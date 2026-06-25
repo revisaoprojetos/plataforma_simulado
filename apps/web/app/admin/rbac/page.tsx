@@ -1,0 +1,119 @@
+import { createServiceClient } from '@/lib/supabase/server'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { RbacMatrix } from '@/components/admin/rbac-matrix'
+import { AlertTriangle } from 'lucide-react'
+
+async function getRbacData(tenantId: string) {
+  const supabase = await createServiceClient()
+
+  try {
+    const [rolesRes, permsRes, rpRes] = await Promise.all([
+      supabase
+        .from('roles')
+        .select('id, nome, descricao, is_sistema')
+        .or(`tenant_id.eq.${tenantId},is_sistema.eq.true`)
+        .order('is_sistema', { ascending: false })
+        .order('nome'),
+      supabase
+        .from('permissions')
+        .select('id, resource, action')
+        .order('resource')
+        .order('action'),
+      supabase.from('role_permissions').select('role_id, permission_id'),
+    ])
+
+    // If tables don't exist, Supabase returns an error code
+    if (rolesRes.error?.message?.includes('does not exist')) {
+      return null
+    }
+
+    const matrix: Record<string, Set<string>> = {}
+    for (const row of rpRes.data ?? []) {
+      if (!matrix[row.role_id]) matrix[row.role_id] = new Set()
+      matrix[row.role_id].add(row.permission_id)
+    }
+
+    return {
+      roles: rolesRes.data ?? [],
+      permissions: permsRes.data ?? [],
+      matrix: Object.fromEntries(
+        Object.entries(matrix).map(([k, v]) => [k, Array.from(v)]),
+      ),
+    }
+  } catch {
+    return null
+  }
+}
+
+export default async function RbacPage() {
+  const supabase = await createServiceClient()
+
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('id')
+    .limit(1)
+    .single()
+
+  if (!tenant) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">RBAC</h1>
+        <p className="text-muted-foreground">Tenant não encontrado.</p>
+      </div>
+    )
+  }
+
+  const data = await getRbacData(tenant.id)
+
+  const byResource = data
+    ? data.permissions.reduce<Record<string, typeof data.permissions>>(
+        (acc, p) => {
+          if (!acc[p.resource]) acc[p.resource] = []
+          acc[p.resource].push(p)
+          return acc
+        },
+        {},
+      )
+    : {}
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Controle de Acesso (RBAC)</h1>
+        <p className="text-muted-foreground">
+          Gerencie permissões por perfil. Marque os módulos que cada perfil pode acessar.
+        </p>
+      </div>
+
+      {!data && (
+        <div className="flex gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/20 dark:text-yellow-300">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            As tabelas de RBAC ainda não foram criadas no banco. Execute a migration{' '}
+            <code className="font-mono text-xs">20260625000003_add_rbac_tables.sql</code> no Supabase.
+          </span>
+        </div>
+      )}
+
+      {data && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Matriz de Permissões</CardTitle>
+            <CardDescription>
+              Cada coluna é um perfil. Cada linha é uma permissão. Clique para ativar/desativar.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <RbacMatrix
+              roles={data.roles}
+              permissions={data.permissions}
+              byResource={byResource}
+              initialMatrix={data.matrix}
+              tenantId={tenant.id}
+            />
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}

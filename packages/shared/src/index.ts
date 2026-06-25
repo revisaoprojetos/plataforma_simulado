@@ -1,0 +1,7 @@
+export * from './types/tenant'
+export * from './types/user'
+export * from './types/questao'
+export * from './types/simulado'
+export * from './schemas/auth'
+export * from './schemas/questao'
+export * from './schemas/simulado'

@@ -1,0 +1,1 @@
+ALTER TABLE public.sessoes_prova ADD COLUMN IF NOT EXISTS ultima_questao_idx integer NOT NULL DEFAULT 0;

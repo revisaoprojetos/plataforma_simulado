@@ -1,0 +1,25 @@
+{
+  "name": "mentoria-v2",
+  "private": true,
+  "version": "0.0.1",
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "clean": "turbo clean && find . -name 'node_modules' -type d -prune -exec rm -rf '{}' + 2>/dev/null; true",
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter api dev",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\" --ignore-path .gitignore"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "prettier": "^3.4.2",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

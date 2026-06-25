@@ -1,0 +1,13 @@
+node_modules
+.output
+.vercel
+.tanstack
+.nitro
+.vinxi
+dist
+dist-ssr
+*.log
+.env
+.env.*
+.git
+.claude
