@@ -20,14 +20,14 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
     { data: alternativas },
   ] = await Promise.all([
     supabase
-      .from('questoes')
-      .select('*')
+      .from('simulado_questoes')
+      .select('*, bancas:simulado_bancas(nome), disciplinas:simulado_disciplinas(nome)')
       .eq('id', id)
       .single(),
-    supabase.from('bancas').select('id, nome').order('nome'),
-    supabase.from('disciplinas').select('id, nome').order('nome'),
+    supabase.from('simulado_bancas').select('nome').order('nome'),
+    supabase.from('simulado_disciplinas').select('nome').order('nome'),
     supabase
-      .from('alternativas')
+      .from('simulado_alternativas')
       .select('*')
       .eq('questao_id', id)
       .order('ordem'),
@@ -37,16 +37,19 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
     notFound()
   }
 
+  const bancasSugestoes = (bancas ?? []).map((b) => b.nome)
+  const disciplinasSugestoes = (disciplinas ?? []).map((d) => d.nome)
+
   const initialData = {
     tipo: questao.tipo as 'objetiva' | 'discursiva',
     enunciado: questao.enunciado,
-    banca_id: questao.banca_id ?? undefined,
-    disciplina_id: questao.disciplina_id ?? undefined,
+    banca: (questao.bancas as { nome?: string } | null)?.nome ?? undefined,
+    disciplina: (questao.disciplinas as { nome?: string } | null)?.nome ?? undefined,
     ano: questao.ano ?? undefined,
-    nivel_dificuldade: questao.nivel_dificuldade as any,
-    gabarito_tipo: questao.gabarito_tipo as any,
+    nivel_dificuldade: (questao.nivel_dificuldade ?? undefined) as 'facil' | 'medio' | 'dificil' | undefined,
+    gabarito_tipo: (questao.gabarito_tipo ?? undefined) as 'oficial' | 'extraoficial' | undefined,
     comentario_professor: questao.comentario_professor ?? undefined,
-    status: questao.status as any,
+    status: (questao.status ?? 'rascunho') as 'rascunho' | 'publicada' | 'arquivada',
     alternativas: alternativas?.map((a) => ({
       texto: a.texto,
       correta: a.correta,
@@ -70,9 +73,9 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
 
       <QuestaoForm
         initialData={initialData}
-        bancas={bancas ?? []}
-        disciplinas={disciplinas ?? []}
-        onSubmit={(data) => updateQuestaoAction(id, data)}
+        bancasSugestoes={bancasSugestoes}
+        disciplinasSugestoes={disciplinasSugestoes}
+        onSubmit={updateQuestaoAction.bind(null, id)}
       />
     </div>
   )

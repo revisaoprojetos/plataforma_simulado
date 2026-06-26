@@ -39,7 +39,7 @@ export function QuestoesFilters() {
         className="max-w-xs"
       />
       <Select
-        defaultValue={searchParams.get('status') ?? ''}
+        defaultValue={searchParams.get('status') ?? 'all'}
         onValueChange={(v) => updateParams('status', v === 'all' ? '' : (v ?? ''))}
       >
         <SelectTrigger className="w-[160px]">

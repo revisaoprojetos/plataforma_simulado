@@ -25,8 +25,22 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
+interface Contato {
+  whatsapp?: string | null
+  email_suporte?: string | null
+  telefone?: string | null
+  link_ajuda?: string | null
+  horario_atendimento?: string | null
+}
+
+interface ErroBloqueio {
+  titulo?: string
+  message: string
+  contato?: Contato | null
+}
+
 export function EmbedLoginForm({ token, metodo, simuladoTitulo }: EmbedLoginFormProps) {
-  const [erro, setErro] = useState<string | null>(null)
+  const [erro, setErro] = useState<ErroBloqueio | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   const {
@@ -56,15 +70,19 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo }: EmbedLoginForm
       })
 
       if (!res.ok) {
-        const json = await res.json().catch(() => ({}))
-        setErro((json as { message?: string }).message ?? 'Acesso negado. Verifique seus dados.')
+        const json = (await res.json().catch(() => ({}))) as ErroBloqueio
+        setErro({
+          titulo: json.titulo,
+          message: json.message ?? 'Acesso negado. Verifique seus dados.',
+          contato: json.contato,
+        })
         return
       }
 
       const { sessao_id } = await res.json()
       window.location.href = `/embed/simulado/${token}?sessao_id=${sessao_id}`
     } catch {
-      setErro('Erro ao verificar identidade. Tente novamente.')
+      setErro({ message: 'Erro ao verificar identidade. Tente novamente.' })
     } finally {
       setIsLoading(false)
     }
@@ -140,7 +158,23 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo }: EmbedLoginForm
             {erro && (
               <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3 text-xs text-destructive">
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span>{erro}</span>
+                <div className="space-y-1">
+                  {erro.titulo && <p className="font-semibold">{erro.titulo}</p>}
+                  <p>{erro.message}</p>
+                  {erro.contato && (erro.contato.whatsapp || erro.contato.email_suporte || erro.contato.telefone || erro.contato.link_ajuda) && (
+                    <div className="pt-1 text-[11px] opacity-90">
+                      <span className="font-medium">Contato: </span>
+                      {[
+                        erro.contato.whatsapp && `WhatsApp ${erro.contato.whatsapp}`,
+                        erro.contato.email_suporte,
+                        erro.contato.telefone,
+                      ].filter(Boolean).join(' · ')}
+                      {erro.contato.horario_atendimento && (
+                        <span className="block opacity-75">{erro.contato.horario_atendimento}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

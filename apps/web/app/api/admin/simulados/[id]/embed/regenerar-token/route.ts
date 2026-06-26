@@ -22,7 +22,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
 
   const service = await createServiceClient()
   const { error } = await service
-    .from('simulados')
+    .from('simulado_simulados')
     .update({ embed_token: newToken })
     .eq('id', id)
 

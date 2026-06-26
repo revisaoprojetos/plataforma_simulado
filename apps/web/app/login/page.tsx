@@ -56,6 +56,9 @@ function LoginForm() {
       return
     }
 
+    // Auditoria de login (fire-and-forget via API; nunca bloqueia o login).
+    void fetch('/api/audit/login', { method: 'POST' }).catch(() => {})
+
     router.push('/admin')
     router.refresh()
   }

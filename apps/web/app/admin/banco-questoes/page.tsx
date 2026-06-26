@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -35,18 +35,18 @@ export default async function BancoQuestoesPage({ searchParams }: PageProps) {
   const supabase = await createClient()
 
   const [{ data: bancas }, { data: disciplinas }] = await Promise.all([
-    supabase.from('bancas').select('id, nome').order('nome'),
-    supabase.from('disciplinas').select('id, nome').order('nome'),
+    supabase.from('simulado_bancas').select('id, nome').order('nome'),
+    supabase.from('simulado_disciplinas').select('id, nome').order('nome'),
   ])
 
   let query = supabase
-    .from('questoes')
+    .from('simulado_questoes')
     .select(`
       id, enunciado, tipo, nivel_dificuldade, ano, status,
-      bancas(id, nome),
-      orgaos(id, nome),
-      disciplinas(id, nome),
-      assuntos(id, nome)
+      bancas:simulado_bancas(id, nome),
+      orgaos:simulado_orgaos(id, nome),
+      disciplinas:simulado_disciplinas(id, nome),
+      assuntos:simulado_assuntos(id, nome)
     `)
     .eq('status', 'publicada')
     .order('criado_em', { ascending: false })
@@ -76,10 +76,10 @@ export default async function BancoQuestoesPage({ searchParams }: PageProps) {
             Explore, filtre e gerencie todas as questões publicadas
           </p>
         </div>
-        <Button render={<Link href="/admin/questoes/nova" />}>
+        <Link href="/admin/questoes/nova" className={buttonVariants()}>
           <Plus className="mr-2 h-4 w-4" />
           Nova Questão
-        </Button>
+        </Link>
       </div>
 
       {/* Filters sidebar layout */}
@@ -139,10 +139,10 @@ export default async function BancoQuestoesPage({ searchParams }: PageProps) {
 
                     {/* Actions */}
                     <div className="mt-3 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Button variant="outline" size="sm" render={<Link href={`/admin/questoes/${q.id}/editar`} />}>
+                      <Link href={`/admin/questoes/${q.id}/editar`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
                         <Pencil className="mr-1.5 h-3 w-3" />
                         Editar
-                      </Button>
+                      </Link>
                       <Button variant="ghost" size="icon-sm" title="Favoritar">
                         <Star className="h-3.5 w-3.5" />
                       </Button>

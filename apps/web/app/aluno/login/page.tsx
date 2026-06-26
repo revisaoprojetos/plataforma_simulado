@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,7 +14,6 @@ import { BookOpen, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 type MetodoIdentificacao = 'email' | 'email_cpf' | 'email_telefone'
-const metodo: MetodoIdentificacao = 'email_cpf'
 
 const loginSchema = z.object({
   email: z.string().email('E-mail inválido'),
@@ -29,6 +28,9 @@ function AlunoLoginForm() {
   const searchParams = useSearchParams()
   const simuladoToken = searchParams.get('token')
   const [isLoading, setIsLoading] = useState(false)
+  // Método resolvido a partir do simulado (não mais fixo no código).
+  const [metodo, setMetodo] = useState<MetodoIdentificacao>('email')
+  const [carregandoInfo, setCarregandoInfo] = useState(true)
 
   const {
     register,
@@ -38,7 +40,37 @@ function AlunoLoginForm() {
     resolver: zodResolver(loginSchema),
   })
 
+  useEffect(() => {
+    if (!simuladoToken) {
+      setCarregandoInfo(false)
+      return
+    }
+    let ativo = true
+    fetch(`/api/simulado/info?token=${simuladoToken}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((info) => {
+        if (ativo && info?.metodo_identificacao) {
+          setMetodo(info.metodo_identificacao as MetodoIdentificacao)
+        }
+      })
+      .catch(() => {})
+      .finally(() => ativo && setCarregandoInfo(false))
+    return () => {
+      ativo = false
+    }
+  }, [simuladoToken])
+
   async function onSubmit(data: FormData) {
+    // Validação client conforme o método exigido pelo simulado.
+    if (metodo === 'email_cpf' && !data.cpf?.trim()) {
+      toast.error('Informe seu CPF.')
+      return
+    }
+    if (metodo === 'email_telefone' && !data.telefone?.trim()) {
+      toast.error('Informe seu telefone.')
+      return
+    }
+
     setIsLoading(true)
     try {
       const res = await fetch('/api/auth/embed/identify', {
@@ -53,8 +85,14 @@ function AlunoLoginForm() {
       })
 
       if (!res.ok) {
-        const err = await res.json()
-        toast.error(err.message ?? 'Acesso negado. Verifique seus dados.')
+        const err = await res.json().catch(() => ({}))
+        const c = err.contato
+        const contatoStr = c
+          ? [c.whatsapp && `WhatsApp ${c.whatsapp}`, c.email_suporte, c.telefone].filter(Boolean).join(' · ')
+          : ''
+        toast.error(err.titulo ?? 'Acesso negado', {
+          description: [err.message, contatoStr && `Contato: ${contatoStr}`].filter(Boolean).join('\n'),
+        })
         return
       }
 
@@ -67,8 +105,20 @@ function AlunoLoginForm() {
     }
   }
 
+  if (carregandoInfo) {
+    return <div className="h-48 animate-pulse rounded bg-muted" />
+  }
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        {metodo === 'email'
+          ? 'Informe seu e-mail cadastrado.'
+          : metodo === 'email_cpf'
+          ? 'Informe seu e-mail e CPF.'
+          : 'Informe seu e-mail e telefone.'}
+      </p>
+
       <div className="space-y-2">
         <Label htmlFor="email">E-mail</Label>
         <Input
@@ -93,9 +143,6 @@ function AlunoLoginForm() {
             {...register('cpf')}
             aria-invalid={!!errors.cpf}
           />
-          {errors.cpf && (
-            <p className="text-sm text-destructive">{errors.cpf.message}</p>
-          )}
         </div>
       )}
 
@@ -108,9 +155,6 @@ function AlunoLoginForm() {
             {...register('telefone')}
             aria-invalid={!!errors.telefone}
           />
-          {errors.telefone && (
-            <p className="text-sm text-destructive">{errors.telefone.message}</p>
-          )}
         </div>
       )}
 
@@ -146,11 +190,7 @@ export default function AlunoLoginPage() {
           <CardHeader>
             <CardTitle className="text-lg">Identificação</CardTitle>
             <CardDescription>
-              {metodo === 'email'
-                ? 'Informe seu e-mail cadastrado.'
-                : metodo === 'email_cpf'
-                ? 'Informe seu e-mail e CPF.'
-                : 'Informe seu e-mail e telefone.'}
+              Seus dados são validados contra o cadastro da plataforma.
             </CardDescription>
           </CardHeader>
           <CardContent>

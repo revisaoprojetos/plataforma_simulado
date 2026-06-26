@@ -43,14 +43,14 @@ export function AdminHeader({ userName, userEmail }: AdminHeaderProps) {
           </Avatar>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel className="font-normal">
+          <div className="px-2 py-1.5">
             <div className="flex flex-col space-y-1">
               <p className="text-sm font-medium leading-none">{userName}</p>
               <p className="text-xs leading-none text-muted-foreground">
                 {userEmail}
               </p>
             </div>
-          </DropdownMenuLabel>
+          </div>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="cursor-pointer"

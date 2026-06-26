@@ -38,7 +38,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   // If enabling embed and there's no token yet, generate one
   if (body.embed_ativo === true) {
     const { data: sim } = await service
-      .from('simulados')
+      .from('simulado_simulados')
       .select('embed_token')
       .eq('id', id)
       .single()
@@ -49,7 +49,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   const { error } = await service
-    .from('simulados')
+    .from('simulado_simulados')
     .update(updateData)
     .eq('id', id)
 

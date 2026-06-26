@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getTenantMensagem, getTenantContato, type TenantContato } from '@/lib/tenant-messages'
+import { rateLimit } from '@/lib/rate-limit'
 
 interface RequestBody {
   embed_token?: string
@@ -7,6 +9,32 @@ interface RequestBody {
   email: string
   cpf?: string
   telefone?: string
+}
+
+/** Monta um texto curto de contato a partir dos canais do tenant. */
+function formatarContato(c: TenantContato): string {
+  if (c.whatsapp) return `WhatsApp ${c.whatsapp}`
+  if (c.email_suporte) return c.email_suporte
+  if (c.telefone) return c.telefone
+  if (c.link_ajuda) return c.link_ajuda
+  return 'o suporte'
+}
+
+/**
+ * Resposta de bloqueio personalizada pelo tenant (mensagem + variáveis + contato).
+ * Retorna { titulo, message, contato } com status 403.
+ */
+async function bloqueio(
+  tenantId: string,
+  chave: string,
+  vars: Record<string, string>,
+) {
+  const contato = await getTenantContato(tenantId)
+  const msg = await getTenantMensagem(chave, { contato: formatarContato(contato), ...vars }, tenantId)
+  return NextResponse.json(
+    { titulo: msg.titulo, message: msg.corpo, contato },
+    { status: 403 },
+  )
 }
 
 export async function POST(request: NextRequest) {
@@ -26,11 +54,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Dados obrigatórios ausentes.' }, { status: 400 })
   }
 
+  // Rate-limit: protege o 2º fator (CPF/telefone) contra brute-force.
+  // Por IP+simulado (8 tentativas / 5 min) e por e-mail+simulado (5 / 5 min).
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || request.headers.get('x-real-ip') || 'unknown'
+  const janela = 5 * 60 * 1000
+  const rlIp = rateLimit(`identify:ip:${ip}:${embed_token}`, 8, janela)
+  const rlEmail = rateLimit(`identify:email:${email.toLowerCase().trim()}:${embed_token}`, 5, janela)
+  if (!rlIp.ok || !rlEmail.ok) {
+    const retry = Math.max(rlIp.retryAfter, rlEmail.retryAfter)
+    return NextResponse.json(
+      { titulo: 'Muitas tentativas', message: `Você excedeu o limite de tentativas. Aguarde ${retry}s e tente novamente.` },
+      { status: 429, headers: { 'Retry-After': String(retry) } },
+    )
+  }
+
   const supabase = await createServiceClient()
 
   // 1. Buscar simulado por embed_token
   const { data: simulado, error: simError } = await supabase
-    .from('simulados')
+    .from('simulado_simulados')
     .select('id, titulo, status, metodo_identificacao, embed_ativo, tenant_id, data_inicio, data_fim, tempo_limite_min')
     .eq('embed_token', embed_token)
     .single()
@@ -39,50 +82,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Simulado não encontrado.' }, { status: 404 })
   }
 
-  if (!simulado.embed_ativo) {
-    return NextResponse.json({ message: 'Embed não habilitado para este simulado.' }, { status: 403 })
-  }
+  const tenantId = simulado.tenant_id as string
+  const tituloSimulado = (simulado.titulo as string) ?? ''
 
   if (simulado.status !== 'publicado' && simulado.status !== 'ativo') {
-    return NextResponse.json({ message: 'Este simulado não está disponível no momento.' }, { status: 403 })
+    return bloqueio(tenantId, 'bloqueio_fora_janela', { simulado: tituloSimulado })
   }
 
   // Verificar janela temporal se aplicável
   const agora = new Date()
   if (simulado.data_inicio && new Date(simulado.data_inicio) > agora) {
-    return NextResponse.json({ message: 'Este simulado ainda não foi iniciado.' }, { status: 403 })
+    return bloqueio(tenantId, 'bloqueio_fora_janela', { simulado: tituloSimulado })
   }
   if (simulado.data_fim && new Date(simulado.data_fim) < agora) {
-    return NextResponse.json({ message: 'O período de realização deste simulado encerrou.' }, { status: 403 })
+    return bloqueio(tenantId, 'bloqueio_prazo_expirado', { simulado: tituloSimulado })
   }
 
-  // 2. Buscar estudante por email (+ cpf ou telefone conforme metodo)
-  const metodo = (simulado.metodo_identificacao as string) ?? 'email_cpf'
+  // 2. Buscar estudante por email no tenant do simulado
+  const metodo = (simulado.metodo_identificacao as string) ?? 'email'
 
-  let estudanteQuery = supabase
-    .from('estudantes')
+  const { data: estudante } = await supabase
+    .from('simulado_estudantes')
     .select('id, nome, user_id, cpf, telefone')
     .eq('tenant_id', simulado.tenant_id)
-
-  // Join via users table for email
-  const { data: users } = await supabase
-    .from('users')
-    .select('id')
-    .eq('email', email.toLowerCase().trim())
-    .limit(1)
-
-  if (!users || users.length === 0) {
-    return NextResponse.json({ message: 'Identidade não encontrada. Verifique seus dados.' }, { status: 403 })
-  }
-
-  const userId = users[0].id
-
-  const { data: estudante } = await estudanteQuery
-    .eq('user_id', userId)
-    .single()
+    .ilike('email', email.toLowerCase().trim())
+    .maybeSingle()
 
   if (!estudante) {
-    return NextResponse.json({ message: 'Identidade não encontrada. Verifique seus dados.' }, { status: 403 })
+    return bloqueio(tenantId, 'bloqueio_identidade', { simulado: tituloSimulado })
   }
 
   // Validar segundo fator conforme metodo
@@ -93,7 +120,7 @@ export async function POST(request: NextRequest) {
     const cpfNorm = cpf.replace(/\D/g, '')
     const estudanteCpfNorm = (estudante.cpf as string | null)?.replace(/\D/g, '') ?? ''
     if (cpfNorm !== estudanteCpfNorm) {
-      return NextResponse.json({ message: 'Identidade não encontrada. Verifique seus dados.' }, { status: 403 })
+      return bloqueio(tenantId, 'bloqueio_identidade', { nome: estudante.nome ?? '', simulado: tituloSimulado })
     }
   } else if (metodo === 'email_telefone') {
     if (!telefone) {
@@ -102,21 +129,19 @@ export async function POST(request: NextRequest) {
     const telNorm = telefone.replace(/\D/g, '')
     const estudanteTelNorm = (estudante.telefone as string | null)?.replace(/\D/g, '') ?? ''
     if (telNorm !== estudanteTelNorm) {
-      return NextResponse.json({ message: 'Identidade não encontrada. Verifique seus dados.' }, { status: 403 })
+      return bloqueio(tenantId, 'bloqueio_identidade', { nome: estudante.nome ?? '', simulado: tituloSimulado })
     }
   }
 
-  // 3. Verificar matrícula ativa OU acesso avulso
+  // 3. Verificar matrícula ativa para este simulado
   const temAcesso = await verificarAcesso(supabase, estudante.id, simulado.id)
   if (!temAcesso) {
-    return NextResponse.json({
-      message: 'Você não tem matrícula ativa ou acesso a este simulado. Entre em contato com o suporte.',
-    }, { status: 403 })
+    return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
   }
 
   // 4. Abrir ou retomar sessao_prova
   const { data: sessaoExistente } = await supabase
-    .from('sessoes_prova')
+    .from('simulado_sessoes_prova')
     .select('id, status')
     .eq('simulado_id', simulado.id)
     .eq('estudante_id', estudante.id)
@@ -132,8 +157,9 @@ export async function POST(request: NextRequest) {
     sessaoId = sessaoExistente.id
   } else {
     const { data: novaSessao, error: sessaoError } = await supabase
-      .from('sessoes_prova')
+      .from('simulado_sessoes_prova')
       .insert({
+        tenant_id: simulado.tenant_id,
         simulado_id: simulado.id,
         estudante_id: estudante.id,
         is_teste: false,
@@ -164,33 +190,16 @@ async function verificarAcesso(
   estudanteId: string,
   simuladoId: string
 ): Promise<boolean> {
-  // Verificar matrícula ativa
+  // Matrícula ativa e liberada para este simulado.
   const { data: matricula } = await supabase
-    .from('matriculas')
-    .select('id')
+    .from('simulado_matriculas')
+    .select('id, liberado, status')
     .eq('estudante_id', estudanteId)
-    .eq('status', 'ativa')
-    .limit(1)
-    .single()
-
-  if (matricula) return true
-
-  // Verificar acesso avulso (simulado_acessos)
-  const agora = new Date().toISOString()
-  const { data: acesso } = await supabase
-    .from('simulado_acessos')
-    .select('id, tentativas_permitidas, tentativas_usadas')
     .eq('simulado_id', simuladoId)
-    .eq('estudante_id', estudanteId)
-    .or(`expira_em.is.null,expira_em.gt.${agora}`)
-    .limit(1)
-    .single()
+    .maybeSingle()
 
-  if (!acesso) return false
-
-  const permitidas = acesso.tentativas_permitidas ?? null
-  const usadas = acesso.tentativas_usadas ?? 0
-  if (permitidas !== null && usadas >= permitidas) return false
-
+  if (!matricula) return false
+  if (matricula.status && matricula.status !== 'ativa') return false
+  if (matricula.liberado === false) return false
   return true
 }

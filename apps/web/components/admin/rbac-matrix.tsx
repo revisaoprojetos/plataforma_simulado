@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, Fragment } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { saveRolePermissions } from '@/app/admin/rbac/actions'
@@ -102,8 +102,8 @@ export function RbacMatrix({ roles, permissions, byResource, initialMatrix, tena
         </thead>
         <tbody>
           {resources.map((resource) => (
-            <>
-              <tr key={`header-${resource}`} className="bg-muted/20">
+            <Fragment key={resource}>
+              <tr className="bg-muted/20">
                 <td
                   colSpan={roles.length + 1}
                   className="sticky left-0 px-4 py-2 font-semibold text-xs uppercase tracking-wide text-muted-foreground"
@@ -138,7 +138,7 @@ export function RbacMatrix({ roles, permissions, byResource, initialMatrix, tena
                   })}
                 </tr>
               ))}
-            </>
+            </Fragment>
           ))}
         </tbody>
       </table>

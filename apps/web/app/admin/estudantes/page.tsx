@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Table,
@@ -22,10 +23,12 @@ const classificacaoConfig: Record<string, { label: string; variant: 'default' | 
 
 export default async function EstudantesPage() {
   const supabase = await createServiceClient()
+  const tenantId = await getCurrentTenantId()
 
   const { data: estudantes } = await supabase
-    .from('estudantes')
+    .from('simulado_estudantes')
     .select('id, nome, email, cpf, telefone, classificacao, matricula_externa, created_at')
+    .eq('tenant_id', tenantId ?? '')
     .order('created_at', { ascending: false })
     .limit(100)
 
@@ -48,10 +51,10 @@ export default async function EstudantesPage() {
             <Upload className="mr-2 h-4 w-4" />
             Importar CSV
           </Button>
-          <Button render={<Link href="/admin/estudantes/novo" />}>
+          <Link href="/admin/estudantes/novo" className={buttonVariants()}>
             <Plus className="mr-2 h-4 w-4" />
             Novo Estudante
-          </Button>
+          </Link>
         </div>
       </div>
 

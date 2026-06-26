@@ -1,13 +1,15 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { NovaMatriculaForm } from '@/components/admin/nova-matricula-form'
 
 export default async function NovaMatriculaPage() {
   const supabase = await createServiceClient()
+  const tenantId = await getCurrentTenantId()
 
   const [{ data: estudantes }, { data: simulados }] = await Promise.all([
-    supabase.from('estudantes').select('id, nome, email').order('nome').limit(500),
-    supabase.from('simulados').select('id, titulo').order('titulo').limit(200),
+    supabase.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tenantId ?? '').order('nome').limit(500),
+    supabase.from('simulado_simulados').select('id, titulo').eq('tenant_id', tenantId ?? '').order('titulo').limit(200),
   ])
 
   return (

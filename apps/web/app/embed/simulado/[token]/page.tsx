@@ -77,7 +77,7 @@ async function fetchSimuladoPorToken(embedToken: string): Promise<{
   try {
     const supabase = await createServiceClient()
     const { data } = await supabase
-      .from('simulados')
+      .from('simulado_simulados')
       .select('id, titulo, embed_ativo, metodo_identificacao')
       .eq('embed_token', embedToken)
       .single()

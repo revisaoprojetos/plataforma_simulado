@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
 
 export interface TenantMensagem {
   id: string
@@ -38,12 +39,15 @@ export function renderMessage(template: string, vars: Record<string, string>): s
 export async function getTenantMensagem(
   chave: string,
   vars: Record<string, string> = {},
+  tenantId?: string,
 ): Promise<{ titulo: string; corpo: string }> {
   try {
+    const tid = tenantId ?? (await getCurrentTenantId())
     const supabase = await createServiceClient()
     const { data, error } = await supabase
-      .from('tenant_mensagens')
+      .from('simulado_tenant_mensagens')
       .select('titulo, corpo')
+      .eq('tenant_id', tid ?? '')
       .eq('chave', chave)
       .eq('ativo', true)
       .single()
@@ -69,12 +73,14 @@ export async function getTenantMensagem(
   }
 }
 
-export async function getTenantContato(): Promise<TenantContato> {
+export async function getTenantContato(tenantId?: string): Promise<TenantContato> {
   try {
+    const tid = tenantId ?? (await getCurrentTenantId())
     const supabase = await createServiceClient()
     const { data, error } = await supabase
-      .from('tenant_contatos')
+      .from('simulado_tenant_contatos')
       .select('*')
+      .eq('tenant_id', tid ?? '')
       .limit(1)
       .single()
 
@@ -85,15 +91,17 @@ export async function getTenantContato(): Promise<TenantContato> {
   }
 }
 
-export async function getAllTenantMensagens(): Promise<TenantMensagem[]> {
+export async function getAllTenantMensagens(tenantId?: string): Promise<TenantMensagem[]> {
   try {
+    const tid = tenantId ?? (await getCurrentTenantId())
     const supabase = await createServiceClient()
     const { data, error } = await supabase
-      .from('tenant_mensagens')
+      .from('simulado_tenant_mensagens')
       .select('*')
+      .eq('tenant_id', tid ?? '')
       .order('chave')
 
-    if (error || !data) return buildDefaultList()
+    if (error || !data || data.length === 0) return buildDefaultList()
     return data as TenantMensagem[]
   } catch {
     return buildDefaultList()

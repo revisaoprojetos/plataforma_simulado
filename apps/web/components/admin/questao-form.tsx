@@ -29,11 +29,11 @@ const alternativaSchema = z.object({
 const questaoSchema = z.object({
   tipo: z.enum(['objetiva', 'discursiva']),
   enunciado: z.string().min(10, 'Enunciado deve ter ao menos 10 caracteres'),
-  banca_id: z.string().optional(),
-  orgao_id: z.string().optional(),
+  banca: z.string().optional(),
+  orgao: z.string().optional(),
   ano: z.coerce.number().optional(),
-  disciplina_id: z.string().optional(),
-  assunto_id: z.string().optional(),
+  disciplina: z.string().optional(),
+  assunto: z.string().optional(),
   nivel_dificuldade: z.enum(['facil', 'medio', 'dificil']).optional(),
   gabarito_tipo: z.enum(['oficial', 'extraoficial']).optional(),
   comentario_professor: z.string().optional(),
@@ -43,21 +43,17 @@ const questaoSchema = z.object({
 
 export type QuestaoFormData = z.infer<typeof questaoSchema>
 
-interface SelectOption {
-  id: string
-  nome: string
-}
-
 interface QuestaoFormProps {
   initialData?: Partial<QuestaoFormData>
-  bancas?: SelectOption[]
-  disciplinas?: SelectOption[]
+  /** Sugestões (nomes já cadastrados) para autocomplete — não são uma base fixa. */
+  bancasSugestoes?: string[]
+  disciplinasSugestoes?: string[]
   onSubmit: (data: QuestaoFormData) => Promise<{ error?: string } | void>
 }
 
 const LETRA = ['A', 'B', 'C', 'D', 'E']
 
-export function QuestaoForm({ initialData, bancas = [], disciplinas = [], onSubmit }: QuestaoFormProps) {
+export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSugestoes = [], onSubmit }: QuestaoFormProps) {
   const [isLoading, setIsLoading] = useState(false)
 
   const {
@@ -104,7 +100,11 @@ export function QuestaoForm({ initialData, bancas = [], disciplinas = [], onSubm
       if (result?.error) {
         toast.error(result.error)
       }
-    } catch {
+    } catch (e) {
+      // redirect() em server action lança NEXT_REDIRECT — deixar o Next navegar.
+      if (e && typeof e === 'object' && 'digest' in e && String((e as { digest?: string }).digest).startsWith('NEXT_REDIRECT')) {
+        throw e
+      }
       toast.error('Erro ao salvar questão')
     } finally {
       setIsLoading(false)
@@ -175,20 +175,18 @@ export function QuestaoForm({ initialData, bancas = [], disciplinas = [], onSubm
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2">
-            <Label>Banca</Label>
-            <Select
-              defaultValue={initialData?.banca_id ?? ''}
-              onValueChange={(v) => setValue('banca_id', v ?? undefined)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a banca" />
-              </SelectTrigger>
-              <SelectContent>
-                {bancas.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>{b.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="banca">Banca</Label>
+            <Input
+              id="banca"
+              list="bancas-sugestoes"
+              placeholder="Digite ou selecione"
+              {...register('banca')}
+            />
+            <datalist id="bancas-sugestoes">
+              {bancasSugestoes.map((nome) => (
+                <option key={nome} value={nome} />
+              ))}
+            </datalist>
           </div>
 
           <div className="space-y-2">
@@ -202,20 +200,18 @@ export function QuestaoForm({ initialData, bancas = [], disciplinas = [], onSubm
           </div>
 
           <div className="space-y-2">
-            <Label>Disciplina</Label>
-            <Select
-              defaultValue={initialData?.disciplina_id ?? ''}
-              onValueChange={(v) => setValue('disciplina_id', v ?? undefined)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a disciplina" />
-              </SelectTrigger>
-              <SelectContent>
-                {disciplinas.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>{d.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="disciplina">Disciplina</Label>
+            <Input
+              id="disciplina"
+              list="disciplinas-sugestoes"
+              placeholder="Digite ou selecione"
+              {...register('disciplina')}
+            />
+            <datalist id="disciplinas-sugestoes">
+              {disciplinasSugestoes.map((nome) => (
+                <option key={nome} value={nome} />
+              ))}
+            </datalist>
           </div>
 
           <div className="space-y-2">

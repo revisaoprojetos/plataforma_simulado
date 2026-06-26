@@ -13,11 +13,11 @@ export async function GET() {
     const service = await createServiceClient()
 
     // Load user roles for this tenant (first tenant by default)
-    const { data: tenant } = await service.from('tenants').select('id').limit(1).single()
+    const { data: tenant } = await service.from('simulado_tenants').select('id').limit(1).single()
     if (!tenant) return NextResponse.json({ permissions: [] })
 
     const { data: userRoles } = await service
-      .from('user_roles')
+      .from('simulado_user_roles')
       .select('role_id, roles(nome)')
       .eq('user_id', user.id)
       .eq('tenant_id', tenant.id)
@@ -38,7 +38,7 @@ export async function GET() {
 
     const roleIds = userRoles.map((r) => r.role_id)
     const { data: rolePerms } = await service
-      .from('role_permissions')
+      .from('simulado_role_permissions')
       .select('permissions(resource, action)')
       .in('role_id', roleIds)
 

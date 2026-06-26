@@ -3,6 +3,8 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { AdminSidebar } from '@/components/admin/sidebar'
 import { AdminHeader } from '@/components/admin/header'
 import { SidebarProvider } from '@/components/ui/sidebar'
+import { CanProvider } from '@/components/auth/can-provider'
+import { getCurrentAccess } from '@/lib/auth/permissions'
 
 const CURRENT_POLICY_VERSION = '1.0'
 
@@ -20,7 +22,7 @@ export default async function AdminLayout({
   try {
     const serviceClient = await createServiceClient()
     const { data: consentimento, error } = await serviceClient
-      .from('lgpd_consentimentos')
+      .from('simulado_lgpd_consentimentos')
       .select('id')
       .eq('user_id', user.id)
       .eq('versao_politica', CURRENT_POLICY_VERSION)
@@ -40,17 +42,22 @@ export default async function AdminLayout({
   const userName = user.user_metadata?.full_name || user.email || 'Usuário'
   const userEmail = user.email || ''
 
+  // Resolve permissões do usuário no tenant atual (para esconder UI por papel).
+  const access = await getCurrentAccess()
+
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        <AdminSidebar />
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <AdminHeader userName={userName} userEmail={userEmail} />
-          <main className="flex-1 overflow-y-auto p-6">
-            {children}
-          </main>
+    <CanProvider isAdmin={access.isAdmin} permissions={access.permissions}>
+      <SidebarProvider>
+        <div className="flex min-h-screen w-full">
+          <AdminSidebar />
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <AdminHeader userName={userName} userEmail={userEmail} />
+            <main className="flex-1 overflow-y-auto p-6">
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </CanProvider>
   )
 }

@@ -19,6 +19,27 @@ export interface TenantThemeResult {
 }
 
 /**
+ * Sanitiza um valor de cor antes de injetá-lo num <style>. Só aceita formatos
+ * seguros (hex, funções de cor CSS, nome simples) — evita CSS-injection / XSS
+ * via valores como `red; } </style><script>...`.
+ */
+function safeColor(raw?: string): string | null {
+  if (!raw) return null
+  const v = raw.trim()
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) return v
+  if (/^(oklch|oklab|rgb|rgba|hsl|hsla|lab|lch)\([0-9.,%\s/-]+\)$/i.test(v)) return v
+  if (/^[a-zA-Z]{1,20}$/.test(v)) return v
+  return null
+}
+
+/** Sanitiza o nome da fonte (só letras/números/espaço/hífen). */
+function safeFont(raw?: string): string | null {
+  if (!raw) return null
+  const v = raw.trim()
+  return /^[a-zA-Z0-9 -]{1,40}$/.test(v) ? v : null
+}
+
+/**
  * Converts a hex color (#rrggbb / #rgb) to an oklch() CSS string.
  * This is a best-effort approximation via sRGB → linear sRGB → XYZ D65 → Oklab → Oklch.
  * If the input is already an oklch() or other CSS color, it is returned as-is.
@@ -97,7 +118,7 @@ export async function getTenantTheme(): Promise<TenantThemeResult> {
     const supabase = await createServiceClient()
 
     const { data, error } = await supabase
-      .from('tenants')
+      .from('simulado_tenants')
       .select('id, nome, tema')
       .eq('ativo', true)
       .limit(1)
@@ -107,10 +128,16 @@ export async function getTenantTheme(): Promise<TenantThemeResult> {
 
     const tema = (data.tema ?? {}) as TenantTema
 
+    // Sanitiza tudo antes de qualquer injeção em <style>.
+    const corPrimaria = safeColor(tema.cor_primaria)
+    const corSecundaria = safeColor(tema.cor_secundaria)
+    const corAccent = safeColor(tema.cor_accent)
+    const fonte = safeFont(tema.fonte)
+
     const lines: string[] = []
 
-    if (tema.cor_primaria) {
-      const primary = hexToOklch(tema.cor_primaria)
+    if (corPrimaria) {
+      const primary = hexToOklch(corPrimaria)
       const primaryFg = deriveForeground(primary)
       lines.push(`  --primary: ${primary};`)
       lines.push(`  --primary-foreground: ${primaryFg};`)
@@ -119,30 +146,30 @@ export async function getTenantTheme(): Promise<TenantThemeResult> {
       lines.push(`  --ring: ${primary};`)
     }
 
-    if (tema.cor_secundaria) {
-      const secondary = hexToOklch(tema.cor_secundaria)
+    if (corSecundaria) {
+      const secondary = hexToOklch(corSecundaria)
       const secondaryFg = deriveForeground(secondary)
       lines.push(`  --secondary: ${secondary};`)
       lines.push(`  --secondary-foreground: ${secondaryFg};`)
     }
 
-    if (tema.cor_accent) {
-      const accent = hexToOklch(tema.cor_accent)
+    if (corAccent) {
+      const accent = hexToOklch(corAccent)
       const accentFg = deriveForeground(accent)
       lines.push(`  --accent: ${accent};`)
       lines.push(`  --accent-foreground: ${accentFg};`)
     }
 
-    if (tema.fonte) {
-      lines.push(`  --font-sans: "${tema.fonte}", var(--font-plus-jakarta), var(--font-inter), sans-serif;`)
+    if (fonte) {
+      lines.push(`  --font-sans: "${fonte}", var(--font-plus-jakarta), var(--font-inter), sans-serif;`)
     }
 
     // Always expose brand tokens for custom components
-    if (tema.cor_primaria) {
-      lines.push(`  --brand-primary: ${hexToOklch(tema.cor_primaria)};`)
+    if (corPrimaria) {
+      lines.push(`  --brand-primary: ${hexToOklch(corPrimaria)};`)
     }
-    if (tema.cor_secundaria) {
-      lines.push(`  --brand-secondary: ${hexToOklch(tema.cor_secundaria)};`)
+    if (corSecundaria) {
+      lines.push(`  --brand-secondary: ${hexToOklch(corSecundaria)};`)
     }
 
     const css =

@@ -1,5 +1,6 @@
 import { headers } from 'next/headers'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
 import { getTenantTheme } from '@/lib/tenant-theme'
 
 export default async function EmbedLayout({
@@ -85,10 +86,12 @@ async function fetchEmbedConfig(): Promise<{
   }
 
   try {
+    const tenantId = await getCurrentTenantId()
     const supabase = await createServiceClient()
     const { data } = await supabase
-      .from('embed_config')
+      .from('simulado_embed_config')
       .select('ativo, origens_permitidas, metodo_identificacao, otp_email')
+      .eq('tenant_id', tenantId ?? '')
       .limit(1)
       .single()
 

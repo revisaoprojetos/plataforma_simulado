@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -13,12 +12,15 @@ import {
 } from '@/components/ui/table'
 import { SimuladoForm } from '@/components/admin/simulado-form'
 import { SimuladoActions } from '@/components/admin/simulado-actions'
+import { SimuladoQuestoesManager } from '@/components/admin/simulado-questoes-manager'
+import { SimuladoRelatorio } from '@/components/admin/simulado-relatorio'
+import { CopyLink } from '@/components/admin/copy-link'
 import { updateSimuladoAction } from '../actions'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import Link from 'next/link'
-import { ChevronLeft, Code } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { ChevronLeft, Code, Layers, CalendarClock, Clock, KeyRound, Link2 } from 'lucide-react'
+import { buttonVariants } from '@/components/ui/button'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -41,37 +43,95 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
   const supabase = await createClient()
 
   const { data: simulado } = await supabase
-    .from('simulados')
+    .from('simulado_simulados')
     .select('*')
     .eq('id', id)
     .single()
 
   if (!simulado) {
-    notFound()
+    return (
+      <div className="space-y-4">
+        <Link
+          href="/admin/simulados"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Voltar para Simulados
+        </Link>
+        <Card>
+          <CardContent className="py-12 text-center space-y-2">
+            <h2 className="text-lg font-semibold">Simulado não encontrado</h2>
+            <p className="text-sm text-muted-foreground">
+              Este simulado não existe ou foi removido. O link pode estar desatualizado.
+            </p>
+            <Link href="/admin/simulados" className={buttonVariants({ variant: 'outline' }) + ' mt-2'}>
+              Ver todos os simulados
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+
+  const modoLabelMap: Record<string, string> = {
+    janela_fixa: 'Janela fixa',
+    prazo_relativo: 'Prazo relativo',
+    aberto: 'Aberto',
+  }
+  const metodoLabelMap: Record<string, string> = {
+    email: 'Somente e-mail',
+    email_cpf: 'E-mail + CPF',
+    email_telefone: 'E-mail + telefone',
   }
 
   const [
     { data: questoes, count: totalQuestoes },
     { data: sessoes, count: totalSessoes },
+    { data: todasQuestoes },
   ] = await Promise.all([
     supabase
-      .from('simulado_questoes')
+      .from('simulado_prova_questoes')
       .select(`
         id, ordem, peso, anulada,
-        questoes(id, enunciado, disciplinas(nome))
+        questoes:simulado_questoes(id, enunciado, disciplinas:simulado_disciplinas(nome))
       `, { count: 'exact' })
       .eq('simulado_id', id)
       .order('ordem'),
     supabase
-      .from('sessoes_prova')
+      .from('simulado_sessoes_prova')
       .select(`
         id, status, nota, iniciado_em, finalizado_em, is_teste,
-        estudantes(nome, user_id)
+        estudantes:simulado_estudantes(nome, user_id)
       `, { count: 'exact' })
       .eq('simulado_id', id)
       .order('iniciado_em', { ascending: false })
       .limit(50),
+    supabase
+      .from('simulado_questoes')
+      .select('id, enunciado, status, disciplinas:simulado_disciplinas(nome)')
+      .order('created_at', { ascending: false }),
   ])
+
+  const questoesNoSimulado = (questoes ?? []).map((sq: any) => ({
+    id: sq.id,
+    ordem: sq.ordem ?? 0,
+    peso: sq.peso ?? 1,
+    anulada: sq.anulada ?? false,
+    questao_id: sq.questoes?.id,
+    enunciado: sq.questoes?.enunciado ?? '',
+    disciplina: sq.questoes?.disciplinas?.nome,
+  }))
+  const idsNoSimulado = new Set(questoesNoSimulado.map((q) => q.questao_id))
+  const questoesDisponiveis = (todasQuestoes ?? [])
+    .filter((q: any) => !idsNoSimulado.has(q.id))
+    .map((q: any) => ({
+      id: q.id,
+      enunciado: q.enunciado ?? '',
+      status: q.status ?? 'rascunho',
+      disciplina: q.disciplinas?.nome,
+    }))
 
   const sessoesFinalizadas = sessoes?.filter((s) => s.status === 'finalizada') ?? []
   const notaMedia =
@@ -129,12 +189,13 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
             <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
             <TabsTrigger value="questoes">Questões ({totalQuestoes ?? 0})</TabsTrigger>
             <TabsTrigger value="sessoes">Sessões ({totalSessoes ?? 0})</TabsTrigger>
+            <TabsTrigger value="relatorio">Relatório</TabsTrigger>
             <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
           </TabsList>
-          <Button variant="outline" size="sm" render={<Link href={`/admin/simulados/${id}/embed`} />}>
+          <Link href={`/admin/simulados/${id}/embed`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
             <Code className="mr-2 h-3.5 w-3.5" />
             Embed
-          </Button>
+          </Link>
         </div>
 
         {/* Visão Geral */}
@@ -178,28 +239,73 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
 
           <Card>
             <CardHeader>
-              <CardTitle>Detalhes</CardTitle>
+              <CardTitle>Início e Acesso</CardTitle>
+              <CardDescription>
+                Como e quando os alunos realizam este simulado, e o link de acesso.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="grid gap-2 text-sm sm:grid-cols-2">
-                <div>
-                  <span className="text-muted-foreground">Modo: </span>
-                  <span className="font-medium capitalize">{simulado.modo_aplicacao?.replace(/_/g, ' ')}</span>
+            <CardContent className="space-y-5">
+              {/* Informações de aplicação */}
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Layers className="h-3.5 w-3.5" /> Modo de aplicação
+                  </div>
+                  <div className="mt-1 text-sm font-medium">
+                    {modoLabelMap[simulado.modo_aplicacao] ?? simulado.modo_aplicacao}
+                  </div>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Início: </span>
-                  <span className="font-medium">{formatDate(simulado.data_inicio)}</span>
+                <div className="rounded-lg border p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <CalendarClock className="h-3.5 w-3.5" /> Disponibilidade
+                  </div>
+                  <div className="mt-1 text-sm font-medium">
+                    {simulado.modo_aplicacao === 'aberto'
+                      ? 'Sempre disponível'
+                      : simulado.modo_aplicacao === 'prazo_relativo'
+                      ? 'Liberado por aluno após a matrícula'
+                      : simulado.data_inicio || simulado.data_fim
+                      ? `${formatDate(simulado.data_inicio)} → ${formatDate(simulado.data_fim)}`
+                      : 'Janela fixa — defina as datas'}
+                  </div>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Fim: </span>
-                  <span className="font-medium">{formatDate(simulado.data_fim)}</span>
+                <div className="rounded-lg border p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5" /> Tempo limite
+                  </div>
+                  <div className="mt-1 text-sm font-medium">
+                    {simulado.tempo_limite_min ? `${simulado.tempo_limite_min} min` : 'Sem limite'}
+                  </div>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Tempo limite: </span>
-                  <span className="font-medium">
-                    {simulado.tempo_limite_min ? `${simulado.tempo_limite_min} min` : '—'}
-                  </span>
+                <div className="rounded-lg border p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <KeyRound className="h-3.5 w-3.5" /> Identificação
+                  </div>
+                  <div className="mt-1 text-sm font-medium">
+                    {metodoLabelMap[simulado.metodo_identificacao] ?? 'Somente e-mail'}
+                  </div>
                 </div>
+              </div>
+
+              {/* Link de acesso do aluno */}
+              <div className="space-y-2 border-t pt-4">
+                <div className="flex items-center gap-1.5 text-sm font-medium">
+                  <Link2 className="h-4 w-4" /> Link de acesso do aluno
+                </div>
+                {simulado.status !== 'publicado' ? (
+                  <p className="text-sm text-muted-foreground">
+                    Publique o simulado (botão acima) para liberar o link de acesso aos alunos.
+                  </p>
+                ) : simulado.embed_token ? (
+                  <>
+                    <CopyLink url={`${appUrl}/aluno/login?token=${simulado.embed_token}`} />
+                    <p className="text-xs text-muted-foreground">
+                      O aluno entra com {(metodoLabelMap[simulado.metodo_identificacao] ?? 'somente e-mail').toLowerCase()} e precisa ter matrícula ativa neste simulado.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Token de acesso indisponível.</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -211,51 +317,15 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
             <CardHeader>
               <CardTitle>Questões do Simulado</CardTitle>
               <CardDescription>
-                Gerencie as questões incluídas neste simulado
+                Adicione questões do banco (do seu tenant) e gerencie as incluídas neste simulado
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[60px]">Ordem</TableHead>
-                    <TableHead>Enunciado</TableHead>
-                    <TableHead>Disciplina</TableHead>
-                    <TableHead>Peso</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {!questoes || questoes.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        Nenhuma questão adicionada.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    questoes.map((sq: any) => {
-                      const q = sq.questoes
-                      const enunciado = (q?.enunciado as string) ?? ''
-                      const preview = enunciado.length > 60 ? enunciado.slice(0, 60) + '…' : enunciado
-                      return (
-                        <TableRow key={sq.id}>
-                          <TableCell className="text-center">{sq.ordem}</TableCell>
-                          <TableCell className="text-sm">{preview}</TableCell>
-                          <TableCell className="text-sm">{q?.disciplinas?.nome ?? '—'}</TableCell>
-                          <TableCell>{sq.peso ?? 1}</TableCell>
-                          <TableCell>
-                            {sq.anulada ? (
-                              <Badge variant="destructive">Anulada</Badge>
-                            ) : (
-                              <Badge variant="secondary">Ativa</Badge>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })
-                  )}
-                </TableBody>
-              </Table>
+            <CardContent>
+              <SimuladoQuestoesManager
+                simuladoId={id}
+                questoesNoSimulado={questoesNoSimulado}
+                questoesDisponiveis={questoesDisponiveis}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -316,10 +386,14 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
         </TabsContent>
 
         {/* Configurações */}
+        <TabsContent value="relatorio">
+          <SimuladoRelatorio simuladoId={id} />
+        </TabsContent>
+
         <TabsContent value="configuracoes">
           <SimuladoForm
             initialData={initialFormData as any}
-            onSubmit={(data) => updateSimuladoAction(id, data)}
+            onSubmit={updateSimuladoAction.bind(null, id)}
           />
         </TabsContent>
       </Tabs>

@@ -19,7 +19,7 @@ export default async function ConsentimentoPage({
   // Check if already consented — skip gracefully if table doesn't exist yet
   try {
     const { data: consentimento } = await supabase
-      .from('lgpd_consentimentos')
+      .from('simulado_lgpd_consentimentos')
       .select('id')
       .eq('user_id', user.id)
       .eq('versao_politica', CURRENT_POLICY_VERSION)

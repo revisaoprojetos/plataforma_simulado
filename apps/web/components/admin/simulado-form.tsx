@@ -94,7 +94,11 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
       if (result?.error) {
         toast.error(result.error)
       }
-    } catch {
+    } catch (e) {
+      // redirect() em server action lança NEXT_REDIRECT — deixar o Next navegar.
+      if (e && typeof e === 'object' && 'digest' in e && String((e as { digest?: string }).digest).startsWith('NEXT_REDIRECT')) {
+        throw e
+      }
       toast.error('Erro ao salvar simulado')
     } finally {
       setIsLoading(false)

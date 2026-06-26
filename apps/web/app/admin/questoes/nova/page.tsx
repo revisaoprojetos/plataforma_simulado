@@ -8,9 +8,12 @@ export default async function NovaQuestaoPage() {
   const supabase = await createClient()
 
   const [{ data: bancas }, { data: disciplinas }] = await Promise.all([
-    supabase.from('bancas').select('id, nome').order('nome'),
-    supabase.from('disciplinas').select('id, nome').order('nome'),
+    supabase.from('simulado_bancas').select('nome').order('nome'),
+    supabase.from('simulado_disciplinas').select('nome').order('nome'),
   ])
+
+  const bancasSugestoes = (bancas ?? []).map((b) => b.nome)
+  const disciplinasSugestoes = (disciplinas ?? []).map((d) => d.nome)
 
   return (
     <div className="space-y-6">
@@ -26,8 +29,8 @@ export default async function NovaQuestaoPage() {
       </div>
 
       <QuestaoForm
-        bancas={bancas ?? []}
-        disciplinas={disciplinas ?? []}
+        bancasSugestoes={bancasSugestoes}
+        disciplinasSugestoes={disciplinasSugestoes}
         onSubmit={createQuestaoAction}
       />
     </div>

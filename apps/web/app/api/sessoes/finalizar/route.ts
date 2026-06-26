@@ -1,0 +1,99 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createServiceClient } from '@/lib/supabase/server'
+
+// POST /api/sessoes/finalizar — finaliza a sessão e calcula a nota.
+export async function POST(request: NextRequest) {
+  let body: { sessao_id?: string }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ message: 'Requisição inválida.' }, { status: 400 })
+  }
+
+  const { sessao_id } = body
+  if (!sessao_id) {
+    return NextResponse.json({ message: 'Sessão ausente.' }, { status: 400 })
+  }
+
+  const supabase = await createServiceClient()
+
+  const { data: sessao } = await supabase
+    .from('simulado_sessoes_prova')
+    .select('id, simulado_id, status')
+    .eq('id', sessao_id)
+    .maybeSingle()
+
+  if (!sessao) {
+    return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  }
+
+  // Total de questões válidas do simulado (denominador da nota).
+  const { count: total } = await supabase
+    .from('simulado_prova_questoes')
+    .select('*', { count: 'exact', head: true })
+    .eq('simulado_id', sessao.simulado_id)
+    .eq('anulada', false)
+
+  const { data: respostas } = await supabase
+    .from('simulado_respostas_objetivas')
+    .select('correta')
+    .eq('sessao_id', sessao_id)
+
+  const totalQ = total ?? 0
+  const acertos = (respostas ?? []).filter((r) => r.correta).length
+  const nota = totalQ > 0 ? (acertos / totalQ) * 10 : 0
+
+  if (sessao.status !== 'finalizada') {
+    await supabase
+      .from('simulado_sessoes_prova')
+      .update({ status: 'finalizada', finalizado_em: new Date().toISOString(), nota })
+      .eq('id', sessao_id)
+
+    await supabase.from('simulado_sessao_eventos').insert({
+      tenant_id: (await supabase.from('simulado_sessoes_prova').select('tenant_id').eq('id', sessao_id).single()).data?.tenant_id,
+      sessao_id,
+      tipo: 'finalizou',
+    })
+
+    await recalcularRanking(supabase, sessao.simulado_id)
+  }
+
+  // Posição final do aluno (após o recálculo).
+  const { data: ranked } = await supabase
+    .from('simulado_sessoes_prova')
+    .select('posicao_ranking')
+    .eq('id', sessao_id)
+    .maybeSingle()
+
+  return NextResponse.json({ nota, acertos, total: totalQ, posicao: ranked?.posicao_ranking ?? null })
+}
+
+/**
+ * Recalcula posicao_ranking de todas as sessões finalizadas (exceto testes)
+ * do simulado: ordena por nota desc, desempate por quem finalizou antes.
+ * Nota: para janelas com 1000+ simultâneos, mover para um job em lote
+ * (auto-encerramento) para evitar thundering herd.
+ */
+async function recalcularRanking(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  simuladoId: string,
+) {
+  const { data: sessoes } = await supabase
+    .from('simulado_sessoes_prova')
+    .select('id, nota, finalizado_em')
+    .eq('simulado_id', simuladoId)
+    .eq('is_teste', false)
+    .eq('status', 'finalizada')
+
+  const ordenadas = (sessoes ?? []).slice().sort((a, b) => {
+    const dn = (b.nota ?? 0) - (a.nota ?? 0)
+    if (dn !== 0) return dn
+    return new Date(a.finalizado_em ?? 0).getTime() - new Date(b.finalizado_em ?? 0).getTime()
+  })
+
+  await Promise.all(
+    ordenadas.map((s, i) =>
+      supabase.from('simulado_sessoes_prova').update({ posicao_ranking: i + 1 }).eq('id', s.id),
+    ),
+  )
+}

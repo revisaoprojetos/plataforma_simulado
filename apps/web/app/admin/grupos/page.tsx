@@ -15,7 +15,7 @@ export default async function GruposPage() {
   const supabase = await createClient()
 
   const { data: grupos } = await supabase
-    .from('grupos')
+    .from('simulado_grupos')
     .select('id, nome, criado_em')
     .order('criado_em', { ascending: false })
 

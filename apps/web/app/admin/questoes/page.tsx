@@ -1,6 +1,8 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { Suspense } from 'react'
+import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Table,
@@ -27,9 +29,15 @@ interface PageProps {
 }
 
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  ativa: { label: 'Ativa', variant: 'default' },
+  publicada: { label: 'Publicada', variant: 'default' },
   rascunho: { label: 'Rascunho', variant: 'outline' },
   arquivada: { label: 'Arquivada', variant: 'secondary' },
+}
+
+const dificuldadeLabel: Record<string, string> = {
+  facil: 'Fácil',
+  medio: 'Médio',
+  dificil: 'Difícil',
 }
 
 export default async function QuestoesPage({ searchParams }: PageProps) {
@@ -39,10 +47,12 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
   const status = params.status ?? ''
 
   const supabase = await createServiceClient()
+  const tenantId = await getCurrentTenantId()
 
   let query = supabase
-    .from('questoes')
-    .select('id, enunciado, status, tipo, disciplina, area, dificuldade', { count: 'exact' })
+    .from('simulado_questoes')
+    .select('id, enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)', { count: 'exact' })
+    .eq('tenant_id', tenantId ?? '')
     .order('created_at', { ascending: false })
     .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)
 
@@ -65,13 +75,15 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
             {count ?? 0} questões cadastradas
           </p>
         </div>
-        <Button render={<Link href="/admin/questoes/nova" />}>
+        <Link href="/admin/questoes/nova" className={buttonVariants()}>
           <Plus className="mr-2 h-4 w-4" />
           Nova Questão
-        </Button>
+        </Link>
       </div>
 
-      <QuestoesFilters />
+      <Suspense fallback={<div className="h-10 animate-pulse rounded-lg bg-muted" />}>
+        <QuestoesFilters />
+      </Suspense>
 
       <Card>
         <CardHeader>
@@ -84,7 +96,8 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
                 <TableHead className="w-[80px]">ID</TableHead>
                 <TableHead>Enunciado</TableHead>
                 <TableHead>Disciplina</TableHead>
-                <TableHead>Área</TableHead>
+                <TableHead>Banca</TableHead>
+                <TableHead>Dificuldade</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-[60px]" />
@@ -93,17 +106,19 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
             <TableBody>
               {!questoes || questoes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     Nenhuma questão encontrada.
                   </TableCell>
                 </TableRow>
               ) : (
                 questoes.map((q) => {
-                  const cfg = statusConfig[q.status ?? 'ativa'] ?? statusConfig.ativa
+                  const cfg = statusConfig[q.status ?? 'rascunho'] ?? statusConfig.rascunho
                   const enunciado = q.enunciado ?? ''
                   const preview = enunciado.length > 80
                     ? enunciado.slice(0, 80) + '…'
                     : enunciado
+                  const disciplina = (q.disciplinas as { nome?: string } | null)?.nome
+                  const banca = (q.bancas as { nome?: string } | null)?.nome
 
                   return (
                     <TableRow key={q.id}>
@@ -114,10 +129,13 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
                         <p className="text-sm line-clamp-2">{preview}</p>
                       </TableCell>
                       <TableCell className="text-sm">
-                        {q.disciplina ?? '—'}
+                        {disciplina ?? '—'}
                       </TableCell>
                       <TableCell className="text-sm">
-                        {q.area ?? '—'}
+                        {banca ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {q.nivel_dificuldade ? dificuldadeLabel[q.nivel_dificuldade] ?? q.nivel_dificuldade : '—'}
                       </TableCell>
                       <TableCell className="text-sm capitalize">
                         {q.tipo ?? '—'}
@@ -126,9 +144,9 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
                         <Badge variant={cfg.variant}>{cfg.label}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon-sm" render={<Link href={`/admin/questoes/${q.id}/editar`} />}>
+                        <Link href={`/admin/questoes/${q.id}/editar`} className={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
                           <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                        </Link>
                       </TableCell>
                     </TableRow>
                   )

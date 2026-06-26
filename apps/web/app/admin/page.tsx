@@ -12,11 +12,11 @@ async function getDashboardStats() {
     { count: totalEstudantes },
     { count: sessoesHoje },
   ] = await Promise.all([
-    supabase.from('questoes').select('*', { count: 'exact', head: true }),
-    supabase.from('simulados').select('*', { count: 'exact', head: true }).eq('status', 'publicado'),
-    supabase.from('estudantes').select('*', { count: 'exact', head: true }),
+    supabase.from('simulado_questoes').select('*', { count: 'exact', head: true }),
+    supabase.from('simulado_simulados').select('*', { count: 'exact', head: true }).eq('status', 'publicado'),
+    supabase.from('simulado_estudantes').select('*', { count: 'exact', head: true }),
     supabase
-      .from('sessoes_prova')
+      .from('simulado_sessoes_prova')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', new Date().toISOString().split('T')[0]),
   ])
@@ -32,7 +32,7 @@ async function getDashboardStats() {
 async function getRecentSimulados() {
   const supabase = await createServiceClient()
   const { data } = await supabase
-    .from('simulados')
+    .from('simulado_simulados')
     .select('id, titulo, status, created_at')
     .order('created_at', { ascending: false })
     .limit(5)

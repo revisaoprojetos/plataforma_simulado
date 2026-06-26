@@ -93,7 +93,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
   const [showRevisao, setShowRevisao] = useState(false)
   const [showConfirmacao, setShowConfirmacao] = useState(false)
   const [isFinalizando, setIsFinalizando] = useState(false)
-  const [resultado, setResultado] = useState<{ nota: number; acertos: number; total: number } | null>(null)
+  const [resultado, setResultado] = useState<{ nota: number; acertos: number; total: number; posicao?: number | null } | null>(null)
 
   useEffect(() => {
     async function loadSessao() {
@@ -222,7 +222,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
             <h2 className="text-xl font-bold">Prova Finalizada!</h2>
             <p className="text-sm text-muted-foreground mt-1">Seu gabarito foi registrado.</p>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className={`grid gap-3 ${resultado.posicao != null ? 'grid-cols-4' : 'grid-cols-3'}`}>
             <div className="rounded-lg bg-muted p-3">
               <div className="text-2xl font-bold">{resultado.nota.toFixed(1)}</div>
               <div className="text-xs text-muted-foreground">Nota</div>
@@ -235,6 +235,12 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
               <div className="text-2xl font-bold">{resultado.total}</div>
               <div className="text-xs text-muted-foreground">Total</div>
             </div>
+            {resultado.posicao != null && (
+              <div className="rounded-lg bg-amber-100 p-3 dark:bg-amber-900/30">
+                <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">{resultado.posicao}º</div>
+                <div className="text-xs text-muted-foreground">Ranking</div>
+              </div>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">
             O gabarito será liberado conforme a configuração do simulado.

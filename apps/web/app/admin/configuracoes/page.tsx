@@ -32,7 +32,7 @@ export async function salvarTema(formData: FormData) {
 
   // Fetch the first active tenant
   const { data: tenant, error: fetchError } = await supabase
-    .from('tenants')
+    .from('simulado_tenants')
     .select('id')
     .eq('ativo', true)
     .limit(1)
@@ -43,7 +43,7 @@ export async function salvarTema(formData: FormData) {
   }
 
   const { error } = await supabase
-    .from('tenants')
+    .from('simulado_tenants')
     .update({ tema })
     .eq('id', tenant.id)
 

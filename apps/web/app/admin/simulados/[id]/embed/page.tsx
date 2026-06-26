@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { ChevronLeft, Code, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { EmbedConfigForm } from '@/components/admin/embed-config-form'
 
 interface PageProps {
@@ -16,7 +16,7 @@ export default async function SimuladoEmbedPage({ params }: PageProps) {
   const supabase = await createServiceClient()
 
   const { data: simulado } = await supabase
-    .from('simulados')
+    .from('simulado_simulados')
     .select('id, titulo, status, embed_token, embed_ativo, metodo_identificacao')
     .eq('id', id)
     .single()
@@ -81,13 +81,13 @@ export default async function SimuladoEmbedPage({ params }: PageProps) {
                     <code className="flex-1 rounded bg-muted px-3 py-2 text-xs break-all">
                       {embedUrl}
                     </code>
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      render={<Link href={embedUrl} target="_blank" />}
+                    <Link
+                      href={embedUrl}
+                      target="_blank"
+                      className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
-                    </Button>
+                    </Link>
                   </div>
                 </CardContent>
               </Card>

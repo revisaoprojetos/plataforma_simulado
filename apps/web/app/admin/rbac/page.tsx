@@ -1,6 +1,8 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { RbacMatrix } from '@/components/admin/rbac-matrix'
+import { NovoPerfilForm } from '@/components/admin/novo-perfil-form'
 import { AlertTriangle } from 'lucide-react'
 
 async function getRbacData(tenantId: string) {
@@ -9,17 +11,17 @@ async function getRbacData(tenantId: string) {
   try {
     const [rolesRes, permsRes, rpRes] = await Promise.all([
       supabase
-        .from('roles')
+        .from('simulado_roles')
         .select('id, nome, descricao, is_sistema')
         .or(`tenant_id.eq.${tenantId},is_sistema.eq.true`)
         .order('is_sistema', { ascending: false })
         .order('nome'),
       supabase
-        .from('permissions')
+        .from('simulado_permissions')
         .select('id, resource, action')
         .order('resource')
         .order('action'),
-      supabase.from('role_permissions').select('role_id, permission_id'),
+      supabase.from('simulado_role_permissions').select('role_id, permission_id'),
     ])
 
     // If tables don't exist, Supabase returns an error code
@@ -46,15 +48,9 @@ async function getRbacData(tenantId: string) {
 }
 
 export default async function RbacPage() {
-  const supabase = await createServiceClient()
+  const tenantId = await getCurrentTenantId()
 
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('id')
-    .limit(1)
-    .single()
-
-  if (!tenant) {
+  if (!tenantId) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">RBAC</h1>
@@ -62,6 +58,7 @@ export default async function RbacPage() {
       </div>
     )
   }
+  const tenant = { id: tenantId }
 
   const data = await getRbacData(tenant.id)
 
@@ -93,6 +90,18 @@ export default async function RbacPage() {
             <code className="font-mono text-xs">20260625000003_add_rbac_tables.sql</code> no Supabase.
           </span>
         </div>
+      )}
+
+      {data && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Perfis</CardTitle>
+            <CardDescription>Crie perfis e ajuste as permissões na matriz abaixo.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <NovoPerfilForm />
+          </CardContent>
+        </Card>
       )}
 
       {data && (

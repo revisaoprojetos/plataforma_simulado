@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useState } from 'react'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,7 +40,10 @@ export default function NovoEstudantePage() {
       if (result?.error) {
         toast.error(result.error)
       }
-    } catch {
+    } catch (e) {
+      if (e && typeof e === 'object' && 'digest' in e && String((e as { digest?: string }).digest).startsWith('NEXT_REDIRECT')) {
+        throw e
+      }
       toast.error('Erro ao criar estudante')
     } finally {
       setIsLoading(false)
@@ -116,9 +119,9 @@ export default function NovoEstudantePage() {
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="outline" render={<Link href="/admin/estudantes" />}>
+              <Link href="/admin/estudantes" className={buttonVariants({ variant: 'outline' })}>
                 Cancelar
-              </Button>
+              </Link>
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? (
                   <>

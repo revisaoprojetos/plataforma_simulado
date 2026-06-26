@@ -13,7 +13,7 @@ export async function aceitarConsentimento(
     const ip = headersList.get('x-forwarded-for') ?? headersList.get('x-real-ip') ?? 'unknown'
     const userAgent = headersList.get('user-agent') ?? ''
 
-    const { error } = await supabase.from('lgpd_consentimentos').upsert(
+    const { error } = await supabase.from('simulado_lgpd_consentimentos').upsert(
       {
         user_id: userId,
         versao_politica: versaoPolitica,

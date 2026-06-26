@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -23,15 +24,17 @@ export default async function MatriculasPage({ searchParams }: PageProps) {
   const params = await searchParams
   const page = Number(params.page ?? 1)
   const supabase = await createServiceClient()
+  const tenantId = await getCurrentTenantId()
 
   const offset = (page - 1) * ITEMS_PER_PAGE
 
   let query = supabase
-    .from('matriculas')
+    .from('simulado_matriculas')
     .select(
-      'id, liberado, created_at, estudante_id, simulado_id, estudantes(nome, email), simulados(titulo)',
+      'id, liberado, created_at, estudante_id, simulado_id, estudantes:simulado_estudantes(nome, email), simulados:simulado_simulados(titulo)',
       { count: 'exact' },
     )
+    .eq('tenant_id', tenantId ?? '')
     .order('created_at', { ascending: false })
     .range(offset, offset + ITEMS_PER_PAGE - 1)
 
@@ -51,10 +54,10 @@ export default async function MatriculasPage({ searchParams }: PageProps) {
             {count ?? 0} matrículas registradas
           </p>
         </div>
-        <Button render={<Link href="/admin/matriculas/nova" />}>
+        <Link href="/admin/matriculas/nova" className={buttonVariants()}>
           <Plus className="mr-2 h-4 w-4" />
           Nova Matrícula
-        </Button>
+        </Link>
       </div>
 
       <MatriculasFilters />

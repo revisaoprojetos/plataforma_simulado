@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, use } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -18,9 +18,13 @@ import {
   Loader2,
   BookOpen,
   Send,
+  Flag,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { RevisaoFinal } from '@/components/aluno/revisao-final'
 
 // --- Types ---
 interface Alternativa {
@@ -86,7 +90,8 @@ function formatTime(segundos: number) {
 const LETRA = ['A', 'B', 'C', 'D', 'E']
 
 // --- Main Component ---
-export default function ProvaPage({ params }: { params: { token: string } }) {
+export default function ProvaPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = use(params)
   const searchParams = useSearchParams()
   const sessionToken = searchParams.get('st')
 
@@ -94,6 +99,8 @@ export default function ProvaPage({ params }: { params: { token: string } }) {
   const [sessao, setSessao] = useState<SessaoData | null>(null)
   const [questaoIndex, setQuestaoIndex] = useState(0)
   const [respostas, setRespostas] = useState<Record<string, string>>({})
+  const [marcadas, setMarcadas] = useState<Set<string>>(new Set()) // questões marcadas p/ revisar depois
+  const [mostrarTempo, setMostrarTempo] = useState(true)
   const [salvando, setSalvando] = useState<string | null>(null)
   const [showRevisao, setShowRevisao] = useState(false)
   const [showConfirmacao, setShowConfirmacao] = useState(false)
@@ -109,39 +116,21 @@ export default function ProvaPage({ params }: { params: { token: string } }) {
 
     async function loadSessao() {
       try {
-        const res = await fetch(`/api/sessoes/current?token=${params.token}&st=${sessionToken}`)
+        const res = await fetch(`/api/sessoes/current?token=${token}&st=${sessionToken}`)
         if (!res.ok) throw new Error('Sessão inválida')
         const data: SessaoData = await res.json()
+        if (!data?.id) throw new Error('Sessão inválida')
         setSessao(data)
         setRespostas(data.respostas ?? {})
-        setStatus('em_andamento')
+        setStatus(data.status === 'finalizada' ? 'finalizada' : 'em_andamento')
       } catch {
-        // Mock data for development
-        const mockSessao: SessaoData = {
-          id: 'mock-sessao-id',
-          questoes: Array.from({ length: 10 }, (_, i) => ({
-            id: `q${i + 1}`,
-            enunciado: `Questão ${i + 1}: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris?`,
-            alternativas: [
-              { id: `q${i + 1}-a`, texto: 'Primeira alternativa com texto explicativo detalhado', ordem: 0 },
-              { id: `q${i + 1}-b`, texto: 'Segunda alternativa com conteúdo diferente', ordem: 1 },
-              { id: `q${i + 1}-c`, texto: 'Terceira opção de resposta', ordem: 2 },
-              { id: `q${i + 1}-d`, texto: 'Quarta alternativa possível', ordem: 3 },
-              { id: `q${i + 1}-e`, texto: 'Quinta e última alternativa', ordem: 4 },
-            ],
-          })),
-          tempo_limite_min: 60,
-          iniciado_em: new Date().toISOString(),
-          status: 'em_andamento',
-          respostas: {},
-        }
-        setSessao(mockSessao)
-        setStatus('em_andamento')
+        // Sessão inexistente/expirada → mostra erro (sem dados fictícios).
+        setStatus('erro')
       }
     }
 
     loadSessao()
-  }, [params.token, sessionToken])
+  }, [token, sessionToken])
 
   const segundosRestantes = useTimer(
     sessao?.iniciado_em ?? new Date().toISOString(),
@@ -179,6 +168,15 @@ export default function ProvaPage({ params }: { params: { token: string } }) {
   function handleResponder(questaoId: string, alternativaId: string) {
     setRespostas((prev) => ({ ...prev, [questaoId]: alternativaId }))
     autoSave(questaoId, alternativaId)
+  }
+
+  function toggleMarcar(questaoId: string) {
+    setMarcadas((prev) => {
+      const next = new Set(prev)
+      if (next.has(questaoId)) next.delete(questaoId)
+      else next.add(questaoId)
+      return next
+    })
   }
 
   async function handleFinalizar() {
@@ -248,38 +246,12 @@ export default function ProvaPage({ params }: { params: { token: string } }) {
     )
   }
 
-  if (status === 'finalizada' && resultado) {
+  if (status === 'finalizada') {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-background to-muted/30">
-        <Card className="max-w-lg w-full">
-          <CardContent className="pt-8 pb-8 text-center space-y-6">
-            <div className="flex h-20 w-20 mx-auto items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-              <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold">Prova Finalizada!</h2>
-              <p className="text-muted-foreground mt-1">Seu gabarito foi registrado com sucesso.</p>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="rounded-lg bg-muted p-4">
-                <div className="text-2xl font-bold">{resultado.nota.toFixed(1)}</div>
-                <div className="text-xs text-muted-foreground">Nota</div>
-              </div>
-              <div className="rounded-lg bg-muted p-4">
-                <div className="text-2xl font-bold">{resultado.acertos}</div>
-                <div className="text-xs text-muted-foreground">Acertos</div>
-              </div>
-              <div className="rounded-lg bg-muted p-4">
-                <div className="text-2xl font-bold">{resultado.total}</div>
-                <div className="text-xs text-muted-foreground">Total</div>
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              O gabarito será liberado conforme a configuração do simulado.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <RevisaoFinal
+        sessionToken={sessionToken ?? ''}
+        voltarUrl={`/aluno/login?token=${token}`}
+      />
     )
   }
 
@@ -296,46 +268,45 @@ export default function ProvaPage({ params }: { params: { token: string } }) {
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
+          <div className="flex flex-1 items-center gap-2">
             <BookOpen className="h-5 w-5 text-muted-foreground" />
             <span className="font-semibold text-sm">Simulado</span>
           </div>
 
-          {/* Timer */}
-          {segundosRestantes !== null && (
-            <div
-              className={cn(
-                'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-mono font-medium',
-                timerWarning
-                  ? 'bg-destructive/10 text-destructive'
-                  : 'bg-muted text-foreground'
-              )}
-            >
-              <Clock className={cn('h-4 w-4', timerWarning && 'animate-pulse')} />
-              {formatTime(segundosRestantes)}
-            </div>
-          )}
+          {/* Centro: contador de questão */}
+          <div className="flex-1 text-center text-sm font-medium">
+            Questão {questaoIndex + 1} de {totalQuestoes}
+          </div>
 
-          <div className="flex items-center gap-2">
+          {/* Direita: salvando + cronômetro (com olhinho) + Finalizar */}
+          <div className="flex flex-1 items-center justify-end gap-2">
             {salvando && (
-              <span className="text-xs text-muted-foreground">
+              <span className="hidden text-xs text-muted-foreground sm:inline">
                 <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
                 Salvando...
               </span>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowRevisao(true)}
-            >
-              Revisar
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setShowConfirmacao(true)}
-              disabled={isFinalizando}
-            >
+            {segundosRestantes !== null && (
+              <div
+                className={cn(
+                  'flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-mono font-medium',
+                  timerWarning && mostrarTempo ? 'bg-destructive/10 text-destructive' : 'bg-muted text-foreground',
+                )}
+              >
+                <Clock className={cn('h-4 w-4', timerWarning && mostrarTempo && 'animate-pulse')} />
+                <span className="tabular-nums">{mostrarTempo ? formatTime(segundosRestantes) : '--:--'}</span>
+                <button
+                  type="button"
+                  onClick={() => setMostrarTempo((v) => !v)}
+                  title={mostrarTempo ? 'Ocultar tempo' : 'Mostrar tempo'}
+                  className="ml-0.5 text-muted-foreground hover:text-foreground"
+                >
+                  {mostrarTempo ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+            )}
+            <Button size="sm" onClick={() => setShowRevisao(true)} disabled={isFinalizando}>
               <Send className="mr-1.5 h-3.5 w-3.5" />
               Finalizar
             </Button>
@@ -347,17 +318,15 @@ export default function ProvaPage({ params }: { params: { token: string } }) {
       </header>
 
       {/* Main content */}
-      <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-6">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+        <div className="grid gap-4 lg:grid-cols-[1fr_14rem]">
+          {/* Coluna da questão */}
+          <div className="flex flex-col gap-6">
         {/* Questão header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">
-              {questaoIndex + 1} / {totalQuestoes}
-            </Badge>
-            <span className="text-sm text-muted-foreground">
-              {totalRespondidas} respondidas
-            </span>
-          </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline">
+            {questaoIndex + 1} / {totalQuestoes}
+          </Badge>
         </div>
 
         {/* Enunciado */}
@@ -402,41 +371,26 @@ export default function ProvaPage({ params }: { params: { token: string } }) {
           })}
         </div>
 
-        {/* Navigation */}
-        <div className="flex items-center justify-between pt-2">
+        {/* Navegação: Voltar, Revisar e Próxima/Finalizar lado a lado */}
+        <div className="flex items-center justify-end gap-2 pt-2">
           <Button
             variant="outline"
             onClick={() => setQuestaoIndex((i) => Math.max(0, i - 1))}
             disabled={questaoIndex === 0}
           >
             <ChevronLeft className="mr-1 h-4 w-4" />
-            Anterior
+            Voltar
           </Button>
 
-          {/* Questão navigator dots */}
-          <div className="flex flex-wrap gap-1.5 max-w-xs justify-center">
-            {sessao.questoes.map((q, i) => {
-              const respondida = !!respostas[q.id]
-              const atual = i === questaoIndex
-              return (
-                <button
-                  key={q.id}
-                  onClick={() => setQuestaoIndex(i)}
-                  className={cn(
-                    'h-7 w-7 rounded text-xs font-medium transition-colors',
-                    atual
-                      ? 'bg-primary text-primary-foreground'
-                      : respondida
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  )}
-                  title={`Questão ${i + 1}`}
-                >
-                  {i + 1}
-                </button>
-              )
-            })}
-          </div>
+          {/* Revisar = marca a questão atual para revisar depois */}
+          <Button
+            variant={marcadas.has(questaoAtual.id) ? 'default' : 'outline'}
+            onClick={() => toggleMarcar(questaoAtual.id)}
+            className={cn(marcadas.has(questaoAtual.id) && 'bg-amber-500 text-white hover:bg-amber-600')}
+          >
+            <Flag className="mr-1 h-4 w-4" />
+            {marcadas.has(questaoAtual.id) ? 'Marcada' : 'Revisar'}
+          </Button>
 
           <Button
             variant={questaoIndex === totalQuestoes - 1 ? 'default' : 'outline'}
@@ -448,9 +402,67 @@ export default function ProvaPage({ params }: { params: { token: string } }) {
               }
             }}
           >
-            {questaoIndex === totalQuestoes - 1 ? 'Revisar' : 'Próxima'}
-            <ChevronRight className="ml-1 h-4 w-4" />
+            {questaoIndex === totalQuestoes - 1 ? (
+              <>
+                <Send className="mr-1 h-4 w-4" />
+                Finalizar
+              </>
+            ) : (
+              <>
+                Próxima
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </>
+            )}
           </Button>
+        </div>
+          </div>
+          {/* Navegador de questões — card lateral direito */}
+          <aside>
+            <Card className="pt-2 pb-2 lg:sticky lg:top-20">
+              <CardContent className="px-4 pb-0 pt-0">
+                <p className="text-center text-sm font-semibold">Navegador de questões</p>
+                <div className="mt-2 mb-3 border-t" />
+                <div className="grid grid-cols-5 gap-1.5">
+                  {sessao.questoes.map((q, i) => {
+                    const respondida = !!respostas[q.id]
+                    const atual = i === questaoIndex
+                    const marcada = marcadas.has(q.id)
+                    return (
+                      <button
+                        key={q.id}
+                        onClick={() => setQuestaoIndex(i)}
+                        title={`Questão ${i + 1}${marcada ? ' (marcada)' : ''}`}
+                        className={cn(
+                          'relative flex h-9 items-center justify-center rounded-md text-xs font-semibold transition-colors',
+                          atual
+                            ? 'bg-primary text-primary-foreground'
+                            : respondida
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-400'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                        )}
+                      >
+                        {i + 1}
+                        {marcada && (
+                          <Flag className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-amber-500 p-0.5 text-white" />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="mt-4 space-y-1.5 border-t pt-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <span className="h-3 w-3 rounded bg-green-400" /> Respondidas ({totalRespondidas})
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-3 w-3 rounded bg-muted" /> Em branco ({totalQuestoes - totalRespondidas})
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Flag className="h-3 w-3 text-amber-500" /> Marcadas ({marcadas.size})
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </aside>
         </div>
       </main>
 
@@ -465,7 +477,7 @@ export default function ProvaPage({ params }: { params: { token: string } }) {
           </DialogHeader>
 
           <div className="space-y-3 py-2 max-h-96 overflow-y-auto">
-            <div className="flex items-center gap-4 text-sm">
+            <div className="flex flex-wrap items-center gap-4 text-sm">
               <div className="flex items-center gap-1.5">
                 <div className="h-3 w-3 rounded bg-green-400" />
                 <span>Respondidas ({totalRespondidas})</span>
@@ -474,6 +486,10 @@ export default function ProvaPage({ params }: { params: { token: string } }) {
                 <div className="h-3 w-3 rounded bg-muted" />
                 <span>Em branco ({totalQuestoes - totalRespondidas})</span>
               </div>
+              <div className="flex items-center gap-1.5">
+                <Flag className="h-3.5 w-3.5 text-amber-500" />
+                <span>Marcadas ({marcadas.size})</span>
+              </div>
             </div>
 
             <Separator />
@@ -481,6 +497,7 @@ export default function ProvaPage({ params }: { params: { token: string } }) {
             <div className="flex flex-wrap gap-2">
               {sessao.questoes.map((q, i) => {
                 const respondida = !!respostas[q.id]
+                const marcada = marcadas.has(q.id)
                 return (
                   <button
                     key={q.id}
@@ -488,17 +505,18 @@ export default function ProvaPage({ params }: { params: { token: string } }) {
                       setQuestaoIndex(i)
                       setShowRevisao(false)
                     }}
+                    title={`Questão ${i + 1}${marcada ? ' (marcada)' : ''}`}
                     className={cn(
-                      'flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium',
+                      'relative flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium',
+                      marcada && 'ring-2 ring-amber-500',
                       respondida
                         ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80',
                     )}
                   >
-                    {respondida ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : (
-                      i + 1
+                    {respondida ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
+                    {marcada && (
+                      <Flag className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full bg-amber-500 p-0.5 text-white" />
                     )}
                   </button>
                 )

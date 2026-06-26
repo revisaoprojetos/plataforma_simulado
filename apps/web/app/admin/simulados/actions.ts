@@ -3,6 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
+import { checkPermission } from '@/lib/auth/permissions'
+import { registrarAudit } from '@/lib/audit'
 
 interface SimuladoData {
   titulo: string
@@ -18,11 +21,16 @@ interface SimuladoData {
 }
 
 export async function createSimuladoAction(data: SimuladoData) {
+  if (!(await checkPermission('simulados:create'))) return { error: 'Você não tem permissão para criar simulados.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { error: 'Tenant não resolvido. Verifique o acesso.' }
+
   const supabase = await createClient()
 
   const { data: simulado, error } = await supabase
-    .from('simulados')
+    .from('simulado_simulados')
     .insert({
+      tenant_id: tenantId,
       titulo: data.titulo,
       descricao: data.descricao || null,
       modo_aplicacao: data.modo_aplicacao,
@@ -41,6 +49,8 @@ export async function createSimuladoAction(data: SimuladoData) {
     return { error: error.message }
   }
 
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_simulados', entidadeId: simulado.id, depois: simulado })
+
   revalidatePath('/admin/simulados')
   redirect(`/admin/simulados/${simulado.id}`)
 }
@@ -49,7 +59,7 @@ export async function updateSimuladoAction(id: string, data: SimuladoData) {
   const supabase = await createClient()
 
   const { error } = await supabase
-    .from('simulados')
+    .from('simulado_simulados')
     .update({
       titulo: data.titulo,
       descricao: data.descricao || null,
@@ -72,14 +82,72 @@ export async function updateSimuladoAction(id: string, data: SimuladoData) {
   redirect(`/admin/simulados/${id}`)
 }
 
+export async function addQuestaoToSimulado(simuladoId: string, questaoId: string) {
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { error: 'Tenant não resolvido.' }
+
+  const supabase = await createClient()
+  const { count } = await supabase
+    .from('simulado_prova_questoes')
+    .select('*', { count: 'exact', head: true })
+    .eq('simulado_id', simuladoId)
+
+  const { error } = await supabase.from('simulado_prova_questoes').insert({
+    tenant_id: tenantId,
+    simulado_id: simuladoId,
+    questao_id: questaoId,
+    ordem: count ?? 0,
+  })
+
+  if (error) return { error: error.message }
+  revalidatePath(`/admin/simulados/${simuladoId}`)
+  return { ok: true }
+}
+
+export async function removeQuestaoFromSimulado(simuladoQuestaoId: string, simuladoId: string) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('simulado_prova_questoes')
+    .delete()
+    .eq('id', simuladoQuestaoId)
+
+  if (error) return { error: error.message }
+  revalidatePath(`/admin/simulados/${simuladoId}`)
+  return { ok: true }
+}
+
 export async function publishSimuladoAction(id: string) {
   const supabase = await createClient()
-  await supabase.from('simulados').update({ status: 'publicado' }).eq('id', id)
+  await supabase.from('simulado_simulados').update({ status: 'publicado' }).eq('id', id)
+  await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'publicado' } })
   revalidatePath(`/admin/simulados/${id}`)
+  revalidatePath('/admin/simulados')
 }
 
 export async function encerrarSimuladoAction(id: string) {
   const supabase = await createClient()
-  await supabase.from('simulados').update({ status: 'encerrado' }).eq('id', id)
+  await supabase.from('simulado_simulados').update({ status: 'encerrado' }).eq('id', id)
+  await registrarAudit({ operacao: 'BLOQUEAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'encerrado' } })
   revalidatePath(`/admin/simulados/${id}`)
+  revalidatePath('/admin/simulados')
+}
+
+export async function reabrirSimuladoAction(id: string) {
+  const supabase = await createClient()
+  await supabase.from('simulado_simulados').update({ status: 'publicado' }).eq('id', id)
+  await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'publicado', reaberto: true } })
+  revalidatePath(`/admin/simulados/${id}`)
+  revalidatePath('/admin/simulados')
+}
+
+export async function deleteSimuladoAction(id: string) {
+  if (!(await checkPermission('simulados:delete'))) return { error: 'Você não tem permissão para excluir simulados.' }
+  const supabase = await createClient()
+  const { data: antes } = await supabase.from('simulado_simulados').select('*').eq('id', id).maybeSingle()
+  // Cascade remove simulado_prova_questoes, sessoes e respostas vinculadas.
+  const { error } = await supabase.from('simulado_simulados').delete().eq('id', id)
+  if (error) return { error: error.message }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_simulados', entidadeId: id, antes })
+  revalidatePath('/admin/simulados')
+  return { ok: true }
 }
