@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { QuestaoResolvivel, type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
+import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
+import { QuestaoCard } from '@/components/aluno/questao-card'
 import { Star } from 'lucide-react'
 
 export default async function AlunoFavoritosPage() {
@@ -16,7 +17,7 @@ export default async function AlunoFavoritosPage() {
   const ids = (favs ?? []).map((f: any) => f.questao_id)
 
   const [{ data: questoes }, { data: alts }] = await Promise.all([
-    ids.length ? svc.from('simulado_questoes').select('id, enunciado, disciplina_id, ano, comentario_professor').in('id', ids).eq('status', 'publicada') : Promise.resolve({ data: [] as any[] }),
+    ids.length ? svc.from('simulado_questoes').select('id, tipo, enunciado, disciplina_id, ano, comentario_professor').in('id', ids).eq('status', 'publicada') : Promise.resolve({ data: [] as any[] }),
     ids.length ? svc.from('simulado_alternativas').select('id, questao_id, texto, ordem, correta').in('questao_id', ids) : Promise.resolve({ data: [] as any[] }),
   ])
 
@@ -40,6 +41,7 @@ export default async function AlunoFavoritosPage() {
     .filter(Boolean)
     .map((x: any) => ({
       id: x.id,
+      tipo: x.tipo,
       enunciado: x.enunciado ?? '',
       disciplina: discMap.get(x.disciplina_id) ?? null,
       ano: x.ano ?? null,
@@ -62,7 +64,7 @@ export default async function AlunoFavoritosPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {lista.map((q, i) => <QuestaoResolvivel key={q.id} questao={q} numero={i + 1} />)}
+          {lista.map((q, i) => <QuestaoCard key={q.id} questao={q} numero={i + 1} />)}
         </div>
       )}
     </div>

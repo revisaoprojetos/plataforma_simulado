@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { QuestaoResolvivel, type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
+import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
+import { QuestaoCard } from '@/components/aluno/questao-card'
 import { PaginationControls } from '@/components/admin/pagination-controls'
 import { Search } from 'lucide-react'
 
@@ -27,7 +28,7 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
   // Questões publicadas (com filtros).
   let q = svc
     .from('simulado_questoes')
-    .select('id, enunciado, disciplina_id, ano, comentario_professor', { count: 'exact' })
+    .select('id, tipo, enunciado, disciplina_id, ano, comentario_professor', { count: 'exact' })
     .eq('tenant_id', sessao!.tenantId)
     .eq('status', 'publicada')
     .order('created_at', { ascending: false })
@@ -58,6 +59,7 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
 
   const lista: QuestaoAluno[] = (questoes ?? []).map((x: any) => ({
     id: x.id,
+    tipo: x.tipo,
     enunciado: x.enunciado ?? '',
     disciplina: discMap.get(x.disciplina_id) ?? null,
     ano: x.ano ?? null,
@@ -100,7 +102,7 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
         </div>
       ) : (
         <div className="space-y-4">
-          {lista.map((q, i) => <QuestaoResolvivel key={q.id} questao={q} numero={offset + i + 1} />)}
+          {lista.map((q, i) => <QuestaoCard key={q.id} questao={q} numero={offset + i + 1} />)}
         </div>
       )}
 

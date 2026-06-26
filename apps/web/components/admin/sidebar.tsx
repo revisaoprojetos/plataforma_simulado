@@ -21,6 +21,7 @@ import {
   SlidersHorizontal,
   Building2,
   Flag,
+  PenLine,
   ChevronDown,
 } from 'lucide-react'
 import {
@@ -66,6 +67,8 @@ const navGroups: NavGroup[] = [
       { label: 'Questões', href: '/admin/questoes', icon: BookOpen, perm: 'questoes:view' },
       { label: 'Banco de Questões', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
       { label: 'Reports de Questões', href: '/admin/feedbacks', icon: Flag, perm: 'questoes:view' },
+      { label: 'Comentários', href: '/admin/comentarios', icon: MessageSquare, perm: 'questoes:view' },
+      { label: 'Correção (discursivas)', href: '/admin/correcao', icon: PenLine, perm: 'questoes:view' },
     ],
   },
   {

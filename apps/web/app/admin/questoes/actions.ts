@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
@@ -27,6 +27,7 @@ interface QuestaoData {
   comentario_professor?: string
   status: string
   alternativas?: AlternativaData[]
+  competencias?: { nome: string; pontos: number; ordem: number }[]
 }
 
 /**
@@ -149,6 +150,16 @@ export async function createQuestaoAction(data: QuestaoData) {
     }
   }
 
+  if (data.tipo === 'discursiva' && data.competencias?.length) {
+    const comps = data.competencias.filter((c) => c.nome?.trim())
+    if (comps.length) {
+      // simulado_competencias tem RLS sem policy de INSERT p/ authenticated → service role.
+      await createAdminClient().from('simulado_competencias').insert(
+        comps.map((c, i) => ({ tenant_id: tenantId, questao_id: questao.id, nome: c.nome.trim(), pontos: c.pontos ?? 1, ordem: c.ordem ?? i })),
+      )
+    }
+  }
+
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_questoes', entidadeId: questao.id, depois: questao })
 
   revalidatePath('/admin/questoes')
@@ -187,6 +198,17 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
         ordem: alt.ordem,
       }))
     )
+  }
+
+  if (data.tipo === 'discursiva' && data.competencias) {
+    const admin = createAdminClient()
+    await admin.from('simulado_competencias').delete().eq('questao_id', id)
+    const comps = data.competencias.filter((c) => c.nome?.trim())
+    if (comps.length) {
+      await admin.from('simulado_competencias').insert(
+        comps.map((c, i) => ({ tenant_id: tenantId, questao_id: id, nome: c.nome.trim(), pontos: c.pontos ?? 1, ordem: c.ordem ?? i })),
+      )
+    }
   }
 
   revalidatePath('/admin/questoes')

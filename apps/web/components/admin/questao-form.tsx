@@ -21,25 +21,48 @@ import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 const alternativaSchema = z.object({
-  texto: z.string().min(1, 'Texto obrigatório'),
+  texto: z.string(),
   correta: z.boolean(),
   ordem: z.number(),
 })
 
-const questaoSchema = z.object({
-  tipo: z.enum(['objetiva', 'discursiva']),
-  enunciado: z.string().min(10, 'Enunciado deve ter ao menos 10 caracteres'),
-  banca: z.string().optional(),
-  orgao: z.string().optional(),
-  ano: z.coerce.number().optional(),
-  disciplina: z.string().optional(),
-  assunto: z.string().optional(),
-  nivel_dificuldade: z.enum(['facil', 'medio', 'dificil']).optional(),
-  gabarito_tipo: z.enum(['oficial', 'extraoficial']).optional(),
-  comentario_professor: z.string().optional(),
-  status: z.enum(['rascunho', 'publicada', 'arquivada']),
-  alternativas: z.array(alternativaSchema).optional(),
+const competenciaSchema = z.object({
+  nome: z.string(),
+  pontos: z.coerce.number().min(0),
+  ordem: z.number(),
 })
+
+const questaoSchema = z
+  .object({
+    tipo: z.enum(['objetiva', 'discursiva']),
+    enunciado: z.string().min(10, 'Enunciado deve ter ao menos 10 caracteres'),
+    banca: z.string().optional(),
+    orgao: z.string().optional(),
+    ano: z.coerce.number().optional(),
+    disciplina: z.string().optional(),
+    assunto: z.string().optional(),
+    nivel_dificuldade: z.enum(['facil', 'medio', 'dificil']).optional(),
+    gabarito_tipo: z.enum(['oficial', 'extraoficial']).optional(),
+    comentario_professor: z.string().optional(),
+    status: z.enum(['rascunho', 'publicada', 'arquivada']),
+    alternativas: z.array(alternativaSchema).optional(),
+    competencias: z.array(competenciaSchema).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.tipo === 'objetiva') {
+      const alts = data.alternativas ?? []
+      if (alts.filter((a) => a.texto.trim()).length < 2) {
+        ctx.addIssue({ code: 'custom', path: ['alternativas'], message: 'Preencha ao menos 2 alternativas.' })
+      }
+      if (!alts.some((a) => a.correta && a.texto.trim())) {
+        ctx.addIssue({ code: 'custom', path: ['alternativas'], message: 'Marque a alternativa correta.' })
+      }
+    } else if (data.tipo === 'discursiva') {
+      if ((data.competencias ?? []).filter((c) => c.nome.trim()).length < 1) {
+        ctx.addIssue({ code: 'custom', path: ['competencias'], message: 'Adicione ao menos 1 competência.' })
+      }
+    }
+  })
 
 export type QuestaoFormData = z.infer<typeof questaoSchema>
 
@@ -75,6 +98,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
         { texto: '', correta: false, ordem: 3 },
         { texto: '', correta: true, ordem: 4 },
       ],
+      competencias: [{ nome: '', pontos: 1, ordem: 0 }],
       ...initialData,
     },
   })
@@ -82,6 +106,11 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'alternativas',
+  })
+
+  const { fields: compFields, append: appendComp, remove: removeComp } = useFieldArray({
+    control,
+    name: 'competencias',
   })
 
   const tipo = watch('tipo')
@@ -302,6 +331,57 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                 Adicionar alternativa
               </Button>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tipo === 'discursiva' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Competências (critérios de correção)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Defina os critérios e a pontuação máxima de cada um. O corretor dará nota por competência.
+            </p>
+            {compFields.map((field, index) => (
+              <div key={field.id} className="flex items-start gap-3">
+                <Input
+                  placeholder={`Critério ${index + 1} (ex.: Domínio do tema)`}
+                  className="flex-1"
+                  {...register(`competencias.${index}.nome`)}
+                />
+                <div className="w-28 shrink-0">
+                  <Input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    placeholder="Pontos"
+                    {...register(`competencias.${index}.pontos`)}
+                  />
+                </div>
+                {compFields.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => removeComp(index)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => appendComp({ nome: '', pontos: 1, ordem: compFields.length })}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Adicionar competência
+            </Button>
           </CardContent>
         </Card>
       )}

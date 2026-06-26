@@ -17,6 +17,7 @@ export interface AltAluno {
 }
 export interface QuestaoAluno {
   id: string
+  tipo?: string
   enunciado: string
   disciplina?: string | null
   banca?: string | null
