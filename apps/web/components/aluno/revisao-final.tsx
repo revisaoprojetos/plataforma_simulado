@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { ReportarErroButton } from '@/components/aluno/reportar-erro-button'
 import {
   CheckCircle2,
   XCircle,
@@ -314,6 +315,10 @@ export function RevisaoFinal({
                         </div>
                       )
                     })}
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <ReportarErroButton sessaoId={sessionToken} questaoId={q.id} />
                   </div>
                 </CardContent>
               </Card>

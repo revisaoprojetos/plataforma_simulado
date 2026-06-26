@@ -4,6 +4,8 @@
   "version": "0.0.1",
   "packageManager": "pnpm@11.9.0",
   "scripts": {
+    "iniciar": "powershell -ExecutionPolicy Bypass -File scripts/dev.ps1",
+    "iniciar:turbo": "powershell -ExecutionPolicy Bypass -File scripts/dev.ps1 -Turbo",
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",

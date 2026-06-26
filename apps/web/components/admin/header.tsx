@@ -12,7 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { SidebarTrigger } from '@/components/ui/sidebar'
-import { LogOut, User } from 'lucide-react'
+import { LogOut } from 'lucide-react'
+import { NotificationBell } from '@/components/admin/notification-bell'
 
 interface AdminHeaderProps {
   userName: string
@@ -33,6 +34,7 @@ export function AdminHeader({ userName, userEmail }: AdminHeaderProps) {
     <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background px-4">
       <SidebarTrigger />
       <div className="flex-1" />
+      <NotificationBell />
       <ThemeToggle />
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
