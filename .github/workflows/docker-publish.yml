@@ -6,6 +6,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  # Pacote deste repositório (o token só tem permissão de escrita no pacote do próprio repo).
+  IMAGE_NAME: plataforma_simulado
 
 jobs:
   build-and-push:
@@ -37,7 +39,7 @@ jobs:
           context: .
           file: ./apps/web/Dockerfile
           push: true
-          tags: ghcr.io/${{ env.IMAGE_OWNER }}/estudando-junto:latest
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:latest
           build-args: |
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
@@ -49,7 +51,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Pula o deploy inteiro se o VPS não estiver configurado (evita falhar o workflow).
+      - name: Verificar configuração do VPS
+        id: vps
+        run: |
+          if [ -z "${{ secrets.VPS_HOST }}" ]; then
+            echo "VPS não configurado (secret VPS_HOST ausente) — pulando deploy."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Configurar SSH
+        if: steps.vps.outputs.skip != 'true'
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
@@ -57,12 +71,13 @@ jobs:
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
       - name: Atualizar serviço no VPS
+        if: steps.vps.outputs.skip != 'true'
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             "docker service update \
               --force \
-              --image ghcr.io/revisaoprojetos/estudando-junto:latest \
+              --image ghcr.io/revisaoprojetos/plataforma_simulado:latest \
               --env-add 'SUPABASE_URL=${{ secrets.SUPABASE_URL }}' \
               --env-add 'SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}' \
               --env-add 'SUPABASE_PUBLISHABLE_KEY=${{ secrets.SUPABASE_PUBLISHABLE_KEY }}' \
-              estudando-junto_app"
+              ${{ secrets.VPS_SERVICE || 'plataforma_simulado_app' }}"
