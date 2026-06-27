@@ -30,13 +30,14 @@ export async function GET(request: NextRequest) {
 
   const { data: sq } = await supabase
     .from('simulado_prova_questoes')
-    .select('ordem, questoes:simulado_questoes(id, enunciado, alternativas:simulado_alternativas(id, texto, ordem))')
+    .select('ordem, questoes:simulado_questoes(id, tipo, enunciado, alternativas:simulado_alternativas(id, texto, ordem))')
     .eq('simulado_id', sessao.simulado_id)
     .eq('anulada', false)
     .order('ordem')
 
   const questoes = (sq ?? []).map((row: any) => ({
     id: row.questoes?.id,
+    tipo: row.questoes?.tipo ?? 'objetiva',
     enunciado: row.questoes?.enunciado ?? '',
     alternativas: (row.questoes?.alternativas ?? [])
       .slice()
@@ -54,6 +55,14 @@ export async function GET(request: NextRequest) {
     if (r.alternativa_id) respMap[r.questao_id as string] = r.alternativa_id as string
   }
 
+  // Respostas discursivas já escritas nesta sessão.
+  const { data: disc } = await supabase
+    .from('simulado_respostas_discursivas')
+    .select('questao_id, texto')
+    .eq('sessao_id', sessao.id)
+  const respDisc: Record<string, string> = {}
+  for (const d of disc ?? []) respDisc[d.questao_id as string] = (d.texto as string) ?? ''
+
   return NextResponse.json({
     id: sessao.id,
     questoes,
@@ -61,5 +70,6 @@ export async function GET(request: NextRequest) {
     iniciado_em: sessao.iniciado_em,
     status: sessao.status,
     respostas: respMap,
+    respostas_discursivas: respDisc,
   })
 }

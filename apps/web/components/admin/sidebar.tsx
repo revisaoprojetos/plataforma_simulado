@@ -22,6 +22,7 @@ import {
   Building2,
   Flag,
   PenLine,
+  FileText,
   ChevronDown,
 } from 'lucide-react'
 import {
@@ -69,6 +70,7 @@ const navGroups: NavGroup[] = [
       { label: 'Reports de Questões', href: '/admin/feedbacks', icon: Flag, perm: 'questoes:view' },
       { label: 'Comentários', href: '/admin/comentarios', icon: MessageSquare, perm: 'questoes:view' },
       { label: 'Correção (discursivas)', href: '/admin/correcao', icon: PenLine, perm: 'questoes:view' },
+      { label: 'Cadernos de Prova', href: '/admin/cadernos', icon: FileText, perm: 'questoes:view' },
     ],
   },
   {

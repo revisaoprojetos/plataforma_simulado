@@ -14,6 +14,7 @@ import { SimuladoForm } from '@/components/admin/simulado-form'
 import { SimuladoActions } from '@/components/admin/simulado-actions'
 import { SimuladoQuestoesManager } from '@/components/admin/simulado-questoes-manager'
 import { SimuladoRelatorio } from '@/components/admin/simulado-relatorio'
+import { SimuladoRecorrecao } from '@/components/admin/simulado-recorrecao'
 import { CopyLink } from '@/components/admin/copy-link'
 import { updateSimuladoAction } from '../actions'
 import { format } from 'date-fns'
@@ -190,6 +191,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
             <TabsTrigger value="questoes">Questões ({totalQuestoes ?? 0})</TabsTrigger>
             <TabsTrigger value="sessoes">Sessões ({totalSessoes ?? 0})</TabsTrigger>
             <TabsTrigger value="relatorio">Relatório</TabsTrigger>
+            <TabsTrigger value="recorrecao">Re-correção</TabsTrigger>
             <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
           </TabsList>
           <Link href={`/admin/simulados/${id}/embed`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
@@ -388,6 +390,10 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
         {/* Configurações */}
         <TabsContent value="relatorio">
           <SimuladoRelatorio simuladoId={id} />
+        </TabsContent>
+
+        <TabsContent value="recorrecao">
+          <SimuladoRecorrecao simuladoId={id} />
         </TabsContent>
 
         <TabsContent value="configuracoes">

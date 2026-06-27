@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { Card, CardContent } from '@/components/ui/card'
-import { BookOpen, Star, ClipboardList, NotebookPen, ArrowRight } from 'lucide-react'
+import { BookOpen, Star, ClipboardList, NotebookPen, ArrowRight, Sparkles } from 'lucide-react'
 
 export default async function AlunoHome() {
   const sessao = await getSessaoAluno()
@@ -16,6 +16,7 @@ export default async function AlunoHome() {
   ])
 
   const atalhos = [
+    { href: '/aluno/recomendado', icon: Sparkles, titulo: 'Recomendado', desc: 'Questões focadas nos seus pontos fracos' },
     { href: '/aluno/questoes', icon: BookOpen, titulo: 'Banco de questões', desc: 'Pratique questões avulsas com filtros' },
     { href: '/aluno/favoritos', icon: Star, titulo: 'Favoritos', desc: 'Questões que você marcou' },
     { href: '/aluno/cadernos', icon: NotebookPen, titulo: 'Cadernos', desc: 'Organize seus estudos' },

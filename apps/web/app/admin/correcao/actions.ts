@@ -17,7 +17,7 @@ export async function assumirCorrecao(respostaId: string): Promise<{ ok: boolean
 
   const { data: r } = await svc
     .from('simulado_respostas_discursivas')
-    .select('id, status, em_correcao_por, lock_expira_em')
+    .select('id, status, em_correcao_por, lock_expira_em, sessao_id')
     .eq('id', respostaId)
     .maybeSingle()
   if (!r) return { ok: false, error: 'Resposta não encontrada.' }
@@ -51,7 +51,7 @@ export async function salvarCorrecao(
 
   const { data: r } = await svc
     .from('simulado_respostas_discursivas')
-    .select('id, status, em_correcao_por, lock_expira_em')
+    .select('id, status, em_correcao_por, lock_expira_em, sessao_id')
     .eq('id', respostaId)
     .maybeSingle()
   if (!r) return { ok: false, error: 'Resposta não encontrada.' }
@@ -87,6 +87,59 @@ export async function salvarCorrecao(
 
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_respostas_discursivas', entidadeId: respostaId, depois: { status: 'corrigida', nota: notaTotal } })
 
+  // Se a discursiva é de uma prova (tem sessão), recompõe a nota da sessão
+  // (objetiva + frações das discursivas corrigidas) e o ranking.
+  if (r.sessao_id) await recomputarNotaSessao(svc, r.sessao_id)
+
   revalidatePath('/admin/correcao')
   return { ok: true }
+}
+
+/**
+ * Nota combinada da sessão: cada questão vale igual (0..1); objetiva = 1 se
+ * correta; discursiva = nota/pontos_máximos (parcial). nota = média × 10.
+ * Discursivas ainda não corrigidas contam 0. Recalcula o ranking ao final.
+ */
+async function recomputarNotaSessao(svc: ReturnType<typeof createAdminClient>, sessaoId: string) {
+  const { data: sessao } = await svc.from('simulado_sessoes_prova').select('simulado_id').eq('id', sessaoId).maybeSingle()
+  if (!sessao) return
+
+  const { data: pq } = await svc
+    .from('simulado_prova_questoes')
+    .select('questao_id')
+    .eq('simulado_id', sessao.simulado_id)
+    .eq('anulada', false)
+  const total = (pq ?? []).length
+  if (total === 0) return
+
+  const { data: ro } = await svc.from('simulado_respostas_objetivas').select('correta').eq('sessao_id', sessaoId)
+  const acertosObj = (ro ?? []).filter((x: any) => x.correta).length
+
+  const { data: rd } = await svc
+    .from('simulado_respostas_discursivas')
+    .select('questao_id, nota')
+    .eq('sessao_id', sessaoId)
+    .eq('status', 'corrigida')
+  let fracDisc = 0
+  for (const d of rd ?? []) {
+    const { data: comps } = await svc.from('simulado_competencias').select('pontos').eq('questao_id', d.questao_id)
+    const maxP = (comps ?? []).reduce((a: number, c: any) => a + Number(c.pontos ?? 0), 0)
+    if (maxP > 0) fracDisc += Math.min(1, Number(d.nota ?? 0) / maxP)
+  }
+
+  const nota = Math.round(((acertosObj + fracDisc) / total) * 10 * 100) / 100
+  await svc.from('simulado_sessoes_prova').update({ nota }).eq('id', sessaoId)
+
+  // Recalcula ranking do simulado.
+  const { data: todas } = await svc
+    .from('simulado_sessoes_prova')
+    .select('id, nota, finalizado_em')
+    .eq('simulado_id', sessao.simulado_id)
+    .eq('is_teste', false)
+    .eq('status', 'finalizada')
+  const ord = (todas ?? []).slice().sort((a: any, b: any) => {
+    const dn = Number(b.nota ?? 0) - Number(a.nota ?? 0)
+    return dn !== 0 ? dn : new Date(a.finalizado_em ?? 0).getTime() - new Date(b.finalizado_em ?? 0).getTime()
+  })
+  await Promise.all(ord.map((s: any, i: number) => svc.from('simulado_sessoes_prova').update({ posicao_ranking: i + 1 }).eq('id', s.id)))
 }

@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 const NAV = [
   { href: '/aluno', label: 'Início', exact: true },
   { href: '/aluno/questoes', label: 'Questões' },
+  { href: '/aluno/recomendado', label: 'Recomendado' },
   { href: '/aluno/favoritos', label: 'Favoritos' },
   { href: '/aluno/cadernos', label: 'Cadernos' },
 ]

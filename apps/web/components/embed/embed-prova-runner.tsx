@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -28,6 +28,7 @@ interface Alternativa {
 
 interface Questao {
   id: string
+  tipo?: string
   enunciado: string
   alternativas: Alternativa[]
 }
@@ -39,6 +40,7 @@ interface SessaoData {
   iniciado_em: string
   status: string
   respostas: Record<string, string>
+  respostas_discursivas?: Record<string, string>
 }
 
 type ProvaStatus = 'loading' | 'em_andamento' | 'finalizada' | 'erro'
@@ -89,6 +91,8 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
   const [sessao, setSessao] = useState<SessaoData | null>(null)
   const [questaoIndex, setQuestaoIndex] = useState(0)
   const [respostas, setRespostas] = useState<Record<string, string>>({})
+  const [respDiscursivas, setRespDiscursivas] = useState<Record<string, string>>({})
+  const discTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [salvando, setSalvando] = useState<string | null>(null)
   const [showRevisao, setShowRevisao] = useState(false)
   const [showConfirmacao, setShowConfirmacao] = useState(false)
@@ -103,6 +107,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
         const data: SessaoData = await res.json()
         setSessao(data)
         setRespostas(data.respostas ?? {})
+        setRespDiscursivas(data.respostas_discursivas ?? {})
         setStatus('em_andamento')
       } catch {
         setStatus('erro')
@@ -186,6 +191,23 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
     autoSave(questaoId, alternativaId)
   }
 
+  // Discursiva: salva com debounce (não a cada tecla).
+  function handleDiscursiva(questaoId: string, texto: string) {
+    setRespDiscursivas((prev) => ({ ...prev, [questaoId]: texto }))
+    if (discTimers.current[questaoId]) clearTimeout(discTimers.current[questaoId])
+    discTimers.current[questaoId] = setTimeout(async () => {
+      try {
+        await fetch('/api/sessoes/resposta-discursiva', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessao_id: sessao?.id, questao_id: questaoId, texto }),
+        })
+      } catch {
+        /* silencioso; tenta de novo na próxima digitação */
+      }
+    }, 900)
+  }
+
   if (status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -254,7 +276,9 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
 
   const questaoAtual = sessao.questoes[questaoIndex]
   const totalQuestoes = sessao.questoes.length
-  const totalRespondidas = Object.keys(respostas).length
+  const respondidaDe = (q: Questao) =>
+    q.tipo === 'discursiva' ? !!respDiscursivas[q.id]?.trim() : !!respostas[q.id]
+  const totalRespondidas = sessao.questoes.filter(respondidaDe).length
   const progresso = (totalRespondidas / totalQuestoes) * 100
   const timerWarning = segundosRestantes !== null && segundosRestantes < 300
 
@@ -311,39 +335,53 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
           </CardContent>
         </Card>
 
-        <div className="space-y-2">
-          {questaoAtual.alternativas.map((alt, i) => {
-            const isSelected = respostas[questaoAtual.id] === alt.id
-            return (
-              <button
-                key={alt.id}
-                onClick={() => handleResponder(questaoAtual.id, alt.id)}
-                className={cn(
-                  'w-full rounded-lg border p-3.5 text-left transition-all hover:border-primary/50',
-                  isSelected
-                    ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                    : 'border-border bg-card hover:bg-muted/30'
-                )}
-              >
-                <div className="flex items-start gap-2.5">
-                  <span
-                    className={cn(
-                      'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs font-bold',
-                      isSelected
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-muted-foreground/30 text-muted-foreground'
-                    )}
-                  >
-                    {LETRA[i] ?? i + 1}
-                  </span>
-                  <span className={cn('text-sm leading-relaxed', isSelected && 'font-medium')}>
-                    {alt.texto}
-                  </span>
-                </div>
-              </button>
-            )
-          })}
-        </div>
+        {questaoAtual.tipo === 'discursiva' ? (
+          <div className="space-y-1">
+            <textarea
+              value={respDiscursivas[questaoAtual.id] ?? ''}
+              onChange={(e) => handleDiscursiva(questaoAtual.id, e.target.value)}
+              placeholder="Escreva sua resposta…"
+              rows={10}
+              maxLength={20000}
+              className="w-full resize-y rounded-lg border bg-card p-3.5 text-sm leading-relaxed outline-none focus:ring-1 focus:ring-ring"
+            />
+            <p className="text-xs text-muted-foreground">Resposta salva automaticamente. Será corrigida por um avaliador.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {questaoAtual.alternativas.map((alt, i) => {
+              const isSelected = respostas[questaoAtual.id] === alt.id
+              return (
+                <button
+                  key={alt.id}
+                  onClick={() => handleResponder(questaoAtual.id, alt.id)}
+                  className={cn(
+                    'w-full rounded-lg border p-3.5 text-left transition-all hover:border-primary/50',
+                    isSelected
+                      ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                      : 'border-border bg-card hover:bg-muted/30'
+                  )}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span
+                      className={cn(
+                        'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs font-bold',
+                        isSelected
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-muted-foreground/30 text-muted-foreground'
+                      )}
+                    >
+                      {LETRA[i] ?? i + 1}
+                    </span>
+                    <span className={cn('text-sm leading-relaxed', isSelected && 'font-medium')}>
+                      {alt.texto}
+                    </span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         <div className="flex items-center justify-between pt-1">
           <Button
@@ -358,7 +396,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
 
           <div className="flex flex-wrap gap-1 max-w-[200px] justify-center">
             {sessao.questoes.map((q, i) => {
-              const respondida = !!respostas[q.id]
+              const respondida = respondidaDe(q)
               const atual = i === questaoIndex
               return (
                 <button
@@ -420,7 +458,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
 
             <div className="flex flex-wrap gap-1.5">
               {sessao.questoes.map((q, i) => {
-                const respondida = !!respostas[q.id]
+                const respondida = respondidaDe(q)
                 return (
                   <button
                     key={q.id}

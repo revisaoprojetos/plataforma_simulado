@@ -13,6 +13,7 @@ import {
   Home,
   Trophy,
   Lock,
+  Printer,
 } from 'lucide-react'
 
 interface AltRev {
@@ -122,10 +123,16 @@ export function RevisaoFinal({
             <CheckCircle2 className="h-5 w-5 text-green-600" />
             <span className="text-sm font-semibold">Prova finalizada</span>
           </div>
-          <a href={voltarUrl} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            <Home className="mr-1.5 h-4 w-4" />
-            Voltar ao menu
-          </a>
+          <div className="flex items-center gap-2">
+            <a href={`/imprimir/resultado/${sessionToken}`} target="_blank" rel="noreferrer" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              <Printer className="mr-1.5 h-4 w-4" />
+              Baixar PDF
+            </a>
+            <a href={voltarUrl} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              <Home className="mr-1.5 h-4 w-4" />
+              Voltar ao menu
+            </a>
+          </div>
         </div>
       </header>
 
