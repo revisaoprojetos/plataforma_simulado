@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import {
   LayoutDashboard,
@@ -23,6 +23,9 @@ import {
   Flag,
   PenLine,
   FileText,
+  MessagesSquare,
+  LogIn,
+  FilePen,
   ChevronDown,
 } from 'lucide-react'
 import {
@@ -67,8 +70,6 @@ const navGroups: NavGroup[] = [
       { label: 'Aplicação de Simulado', href: '/admin/simulados', icon: ClipboardList, perm: 'simulados:view' },
       { label: 'Questões', href: '/admin/questoes', icon: BookOpen, perm: 'questoes:view' },
       { label: 'Banco de Questões', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
-      { label: 'Reports de Questões', href: '/admin/feedbacks', icon: Flag, perm: 'questoes:view' },
-      { label: 'Comentários', href: '/admin/comentarios', icon: MessageSquare, perm: 'questoes:view' },
       { label: 'Correção (discursivas)', href: '/admin/correcao', icon: PenLine, perm: 'questoes:view' },
       { label: 'Cadernos de Prova', href: '/admin/cadernos', icon: FileText, perm: 'questoes:view' },
     ],
@@ -87,7 +88,22 @@ const navGroups: NavGroup[] = [
     icon: BarChart3,
     items: [
       { label: 'Relatórios', href: '/admin/relatorios', icon: BarChart3, perm: 'relatorios:view' },
-      { label: 'Auditoria', href: '/admin/auditoria', icon: ClipboardCheck, perm: 'auditoria:view' },
+    ],
+  },
+  {
+    label: 'Auditoria',
+    icon: ClipboardCheck,
+    items: [
+      { label: 'Acessos', href: '/admin/auditoria?tipo=acessos', icon: LogIn, perm: 'auditoria:view' },
+      { label: 'Modificações', href: '/admin/auditoria?tipo=modificacoes', icon: FilePen, perm: 'auditoria:view' },
+    ],
+  },
+  {
+    label: 'Feedback',
+    icon: MessagesSquare,
+    items: [
+      { label: 'Comentários', href: '/admin/comentarios', icon: MessageSquare, perm: 'questoes:view' },
+      { label: 'Reports de Questões', href: '/admin/feedbacks', icon: Flag, perm: 'questoes:view' },
     ],
   },
   {
@@ -103,13 +119,22 @@ const navGroups: NavGroup[] = [
   },
 ]
 
-function itemAtivo(item: NavItem, pathname: string) {
-  if (item.exact) return pathname === item.href
-  return pathname.startsWith(item.href)
+function itemAtivo(item: NavItem, pathname: string, search: URLSearchParams) {
+  const [path, qs] = item.href.split('?')
+  if (item.exact) return pathname === path
+  if (qs) {
+    // Itens que compartilham a mesma rota e diferem só pela query (ex.: Auditoria).
+    if (pathname !== path) return false
+    const want = new URLSearchParams(qs)
+    for (const [k, v] of want) if (search.get(k) !== v) return false
+    return true
+  }
+  return pathname.startsWith(path)
 }
 
 export function AdminSidebar() {
   const pathname = usePathname()
+  const search = useSearchParams()
   const can = useCan()
 
   // Filtra itens/grupos por permissão do usuário.
@@ -117,11 +142,11 @@ export function AdminSidebar() {
     .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm)) }))
     .filter((g) => g.items.length > 0)
 
-  const grupoAtivo = (group: NavGroup) => group.items.some((i) => itemAtivo(i, pathname))
+  const grupoAtivo = (group: NavGroup) => group.items.some((i) => itemAtivo(i, pathname, search))
 
   // Abre por padrão a seção que contém a rota atual.
   const [abertos, setAbertos] = useState<string[]>(() =>
-    gruposVisiveis.filter((g) => g.items.some((i) => itemAtivo(i, pathname))).map((g) => g.label),
+    gruposVisiveis.filter((g) => g.items.some((i) => itemAtivo(i, pathname, search))).map((g) => g.label),
   )
 
   function toggle(label: string) {
@@ -145,7 +170,7 @@ export function AdminSidebar() {
             <SidebarMenu>
               {/* Dashboard (item solto) */}
               <SidebarMenuItem>
-                <SidebarMenuButton render={<Link href={dashboard.href} />} isActive={itemAtivo(dashboard, pathname)}>
+                <SidebarMenuButton render={<Link href={dashboard.href} />} isActive={itemAtivo(dashboard, pathname, search)}>
                   <dashboard.icon className="h-4 w-4" />
                   <span>{dashboard.label}</span>
                 </SidebarMenuButton>
@@ -175,7 +200,7 @@ export function AdminSidebar() {
                           <SidebarMenuSubItem key={item.href}>
                             <SidebarMenuSubButton
                               render={<Link href={item.href} />}
-                              isActive={itemAtivo(item, pathname)}
+                              isActive={itemAtivo(item, pathname, search)}
                             >
                               <item.icon className="h-4 w-4" />
                               <span>{item.label}</span>

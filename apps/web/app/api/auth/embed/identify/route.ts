@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
   // 1. Buscar simulado por embed_token
   const { data: simulado, error: simError } = await supabase
     .from('simulado_simulados')
-    .select('id, titulo, status, metodo_identificacao, embed_ativo, tenant_id, data_inicio, data_fim, tempo_limite_min')
+    .select('id, titulo, status, metodo_identificacao, embed_ativo, tenant_id, data_inicio, data_fim, tempo_limite_min, regras, modo_aplicacao')
     .eq('embed_token', embed_token)
     .single()
 
@@ -133,10 +133,30 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 3. Verificar matrícula ativa para este simulado
-  const temAcesso = await verificarAcesso(supabase, estudante.id, simulado.id)
-  if (!temAcesso) {
-    return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
+  // 3. Verificar acesso. Modo prazo_relativo usa acesso avulso (simulado_acessos);
+  //    demais modos usam matrícula ativa.
+  let acessoAvulso: { id: string; expira_em: string | null; tentativas_permitidas: number; tentativas_usadas: number } | null = null
+  if (simulado.modo_aplicacao === 'prazo_relativo') {
+    const { data: acesso } = await supabase
+      .from('simulado_acessos')
+      .select('id, expira_em, tentativas_permitidas, tentativas_usadas')
+      .eq('simulado_id', simulado.id)
+      .eq('estudante_id', estudante.id)
+      .order('criado_em', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (!acesso) {
+      return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
+    }
+    if (acesso.expira_em && new Date(acesso.expira_em) < new Date()) {
+      return bloqueio(tenantId, 'bloqueio_prazo_expirado', { nome: estudante.nome ?? '', simulado: tituloSimulado })
+    }
+    acessoAvulso = acesso
+  } else {
+    const temAcesso = await verificarAcesso(supabase, estudante.id, simulado.id)
+    if (!temAcesso) {
+      return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
+    }
   }
 
   // 4. Abrir ou retomar sessao_prova
@@ -154,8 +174,37 @@ export async function POST(request: NextRequest) {
   let sessaoId: string
 
   if (sessaoExistente) {
+    // Retoma a sessão em andamento.
     sessaoId = sessaoExistente.id
   } else {
+    let tentativaNum: number
+
+    if (acessoAvulso) {
+      // Modo prazo relativo: limite e contagem vêm do acesso avulso.
+      if (acessoAvulso.tentativas_usadas >= acessoAvulso.tentativas_permitidas) {
+        return bloqueio(tenantId, 'bloqueio_tentativas', { nome: estudante.nome ?? '', simulado: tituloSimulado, tentativas_restantes: '0' })
+      }
+      tentativaNum = acessoAvulso.tentativas_usadas + 1
+      await supabase.from('simulado_acessos').update({ tentativas_usadas: tentativaNum }).eq('id', acessoAvulso.id)
+    } else {
+      // Demais modos — limite de retentativas pela regra (sem config = ilimitado).
+      const regras = (simulado.regras as Record<string, unknown>) ?? {}
+      const max = Number(regras.max_tentativas ?? regras.retentativas ?? 0)
+      const ilimitado = !(max > 0)
+      const { count: finalizadas } = await supabase
+        .from('simulado_sessoes_prova')
+        .select('*', { count: 'exact', head: true })
+        .eq('simulado_id', simulado.id)
+        .eq('estudante_id', estudante.id)
+        .eq('is_teste', false)
+        .eq('status', 'finalizada')
+
+      if (!ilimitado && (finalizadas ?? 0) >= max) {
+        return bloqueio(tenantId, 'bloqueio_tentativas', { nome: estudante.nome ?? '', simulado: tituloSimulado, tentativas_restantes: '0' })
+      }
+      tentativaNum = (finalizadas ?? 0) + 1
+    }
+
     const { data: novaSessao, error: sessaoError } = await supabase
       .from('simulado_sessoes_prova')
       .insert({
@@ -165,7 +214,7 @@ export async function POST(request: NextRequest) {
         is_teste: false,
         status: 'em_andamento',
         iniciado_em: new Date().toISOString(),
-        tentativa_num: 1,
+        tentativa_num: tentativaNum,
       })
       .select('id')
       .single()

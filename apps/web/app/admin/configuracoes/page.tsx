@@ -1,8 +1,10 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { getCurrentAccess } from '@/lib/auth/permissions'
 import { getTenantTheme } from '@/lib/tenant-theme'
+import { registrarAudit } from '@/lib/audit'
 import { ConfiguracoesForm } from './configuracoes-form'
 
 // ─── Server action ─────────────────────────────────────────────────────────────
@@ -28,28 +30,29 @@ export async function salvarTema(formData: FormData) {
     ...(fonte && { fonte }),
   }
 
-  const supabase = await createServiceClient()
-
-  // Fetch the first active tenant
-  const { data: tenant, error: fetchError } = await supabase
-    .from('simulado_tenants')
-    .select('id')
-    .eq('ativo', true)
-    .limit(1)
-    .single()
-
-  if (fetchError || !tenant) {
-    throw new Error('Tenant não encontrado')
+  // Escrita em tenants exige service-role real (createServiceClient é
+  // bloqueado por RLS e o UPDATE não afeta nenhuma linha — o save "falha em silêncio").
+  const access = await getCurrentAccess()
+  if (!(access.isAdmin || access.permissions.includes('configuracoes:view'))) {
+    throw new Error('Sem permissão para alterar a identidade visual.')
   }
 
-  const { error } = await supabase
-    .from('simulado_tenants')
-    .update({ tema })
-    .eq('id', tenant.id)
+  const svc = createAdminClient()
 
-  if (error) {
-    throw new Error(`Erro ao salvar tema: ${error.message}`)
+  // Mira o tenant atual (resolvido pela sessão/subdomínio); fallback p/ o 1º ativo.
+  let tenantId = access.tenantId
+  if (!tenantId) {
+    const { data: tenant } = await svc.from('simulado_tenants').select('id').eq('ativo', true).limit(1).single()
+    tenantId = tenant?.id ?? null
   }
+  if (!tenantId) throw new Error('Tenant não encontrado')
+
+  const { data: anterior } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
+
+  const { error } = await svc.from('simulado_tenants').update({ tema }).eq('id', tenantId)
+  if (error) throw new Error(`Erro ao salvar tema: ${error.message}`)
+
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenants', entidadeId: tenantId, antes: (anterior?.tema as Record<string, unknown>) ?? {}, depois: tema, tenantId })
 
   revalidatePath('/', 'layout')
   revalidatePath('/admin/configuracoes')

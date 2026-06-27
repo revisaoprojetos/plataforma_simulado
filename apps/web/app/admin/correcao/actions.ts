@@ -4,12 +4,13 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { rankearSimulado } from '@/lib/ranking'
 
 const LOCK_MIN = 30
 
 /** Assume a correção (lock). Falha se já há outro corretor com lock ativo. */
 export async function assumirCorrecao(respostaId: string): Promise<{ ok: boolean; error?: string }> {
-  if (!(await checkPermission('correcao:corrigir')) && !(await checkPermission('questoes:update'))) {
+  if (!(await checkPermission('questoes:update'))) {
     return { ok: false, error: 'Sem permissão para corrigir.' }
   }
   const access = await getCurrentAccess()
@@ -43,7 +44,7 @@ export async function salvarCorrecao(
   competencias: { competencia_id: string; nota: number; comentario?: string }[],
   feedback: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!(await checkPermission('correcao:corrigir')) && !(await checkPermission('questoes:update'))) {
+  if (!(await checkPermission('questoes:update'))) {
     return { ok: false, error: 'Sem permissão para corrigir.' }
   }
   const access = await getCurrentAccess()
@@ -130,16 +131,6 @@ async function recomputarNotaSessao(svc: ReturnType<typeof createAdminClient>, s
   const nota = Math.round(((acertosObj + fracDisc) / total) * 10 * 100) / 100
   await svc.from('simulado_sessoes_prova').update({ nota }).eq('id', sessaoId)
 
-  // Recalcula ranking do simulado.
-  const { data: todas } = await svc
-    .from('simulado_sessoes_prova')
-    .select('id, nota, finalizado_em')
-    .eq('simulado_id', sessao.simulado_id)
-    .eq('is_teste', false)
-    .eq('status', 'finalizada')
-  const ord = (todas ?? []).slice().sort((a: any, b: any) => {
-    const dn = Number(b.nota ?? 0) - Number(a.nota ?? 0)
-    return dn !== 0 ? dn : new Date(a.finalizado_em ?? 0).getTime() - new Date(b.finalizado_em ?? 0).getTime()
-  })
-  await Promise.all(ord.map((s: any, i: number) => svc.from('simulado_sessoes_prova').update({ posicao_ranking: i + 1 }).eq('id', s.id)))
+  // Recalcula ranking (dedup por aluno conforme a política de nota).
+  await rankearSimulado(svc, sessao.simulado_id)
 }

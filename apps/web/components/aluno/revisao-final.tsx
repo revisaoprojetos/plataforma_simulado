@@ -24,9 +24,11 @@ interface AltRev {
 interface QuestaoRev {
   numero: number
   id: string
+  tipo?: string
   enunciado: string
   resposta_aluno: string | null
   acertou: boolean | null
+  discursiva?: { texto: string; status: string; nota: number | null; feedback: string | null } | null
   alternativas: AltRev[]
 }
 interface StatDisciplina {
@@ -283,7 +285,31 @@ export function RevisaoFinal({
 
                   <p className="text-sm leading-relaxed">{q.enunciado}</p>
 
-                  {/* alternativas */}
+                  {/* discursiva: resposta escrita + correção */}
+                  {q.tipo === 'discursiva' ? (
+                    <div className="space-y-2">
+                      {q.discursiva?.status === 'corrigida' ? (
+                        <div className="flex items-center gap-2 rounded-md bg-green-50 p-2.5 text-sm dark:bg-green-900/20">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <span className="font-medium text-green-700 dark:text-green-400">Corrigida — nota {Number(q.discursiva.nota ?? 0).toFixed(1)}</span>
+                        </div>
+                      ) : (
+                        <div className="rounded-md bg-amber-50 p-2.5 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+                          Resposta enviada — aguardando correção por um avaliador.
+                        </div>
+                      )}
+                      <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
+                        {q.discursiva?.texto || '(resposta em branco)'}
+                      </div>
+                      {q.discursiva?.feedback && (
+                        <div className="rounded-md border bg-primary/5 p-3 text-sm">
+                          <p className="mb-1 text-xs font-semibold text-muted-foreground">Feedback do corretor</p>
+                          {q.discursiva.feedback}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                  /* alternativas */
                   <div className="space-y-2">
                     {q.alternativas.map((alt, i) => {
                       const marcada = q.resposta_aluno === alt.id
@@ -323,6 +349,7 @@ export function RevisaoFinal({
                       )
                     })}
                   </div>
+                  )}
 
                   <div className="flex justify-end pt-1">
                     <ReportarErroButton sessaoId={sessionToken} questaoId={q.id} />

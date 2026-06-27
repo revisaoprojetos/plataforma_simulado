@@ -16,12 +16,17 @@ const ITEMS_PER_PAGE = 30
 interface PageProps {
   searchParams: Promise<{
     page?: string
+    tipo?: string
     acao?: string
     entidade?: string
     data_inicio?: string
     data_fim?: string
   }>
 }
+
+// Acessos = entradas/saídas/bloqueios; Modificações = mutações de dados.
+const ACESSO_OPS = ['LOGIN', 'LOGOUT', 'BLOQUEIO_AUTOMATICO']
+const MODIFICACAO_OPS = ['INSERT', 'UPDATE', 'DELETE', 'LIBERAR', 'BLOQUEAR', 'ANULAR', 'RECORRIGIR']
 
 const acaoVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   INSERT: 'default',
@@ -49,6 +54,9 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
     .order('criado_em', { ascending: false })
     .range(offset, offset + ITEMS_PER_PAGE - 1)
 
+  const tipo = params.tipo === 'acessos' ? 'acessos' : params.tipo === 'modificacoes' ? 'modificacoes' : 'todos'
+  if (tipo === 'acessos') query = query.in('operacao', ACESSO_OPS)
+  else if (tipo === 'modificacoes') query = query.in('operacao', MODIFICACAO_OPS)
   if (params.acao) query = query.eq('operacao', params.acao)
   if (params.entidade) query = query.ilike('entidade', `%${params.entidade}%`)
   if (params.data_inicio) query = query.gte('criado_em', params.data_inicio)
@@ -60,9 +68,16 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Auditoria</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {tipo === 'acessos' ? 'Auditoria · Acessos' : tipo === 'modificacoes' ? 'Auditoria · Modificações' : 'Auditoria'}
+        </h1>
         <p className="text-muted-foreground">
-          Registro imutável de todas as ações — {count ?? 0} entradas
+          {tipo === 'acessos'
+            ? 'Entradas, saídas e bloqueios automáticos'
+            : tipo === 'modificacoes'
+              ? 'Criações, edições, exclusões, liberações e anulações'
+              : 'Registro imutável de todas as ações'}{' '}
+          — {count ?? 0} entradas
         </p>
       </div>
 

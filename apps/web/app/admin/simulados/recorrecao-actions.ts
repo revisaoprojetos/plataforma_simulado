@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { rankearSimulado } from '@/lib/ranking'
 
 type Politica = 'pontua_todos' | 'desconsidera'
 
@@ -91,27 +92,18 @@ export async function anularQuestao(
     await svc.from('simulado_sessoes_prova').update({ nota: Math.round(nota * 100) / 100 }).eq('id', s.id)
   }
 
-  // 5) Recalcula ranking (nota desc, desempate por quem finalizou antes).
-  const { data: atualizadas } = await svc
-    .from('simulado_sessoes_prova')
-    .select('id, estudante_id, nota, finalizado_em')
-    .eq('simulado_id', simuladoId)
-    .eq('is_teste', false)
-    .eq('status', 'finalizada')
-  const ordenadas = (atualizadas ?? []).slice().sort((a: any, b: any) => {
-    const dn = Number(b.nota ?? 0) - Number(a.nota ?? 0)
-    if (dn !== 0) return dn
-    return new Date(a.finalizado_em ?? 0).getTime() - new Date(b.finalizado_em ?? 0).getTime()
-  })
-  const rankingDepois = new Map<string, number>()
-  for (let i = 0; i < ordenadas.length; i++) {
-    rankingDepois.set(ordenadas[i].id, i + 1)
-    await svc.from('simulado_sessoes_prova').update({ posicao_ranking: i + 1 }).eq('id', ordenadas[i].id)
-  }
+  // 5) Recalcula ranking (dedup por aluno conforme a política de nota).
+  await rankearSimulado(svc, simuladoId)
 
-  // 6) Registra impacto por aluno (antes × depois).
+  // 6) Registra impacto por aluno (antes × depois), com o estado já recalculado.
   if (recorrecaoId) {
-    const impactos = ordenadas.map((s: any) => {
+    const { data: depoisSessoes } = await svc
+      .from('simulado_sessoes_prova')
+      .select('id, estudante_id, nota, posicao_ranking')
+      .eq('simulado_id', simuladoId)
+      .eq('is_teste', false)
+      .eq('status', 'finalizada')
+    const impactos = (depoisSessoes ?? []).map((s: any) => {
       const a = antes.get(s.id) ?? { nota: 0, ranking: null }
       const notaDepois = Number(s.nota ?? 0)
       const delta = Math.round((notaDepois - a.nota) * 100) / 100
@@ -124,7 +116,7 @@ export async function anularQuestao(
         nota_depois: notaDepois,
         delta,
         ranking_antes: a.ranking,
-        ranking_depois: rankingDepois.get(s.id) ?? null,
+        ranking_depois: s.posicao_ranking ?? null,
         classificacao,
       }
     })

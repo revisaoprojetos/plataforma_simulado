@@ -18,13 +18,14 @@ export async function GET(request: NextRequest) {
     .maybeSingle()
   if (!sessao) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
 
-  // Total de participantes (sessões finalizadas, exceto testes) — contexto do ranking.
-  const { count: totalParticipantes } = await supabase
+  // Total de participantes (alunos distintos finalizados, exceto testes) — contexto do ranking.
+  const { data: participantes } = await supabase
     .from('simulado_sessoes_prova')
-    .select('*', { count: 'exact', head: true })
+    .select('estudante_id')
     .eq('simulado_id', sessao.simulado_id)
     .eq('is_teste', false)
     .eq('status', 'finalizada')
+  const totalParticipantes = new Set((participantes ?? []).map((p: any) => p.estudante_id)).size
 
   const { data: simulado } = await supabase
     .from('simulado_simulados')
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
 
   const { data: sq } = await supabase
     .from('simulado_prova_questoes')
-    .select('ordem, questoes:simulado_questoes(id, enunciado, disciplina_id, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem))')
+    .select('ordem, questoes:simulado_questoes(id, tipo, enunciado, disciplina_id, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem))')
     .eq('simulado_id', sessao.simulado_id)
     .eq('anulada', false)
     .order('ordem')
@@ -55,6 +56,13 @@ export async function GET(request: NextRequest) {
     .from('simulado_respostas_objetivas')
     .select('questao_id, alternativa_id, correta')
     .eq('sessao_id', st)
+
+  // Respostas discursivas desta sessão (com correção, se houver).
+  const { data: disc } = await supabase
+    .from('simulado_respostas_discursivas')
+    .select('questao_id, texto, status, nota, feedback')
+    .eq('sessao_id', st)
+  const discMap = new Map((disc ?? []).map((d: any) => [d.questao_id, d]))
 
   // Para revelar o gabarito, buscamos as alternativas corretas separadamente.
   let corretasMap = new Map<string, string>() // questao_id -> alternativa_id correta
@@ -101,12 +109,18 @@ export async function GET(request: NextRequest) {
     const q = row.questoes
     const resp = respMap.get(q?.id)
     const correta_id = corretasMap.get(q?.id) ?? null
+    const d = discMap.get(q?.id)
     return {
       numero: idx + 1,
       id: q?.id,
+      tipo: q?.tipo ?? 'objetiva',
       enunciado: q?.enunciado ?? '',
       resposta_aluno: resp?.alternativa_id ?? null,
       acertou: gabaritoLiberado ? resp?.correta ?? false : null,
+      // Para discursiva: a resposta escrita + estado da correção.
+      discursiva: q?.tipo === 'discursiva' && d
+        ? { texto: d.texto ?? '', status: d.status, nota: d.nota, feedback: d.feedback }
+        : null,
       alternativas: (q?.alternativas ?? [])
         .slice()
         .sort((a: any, b: any) => a.ordem - b.ordem)

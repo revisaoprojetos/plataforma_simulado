@@ -61,9 +61,11 @@ function SelectContent({
   children,
   side = "bottom",
   sideOffset = 4,
-  align = "center",
+  align = "start",
   alignOffset = 0,
-  alignItemWithTrigger = true,
+  // false = abre sempre abaixo do trigger (popper), sem centralizar o item
+  // selecionado sobre o gatilho (evita a lista "pular" ao reabrir).
+  alignItemWithTrigger = false,
   ...props
 }: SelectPrimitive.Popup.Props &
   Pick<

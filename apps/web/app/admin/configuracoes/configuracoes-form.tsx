@@ -7,7 +7,21 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { TenantTema } from '@/lib/tenant-theme'
+
+// Fontes Google disponíveis para a marca. Cada item é renderizado na própria fonte.
+const FONTES = [
+  'Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins', 'Raleway',
+  'Nunito', 'Work Sans', 'Source Sans 3', 'DM Sans', 'Rubik', 'Mulish', 'Quicksand',
+  'Merriweather', 'Playfair Display', 'Lora', 'Roboto Slab', 'Oswald', 'Bebas Neue',
+]
+const SEM_FONTE = '__default__'
+// URL única do Google Fonts que carrega todas as opções (para o preview na lista).
+const GOOGLE_FONTS_URL =
+  'https://fonts.googleapis.com/css2?' +
+  FONTES.map((f) => `family=${f.replace(/ /g, '+')}:wght@400;600`).join('&') +
+  '&display=swap'
 
 // ─── Live preview component ──────────────────────────────────────────────────
 
@@ -204,15 +218,32 @@ export function ConfiguracoesForm({ tema, salvarTema }: ConfiguracoesFormProps) 
 
               <div className="space-y-2">
                 <Label htmlFor="fonte">Fonte</Label>
-                <Input
-                  id="fonte"
-                  name="fonte"
-                  defaultValue={tema?.fonte ?? ''}
-                  placeholder="Inter, Roboto, Poppins…"
-                  onChange={(e) => setFonte(e.target.value)}
-                />
+                {/* Carrega as fontes para que cada opção apareça na própria tipografia */}
+                <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
+                {/* Valor real submetido no formulário */}
+                <input type="hidden" name="fonte" value={fonte} />
+                <Select
+                  value={fonte || SEM_FONTE}
+                  onValueChange={(v) => setFonte(v === SEM_FONTE ? '' : (v ?? ''))}
+                >
+                  <SelectTrigger
+                    id="fonte"
+                    className="w-full"
+                    style={{ fontFamily: fonte ? `"${fonte}", sans-serif` : undefined }}
+                  >
+                    <SelectValue placeholder="Selecione uma fonte" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    <SelectItem value={SEM_FONTE}>Padrão (sistema)</SelectItem>
+                    {FONTES.map((f) => (
+                      <SelectItem key={f} value={f} style={{ fontFamily: `"${f}", sans-serif`, fontSize: '1rem' }}>
+                        {f}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <p className="text-xs text-muted-foreground">
-                  Nome exato de uma Google Font. Deixe vazio para usar a fonte padrão.
+                  Cada opção é exibida na própria fonte. Deixe em “Padrão” para usar a fonte do sistema.
                 </p>
               </div>
 

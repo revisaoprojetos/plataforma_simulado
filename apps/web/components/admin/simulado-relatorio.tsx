@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Trophy, TrendingDown, BarChart3 } from 'lucide-react'
+import { calcularRanking } from '@/lib/ranking'
 
 interface Props {
   simuladoId: string
@@ -14,7 +15,7 @@ export async function SimuladoRelatorio({ simuladoId }: Props) {
   // Sessões finalizadas (exceto testes) com aluno.
   const { data: sessoes } = await svc
     .from('simulado_sessoes_prova')
-    .select('id, nota, posicao_ranking, estudantes:simulado_estudantes(nome)')
+    .select('id, nota, posicao_ranking, estudante_id, estudantes:simulado_estudantes(nome)')
     .eq('simulado_id', simuladoId)
     .eq('is_teste', false)
     .eq('status', 'finalizada')
@@ -22,6 +23,11 @@ export async function SimuladoRelatorio({ simuladoId }: Props) {
 
   const sessoesArr = sessoes ?? []
   const sessaoIds = sessoesArr.map((s: any) => s.id)
+
+  // Ranking deduplicado por aluno (1 entrada por aluno, conforme política de nota).
+  const ranking = await calcularRanking(svc, simuladoId)
+  const nomePorAluno = new Map<string, string>()
+  for (const s of sessoesArr as any[]) if (s.estudante_id) nomePorAluno.set(s.estudante_id, s.estudantes?.nome ?? '—')
 
   // Questões do simulado + matéria.
   const { data: pq } = await svc
@@ -92,7 +98,7 @@ export async function SimuladoRelatorio({ simuladoId }: Props) {
       <Card className="lg:col-span-2">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Trophy className="h-4 w-4 text-amber-500" /> Ranking da turma ({sessoesArr.length})
+            <Trophy className="h-4 w-4 text-amber-500" /> Ranking da turma ({ranking.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -102,15 +108,17 @@ export async function SimuladoRelatorio({ simuladoId }: Props) {
                 <tr>
                   <th className="px-4 py-2 text-left font-medium">#</th>
                   <th className="px-4 py-2 text-left font-medium">Aluno</th>
+                  <th className="px-4 py-2 text-center font-medium">Tentativas</th>
                   <th className="px-4 py-2 text-right font-medium">Nota</th>
                 </tr>
               </thead>
               <tbody>
-                {sessoesArr.map((s: any, i: number) => (
-                  <tr key={s.id} className="border-t">
-                    <td className="px-4 py-2 font-mono text-muted-foreground">{s.posicao_ranking ?? i + 1}º</td>
-                    <td className="px-4 py-2 font-medium">{s.estudantes?.nome ?? '—'}</td>
-                    <td className="px-4 py-2 text-right font-semibold">{(s.nota ?? 0).toFixed(1)}</td>
+                {ranking.map((r) => (
+                  <tr key={r.estudanteId} className="border-t">
+                    <td className="px-4 py-2 font-mono text-muted-foreground">{r.posicao}º</td>
+                    <td className="px-4 py-2 font-medium">{nomePorAluno.get(r.estudanteId) ?? '—'}</td>
+                    <td className="px-4 py-2 text-center text-muted-foreground">{r.tentativas > 1 ? r.tentativas : '—'}</td>
+                    <td className="px-4 py-2 text-right font-semibold">{r.notaOficial.toFixed(1)}</td>
                   </tr>
                 ))}
               </tbody>
