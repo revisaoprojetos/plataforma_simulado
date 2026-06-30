@@ -5,6 +5,8 @@ import { AdminHeader } from '@/components/admin/header'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { CanProvider } from '@/components/auth/can-provider'
 import { getCurrentAccess } from '@/lib/auth/permissions'
+import { getTenantTheme } from '@/lib/tenant-theme'
+import { SplashSistema } from '@/components/admin/splash-sistema'
 
 const CURRENT_POLICY_VERSION = '1.0'
 
@@ -45,8 +47,18 @@ export default async function AdminLayout({
   // Resolve permissões do usuário no tenant atual (para esconder UI por papel).
   const access = await getCurrentAccess()
 
+  // Config da tela de imersão (mostrada uma vez ao acessar o sistema).
+  const { tema, tenantNome } = await getTenantTheme()
+  const ti = (tema ?? {}) as any
+
   return (
     <CanProvider isAdmin={access.isAdmin} permissions={access.permissions}>
+      <SplashSistema
+        estilo={ti.splash_estilo ?? 'spinner'}
+        logo={ti.splash_logo ?? ti.logo_url ?? null}
+        nome={ti.nome_site ?? tenantNome ?? 'Plataforma'}
+        mensagem={ti.splash_mensagem ?? 'Carregando o sistema…'}
+      />
       <SidebarProvider>
         <div className="flex min-h-screen w-full">
           <AdminSidebar />

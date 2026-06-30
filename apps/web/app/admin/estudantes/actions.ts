@@ -2,10 +2,12 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { softDelete } from '@/lib/soft-delete'
+import { rankearSimulado } from '@/lib/ranking'
 
 interface NovoEstudanteData {
   nome: string
@@ -53,4 +55,27 @@ export async function createEstudanteAction(data: NovoEstudanteData) {
 
   revalidatePath('/admin/estudantes')
   redirect('/admin/estudantes')
+}
+
+/** Soft delete do estudante → vai para a Lixeira (recuperável). Sessões/vínculos preservados. */
+export async function deleteEstudanteAction(id: string) {
+  if (!(await checkPermission('estudantes:delete'))) return { error: 'Você não tem permissão para excluir estudantes.' }
+  const { error } = await softDelete('simulado_estudantes', id)
+  if (error) return { error: error.message }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_estudantes', entidadeId: id, depois: { deletado: true } })
+  revalidatePath('/admin/estudantes')
+  return { ok: true }
+}
+
+/** Soft delete de UMA sessão (tentativa) → sai do histórico/resultados/ranking; recalcula o ranking. */
+export async function excluirSessaoAction(sessaoId: string, simuladoId: string, estudanteId: string) {
+  if (!(await checkPermission('simulados:update'))) return { error: 'Você não tem permissão.' }
+  const { error } = await softDelete('simulado_sessoes_prova', sessaoId)
+  if (error) return { error: error.message }
+  // A sessão excluída sai do cálculo: recalcula o ranking do simulado.
+  if (simuladoId) { try { await rankearSimulado(createAdminClient(), simuladoId) } catch { /* ranking best-effort */ } }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_sessoes_prova', entidadeId: sessaoId, depois: { deletado: true } })
+  revalidatePath(`/admin/estudantes/${estudanteId}`)
+  if (simuladoId) revalidatePath(`/admin/simulados/${simuladoId}`)
+  return { ok: true }
 }

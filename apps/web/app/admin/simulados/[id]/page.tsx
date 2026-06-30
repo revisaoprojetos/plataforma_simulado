@@ -108,6 +108,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
         estudantes:simulado_estudantes(nome, user_id)
       `, { count: 'exact' })
       .eq('simulado_id', id)
+      .eq('deletado', false)
       .order('iniciado_em', { ascending: false })
       .limit(50),
     supabase

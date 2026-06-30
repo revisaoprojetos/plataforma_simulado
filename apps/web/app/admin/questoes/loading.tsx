@@ -1,9 +1,5 @@
-import { Loader2 } from 'lucide-react'
+import { AppLoading } from '@/components/admin/app-loading'
 
 export default function Loading() {
-  return (
-    <div className="flex flex-1 items-center justify-center py-12">
-      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-    </div>
-  )
+  return <AppLoading />
 }

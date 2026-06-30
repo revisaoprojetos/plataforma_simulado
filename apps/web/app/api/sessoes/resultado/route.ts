@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     .eq('simulado_id', sessao.simulado_id)
     .eq('is_teste', false)
     .eq('status', 'finalizada')
+    .eq('deletado', false)
   const totalParticipantes = new Set((participantes ?? []).map((p: any) => p.estudante_id)).size
 
   const { data: simulado } = await supabase
@@ -33,17 +34,17 @@ export async function GET(request: NextRequest) {
     .eq('id', sessao.simulado_id)
     .single()
 
-  const regras = (simulado?.regras as { liberar_gabarito?: string }) ?? {}
+  const regras = (simulado?.regras as { liberar_gabarito?: string; gabarito_liberado?: boolean }) ?? {}
   const liberar = regras.liberar_gabarito ?? 'apos_janela'
   const agora = new Date()
   let gabaritoLiberado = false
-  if (liberar === 'imediato') gabaritoLiberado = true
+  if (regras.gabarito_liberado) gabaritoLiberado = true // liberação manual (qualquer modo)
+  else if (liberar === 'imediato') gabaritoLiberado = true
   else if (liberar === 'apos_janela') {
     gabaritoLiberado =
       simulado?.status === 'encerrado' ||
       (!!simulado?.data_fim && new Date(simulado.data_fim) < agora)
   }
-  // 'manual' permanece false (sem flag de liberação manual no MVP)
 
   const { data: sq } = await supabase
     .from('simulado_prova_questoes')

@@ -52,6 +52,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
   let query = supabase
     .from('simulado_questoes')
     .select('id, enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)', { count: 'exact' })
+    .eq('deletado', false)
     .eq('tenant_id', tenantId ?? '')
     .order('created_at', { ascending: false })
     .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)

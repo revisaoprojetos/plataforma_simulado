@@ -1,9 +1,12 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
-import { CadernoEditor } from '@/components/admin/caderno-editor'
-import { ArrowLeft } from 'lucide-react'
+import { CadernoEditorV2 } from '@/components/admin/caderno-editor-v2'
+import { carregarRegistros } from '@/lib/caderno-designer/merge'
+import { dataComQuestao } from '@/lib/caderno-designer/blocks'
+import type { CadernoData } from '@/lib/caderno-designer/types'
+
+const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
 
 export default async function CadernoEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -18,39 +21,78 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
     .maybeSingle()
   if (!caderno) notFound()
 
-  // Questões publicadas disponíveis (para o seletor).
-  const { data: questoes } = await svc
-    .from('simulado_questoes')
-    .select('id, enunciado, tipo, disciplina_id')
+  const config = (caderno.config ?? {}) as any
+  const bancoId: string | null = config.bancoId ?? null
+
+  // Bancos (pastas) do tenant para o seletor do header.
+  const { data: bancos } = await svc
+    .from('simulado_pastas')
+    .select('id, nome')
     .eq('tenant_id', access.tenantId ?? '')
-    .eq('status', 'publicada')
-    .order('created_at', { ascending: false })
-    .limit(300)
+    .order('nome')
+  const bancoNome = bancoId ? (bancos ?? []).find((b: any) => b.id === bancoId)?.nome ?? null : null
 
-  const discIds = [...new Set((questoes ?? []).map((q: any) => q.disciplina_id).filter(Boolean))]
-  const { data: discs } = discIds.length
-    ? await svc.from('simulado_disciplinas').select('id, nome').in('id', discIds)
+  // Questões: do banco vinculado (se houver) ou publicadas do tenant.
+  let questoes: any[] | null = null
+  if (bancoId) {
+    const { data: vinc } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId)
+    const ids = (vinc ?? []).map((v: any) => v.questao_id)
+    questoes = ids.length
+      ? (await svc.from('simulado_questoes').select('id, enunciado, tipo').in('id', ids).limit(80)).data
+      : []
+  } else {
+    questoes = (await svc
+      .from('simulado_questoes')
+      .select('id, enunciado, tipo')
+      .eq('tenant_id', access.tenantId ?? '')
+      .eq('status', 'publicada')
+      .order('created_at', { ascending: false })
+      .limit(60)).data
+  }
+
+  const amostraIds = (questoes ?? []).slice(0, 6).map((q: any) => q.id)
+  const { data: alts } = amostraIds.length
+    ? await svc.from('simulado_alternativas').select('questao_id, texto, ordem, correta').in('questao_id', amostraIds)
     : { data: [] as any[] }
-  const discMap = new Map((discs ?? []).map((d: any) => [d.id, d.nome]))
+  const altMap = new Map<string, any[]>()
+  for (const a of alts ?? []) { const arr = altMap.get(a.questao_id) ?? []; arr.push(a); altMap.set(a.questao_id, arr) }
 
-  const disponiveis = (questoes ?? []).map((q: any) => ({
-    id: q.id,
-    enunciado: q.enunciado ?? '',
-    tipo: q.tipo,
-    disciplina: discMap.get(q.disciplina_id) ?? null,
-  }))
+  const previewData: CadernoData = {
+    numQuestoes: (questoes ?? []).length || 20,
+    numAlternativas: 5,
+    questoes: (questoes ?? []).slice(0, 6).map((q: any, i: number) => ({
+      id: q.id, numero: i + 1, enunciado: q.enunciado ?? '', tipo: q.tipo,
+      alternativas: (altMap.get(q.id) ?? []).sort((x, y) => x.ordem - y.ordem).map((a, j) => ({ letra: LETRAS[j] ?? '?', texto: a.texto ?? '', correta: !!a.correta })),
+    })),
+    vars: {
+      nome: 'João da Silva', simulado: bancoNome ?? caderno.nome, acertos: '14', total_questoes: String((questoes ?? []).length || 20),
+      nota: '7,0', percentual: '70%',
+    },
+  }
+
+  // Mala direta: alunos do banco vinculado, com suas variáveis reais.
+  const registros = bancoId ? await carregarRegistros(svc, access.tenantId ?? '', bancoId, bancoNome ?? caderno.nome) : []
+  if (registros.length) previewData.vars = { ...previewData.vars, ...registros[0].vars }
+
+  previewData.gabaritoLiberado = true // no editor a correção sempre aparece (para desenhar)
+
+  // Base: a 1ª questão preenche as variáveis de questão ({q_enunciado}, {q_alternativas}…)
+  // mesmo fora do repetidor, para o preview ter uma referência.
+  if (previewData.questoes[0]) {
+    const base = dataComQuestao(previewData, previewData.questoes[0])
+    previewData.vars = base.vars
+    previewData.questaoAtual = base.questaoAtual
+  }
 
   return (
-    <div className="space-y-5">
-      <Link href="/admin/cadernos" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> Cadernos de prova
-      </Link>
-      <CadernoEditor
-        cadernoId={caderno.id}
-        nome={caderno.nome}
-        configInicial={caderno.config ?? { blocos: [] }}
-        questoesDisponiveis={disponiveis}
-      />
-    </div>
+    <CadernoEditorV2
+      cadernoId={caderno.id}
+      nome={caderno.nome}
+      inicial={{ docsV2: config.docsV2, modalidadesV2: config.modalidadesV2, cores: config.cores }}
+      previewData={previewData}
+      bancos={(bancos ?? []) as { id: string; nome: string }[]}
+      bancoIdInicial={bancoId}
+      registros={registros}
+    />
   )
 }

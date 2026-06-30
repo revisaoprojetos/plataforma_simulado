@@ -12,12 +12,13 @@ async function getDashboardStats() {
     { count: totalEstudantes },
     { count: sessoesHoje },
   ] = await Promise.all([
-    supabase.from('simulado_questoes').select('*', { count: 'exact', head: true }),
-    supabase.from('simulado_simulados').select('*', { count: 'exact', head: true }).eq('status', 'publicado'),
-    supabase.from('simulado_estudantes').select('*', { count: 'exact', head: true }),
+    supabase.from('simulado_questoes').select('*', { count: 'exact', head: true }).eq('deletado', false),
+    supabase.from('simulado_simulados').select('*', { count: 'exact', head: true }).eq('deletado', false).eq('status', 'publicado'),
+    supabase.from('simulado_estudantes').select('*', { count: 'exact', head: true }).eq('deletado', false),
     supabase
       .from('simulado_sessoes_prova')
       .select('*', { count: 'exact', head: true })
+      .eq('deletado', false)
       .gte('created_at', new Date().toISOString().split('T')[0]),
   ])
 
@@ -34,6 +35,7 @@ async function getRecentSimulados() {
   const { data } = await supabase
     .from('simulado_simulados')
     .select('id, titulo, status, created_at')
+    .eq('deletado', false)
     .order('created_at', { ascending: false })
     .limit(5)
 

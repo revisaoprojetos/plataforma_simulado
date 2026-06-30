@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Plus, Loader2 } from 'lucide-react'
@@ -11,7 +10,6 @@ import { criarCaderno } from '@/app/admin/cadernos/actions'
 export function NovoCadernoForm() {
   const [nome, setNome] = useState('')
   const [pending, start] = useTransition()
-  const router = useRouter()
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -20,7 +18,8 @@ export function NovoCadernoForm() {
       const r = await criarCaderno(nome)
       if (r.ok && r.id) {
         toast.success('Caderno criado')
-        router.push(`/admin/cadernos/${r.id}`)
+        // Navegação dura: garante a ida ao editor sem corrida com revalidação.
+        window.location.assign(`/admin/cadernos/${r.id}`)
       } else {
         toast.error(r.error ?? 'Erro ao criar')
       }

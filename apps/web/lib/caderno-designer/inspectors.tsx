@@ -1,0 +1,296 @@
+'use client'
+
+import { useRef } from 'react'
+import { Plus, Trash2, Upload, Image as ImageIcon, Bold, Italic, Underline } from 'lucide-react'
+import type { Block } from './types'
+import { FONTES_CADERNO } from './theme'
+
+const VARIAVEIS = [
+  { token: '{nome}', label: 'Nome' },
+  { token: '{simulado}', label: 'Simulado' },
+  { token: '{acertos}', label: 'Acertos' },
+  { token: '{total_questoes}', label: 'Total questões' },
+  { token: '{nota}', label: 'Nota' },
+  { token: '{percentual}', label: 'Percentual' },
+]
+const QVARIAVEIS = [
+  { token: '{q_num}', label: 'Nº da questão' },
+  { token: '{q_enunciado}', label: 'Enunciado' },
+  { token: '{q_disciplina}', label: 'Disciplina' },
+  { token: '{q_alternativas}', label: 'Alternativas (todas)' },
+  { token: '{q_letras}', label: 'Letras (A,B,C…)' },
+  { token: '{q_resposta}', label: 'Resposta marcada (B) texto)' },
+  { token: '{q_resposta_letra}', label: 'Resposta (só letra)' },
+]
+const ALTVARIAVEIS = [
+  { token: '{q_alt_a}', label: 'A)' }, { token: '{q_alt_b}', label: 'B)' }, { token: '{q_alt_c}', label: 'C)' },
+  { token: '{q_alt_d}', label: 'D)' }, { token: '{q_alt_e}', label: 'E)' },
+]
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block space-y-1">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  )
+}
+// Grupo (div, sem <label>): usar quando houver vários botões — evita que o hover
+// num botão acione o :hover do 1º controle associado ao label.
+function Grupo({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <span className="block text-xs font-medium text-muted-foreground">{label}</span>
+      {children}
+    </div>
+  )
+}
+const inputCls = 'w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring'
+
+function Cor({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <Row label={label}>
+      <div className="flex items-center gap-2">
+        <input type="color" value={value || '#000000'} onChange={(e) => onChange(e.target.value)} className="h-8 w-10 cursor-pointer rounded border bg-background" />
+        <input value={value} onChange={(e) => onChange(e.target.value)} placeholder="auto (tema)" className={inputCls} />
+        {value && <button type="button" onClick={() => onChange('')} className="text-xs text-muted-foreground hover:text-foreground">limpar</button>}
+      </div>
+    </Row>
+  )
+}
+
+const ALIN = [{ v: 'left', n: 'Esq.' }, { v: 'center', n: 'Centro' }, { v: 'right', n: 'Dir.' }]
+function Align({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <Grupo label="Alinhamento">
+      <div className="flex gap-1">
+        {ALIN.map((o) => (
+          <button key={o.v} type="button" onClick={() => onChange(o.v)} className={`flex-1 rounded-md border px-2 py-1 text-xs ${value === o.v ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted'}`}>{o.n}</button>
+        ))}
+      </div>
+    </Grupo>
+  )
+}
+
+function UploadImagem({ url, onChange }: { url: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLInputElement>(null)
+  return (
+    <div className="space-y-2">
+      <input ref={ref} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => onChange(String(r.result)); r.readAsDataURL(f); e.target.value = '' }} />
+      <button type="button" onClick={() => ref.current?.click()}
+        className="flex w-full flex-col items-center gap-2 rounded-lg border-2 border-dashed border-primary/40 p-4 text-center text-xs transition-colors hover:border-primary hover:bg-primary/5">
+        {url ? <img src={url} alt="" className="max-h-24 w-auto rounded object-contain" /> : <Upload className="h-7 w-7 text-primary" />}
+        <span className="flex items-center gap-1 font-medium text-primary"><ImageIcon className="h-3.5 w-3.5" /> {url ? 'Trocar imagem' : 'Enviar imagem'}</span>
+      </button>
+      {url && <button type="button" onClick={() => onChange('')} className="text-xs text-muted-foreground hover:text-foreground">Remover imagem</button>}
+    </div>
+  )
+}
+
+function FonteSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <Row label="Fonte">
+      <select value={value || ''} onChange={(e) => onChange(e.target.value)} className={inputCls}>
+        <option value="">Padrão do tema</option>
+        {FONTES_CADERNO.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+      </select>
+    </Row>
+  )
+}
+
+export function BlockInspector({ block, onChange }: { block: Block; onChange: (patch: Record<string, unknown>) => void }) {
+  const a = block.attributes as any
+  const set = (k: string, v: unknown) => onChange({ [k]: v })
+  const fieldRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null)
+
+  function inserirVar(token: string) {
+    const el = fieldRef.current
+    const texto = String(a.texto ?? '')
+    if (!el) { set('texto', texto + token); return }
+    const s = el.selectionStart ?? texto.length, e = el.selectionEnd ?? texto.length
+    set('texto', texto.slice(0, s) + token + texto.slice(e))
+    requestAnimationFrame(() => { el.focus(); const p = s + token.length; try { el.setSelectionRange(p, p) } catch { /* ignore */ } })
+  }
+  const Chip = ({ token, label }: { token: string; label: string }) => (
+    <button type="button" title={token} onMouseDown={(e) => e.preventDefault()} onClick={() => inserirVar(token)}
+      className="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary/5 hover:text-primary">{label}</button>
+  )
+  const Variaveis = () => (
+    <>
+      <Grupo label="Variáveis (mala direta)">
+        <div className="flex flex-wrap gap-1">{VARIAVEIS.map((v) => <Chip key={v.token} {...v} />)}</div>
+      </Grupo>
+      <Grupo label="Variáveis da questão (no repetidor)">
+        <div className="flex flex-wrap gap-1">{QVARIAVEIS.map((v) => <Chip key={v.token} {...v} />)}</div>
+      </Grupo>
+      <Grupo label="Alternativa por letra (A) texto…)">
+        <div className="flex flex-wrap gap-1">{ALTVARIAVEIS.map((v) => <Chip key={v.token} {...v} />)}</div>
+      </Grupo>
+    </>
+  )
+
+  const estiloBtn = (on: boolean) => `flex-1 rounded-md border px-2 py-1.5 ${on ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted'}`
+
+  switch (block.type) {
+    case 'titulo-secao':
+      return (
+        <div className="space-y-3">
+          <Row label="Texto"><input ref={fieldRef as React.RefObject<HTMLInputElement>} value={a.texto} onChange={(e) => set('texto', e.target.value)} className={inputCls} /></Row>
+          <Variaveis />
+          <Row label="Nível">
+            <select value={a.nivel} onChange={(e) => set('nivel', Number(e.target.value))} className={inputCls}>
+              <option value={1}>Título (grande)</option><option value={2}>Subtítulo</option><option value={3}>Menor</option>
+            </select>
+          </Row>
+          <FonteSelect value={a.fonte} onChange={(v) => set('fonte', v)} />
+          <Grupo label="Estilo">
+            <div className="flex gap-1">
+              <button type="button" onClick={() => set('italico', !a.italico)} className={estiloBtn(a.italico)}><Italic className="mx-auto h-4 w-4" /></button>
+              <button type="button" onClick={() => set('sublinhado', !a.sublinhado)} className={estiloBtn(a.sublinhado)}><Underline className="mx-auto h-4 w-4" /></button>
+            </div>
+          </Grupo>
+          <Align value={a.align} onChange={(v) => set('align', v)} />
+          <Cor label="Cor" value={a.cor} onChange={(v) => set('cor', v)} />
+          <Row label={`Espaçamento entre letras: ${a.espacamento ?? 0}px`}><input type="range" min={0} max={8} value={a.espacamento ?? 0} onChange={(e) => set('espacamento', Number(e.target.value))} className="w-full" /></Row>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarLinha} onChange={(e) => set('mostrarLinha', e.target.checked)} /> Linha sob o título</label>
+        </div>
+      )
+    case 'texto-livre':
+      return (
+        <div className="space-y-3">
+          <Row label="Texto"><textarea ref={fieldRef as React.RefObject<HTMLTextAreaElement>} value={a.texto} onChange={(e) => set('texto', e.target.value)} rows={4} className={inputCls} /></Row>
+          <Variaveis />
+          <FonteSelect value={a.fonte} onChange={(v) => set('fonte', v)} />
+          <Grupo label="Estilo">
+            <div className="flex gap-1">
+              <button type="button" onClick={() => set('bold', !a.bold)} className={estiloBtn(a.bold)}><Bold className="mx-auto h-4 w-4" /></button>
+              <button type="button" onClick={() => set('italico', !a.italico)} className={estiloBtn(a.italico)}><Italic className="mx-auto h-4 w-4" /></button>
+              <button type="button" onClick={() => set('sublinhado', !a.sublinhado)} className={estiloBtn(a.sublinhado)}><Underline className="mx-auto h-4 w-4" /></button>
+            </div>
+          </Grupo>
+          <Align value={a.align} onChange={(v) => set('align', v)} />
+          <Row label="Tamanho (pt)"><input type="number" min={8} max={48} value={a.size} onChange={(e) => set('size', Number(e.target.value))} className={inputCls} /></Row>
+          <Row label={`Altura da linha: ${a.lineHeight ?? 1.5}`}><input type="range" min={1} max={2.5} step={0.1} value={a.lineHeight ?? 1.5} onChange={(e) => set('lineHeight', Number(e.target.value))} className="w-full" /></Row>
+          <Cor label="Cor" value={a.color} onChange={(v) => set('color', v)} />
+          <Row label={`Espaçamento entre letras: ${a.espacamento ?? 0}px`}><input type="range" min={0} max={8} value={a.espacamento ?? 0} onChange={(e) => set('espacamento', Number(e.target.value))} className="w-full" /></Row>
+        </div>
+      )
+    case 'instrucoes':
+      return (
+        <div className="space-y-3">
+          <Row label="Título"><input value={a.titulo} onChange={(e) => set('titulo', e.target.value)} className={inputCls} /></Row>
+          <Row label="Texto"><textarea value={a.texto} onChange={(e) => set('texto', e.target.value)} rows={4} className={inputCls} /></Row>
+          <Cor label="Cor de fundo" value={a.corFundo} onChange={(v) => set('corFundo', v)} />
+          <Cor label="Cor da borda" value={a.corBorda} onChange={(v) => set('corBorda', v)} />
+        </div>
+      )
+    case 'lista-questoes':
+      return (
+        <div className="space-y-3">
+          <p className="rounded bg-blue-50 px-2 py-1.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">Puxa as questões reais do simulado/pasta vinculado.</p>
+          <Row label="Título (opcional)"><input value={a.titulo} onChange={(e) => set('titulo', e.target.value)} className={inputCls} /></Row>
+          <Row label="Quantidade (vazio = todas)"><input type="number" min={1} value={a.quantidade ?? ''} onChange={(e) => set('quantidade', e.target.value ? Number(e.target.value) : null)} className={inputCls} /></Row>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarAlternativas} onChange={(e) => set('mostrarAlternativas', e.target.checked)} /> Mostrar alternativas</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarGabarito} onChange={(e) => set('mostrarGabarito', e.target.checked)} /> Marcar gabarito</label>
+        </div>
+      )
+    case 'gabarito-grid':
+      return (
+        <div className="space-y-3">
+          <Row label="Título"><input value={a.titulo} onChange={(e) => set('titulo', e.target.value)} className={inputCls} /></Row>
+          <Row label="Nº de questões (vazio = real)"><input type="number" min={1} value={a.numQuestoes ?? ''} onChange={(e) => set('numQuestoes', e.target.value ? Number(e.target.value) : null)} className={inputCls} /></Row>
+          <Row label="Alternativas por questão"><input type="number" min={2} max={6} value={a.numAlternativas} onChange={(e) => set('numAlternativas', Number(e.target.value))} className={inputCls} /></Row>
+          <Row label="Colunas"><input type="number" min={1} max={5} value={a.colunas} onChange={(e) => set('colunas', Number(e.target.value))} className={inputCls} /></Row>
+          <Row label="Estilo das bolhas">
+            <select value={a.estilo} onChange={(e) => set('estilo', e.target.value)} className={inputCls}><option value="circulo">Círculo</option><option value="quadrado">Quadrado</option></select>
+          </Row>
+        </div>
+      )
+    case 'identificacao':
+      return (
+        <div className="space-y-3">
+          <Row label="Título"><input value={a.titulo} onChange={(e) => set('titulo', e.target.value)} className={inputCls} /></Row>
+          <div className="space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Campos</span>
+            {(a.campos ?? []).map((campo: string, i: number) => (
+              <div key={i} className="flex items-center gap-1">
+                <input value={campo} onChange={(e) => { const cp = [...a.campos]; cp[i] = e.target.value; set('campos', cp) }} className={inputCls} />
+                <button type="button" onClick={() => set('campos', a.campos.filter((_: string, j: number) => j !== i))} className="text-destructive hover:opacity-70"><Trash2 className="h-4 w-4" /></button>
+              </div>
+            ))}
+            <button type="button" onClick={() => set('campos', [...(a.campos ?? []), 'Novo campo'])} className="flex items-center gap-1 text-xs text-primary hover:underline"><Plus className="h-3.5 w-3.5" /> Adicionar campo</button>
+          </div>
+        </div>
+      )
+    case 'imagem':
+      return (
+        <div className="space-y-3">
+          <UploadImagem url={a.url} onChange={(v) => set('url', v)} />
+          <Row label={`Largura: ${a.largura}%`}><input type="range" min={10} max={100} value={a.largura} onChange={(e) => set('largura', Number(e.target.value))} className="w-full" /></Row>
+          <Align value={a.align} onChange={(v) => set('align', v)} />
+        </div>
+      )
+    case 'separador':
+      return (
+        <div className="space-y-3">
+          <Row label="Espessura"><select value={a.espessura} onChange={(e) => set('espessura', Number(e.target.value))} className={inputCls}><option value={1}>Fina</option><option value={2}>Média</option><option value={4}>Grossa</option></select></Row>
+          <Row label="Estilo"><select value={a.estilo} onChange={(e) => set('estilo', e.target.value)} className={inputCls}><option value="solido">Sólido</option><option value="tracejado">Tracejado</option><option value="pontilhado">Pontilhado</option></select></Row>
+          <Cor label="Cor" value={a.cor} onChange={(v) => set('cor', v)} />
+        </div>
+      )
+    case 'espacador':
+      return <Row label={`Altura: ${a.altura}px`}><input type="range" min={4} max={400} value={a.altura} onChange={(e) => set('altura', Number(e.target.value))} className="w-full" /></Row>
+    case 'repeticao':
+      return (
+        <div className="space-y-3">
+          <p className="rounded bg-blue-50 px-2 py-1.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">Desenhe o template dentro do bloco (textos, cards, alternativas). Ele se repete para cada questão do banco. Use as variáveis <code>{'{q_num}'}</code>, <code>{'{q_enunciado}'}</code> e o bloco <strong>Alternativas</strong>.</p>
+          <Row label="Quantidade (vazio = todas)"><input type="number" min={1} value={a.quantidade ?? ''} onChange={(e) => set('quantidade', e.target.value ? Number(e.target.value) : null)} className={inputCls} /></Row>
+          <Row label={`Espaço entre questões: ${a.gap ?? 16}px`}><input type="range" min={0} max={48} value={a.gap ?? 16} onChange={(e) => set('gap', Number(e.target.value))} className="w-full" /></Row>
+        </div>
+      )
+    case 'alternativas':
+      return (
+        <div className="space-y-3">
+          <p className="rounded bg-blue-50 px-2 py-1.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">Mostra as alternativas da questão atual (uma embaixo da outra). Use dentro do bloco <strong>Repetir por questão</strong>.</p>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarGabarito} onChange={(e) => set('mostrarGabarito', e.target.checked)} /> Marcar gabarito</label>
+        </div>
+      )
+    case 'gabarito-correcao':
+      return (
+        <div className="space-y-3">
+          <p className="rounded bg-green-50 px-2 py-1.5 text-xs text-green-700 dark:bg-green-950/40 dark:text-green-300">Mostra a resposta marcada (verde se acertou, vermelho se errou) e, ao errar, a alternativa correta em verde. Aparece só quando o gabarito do simulado é liberado. Use dentro do <strong>Repetir por questão</strong>.</p>
+          <Row label="Rótulo (opcional)"><input value={a.rotulo ?? ''} onChange={(e) => set('rotulo', e.target.value)} placeholder="Sua resposta:" className={inputCls} /></Row>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarCorreta} onChange={(e) => set('mostrarCorreta', e.target.checked)} /> Mostrar a correta quando errar</label>
+        </div>
+      )
+    case 'card':
+      return (
+        <div className="space-y-3">
+          <p className="rounded bg-blue-50 px-2 py-1.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">Use os botões no card (canvas) para inserir blocos dentro dele.</p>
+          <Cor label="Cor de fundo" value={a.corFundo} onChange={(v) => set('corFundo', v)} />
+          <Cor label="Cor da borda" value={a.bordaCor} onChange={(v) => set('bordaCor', v)} />
+          <Row label={`Espessura da borda: ${a.bordaLargura}px`}><input type="range" min={0} max={6} value={a.bordaLargura} onChange={(e) => set('bordaLargura', Number(e.target.value))} className="w-full" /></Row>
+          <Row label={`Cantos arredondados: ${a.bordaRaio}px`}><input type="range" min={0} max={28} value={a.bordaRaio} onChange={(e) => set('bordaRaio', Number(e.target.value))} className="w-full" /></Row>
+          <Row label={`Espaçamento interno: ${a.padding}px`}><input type="range" min={0} max={40} value={a.padding} onChange={(e) => set('padding', Number(e.target.value))} className="w-full" /></Row>
+          <Row label={`Largura: ${a.largura}%`}><input type="range" min={20} max={100} value={a.largura} onChange={(e) => set('largura', Number(e.target.value))} className="w-full" /></Row>
+          <Align value={a.alinhamento} onChange={(v) => set('alinhamento', v)} />
+        </div>
+      )
+    case 'colunas':
+      return (
+        <div className="space-y-3">
+          <p className="rounded bg-blue-50 px-2 py-1.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">Use “+ coluna / − coluna” no bloco (canvas) e adicione blocos dentro de cada coluna.</p>
+          <Row label={`Espaço entre colunas: ${a.gap}px`}><input type="range" min={0} max={48} value={a.gap} onChange={(e) => set('gap', Number(e.target.value))} className="w-full" /></Row>
+        </div>
+      )
+    case 'plano-fundo':
+      return (
+        <div className="space-y-3">
+          <UploadImagem url={a.url} onChange={(v) => set('url', v)} />
+          <Row label={`Opacidade: ${a.opacidade}%`}><input type="range" min={5} max={100} value={a.opacidade} onChange={(e) => set('opacidade', Number(e.target.value))} className="w-full" /></Row>
+        </div>
+      )
+    default:
+      return <p className="text-sm text-muted-foreground">Sem opções.</p>
+  }
+}

@@ -62,6 +62,7 @@ export async function anularQuestao(
     .eq('simulado_id', simuladoId)
     .eq('is_teste', false)
     .eq('status', 'finalizada')
+    .eq('deletado', false)
   const lista = sessoes ?? []
   const antes = new Map(lista.map((s: any) => [s.id, { nota: Number(s.nota ?? 0), ranking: s.posicao_ranking }]))
 

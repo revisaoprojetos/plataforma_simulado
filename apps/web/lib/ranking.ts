@@ -33,6 +33,7 @@ export async function calcularRanking(svc: AnyClient, simuladoId: string): Promi
     .eq('simulado_id', simuladoId)
     .eq('is_teste', false)
     .eq('status', 'finalizada')
+    .eq('deletado', false) // sessões na Lixeira não contam no ranking
 
   const porAluno = new Map<string, { ids: string[]; notas: number[]; datas: string[] }>()
   for (const s of (sessoes ?? []) as any[]) {

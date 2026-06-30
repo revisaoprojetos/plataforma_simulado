@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { softDelete } from '@/lib/soft-delete'
 
 interface SimuladoData {
   titulo: string
@@ -18,6 +19,8 @@ interface SimuladoData {
   embed_ativo?: boolean
   regras?: Record<string, unknown>
   status?: string
+  /** Questões selecionadas (dos bancos) para já compor a prova na criação. */
+  questaoIds?: string[]
 }
 
 export async function createSimuladoAction(data: SimuladoData) {
@@ -49,7 +52,15 @@ export async function createSimuladoAction(data: SimuladoData) {
     return { error: error.message }
   }
 
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_simulados', entidadeId: simulado.id, depois: simulado })
+  // Compõe a prova com as questões escolhidas (dos bancos), na ordem selecionada.
+  const ids = [...new Set((data.questaoIds ?? []).filter(Boolean))]
+  if (ids.length) {
+    await supabase.from('simulado_prova_questoes').insert(
+      ids.map((questao_id, i) => ({ tenant_id: tenantId, simulado_id: simulado.id, questao_id, ordem: i })),
+    )
+  }
+
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_simulados', entidadeId: simulado.id, depois: { ...simulado, questoes: ids.length } })
 
   revalidatePath('/admin/simulados')
   redirect(`/admin/simulados/${simulado.id}`)
@@ -140,14 +151,23 @@ export async function reabrirSimuladoAction(id: string) {
   revalidatePath('/admin/simulados')
 }
 
+/** Libera (ou bloqueia) manualmente o gabarito do simulado — grava regras.gabarito_liberado. */
+export async function liberarGabaritoAction(id: string, liberado: boolean) {
+  const supabase = await createClient()
+  const { data: s } = await supabase.from('simulado_simulados').select('regras').eq('id', id).maybeSingle()
+  const regras = { ...(((s?.regras as Record<string, unknown>) ?? {})), gabarito_liberado: liberado }
+  await supabase.from('simulado_simulados').update({ regras }).eq('id', id)
+  await registrarAudit({ operacao: liberado ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_simulados', entidadeId: id, depois: { gabarito_liberado: liberado } })
+  revalidatePath('/admin/simulados')
+  revalidatePath(`/admin/simulados/${id}`)
+}
+
 export async function deleteSimuladoAction(id: string) {
   if (!(await checkPermission('simulados:delete'))) return { error: 'Você não tem permissão para excluir simulados.' }
-  const supabase = await createClient()
-  const { data: antes } = await supabase.from('simulado_simulados').select('*').eq('id', id).maybeSingle()
-  // Cascade remove simulado_prova_questoes, sessoes e respostas vinculadas.
-  const { error } = await supabase.from('simulado_simulados').delete().eq('id', id)
+  // Soft delete: vai para a Lixeira (recuperável); sessões/prova_questoes ficam preservadas.
+  const { error } = await softDelete('simulado_simulados', id)
   if (error) return { error: error.message }
-  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_simulados', entidadeId: id, antes })
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_simulados', entidadeId: id, depois: { deletado: true } })
   revalidatePath('/admin/simulados')
   return { ok: true }
 }

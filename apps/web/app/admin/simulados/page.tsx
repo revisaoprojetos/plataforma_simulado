@@ -11,7 +11,8 @@ export default async function SimuladosPage() {
 
   const { data: simulados } = await supabase
     .from('simulado_simulados')
-    .select('id, titulo, status, data_inicio, data_fim, modo_aplicacao, tempo_limite_min, embed_token, created_at')
+    .select('id, titulo, status, data_inicio, data_fim, modo_aplicacao, tempo_limite_min, embed_token, created_at, regras')
+    .eq('deletado', false)
     .eq('tenant_id', tenantId ?? '')
     .order('created_at', { ascending: false })
 

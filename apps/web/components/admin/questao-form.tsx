@@ -47,6 +47,7 @@ const questaoSchema = z
     status: z.enum(['rascunho', 'publicada', 'arquivada']),
     alternativas: z.array(alternativaSchema).optional(),
     competencias: z.array(competenciaSchema).optional(),
+    bancoIds: z.array(z.string()).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.tipo === 'objetiva') {
@@ -71,12 +72,14 @@ interface QuestaoFormProps {
   /** Sugestões (nomes já cadastrados) para autocomplete — não são uma base fixa. */
   bancasSugestoes?: string[]
   disciplinasSugestoes?: string[]
+  /** Bancos (pastas) disponíveis para armazenar a questão diretamente. */
+  bancos?: { id: string; nome: string }[]
   onSubmit: (data: QuestaoFormData) => Promise<{ error?: string } | void>
 }
 
 const LETRA = ['A', 'B', 'C', 'D', 'E']
 
-export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSugestoes = [], onSubmit }: QuestaoFormProps) {
+export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSugestoes = [], bancos = [], onSubmit }: QuestaoFormProps) {
   const [isLoading, setIsLoading] = useState(false)
 
   const {
@@ -277,6 +280,45 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
           </div>
         </CardContent>
       </Card>
+
+      {bancos.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Banco(s) de destino</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Armazene esta questão diretamente em um ou mais bancos. Pode ficar em vários.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {bancos.map((banco) => {
+                const selecionados = (watch('bancoIds') ?? []) as string[]
+                const ativo = selecionados.includes(banco.id)
+                return (
+                  <button
+                    key={banco.id}
+                    type="button"
+                    onClick={() =>
+                      setValue(
+                        'bancoIds',
+                        ativo ? selecionados.filter((b) => b !== banco.id) : [...selecionados, banco.id],
+                        { shouldDirty: true },
+                      )
+                    }
+                    className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                      ativo
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border text-muted-foreground hover:border-primary'
+                    }`}
+                  >
+                    {banco.nome}
+                  </button>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {tipo === 'objetiva' && (
         <Card>

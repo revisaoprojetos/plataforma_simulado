@@ -23,6 +23,8 @@ import {
   Play,
   Send,
   Trash2,
+  Lock,
+  Unlock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
@@ -33,6 +35,7 @@ import {
   reabrirSimuladoAction,
   publishSimuladoAction,
   deleteSimuladoAction,
+  liberarGabaritoAction,
 } from '@/app/admin/simulados/actions'
 
 export interface SimuladoCard {
@@ -45,6 +48,7 @@ export interface SimuladoCard {
   tempo_limite_min: number | null
   embed_token: string | null
   created_at: string
+  regras?: { gabarito_liberado?: boolean } | null
 }
 
 const modoLabel: Record<string, string> = {
@@ -100,8 +104,19 @@ const statusText: Record<string, string> = {
 function CardItem({ s, appUrl }: { s: SimuladoCard; appUrl: string }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
+  const [gabLiberado, setGabLiberado] = useState(!!s.regras?.gabarito_liberado)
 
   const linkAcesso = s.embed_token ? `${appUrl}/aluno/login?token=${s.embed_token}` : null
+
+  function toggleGabarito() {
+    const novo = !gabLiberado
+    setGabLiberado(novo)
+    startTransition(async () => {
+      await liberarGabaritoAction(s.id, novo)
+      toast.success(novo ? 'Gabarito liberado para os alunos' : 'Gabarito bloqueado')
+      router.refresh()
+    })
+  }
 
   function acao(fn: (id: string) => Promise<unknown>, msg: string) {
     startTransition(async () => {
@@ -208,6 +223,16 @@ function CardItem({ s, appUrl }: { s: SimuladoCard; appUrl: string }) {
         </div>
 
         <p className={cn('mt-1 text-xs font-medium', statusText[s.status])}>{statusLabel[s.status]}</p>
+
+        {/* Liberar gabarito — só quando encerrado */}
+        {s.status === 'encerrado' && (
+          <button onClick={toggleGabarito} disabled={pending} title={gabLiberado ? 'Gabarito liberado para os alunos — clique para bloquear' : 'Liberar o gabarito para os alunos verem suas respostas'}
+            className={cn('mt-2 inline-flex items-center gap-1.5 self-start rounded-md border px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50',
+              gabLiberado ? 'border-green-500/60 bg-background text-green-700 dark:border-green-600/50 dark:text-green-400' : 'text-muted-foreground hover:border-primary hover:bg-primary/5 hover:text-foreground')}>
+            {gabLiberado ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+            {gabLiberado ? 'Gabarito liberado' : 'Liberar gabarito'}
+          </button>
+        )}
 
         {/* Rodapé sempre na base, formato único */}
         <div className="mt-auto flex items-center gap-2 pt-3 text-[11px] whitespace-nowrap text-muted-foreground">

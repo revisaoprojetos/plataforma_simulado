@@ -30,17 +30,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Sessão já finalizada.' }, { status: 400 })
   }
 
-  // Valida a alternativa e captura o gabarito vigente (snapshot).
-  const { data: alt } = await supabase
+  // Valida a alternativa e já resolve a LETRA (por ordem) para armazenar — assim a
+  // exibição (caderno, gabarito, mala direta) lê o valor pronto, sem recalcular.
+  const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
+  const { data: qAlts } = await supabase
     .from('simulado_alternativas')
-    .select('id, correta')
-    .eq('id', alternativa_id)
+    .select('id, correta, ordem')
     .eq('questao_id', questao_id)
-    .maybeSingle()
-
-  if (!alt) {
+    .order('ordem')
+  const idx = (qAlts ?? []).findIndex((a) => a.id === alternativa_id)
+  if (idx < 0) {
     return NextResponse.json({ message: 'Alternativa inválida.' }, { status: 400 })
   }
+  const alt = qAlts![idx]
+  const letra = LETRA[idx] ?? '?'
 
   const { error } = await supabase.from('simulado_respostas_objetivas').upsert(
     {
@@ -50,7 +53,8 @@ export async function POST(request: NextRequest) {
       alternativa_id,
       correta: alt.correta,
       pontuacao: alt.correta ? 1 : 0,
-      snapshot_gabarito: { alternativa_id: alt.id, correta: alt.correta },
+      // letra armazenada junto (valor pronto p/ exibição, sem recalcular depois).
+      snapshot_gabarito: { alternativa_id: alt.id, correta: alt.correta, letra },
       respondido_em: new Date().toISOString(),
     },
     { onConflict: 'sessao_id,questao_id' },

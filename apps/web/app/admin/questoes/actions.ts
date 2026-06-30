@@ -28,6 +28,25 @@ interface QuestaoData {
   status: string
   alternativas?: AlternativaData[]
   competencias?: { nome: string; pontos: number; ordem: number }[]
+  /** Bancos (pastas) de destino — a questão é vinculada a estes ao salvar. */
+  bancoIds?: string[]
+}
+
+/**
+ * Sincroniza os vínculos da questão com os bancos selecionados (N:N via
+ * simulado_questao_pasta). Usa service role pois a tabela tem RLS sem policy
+ * de INSERT/DELETE para authenticated. `sync=false` apenas adiciona (create).
+ */
+async function vincularBancos(tenantId: string, questaoId: string, bancoIds: string[] | undefined, sync: boolean) {
+  if (!bancoIds) return // undefined = não mexe nos vínculos (ex.: edição sem o campo)
+  const admin = createAdminClient()
+  if (sync) await admin.from('simulado_questao_pasta').delete().eq('questao_id', questaoId).eq('tenant_id', tenantId)
+  const ids = [...new Set(bancoIds.filter(Boolean))]
+  if (ids.length) {
+    await admin.from('simulado_questao_pasta').insert(
+      ids.map((pasta_id) => ({ tenant_id: tenantId, questao_id: questaoId, pasta_id })),
+    )
+  }
 }
 
 /**
@@ -160,9 +179,13 @@ export async function createQuestaoAction(data: QuestaoData) {
     }
   }
 
+  // Armazena a questão diretamente nos bancos de destino escolhidos.
+  await vincularBancos(tenantId, questao.id, data.bancoIds, false)
+
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_questoes', entidadeId: questao.id, depois: questao })
 
   revalidatePath('/admin/questoes')
+  revalidatePath('/admin/banco-questoes')
   redirect('/admin/questoes')
 }
 
@@ -211,7 +234,11 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
     }
   }
 
+  // Sincroniza os bancos de destino (substitui os vínculos pelos selecionados).
+  await vincularBancos(tenantId, id, data.bancoIds, true)
+
   revalidatePath('/admin/questoes')
   revalidatePath(`/admin/questoes/${id}/editar`)
+  revalidatePath('/admin/banco-questoes')
   redirect('/admin/questoes')
 }

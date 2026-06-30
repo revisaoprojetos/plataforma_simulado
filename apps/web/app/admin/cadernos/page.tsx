@@ -1,10 +1,16 @@
-import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { buttonVariants } from '@/components/ui/button'
-import { NovoCadernoForm } from '@/components/admin/novo-caderno-form'
-import { ShieldAlert, NotebookPen, Pencil, Printer } from 'lucide-react'
+import { CadernosClient } from '@/components/admin/cadernos-client'
+import { ShieldAlert } from 'lucide-react'
+
+function contarBlocos(config: any): number {
+  if (config?.docsV2) {
+    let n = 0
+    for (const doc of Object.values(config.docsV2) as any[]) for (const p of doc?.pages ?? []) n += (p.blocks?.length ?? 0)
+    return n
+  }
+  return (config?.blocos ?? []).length
+}
 
 export default async function CadernosAdminPage() {
   const access = await getCurrentAccess()
@@ -24,49 +30,19 @@ export default async function CadernosAdminPage() {
   const { data: cadernos } = await svc
     .from('simulado_cadernos_designer')
     .select('id, nome, config, atualizado_em')
+    .eq('deletado', false)
     .eq('tenant_id', access.tenantId ?? '')
     .order('atualizado_em', { ascending: false })
+
+  const lista = (cadernos ?? []).map((c: any) => ({ id: c.id, nome: c.nome, blocos: contarBlocos(c.config) }))
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Cadernos de prova</h1>
-        <p className="text-muted-foreground">Monte cadernos imprimíveis com questões e textos, e gere o PDF.</p>
+        <p className="text-muted-foreground">Monte cadernos em blocos (estilo Gutenberg) com a identidade do simulado e gere o PDF.</p>
       </div>
-
-      <NovoCadernoForm />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Cadernos ({cadernos?.length ?? 0})</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {!cadernos || cadernos.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
-              <NotebookPen className="h-8 w-8" />
-              <p className="text-sm">Nenhum caderno ainda.</p>
-            </div>
-          ) : (
-            cadernos.map((c: any) => {
-              const blocos = (c.config?.blocos ?? []).length
-              return (
-                <div key={c.id} className="flex items-center gap-3 rounded-lg border p-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{c.nome}</p>
-                    <p className="text-xs text-muted-foreground">{blocos} bloco(s)</p>
-                  </div>
-                  <Link href={`/admin/cadernos/${c.id}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                    <Pencil className="mr-1 h-3.5 w-3.5" /> Editar
-                  </Link>
-                  <Link href={`/imprimir/caderno/${c.id}`} target="_blank" className={buttonVariants({ size: 'sm' })}>
-                    <Printer className="mr-1 h-3.5 w-3.5" /> Imprimir
-                  </Link>
-                </div>
-              )
-            })
-          )}
-        </CardContent>
-      </Card>
+      <CadernosClient cadernos={lista} />
     </div>
   )
 }

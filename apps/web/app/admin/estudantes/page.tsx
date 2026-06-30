@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus, Upload } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { ExcluirEstudanteButton } from '@/components/admin/excluir-estudante-button'
 
 const classificacaoConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
   passaporte: { label: 'Passaporte', variant: 'default' },
@@ -28,6 +29,7 @@ export default async function EstudantesPage() {
   const { data: estudantes } = await supabase
     .from('simulado_estudantes')
     .select('id, nome, email, cpf, telefone, classificacao, matricula_externa, created_at')
+    .eq('deletado', false)
     .eq('tenant_id', tenantId ?? '')
     .order('created_at', { ascending: false })
     .limit(100)
@@ -71,12 +73,13 @@ export default async function EstudantesPage() {
                 <TableHead>CPF</TableHead>
                 <TableHead>Classificação</TableHead>
                 <TableHead>Cadastrado</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {!estudantes || estudantes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     Nenhum estudante cadastrado.
                   </TableCell>
                 </TableRow>
@@ -86,7 +89,11 @@ export default async function EstudantesPage() {
 
                   return (
                     <TableRow key={e.id}>
-                      <TableCell className="font-medium">{e.nome}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link href={`/admin/estudantes/${e.id}`} className="text-primary hover:underline">
+                          {e.nome}
+                        </Link>
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {e.email}
                       </TableCell>
@@ -102,6 +109,9 @@ export default async function EstudantesPage() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {formatDate(e.created_at)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <ExcluirEstudanteButton id={e.id} nome={e.nome} />
                       </TableCell>
                     </TableRow>
                   )

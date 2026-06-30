@@ -27,6 +27,7 @@ import {
   LogIn,
   FilePen,
   ChevronDown,
+  Trash2,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -115,6 +116,7 @@ const navGroups: NavGroup[] = [
       { label: 'API Keys', href: '/admin/api-keys', icon: KeyRound, perm: 'api_keys:manage' },
       { label: 'Configurações', href: '/admin/configuracoes', icon: Settings, exact: true, perm: 'configuracoes:view' },
       { label: 'Mensagens', href: '/admin/configuracoes/mensagens', icon: MessageSquare, perm: 'configuracoes:view' },
+      { label: 'Lixeira', href: '/admin/lixeira', icon: Trash2, perm: 'questoes:view' },
     ],
   },
 ]

@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
 import { QuestaoForm } from '@/components/admin/questao-form'
 import { updateQuestaoAction } from '../../actions'
 import { notFound } from 'next/navigation'
@@ -12,12 +13,16 @@ interface PageProps {
 export default async function EditarQuestaoPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+  const admin = createAdminClient()
 
   const [
     { data: questao },
     { data: bancas },
     { data: disciplinas },
     { data: alternativas },
+    { data: bancosDestino },
+    { data: vinculos },
   ] = await Promise.all([
     supabase
       .from('simulado_questoes')
@@ -31,6 +36,8 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
       .select('*')
       .eq('questao_id', id)
       .order('ordem'),
+    admin.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome'),
+    admin.from('simulado_questao_pasta').select('pasta_id').eq('questao_id', id),
   ])
 
   if (!questao) {
@@ -39,6 +46,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
 
   const bancasSugestoes = (bancas ?? []).map((b) => b.nome)
   const disciplinasSugestoes = (disciplinas ?? []).map((d) => d.nome)
+  const bancoIds = (vinculos ?? []).map((v: { pasta_id: string }) => v.pasta_id)
 
   const initialData = {
     tipo: questao.tipo as 'objetiva' | 'discursiva',
@@ -55,6 +63,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
       correta: a.correta,
       ordem: a.ordem,
     })),
+    bancoIds,
   }
 
   return (
@@ -75,6 +84,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
         initialData={initialData}
         bancasSugestoes={bancasSugestoes}
         disciplinasSugestoes={disciplinasSugestoes}
+        bancos={bancosDestino ?? []}
         onSubmit={updateQuestaoAction.bind(null, id)}
       />
     </div>

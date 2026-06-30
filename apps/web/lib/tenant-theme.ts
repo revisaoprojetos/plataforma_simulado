@@ -97,6 +97,67 @@ function deriveForeground(oklchValue: string): string {
   return 'oklch(0.985 0 0)'
 }
 
+/** Override global da cor da fonte (texto), se configurada. */
+function cssFonteCor(tema: Record<string, unknown>): string {
+  const cor = safeColor(typeof tema.fonte_cor === 'string' ? (tema.fonte_cor as string) : undefined)
+  if (!cor) return ''
+  const ok = hexToOklch(cor)
+  return `\n:root, .dark {\n  --foreground: ${ok};\n  --card-foreground: ${ok};\n  --popover-foreground: ${ok};\n  --secondary-foreground: ${ok};\n}`
+}
+
+/**
+ * Constrói a paleta completa do app a partir do configurador (cores de
+ * sidebar/conteúdo). Aplica em `:root, .dark` para que a marca defina o visual
+ * independentemente do modo claro/escuro.
+ */
+function construirPaletaCompleta(cores: Record<string, unknown>, fonte: string | null): string {
+  const v = (x: unknown) => safeColor(typeof x === 'string' ? x : undefined)
+  const sidebar = v(cores.sidebar), sidetext = v(cores.sidetext), active = v(cores.active), sborder = v(cores.sborder)
+  const bg = v(cores.bg), text = v(cores.text), card = v(cores.card), cborder = v(cores.cborder), btn = v(cores.btn), accent = v(cores.accent)
+  if (!bg || !text || !card || !btn || !sidebar || !sidetext) return ''
+
+  const ok = (c: string) => hexToOklch(c)
+  const btnFg = deriveForeground(ok(btn))
+  const activeFg = active ? deriveForeground(ok(active)) : 'oklch(0.985 0 0)'
+
+  const lines = [
+    `  --background: ${ok(bg)};`,
+    `  --foreground: ${ok(text)};`,
+    `  --card: ${ok(card)};`,
+    `  --card-foreground: ${ok(text)};`,
+    `  --popover: ${ok(card)};`,
+    `  --popover-foreground: ${ok(text)};`,
+    `  --secondary: ${ok(card)};`,
+    `  --secondary-foreground: ${ok(text)};`,
+    `  --muted: ${ok(card)};`,
+    `  --muted-foreground: color-mix(in oklab, ${ok(text)} 60%, ${ok(bg)});`,
+    `  --accent: color-mix(in oklab, ${ok(accent ?? btn)} 16%, ${ok(card)});`,
+    `  --accent-foreground: ${ok(text)};`,
+    `  --primary: ${ok(btn)};`,
+    `  --primary-foreground: ${btnFg};`,
+    `  --ring: ${ok(btn)};`,
+    cborder ? `  --border: ${ok(cborder)};` : '',
+    cborder ? `  --input: ${ok(cborder)};` : '',
+    `  --sidebar: ${ok(sidebar)};`,
+    `  --sidebar-foreground: ${ok(sidetext)};`,
+    active ? `  --sidebar-primary: ${ok(active)};` : '',
+    active ? `  --sidebar-primary-foreground: ${activeFg};` : '',
+    active ? `  --sidebar-accent: color-mix(in oklab, ${ok(active)} 14%, ${ok(sidebar)});` : '',
+    `  --sidebar-accent-foreground: ${ok(sidetext)};`,
+    sborder ? `  --sidebar-border: ${ok(sborder)};` : '',
+    active ? `  --sidebar-ring: ${ok(active)};` : '',
+    `  --brand-primary: ${ok(btn)};`,
+    accent ? `  --brand-accent: ${ok(accent)};` : '',
+    // Sempre define a fonte: a custom (se houver) ou a padrão do sistema —
+    // senão a --font-sans fica sem valor ao aplicar a paleta e a fonte muda.
+    fonte
+      ? `  --font-sans: "${fonte}", var(--font-plus-jakarta), var(--font-inter), sans-serif;`
+      : `  --font-sans: var(--font-plus-jakarta), var(--font-inter), sans-serif;`,
+  ].filter(Boolean)
+
+  return `:root, .dark {\n${lines.join('\n')}\n}`
+}
+
 /**
  * Fetches the first available tenant's theme from Supabase and returns:
  * - A string of CSS variable overrides to inject into :root { … }
@@ -127,6 +188,16 @@ export async function getTenantTheme(): Promise<TenantThemeResult> {
     if (error || !data) return empty
 
     const tema = (data.tema ?? {}) as TenantTema
+
+    // Configurador de tema completo (paleta sidebar/conteúdo). Se presente,
+    // gera a paleta inteira do app e ignora o caminho legado.
+    const cores = (tema as any).cores
+    if (cores && typeof cores === 'object') {
+      const css = construirPaletaCompleta(cores, safeFont((tema as any).fonte))
+      if (css) {
+        return { css: css + cssFonteCor(tema as any), tema, tenantId: data.id as string, tenantNome: data.nome as string, favicon: (tema as any).favicon ?? null }
+      }
+    }
 
     // Sanitiza tudo antes de qualquer injeção em <style>.
     const corPrimaria = safeColor(tema.cor_primaria)
@@ -173,9 +244,7 @@ export async function getTenantTheme(): Promise<TenantThemeResult> {
     }
 
     const css =
-      lines.length > 0
-        ? `:root {\n${lines.join('\n')}\n}`
-        : ''
+      (lines.length > 0 ? `:root {\n${lines.join('\n')}\n}` : '') + cssFonteCor(tema as any)
 
     return {
       css,

@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
 import { QuestaoForm } from '@/components/admin/questao-form'
 import { createQuestaoAction } from '../actions'
 import Link from 'next/link'
@@ -6,10 +7,12 @@ import { ChevronLeft } from 'lucide-react'
 
 export default async function NovaQuestaoPage() {
   const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
 
-  const [{ data: bancas }, { data: disciplinas }] = await Promise.all([
+  const [{ data: bancas }, { data: disciplinas }, { data: bancosDestino }] = await Promise.all([
     supabase.from('simulado_bancas').select('nome').order('nome'),
     supabase.from('simulado_disciplinas').select('nome').order('nome'),
+    createAdminClient().from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome'),
   ])
 
   const bancasSugestoes = (bancas ?? []).map((b) => b.nome)
@@ -31,6 +34,7 @@ export default async function NovaQuestaoPage() {
       <QuestaoForm
         bancasSugestoes={bancasSugestoes}
         disciplinasSugestoes={disciplinasSugestoes}
+        bancos={bancosDestino ?? []}
         onSubmit={createQuestaoAction}
       />
     </div>

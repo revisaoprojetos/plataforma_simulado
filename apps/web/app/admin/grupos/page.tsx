@@ -17,6 +17,7 @@ export default async function GruposPage() {
   const { data: grupos } = await supabase
     .from('simulado_grupos')
     .select('id, nome, criado_em')
+    .eq('deletado', false)
     .order('criado_em', { ascending: false })
 
   return (
