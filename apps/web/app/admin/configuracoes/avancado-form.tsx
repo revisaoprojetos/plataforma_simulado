@@ -40,7 +40,7 @@ export function AvancadoForm({ tema, salvarTema }: { tema: any; salvarTema: (t: 
       <div className="space-y-2">
         <Label>Fonte</Label>
         <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
-        <Select value={fonte || SEM} onValueChange={(v) => setFonte(v === SEM ? '' : v)} items={fonteItems}>
+        <Select value={fonte || SEM} onValueChange={(v) => setFonte(v && v !== SEM ? v : '')} items={fonteItems}>
           <SelectTrigger className="w-full" style={{ fontFamily: fonte ? `"${fonte}", sans-serif` : undefined }}>
             <SelectValue placeholder="Selecione uma fonte" />
           </SelectTrigger>

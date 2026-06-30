@@ -92,14 +92,14 @@ export function AdicionarQuestoesDialog({
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por enunciado, código, disciplina…" className="pl-8" />
           </div>
-          <Select value={disc} onValueChange={setDisc} items={discItems}>
+          <Select value={disc} onValueChange={(v) => setDisc(v ?? '')} items={discItems}>
             <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas disciplinas</SelectItem>
               {disciplinas.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={dif} onValueChange={setDif} items={difItems}>
+          <Select value={dif} onValueChange={(v) => setDif(v ?? '')} items={difItems}>
             <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>

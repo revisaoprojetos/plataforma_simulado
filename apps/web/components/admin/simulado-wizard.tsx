@@ -182,14 +182,14 @@ export function SimuladoWizard({
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar questão…" className="pl-8" />
                 </div>
-                <Select value={fBanco} onValueChange={setFBanco} items={{ all: 'Todos bancos', ...Object.fromEntries(bancos.map((b) => [b.id, b.nome])) }}>
+                <Select value={fBanco} onValueChange={(v) => setFBanco(v ?? '')} items={{ all: 'Todos bancos', ...Object.fromEntries(bancos.map((b) => [b.id, b.nome])) }}>
                   <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos bancos</SelectItem>
                     {bancos.map((b) => <SelectItem key={b.id} value={b.id}>{b.nome}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={fDisc} onValueChange={setFDisc} items={{ all: 'Todas matérias', ...Object.fromEntries(disciplinas.map((d) => [d, d])) }}>
+                <Select value={fDisc} onValueChange={(v) => setFDisc(v ?? '')} items={{ all: 'Todas matérias', ...Object.fromEntries(disciplinas.map((d) => [d, d])) }}>
                   <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas matérias</SelectItem>

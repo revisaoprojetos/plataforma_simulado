@@ -82,14 +82,14 @@ export function BancoQuestoesTable({ bancoId, questoes, acao }: { bancoId: strin
 
       {/* Linha 2: filtros */}
       <div className="flex flex-wrap items-center gap-2 border-b px-3 pt-0 pb-3">
-        <Select value={disc} onValueChange={setDisc} items={discItems}>
+        <Select value={disc} onValueChange={(v) => setDisc(v ?? '')} items={discItems}>
           <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas matérias</SelectItem>
             {disciplinas.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={status} onValueChange={setStatus} items={statusItems}>
+        <Select value={status} onValueChange={(v) => setStatus(v ?? '')} items={statusItems}>
           <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos status</SelectItem>
@@ -98,7 +98,7 @@ export function BancoQuestoesTable({ bancoId, questoes, acao }: { bancoId: strin
             <SelectItem value="arquivada">Arquivada</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={dif} onValueChange={setDif} items={difItems}>
+        <Select value={dif} onValueChange={(v) => setDif(v ?? '')} items={difItems}>
           <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas dific.</SelectItem>
