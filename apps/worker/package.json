@@ -12,11 +12,14 @@
     "@supabase/supabase-js": "^2.47.0",
     "bullmq": "^5.56.6",
     "dotenv": "^16.4.7",
-    "ioredis": "^5.4.1"
+    "ioredis": "5.11.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.7.3"
+  },
+  "overrides": {
+    "ioredis": "5.11.1"
   }
 }
