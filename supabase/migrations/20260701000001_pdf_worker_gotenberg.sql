@@ -47,18 +47,24 @@ CREATE TRIGGER trg_pdf_jobs_touch BEFORE UPDATE ON public.simulado_pdf_jobs
 
 ALTER TABLE public.simulado_pdf_jobs ENABLE ROW LEVEL SECURITY;
 
--- Admin autenticado do tenant enxerga/gerencia (service-role do worker/web bypassa).
-DROP POLICY IF EXISTS "pdf_jobs_admin_all" ON public.simulado_pdf_jobs;
-CREATE POLICY "pdf_jobs_admin_all"
-  ON public.simulado_pdf_jobs FOR ALL
-  TO authenticated
-  USING (
-    EXISTS (SELECT 1 FROM public.simulado_tenant_acessos ta
-            WHERE ta.user_id = auth.uid() AND ta.tenant_id = simulado_pdf_jobs.tenant_id AND ta.ativo)
-  )
-  WITH CHECK (
-    EXISTS (SELECT 1 FROM public.simulado_tenant_acessos ta
-            WHERE ta.user_id = auth.uid() AND ta.tenant_id = simulado_pdf_jobs.tenant_id AND ta.ativo)
-  );
+-- Admin autenticado do tenant enxerga/gerencia (service-role do worker/web bypassa
+-- RLS de qualquer jeito). A política só é criada se a tabela de acessos existir com
+-- esse nome — assim a migration NUNCA falha por divergência de nome; no pior caso a
+-- tabela fica só com RLS ligado (nega authenticated) e o app segue via service-role.
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS "pdf_jobs_admin_all" ON public.simulado_pdf_jobs;
+  IF to_regclass('public.simulado_tenant_acessos') IS NOT NULL THEN
+    EXECUTE $pol$
+      CREATE POLICY "pdf_jobs_admin_all"
+        ON public.simulado_pdf_jobs FOR ALL
+        TO authenticated
+        USING (EXISTS (SELECT 1 FROM public.simulado_tenant_acessos ta
+                       WHERE ta.user_id = auth.uid() AND ta.tenant_id = simulado_pdf_jobs.tenant_id AND ta.ativo))
+        WITH CHECK (EXISTS (SELECT 1 FROM public.simulado_tenant_acessos ta
+                       WHERE ta.user_id = auth.uid() AND ta.tenant_id = simulado_pdf_jobs.tenant_id AND ta.ativo));
+    $pol$;
+  END IF;
+END $$;
 
 NOTIFY pgrst, 'reload schema';

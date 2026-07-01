@@ -1,28 +1,23 @@
 # =====================================================================
-# STACK PORTAINER — App + PDF assíncrono (worker + Gotenberg)
-# Suba este arquivo como Stack no Portainer (via Git repository).
-# Serviços na MESMA rede: web:3000, redis:6379, gotenberg:3000 se resolvem sozinhos.
+# STACK PORTAINER (Swarm) — App + PDF assíncrono (worker + Gotenberg)
+# Usa IMAGENS PRONTAS do GHCR (buildadas pelo GitHub Actions). Swarm não builda.
 #
 # ANTES DE SUBIR:
-#  1) Rode a migration supabase/migrations/20260701000001_pdf_worker_gotenberg.sql
-#     no SQL Editor do Supabase (cria o bucket `pdfs` + tabela simulado_pdf_jobs).
-#  2) Preencha as 4 variáveis em "Environment variables" no Portainer (ver abaixo).
+#  1) O workflow .github/workflows/docker-publish.yml precisa ter rodado com sucesso
+#     (publica as imagens web e worker no ghcr.io). Deixe os 2 pacotes PÚBLICOS
+#     (GitHub → Packages → cada pacote → Package settings → Change visibility → Public),
+#     senão o Swarm não consegue baixar.
+#  2) Rode a migration supabase/migrations/20260701000001_pdf_worker_gotenberg.sql
+#     no SQL Editor do Supabase (bucket `pdfs` + tabela simulado_pdf_jobs).
+#  3) Preencha as 4 variáveis em "Environment variables" no Portainer (ver README/guia).
 #
-# NÃO inclui o `api` (NestJS) nem o nginx do repo: o app fala direto com o Supabase
-# e as rotas /api/* são do próprio Next. Coloque seu proxy/HTTPS (Cloudflare, Traefik,
-# Nginx Proxy Manager…) na frente do serviço `web`.
+# Coloque seu proxy/HTTPS (Cloudflare, Nginx Proxy Manager, Traefik…) na frente do `web`.
 # =====================================================================
 
 services:
-  # App Next.js — serve a UI, enfileira os PDFs e serve as páginas /imprimir
+  # App Next.js — UI, enfileira PDFs e serve as páginas /imprimir
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      args:
-        # NEXT_PUBLIC_* são embutidas no bundle em BUILD-TIME (precisam vir como args).
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    image: ghcr.io/revisaoprojetos/plataforma_simulado:latest
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
@@ -32,16 +27,15 @@ services:
       - PDF_RENDER_SECRET=${PDF_RENDER_SECRET}
       - WEB_INTERNAL_URL=http://web:3000
     ports:
-      - "3000:3000" # exponha atrás do seu proxy/HTTPS
-    depends_on:
-      - redis
-    restart: unless-stopped
+      - "3000:3000"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
 
   # Consome a fila, chama o Gotenberg, sobe o PDF no bucket `pdfs`
   worker:
-    build:
-      context: ./apps/worker
-      dockerfile: Dockerfile
+    image: ghcr.io/revisaoprojetos/plataforma_simulado-worker:latest
     environment:
       - NODE_ENV=production
       - SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
@@ -49,42 +43,34 @@ services:
       - REDIS_URL=redis://redis:6379
       - GOTENBERG_URL=http://gotenberg:3000
       - WEB_INTERNAL_URL=http://web:3000
-      # PDF_PUBLIC_BASE é opcional: sem ele, o worker usa o getPublicUrl do Supabase.
-    depends_on:
-      - redis
-      - gotenberg
-    restart: unless-stopped
+      # PDF_PUBLIC_BASE é opcional: sem ela, o worker usa o getPublicUrl do Supabase.
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
 
-  # Motor de PDF (Chromium embutido) — renderiza as páginas /imprimir fora do app
+  # Motor de PDF (Chromium embutido) — renderiza /imprimir fora do app
   gotenberg:
     image: gotenberg/gotenberg:8
     command:
       - gotenberg
       - --chromium-allow-list=.*
       - --api-timeout=120s
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
 
-  # Fila (compartilhada entre web=produtor e worker=consumidor)
+  # Fila (compartilhada web=produtor / worker=consumidor)
   redis:
     image: redis:7-alpine
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
 
 volumes:
   redis_data:
-
-networks:
-  default:
-    driver: bridge
