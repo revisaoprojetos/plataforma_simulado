@@ -20,6 +20,8 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       allowedOrigins: ["localhost:3000"],
+      // Cadernos do designer podem ficar grandes (imagens, muitos blocos) — sobe o limite do body.
+      bodySizeLimit: "12mb",
     },
   },
 };

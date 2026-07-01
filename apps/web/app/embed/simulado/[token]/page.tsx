@@ -1,7 +1,11 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { resolveTemaDark } from '@/lib/hud/resolve-dark'
+import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { EmbedLoginForm } from '@/components/embed/embed-login-form'
 import { EmbedProvaRunner } from '@/components/embed/embed-prova-runner'
 import { AlertCircle } from 'lucide-react'
+import { type HudCores, type HudPorPagina, efetivarHud } from '@/lib/caderno-designer/types'
+import { hudCssVars } from '@/lib/caderno-designer/hud'
+import { resolverHudConfig } from '@/lib/hud/resolve-hud'
 
 interface PageProps {
   params: Promise<{ token: string }>
@@ -47,25 +51,60 @@ export default async function EmbedSimuladoPage({ params, searchParams }: PagePr
     | 'email_cpf'
     | 'email_telefone'
 
-  // Etapa 2: sessão já existe — mostrar runner
+  // Cores + marca do caderno vinculado — login e prova seguem o designer (cores próprias por página).
+  const hud = await fetchHudCores(simulado.id)
+  const branding = await fetchBranding(simulado.tenant_id)
+
+  // Etapa 2: sessão já existe — mostrar runner (cores da página "prova")
   if (sessao_id) {
     return (
-      <EmbedProvaRunner
-        embedToken={token}
-        sessaoId={sessao_id}
-        simuladoTitulo={simulado.titulo}
-      />
+      <div className="min-h-screen bg-background" style={hudCssVars(efetivarHud(hud.base, hud.porPagina, 'prova')) as React.CSSProperties}>
+        <EmbedProvaRunner
+          embedToken={token}
+          sessaoId={sessao_id}
+          simuladoTitulo={simulado.titulo}
+          branding={branding}
+        />
+      </div>
     )
   }
 
-  // Etapa 1: identificação
+  // Etapa 1: identificação (o EmbedLoginForm aplica o tema da página "login" + claro/escuro)
+  const dark = await resolveTemaDark()
   return (
     <EmbedLoginForm
       token={token}
       metodo={metodo}
       simuladoTitulo={simulado.titulo}
+      branding={branding}
+      darkInicial={dark}
+      hud={{ base: hud.base, porPagina: hud.porPagina }}
+      prova={{
+        status: simulado.status,
+        dataInicio: simulado.data_inicio,
+        dataFim: simulado.data_fim,
+        tempoLimiteMin: simulado.tempo_limite_min,
+      }}
     />
   )
+}
+
+/** Marca do tenant (logo + nome) para login/prova seguirem a configuração. */
+async function fetchBranding(tenantId: string) {
+  try {
+    const svc = createAdminClient()
+    const { data: t } = await svc.from('simulado_tenants').select('nome, tema').eq('id', tenantId).maybeSingle()
+    const tema = (t?.tema ?? {}) as any
+    return {
+      nome: tema.nome_site ?? t?.nome ?? 'Simulado',
+      logoUrl: (tema.logo_url ?? null) as string | null,
+      logoGrandeUrl: (tema.logo_grande_url ?? null) as string | null,
+      logoBg: (tema.logo_png_bg ?? '#ffffff') as string,
+      logoEstilo: (tema.logo_estilo ?? 'arredondado') as string,
+    }
+  } catch {
+    return null
+  }
 }
 
 async function fetchSimuladoPorToken(embedToken: string): Promise<{
@@ -73,12 +112,17 @@ async function fetchSimuladoPorToken(embedToken: string): Promise<{
   titulo: string
   embed_ativo: boolean
   metodo_identificacao: string | null
+  tenant_id: string
+  status: string | null
+  data_inicio: string | null
+  data_fim: string | null
+  tempo_limite_min: number | null
 } | null> {
   try {
     const supabase = await createServiceClient()
     const { data } = await supabase
       .from('simulado_simulados')
-      .select('id, titulo, embed_ativo, metodo_identificacao')
+      .select('id, titulo, embed_ativo, metodo_identificacao, tenant_id, status, data_inicio, data_fim, tempo_limite_min')
       .eq('embed_token', embedToken)
       .single()
 
@@ -86,4 +130,10 @@ async function fetchSimuladoPorToken(embedToken: string): Promise<{
   } catch {
     return null
   }
+}
+
+/** Cores do HUD do caderno vinculado ao simulado (link explícito ou banco). Fallback p/ o padrão. */
+async function fetchHudCores(simuladoId: string): Promise<{ base: HudCores; porPagina: HudPorPagina }> {
+  const { base, porPagina } = await resolverHudConfig(simuladoId)
+  return { base, porPagina }
 }

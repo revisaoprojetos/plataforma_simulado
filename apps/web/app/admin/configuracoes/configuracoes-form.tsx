@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Save, RotateCcw, ImageIcon, Loader2, Bell, Moon, FolderOpen, MoreVertical, Menu } from 'lucide-react'
+import { Save, RotateCcw, ImageIcon, Loader2, Bell, Moon, Sun, FolderOpen, MoreVertical, Menu, ArrowLeft, Upload, X } from 'lucide-react'
 
 /**
  * Lê uma variável CSS do sistema e converte para hex. Renderiza a cor (lab,
@@ -43,15 +43,46 @@ interface Cores {
   sidebar: string; sidetext: string; active: string; topbar: string; sborder: string
   bg: string; text: string; card: string; cborder: string; btn: string; accent: string
 }
+type LogoEstilo = 'quadrado' | 'arredondado' | 'borda'
+type SelecaoEstilo = 'quadrada' | 'redonda' | 'borda'
 interface Tema {
-  nome_site: string; titulo_pagina: string; logo_url: string | null; logo_png_bg: string; cores: Cores
+  nome_site: string; titulo_pagina: string
+  logo_url: string | null; logo_grande_url: string | null; logo_selecao_url: string | null
+  logo_png_bg: string; logo_estilo: LogoEstilo; logo_selecao_estilo: SelecaoEstilo; cores: Cores
+}
+
+const LOGO_ESTILOS: { id: LogoEstilo; nome: string }[] = [
+  { id: 'quadrado', nome: 'Reto' },
+  { id: 'arredondado', nome: 'Arredondado' },
+  { id: 'borda', nome: 'Borda' },
+]
+const SELECAO_ESTILOS: { id: SelecaoEstilo; nome: string }[] = [
+  { id: 'quadrada', nome: 'Quadrada' },
+  { id: 'redonda', nome: 'Redonda' },
+  { id: 'borda', nome: 'Com borda' },
+]
+/** Classes do quadro do logo conforme o estilo. */
+export function frameLogo(estilo?: string): string {
+  if (estilo === 'quadrado') return 'rounded-none'
+  if (estilo === 'borda') return 'rounded-lg border'
+  return 'rounded-lg'
+}
+/** Classes do quadro da imagem de seleção (tiles do login). */
+export function frameSelecao(estilo?: string): string {
+  if (estilo === 'quadrada') return 'rounded-xl'
+  if (estilo === 'borda') return 'rounded-full border-2'
+  return 'rounded-full'
 }
 
 const DEFAULT: Tema = {
   nome_site: 'Plataforma',
   titulo_pagina: 'Banco de Questões',
   logo_url: null,
+  logo_grande_url: null,
+  logo_selecao_url: null,
   logo_png_bg: '#ffffff',
+  logo_estilo: 'arredondado',
+  logo_selecao_estilo: 'redonda',
   cores: { sidebar: '#0f0f13', sidetext: '#c8c8d0', active: '#7f77dd', topbar: '#111118', sborder: '#35353f', bg: '#18181f', text: '#e8e8ee', card: '#26262f', cborder: '#35353f', btn: '#7f77dd', accent: '#7f77dd' },
 }
 
@@ -82,14 +113,18 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
     nome_site: tema?.nome_site ?? DEFAULT.nome_site,
     titulo_pagina: tema?.titulo_pagina ?? DEFAULT.titulo_pagina,
     logo_url: tema?.logo_url ?? null,
+    logo_grande_url: tema?.logo_grande_url ?? null,
+    logo_selecao_url: tema?.logo_selecao_url ?? null,
     logo_png_bg: tema?.logo_png_bg ?? DEFAULT.logo_png_bg,
+    logo_estilo: (tema?.logo_estilo as LogoEstilo) ?? DEFAULT.logo_estilo,
+    logo_selecao_estilo: (tema?.logo_selecao_estilo as SelecaoEstilo) ?? DEFAULT.logo_selecao_estilo,
     cores: { ...DEFAULT.cores, ...(tema?.cores ?? {}) },
   }
   const [t, setT] = useState<Tema>(inicial)
   const [aba, setAba] = useState<'logo' | 'sidebar' | 'conteudo'>('logo')
-  const [isPng, setIsPng] = useState<boolean>(typeof tema?.logo_url === 'string' && tema.logo_url.startsWith('data:image/png'))
+  const [previewModo, setPreviewModo] = useState<'painel' | 'login' | 'selecao'>('painel')
+  const [loginDark, setLoginDark] = useState<boolean>(tema?.modo_padrao === 'dark')
   const [pending, start] = useTransition()
-  const fileRef = useRef<HTMLInputElement>(null)
   const editou = useRef(false)
 
   // Sem tema salvo: a prévia espelha as cores reais do sistema (claro/escuro).
@@ -118,15 +153,6 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
   const setCor = (k: keyof Cores, v: string) => { editou.current = true; setT((p) => ({ ...p, cores: { ...p.cores, [k]: v } })) }
   const aplicarPreset = (cores: Cores) => { editou.current = true; setT((p) => ({ ...p, cores: { ...cores } })) }
 
-  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setIsPng(file.type === 'image/png')
-    const reader = new FileReader()
-    reader.onload = () => setT((p) => ({ ...p, logo_url: String(reader.result) }))
-    reader.readAsDataURL(file)
-  }
-
   function salvar() {
     start(async () => {
       const payload = {
@@ -146,7 +172,7 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
     >
       <div className="flex flex-col lg:flex-row">
         {/* ── PAINEL DE CONTROLES ── */}
-        <div className="w-full shrink-0 border-b lg:w-[230px] lg:border-b-0 lg:border-r">
+        <div className="w-full shrink-0 border-b lg:w-[300px] lg:border-b-0 lg:border-r">
           {/* Abas */}
           <div className="flex border-b text-sm">
             {(['logo', 'sidebar', 'conteudo'] as const).map((k) => (
@@ -160,31 +186,75 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
           <div className="space-y-4 p-3">
             {/* ABA LOGO */}
             {aba === 'logo' && (
-              <>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
-                <button type="button" onClick={() => fileRef.current?.click()}
-                  className="flex w-full flex-col items-center gap-2 rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground hover:border-primary">
-                  <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg text-2xl font-bold"
-                    style={{ background: t.logo_url ? (isPng ? t.logo_png_bg : 'transparent') : c.btn, color: contraste(c.btn) }}>
-                    {t.logo_url ? <img src={t.logo_url} alt="logo" className="h-full w-full object-contain" /> : (t.nome_site[0] ?? 'P').toUpperCase()}
-                  </span>
-                  <span className="flex items-center gap-1"><ImageIcon className="h-3.5 w-3.5" /> Enviar logo</span>
-                </button>
-                {isPng && t.logo_url && (
-                  <Field label="Fundo (PNG transparente)"><Swatch value={t.logo_png_bg} onChange={(v) => setT((p) => ({ ...p, logo_png_bg: v }))} /></Field>
+              <div className="space-y-5">
+                {/* Imagens */}
+                <Grupo titulo="Imagens">
+                  <LogoRow label="Logo (pequena)" desc="Sidebar, topo e ícones"
+                    value={t.logo_url} onChange={(v) => setT((p) => ({ ...p, logo_url: v }))} onRemove={() => setT((p) => ({ ...p, logo_url: null }))}
+                    frame={frameLogo(t.logo_estilo)} bg={t.logo_png_bg} inicial={(t.nome_site[0] ?? 'P').toUpperCase()} inicialBg={c.btn} />
+                  <LogoRow label="Logo grande (login)" desc="Painel da esquerda do login"
+                    value={t.logo_grande_url} onChange={(v) => setT((p) => ({ ...p, logo_grande_url: v }))} onRemove={() => setT((p) => ({ ...p, logo_grande_url: null }))} />
+                  <LogoRow label="Imagem da seleção" desc="Bloco de seleção (início)"
+                    value={t.logo_selecao_url} onChange={(v) => setT((p) => ({ ...p, logo_selecao_url: v }))} onRemove={() => setT((p) => ({ ...p, logo_selecao_url: null }))} />
+                </Grupo>
+
+                {/* Ícone — só faz sentido com a logo pequena */}
+                {t.logo_url && (
+                  <Grupo titulo="Ícone (logo pequena)">
+                    <Field label="Cor de fundo">
+                      <div className="flex items-center gap-1.5">
+                        <button type="button" onClick={() => setT((p) => ({ ...p, logo_png_bg: p.logo_png_bg === 'transparent' ? '#ffffff' : 'transparent' }))}
+                          className={`rounded-md border px-2 py-1 text-[10px] font-medium transition-colors ${t.logo_png_bg === 'transparent' ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>
+                          Transparente
+                        </button>
+                        {t.logo_png_bg !== 'transparent' && <Swatch value={t.logo_png_bg} onChange={(v) => setT((p) => ({ ...p, logo_png_bg: v }))} />}
+                      </div>
+                    </Field>
+                    <div className="space-y-1.5">
+                      <span className="text-xs text-muted-foreground">Borda</span>
+                      <div className="flex gap-1.5">
+                        {LOGO_ESTILOS.map((e) => (
+                          <button key={e.id} type="button" onClick={() => setT((p) => ({ ...p, logo_estilo: e.id }))}
+                            className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_estilo === e.id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>
+                            {e.nome}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </Grupo>
                 )}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Nome do site</label>
-                  <input value={t.nome_site} onChange={(e) => setT((p) => ({ ...p, nome_site: e.target.value }))}
-                    className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Título da página</label>
-                  <input value={t.titulo_pagina} onChange={(e) => setT((p) => ({ ...p, titulo_pagina: e.target.value }))}
-                    className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Presets</label>
+
+                {/* Bloco de seleção (tiles da tela inicial do login) */}
+                <Grupo titulo="Bloco de seleção">
+                  <div className="space-y-1.5">
+                    <span className="text-xs text-muted-foreground">Formato da imagem</span>
+                    <div className="flex gap-1.5">
+                      {SELECAO_ESTILOS.map((e) => (
+                        <button key={e.id} type="button" onClick={() => setT((p) => ({ ...p, logo_selecao_estilo: e.id }))}
+                          className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_selecao_estilo === e.id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>
+                          {e.nome}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </Grupo>
+
+                {/* Identidade */}
+                <Grupo titulo="Identidade">
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">Nome do site</label>
+                    <input value={t.nome_site} onChange={(e) => setT((p) => ({ ...p, nome_site: e.target.value }))}
+                      className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">Título da página</label>
+                    <input value={t.titulo_pagina} onChange={(e) => setT((p) => ({ ...p, titulo_pagina: e.target.value }))}
+                      className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+                  </div>
+                </Grupo>
+
+                {/* Presets de cor */}
+                <Grupo titulo="Presets de cor">
                   <div className="flex flex-wrap gap-2">
                     {PRESETS.map((p) => (
                       <button key={p.nome} type="button" title={p.nome} onClick={() => aplicarPreset(p.cores)}
@@ -192,8 +262,8 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
                         style={{ background: p.cores.btn, borderColor: 'var(--cfg-border)' }} />
                     ))}
                   </div>
-                </div>
-              </>
+                </Grupo>
+              </div>
             )}
 
             {/* ABA SIDEBAR */}
@@ -217,7 +287,7 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
 
           {/* Rodapé do painel */}
           <div className="flex flex-col gap-2 border-t p-3">
-            <button type="button" onClick={() => { editou.current = true; setT(DEFAULT); setIsPng(false) }}
+            <button type="button" onClick={() => { editou.current = true; setT(DEFAULT) }}
               className="flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm text-muted-foreground hover:text-foreground">
               <RotateCcw className="h-4 w-4" /> Resetar padrão
             </button>
@@ -230,15 +300,36 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
 
         {/* ── PRÉVIA ── */}
         <div className="flex-1 bg-muted/30 p-4">
+          {/* alternador Painel / Login */}
+          <div className="mb-3 flex items-center justify-between">
+            <div className="inline-flex rounded-lg border bg-background p-0.5 text-xs">
+              {(['painel', 'login', 'selecao'] as const).map((m) => (
+                <button key={m} type="button" onClick={() => setPreviewModo(m)}
+                  className={`rounded-md px-3 py-1 font-medium transition-colors ${previewModo === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+                  {m === 'painel' ? 'Painel' : m === 'login' ? 'Login' : 'Seleção'}
+                </button>
+              ))}
+            </div>
+            {previewModo !== 'painel' && (
+              <button type="button" onClick={() => setLoginDark((v) => !v)} title="Alternar claro/escuro do login"
+                className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground">
+                {loginDark ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+                {loginDark ? 'Escuro' : 'Claro'}
+              </button>
+            )}
+          </div>
+
           {/* navegador falso */}
           <div className="overflow-hidden rounded-lg border shadow-sm">
             <div className="flex items-center gap-2 border-b bg-background px-3 py-2">
               <span className="h-3 w-3 rounded-full bg-red-400" />
               <span className="h-3 w-3 rounded-full bg-yellow-400" />
               <span className="h-3 w-3 rounded-full bg-green-400" />
-              <span className="ml-2 flex-1 truncate rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{t.nome_site.toLowerCase().replace(/\s+/g, '')}.app/admin/banco-questoes</span>
+              <span className="ml-2 flex-1 truncate rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                {t.nome_site.toLowerCase().replace(/\s+/g, '')}.app/{previewModo !== 'painel' ? 'login' : 'admin/banco-questoes'}
+              </span>
             </div>
-            <Preview t={t} isPng={isPng} />
+            {previewModo === 'painel' ? <Preview t={t} /> : previewModo === 'login' ? <PreviewLogin t={t} dark={loginDark} /> : <PreviewSelecao t={t} dark={loginDark} />}
           </div>
         </div>
       </div>
@@ -255,8 +346,121 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+/** Seção com título dentro do painel de controles. */
+function Grupo({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</p>
+      <div className="space-y-2.5">{children}</div>
+    </div>
+  )
+}
+
+/** Linha compacta de upload de imagem (thumb + label + Enviar/Trocar/Remover). */
+function LogoRow({ label, desc, value, onChange, onRemove, frame, bg, inicial, inicialBg }: {
+  label: string; desc: string; value: string | null; onChange: (v: string) => void; onRemove?: () => void
+  frame?: string; bg?: string; inicial?: string; inicialBg?: string
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; if (!f) return
+    const r = new FileReader(); r.onload = () => onChange(String(r.result)); r.readAsDataURL(f)
+  }
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg border bg-background p-2">
+      <input ref={ref} type="file" accept="image/*" className="hidden" onChange={pick} />
+      <button type="button" onClick={() => ref.current?.click()} title={value ? 'Trocar imagem' : 'Enviar imagem'}
+        className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden border ${frame ?? 'rounded-lg'}`}
+        style={{ background: value ? (bg ?? 'transparent') : (inicial ? inicialBg : 'var(--muted)'), color: inicial && inicialBg ? contraste(inicialBg) : undefined }}>
+        {value ? <img src={value} alt={label} className="h-full w-full object-contain" /> : inicial ? <span className="text-base font-bold">{inicial}</span> : <ImageIcon className="h-4 w-4 opacity-50" />}
+      </button>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-medium">{label}</p>
+        <p className="truncate text-[10px] text-muted-foreground">{desc}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <button type="button" onClick={() => ref.current?.click()} title={value ? 'Trocar' : 'Enviar'}
+          className="flex h-7 w-7 items-center justify-center rounded-md border text-muted-foreground hover:border-primary hover:text-primary">
+          <Upload className="h-3.5 w-3.5" />
+        </button>
+        {value && onRemove && (
+          <button type="button" onClick={onRemove} title="Remover"
+            className="flex h-7 w-7 items-center justify-center rounded-md border text-muted-foreground hover:border-destructive hover:text-destructive">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Prévia do bloco de seleção de plataforma (tela inicial do login). */
+function PreviewSelecao({ t, dark }: { t: Tema; dark: boolean }) {
+  const c = t.cores
+  const bg = dark ? '#0d0d11' : '#f6f7f9'
+  const text = dark ? '#e8e8ee' : '#1a1d24'
+  const muted = dark ? '#8a8a99' : '#6b7280'
+  const cardBg = dark ? '#15151c' : '#ffffff'
+  const border = dark ? '#2a2a35' : '#e5e7eb'
+  const tileBg = dark ? '#1c1c25' : '#f7f7fa'
+  const img = t.logo_selecao_url ?? t.logo_url
+  return (
+    <div className="flex h-[420px] items-center justify-center" style={{ background: bg, color: text }}>
+      <div className="w-72 rounded-2xl border p-6 text-center shadow-sm" style={{ background: cardBg, borderColor: border }}>
+        <p className="text-base font-bold">Entrar</p>
+        <p className="mb-5 text-[11px]" style={{ color: muted }}>Escolha sua plataforma para acessar.</p>
+        <button className="mx-auto flex aspect-[5/4] w-40 flex-col items-center justify-center gap-2.5 rounded-xl border p-3" style={{ borderColor: border, background: tileBg }}>
+          <span className={`flex h-16 w-16 items-center justify-center overflow-hidden ${frameSelecao(t.logo_selecao_estilo)}`} style={{ background: dark ? '#26262f' : '#e7e7ee', borderColor: c.btn }}>
+            {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : <span className="text-lg font-bold" style={{ color: c.btn }}>{(t.nome_site[0] ?? 'P').toUpperCase()}</span>}
+          </span>
+          <span className="text-xs font-semibold">{t.nome_site}</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** Prévia da tela de login (estilo Instagram) com logo, cor da marca e modo claro/escuro. */
+function PreviewLogin({ t, dark }: { t: Tema; dark: boolean }) {
+  const c = t.cores
+  const bg = dark ? '#0d0d11' : '#ffffff'
+  const panel = dark ? '#15151c' : '#f4f4f7'
+  const text = dark ? '#e8e8ee' : '#1a1d24'
+  const muted = dark ? '#8a8a99' : '#6b7280'
+  const inputBg = dark ? '#1c1c25' : '#f1f1f4'
+  const border = dark ? '#2a2a35' : '#e5e7eb'
+  // No login usa a logo GRANDE; cai na pequena se não houver.
+  const bigLogo = t.logo_grande_url ?? t.logo_url
+
+  return (
+    <div className="flex h-[420px] text-[12px]" style={{ background: bg, color: text, fontFamily: 'system-ui, sans-serif' }}>
+      {/* esquerda — logo grande da plataforma */}
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden" style={{ background: panel, borderRight: `1px solid ${border}` }}>
+        <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 35% 35%, ${c.accent}26, transparent 60%)` }} />
+        {bigLogo ? (
+          <img src={bigLogo} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          <span className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl text-3xl font-bold" style={{ background: c.btn, color: contraste(c.btn) }}>
+            {(t.nome_site[0] ?? 'P').toUpperCase()}
+          </span>
+        )}
+      </div>
+
+      {/* direita — credenciais */}
+      <div className="flex w-[48%] shrink-0 flex-col justify-center gap-3 px-6">
+        <span className="flex items-center gap-1 text-[11px]" style={{ color: muted }}><ArrowLeft className="h-3 w-3" /> Trocar plataforma</span>
+        <p className="text-sm font-bold">Acesso administrativo</p>
+        <div className="flex h-9 items-center rounded-md px-2.5 text-[11px]" style={{ background: inputBg, border: `1px solid ${border}`, color: muted }}>Endereço de e-mail</div>
+        <div className="flex h-9 items-center rounded-md px-2.5 text-[11px]" style={{ background: inputBg, border: `1px solid ${border}`, color: muted }}>Senha</div>
+        <div className="flex h-9 items-center justify-center rounded-md text-[11px] font-semibold" style={{ background: c.btn, color: contraste(c.btn) }}>Entrar no painel</div>
+        <span className="rounded-full border px-3 py-1 text-[10px] font-medium" style={{ alignSelf: 'flex-end', borderColor: border, color: muted }}>Área do aluno</span>
+      </div>
+    </div>
+  )
+}
+
 /** Prévia do dashboard com as cores aplicadas. */
-function Preview({ t, isPng }: { t: Tema; isPng: boolean }) {
+function Preview({ t }: { t: Tema }) {
   const c = t.cores
   const menu = [
     { nome: 'Dashboard' }, { nome: 'Simulado', sub: ['Aplicação', 'Questões', 'Banco de questões', 'Correção'] },
@@ -267,7 +471,7 @@ function Preview({ t, isPng }: { t: Tema; isPng: boolean }) {
       {/* sidebar */}
       <div className="flex w-[150px] shrink-0 flex-col" style={{ background: c.sidebar, borderRight: `1px solid ${c.sborder}` }}>
         <div className="flex items-center gap-2 px-3 py-3" style={{ borderBottom: `1px solid ${c.sborder}` }}>
-          <span className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-md text-[11px] font-bold" style={{ background: t.logo_url ? (isPng ? t.logo_png_bg : 'transparent') : c.btn, color: contraste(c.btn) }}>
+          <span className={`flex h-6 w-6 items-center justify-center overflow-hidden text-[11px] font-bold ${frameLogo(t.logo_estilo)}`} style={{ background: t.logo_url ? t.logo_png_bg : c.btn, color: contraste(t.logo_url ? t.logo_png_bg : c.btn), borderColor: c.cborder }}>
             {t.logo_url ? <img src={t.logo_url} alt="" className="h-full w-full object-contain" /> : (t.nome_site[0] ?? 'P').toUpperCase()}
           </span>
           <span className="truncate font-semibold" style={{ color: c.sidetext }}>{t.nome_site}</span>

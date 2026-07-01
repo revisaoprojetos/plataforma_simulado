@@ -1,7 +1,6 @@
 import { Job } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
-import puppeteer from 'puppeteer-core'
-import chromium from '@sparticuz/chromium'
+import { htmlParaPdf } from '../lib/gotenberg'
 import { createHash } from 'crypto'
 
 const supabase = createClient(
@@ -173,27 +172,15 @@ export async function pdfRelatorioProcessor(job: Job) {
     questoes,
   })
 
-  // 6. Launch Puppeteer and generate PDF
-  const browser = await puppeteer.launch({
-    args: chromium.args,
-    executablePath: await chromium.executablePath(),
-    headless: true,
+  // 6. Gerar PDF via Gotenberg (HTML → PDF), fora do app.
+  const pdfBuffer = await htmlParaPdf(html, {
+    marginTop: 0.8, marginBottom: 0.8, marginLeft: 0.6, marginRight: 0.6,
   })
 
-  let pdfBuffer: Buffer
-  try {
-    const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'load' })
-    const rawPdf = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '20mm', bottom: '20mm', left: '15mm', right: '15mm' } })
-    pdfBuffer = Buffer.from(rawPdf)
-  } finally {
-    await browser.close()
-  }
-
-  // 7. Upload to Supabase Storage
+  // 7. Upload to Supabase Storage (bucket `pdfs`)
   const fileName = `relatorios/${sessao_id}_${createHash('sha256').update(sessao_id).digest('hex').slice(0, 8)}.pdf`
   const { error: uploadErr } = await supabase.storage
-    .from('arquivos')
+    .from('pdfs')
     .upload(fileName, pdfBuffer, { contentType: 'application/pdf', upsert: true })
 
   if (uploadErr) {
@@ -201,7 +188,7 @@ export async function pdfRelatorioProcessor(job: Job) {
     // Fall through — still return partial result
   }
 
-  const { data: { publicUrl } } = supabase.storage.from('arquivos').getPublicUrl(fileName)
+  const { data: { publicUrl } } = supabase.storage.from('pdfs').getPublicUrl(fileName)
 
   // 8. Save notification
   await supabase.from('notificacoes').insert({

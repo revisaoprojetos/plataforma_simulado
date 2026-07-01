@@ -55,38 +55,49 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
   const respPorAluno = new Map<string, Map<string, boolean>>()
   const marcadaPorAluno = new Map<string, Map<string, string>>() // est → (questaoId → letra)
   if (qids.length) {
-    let sq = svc.from('simulado_sessoes_prova').select('id, estudante_id, iniciado_em').in('estudante_id', estIds).eq('is_teste', false).eq('deletado', false)
+    let sq = svc.from('simulado_sessoes_prova').select('id, estudante_id, iniciado_em, status').in('estudante_id', estIds).eq('is_teste', false).eq('deletado', false)
     if (sessaoId) sq = sq.eq('id', sessaoId)
     const { data: sessoes } = await sq
-    // 1 sessão por aluno: a indicada, ou a mais recente (maior iniciado_em).
-    const sessaoDoAluno = new Map<string, { id: string; quando: string }>()
-    for (const s of sessoes ?? []) {
-      const est = (s as any).estudante_id
-      const quando = String((s as any).iniciado_em ?? '')
-      const atual = sessaoDoAluno.get(est)
-      if (!atual || quando > atual.quando) sessaoDoAluno.set(est, { id: (s as any).id, quando })
+    const allSessIds = (sessoes ?? []).map((s: any) => s.id)
+
+    // Carrega as respostas de TODAS as sessões candidatas (pra saber quais têm respostas).
+    const respPorSessao = new Map<string, any[]>()
+    if (allSessIds.length) {
+      const { data: resp } = await svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta, alternativa_id, snapshot_gabarito').in('sessao_id', allSessIds).in('questao_id', qids)
+      for (const r of resp ?? []) { const arr = respPorSessao.get((r as any).sessao_id) ?? []; arr.push(r); respPorSessao.set((r as any).sessao_id, arr) }
     }
-    const sessEst = new Map<string, string>([...sessaoDoAluno.entries()].map(([est, s]) => [s.id, est]))
-    const sessIds = [...sessEst.keys()]
-    if (sessIds.length) {
-      const { data: resp } = await svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta, alternativa_id, snapshot_gabarito').in('sessao_id', sessIds).in('questao_id', qids)
-      for (const r of resp ?? []) {
-        const est = sessEst.get((r as any).sessao_id); if (!est) continue
-        const m = respPorAluno.get(est) ?? new Map<string, boolean>()
-        m.set((r as any).questao_id, !!(r as any).correta) // uma sessão → valor direto, sem OR.
-        respPorAluno.set(est, m)
-        // Letra marcada: usa o valor JÁ ARMAZENADO (snapshot_gabarito.letra); só
-        // recai no mapeamento por id para respostas antigas sem a letra gravada.
+
+    // 1 sessão por aluno (a indicada, ou a "melhor"): prioriza ter RESPOSTAS, depois
+    // FINALIZADA, depois a mais recente. Evita pegar uma tentativa vazia/abandonada.
+    const porAluno = new Map<string, any[]>()
+    for (const s of sessoes ?? []) { const arr = porAluno.get((s as any).estudante_id) ?? []; arr.push(s); porAluno.set((s as any).estudante_id, arr) }
+    const score = (id: string) => { const rs = respPorSessao.get(id) ?? []; return { n: rs.length, ok: rs.filter((r: any) => r.correta).length } }
+    for (const [est, lista] of porAluno) {
+      // Melhor tentativa: mais respostas (mais completa) → mais acertos → finalizada → mais recente.
+      lista.sort((a: any, b: any) => {
+        const sa = score(a.id), sb = score(b.id)
+        if (sa.n !== sb.n) return sb.n - sa.n
+        if (sa.ok !== sb.ok) return sb.ok - sa.ok
+        const fa = a.status === 'finalizada' ? 1 : 0, fb = b.status === 'finalizada' ? 1 : 0
+        if (fa !== fb) return fb - fa
+        return String(b.iniciado_em ?? '').localeCompare(String(a.iniciado_em ?? ''))
+      })
+      const rs = respPorSessao.get(lista[0].id) ?? []
+      const m = new Map<string, boolean>()
+      const mm = new Map<string, string>()
+      for (const r of rs) {
+        m.set((r as any).questao_id, !!(r as any).correta)
         const snap = (r as any).snapshot_gabarito
         const altId = (r as any).alternativa_id ?? snap?.alternativa_id
-        // 1) letra gravada → 2) mapeia o id válido → 3) se acertou, a marcada é a correta.
-        const letra = snap?.letra ?? (altId ? altLetra.get(altId) : undefined) ?? ((r as any).correta ? corretaLetra.get((r as any).questao_id) : undefined)
-        if (letra) {
-          const mm = marcadaPorAluno.get(est) ?? new Map<string, string>()
-          mm.set((r as any).questao_id, letra)
-          marcadaPorAluno.set(est, mm)
-        }
+        const letraSnap = snap?.letra
+        // ignora letra inválida ('?' de dados antigos); cai no id válido ou, se acertou, na correta.
+        const letra = (letraSnap && letraSnap !== '?')
+          ? letraSnap
+          : (altId ? altLetra.get(altId) : undefined) ?? ((r as any).correta ? corretaLetra.get((r as any).questao_id) : undefined)
+        if (letra) mm.set((r as any).questao_id, letra)
       }
+      respPorAluno.set(est, m)
+      marcadaPorAluno.set(est, mm)
     }
   }
 

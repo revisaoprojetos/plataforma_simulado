@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
+import { type HudCores } from '@/lib/caderno-designer/types'
+import { resolverHudConfig } from '@/lib/hud/resolve-hud'
 
 // GET /api/sessoes/current?token={embed_token}&st={sessao_id}
 // Carrega o estado da sessão para o runner do aluno.
@@ -24,7 +26,7 @@ export async function GET(request: NextRequest) {
 
   const { data: simulado } = await supabase
     .from('simulado_simulados')
-    .select('tempo_limite_min')
+    .select('tempo_limite_min, titulo')
     .eq('id', sessao.simulado_id)
     .single()
 
@@ -63,13 +65,37 @@ export async function GET(request: NextRequest) {
   const respDisc: Record<string, string> = {}
   for (const d of disc ?? []) respDisc[d.questao_id as string] = (d.texto as string) ?? ''
 
+  // Cores do HUD do caderno vinculado ao simulado — recolore a prova com o tema do caderno.
+  const hud = await resolverHudConfig(sessao.simulado_id, sessao.tenant_id)
+  const hudCores: HudCores = hud.base
+  const hudPorPagina = hud.porPagina
+
+  // Branding do tenant (logo + nome) — o header da prova segue a configuração do sistema.
+  let branding: { nome: string; logoUrl: string | null; logoGrandeUrl: string | null; logoBg: string; logoEstilo: string } | null = null
+  try {
+    const admin = createAdminClient()
+    const { data: t } = await admin.from('simulado_tenants').select('nome, tema').eq('id', sessao.tenant_id).maybeSingle()
+    const tema = (t?.tema ?? {}) as any
+    branding = {
+      nome: tema.nome_site ?? t?.nome ?? 'Simulado',
+      logoUrl: tema.logo_url ?? null,
+      logoGrandeUrl: tema.logo_grande_url ?? null,
+      logoBg: tema.logo_png_bg ?? '#ffffff',
+      logoEstilo: tema.logo_estilo ?? 'arredondado',
+    }
+  } catch { /* sem branding */ }
+
   return NextResponse.json({
     id: sessao.id,
     questoes,
+    simuladoTitulo: simulado?.titulo ?? 'Simulado',
     tempo_limite_min: simulado?.tempo_limite_min ?? null,
     iniciado_em: sessao.iniciado_em,
     status: sessao.status,
     respostas: respMap,
     respostas_discursivas: respDisc,
+    hudCores,
+    hudPorPagina,
+    branding,
   })
 }

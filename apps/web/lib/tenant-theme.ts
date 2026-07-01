@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export interface TenantTema {
@@ -16,6 +17,8 @@ export interface TenantThemeResult {
   tenantId: string | null
   tenantNome: string | null
   favicon: string | null
+  /** Modo padrão do sistema (claro/escuro) p/ quem ainda não escolheu. Default 'light'. */
+  modoPadrao: 'light' | 'dark'
 }
 
 /**
@@ -97,62 +100,32 @@ function deriveForeground(oklchValue: string): string {
   return 'oklch(0.985 0 0)'
 }
 
-/** Override global da cor da fonte (texto), se configurada. */
-function cssFonteCor(tema: Record<string, unknown>): string {
-  const cor = safeColor(typeof tema.fonte_cor === 'string' ? (tema.fonte_cor as string) : undefined)
-  if (!cor) return ''
-  const ok = hexToOklch(cor)
-  return `\n:root, .dark {\n  --foreground: ${ok};\n  --card-foreground: ${ok};\n  --popover-foreground: ${ok};\n  --secondary-foreground: ${ok};\n}`
-}
-
 /**
- * Constrói a paleta completa do app a partir do configurador (cores de
- * sidebar/conteúdo). Aplica em `:root, .dark` para que a marca defina o visual
- * independentemente do modo claro/escuro.
+ * Marca = só cor de DESTAQUE (primária/accent), aplicada igual no claro e no escuro.
+ * O fundo/texto/cards ficam por conta do modo (claro/escuro de verdade) — definidos
+ * em globals.css (:root para claro, .dark para escuro). Por isso NÃO emitimos
+ * --background/--foreground/--card aqui (era o que travava o dark mode).
  */
 function construirPaletaCompleta(cores: Record<string, unknown>, fonte: string | null): string {
   const v = (x: unknown) => safeColor(typeof x === 'string' ? x : undefined)
-  const sidebar = v(cores.sidebar), sidetext = v(cores.sidetext), active = v(cores.active), sborder = v(cores.sborder)
-  const bg = v(cores.bg), text = v(cores.text), card = v(cores.card), cborder = v(cores.cborder), btn = v(cores.btn), accent = v(cores.accent)
-  if (!bg || !text || !card || !btn || !sidebar || !sidetext) return ''
-
+  const btn = v(cores.btn), accent = v(cores.accent), active = v(cores.active)
   const ok = (c: string) => hexToOklch(c)
-  const btnFg = deriveForeground(ok(btn))
-  const activeFg = active ? deriveForeground(ok(active)) : 'oklch(0.985 0 0)'
+  const fontLine = fonte
+    ? `  --font-sans: "${fonte}", var(--font-plus-jakarta), var(--font-inter), sans-serif;`
+    : `  --font-sans: var(--font-plus-jakarta), var(--font-inter), sans-serif;`
 
+  if (!btn) return `:root, .dark {\n${fontLine}\n}`
+
+  const activeC = active ?? btn
   const lines = [
-    `  --background: ${ok(bg)};`,
-    `  --foreground: ${ok(text)};`,
-    `  --card: ${ok(card)};`,
-    `  --card-foreground: ${ok(text)};`,
-    `  --popover: ${ok(card)};`,
-    `  --popover-foreground: ${ok(text)};`,
-    `  --secondary: ${ok(card)};`,
-    `  --secondary-foreground: ${ok(text)};`,
-    `  --muted: ${ok(card)};`,
-    `  --muted-foreground: color-mix(in oklab, ${ok(text)} 60%, ${ok(bg)});`,
-    `  --accent: color-mix(in oklab, ${ok(accent ?? btn)} 16%, ${ok(card)});`,
-    `  --accent-foreground: ${ok(text)};`,
     `  --primary: ${ok(btn)};`,
-    `  --primary-foreground: ${btnFg};`,
+    `  --primary-foreground: ${deriveForeground(ok(btn))};`,
     `  --ring: ${ok(btn)};`,
-    cborder ? `  --border: ${ok(cborder)};` : '',
-    cborder ? `  --input: ${ok(cborder)};` : '',
-    `  --sidebar: ${ok(sidebar)};`,
-    `  --sidebar-foreground: ${ok(sidetext)};`,
-    active ? `  --sidebar-primary: ${ok(active)};` : '',
-    active ? `  --sidebar-primary-foreground: ${activeFg};` : '',
-    active ? `  --sidebar-accent: color-mix(in oklab, ${ok(active)} 14%, ${ok(sidebar)});` : '',
-    `  --sidebar-accent-foreground: ${ok(sidetext)};`,
-    sborder ? `  --sidebar-border: ${ok(sborder)};` : '',
-    active ? `  --sidebar-ring: ${ok(active)};` : '',
+    `  --sidebar-primary: ${ok(activeC)};`,
+    `  --sidebar-primary-foreground: ${deriveForeground(ok(activeC))};`,
     `  --brand-primary: ${ok(btn)};`,
     accent ? `  --brand-accent: ${ok(accent)};` : '',
-    // Sempre define a fonte: a custom (se houver) ou a padrão do sistema —
-    // senão a --font-sans fica sem valor ao aplicar a paleta e a fonte muda.
-    fonte
-      ? `  --font-sans: "${fonte}", var(--font-plus-jakarta), var(--font-inter), sans-serif;`
-      : `  --font-sans: var(--font-plus-jakarta), var(--font-inter), sans-serif;`,
+    fontLine,
   ].filter(Boolean)
 
   return `:root, .dark {\n${lines.join('\n')}\n}`
@@ -166,13 +139,14 @@ function construirPaletaCompleta(cores: Record<string, unknown>, fonte: string |
  *
  * Returns empty css + nulls on any error so the caller can fall back to defaults.
  */
-export async function getTenantTheme(): Promise<TenantThemeResult> {
+export const getTenantTheme = cache(async (): Promise<TenantThemeResult> => {
   const empty: TenantThemeResult = {
     css: '',
     tema: null,
     tenantId: null,
     tenantNome: null,
     favicon: null,
+    modoPadrao: 'light',
   }
 
   try {
@@ -188,14 +162,15 @@ export async function getTenantTheme(): Promise<TenantThemeResult> {
     if (error || !data) return empty
 
     const tema = (data.tema ?? {}) as TenantTema
+    const modoPadrao: 'light' | 'dark' = (tema as any).modo_padrao === 'dark' ? 'dark' : 'light'
 
     // Configurador de tema completo (paleta sidebar/conteúdo). Se presente,
-    // gera a paleta inteira do app e ignora o caminho legado.
+    // gera só as cores de destaque da marca (fundo/texto seguem o modo).
     const cores = (tema as any).cores
     if (cores && typeof cores === 'object') {
       const css = construirPaletaCompleta(cores, safeFont((tema as any).fonte))
       if (css) {
-        return { css: css + cssFonteCor(tema as any), tema, tenantId: data.id as string, tenantNome: data.nome as string, favicon: (tema as any).favicon ?? null }
+        return { css, tema, tenantId: data.id as string, tenantNome: data.nome as string, favicon: (tema as any).favicon ?? null, modoPadrao }
       }
     }
 
@@ -243,8 +218,7 @@ export async function getTenantTheme(): Promise<TenantThemeResult> {
       lines.push(`  --brand-secondary: ${hexToOklch(corSecundaria)};`)
     }
 
-    const css =
-      (lines.length > 0 ? `:root {\n${lines.join('\n')}\n}` : '') + cssFonteCor(tema as any)
+    const css = lines.length > 0 ? `:root, .dark {\n${lines.join('\n')}\n}` : ''
 
     return {
       css,
@@ -252,8 +226,9 @@ export async function getTenantTheme(): Promise<TenantThemeResult> {
       tenantId: data.id as string,
       tenantNome: data.nome as string,
       favicon: tema.favicon ?? null,
+      modoPadrao,
     }
   } catch {
     return empty
   }
-}
+})

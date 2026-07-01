@@ -66,7 +66,7 @@ export default async function GabaritoEstudantePage({ params }: { params: Promis
       <div className="flex items-center gap-3">
         <Link href={`/admin/estudantes/${id}`} className={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}><ArrowLeft className="h-4 w-4" /></Link>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Gabarito do estudante</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Caderno do estudante</h1>
           <p className="text-muted-foreground">{nome} · {titulo}{sess.tentativa_num ? ` · ${sess.tentativa_num}ª tentativa` : ''}</p>
         </div>
       </div>
@@ -106,7 +106,7 @@ export default async function GabaritoEstudantePage({ params }: { params: Promis
                         <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${ehMarcada ? (ok ? 'border-green-500 bg-green-500 text-white' : 'border-red-500 bg-red-500 text-white') : 'border-muted-foreground/30'}`}>{LETRA[j] ?? j + 1}</span>
                         <span className={ehMarcada ? 'font-medium' : ''}>{a.texto}</span>
                         {ehMarcada && <span className="text-xs text-muted-foreground">(marcada)</span>}
-                        {ehCorreta && !ehMarcada && <span className="text-xs font-medium text-emerald-600">✓ gabarito</span>}
+                        {ehCorreta && !ehMarcada && <span className="text-xs font-medium text-emerald-600">✓ correta</span>}
                       </div>
                     )
                   })}

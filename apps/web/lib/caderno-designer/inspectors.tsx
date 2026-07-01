@@ -240,6 +240,15 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
       )
     case 'espacador':
       return <Row label={`Altura: ${a.altura}px`}><input type="range" min={4} max={400} value={a.altura} onChange={(e) => set('altura', Number(e.target.value))} className="w-full" /></Row>
+    case 'linhas-resposta':
+      return (
+        <div className="space-y-3">
+          <Row label="Rótulo"><input value={a.rotulo ?? ''} onChange={(e) => set('rotulo', e.target.value)} placeholder="Resposta:" className={inputCls} /></Row>
+          <Row label="Nº de linhas"><input type="number" min={1} max={40} value={a.quantidade ?? 6} onChange={(e) => set('quantidade', Number(e.target.value))} className={inputCls} /></Row>
+          <Row label={`Altura da linha: ${a.altura ?? 28}px`}><input type="range" min={16} max={60} value={a.altura ?? 28} onChange={(e) => set('altura', Number(e.target.value))} className="w-full" /></Row>
+          <Cor label="Cor da linha" value={a.cor} onChange={(v) => set('cor', v)} />
+        </div>
+      )
     case 'repeticao':
       return (
         <div className="space-y-3">

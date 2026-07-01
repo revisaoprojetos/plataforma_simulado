@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { GraduationCap, LogOut } from 'lucide-react'
+import { toast } from 'sonner'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { cn } from '@/lib/utils'
 
@@ -19,8 +20,9 @@ export function AlunoHeader({ nome, plataforma }: { nome: string; plataforma: st
   const pathname = usePathname()
 
   async function sair() {
+    toast.success('Saindo… logout realizado.')
     await fetch('/api/aluno/logout', { method: 'POST' }).catch(() => {})
-    router.push('/aluno/entrar')
+    router.push('/login')
     router.refresh()
   }
 

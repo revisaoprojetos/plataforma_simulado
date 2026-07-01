@@ -10,13 +10,17 @@ export function SplashSistema({ estilo, logo, nome, mensagem }: { estilo: Estilo
   const [fade, setFade] = useState(false)
 
   useEffect(() => {
-    try {
-      if (sessionStorage.getItem('splash_sistema_visto')) return
-      sessionStorage.setItem('splash_sistema_visto', '1')
-    } catch { /* ignore */ }
+    let visto = false
+    try { visto = !!sessionStorage.getItem('splash_sistema_visto') } catch { /* ignore */ }
+    if (visto) return
     setShow(true)
     const t1 = setTimeout(() => setFade(true), 1100)
-    const t2 = setTimeout(() => setShow(false), 1450)
+    // Marca como visto só ao FINAL (StrictMode-safe: o 2º efeito reagenda os timers
+    // em vez de sair cedo, evitando a splash presa).
+    const t2 = setTimeout(() => {
+      setShow(false)
+      try { sessionStorage.setItem('splash_sistema_visto', '1') } catch { /* ignore */ }
+    }, 1450)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [])
 

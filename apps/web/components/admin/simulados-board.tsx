@@ -27,6 +27,7 @@ import {
   Unlock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { abrirLinkTemado } from '@/lib/hud/abrir-temado'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -133,7 +134,7 @@ function CardItem({ s, appUrl }: { s: SimuladoCard; appUrl: string }) {
 
   function abrirSimulado() {
     if (!linkAcesso) return toast.error('Link indisponível.')
-    window.open(linkAcesso, '_blank')
+    abrirLinkTemado(linkAcesso)
   }
 
   function excluir() {

@@ -60,9 +60,9 @@ export default async function AdminLayout({
         mensagem={ti.splash_mensagem ?? 'Carregando o sistema…'}
       />
       <SidebarProvider>
-        <div className="flex min-h-screen w-full">
-          <AdminSidebar />
-          <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex h-screen w-full overflow-hidden">
+          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} />
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <AdminHeader userName={userName} userEmail={userEmail} />
             <main className="flex-1 overflow-y-auto p-6">
               {children}

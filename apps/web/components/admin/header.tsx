@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { LogOut } from 'lucide-react'
+import { toast } from 'sonner'
 import { NotificationBell } from '@/components/admin/notification-bell'
 
 interface AdminHeaderProps {
@@ -56,7 +57,7 @@ export function AdminHeader({ userName, userEmail }: AdminHeaderProps) {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="cursor-pointer"
-            onClick={() => logoutAction()}
+            onClick={() => { toast.success('Saindo… logout realizado.'); logoutAction() }}
           >
             <LogOut className="mr-2 h-4 w-4" />
             Sair

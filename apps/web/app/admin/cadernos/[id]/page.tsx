@@ -4,6 +4,7 @@ import { getCurrentAccess } from '@/lib/auth/permissions'
 import { CadernoEditorV2 } from '@/components/admin/caderno-editor-v2'
 import { carregarRegistros } from '@/lib/caderno-designer/merge'
 import { dataComQuestao } from '@/lib/caderno-designer/blocks'
+import { getTenantTheme } from '@/lib/tenant-theme'
 import type { CadernoData } from '@/lib/caderno-designer/types'
 
 const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -84,15 +85,27 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
     previewData.questaoAtual = base.questaoAtual
   }
 
+  // Branding do sistema (logo + nome) para o preview do HUD refletir a config.
+  const { tema, tenantNome } = await getTenantTheme()
+  const ti = (tema ?? {}) as any
+  const branding = {
+    nome: ti.nome_site ?? tenantNome ?? 'Simulado',
+    logoUrl: ti.logo_url ?? null,
+    logoGrandeUrl: ti.logo_grande_url ?? null,
+    logoBg: ti.logo_png_bg ?? '#ffffff',
+    logoEstilo: ti.logo_estilo ?? 'arredondado',
+  }
+
   return (
     <CadernoEditorV2
       cadernoId={caderno.id}
       nome={caderno.nome}
-      inicial={{ docsV2: config.docsV2, modalidadesV2: config.modalidadesV2, cores: config.cores }}
+      inicial={{ docsV2: config.docsV2, modalidadesV2: config.modalidadesV2, cores: config.cores, hudCores: config.hudCores, hudPorPagina: config.hudPorPagina }}
       previewData={previewData}
       bancos={(bancos ?? []) as { id: string; nome: string }[]}
       bancoIdInicial={bancoId}
       registros={registros}
+      branding={branding}
     />
   )
 }

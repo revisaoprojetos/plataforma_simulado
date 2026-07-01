@@ -13,6 +13,7 @@ import {
 import { SimuladoForm } from '@/components/admin/simulado-form'
 import { SimuladoActions } from '@/components/admin/simulado-actions'
 import { SimuladoQuestoesManager } from '@/components/admin/simulado-questoes-manager'
+import { SimuladoCadernoLink } from '@/components/admin/simulado-caderno-link'
 import { SimuladoRelatorio } from '@/components/admin/simulado-relatorio'
 import { SimuladoRecorrecao } from '@/components/admin/simulado-recorrecao'
 import { SimuladoAcessos } from '@/components/admin/simulado-acessos'
@@ -116,6 +117,14 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
       .select('id, enunciado, status, disciplinas:simulado_disciplinas(nome)')
       .order('created_at', { ascending: false }),
   ])
+
+  // Cadernos de design do tenant (para vincular o tema/HUD ao simulado).
+  const { data: cadernosRaw } = await supabase
+    .from('simulado_cadernos_designer')
+    .select('id, nome')
+    .order('atualizado_em', { ascending: false })
+  const cadernos = (cadernosRaw ?? []).map((c: any) => ({ id: c.id as string, nome: (c.nome as string) ?? 'Caderno' }))
+  const cadernoVinculado = ((simulado.regras as Record<string, unknown> | null)?.caderno_id as string | undefined) ?? null
 
   const questoesNoSimulado = (questoes ?? []).map((sq: any) => ({
     id: sq.id,
@@ -317,7 +326,8 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
         </TabsContent>
 
         {/* Questões */}
-        <TabsContent value="questoes">
+        <TabsContent value="questoes" className="space-y-4">
+          <SimuladoCadernoLink simuladoId={id} cadernos={cadernos} atual={cadernoVinculado} />
           <Card>
             <CardHeader>
               <CardTitle>Questões do Simulado</CardTitle>

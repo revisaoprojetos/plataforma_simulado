@@ -1,5 +1,5 @@
 import type { ComponentType, CSSProperties } from 'react'
-import { Heading1, Type, AlignLeft, ListChecks, Grid3x3, IdCard, Image as ImageIcon, Minus, MoveVertical, Square, Columns2, Wallpaper, Repeat, Rows3, ClipboardCheck } from 'lucide-react'
+import { Heading1, Type, AlignLeft, ListChecks, Grid3x3, IdCard, Image as ImageIcon, Minus, MoveVertical, Square, Columns2, Wallpaper, Repeat, Rows3, ClipboardCheck, PenLine } from 'lucide-react'
 import { cssDaFonte, type CadernoTheme } from './theme'
 import { type Block, type BlockCategory, type CadernoData, type QuestaoData, genId } from './types'
 
@@ -11,6 +11,7 @@ export type BlockMeta = {
   category: BlockCategory
   dynamic?: boolean
   unico?: boolean
+  unicoPorPagina?: boolean // no máximo um por página (ex.: imagem de fundo full-bleed)
   supportsVars?: boolean
   container?: boolean // aceita blocos filhos (card/colunas/coluna)
   fullBleed?: boolean // camada de fundo da página inteira
@@ -49,12 +50,14 @@ export const BLOCKS: BlockMeta[] = [
     defaults: { gap: 16 } },
   { type: 'imagem', title: 'Imagem', icon: ImageIcon, category: 'estrutura',
     defaults: { url: '', largura: 60, align: 'center' } },
-  { type: 'plano-fundo', title: 'Imagem de fundo', icon: Wallpaper, category: 'estrutura', unico: true, fullBleed: true,
+  { type: 'plano-fundo', title: 'Imagem de fundo', icon: Wallpaper, category: 'estrutura', unicoPorPagina: true, fullBleed: true,
     defaults: { url: '', opacidade: 100 } },
   { type: 'separador', title: 'Separador', icon: Minus, category: 'estrutura',
     defaults: { espessura: 1, estilo: 'solido', cor: '' } },
   { type: 'espacador', title: 'Espaçador', icon: MoveVertical, category: 'estrutura',
     defaults: { altura: 24 } },
+  { type: 'linhas-resposta', title: 'Linhas p/ resposta', icon: PenLine, category: 'conteudo', supportsVars: true,
+    defaults: { quantidade: 6, rotulo: 'Resposta:', altura: 28, cor: '' } },
 ]
 
 export function getBlockMeta(type: string): BlockMeta | undefined {
@@ -234,6 +237,17 @@ export function BlockRender({ block, theme, data }: { block: Block; theme: Cader
     }
     case 'espacador':
       return <div style={{ height: a.altura ?? 24 }} />
+    case 'linhas-resposta': {
+      const n = Math.max(1, Math.min(40, Number(a.quantidade ?? 6)))
+      const h = Number(a.altura ?? 28)
+      const cor = (a.cor as string) || c.secundaria
+      return (
+        <div style={{ fontFamily: theme.tipografia.familia }}>
+          {a.rotulo ? <p style={{ margin: '0 0 6px', fontSize: 13, fontWeight: 600, color: c.texto }}>{applyVars(String(a.rotulo), data.vars)}</p> : null}
+          {Array.from({ length: n }).map((_, i) => <div key={i} style={{ borderBottom: `1px solid ${cor}`, height: h }} />)}
+        </div>
+      )
+    }
     case 'card': {
       const al = (a.alinhamento as keyof typeof ALIN) ?? 'center'
       return (

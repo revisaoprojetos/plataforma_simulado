@@ -24,6 +24,15 @@ function formatarContato(c: TenantContato): string {
  * Resposta de bloqueio personalizada pelo tenant (mensagem + variáveis + contato).
  * Retorna { titulo, message, contato } com status 403.
  */
+// Mapeia a chave de bloqueio para o tipo de pop-up mostrado no login.
+const TIPO_POR_CHAVE: Record<string, 'email_invalido' | 'nao_iniciado' | 'encerrado'> = {
+  bloqueio_fora_janela: 'nao_iniciado',
+  bloqueio_prazo_expirado: 'encerrado',
+  bloqueio_identidade: 'email_invalido',
+  bloqueio_sem_matricula: 'email_invalido',
+  bloqueio_tentativas: 'email_invalido',
+}
+
 async function bloqueio(
   tenantId: string,
   chave: string,
@@ -32,7 +41,7 @@ async function bloqueio(
   const contato = await getTenantContato(tenantId)
   const msg = await getTenantMensagem(chave, { contato: formatarContato(contato), ...vars }, tenantId)
   return NextResponse.json(
-    { titulo: msg.titulo, message: msg.corpo, contato },
+    { titulo: msg.titulo, message: msg.corpo, contato, tipo: TIPO_POR_CHAVE[chave] ?? 'email_invalido' },
     { status: 403 },
   )
 }

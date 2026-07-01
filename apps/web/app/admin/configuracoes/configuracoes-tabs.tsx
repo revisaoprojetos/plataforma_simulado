@@ -5,6 +5,7 @@ import { ConfiguracoesForm } from './configuracoes-form'
 import { CarregamentoForm } from './carregamento-form'
 import { ImersaoForm } from './imersao-form'
 import { AvancadoForm } from './avancado-form'
+import { TemaSistemaForm } from './tema-sistema-form'
 import type { EstiloLoader } from '@/components/admin/loaders'
 
 export function ConfiguracoesTabs({ tema, salvarTema }: { tema: any; salvarTema: (t: Record<string, unknown>) => Promise<{ ok?: boolean } | void> }) {
@@ -13,6 +14,7 @@ export function ConfiguracoesTabs({ tema, salvarTema }: { tema: any; salvarTema:
     <Tabs defaultValue="sistema">
       <TabsList>
         <TabsTrigger value="sistema">Sistema</TabsTrigger>
+        <TabsTrigger value="tema">Tema</TabsTrigger>
         <TabsTrigger value="carregamento">Carregamento</TabsTrigger>
         <TabsTrigger value="imersao">Tela de carregamento</TabsTrigger>
         <TabsTrigger value="avancado">Avançado</TabsTrigger>
@@ -20,6 +22,9 @@ export function ConfiguracoesTabs({ tema, salvarTema }: { tema: any; salvarTema:
 
       <TabsContent value="sistema">
         <ConfiguracoesForm tema={tema} salvarTema={salvarTema} />
+      </TabsContent>
+      <TabsContent value="tema">
+        <TemaSistemaForm tema={tema} salvarTema={salvarTema} />
       </TabsContent>
       <TabsContent value="carregamento">
         <CarregamentoForm estiloInicial={estiloInicial} salvarTema={salvarTema} />

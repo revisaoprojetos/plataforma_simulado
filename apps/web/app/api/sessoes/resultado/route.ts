@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
 
 // GET /api/sessoes/resultado?st={sessao_id}
 // Dados da central de revisão: resumo + questões com resposta do aluno.
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
   const { data: sessao } = await supabase
     .from('simulado_sessoes_prova')
-    .select('id, simulado_id, status, nota, posicao_ranking')
+    .select('id, simulado_id, status, nota, posicao_ranking, iniciado_em, finalizado_em, estudante_id')
     .eq('id', st)
     .maybeSingle()
   if (!sessao) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
   const { data: sq } = await supabase
     .from('simulado_prova_questoes')
-    .select('ordem, questoes:simulado_questoes(id, tipo, enunciado, disciplina_id, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem))')
+    .select('ordem, questoes:simulado_questoes(id, tipo, enunciado, comentario_professor, disciplina_id, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem))')
     .eq('simulado_id', sessao.simulado_id)
     .eq('anulada', false)
     .order('ordem')
@@ -118,6 +118,8 @@ export async function GET(request: NextRequest) {
       enunciado: q?.enunciado ?? '',
       resposta_aluno: resp?.alternativa_id ?? null,
       acertou: gabaritoLiberado ? resp?.correta ?? false : null,
+      // Justificativa (comentário do professor) — só revelada com o gabarito.
+      justificativa: gabaritoLiberado ? (q?.comentario_professor ?? null) : null,
       // Para discursiva: a resposta escrita + estado da correção.
       discursiva: q?.tipo === 'discursiva' && d
         ? { texto: d.texto ?? '', status: d.status, nota: d.nota, feedback: d.feedback }
@@ -133,11 +135,65 @@ export async function GET(request: NextRequest) {
     }
   })
 
+  // Marcadas / em branco + tempo (para a tela de encerramento).
+  const marcadas = questoes.filter((q: any) => q.tipo === 'discursiva' ? !!q.discursiva?.texto : !!q.resposta_aluno).length
+  const emBranco = Math.max(0, total - marcadas)
+  let tempo: string | null = null
+  if (sessao.iniciado_em && sessao.finalizado_em) {
+    const seg = Math.max(0, Math.floor((new Date(sessao.finalizado_em as string).getTime() - new Date(sessao.iniciado_em as string).getTime()) / 1000))
+    const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), s = seg % 60
+    tempo = h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  }
+
+  const admin = createAdminClient()
+
+  // Dados do estudante vinculado (nome + e-mail) para o cabeçalho do encerramento.
+  let alunoNome = 'Estudante'
+  let alunoEmail = ''
+  try {
+    const { data: est } = await admin.from('simulado_estudantes').select('nome, user_id').eq('id', sessao.estudante_id).maybeSingle()
+    if (est?.nome) alunoNome = est.nome as string
+    if (est?.user_id) {
+      const { data: u } = await admin.from('simulado_users').select('email').eq('id', est.user_id).maybeSingle()
+      if (u?.email) alunoEmail = u.email as string
+    }
+    if (!alunoEmail) {
+      try {
+        const { data: est2 } = await admin.from('simulado_estudantes').select('email').eq('id', sessao.estudante_id).maybeSingle()
+        if ((est2 as any)?.email) alunoEmail = (est2 as any).email
+      } catch { /* estudantes pode não ter coluna email */ }
+    }
+  } catch { /* sem estudante */ }
+
+  // Caderno vinculado (para o download do "Caderno completo").
+  let cadernoId: string | null = null
+  try {
+    const qids = questoes.map((q: any) => q.id).filter(Boolean)
+    if (qids.length) {
+      const { data: qp } = await admin.from('simulado_questao_pasta').select('pasta_id').in('questao_id', qids)
+      const pastaIds = [...new Set((qp ?? []).map((r: any) => r.pasta_id))]
+      if (pastaIds.length) {
+        const { data: cads } = await admin.from('simulado_cadernos_designer').select('id, config').order('atualizado_em', { ascending: false })
+        const cad = (cads ?? []).find((c: any) => c.config?.bancoId && pastaIds.includes(c.config.bancoId))
+        cadernoId = (cad?.id as string) ?? null
+      }
+    }
+  } catch { /* sem caderno */ }
+
   return NextResponse.json({
     titulo: simulado?.titulo ?? 'Simulado',
     nota: sessao.nota ?? null,
     acertos,
     total,
+    marcadas,
+    em_branco: emBranco,
+    tempo,
+    aluno_nome: alunoNome,
+    aluno_email: alunoEmail,
+    iniciado_em: sessao.iniciado_em ?? null,
+    finalizado_em: sessao.finalizado_em ?? null,
+    estudante_id: sessao.estudante_id ?? null,
+    caderno_id: cadernoId,
     posicao: sessao.posicao_ranking ?? null,
     total_participantes: totalParticipantes ?? 0,
     stats_por_disciplina: statsPorDisciplina,

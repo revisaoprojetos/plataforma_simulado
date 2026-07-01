@@ -134,7 +134,13 @@ function itemAtivo(item: NavItem, pathname: string, search: URLSearchParams) {
   return pathname.startsWith(path)
 }
 
-export function AdminSidebar() {
+function frameLogo(estilo?: string): string {
+  if (estilo === 'quadrado') return 'rounded-none'
+  if (estilo === 'borda') return 'rounded-lg border'
+  return 'rounded-lg'
+}
+
+export function AdminSidebar({ logo, nome = 'Plataforma', logoBg = '#ffffff', logoEstilo = 'arredondado' }: { logo?: string | null; nome?: string; logoBg?: string; logoEstilo?: string }) {
   const pathname = usePathname()
   const search = useSearchParams()
   const can = useCan()
@@ -157,12 +163,18 @@ export function AdminSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader className="border-b px-4 py-4">
+      <SidebarHeader className="flex h-14 flex-row items-center border-b px-4">
         <Link href="/admin" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <BookOpen className="h-4 w-4" />
+          <div className={cn('flex h-8 w-8 items-center justify-center overflow-hidden', frameLogo(logoEstilo), !logo && 'bg-primary text-primary-foreground')}
+            style={logo ? { background: logoBg } : undefined}>
+            {logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logo} alt={nome} className="h-full w-full object-contain" />
+            ) : (
+              <BookOpen className="h-4 w-4" />
+            )}
           </div>
-          <span className="font-semibold text-sm">Plataforma</span>
+          <span className="truncate font-semibold text-sm">{nome}</span>
         </Link>
       </SidebarHeader>
 

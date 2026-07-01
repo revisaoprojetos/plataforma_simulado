@@ -2,7 +2,7 @@
 
 import { Fragment, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, Printer, Plus, Trash2, ArrowUp, ArrowDown, FileText, Palette, LayoutTemplate, ChevronLeft, ChevronRight, Columns2, PanelTop, PanelBottom, Minus, Wallpaper, Database, Users, Repeat } from 'lucide-react'
+import { Loader2, Save, Printer, Plus, Trash2, ArrowUp, ArrowDown, FileText, Palette, LayoutTemplate, ChevronLeft, ChevronRight, Columns2, PanelTop, PanelBottom, Minus, Wallpaper, Database, Users, Repeat, Copy } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -10,7 +10,10 @@ import { BLOCKS, blocksByCategory, createBlock, getBlockMeta, BlockRender, cardS
 import { BlockInspector } from '@/lib/caderno-designer/inspectors'
 import { resolveTheme, type CadernoTheme } from '@/lib/caderno-designer/theme'
 import * as tree from '@/lib/caderno-designer/block-tree'
-import { SHEET_W, SHEET_H, PAD_H, PAD_V, PAGE_KINDS, MODALIDADES_PADRAO, RUNNING_PADRAO, novoDoc, genId, type CadernoDoc, type Modalidade, type Block, type PageKind, type CadernoData } from '@/lib/caderno-designer/types'
+import { SHEET_W, SHEET_H, PAD_H, PAD_V, PAGE_KINDS, RUNNING_PADRAO, HUD_CORES_PADRAO, novoDoc, docCadernoCompleto, genId, mesclarModalidades, type CadernoDoc, type Modalidade, type Block, type PageKind, type CadernoData, type HudCores, type HudPorPagina } from '@/lib/caderno-designer/types'
+import { HudSimuladoEditor } from '@/components/admin/hud-simulado-editor'
+import { GerarPdfServidor } from '@/components/admin/gerar-pdf-servidor'
+import { MonitorPlay } from 'lucide-react'
 import { salvarCadernoDesignerV2 } from '@/app/admin/cadernos/actions'
 
 const CAT_NOMES: Record<string, string> = { conteudo: 'Conteúdo', avaliacao: 'Avaliação', identificacao: 'Identificação', estrutura: 'Estrutura' }
@@ -70,7 +73,7 @@ function DropZoneVazia({ onClick }: { onClick: () => void }) {
 type NodeCtx = {
   theme: CadernoTheme; data: CadernoData; selId: string | null; overId: string | null; overPos: Pos | null; arrastando: boolean
   select: (b: Block) => void; addInto: (id: string) => void
-  mover: (id: string, dir: -1 | 1) => void; remover: (id: string) => void
+  mover: (id: string, dir: -1 | 1) => void; remover: (id: string) => void; duplicar: (id: string) => void
   aoLado: (id: string) => void; setCols: (id: string, n: number) => void
   setOver: (id: string | null, pos?: Pos) => void
   dragStart: (e: React.DragEvent, id: string) => void
@@ -89,6 +92,7 @@ function NodeToolbar({ block, ctx }: { block: Block; ctx: NodeCtx }) {
       )}
       {isColunas && <button title="+ coluna" onClick={() => ctx.setCols(block.id, (block.innerBlocks?.length ?? 0) + 1)} className="text-primary-foreground/90 hover:text-white"><Plus className="h-3.5 w-3.5" /></button>}
       {isColunas && <button title="− coluna" onClick={() => ctx.setCols(block.id, (block.innerBlocks?.length ?? 1) - 1)} className="text-primary-foreground/90 hover:text-white"><Minus className="h-3.5 w-3.5" /></button>}
+      <button title="Duplicar" onClick={() => ctx.duplicar(block.id)} className="text-primary-foreground/90 hover:text-white"><Copy className="h-3.5 w-3.5" /></button>
       <button title="Excluir" onClick={() => ctx.remover(block.id)} className="text-primary-foreground/90 hover:text-white"><Trash2 className="h-3.5 w-3.5" /></button>
     </div>
   )
@@ -227,27 +231,31 @@ function EditorNode({ block, ctx }: { block: Block; ctx: NodeCtx }) {
 
 // ----------------- Editor -----------------
 export function CadernoEditorV2({
-  cadernoId, nome, inicial, previewData, bancos = [], bancoIdInicial = null, registros = [],
+  cadernoId, nome, inicial, previewData, bancos = [], bancoIdInicial = null, registros = [], branding = null,
 }: {
   cadernoId: string
   nome: string
-  inicial: { docsV2?: Record<string, CadernoDoc>; modalidadesV2?: Modalidade[]; cores?: Record<string, string> }
+  inicial: { docsV2?: Record<string, CadernoDoc>; modalidadesV2?: Modalidade[]; cores?: Record<string, string>; hudCores?: Partial<HudCores>; hudPorPagina?: HudPorPagina }
   previewData: CadernoData
   bancos?: { id: string; nome: string }[]
   bancoIdInicial?: string | null
   registros?: { id: string; nome: string; vars: Record<string, string>; respostas?: Record<string, string> }[]
+  branding?: { nome?: string; logoUrl?: string | null; logoGrandeUrl?: string | null; logoBg?: string; logoEstilo?: string } | null
 }) {
-  const mods0 = inicial.modalidadesV2?.length ? inicial.modalidadesV2 : MODALIDADES_PADRAO
+  const mods0 = mesclarModalidades(inicial.modalidadesV2)
   const [modalidades, setModalidades] = useState<Modalidade[]>(mods0)
   const [docs, setDocs] = useState<Record<string, CadernoDoc>>(() => {
     const d = { ...(inicial.docsV2 ?? {}) }
     for (const m of mods0) {
-      if (!d[m.id]) d[m.id] = novoDoc()
+      if (!d[m.id]) d[m.id] = m.id === 'caderno_completo' ? docCadernoCompleto() : novoDoc()
       else d[m.id] = { ...novoDoc(), ...d[m.id], cabecalho: d[m.id].cabecalho ?? [], rodape: d[m.id].rodape ?? [], running: d[m.id].running ?? { ...RUNNING_PADRAO } }
     }
     return d
   })
   const [cores, setCores] = useState<Record<string, string>>(inicial.cores ?? {})
+  const [hudCores, setHudCores] = useState<HudCores>({ ...HUD_CORES_PADRAO, ...(inicial.hudCores ?? {}) })
+  const [hudPorPagina, setHudPorPagina] = useState<HudPorPagina>(inicial.hudPorPagina ?? {})
+  const [hudMode, setHudMode] = useState(false)
   const [bancoId, setBancoId] = useState<string | null>(bancoIdInicial)
   const [regIndex, setRegIndex] = useState(0)
   const [modAtiva, setModAtiva] = useState<string>(mods0[0].id)
@@ -294,6 +302,10 @@ export function CadernoEditorV2({
     // Imagem de fundo (full-bleed) sempre no nível da página — nunca dentro de container.
     if (meta?.fullBleed) {
       const pid = selPage ?? doc.pages[0]?.id; if (!pid) { toast.error('Selecione uma página primeiro.'); return }
+      if (meta.unicoPorPagina) {
+        const pg = doc.pages.find((p) => p.id === pid)
+        if (pg?.blocks.some((b) => b.type === type)) { toast.error(`Esta página já tem "${meta.title}". Selecione outra página para adicionar mais um.`); return }
+      }
       setDoc((d) => ({ ...d, pages: d.pages.map((p) => p.id === pid ? { ...p, blocks: [novo, ...p.blocks] } : p) }))
       setSelBlock(novo.id); setSelPage(pid); setAba('bloco')
       toast.info('Imagem de fundo adicionada — envie a imagem no inspetor à direita.')
@@ -325,6 +337,10 @@ export function CadernoEditorV2({
     const novo = createBlock(type)
     if (meta?.fullBleed) {
       const pid = alvo.kind === 'page' ? alvo.pageId : (selPage ?? doc.pages[0]?.id); if (!pid) return
+      if (meta.unicoPorPagina) {
+        const pg = doc.pages.find((p) => p.id === pid)
+        if (pg?.blocks.some((b) => b.type === type)) { toast.error(`Esta página já tem "${meta.title}".`); return }
+      }
       setDoc((d) => ({ ...d, pages: d.pages.map((p) => p.id === pid ? { ...p, blocks: [novo, ...p.blocks] } : p) }))
     } else {
       aplicarInsercao(alvo, novo)
@@ -370,6 +386,7 @@ export function CadernoEditorV2({
     addInto: (id) => { setSelBlock(id); toast.info('Container selecionado — escolha um bloco à esquerda para inserir dentro.') },
     mover: (id, dir) => mutarTudo((bs) => tree.moveBlock(bs, id, dir)),
     remover: (id) => { mutarTudo((bs) => tree.limparArvore(tree.removeBlock(bs, id))); if (selBlock === id) setSelBlock(null) },
+    duplicar: (id) => mutarTudo((bs) => tree.duplicateBlock(bs, id)),
     aoLado: (id) => { mutarTudo((bs) => tree.wrapAoLado(bs, id)) },
     setCols: (id, n) => mutarTudo((bs) => tree.setNumColunas(bs, id, n)),
     setOver,
@@ -388,14 +405,14 @@ export function CadernoEditorV2({
 
   function salvar() {
     start(async () => {
-      const r = await salvarCadernoDesignerV2(cadernoId, { docsV2: docs, modalidadesV2: modalidades, cores, bancoId })
+      const r = await salvarCadernoDesignerV2(cadernoId, { docsV2: docs, modalidadesV2: modalidades, cores, hudCores, hudPorPagina, bancoId })
       r.ok ? toast.success('Caderno salvo') : toast.error(r.error ?? 'Erro ao salvar')
     })
   }
   function vincularBanco(novoId: string | null) {
     setBancoId(novoId)
     start(async () => {
-      const r = await salvarCadernoDesignerV2(cadernoId, { docsV2: docs, modalidadesV2: modalidades, cores, bancoId: novoId })
+      const r = await salvarCadernoDesignerV2(cadernoId, { docsV2: docs, modalidadesV2: modalidades, cores, hudCores, hudPorPagina, bancoId: novoId })
       if (r.ok) window.location.reload() // refaz o preview com os dados do banco
       else toast.error(r.error ?? 'Erro ao vincular banco')
     })
@@ -457,9 +474,11 @@ export function CadernoEditorV2({
             <Button variant="outline" size="sm"><Printer className="mr-1.5 h-4 w-4" /> Imprimir/PDF</Button>
           </a>
           {registros.length > 0 && (
-            <a href={`/imprimir/caderno/${cadernoId}?mod=${modAtiva}&todos=1`} target="_blank" rel="noreferrer">
-              <Button variant="outline" size="sm"><Users className="mr-1.5 h-4 w-4" /> Mala direta ({registros.length})</Button>
-            </a>
+            <GerarPdfServidor
+              payload={{ tipo: 'caderno', cadernoId, mod: modAtiva, todos: true, titulo: `Mala direta — ${nome}` }}
+              label={`Mala direta (${registros.length})`}
+              icon={<Users className="mr-1.5 h-4 w-4" />}
+            />
           )}
           <Button onClick={salvar} disabled={pending} size="sm">
             {pending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />} Salvar
@@ -467,6 +486,9 @@ export function CadernoEditorV2({
         </div>
       </div>
 
+      {hudMode ? (
+        <HudSimuladoEditor base={hudCores} porPagina={hudPorPagina} onChangePorPagina={setHudPorPagina} onVoltar={() => setHudMode(false)} titulo={nome} branding={branding} />
+      ) : (
       <div className="grid min-h-0 flex-1 grid-cols-[188px_1fr_236px]">
         {/* Esquerda */}
         <div className="scroll-claro flex min-h-0 flex-col gap-4 overflow-y-auto border-r bg-muted/20 p-2.5">
@@ -480,6 +502,10 @@ export function CadernoEditorV2({
               <button onClick={() => renameModalidade(modAtiva)} className="text-muted-foreground hover:underline">Renomear</button>
               <button onClick={() => removeModalidade(modAtiva)} className="text-destructive hover:underline">Excluir</button>
             </div>
+            <button onClick={() => setHudMode(true)} title="Personalizar as cores da interface da prova"
+              className="mt-2.5 flex w-full items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-2.5 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-primary/10">
+              <MonitorPlay className="h-4 w-4 text-primary" /> HUD de Simulado
+            </button>
           </div>
 
           <div>
@@ -491,7 +517,8 @@ export function CadernoEditorV2({
                   <div className="flex flex-col gap-1.5">
                     {cats[cat].map((b) => {
                       const Icon = b.icon
-                      const dis = b.unico && tiposUsados.has(b.type)
+                      const pgSel = doc.pages.find((p) => p.id === (selPage ?? doc.pages[0]?.id))
+                      const dis = (b.unico && tiposUsados.has(b.type)) || (b.unicoPorPagina && !!pgSel?.blocks.some((x) => x.type === b.type))
                       return (
                         <button key={b.type} disabled={dis} onClick={() => addBlock(b.type)}
                           draggable={!dis} onDragStart={(e) => { setArrastando(true); e.dataTransfer.setData('text/plain', `novo:${b.type}`) }}
@@ -630,6 +657,7 @@ export function CadernoEditorV2({
           </div>
         </div>
       </div>
+      )}
     </div>
   )
 }

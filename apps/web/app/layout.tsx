@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
 import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/providers'
@@ -35,17 +36,30 @@ export default async function RootLayout({
   children: React.ReactNode
 }>) {
   // Fetch tenant theme server-side; falls back to defaults on any error
-  const { css: tenantCss, tenantNome, favicon } = await getTenantTheme()
+  const { css: tenantCss, tenantNome, favicon, modoPadrao } = await getTenantTheme()
 
   const themeCSS = tenantCss || DEFAULT_THEME_CSS
+
+  // Tema resolvido no servidor (cookie do next-themes; senão, padrão do tenant).
+  // `color-scheme` faz o "vazio" do navegador durante o load já ser escuro — sem flash branco.
+  const cookieTheme = (await cookies()).get('theme')?.value
+  const dark = cookieTheme === 'dark' || (cookieTheme == null && modoPadrao === 'dark')
 
   return (
     <html
       lang="pt-BR"
       className={`${inter.variable} ${plusJakarta.variable}`}
+      style={{ colorScheme: dark ? 'dark' : 'light', background: dark ? '#0b0b0f' : undefined }}
       suppressHydrationWarning
     >
       <head>
+        {/* Espelha o tema (next-themes/localStorage) num cookie ANTES de qualquer navegação,
+            para os Server Components (login/simulado) já renderizarem no tema certo — sem flash. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.cookie='theme='+t+';path=/;max-age=31536000;samesite=lax'}catch(e){}`,
+          }}
+        />
         {/* Dynamic white-label theme — overrides shadcn CSS variable defaults */}
         <style dangerouslySetInnerHTML={{ __html: themeCSS }} />
         {/* Favicon: use tenant's if available, otherwise fall back to default */}
@@ -56,7 +70,7 @@ export default async function RootLayout({
         )}
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
-        <Providers>
+        <Providers defaultTheme={modoPadrao}>
           {children}
           <Toaster position="bottom-right" richColors />
         </Providers>

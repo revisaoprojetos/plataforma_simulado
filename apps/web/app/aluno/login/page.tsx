@@ -1,209 +1,94 @@
-'use client'
+import { resolveTemaDark } from '@/lib/hud/resolve-dark'
+import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
+import { EmbedLoginForm } from '@/components/embed/embed-login-form'
+import { BookOpen } from 'lucide-react'
+import { resolverHudConfig } from '@/lib/hud/resolve-hud'
 
-import { Suspense } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { BookOpen, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
+interface PageProps {
+  searchParams: Promise<{ token?: string }>
+}
 
-type MetodoIdentificacao = 'email' | 'email_cpf' | 'email_telefone'
-
-const loginSchema = z.object({
-  email: z.string().email('E-mail inválido'),
-  cpf: z.string().optional(),
-  telefone: z.string().optional(),
-})
-
-type FormData = z.infer<typeof loginSchema>
-
-function AlunoLoginForm() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const simuladoToken = searchParams.get('token')
-  const [isLoading, setIsLoading] = useState(false)
-  // Método resolvido a partir do simulado (não mais fixo no código).
-  const [metodo, setMetodo] = useState<MetodoIdentificacao>('email')
-  const [carregandoInfo, setCarregandoInfo] = useState(true)
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(loginSchema),
-  })
-
-  useEffect(() => {
-    if (!simuladoToken) {
-      setCarregandoInfo(false)
-      return
-    }
-    let ativo = true
-    fetch(`/api/simulado/info?token=${simuladoToken}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((info) => {
-        if (ativo && info?.metodo_identificacao) {
-          setMetodo(info.metodo_identificacao as MetodoIdentificacao)
-        }
-      })
-      .catch(() => {})
-      .finally(() => ativo && setCarregandoInfo(false))
-    return () => {
-      ativo = false
-    }
-  }, [simuladoToken])
-
-  async function onSubmit(data: FormData) {
-    // Validação client conforme o método exigido pelo simulado.
-    if (metodo === 'email_cpf' && !data.cpf?.trim()) {
-      toast.error('Informe seu CPF.')
-      return
-    }
-    if (metodo === 'email_telefone' && !data.telefone?.trim()) {
-      toast.error('Informe seu telefone.')
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      const res = await fetch('/api/auth/embed/identify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: data.email,
-          cpf: data.cpf,
-          telefone: data.telefone,
-          token: simuladoToken,
-        }),
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        const c = err.contato
-        const contatoStr = c
-          ? [c.whatsapp && `WhatsApp ${c.whatsapp}`, c.email_suporte, c.telefone].filter(Boolean).join(' · ')
-          : ''
-        toast.error(err.titulo ?? 'Acesso negado', {
-          description: [err.message, contatoStr && `Contato: ${contatoStr}`].filter(Boolean).join('\n'),
-        })
-        return
-      }
-
-      const { sessionToken } = await res.json()
-      router.push(`/simulado/${simuladoToken}?st=${sessionToken}`)
-    } catch {
-      toast.error('Erro ao verificar identidade. Tente novamente.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  if (carregandoInfo) {
-    return <div className="h-48 animate-pulse rounded bg-muted" />
-  }
-
+/** Aviso simples (sem token / simulado inexistente). */
+function Aviso({ titulo, msg, erro }: { titulo: string; msg: string; erro?: boolean }) {
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        {metodo === 'email'
-          ? 'Informe seu e-mail cadastrado.'
-          : metodo === 'email_cpf'
-          ? 'Informe seu e-mail e CPF.'
-          : 'Informe seu e-mail e telefone.'}
-      </p>
-
-      <div className="space-y-2">
-        <Label htmlFor="email">E-mail</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="seu@email.com"
-          autoComplete="email"
-          {...register('email')}
-          aria-invalid={!!errors.email}
-        />
-        {errors.email && (
-          <p className="text-sm text-destructive">{errors.email.message}</p>
-        )}
+    <div className="flex min-h-screen items-center justify-center bg-background p-6">
+      <div className="space-y-3 text-center">
+        <BookOpen className={`mx-auto h-10 w-10 ${erro ? 'text-destructive' : 'text-muted-foreground'}`} />
+        <h2 className="text-base font-semibold">{titulo}</h2>
+        <p className="text-sm text-muted-foreground">{msg}</p>
       </div>
-
-      {metodo === 'email_cpf' && (
-        <div className="space-y-2">
-          <Label htmlFor="cpf">CPF</Label>
-          <Input
-            id="cpf"
-            placeholder="000.000.000-00"
-            {...register('cpf')}
-            aria-invalid={!!errors.cpf}
-          />
-        </div>
-      )}
-
-      {metodo === 'email_telefone' && (
-        <div className="space-y-2">
-          <Label htmlFor="telefone">Telefone</Label>
-          <Input
-            id="telefone"
-            placeholder="(00) 00000-0000"
-            {...register('telefone')}
-            aria-invalid={!!errors.telefone}
-          />
-        </div>
-      )}
-
-      <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
-        {isLoading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Verificando...
-          </>
-        ) : (
-          'Acessar Simulado'
-        )}
-      </Button>
-    </form>
+    </div>
   )
 }
 
-export default function AlunoLoginPage() {
+async function fetchSimulado(token: string) {
+  try {
+    const svc = await createServiceClient()
+    const { data } = await svc
+      .from('simulado_simulados')
+      .select('id, titulo, metodo_identificacao, tenant_id, status, data_inicio, data_fim, tempo_limite_min')
+      .eq('embed_token', token)
+      .single()
+    return data ?? null
+  } catch {
+    return null
+  }
+}
+
+async function fetchBranding(tenantId: string) {
+  try {
+    const svc = createAdminClient()
+    const { data: t } = await svc.from('simulado_tenants').select('nome, tema').eq('id', tenantId).maybeSingle()
+    const tema = (t?.tema ?? {}) as Record<string, string>
+    return {
+      nome: tema.nome_site ?? t?.nome ?? 'Simulado',
+      logoUrl: tema.logo_url ?? null,
+      logoGrandeUrl: tema.logo_grande_url ?? null,
+      logoBg: tema.logo_png_bg ?? '#ffffff',
+      logoEstilo: tema.logo_estilo ?? 'arredondado',
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Login do aluno para o simulado (página cheia). Mesmo visual/HUD do embed:
+ * cores da página "login" do caderno vinculado, pop-ups por cima, e ao identificar
+ * segue para /simulado/[token] com a animação de entrada.
+ */
+export default async function AlunoLoginPage({ searchParams }: PageProps) {
+  const { token } = await searchParams
+
+  if (!token) {
+    return <Aviso titulo="Link de acesso ausente" msg="Use o link do simulado enviado pela sua plataforma." />
+  }
+
+  const simulado = await fetchSimulado(token)
+  if (!simulado) {
+    return <Aviso erro titulo="Simulado não encontrado" msg="O link de acesso é inválido ou o simulado não está disponível." />
+  }
+
+  const metodo = (simulado.metodo_identificacao ?? 'email_cpf') as 'email' | 'email_cpf' | 'email_telefone'
+  const hud = await resolverHudConfig(simulado.id, simulado.tenant_id)
+  const branding = await fetchBranding(simulado.tenant_id)
+  const dark = await resolveTemaDark()
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted/30 p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="flex flex-col items-center gap-2 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-            <BookOpen className="h-7 w-7" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">Acessar Simulado</h1>
-          <p className="text-sm text-muted-foreground">
-            Informe seus dados para acessar a prova
-          </p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Identificação</CardTitle>
-            <CardDescription>
-              Seus dados são validados contra o cadastro da plataforma.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Suspense fallback={<div className="h-48 animate-pulse rounded bg-muted" />}>
-              <AlunoLoginForm />
-            </Suspense>
-          </CardContent>
-        </Card>
-
-        <p className="text-center text-xs text-muted-foreground">
-          Dúvidas? Entre em contato com sua plataforma de ensino.
-        </p>
-      </div>
-    </div>
+    <EmbedLoginForm
+      token={token}
+      destino="simulado"
+      metodo={metodo}
+      simuladoTitulo={simulado.titulo}
+      branding={branding}
+      darkInicial={dark}
+      hud={{ base: hud.base, porPagina: hud.porPagina }}
+      prova={{
+        status: simulado.status,
+        dataInicio: simulado.data_inicio,
+        dataFim: simulado.data_fim,
+        tempoLimiteMin: simulado.tempo_limite_min,
+      }}
+    />
   )
 }

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { ProvaIntro, ProvaLoading } from '@/components/prova/prova-intro'
 
 interface Alternativa {
   id: string
@@ -84,10 +85,12 @@ interface EmbedProvaRunnerProps {
   embedToken: string
   sessaoId: string
   simuladoTitulo: string
+  branding?: { nome?: string; logoUrl?: string | null; logoGrandeUrl?: string | null; logoBg?: string; logoEstilo?: string } | null
 }
 
-export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: EmbedProvaRunnerProps) {
+export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, branding }: EmbedProvaRunnerProps) {
   const [status, setStatus] = useState<ProvaStatus>('loading')
+  const [iniciado, setIniciado] = useState(false)
   const [sessao, setSessao] = useState<SessaoData | null>(null)
   const [questaoIndex, setQuestaoIndex] = useState(0)
   const [respostas, setRespostas] = useState<Record<string, string>>({})
@@ -209,14 +212,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
   }
 
   if (status === 'loading') {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-7 w-7 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Carregando prova...</p>
-        </div>
-      </div>
-    )
+    return <ProvaLoading logoUrl={branding?.logoUrl ?? null} logoBg={branding?.logoBg} logoEstilo={branding?.logoEstilo} />
   }
 
   if (status === 'erro') {
@@ -226,7 +222,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
           <AlertCircle className="mx-auto h-10 w-10 text-destructive" />
           <h2 className="text-base font-semibold">Sessão inválida</h2>
           <p className="text-sm text-muted-foreground">
-            Não foi possível carregar sua prova. Tente novamente ou entre em contato com o suporte.
+            Não foi possível carregar seu simulado. Tente novamente ou entre em contato com o suporte.
           </p>
         </div>
       </div>
@@ -241,7 +237,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
             <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
           </div>
           <div>
-            <h2 className="text-xl font-bold">Prova Finalizada!</h2>
+            <h2 className="text-xl font-bold">Simulado Finalizado!</h2>
             <p className="text-sm text-muted-foreground mt-1">Seu gabarito foi registrado.</p>
           </div>
           <div className={`grid gap-3 ${resultado.posicao != null ? 'grid-cols-4' : 'grid-cols-3'}`}>
@@ -281,6 +277,22 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
   const totalRespondidas = sessao.questoes.filter(respondidaDe).length
   const progresso = (totalRespondidas / totalQuestoes) * 100
   const timerWarning = segundosRestantes !== null && segundosRestantes < 300
+
+  // Pop-up de entrada: tempo restante + orientação antes de começar.
+  if (!iniciado) {
+    return (
+      <ProvaIntro
+        titulo={simuladoTitulo}
+        logoUrl={branding?.logoUrl ?? null}
+        logoGrandeUrl={branding?.logoGrandeUrl ?? null}
+        logoBg={branding?.logoBg}
+        logoEstilo={branding?.logoEstilo}
+        tempoLabel={segundosRestantes !== null ? formatTime(segundosRestantes) : null}
+        totalQuestoes={totalQuestoes}
+        onIniciar={() => setIniciado(true)}
+      />
+    )
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -483,7 +495,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo }: Embed
             </Button>
             <Button size="sm" onClick={() => { setShowRevisao(false); setShowConfirmacao(true) }}>
               <Send className="mr-1.5 h-3.5 w-3.5" />
-              Enviar prova
+              Enviar simulado
             </Button>
           </DialogFooter>
         </DialogContent>

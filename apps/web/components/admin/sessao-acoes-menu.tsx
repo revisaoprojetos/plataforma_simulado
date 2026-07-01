@@ -60,7 +60,7 @@ export function SessaoAcoesMenu({
         {temResultado && (
           <>
             <DropdownMenuGroup>
-              <DropdownMenuLabel>Gabaritos</DropdownMenuLabel>
+              <DropdownMenuLabel>Cadernos</DropdownMenuLabel>
               {cadId && mods.length ? (
                 mods.map((m) => (
                   <DropdownMenuItem key={m.id} onClick={() => abrir(`/imprimir/caderno/${cadId}?aluno=${estudanteId}&mod=${m.id}&sessao=${sessaoId}`)}>
@@ -69,7 +69,7 @@ export function SessaoAcoesMenu({
                 ))
               ) : (
                 <DropdownMenuItem onClick={() => router.push(`/admin/estudantes/${estudanteId}/gabarito/${sessaoId}`)}>
-                  <ListChecks className="mr-2 h-4 w-4" /> Ver gabarito
+                  <ListChecks className="mr-2 h-4 w-4" /> Ver caderno
                 </DropdownMenuItem>
               )}
             </DropdownMenuGroup>

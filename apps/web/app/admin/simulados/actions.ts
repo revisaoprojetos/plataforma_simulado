@@ -93,6 +93,20 @@ export async function updateSimuladoAction(id: string, data: SimuladoData) {
   redirect(`/admin/simulados/${id}`)
 }
 
+/** Vincula (ou desvincula) explicitamente um caderno de design ao simulado — define o tema/HUD aplicado. */
+export async function vincularCadernoSimulado(simuladoId: string, cadernoId: string | null) {
+  const supabase = await createClient()
+  const { data: sim } = await supabase.from('simulado_simulados').select('regras').eq('id', simuladoId).maybeSingle()
+  const regras: Record<string, unknown> = { ...((sim?.regras as Record<string, unknown>) ?? {}) }
+  if (cadernoId) regras.caderno_id = cadernoId
+  else delete regras.caderno_id
+  const { error } = await supabase.from('simulado_simulados').update({ regras }).eq('id', simuladoId)
+  if (error) return { error: error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_simulados', entidadeId: simuladoId, depois: { caderno_id: cadernoId } })
+  revalidatePath(`/admin/simulados/${simuladoId}`)
+  return { ok: true }
+}
+
 export async function addQuestaoToSimulado(simuladoId: string, questaoId: string) {
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { error: 'Tenant não resolvido.' }

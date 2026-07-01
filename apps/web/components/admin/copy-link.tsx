@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Check, Copy, ExternalLink } from 'lucide-react'
+import { abrirLinkTemado } from '@/lib/hud/abrir-temado'
 
 export function CopyLink({ url }: { url: string }) {
   const [copiado, setCopiado] = useState(false)
@@ -23,15 +24,14 @@ export function CopyLink({ url }: { url: string }) {
       <Button variant="outline" size="icon-sm" onClick={copiar} title="Copiar link">
         {copiado ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
       </Button>
-      <a
-        href={url}
-        target="_blank"
-        rel="noreferrer"
+      <button
+        type="button"
+        onClick={() => abrirLinkTemado(url)}
         className="inline-flex h-7 w-7 items-center justify-center rounded-lg border hover:bg-muted"
         title="Abrir em nova aba"
       >
         <ExternalLink className="h-3.5 w-3.5" />
-      </a>
+      </button>
     </div>
   )
 }

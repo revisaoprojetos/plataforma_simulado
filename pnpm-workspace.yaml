@@ -1,6 +1,9 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+overrides:
+  # Dedupe ioredis (bullmq puxa transitivo). Uma versão só → tipos casam no tsc.
+  ioredis: 5.11.1
 allowBuilds:
   '@scarf/scarf': false
   msgpackr-extract: true

@@ -3,6 +3,23 @@
 
 import { type Block, genId } from './types'
 
+/** Clona um bloco com novos ids (recursivo nos filhos) — usado ao duplicar. */
+function cloneComIds(b: Block): Block {
+  return {
+    ...b,
+    id: genId(b.type),
+    attributes: { ...b.attributes },
+    innerBlocks: b.innerBlocks ? b.innerBlocks.map(cloneComIds) : undefined,
+  }
+}
+
+/** Duplica o bloco (e seus filhos) logo após o original. */
+export function duplicateBlock(blocks: Block[], id: string): Block[] {
+  const orig = findBlock(blocks, id)
+  if (!orig) return blocks
+  return insertAfter(blocks, id, cloneComIds(orig))
+}
+
 export function findBlock(blocks: Block[], id: string): Block | null {
   for (const b of blocks) {
     if (b.id === id) return b

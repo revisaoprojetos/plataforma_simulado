@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getCurrentAccess } from '@/lib/auth/permissions'
+import { getCurrentAccess, type Access } from '@/lib/auth/permissions'
+import { verificarRenderToken } from '@/lib/pdf/render-token'
 import { CadernoPrintControls } from '@/components/admin/caderno-print-controls'
 import { BlockRender, dataComQuestao } from '@/lib/caderno-designer/blocks'
 import { resolveTheme } from '@/lib/caderno-designer/theme'
@@ -13,14 +14,22 @@ export default async function CadernoImprimirPage({
   params, searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ gabarito?: string; mod?: string; aluno?: string; todos?: string; sessao?: string }>
+  searchParams: Promise<{ gabarito?: string; mod?: string; aluno?: string; todos?: string; sessao?: string; pdftoken?: string }>
 }) {
   const { id } = await params
-  const { gabarito: g, mod, aluno, todos, sessao } = await searchParams
+  const { gabarito: g, mod, aluno, todos, sessao, pdftoken } = await searchParams
   const gabarito = g === '1'
 
-  const access = await getCurrentAccess()
-  if (!access.isAdmin && !access.permissions.includes('questoes:view')) notFound()
+  // Acesso: cookie do admin OU token de render assinado (Gotenberg, sem cookie),
+  // escopado a este caderno + tenant.
+  let access: Access
+  const tokenPayload = verificarRenderToken(pdftoken)
+  if (tokenPayload && tokenPayload.r === 'caderno' && tokenPayload.id === id) {
+    access = { userId: null, tenantId: tokenPayload.t, role: 'render', isAdmin: true, permissions: ['*'] }
+  } else {
+    access = await getCurrentAccess()
+    if (!access.isAdmin && !access.permissions.includes('questoes:view')) notFound()
+  }
 
   const svc = createAdminClient()
   const { data: caderno } = await svc

@@ -9,12 +9,18 @@ import {
   CheckCircle2,
   XCircle,
   Circle,
-  Loader2,
   Home,
-  Trophy,
   Lock,
-  Printer,
+  FileText,
+  FileStack,
+  Trophy,
+  RefreshCw,
 } from 'lucide-react'
+import { FitaTopo } from '@/components/prova/fita-topo'
+import { ThemeToggle } from '@/components/prova/theme-toggle'
+import { ProvaLoading, type EstiloProvaLoading } from '@/components/prova/prova-intro'
+import { efetivarHud, type HudCores, type HudPorPagina } from '@/lib/caderno-designer/types'
+import { hudCssVars } from '@/lib/caderno-designer/hud'
 
 interface AltRev {
   id: string
@@ -28,6 +34,14 @@ interface QuestaoRev {
   enunciado: string
   resposta_aluno: string | null
   acertou: boolean | null
+  anulada?: boolean
+  alt_trocada?: boolean
+  /** id da alternativa que era correta ANTES da alteração de gabarito */
+  alt_correta_anterior?: string | null
+  /** se o aluno havia acertado ANTES da alteração de gabarito */
+  acertou_antes?: boolean | null
+  /** justificativa/comentário da questão (exibida quando o gabarito é liberado) */
+  justificativa?: string | null
   discursiva?: { texto: string; status: string; nota: number | null; feedback: string | null } | null
   alternativas: AltRev[]
 }
@@ -42,6 +56,15 @@ interface Resultado {
   nota: number | null
   acertos: number
   total: number
+  marcadas: number
+  em_branco: number
+  tempo: string | null
+  aluno_nome: string
+  aluno_email: string
+  iniciado_em: string | null
+  finalizado_em: string | null
+  estudante_id: string | null
+  caderno_id: string | null
   posicao: number | null
   total_participantes: number
   stats_por_disciplina: StatDisciplina[]
@@ -51,12 +74,41 @@ interface Resultado {
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 
+// Botões da prova encerrada — classes/cores idênticas ao preview da HUD.
+const BTN_CADERNO = 'inline-flex h-10 items-center justify-center gap-1.5 rounded-md border px-4 text-sm font-medium transition-colors'
+const CADERNO_STYLE = {
+  background: 'var(--prova-caderno-btn-fundo, var(--background))',
+  borderColor: 'var(--prova-caderno-btn, var(--border))',
+  color: 'var(--prova-caderno-btn, var(--foreground))',
+}
+const BTN_VOLTAR = 'inline-flex h-11 w-full items-center justify-center rounded-md px-6 text-sm font-medium transition-colors'
+const VOLTAR_STYLE = { background: 'var(--prova-voltar-btn-fundo, var(--primary))', color: 'var(--prova-voltar-btn, #fff)' }
+
+// Estilo da justificativa — segue a cor de acerto/erro do aluno (cores editáveis).
+function justCor(acertou: boolean | null): string {
+  return acertou === null ? 'var(--prova-branco, #6b7280)' : acertou ? 'var(--prova-acerto, #16a34a)' : 'var(--prova-erro, #dc2626)'
+}
+function justStyle(acertou: boolean | null): React.CSSProperties {
+  const cor = justCor(acertou)
+  return { borderColor: cor, background: `color-mix(in oklab, ${cor} 10%, var(--card))` }
+}
+
 export function RevisaoFinal({
   sessionToken,
   voltarUrl,
+  hudCores,
+  hudPorPagina,
+  branding,
+  dark,
+  onToggleDark,
 }: {
   sessionToken: string
   voltarUrl: string
+  hudCores?: Partial<HudCores>
+  hudPorPagina?: HudPorPagina
+  branding?: { logoUrl?: string | null; logoBg?: string; logoEstilo?: string } | null
+  dark?: boolean
+  onToggleDark?: () => void
 }) {
   const [data, setData] = useState<Resultado | null>(null)
   const [carregando, setCarregando] = useState(true)
@@ -79,9 +131,17 @@ export function RevisaoFinal({
   }, [sessionToken])
 
   if (carregando) {
+    // Tela de carregamento do caderno (mesma "página Carregamento" — estilo + cor).
+    const cores = efetivarHud(hudCores, hudPorPagina, 'loading')
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div style={hudCssVars(cores) as React.CSSProperties}>
+        <ProvaLoading
+          mensagem="Carregando resultado do simulado..."
+          tipo={cores.loadingTipo as EstiloProvaLoading}
+          logoUrl={branding?.logoUrl ?? null}
+          logoBg={branding?.logoBg}
+          logoEstilo={branding?.logoEstilo}
+        />
       </div>
     )
   }
@@ -97,7 +157,7 @@ export function RevisaoFinal({
             <div>
               <h2 className="text-lg font-semibold">Sessão não encontrada</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Esta sessão de prova não existe mais ou o link expirou. Acesse o simulado novamente para realizá-lo.
+                Esta sessão do simulado não existe mais ou o link expirou. Acesse o simulado novamente para realizá-lo.
               </p>
             </div>
             <a href={voltarUrl} className={buttonVariants()}>
@@ -110,90 +170,154 @@ export function RevisaoFinal({
     )
   }
 
-  const nota = data?.nota ?? 0
-  const acertos = data?.acertos ?? 0
-  const total = data?.total ?? 0
-  const pct = total > 0 ? Math.round((acertos / total) * 100) : 0
   const liberado = data?.gabarito_liberado ?? false
+  const qs = data?.questoes ?? []
+  // Acerto efetivo por questão: na alt. trocada, mantém o ponto quem marcou a correta ANTES ou DEPOIS.
+  const acertoEfetivo = (q: QuestaoRev): boolean | null => {
+    if (q.alt_trocada && liberado) {
+      if (q.resposta_aluno == null) return null
+      const novaId = q.alternativas.find((a) => a.correta === true)?.id ?? null
+      return q.resposta_aluno === q.alt_correta_anterior || q.resposta_aluno === novaId
+    }
+    return q.acertou
+  }
+  const acertos = qs.filter((q) => acertoEfetivo(q) === true).length
+  const erros = qs.filter((q) => acertoEfetivo(q) === false).length
+  const pendentes = qs.filter((q) => acertoEfetivo(q) === null).length
+  const respondidas = qs.filter((q) => q.resposta_aluno !== null).length
+  const branco = qs.length - respondidas
+  const media = qs.length > 0 ? Math.round((acertos / qs.length) * 100) : 0
+  const numAnuladas = qs.filter((q) => q.anulada).length
+  const numAlt = qs.filter((q) => q.alt_trocada).length
+  // Cores do navegador — iguais às da prova (respondem às CSS vars do caderno).
+  const COR_MARCADA = 'var(--prova-marcada, var(--primary))'
+  const COR_ANUL = 'var(--prova-anulada, #6b7280)'
+  const COR_ALT = 'var(--prova-alt, #0891b2)'
+  const COR_ACERTO = 'var(--prova-acerto, #16a34a)'
+  const COR_ERRO = 'var(--prova-erro, #dc2626)'
+  const COR_BRANCO = 'var(--prova-branco, #6b7280)'
+  const COR_MEDIA = 'var(--prova-media, #6d28d9)'
+  // Card de resultado: fundo = versão clara da própria cor; ícone e número = a cor.
+  const cardStat = (cor: string) => ({ borderColor: `color-mix(in oklab, ${cor} 30%, var(--border))`, background: `color-mix(in oklab, ${cor} 12%, var(--card))` })
+  const fmtData = (s: string | null | undefined) => (s ? new Date(s).toLocaleDateString('pt-BR') : '—')
+  const fmtHora = (s: string | null | undefined) => (s ? new Date(s).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—')
+  const fmtDur = (a: string | null | undefined, bb: string | null | undefined) => {
+    if (!a || !bb) return data?.tempo ?? '—'
+    const seg = Math.max(0, Math.floor((new Date(bb).getTime() - new Date(a).getTime()) / 1000))
+    const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60)
+    return h > 0 ? `${h}h ${String(m).padStart(2, '0')}min` : `${m}min`
+  }
+  // Downloads: gabarito (folha de respostas) e caderno completo.
+  const urlGabarito = `/imprimir/resultado/${sessionToken}`
+  const urlCompleto = data?.caderno_id
+    ? `/imprimir/caderno/${data.caderno_id}?mod=caderno_completo&sessao=${sessionToken}${data.estudante_id ? `&aluno=${data.estudante_id}` : ''}`
+    : urlGabarito
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
-      {/* Cabeçalho fixo */}
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
+      {/* Cabeçalho fixo — top bar com cor própria (HUD) */}
+      <header className="sticky top-0 z-40 border-b backdrop-blur" style={{ background: 'var(--prova-topbar, var(--background))', color: 'var(--prova-topbar-texto, var(--foreground))' }}>
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-green-600" />
-            <span className="text-sm font-semibold">Prova finalizada</span>
+            <span className="text-sm font-semibold">Simulado finalizado</span>
           </div>
-          <div className="flex items-center gap-2">
-            <a href={`/imprimir/resultado/${sessionToken}`} target="_blank" rel="noreferrer" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              <Printer className="mr-1.5 h-4 w-4" />
-              Baixar PDF
-            </a>
-            <a href={voltarUrl} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              <Home className="mr-1.5 h-4 w-4" />
+          <div className="flex items-center gap-1.5">
+            {onToggleDark && <ThemeToggle dark={!!dark} onToggle={onToggleDark} />}
+            <a href={voltarUrl} className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
+              style={{ background: 'var(--prova-voltar-btn-fundo, var(--background))', borderColor: 'var(--prova-voltar-btn-fundo, var(--border))', color: 'var(--prova-voltar-btn, var(--foreground))' }}>
+              <Home className="h-3.5 w-3.5" />
               Voltar ao menu
             </a>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-        {/* Resumo */}
-        <Card>
-          <CardContent className="flex flex-col items-center gap-4 py-8 text-center sm:flex-row sm:justify-between sm:text-left">
-            <div className="flex items-center gap-4">
-              <div className="relative flex h-20 w-20 items-center justify-center">
-                <svg className="absolute inset-0 h-20 w-20 -rotate-90" viewBox="0 0 36 36">
-                  <circle cx="18" cy="18" r="16" fill="none" className="stroke-muted" strokeWidth="3" />
-                  <circle
-                    cx="18"
-                    cy="18"
-                    r="16"
-                    fill="none"
-                    className={cn(
-                      'transition-all',
-                      pct >= 70 ? 'stroke-green-500' : pct >= 50 ? 'stroke-amber-500' : 'stroke-red-500',
-                    )}
-                    strokeWidth="3"
-                    strokeDasharray={`${pct} 100`}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <span className="text-lg font-bold">{pct}%</span>
+      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">
+        {/* Resumo — dados do aluno + tempos + marcadas/em branco + downloads */}
+        <Card className="relative overflow-hidden">
+          <FitaTopo />
+          <CardContent className="space-y-5 p-6 sm:p-8">
+            <div>
+              <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <Trophy className="h-4 w-4" /> Simulado finalizado
               </div>
-              <div>
-                <h1 className="text-xl font-bold">{data?.titulo ?? 'Resultado'}</h1>
-                <p className="text-sm text-muted-foreground">
-                  Você acertou <strong className="text-foreground">{acertos}</strong> de{' '}
-                  <strong className="text-foreground">{total}</strong> questões.
-                </p>
-              </div>
+              <h1 className="text-2xl font-bold leading-tight">{data?.titulo ?? 'Simulado'}</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">{data?.aluno_nome ?? 'Estudante'}</span>
+                {data?.aluno_email ? <> · {data.aluno_email}</> : null}
+              </p>
             </div>
-            <div className="flex items-center gap-3">
-              {data?.posicao != null && (
-                <div className="flex items-center gap-2 rounded-xl bg-muted px-5 py-3">
-                  <Trophy className="h-5 w-5 text-amber-500" />
-                  <div className="text-left">
-                    <div className="text-2xl font-bold leading-none">{data.posicao}º</div>
-                    <div className="text-xs text-muted-foreground">de {data.total_participantes}</div>
-                  </div>
+
+            <div className="grid grid-cols-2 gap-4 border-t pt-5 sm:grid-cols-4">
+              <div><p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Data</p><p className="text-sm font-semibold">{fmtData(data?.iniciado_em)}</p></div>
+              <div><p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Início</p><p className="text-sm font-semibold">{fmtHora(data?.iniciado_em)}</p></div>
+              <div><p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Término</p><p className="text-sm font-semibold">{fmtHora(data?.finalizado_em)}</p></div>
+              <div><p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tempo utilizado</p><p className="text-sm font-semibold">{fmtDur(data?.iniciado_em, data?.finalizado_em)}</p></div>
+            </div>
+
+            {liberado ? (
+              // Gabarito liberado: acertadas / erradas / em branco / média (cores editáveis)
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded-xl border p-3 text-center" style={cardStat(COR_ACERTO)}>
+                  <CheckCircle2 className="mx-auto mb-1 h-4 w-4" style={{ color: COR_ACERTO }} />
+                  <p className="text-xl font-bold tabular-nums" style={{ color: COR_ACERTO }}>{acertos}</p>
+                  <p className="text-[11px] text-muted-foreground">Acertadas</p>
                 </div>
-              )}
-              <div className="flex items-center gap-2 rounded-xl bg-primary/10 px-5 py-3">
-                <div className="text-left">
-                  <div className="text-2xl font-bold leading-none text-primary">{nota.toFixed(1)}</div>
-                  <div className="text-xs text-muted-foreground">Nota final</div>
+                <div className="rounded-xl border p-3 text-center" style={cardStat(COR_ERRO)}>
+                  <XCircle className="mx-auto mb-1 h-4 w-4" style={{ color: COR_ERRO }} />
+                  <p className="text-xl font-bold tabular-nums" style={{ color: COR_ERRO }}>{erros}</p>
+                  <p className="text-[11px] text-muted-foreground">Erradas</p>
+                </div>
+                <div className="rounded-xl border p-3 text-center" style={cardStat(COR_BRANCO)}>
+                  <FileText className="mx-auto mb-1 h-4 w-4" style={{ color: COR_BRANCO }} />
+                  <p className="text-xl font-bold tabular-nums" style={{ color: COR_BRANCO }}>{branco}</p>
+                  <p className="text-[11px] text-muted-foreground">Em branco</p>
+                </div>
+                <div className="rounded-xl border p-3 text-center" style={cardStat(COR_MEDIA)}>
+                  <Trophy className="mx-auto mb-1 h-4 w-4" style={{ color: COR_MEDIA }} />
+                  <p className="text-xl font-bold tabular-nums" style={{ color: COR_MEDIA }}>{media}%</p>
+                  <p className="text-[11px] text-muted-foreground">Média</p>
                 </div>
               </div>
+            ) : (
+              // Gabarito não liberado: marcadas / em branco
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl border bg-muted/40 p-3 text-center">
+                  <CheckCircle2 className="mx-auto mb-1 h-4 w-4 text-muted-foreground" />
+                  <p className="text-xl font-bold tabular-nums">{data?.marcadas ?? 0}</p>
+                  <p className="text-[11px] text-muted-foreground">Marcadas</p>
+                </div>
+                <div className="rounded-xl border bg-muted/40 p-3 text-center">
+                  <FileText className="mx-auto mb-1 h-4 w-4 text-muted-foreground" />
+                  <p className="text-xl font-bold tabular-nums">{data?.em_branco ?? 0}</p>
+                  <p className="text-[11px] text-muted-foreground">Em branco</p>
+                </div>
+              </div>
+            )}
+
+            {/* Dois downloads lado a lado */}
+            <div className="grid grid-cols-2 gap-2">
+              <a href={urlGabarito} target="_blank" rel="noreferrer" className={BTN_CADERNO} style={CADERNO_STYLE}>
+                <FileText className="mr-1.5 h-4 w-4" /> Caderno de gabarito PDF
+              </a>
+              <a href={urlCompleto} target="_blank" rel="noreferrer" className={BTN_CADERNO} style={CADERNO_STYLE}>
+                <FileStack className="mr-1.5 h-4 w-4" /> Caderno completo PDF
+              </a>
             </div>
+
+            {/* Voltar ao menu — logo abaixo dos downloads */}
+            <a href={voltarUrl} className={BTN_VOLTAR} style={VOLTAR_STYLE}>
+              <Home className="mr-2 h-4 w-4" /> Voltar ao menu
+            </a>
           </CardContent>
         </Card>
 
         {/* Desempenho por matéria */}
         {liberado && (data?.stats_por_disciplina?.length ?? 0) > 0 && (
-          <Card>
-            <CardContent className="space-y-3 p-5">
+          <Card className="relative overflow-hidden">
+            <FitaTopo />
+            <CardContent className="space-y-3 p-5 pt-6">
               <h2 className="text-sm font-semibold">Desempenho por matéria</h2>
               {data!.stats_por_disciplina.map((s) => (
                 <div key={s.disciplina} className="space-y-1">
@@ -213,66 +337,39 @@ export function RevisaoFinal({
           </Card>
         )}
 
-        {/* Aviso de gabarito */}
-        {!liberado && (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-300">
-            <Lock className="h-4 w-4 shrink-0" />
-            O gabarito será liberado conforme a configuração do simulado. Abaixo estão suas respostas marcadas.
-          </div>
-        )}
-
-        {/* Navegador de questões — clicar vai direto para a questão */}
-        <div className="rounded-xl border bg-card p-3">
-          <p className="mb-2 text-xs font-medium text-muted-foreground">Ir para questão</p>
-          <div className="flex flex-wrap gap-1.5">
+        {/* Grid: revisão à esquerda + navegador fixo à direita (mesmo modo da prova) */}
+        <div className="grid gap-4 lg:grid-cols-[1fr_14rem] lg:gap-10">
+          {/* Coluna: revisão das questões */}
+          <div className="space-y-3">
             {(data?.questoes ?? []).map((q) => {
-              const status = q.acertou === null ? 'pendente' : q.acertou ? 'acertou' : 'errou'
+              // Regra da alternativa trocada: mantém o ponto se marcou a correta ANTES ou DEPOIS da alteração;
+              // só perde o ponto quem marcou uma que não era nem a anterior nem a nova correta.
+              const novaCorretaId = q.alternativas.find((a) => a.correta === true)?.id ?? null
+              const manteve = !!q.alt_trocada && liberado && q.resposta_aluno != null &&
+                (q.resposta_aluno === q.alt_correta_anterior || q.resposta_aluno === novaCorretaId)
+              const acertouEff = q.alt_trocada && liberado
+                ? (q.resposta_aluno == null ? null : manteve)
+                : q.acertou
+              const status = !liberado || acertouEff === null ? 'pendente' : acertouEff ? 'acertou' : 'errou'
               return (
-                <button
-                  key={q.id}
-                  onClick={() =>
-                    document.getElementById(`q-${q.numero}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                  }
-                  title={`Questão ${q.numero}`}
-                  className={cn(
-                    'h-8 w-8 rounded-md text-xs font-semibold transition-colors',
-                    status === 'acertou' &&
-                      'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400',
-                    status === 'errou' &&
-                      'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400',
-                    status === 'pendente' && 'bg-muted text-muted-foreground hover:bg-muted/80',
-                  )}
-                >
-                  {q.numero}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Revisão das questões */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground">
-            Revisão das questões ({total})
-          </h2>
-
-          {(data?.questoes ?? []).map((q) => {
-            const status = q.acertou === null ? 'pendente' : q.acertou ? 'acertou' : 'errou'
-            return (
-              <Card key={q.id} id={`q-${q.numero}`} className="overflow-hidden scroll-mt-20">
-                <CardContent className="space-y-3 p-4">
+                <Card key={q.id} id={`q-${q.numero}`} className="relative overflow-hidden scroll-mt-20">
+                  <FitaTopo />
+                  <CardContent className="space-y-3 p-4 pt-5">
                   {/* cabeçalho da questão */}
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex h-7 min-w-7 items-center justify-center rounded-md bg-muted px-2 text-sm font-semibold">
                       {q.numero}
                     </span>
+                    {q.anulada && (
+                      <span className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium text-white" style={{ background: COR_ANUL }}>Anulada</span>
+                    )}
                     {status === 'acertou' && (
-                      <span className="flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                      <span className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ background: `color-mix(in oklab, ${COR_ACERTO} 15%, var(--card))`, color: COR_ACERTO }}>
                         <CheckCircle2 className="h-3.5 w-3.5" /> Acertou
                       </span>
                     )}
                     {status === 'errou' && (
-                      <span className="flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                      <span className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ background: `color-mix(in oklab, ${COR_ERRO} 15%, var(--card))`, color: COR_ERRO }}>
                         <XCircle className="h-3.5 w-3.5" /> Errou
                       </span>
                     )}
@@ -284,6 +381,34 @@ export function RevisaoFinal({
                   </div>
 
                   <p className="text-sm leading-relaxed">{q.enunciado}</p>
+
+                  {/* Gabarito alterado após a resposta — texto neutro, sem "perdeu ponto" */}
+                  {liberado && q.alt_trocada && (() => {
+                    const idxDe = (id?: string | null) => q.alternativas.findIndex((a) => a.id === id)
+                    const L = (i: number) => (i >= 0 ? (LETRA[i] ?? i + 1) : '—')
+                    const marc = idxDe(q.resposta_aluno)
+                    const antes = idxDe(q.alt_correta_anterior)
+                    const depois = q.alternativas.findIndex((a) => a.correta === true)
+                    const marcouAntes = marc >= 0 && marc === antes
+                    const marcouDepois = marc >= 0 && marc === depois
+                    return (
+                      <div className="rounded-md border p-3 text-xs" style={{ borderColor: COR_ALT, background: `color-mix(in oklab, ${COR_ALT} 10%, var(--card))` }}>
+                        <p className="mb-1 flex items-center gap-1.5 font-semibold" style={{ color: COR_ALT }}>
+                          <RefreshCw className="h-3.5 w-3.5" /> Esta questão teve a alternativa correta alterada
+                        </p>
+                        <p className="leading-relaxed">
+                          A alternativa correta mudou de <strong>{L(antes)}</strong> para <strong>{L(depois)}</strong>.{' '}
+                          {q.resposta_aluno == null
+                            ? 'Você deixou esta questão em branco.'
+                            : marcouAntes
+                              ? <>Você marcou <strong>{L(marc)}</strong>, que era a correta antes da alteração — seu ponto está garantido.</>
+                              : marcouDepois
+                                ? <>Você marcou <strong>{L(marc)}</strong>, a nova alternativa correta — seu acerto será contabilizado.</>
+                                : <>Você marcou <strong>{L(marc)}</strong>.</>}
+                        </p>
+                      </div>
+                    )
+                  })()}
 
                   {/* discursiva: resposta escrita + correção */}
                   {q.tipo === 'discursiva' ? (
@@ -313,25 +438,36 @@ export function RevisaoFinal({
                   <div className="space-y-2">
                     {q.alternativas.map((alt, i) => {
                       const marcada = q.resposta_aluno === alt.id
-                      const correta = alt.correta === true
-                      const erradaMarcada = marcada && alt.correta === false
+                      const correta = liberado && alt.correta === true
+                      // Se manteve o ponto (alt. trocada), a marcada não é considerada errada.
+                      const erradaMarcada = liberado && marcada && alt.correta === false && !manteve
+                      // Alternativa que era correta ANTES da alteração de gabarito (destacada em separado).
+                      const antesCorreta = liberado && !!q.alt_trocada && alt.id === q.alt_correta_anterior && !correta
+                      const boxStyle: React.CSSProperties | undefined =
+                        correta ? { borderColor: COR_ACERTO, background: `color-mix(in oklab, ${COR_ACERTO} 10%, var(--card))` }
+                        : erradaMarcada ? { borderColor: COR_ERRO, background: `color-mix(in oklab, ${COR_ERRO} 10%, var(--card))` }
+                        : antesCorreta ? { borderColor: COR_ALT, background: `color-mix(in oklab, ${COR_ALT} 8%, var(--card))` }
+                        : undefined
+                      const letraStyle: React.CSSProperties | undefined =
+                        correta ? { borderColor: COR_ACERTO, background: COR_ACERTO, color: '#fff' }
+                        : erradaMarcada ? { borderColor: COR_ERRO, background: COR_ERRO, color: '#fff' }
+                        : antesCorreta ? { borderColor: COR_ALT, color: COR_ALT }
+                        : undefined
                       return (
                         <div
                           key={alt.id}
                           className={cn(
                             'flex items-start gap-3 rounded-lg border p-3 text-sm',
-                            correta && 'border-green-500 bg-green-50 dark:bg-green-900/20',
-                            erradaMarcada && 'border-red-500 bg-red-50 dark:bg-red-900/20',
-                            !correta && !erradaMarcada && marcada && 'border-primary bg-primary/5',
+                            !correta && !erradaMarcada && !antesCorreta && marcada && 'border-primary bg-primary/5',
                           )}
+                          style={boxStyle}
                         >
                           <span
                             className={cn(
                               'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold',
-                              correta && 'border-green-500 bg-green-500 text-white',
-                              erradaMarcada && 'border-red-500 bg-red-500 text-white',
-                              !correta && !erradaMarcada && 'border-muted-foreground/30 text-muted-foreground',
+                              !correta && !erradaMarcada && !antesCorreta && 'border-muted-foreground/30 text-muted-foreground',
                             )}
+                            style={letraStyle}
                           >
                             {LETRA[i] ?? i + 1}
                           </span>
@@ -342,8 +478,13 @@ export function RevisaoFinal({
                                 Sua resposta
                               </span>
                             )}
-                            {correta && <CheckCircle2 className="h-4 w-4 text-green-600" />}
-                            {erradaMarcada && <XCircle className="h-4 w-4 text-red-600" />}
+                            {antesCorreta && (
+                              <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-white" style={{ background: COR_ALT }}>
+                                Correta antes
+                              </span>
+                            )}
+                            {correta && <CheckCircle2 className="h-4 w-4" style={{ color: COR_ACERTO }} />}
+                            {erradaMarcada && <XCircle className="h-4 w-4" style={{ color: COR_ERRO }} />}
                           </div>
                         </div>
                       )
@@ -351,20 +492,72 @@ export function RevisaoFinal({
                   </div>
                   )}
 
+                  {/* Justificativa — só com gabarito liberado; cor segue acerto/erro do aluno */}
+                  {liberado && q.tipo !== 'discursiva' && q.justificativa && (
+                    <div className="rounded-md border p-3 text-sm" style={justStyle(acertouEff)}>
+                      <p className="mb-1 text-xs font-semibold" style={{ color: justCor(acertouEff) }}>Justificativa</p>
+                      <p className="whitespace-pre-wrap leading-relaxed">{q.justificativa}</p>
+                    </div>
+                  )}
+
                   <div className="flex justify-end pt-1">
                     <ReportarErroButton sessaoId={sessionToken} questaoId={q.id} />
                   </div>
                 </CardContent>
               </Card>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
 
-        <div className="flex justify-center pt-2">
-          <a href={voltarUrl} className={buttonVariants({ size: 'lg' })}>
-            <Home className="mr-2 h-4 w-4" />
-            Voltar ao menu
-          </a>
+          {/* Navegador de questões — card lateral direito (mesmo modo da prova) */}
+          <aside>
+            <Card className="relative overflow-hidden pb-2 pt-3 lg:sticky lg:top-20">
+              <FitaTopo />
+              <CardContent className="px-4 pb-0 pt-0">
+                <p className="text-center text-sm font-semibold">Navegador de questões</p>
+                <div className="mt-2 mb-3 border-t" />
+                <div className="grid grid-cols-5 gap-1.5">
+                  {qs.map((q) => {
+                    const respondida = q.resposta_aluno !== null
+                    let st: React.CSSProperties | undefined
+                    let cls = 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    if (q.anulada) { cls = 'text-white'; st = { background: COR_ANUL, textDecoration: 'line-through' } }
+                    else if (q.alt_trocada) { cls = 'text-white'; st = { background: COR_ALT } }
+                    else if (liberado && q.acertou === true) { cls = 'text-white'; st = { background: COR_ACERTO } }
+                    else if (liberado && q.acertou === false) { cls = 'text-white'; st = { background: COR_ERRO } }
+                    else if (respondida) { cls = 'text-white'; st = { background: COR_MARCADA } }
+                    return (
+                      <button
+                        key={q.id}
+                        onClick={() => document.getElementById(`q-${q.numero}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                        title={`Questão ${q.numero}${q.anulada ? ' (anulada)' : q.alt_trocada ? ' (alternativa trocada)' : ''}`}
+                        className={cn('flex h-9 items-center justify-center rounded-md text-xs font-bold transition-colors', cls)}
+                        style={st}
+                      >
+                        {q.numero}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="mt-4 space-y-1.5 border-t pt-3 text-xs text-muted-foreground">
+                  {liberado ? (
+                    <>
+                      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ACERTO }} /> Acertou ({acertos})</div>
+                      {erros > 0 && <div className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ERRO }} /> Errou ({erros})</div>}
+                      {pendentes > 0 && <div className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Sem resposta ({pendentes})</div>}
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_MARCADA }} /> Respondidas ({respondidas})</div>
+                      {branco > 0 && <div className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Em branco ({branco})</div>}
+                    </>
+                  )}
+                  {numAnuladas > 0 && <div className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ANUL }} /> Anuladas ({numAnuladas})</div>}
+                  {numAlt > 0 && <div className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ALT }} /> Alternativa trocada ({numAlt})</div>}
+                </div>
+              </CardContent>
+            </Card>
+          </aside>
         </div>
       </main>
     </div>

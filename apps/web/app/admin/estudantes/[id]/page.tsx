@@ -8,6 +8,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ArrowLeft, Mail, Phone, IdCard, Calendar, FolderOpen, User, ListChecks, ClipboardList, FileText, FileCheck2 } from 'lucide-react'
 import { SessaoAcoesMenu } from '@/components/admin/sessao-acoes-menu'
+import { mesclarModalidades } from '@/lib/caderno-designer/types'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -106,7 +107,7 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
       const cadIds = [...new Set([...cadernoPorSim.values()])]
       if (cadIds.length) {
         const { data: cads } = await svc.from('simulado_cadernos_designer').select('id, config').in('id', cadIds)
-        for (const c of cads ?? []) modsPorCad.set((c as any).id, (c as any).config?.modalidadesV2 ?? [{ id: 'gabarito_objetivo', nome: 'Gabarito' }])
+        for (const c of cads ?? []) modsPorCad.set((c as any).id, mesclarModalidades((c as any).config?.modalidadesV2))
       }
     }
   }
