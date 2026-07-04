@@ -7,10 +7,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Sun, Moon, Save, Check, Trash2, Loader2, Palette } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { confirmar } from '@/components/ui/confirm-dialog'
 
 // Campos que um "modelo" (preset) captura do tema atual para reaplicar depois.
 const CAMPOS_MODELO = [
-  'cores', 'fonte', 'fonte_cor', 'logo_url', 'logo_dark_url', 'favicon',
+  'cores', 'cores_dark', 'fonte', 'fonte_cor', 'logo_url', 'logo_dark_url', 'favicon',
   'modo_padrao', 'nome_site', 'titulo_pagina', 'splash_estilo', 'splash_logo',
   'splash_mensagem', 'loading_estilo',
 ] as const
@@ -53,8 +54,8 @@ export function TemaSistemaForm({ tema, salvarTema }: { tema: any; salvarTema: S
     })
   }
 
-  function excluir(m: Modelo) {
-    if (!confirm(`Excluir o modelo "${m.nome}"?`)) return
+  async function excluir(m: Modelo) {
+    if (!(await confirmar({ mensagem: `Excluir o modelo "${m.nome}"?`, destrutivo: true }))) return
     const lista = modelos.filter((x) => x.id !== m.id)
     setModelos(lista)
     start(async () => { await salvarTema({ modelos: lista }); toast.success('Modelo removido') })

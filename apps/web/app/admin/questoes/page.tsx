@@ -13,9 +13,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, Pencil } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { QuestoesFilters } from '@/components/admin/questoes-filters'
 import { PaginationControls } from '@/components/admin/pagination-controls'
+import { CopiarCodigo } from '@/components/admin/copiar-codigo'
+import { codigoQuestao } from '@/lib/codigo-questao'
+import { NovaQuestaoDialog } from '@/components/admin/nova-questao-dialog'
 
 const ITEMS_PER_PAGE = 20
 
@@ -24,6 +27,8 @@ interface PageProps {
     page?: string
     q?: string
     disciplina?: string
+    dificuldade?: string
+    tipo?: string
     status?: string
   }>
 }
@@ -45,26 +50,46 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
   const page = Number(params.page ?? 1)
   const q = params.q ?? ''
   const status = params.status ?? ''
+  const disciplina = params.disciplina ?? ''
+  const dificuldade = params.dificuldade ?? ''
+  const tipo = params.tipo ?? ''
 
   const supabase = await createServiceClient()
   const tenantId = await getCurrentTenantId()
 
-  let query = supabase
-    .from('simulado_questoes')
-    .select('id, enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)', { count: 'exact' })
-    .eq('deletado', false)
+  // Disciplinas do tenant para o filtro (dropdown).
+  const { data: disciplinas } = await supabase
+    .from('simulado_disciplinas')
+    .select('id, nome')
     .eq('tenant_id', tenantId ?? '')
-    .order('created_at', { ascending: false })
-    .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)
+    .order('nome')
 
-  if (q) {
-    query = query.ilike('enunciado', `%${q}%`)
-  }
-  if (status) {
-    query = query.eq('status', status)
+  // Busca por código OU enunciado. Tolerante: se a coluna `codigo` ainda não
+  // existe (migration pendente), refaz sem ela e busca só por enunciado.
+  function montarQuery(comCodigo: boolean) {
+    const sel: string = comCodigo
+      ? 'id, codigo, enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)'
+      : 'id, enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)'
+    let query = supabase
+      .from('simulado_questoes')
+      .select(sel, { count: 'exact' })
+      .eq('deletado', false)
+      .eq('tenant_id', tenantId ?? '')
+      .order('created_at', { ascending: false })
+      .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)
+
+    if (q) query = comCodigo ? query.or(`enunciado.ilike.%${q}%,codigo.ilike.%${q}%`) : query.ilike('enunciado', `%${q}%`)
+    if (status) query = query.eq('status', status)
+    if (disciplina) query = query.eq('disciplina_id', disciplina)
+    if (dificuldade) query = query.eq('nivel_dificuldade', dificuldade)
+    if (tipo) query = query.eq('tipo', tipo)
+    return query
   }
 
-  const { data: questoes, count } = await query
+  let res = await montarQuery(true)
+  if (res.error && /codigo/i.test(res.error.message)) res = await montarQuery(false)
+  const questoes = (res.data ?? []) as any[]
+  const count = res.count
   const totalPages = Math.ceil((count ?? 0) / ITEMS_PER_PAGE)
 
   return (
@@ -76,25 +101,21 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
             {count ?? 0} questões cadastradas
           </p>
         </div>
-        <Link href="/admin/questoes/nova" className={buttonVariants()}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Questão
-        </Link>
+        <NovaQuestaoDialog />
       </div>
 
-      <Suspense fallback={<div className="h-10 animate-pulse rounded-lg bg-muted" />}>
-        <QuestoesFilters />
-      </Suspense>
-
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Listagem</CardTitle>
+        <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <CardTitle className="shrink-0 text-base">Listagem</CardTitle>
+          <Suspense fallback={<div className="h-10 w-full animate-pulse rounded-lg bg-muted lg:max-w-2xl" />}>
+            <QuestoesFilters disciplinas={disciplinas ?? []} />
+          </Suspense>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[80px]">ID</TableHead>
+                <TableHead className="w-[130px]">Código</TableHead>
                 <TableHead>Enunciado</TableHead>
                 <TableHead>Disciplina</TableHead>
                 <TableHead>Banca</TableHead>
@@ -123,11 +144,11 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
 
                   return (
                     <TableRow key={q.id}>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {q.id.slice(0, 8)}
+                      <TableCell>
+                        <CopiarCodigo codigo={codigoQuestao(q.id, (q as any).codigo)} />
                       </TableCell>
                       <TableCell className="max-w-xs">
-                        <p className="text-sm line-clamp-2">{preview}</p>
+                        <Link href={`/admin/questoes/${q.id}/editar`} className="text-sm line-clamp-2 hover:text-primary hover:underline">{preview}</Link>
                       </TableCell>
                       <TableCell className="text-sm">
                         {disciplina ?? '—'}

@@ -1,8 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { NovoBancoForm } from '@/components/admin/novo-banco-form'
-import { BancoCard } from '@/components/admin/banco-card'
-import { Database } from 'lucide-react'
+import { BancosGrid } from '@/components/admin/bancos-grid'
 
 // Sempre renderizar fresco — a lista precisa refletir criações/exclusões na hora.
 export const dynamic = 'force-dynamic'
@@ -24,27 +23,17 @@ export default async function BancoQuestoesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Banco de Questões</h1>
-        <p className="text-muted-foreground">
-          Crie bancos para organizar suas questões. Uma questão pode estar em vários bancos.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Banco de Questões</h1>
+          <p className="text-muted-foreground">
+            Crie bancos para organizar suas questões. Uma questão pode estar em vários bancos.
+          </p>
+        </div>
+        <NovoBancoForm />
       </div>
 
-      <NovoBancoForm />
-
-      {lista.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
-          <Database className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
-          <p className="text-muted-foreground">Nenhum banco ainda. Crie o primeiro acima.</p>
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {lista.map((b: any) => (
-            <BancoCard key={b.id} id={b.id} nome={b.nome} total={contagem.get(b.id) ?? 0} />
-          ))}
-        </div>
-      )}
+      <BancosGrid bancos={lista.map((b: any) => ({ id: b.id, nome: b.nome, total: contagem.get(b.id) ?? 0 }))} />
     </div>
   )
 }

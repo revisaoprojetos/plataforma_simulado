@@ -61,7 +61,7 @@ export default async function AdminLayout({
       />
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
-          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} />
+          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro ?? 'none'} />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <AdminHeader userName={userName} userEmail={userEmail} />
             <main className="flex-1 overflow-y-auto p-6">

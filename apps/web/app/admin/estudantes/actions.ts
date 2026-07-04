@@ -57,6 +57,55 @@ export async function createEstudanteAction(data: NovoEstudanteData) {
   redirect('/admin/estudantes')
 }
 
+interface EditarEstudanteData {
+  nome: string
+  email: string
+  cpf?: string | null
+  telefone?: string | null
+  data_nascimento?: string | null
+  classificacao?: string | null
+  matricula_externa?: string | null
+  created_at?: string | null
+}
+
+/** Edita as informações de um estudante (perfil). */
+export async function editarEstudanteAction(id: string, data: EditarEstudanteData) {
+  if (!(await checkPermission('estudantes:update'))) return { error: 'Você não tem permissão para editar estudantes.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { error: 'Tenant não resolvido. Verifique o acesso.' }
+
+  const nome = data.nome?.trim()
+  const email = data.email?.trim()
+  if (!nome) return { error: 'Informe o nome.' }
+  if (!email) return { error: 'Informe o e-mail.' }
+
+  const svc = createAdminClient()
+  const { data: antes } = await svc
+    .from('simulado_estudantes')
+    .select('nome, email, cpf, telefone, data_nascimento, classificacao, matricula_externa, created_at')
+    .eq('id', id).eq('tenant_id', tenantId).maybeSingle()
+
+  const update: Record<string, unknown> = {
+    nome,
+    email,
+    cpf: data.cpf?.trim() || null,
+    telefone: data.telefone?.trim() || null,
+    data_nascimento: data.data_nascimento || null,
+    classificacao: data.classificacao || null,
+    matricula_externa: data.matricula_externa?.trim() || null,
+  }
+  // Só altera a data de cadastro se foi informada (evita sobrescrever com vazio).
+  if (data.created_at) update.created_at = data.created_at
+
+  const { error } = await svc.from('simulado_estudantes').update(update).eq('id', id).eq('tenant_id', tenantId)
+  if (error) return { error: error.message }
+
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_estudantes', entidadeId: id, antes, depois: update })
+  revalidatePath(`/admin/estudantes/${id}`)
+  revalidatePath('/admin/estudantes')
+  return { ok: true }
+}
+
 /** Soft delete do estudante → vai para a Lixeira (recuperável). Sessões/vínculos preservados. */
 export async function deleteEstudanteAction(id: string) {
   if (!(await checkPermission('estudantes:delete'))) return { error: 'Você não tem permissão para excluir estudantes.' }

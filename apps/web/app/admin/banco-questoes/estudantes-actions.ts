@@ -34,6 +34,55 @@ export async function vincularEstudantes(bancoId: string, estudanteIds: string[]
   return { ok: true, vinculados: novos.length }
 }
 
+/**
+ * Vincula um grupo ao banco: registra o vínculo (para auto-sync futuro) e liga
+ * todos os membros atuais do grupo ao banco (ignora os já vinculados).
+ */
+export async function vincularGrupoAoBanco(bancoId: string, grupoId: string): Promise<{ ok: boolean; vinculados?: number; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+
+  // Registra o vínculo banco↔grupo (idempotente). Tolerante se a tabela não existir.
+  const { error: linkErr } = await svc
+    .from('simulado_pasta_grupos')
+    .upsert({ tenant_id: g.tenantId, pasta_id: bancoId, grupo_id: grupoId }, { onConflict: 'pasta_id,grupo_id' })
+  if (linkErr) {
+    if (/pasta_grupos|relation|does not exist/i.test(linkErr.message)) return { ok: false, error: 'Rode a migration simulado_pasta_grupos no banco.' }
+    return { ok: false, error: linkErr.message }
+  }
+
+  // Liga os membros atuais do grupo ao banco.
+  const { data: membros } = await svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId)
+  const ids = [...new Set((membros ?? []).map((m: any) => m.estudante_id))]
+  let vinculados = 0
+  if (ids.length) {
+    const { data: ja } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).in('estudante_id', ids)
+    const jaSet = new Set((ja ?? []).map((r: any) => r.estudante_id))
+    const novos = ids.filter((id) => !jaSet.has(id))
+    if (novos.length) {
+      const { error } = await svc.from('simulado_pasta_estudantes').insert(novos.map((estudante_id) => ({ tenant_id: g.tenantId, pasta_id: bancoId, estudante_id })))
+      if (error) return { ok: false, error: error.message }
+      vinculados = novos.length
+    }
+  }
+
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_pasta_estudantes', entidadeId: bancoId, depois: { grupo: grupoId, vinculados } })
+  revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  return { ok: true, vinculados }
+}
+
+/** Remove o vínculo do grupo com o banco (os estudantes já ligados permanecem). */
+export async function desvincularGrupoDoBanco(bancoId: string, grupoId: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_pasta_grupos').delete().eq('pasta_id', bancoId).eq('grupo_id', grupoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  return { ok: true }
+}
+
 /** Cria um novo estudante (conta + perfil) e já o vincula ao banco. */
 export async function importarEstudante(
   bancoId: string,

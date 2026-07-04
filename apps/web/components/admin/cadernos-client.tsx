@@ -1,4 +1,5 @@
 'use client'
+import { confirmar } from '@/components/ui/confirm-dialog'
 
 import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
@@ -41,8 +42,8 @@ export function CadernosClient({ cadernos }: { cadernos: CadernoItem[] }) {
     })
   }
 
-  function excluir(id: string, nm: string) {
-    if (!confirm(`Excluir o caderno "${nm}"?`)) return
+  async function excluir(id: string, nm: string) {
+    if (!(await confirmar({ mensagem: `Excluir o caderno "${nm}"?`, destrutivo: true }))) return
     setExcluindo(id)
     start(async () => {
       const r = await excluirCaderno(id)

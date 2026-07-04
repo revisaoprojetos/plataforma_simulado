@@ -1,9 +1,10 @@
 'use client'
+import { confirmar } from '@/components/ui/confirm-dialog'
 
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { MoreHorizontal, Trash2, ListChecks, ClipboardList, FileText, FileCheck2, Loader2 } from 'lucide-react'
+import { MoreHorizontal, Trash2, ListChecks, ClipboardList, FileText, FileCheck2, Loader2, FileSpreadsheet } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,9 +40,14 @@ export function SessaoAcoesMenu({
   function abrir(url: string) {
     window.open(url, '_blank', 'noopener')
   }
+  function baixar(url: string) {
+    const a = document.createElement('a')
+    a.href = url; a.rel = 'noopener'
+    document.body.appendChild(a); a.click(); a.remove()
+  }
 
-  function excluir() {
-    if (!confirm('Excluir esta tentativa?\n\nEla sai do histórico, dos resultados e do ranking (recalculado), e vai para a Lixeira — pode ser restaurada.')) return
+  async function excluir() {
+    if (!(await confirmar({ mensagem: 'Excluir esta tentativa?\n\nEla sai do histórico, dos resultados e do ranking (recalculado), e vai para a Lixeira — pode ser restaurada.', destrutivo: true }))) return
     start(async () => {
       const r = await excluirSessaoAction(sessaoId, simuladoId, estudanteId)
       if (r?.error) toast.error(r.error)
@@ -73,6 +79,10 @@ export function SessaoAcoesMenu({
                 </DropdownMenuItem>
               )}
             </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => baixar(`/api/admin/relatorio-sessao/${sessaoId}`)}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" /> Baixar relatório (Excel)
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
         )}

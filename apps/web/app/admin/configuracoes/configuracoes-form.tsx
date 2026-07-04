@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
+import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
-import { Save, RotateCcw, ImageIcon, Loader2, Bell, Moon, Sun, FolderOpen, MoreVertical, Menu, ArrowLeft, Upload, X } from 'lucide-react'
+import { confirmar } from '@/components/ui/confirm-dialog'
+import { Save, RotateCcw, ImageIcon, Loader2, Bell, Moon, Sun, FolderOpen, MoreVertical, Menu, ArrowLeft, Upload, X, Copy, Check, ClipboardPaste, Palette, ChevronDown, PanelLeft, LayoutGrid, Sparkles, Trash2, Monitor } from 'lucide-react'
 
 /**
  * Lê uma variável CSS do sistema e converte para hex. Renderiza a cor (lab,
@@ -40,15 +42,59 @@ function contraste(hex: string): string {
 }
 
 interface Cores {
-  sidebar: string; sidetext: string; active: string; topbar: string; sborder: string
-  bg: string; text: string; card: string; cborder: string; btn: string; accent: string
+  sidebar: string; sidetext: string; sidetextHover: string; sidetextActive: string; icon: string; iconHover: string; iconAtivo: string; active: string; topbar: string; sborder: string
+  bg: string; text: string; titulo: string; card: string; cborder: string; btn: string; accent: string
+  tabBg: string; tabAtivo: string; tabTexto: string  // fundo das tabs, tab selecionada, texto (hover/ativo)
+}
+
+/** Gera as CSS variables (em hex/color-mix) de uma paleta, para aplicar ao vivo no app.
+ *  Espelha o que o servidor injeta em construirPaletaCompleta (tenant-theme.ts). */
+function cssVarsFromCores(c: Cores): string {
+  const fg = (hex: string) => contraste(hex)
+  return [
+    `--primary:${c.btn}`, `--primary-foreground:${fg(c.btn)}`, `--ring:${c.btn}`, `--brand-primary:${c.btn}`, `--brand-accent:${c.accent}`,
+    `--sidebar-primary:${c.active}`, `--sidebar-primary-foreground:${fg(c.active)}`, `--sidebar-accent:${c.active}`, `--sidebar-accent-foreground:${fg(c.active)}`,
+    `--sidebar-icon-hover:${c.iconHover}`, `--sidebar-icon-active:${c.iconAtivo}`, `--sidebar-text-hover:${c.sidetextHover}`, `--sidebar-text-active:${c.sidetextActive}`,
+    `--sidebar:${c.sidebar}`, `--sidebar-foreground:${c.sidetext}`, `--sidebar-icon:${c.icon}`, `--sidebar-border:${c.sborder}`, `--sidebar-ring:${c.active}`,
+    `--topbar:${c.topbar}`, `--topbar-foreground:${fg(c.topbar)}`,
+    `--background:${c.bg}`, `--foreground:${c.text}`, `--content-title:${c.titulo}`,
+    `--card:${c.card}`, `--popover:${c.card}`, `--secondary:${c.card}`, `--muted:${c.card}`,
+    `--card-foreground:${c.text}`, `--popover-foreground:${c.text}`, `--secondary-foreground:${c.text}`,
+    `--muted-foreground:color-mix(in srgb, ${c.text} 55%, ${c.bg})`, `--accent:color-mix(in srgb, ${c.text} 12%, ${c.bg})`, `--accent-foreground:${c.text}`,
+    `--border:${c.cborder}`, `--input:${c.cborder}`,
+    `--tab-bg:${c.tabBg}`, `--tab-active:${c.tabAtivo}`, `--tab-active-foreground:${c.tabTexto}`,
+  ].join(';')
 }
 type LogoEstilo = 'quadrado' | 'arredondado' | 'borda'
 type SelecaoEstilo = 'quadrada' | 'redonda' | 'borda'
+type LogoFiltro = 'none' | 'branco' | 'preto'
+type PresetCor = { id: string; nome: string; cores: Cores; coresDark: Cores }
+
+/** Deriva uma paleta ESCURA a partir de uma clara: escurece as superfícies e
+ *  mantém a marca (botão/accent/ativo) e os estados de destaque. */
+function derivarEscuro(c: Cores): Cores {
+  return {
+    ...c,
+    sidebar: '#141420', sidetext: '#c8c8d0', icon: '#c8c8d0',
+    topbar: '#141420', sborder: '#2a2a38',
+    bg: '#0f0f16', text: '#e8e8ee', titulo: '#e8e8ee',
+    card: '#1a1a26', cborder: '#2a2a38',
+    tabBg: '#24242e', tabAtivo: '#33333f', tabTexto: '#e8e8ee',
+  }
+}
 interface Tema {
-  nome_site: string; titulo_pagina: string
+  nome_site: string; subtitulo_site: string; titulo_pagina: string
   logo_url: string | null; logo_grande_url: string | null; logo_selecao_url: string | null
-  logo_png_bg: string; logo_estilo: LogoEstilo; logo_selecao_estilo: SelecaoEstilo; cores: Cores
+  logo_png_bg: string; logo_estilo: LogoEstilo; logo_filtro: LogoFiltro; logo_selecao_estilo: SelecaoEstilo
+  cores: Cores        // paleta do modo CLARO
+  coresDark: Cores    // paleta do modo ESCURO
+}
+
+/** Filtro CSS que força a logo a branco/preto (útil em sidebar escura/clara). */
+function filtroLogoCss(f?: string): string | undefined {
+  if (f === 'branco') return 'brightness(0) invert(1)'
+  if (f === 'preto') return 'brightness(0)'
+  return undefined
 }
 
 const LOGO_ESTILOS: { id: LogoEstilo; nome: string }[] = [
@@ -76,28 +122,52 @@ export function frameSelecao(estilo?: string): string {
 
 const DEFAULT: Tema = {
   nome_site: 'Plataforma',
+  subtitulo_site: '',
   titulo_pagina: 'Banco de Questões',
   logo_url: null,
   logo_grande_url: null,
   logo_selecao_url: null,
   logo_png_bg: '#ffffff',
   logo_estilo: 'arredondado',
+  logo_filtro: 'none',
   logo_selecao_estilo: 'redonda',
-  cores: { sidebar: '#0f0f13', sidetext: '#c8c8d0', active: '#7f77dd', topbar: '#111118', sborder: '#35353f', bg: '#18181f', text: '#e8e8ee', card: '#26262f', cborder: '#35353f', btn: '#7f77dd', accent: '#7f77dd' },
+  cores: { sidebar: '#0f0f13', sidetext: '#c8c8d0', sidetextHover: '#ffffff', sidetextActive: '#ffffff', icon: '#c8c8d0', iconHover: '#ffffff', iconAtivo: '#ffffff', active: '#7f77dd', topbar: '#111118', sborder: '#35353f', bg: '#18181f', text: '#e8e8ee', titulo: '#e8e8ee', card: '#26262f', cborder: '#35353f', btn: '#7f77dd', accent: '#7f77dd', tabBg: '#26262f', tabAtivo: '#3a3a48', tabTexto: '#ffffff' },
+  // Paleta escura padrão (roxo escuro) — base do modo escuro.
+  coresDark: { sidebar: '#161421', sidetext: '#c8c8d0', sidetextHover: '#ffffff', sidetextActive: '#ffffff', icon: '#c8c8d0', iconHover: '#ffffff', iconAtivo: '#ffffff', active: '#7f77dd', topbar: '#161421', sborder: '#2b2838', bg: '#0f0e16', text: '#e8e8ee', titulo: '#e8e8ee', card: '#1b1926', cborder: '#2b2838', btn: '#7f77dd', accent: '#7f77dd', tabBg: '#1b1926', tabAtivo: '#2b2838', tabTexto: '#ffffff' },
 }
 
-const PRESETS: { nome: string; cores: Cores }[] = [
-  { nome: 'Dark Violet', cores: DEFAULT.cores },
-  { nome: 'Dark Blue', cores: { sidebar: '#0c1322', sidetext: '#c2cce0', active: '#4f7fff', topbar: '#0e1626', sborder: '#25304a', bg: '#121a2b', text: '#e6ecf7', card: '#1b2540', cborder: '#25304a', btn: '#4f7fff', accent: '#4f7fff' } },
-  { nome: 'Dark Green', cores: { sidebar: '#0c1410', sidetext: '#c2d6c8', active: '#36c08a', topbar: '#0e1812', sborder: '#233129', bg: '#111c16', text: '#e6f2ea', card: '#19271f', cborder: '#233129', btn: '#36c08a', accent: '#36c08a' } },
-  { nome: 'Light', cores: { sidebar: '#ffffff', sidetext: '#444b58', active: '#6d28d9', topbar: '#ffffff', sborder: '#e5e7eb', bg: '#f6f7f9', text: '#1a1d24', card: '#ffffff', cborder: '#e5e7eb', btn: '#6d28d9', accent: '#6d28d9' } },
-  { nome: 'Coral', cores: { sidebar: '#1a1012', sidetext: '#e6c8c8', active: '#ff6b5e', topbar: '#1f1315', sborder: '#3a2628', bg: '#201416', text: '#f5e6e6', card: '#2b1c1e', cborder: '#3a2628', btn: '#ff6b5e', accent: '#ff6b5e' } },
-  { nome: 'Slate', cores: { sidebar: '#0f1318', sidetext: '#c5ccd6', active: '#64748b', topbar: '#121821', sborder: '#2a323d', bg: '#161b22', text: '#e7ecf2', card: '#1f2630', cborder: '#2a323d', btn: '#64748b', accent: '#64748b' } },
-  { nome: 'Rose', cores: { sidebar: '#1a0f15', sidetext: '#e6c8d6', active: '#f43f7f', topbar: '#1f1319', sborder: '#3a2630', bg: '#20141a', text: '#f5e6ee', card: '#2b1c24', cborder: '#3a2630', btn: '#f43f7f', accent: '#f43f7f' } },
+type BuiltinPreset = { id: string; nome: string; cores: Cores; coresDark: Cores }
+
+/** Monta um esquema (paleta CLARA + ESCURA) a partir da cor de marca. */
+function esquema(nome: string, o: { btn: string; active?: string; accent?: string; ativoFg?: string }): BuiltinPreset {
+  const active = o.active ?? o.btn
+  const accent = o.accent ?? o.btn
+  const aFg = o.ativoFg ?? '#ffffff' // cor do texto/ícone sobre o item ativo
+  const claro: Cores = { sidebar: '#ffffff', sidetext: '#444b58', sidetextHover: aFg, sidetextActive: aFg, icon: active, iconHover: aFg, iconAtivo: aFg, active, topbar: '#ffffff', sborder: '#e5e7eb', bg: '#f6f7f9', text: '#1a1d24', titulo: '#1a1d24', card: '#ffffff', cborder: '#e5e7eb', btn: o.btn, accent, tabBg: '#eef1f5', tabAtivo: '#ffffff', tabTexto: '#1a1d24' }
+  const escuro: Cores = { sidebar: '#141420', sidetext: '#c8c8d0', sidetextHover: aFg, sidetextActive: aFg, icon: '#c8c8d0', iconHover: aFg, iconAtivo: aFg, active, topbar: '#141420', sborder: '#2a2a38', bg: '#0f0f16', text: '#e8e8ee', titulo: '#e8e8ee', card: '#1a1a26', cborder: '#2a2a38', btn: o.btn, accent, tabBg: '#24242e', tabAtivo: '#33333f', tabTexto: '#e8e8ee' }
+  return { id: nome, nome, cores: claro, coresDark: escuro }
+}
+
+// Roxo & Âmbar — esquema com identidade própria (sidebar roxo escuro + âmbar), nos 2 modos.
+const ROXO_AMBAR: BuiltinPreset = {
+  id: 'Roxo & Âmbar',
+  nome: 'Roxo & Âmbar',
+  cores: { sidebar: '#3b3260', sidetext: '#e7e3f5', sidetextHover: '#241f33', sidetextActive: '#241f33', icon: '#f4c430', iconHover: '#241f33', iconAtivo: '#241f33', active: '#f4c430', topbar: '#453a63', sborder: '#4c4276', bg: '#f7f3ec', text: '#241f33', titulo: '#5a4b9a', card: '#ffffff', cborder: '#e8e2d5', btn: '#5a4b9a', accent: '#f4c430', tabBg: '#efeae0', tabAtivo: '#ffffff', tabTexto: '#241f33' },
+  coresDark: { sidebar: '#241f33', sidetext: '#e7e3f5', sidetextHover: '#241f33', sidetextActive: '#241f33', icon: '#f4c430', iconHover: '#241f33', iconAtivo: '#241f33', active: '#f4c430', topbar: '#241f33', sborder: '#3a3450', bg: '#15121e', text: '#e8e6f0', titulo: '#b7a6ff', card: '#1e1a2b', cborder: '#332d47', btn: '#8b7fd6', accent: '#f4c430', tabBg: '#2a2540', tabAtivo: '#372f52', tabTexto: '#e8e6f0' },
+}
+
+const PRESETS: BuiltinPreset[] = [
+  esquema('Violeta', { btn: '#7f77dd' }),
+  esquema('Azul', { btn: '#4f7fff' }),
+  esquema('Verde', { btn: '#36c08a' }),
+  esquema('Coral', { btn: '#ff6b5e' }),
+  esquema('Ardósia', { btn: '#64748b' }),
+  esquema('Rosa', { btn: '#f43f7f' }),
+  ROXO_AMBAR,
 ]
 
-const SIDEBAR_CAMPOS: [keyof Cores, string][] = [['sidebar', 'Fundo da sidebar'], ['sidetext', 'Texto da sidebar'], ['active', 'Item ativo'], ['topbar', 'Fundo da topbar'], ['sborder', 'Cor da borda']]
-const CONTEUDO_CAMPOS: [keyof Cores, string][] = [['bg', 'Fundo'], ['text', 'Texto'], ['card', 'Cor do card'], ['cborder', 'Borda do card'], ['btn', 'Botão'], ['accent', 'Destaque']]
+const SIDEBAR_CAMPOS: [keyof Cores, string][] = [['sidebar', 'Fundo da sidebar'], ['sidetext', 'Texto (normal)'], ['sidetextActive', 'Texto (hover/ativo)'], ['icon', 'Ícones (normal)'], ['iconAtivo', 'Ícones (hover/ativo)'], ['active', 'Item ativo (tabs)'], ['topbar', 'Fundo da topbar'], ['sborder', 'Cor da borda']]
+const CONTEUDO_CAMPOS: [keyof Cores, string][] = [['bg', 'Fundo'], ['text', 'Texto'], ['titulo', 'Cor dos títulos'], ['card', 'Cor do card'], ['cborder', 'Borda do card'], ['btn', 'Botão'], ['accent', 'Destaque'], ['tabBg', 'Fundo das tabs'], ['tabAtivo', 'Tab selecionada'], ['tabTexto', 'Texto tab (hover/ativo)']]
 
 function Swatch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
@@ -108,24 +178,129 @@ function Swatch({ value, onChange }: { value: string; onChange: (v: string) => v
   )
 }
 
+/** Normaliza um hex (com/sem #, 3 ou 6 dígitos) → '#rrggbb' minúsculo, ou null. */
+function normalizarHex(s: string): string | null {
+  const v = s.trim().replace(/^#/, '')
+  if (/^[0-9a-fA-F]{3}$/.test(v) || /^[0-9a-fA-F]{6}$/.test(v)) return '#' + v.toLowerCase()
+  return null
+}
+
+/** Controle de cor: hex editável (digitar/colar) + copiar + colar + swatch. */
+function ColorControl({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [copiado, setCopiado] = useState(false)
+  const [texto, setTexto] = useState(value)
+  useEffect(() => setTexto(value), [value])
+
+  const aplicarTexto = () => {
+    const v = normalizarHex(texto)
+    if (v) onChange(v)
+    else setTexto(value) // valor inválido → reverte para o atual
+  }
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopiado(true)
+      toast.success(`Cor ${value.toUpperCase()} copiada`)
+      setTimeout(() => setCopiado(false), 1200)
+    } catch { toast.error('Não foi possível copiar') }
+  }
+  const colar = async () => {
+    try {
+      const t = await navigator.clipboard.readText()
+      const v = normalizarHex(t)
+      if (v) { onChange(v); toast.success(`Cor ${v.toUpperCase()} colada`) }
+      else toast.error('A área de transferência não tem uma cor hex válida')
+    } catch { toast.error('Não foi possível colar (permita o acesso à área de transferência)') }
+  }
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        value={texto}
+        onChange={(e) => { setTexto(e.target.value); const v = normalizarHex(e.target.value); if (v) onChange(v) }}
+        onBlur={aplicarTexto}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicarTexto() } }}
+        spellCheck={false}
+        className="w-16 rounded-md border bg-background px-1.5 py-1 text-center font-mono text-[11px] uppercase outline-none focus:ring-1 focus:ring-ring"
+      />
+      <button type="button" onClick={copiar} title="Copiar cor"
+        className="flex h-6 w-6 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+        {copiado ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+      </button>
+      <button type="button" onClick={colar} title="Colar cor"
+        className="flex h-6 w-6 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+        <ClipboardPaste className="h-3.5 w-3.5" />
+      </button>
+      <Swatch value={value} onChange={onChange} />
+    </div>
+  )
+}
+
+/** Seção recolhível animada (accordion) para organizar os controles. */
+function Secao({ titulo, desc, icon: Icon, defaultOpen = false, children }: { titulo: string; desc?: string; icon: React.ComponentType<{ className?: string }>; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+        className="flex w-full items-center gap-2.5 px-4 py-3 text-left">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4" /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">{titulo}</span>
+          {desc && <span className="block truncate text-[11px] text-muted-foreground">{desc}</span>}
+        </span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+        <div className="overflow-hidden">
+          <div className="space-y-3 border-t p-4">{children}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Controle segmentado (pills) reutilizável. */
+function Seg<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { v: T; label: string; icon?: React.ComponentType<{ className?: string }> }[] }) {
+  return (
+    <div className="inline-flex rounded-lg border bg-muted/40 p-0.5 text-xs">
+      {options.map((o) => (
+        <button key={o.v} type="button" onClick={() => onChange(o.v)}
+          className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-medium transition-all duration-200 ${value === o.v ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+          {o.icon && <o.icon className="h-3.5 w-3.5" />} {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema: (t: Record<string, unknown>) => Promise<{ ok?: boolean } | void> }) {
   const inicial: Tema = {
     nome_site: tema?.nome_site ?? DEFAULT.nome_site,
+    subtitulo_site: tema?.subtitulo_site ?? DEFAULT.subtitulo_site,
     titulo_pagina: tema?.titulo_pagina ?? DEFAULT.titulo_pagina,
     logo_url: tema?.logo_url ?? null,
     logo_grande_url: tema?.logo_grande_url ?? null,
     logo_selecao_url: tema?.logo_selecao_url ?? null,
     logo_png_bg: tema?.logo_png_bg ?? DEFAULT.logo_png_bg,
     logo_estilo: (tema?.logo_estilo as LogoEstilo) ?? DEFAULT.logo_estilo,
+    logo_filtro: (tema?.logo_filtro as LogoFiltro) ?? DEFAULT.logo_filtro,
     logo_selecao_estilo: (tema?.logo_selecao_estilo as SelecaoEstilo) ?? DEFAULT.logo_selecao_estilo,
     cores: { ...DEFAULT.cores, ...(tema?.cores ?? {}) },
+    coresDark: { ...DEFAULT.coresDark, ...(tema?.cores_dark ?? {}) },
   }
   const [t, setT] = useState<Tema>(inicial)
-  const [aba, setAba] = useState<'logo' | 'sidebar' | 'conteudo'>('logo')
+  const [modoEdicao, setModoEdicao] = useState<'light' | 'dark'>('light')
+  // Presets salvos: retrocompatível — se um preset antigo não tem paleta escura, deriva na hora.
+  const [presetsCustom, setPresetsCustom] = useState<PresetCor[]>(() =>
+    (Array.isArray(tema?.presets_cor) ? tema.presets_cor : []).map((p: any) => ({
+      id: p.id, nome: p.nome, cores: p.cores, coresDark: p.coresDark ?? derivarEscuro(p.cores),
+    })),
+  )
+  const [nomePreset, setNomePreset] = useState('')
+  const [presetSelId, setPresetSelId] = useState<string | null>(null) // preset em edição (embutido ou salvo)
   const [previewModo, setPreviewModo] = useState<'painel' | 'login' | 'selecao'>('painel')
-  const [loginDark, setLoginDark] = useState<boolean>(tema?.modo_padrao === 'dark')
   const [pending, start] = useTransition()
   const editou = useRef(false)
+  const { setTheme, resolvedTheme } = useTheme()
 
   // Sem tema salvo: a prévia espelha as cores reais do sistema (claro/escuro).
   // Reage à troca de modo, a menos que o usuário já tenha editado.
@@ -136,10 +311,17 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
       const fb = DEFAULT.cores
       const g = (v: string, d: string) => corDoSistema(v) ?? d
       setT((p) => ({ ...p, cores: {
-        sidebar: g('--sidebar', fb.sidebar), sidetext: g('--sidebar-foreground', fb.sidetext), active: corDoSistema('--sidebar-accent', '--sidebar') ?? fb.active,
+        sidebar: g('--sidebar', fb.sidebar), sidetext: g('--sidebar-foreground', fb.sidetext),
+        sidetextHover: corDoSistema('--sidebar-text-hover', '--sidebar-accent') ?? fb.sidetextHover,
+        sidetextActive: corDoSistema('--sidebar-text-active', '--sidebar-accent') ?? fb.sidetextActive,
+        icon: corDoSistema('--sidebar-icon', '--sidebar') ?? g('--sidebar-foreground', fb.icon),
+        iconHover: corDoSistema('--sidebar-icon-hover', '--sidebar-accent') ?? fb.iconHover,
+        iconAtivo: corDoSistema('--sidebar-icon-active', '--sidebar-accent') ?? fb.iconAtivo,
+        active: corDoSistema('--sidebar-accent', '--sidebar') ?? fb.active,
         topbar: g('--sidebar', fb.topbar), sborder: corDoSistema('--sidebar-border', '--sidebar') ?? fb.sborder,
-        bg: g('--background', fb.bg), text: g('--foreground', fb.text), card: g('--card', fb.card),
-        cborder: corDoSistema('--border', '--card') ?? fb.cborder, btn: g('--primary', fb.btn), accent: g('--primary', fb.accent),
+        bg: g('--background', fb.bg), text: g('--foreground', fb.text), titulo: corDoSistema('--content-title') ?? g('--foreground', fb.titulo),
+        card: g('--card', fb.card), cborder: corDoSistema('--border', '--card') ?? fb.cborder, btn: g('--primary', fb.btn), accent: g('--primary', fb.accent),
+        tabBg: corDoSistema('--tab-bg', '--muted') ?? g('--muted', fb.tabBg), tabAtivo: corDoSistema('--tab-active', '--background') ?? g('--background', fb.tabAtivo), tabTexto: corDoSistema('--tab-active-foreground') ?? g('--foreground', fb.tabTexto),
       } }))
     }
     sincronizar()
@@ -149,187 +331,245 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const c = t.cores
-  const setCor = (k: keyof Cores, v: string) => { editou.current = true; setT((p) => ({ ...p, cores: { ...p.cores, [k]: v } })) }
-  const aplicarPreset = (cores: Cores) => { editou.current = true; setT((p) => ({ ...p, cores: { ...cores } })) }
+  // Paleta ativa = a que está sendo editada/pré-visualizada (claro ou escuro).
+  const chaveCores = modoEdicao === 'dark' ? 'coresDark' : 'cores'
+  const c = t[chaveCores]
+  const setCor = (k: keyof Cores, v: string) => { editou.current = true; setT((p) => ({ ...p, [chaveCores]: { ...p[chaveCores], [k]: v } })) }
+  // Aplica um preset inteiro (só na edição/preview): paleta clara → cores, escura → coresDark.
+  const aplicarPreset = (preset: { id?: string; cores: Cores; coresDark?: Cores }) => {
+    editou.current = true
+    if (preset.id) setPresetSelId(preset.id)
+    setT((p) => ({ ...p, cores: { ...DEFAULT.cores, ...preset.cores }, coresDark: { ...DEFAULT.coresDark, ...(preset.coresDark ?? derivarEscuro(preset.cores)) } }))
+  }
+  const presetSel = presetsCustom.find((p) => p.id === presetSelId) ?? PRESETS.find((p) => p.id === presetSelId) ?? null
 
-  function salvar() {
+  // O modo de edição/preview SEGUE o tema real do app (toggle claro/escuro na topbar
+  // e o botão Claro/Escuro do preview trocam o mesmo tema) — mantém tudo coerente.
+  useEffect(() => { if (resolvedTheme === 'light' || resolvedTheme === 'dark') setModoEdicao(resolvedTheme) }, [resolvedTheme])
+
+  // Aplica a paleta ativa AO VIVO no app inteiro (sidebar, topbar, conteúdo) — não só no
+  // quadrinho de preview. Injeta as vars no modo atual; some ao sair da página (tema salvo volta).
+  useEffect(() => {
+    const id = 'cfg-theme-live'
+    let el = document.getElementById(id) as HTMLStyleElement | null
+    if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el) }
+    const sel = modoEdicao === 'dark' ? '.dark' : ':root:not(.dark)'
+    el.textContent = `${sel}{${cssVarsFromCores(c)}}`
+  }, [c, modoEdicao])
+  useEffect(() => () => { document.getElementById('cfg-theme-live')?.remove() }, [])
+
+  function salvarPreset() {
+    if (!nomePreset.trim()) { toast.error('Dê um nome ao preset.'); return }
+    const novo: PresetCor = { id: crypto.randomUUID(), nome: nomePreset.trim(), cores: { ...t.cores }, coresDark: { ...t.coresDark } }
+    const lista = [...presetsCustom, novo]
+    setPresetsCustom(lista); setNomePreset(''); setPresetSelId(novo.id)
+    start(async () => { await salvarTema({ presets_cor: lista }); toast.success(`Preset "${novo.nome}" salvo`) })
+  }
+  async function excluirPreset(id: string) {
+    const alvo = presetsCustom.find((p) => p.id === id)
+    if (!(await confirmar({ mensagem: `Excluir o preset "${alvo?.nome ?? ''}"? Esta ação não pode ser desfeita.`, destrutivo: true }))) return
+    const lista = presetsCustom.filter((p) => p.id !== id)
+    setPresetsCustom(lista)
+    start(async () => { await salvarTema({ presets_cor: lista }); toast.success('Preset removido') })
+  }
+
+  // SALVAR = grava as customizações atuais NO preset selecionado (não mexe no sistema).
+  function salvarPresetSelecionado() {
+    const custom = presetsCustom.find((p) => p.id === presetSelId)
+    if (custom) {
+      const lista = presetsCustom.map((p) => p.id === custom.id ? { ...p, cores: { ...t.cores }, coresDark: { ...t.coresDark } } : p)
+      setPresetsCustom(lista)
+      start(async () => { await salvarTema({ presets_cor: lista }); toast.success(`Preset "${custom.nome}" atualizado`) })
+      return
+    }
+    // Preset embutido (imutável) ou nenhum → cria uma cópia personalizada e a seleciona.
+    const base = PRESETS.find((p) => p.id === presetSelId)
+    const nome = base ? `${base.nome} (personalizado)` : (nomePreset.trim() || 'Meu tema')
+    const novo: PresetCor = { id: crypto.randomUUID(), nome, cores: { ...t.cores }, coresDark: { ...t.coresDark } }
+    const lista = [...presetsCustom, novo]
+    setPresetsCustom(lista); setPresetSelId(novo.id); setNomePreset('')
+    start(async () => { await salvarTema({ presets_cor: lista }); toast.success(base ? `Cópia "${nome}" criada` : `Preset "${nome}" salvo`) })
+  }
+
+  // APLICAR = aplica o tema atual NO SISTEMA (persiste como identidade ativa do tenant).
+  function aplicarNoSistema() {
     start(async () => {
+      const { coresDark, ...restoT } = t
       const payload = {
-        ...t,
-        // espelha campos legados p/ compatibilidade com o tema atual
-        cor_primaria: c.btn, cor_secundaria: c.card, cor_accent: c.accent, logo_url: t.logo_url ?? undefined,
+        ...restoT,
+        cores_dark: coresDark,
+        presets_cor: presetsCustom,
+        cor_primaria: t.cores.btn, cor_secundaria: t.cores.card, cor_accent: t.cores.accent, logo_url: t.logo_url ?? undefined,
       }
-      try { await salvarTema(payload); toast.success('Identidade visual salva!') }
-      catch (err) { toast.error(err instanceof Error ? err.message : 'Erro ao salvar') }
+      try { await salvarTema(payload); toast.success('Tema aplicado no sistema!') }
+      catch (err) { toast.error(err instanceof Error ? err.message : 'Erro ao aplicar') }
     })
   }
 
+  // RESETAR = volta SÓ o preset selecionado ao original (não mexe nos outros nem no logo/nome).
+  function resetarPreset() {
+    if (presetSel) { aplicarPreset(presetSel); toast.info(`"${presetSel.nome}" restaurado ao original`) }
+    else { editou.current = true; setT((p) => ({ ...p, cores: { ...DEFAULT.cores }, coresDark: { ...DEFAULT.coresDark } })); toast.info('Cores redefinidas ao padrão') }
+  }
+
   return (
-    <div
-      className="overflow-hidden rounded-xl border"
+    <div className="animate-page space-y-4"
       style={{ '--cfg-bg': 'var(--card)', '--cfg-border': 'var(--border)', '--cfg-muted': 'var(--muted-foreground)' } as React.CSSProperties}
     >
-      <div className="flex flex-col lg:flex-row">
-        {/* ── PAINEL DE CONTROLES ── */}
-        <div className="w-full shrink-0 border-b lg:w-[300px] lg:border-b-0 lg:border-r">
-          {/* Abas */}
-          <div className="flex border-b text-sm">
-            {(['logo', 'sidebar', 'conteudo'] as const).map((k) => (
-              <button key={k} type="button" onClick={() => setAba(k)}
-                className={`flex-1 px-2 py-2.5 font-medium capitalize transition-colors ${aba === k ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-                {k === 'conteudo' ? 'Conteúdo' : k.charAt(0).toUpperCase() + k.slice(1)}
-              </button>
-            ))}
-          </div>
-
-          <div className="space-y-4 p-3">
-            {/* ABA LOGO */}
-            {aba === 'logo' && (
-              <div className="space-y-5">
-                {/* Imagens */}
-                <Grupo titulo="Imagens">
-                  <LogoRow label="Logo (pequena)" desc="Sidebar, topo e ícones"
-                    value={t.logo_url} onChange={(v) => setT((p) => ({ ...p, logo_url: v }))} onRemove={() => setT((p) => ({ ...p, logo_url: null }))}
-                    frame={frameLogo(t.logo_estilo)} bg={t.logo_png_bg} inicial={(t.nome_site[0] ?? 'P').toUpperCase()} inicialBg={c.btn} />
-                  <LogoRow label="Logo grande (login)" desc="Painel da esquerda do login"
-                    value={t.logo_grande_url} onChange={(v) => setT((p) => ({ ...p, logo_grande_url: v }))} onRemove={() => setT((p) => ({ ...p, logo_grande_url: null }))} />
-                  <LogoRow label="Imagem da seleção" desc="Bloco de seleção (início)"
-                    value={t.logo_selecao_url} onChange={(v) => setT((p) => ({ ...p, logo_selecao_url: v }))} onRemove={() => setT((p) => ({ ...p, logo_selecao_url: null }))} />
-                </Grupo>
-
-                {/* Ícone — só faz sentido com a logo pequena */}
-                {t.logo_url && (
-                  <Grupo titulo="Ícone (logo pequena)">
-                    <Field label="Cor de fundo">
-                      <div className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => setT((p) => ({ ...p, logo_png_bg: p.logo_png_bg === 'transparent' ? '#ffffff' : 'transparent' }))}
-                          className={`rounded-md border px-2 py-1 text-[10px] font-medium transition-colors ${t.logo_png_bg === 'transparent' ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>
-                          Transparente
-                        </button>
-                        {t.logo_png_bg !== 'transparent' && <Swatch value={t.logo_png_bg} onChange={(v) => setT((p) => ({ ...p, logo_png_bg: v }))} />}
-                      </div>
-                    </Field>
-                    <div className="space-y-1.5">
-                      <span className="text-xs text-muted-foreground">Borda</span>
-                      <div className="flex gap-1.5">
-                        {LOGO_ESTILOS.map((e) => (
-                          <button key={e.id} type="button" onClick={() => setT((p) => ({ ...p, logo_estilo: e.id }))}
-                            className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_estilo === e.id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>
-                            {e.nome}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </Grupo>
-                )}
-
-                {/* Bloco de seleção (tiles da tela inicial do login) */}
-                <Grupo titulo="Bloco de seleção">
-                  <div className="space-y-1.5">
-                    <span className="text-xs text-muted-foreground">Formato da imagem</span>
-                    <div className="flex gap-1.5">
-                      {SELECAO_ESTILOS.map((e) => (
-                        <button key={e.id} type="button" onClick={() => setT((p) => ({ ...p, logo_selecao_estilo: e.id }))}
-                          className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_selecao_estilo === e.id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>
-                          {e.nome}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </Grupo>
-
-                {/* Identidade */}
-                <Grupo titulo="Identidade">
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-muted-foreground">Nome do site</label>
-                    <input value={t.nome_site} onChange={(e) => setT((p) => ({ ...p, nome_site: e.target.value }))}
-                      className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-muted-foreground">Título da página</label>
-                    <input value={t.titulo_pagina} onChange={(e) => setT((p) => ({ ...p, titulo_pagina: e.target.value }))}
-                      className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
-                  </div>
-                </Grupo>
-
-                {/* Presets de cor */}
-                <Grupo titulo="Presets de cor">
-                  <div className="flex flex-wrap gap-2">
-                    {PRESETS.map((p) => (
-                      <button key={p.nome} type="button" title={p.nome} onClick={() => aplicarPreset(p.cores)}
-                        className="h-7 w-7 rounded-full border-2 transition-transform hover:scale-110"
-                        style={{ background: p.cores.btn, borderColor: 'var(--cfg-border)' }} />
-                    ))}
-                  </div>
-                </Grupo>
-              </div>
-            )}
-
-            {/* ABA SIDEBAR */}
-            {aba === 'sidebar' && (
-              <div className="space-y-2.5">
-                {SIDEBAR_CAMPOS.map(([k, label]) => (
-                  <Field key={k} label={label}><Swatch value={c[k]} onChange={(v) => setCor(k, v)} /></Field>
-                ))}
-              </div>
-            )}
-
-            {/* ABA CONTEÚDO */}
-            {aba === 'conteudo' && (
-              <div className="space-y-2.5">
-                {CONTEUDO_CAMPOS.map(([k, label]) => (
-                  <Field key={k} label={label}><Swatch value={c[k]} onChange={(v) => setCor(k, v)} /></Field>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Rodapé do painel */}
-          <div className="flex flex-col gap-2 border-t p-3">
-            <button type="button" onClick={() => { editou.current = true; setT(DEFAULT) }}
-              className="flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm text-muted-foreground hover:text-foreground">
-              <RotateCcw className="h-4 w-4" /> Resetar padrão
-            </button>
-            <button type="button" onClick={salvar} disabled={pending}
-              className="flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">
-              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar
-            </button>
+      {/* ── TOOLBAR ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Palette className="h-5 w-5" /></span>
+          <div>
+            <p className="text-sm font-semibold leading-none">Aparência do sistema</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {presetSel ? <>Editando <span className="font-medium text-foreground">{presetSel.nome}</span></> : 'Cores, logo e tema — claro e escuro'}
+            </p>
           </div>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Seg value={modoEdicao} onChange={(m) => setTheme(m)} options={[{ v: 'light', label: 'Claro', icon: Sun }, { v: 'dark', label: 'Escuro', icon: Moon }]} />
+          <span className="mx-1 hidden h-6 w-px bg-border sm:block" />
+          <button type="button" onClick={resetarPreset} title={presetSel ? `Resetar "${presetSel.nome}"` : 'Resetar cores'}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+            <RotateCcw className="h-4 w-4" /><span className="hidden md:inline">Resetar</span>
+          </button>
+          <button type="button" onClick={salvarPresetSelecionado} disabled={pending}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/50 bg-primary/10 px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-primary/15 disabled:opacity-50">
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}<span className="hidden md:inline">{presetSel ? 'Salvar no preset' : 'Salvar preset'}</span>
+          </button>
+          <button type="button" onClick={aplicarNoSistema} disabled={pending}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50">
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Aplicar
+          </button>
+        </div>
+      </div>
 
-        {/* ── PRÉVIA ── */}
-        <div className="flex-1 bg-muted/30 p-4">
-          {/* alternador Painel / Login */}
-          <div className="mb-3 flex items-center justify-between">
-            <div className="inline-flex rounded-lg border bg-background p-0.5 text-xs">
-              {(['painel', 'login', 'selecao'] as const).map((m) => (
-                <button key={m} type="button" onClick={() => setPreviewModo(m)}
-                  className={`rounded-md px-3 py-1 font-medium transition-colors ${previewModo === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-                  {m === 'painel' ? 'Painel' : m === 'login' ? 'Login' : 'Seleção'}
-                </button>
-              ))}
+      {/* ── GRID ── */}
+      <div className="grid gap-4 lg:grid-cols-[380px_1fr]">
+        {/* ESQUERDA: controles */}
+        <div className="stagger space-y-3">
+          {/* Presets */}
+          <div className="rounded-xl border bg-card p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Modelos de cor</span>
+              <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">claro + escuro</span>
             </div>
-            {previewModo !== 'painel' && (
-              <button type="button" onClick={() => setLoginDark((v) => !v)} title="Alternar claro/escuro do login"
-                className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground">
-                {loginDark ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
-                {loginDark ? 'Escuro' : 'Claro'}
+            <div className="grid grid-cols-3 gap-2">
+              {[...PRESETS, ...presetsCustom].map((p) => {
+                const isCustom = presetsCustom.some((x) => x.id === p.id)
+                const sel = presetSelId === p.id
+                return (
+                  <div key={p.id} className="group relative">
+                    <button type="button" title={`${p.nome} (claro + escuro)`} onClick={() => aplicarPreset(p)}
+                      className={`flex w-full flex-col items-center gap-1 rounded-lg border p-1.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow ${sel ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-primary/50'}`}>
+                      <span className="flex h-8 w-full overflow-hidden rounded-md ring-1 ring-black/5">
+                        <span className="flex flex-1 items-center justify-center" style={{ background: p.cores.bg }}><span className="h-3 w-3 rounded-full" style={{ background: p.cores.btn }} /></span>
+                        <span className="flex flex-1 items-center justify-center" style={{ background: p.coresDark.bg }}><span className="h-3 w-3 rounded-full" style={{ background: p.coresDark.btn }} /></span>
+                      </span>
+                      <span className="max-w-full truncate text-[10px] font-medium text-muted-foreground group-hover:text-foreground">{p.nome}</span>
+                    </button>
+                    {isCustom && (
+                      <button type="button" title={`Excluir "${p.nome}"`} onClick={() => excluirPreset(p.id)}
+                        className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 items-center justify-center rounded-full border bg-card text-destructive shadow-sm transition-transform hover:scale-110 group-hover:flex">
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <div className="mt-3 flex gap-1.5">
+              <input value={nomePreset} onChange={(e) => setNomePreset(e.target.value)} placeholder="Novo preset das cores atuais"
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); salvarPreset() } }}
+                className="min-w-0 flex-1 rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring" />
+              <button type="button" onClick={salvarPreset} disabled={pending || !nomePreset.trim()}
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">
+                <Save className="h-3.5 w-3.5" /> Criar
               </button>
-            )}
+            </div>
           </div>
 
-          {/* navegador falso */}
-          <div className="overflow-hidden rounded-lg border shadow-sm">
-            <div className="flex items-center gap-2 border-b bg-background px-3 py-2">
-              <span className="h-3 w-3 rounded-full bg-red-400" />
-              <span className="h-3 w-3 rounded-full bg-yellow-400" />
-              <span className="h-3 w-3 rounded-full bg-green-400" />
-              <span className="ml-2 flex-1 truncate rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                {t.nome_site.toLowerCase().replace(/\s+/g, '')}.app/{previewModo !== 'painel' ? 'login' : 'admin/banco-questoes'}
+          {/* Marca & Logo */}
+          <Secao titulo="Marca & Logo" desc="Logos, nome do site e ícone" icon={ImageIcon} defaultOpen>
+            <div className="space-y-2.5">
+              <LogoRow label="Logo (pequena)" desc="Sidebar, topo e ícones"
+                value={t.logo_url} onChange={(v) => setT((p) => ({ ...p, logo_url: v }))} onRemove={() => setT((p) => ({ ...p, logo_url: null }))}
+                frame={frameLogo(t.logo_estilo)} bg={t.logo_png_bg} inicial={(t.nome_site[0] ?? 'P').toUpperCase()} inicialBg={c.btn} />
+              <LogoRow label="Logo grande (login)" desc="Painel da esquerda do login"
+                value={t.logo_grande_url} onChange={(v) => setT((p) => ({ ...p, logo_grande_url: v }))} onRemove={() => setT((p) => ({ ...p, logo_grande_url: null }))} />
+              <LogoRow label="Imagem da seleção" desc="Bloco de seleção (início)"
+                value={t.logo_selecao_url} onChange={(v) => setT((p) => ({ ...p, logo_selecao_url: v }))} onRemove={() => setT((p) => ({ ...p, logo_selecao_url: null }))} />
+            </div>
+            {t.logo_url && (
+              <div className="space-y-2.5 rounded-lg border bg-muted/20 p-3">
+                <Field label="Fundo do ícone">
+                  <div className="flex items-center gap-1.5">
+                    <button type="button" onClick={() => setT((p) => ({ ...p, logo_png_bg: p.logo_png_bg === 'transparent' ? '#ffffff' : 'transparent' }))}
+                      className={`rounded-md border px-2 py-1 text-[10px] font-medium transition-colors ${t.logo_png_bg === 'transparent' ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>Transparente</button>
+                    {t.logo_png_bg !== 'transparent' && <Swatch value={t.logo_png_bg} onChange={(v) => setT((p) => ({ ...p, logo_png_bg: v }))} />}
+                  </div>
+                </Field>
+                <div className="space-y-1.5"><span className="text-xs text-muted-foreground">Borda</span>
+                  <div className="flex gap-1.5">{LOGO_ESTILOS.map((e) => (<button key={e.id} type="button" onClick={() => setT((p) => ({ ...p, logo_estilo: e.id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_estilo === e.id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{e.nome}</button>))}</div>
+                </div>
+                <div className="space-y-1.5"><span className="text-xs text-muted-foreground">Gama (recolorir a logo)</span>
+                  <div className="flex gap-1.5">{(([['none', 'Normal'], ['branco', 'Branca'], ['preto', 'Preta']]) as [LogoFiltro, string][]).map(([id, nome]) => (<button key={id} type="button" onClick={() => setT((p) => ({ ...p, logo_filtro: id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_filtro === id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{nome}</button>))}</div>
+                  <p className="text-[10px] text-muted-foreground">Força a logo a branco/preto — útil quando ela some na sidebar escura/clara.</p>
+                </div>
+              </div>
+            )}
+            <div className="space-y-1.5"><span className="text-xs text-muted-foreground">Formato da imagem de seleção</span>
+              <div className="flex gap-1.5">{SELECAO_ESTILOS.map((e) => (<button key={e.id} type="button" onClick={() => setT((p) => ({ ...p, logo_selecao_estilo: e.id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_selecao_estilo === e.id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{e.nome}</button>))}</div>
+            </div>
+            <div className="space-y-2.5 border-t pt-3">
+              <div className="space-y-1.5"><label className="text-xs text-muted-foreground">Nome do site</label>
+                <input value={t.nome_site} onChange={(e) => setT((p) => ({ ...p, nome_site: e.target.value }))} className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" /></div>
+              <div className="space-y-1.5"><label className="text-xs text-muted-foreground">Subtítulo (abaixo do nome, na sidebar)</label>
+                <input value={t.subtitulo_site} onChange={(e) => setT((p) => ({ ...p, subtitulo_site: e.target.value }))} placeholder="ex.: Ensino Jurídico" className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" /></div>
+              <div className="space-y-1.5"><label className="text-xs text-muted-foreground">Título da página</label>
+                <input value={t.titulo_pagina} onChange={(e) => setT((p) => ({ ...p, titulo_pagina: e.target.value }))} className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" /></div>
+            </div>
+          </Secao>
+
+          {/* Barra lateral & topo */}
+          <Secao titulo="Barra lateral & topo" desc="Fundo, texto, ícones e item ativo" icon={PanelLeft}>
+            <div className="space-y-2.5">
+              {SIDEBAR_CAMPOS.map(([k, label]) => (<Field key={k} label={label}><ColorControl value={c[k]} onChange={(v) => setCor(k, v)} /></Field>))}
+            </div>
+            <div className="space-y-1.5 border-t pt-3"><span className="text-xs text-muted-foreground">Gama do ícone (logo)</span>
+              <div className="flex gap-1.5">{(([['none', 'Normal'], ['branco', 'Branca'], ['preto', 'Preta']]) as [LogoFiltro, string][]).map(([id, nome]) => (<button key={id} type="button" onClick={() => setT((p) => ({ ...p, logo_filtro: id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_filtro === id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{nome}</button>))}</div>
+              <p className="text-[10px] text-muted-foreground">A topbar usa o “Fundo da topbar” acima; os ícones dela seguem a cor dos ícones da sidebar.</p>
+            </div>
+          </Secao>
+
+          {/* Conteúdo & páginas */}
+          <Secao titulo="Conteúdo & páginas" desc="Fundo, títulos, cards e botões" icon={LayoutGrid}>
+            <div className="space-y-2.5">
+              {CONTEUDO_CAMPOS.map(([k, label]) => (<Field key={k} label={label}><ColorControl value={c[k]} onChange={(v) => setCor(k, v)} /></Field>))}
+            </div>
+          </Secao>
+        </div>
+
+        {/* DIREITA: prévia (sticky) */}
+        <div className="lg:sticky lg:top-4 lg:self-start">
+          <div className="rounded-xl border bg-card p-4 shadow-sm">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <Seg value={previewModo} onChange={setPreviewModo} options={[{ v: 'painel', label: 'Painel', icon: Monitor }, { v: 'login', label: 'Login' }, { v: 'selecao', label: 'Seleção' }]} />
+              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                {modoEdicao === 'dark' ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />} prévia {modoEdicao === 'dark' ? 'escura' : 'clara'}
               </span>
             </div>
-            {previewModo === 'painel' ? <Preview t={t} /> : previewModo === 'login' ? <PreviewLogin t={t} dark={loginDark} /> : <PreviewSelecao t={t} dark={loginDark} />}
+            <div className="overflow-hidden rounded-lg border shadow-sm">
+              <div className="flex items-center gap-2 border-b bg-background px-3 py-2">
+                <span className="h-3 w-3 rounded-full bg-red-400" /><span className="h-3 w-3 rounded-full bg-yellow-400" /><span className="h-3 w-3 rounded-full bg-green-400" />
+                <span className="ml-2 flex-1 truncate rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{t.nome_site.toLowerCase().replace(/\s+/g, '')}.app/{previewModo !== 'painel' ? 'login' : 'admin/banco-questoes'}</span>
+              </div>
+              <div key={`${previewModo}-${modoEdicao}`} className="animate-pop">
+                {previewModo === 'painel' ? <Preview t={t} cores={c} /> : previewModo === 'login' ? <PreviewLogin t={t} cores={c} dark={modoEdicao === 'dark'} /> : <PreviewSelecao t={t} cores={c} dark={modoEdicao === 'dark'} />}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -342,16 +582,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="flex items-center justify-between gap-2">
       <span className="text-xs text-muted-foreground">{label}</span>
       {children}
-    </div>
-  )
-}
-
-/** Seção com título dentro do painel de controles. */
-function Grupo({ titulo, children }: { titulo: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2.5">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</p>
-      <div className="space-y-2.5">{children}</div>
     </div>
   )
 }
@@ -395,8 +625,8 @@ function LogoRow({ label, desc, value, onChange, onRemove, frame, bg, inicial, i
 }
 
 /** Prévia do bloco de seleção de plataforma (tela inicial do login). */
-function PreviewSelecao({ t, dark }: { t: Tema; dark: boolean }) {
-  const c = t.cores
+function PreviewSelecao({ t, cores, dark }: { t: Tema; cores: Cores; dark: boolean }) {
+  const c = cores
   const bg = dark ? '#0d0d11' : '#f6f7f9'
   const text = dark ? '#e8e8ee' : '#1a1d24'
   const muted = dark ? '#8a8a99' : '#6b7280'
@@ -421,8 +651,8 @@ function PreviewSelecao({ t, dark }: { t: Tema; dark: boolean }) {
 }
 
 /** Prévia da tela de login (estilo Instagram) com logo, cor da marca e modo claro/escuro. */
-function PreviewLogin({ t, dark }: { t: Tema; dark: boolean }) {
-  const c = t.cores
+function PreviewLogin({ t, cores, dark }: { t: Tema; cores: Cores; dark: boolean }) {
+  const c = cores
   const bg = dark ? '#0d0d11' : '#ffffff'
   const panel = dark ? '#15151c' : '#f4f4f7'
   const text = dark ? '#e8e8ee' : '#1a1d24'
@@ -460,8 +690,8 @@ function PreviewLogin({ t, dark }: { t: Tema; dark: boolean }) {
 }
 
 /** Prévia do dashboard com as cores aplicadas. */
-function Preview({ t }: { t: Tema }) {
-  const c = t.cores
+function Preview({ t, cores }: { t: Tema; cores: Cores }) {
+  const c = cores
   const menu = [
     { nome: 'Dashboard' }, { nome: 'Simulado', sub: ['Aplicação', 'Questões', 'Banco de questões', 'Correção'] },
     { nome: 'Alunos' }, { nome: 'Análise' }, { nome: 'Configuração' },
@@ -471,10 +701,13 @@ function Preview({ t }: { t: Tema }) {
       {/* sidebar */}
       <div className="flex w-[150px] shrink-0 flex-col" style={{ background: c.sidebar, borderRight: `1px solid ${c.sborder}` }}>
         <div className="flex items-center gap-2 px-3 py-3" style={{ borderBottom: `1px solid ${c.sborder}` }}>
-          <span className={`flex h-6 w-6 items-center justify-center overflow-hidden text-[11px] font-bold ${frameLogo(t.logo_estilo)}`} style={{ background: t.logo_url ? t.logo_png_bg : c.btn, color: contraste(t.logo_url ? t.logo_png_bg : c.btn), borderColor: c.cborder }}>
-            {t.logo_url ? <img src={t.logo_url} alt="" className="h-full w-full object-contain" /> : (t.nome_site[0] ?? 'P').toUpperCase()}
+          <span className={`flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden text-[11px] font-bold ${frameLogo(t.logo_estilo)}`} style={{ background: t.logo_url ? t.logo_png_bg : c.btn, color: contraste(t.logo_url ? t.logo_png_bg : c.btn), borderColor: c.cborder }}>
+            {t.logo_url ? <img src={t.logo_url} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogoCss(t.logo_filtro) }} /> : (t.nome_site[0] ?? 'P').toUpperCase()}
           </span>
-          <span className="truncate font-semibold" style={{ color: c.sidetext }}>{t.nome_site}</span>
+          <span className="flex min-w-0 flex-col leading-tight">
+            <span className="truncate font-semibold" style={{ color: c.sidetext }}>{t.nome_site}</span>
+            {t.subtitulo_site && <span className="truncate text-[9px] opacity-70" style={{ color: c.sidetext }}>{t.subtitulo_site}</span>}
+          </span>
         </div>
         <div className="space-y-0.5 px-2 py-2">
           <p className="px-1.5 py-1 text-[9px] font-semibold uppercase opacity-50" style={{ color: c.sidetext }}>Menu</p>
@@ -486,7 +719,7 @@ function Preview({ t }: { t: Tema }) {
                   {m.sub.map((s) => {
                     const ativo = s === 'Banco de questões'
                     return (
-                      <div key={s} className="rounded-md px-2 py-1" style={ativo ? { background: c.active, color: contraste(c.active) } : { color: c.sidetext, opacity: 0.85 }}>{s}</div>
+                      <div key={s} className="rounded-md px-2 py-1" style={ativo ? { background: c.active, color: c.sidetextActive } : { color: c.sidetext, opacity: 0.85 }}>{s}</div>
                     )
                   })}
                 </div>
@@ -500,17 +733,17 @@ function Preview({ t }: { t: Tema }) {
       <div className="flex flex-1 flex-col">
         {/* topbar */}
         <div className="flex items-center justify-between px-4 py-2.5" style={{ background: c.topbar, borderBottom: `1px solid ${c.sborder}` }}>
-          <Menu className="h-4 w-4" style={{ color: c.sidetext }} />
+          <Menu className="h-4 w-4" style={{ color: c.icon }} />
           <div className="flex items-center gap-3">
-            <Bell className="h-4 w-4" style={{ color: c.sidetext }} />
-            <Moon className="h-4 w-4" style={{ color: c.sidetext }} />
+            <Bell className="h-4 w-4" style={{ color: c.icon }} />
+            <Moon className="h-4 w-4" style={{ color: c.icon }} />
             <span className="h-6 w-6 rounded-full" style={{ background: c.accent }} />
           </div>
         </div>
         {/* conteúdo */}
         <div className="flex-1 overflow-hidden p-4">
           <div className="mb-1 flex items-center justify-between">
-            <h2 className="text-base font-bold">{t.titulo_pagina}</h2>
+            <h2 className="text-base font-bold" style={{ color: c.titulo }}>{t.titulo_pagina}</h2>
             <button className="rounded-md px-3 py-1.5 text-[11px] font-medium" style={{ background: c.btn, color: contraste(c.btn) }}>+ Criar banco</button>
           </div>
           <p className="mb-3 text-[11px] opacity-60">Crie bancos para organizar suas questões.</p>

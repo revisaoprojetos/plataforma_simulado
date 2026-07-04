@@ -12,6 +12,8 @@ import { BancoCaderno } from '@/components/admin/banco-caderno'
 import { BancoRelatorio } from '@/components/admin/banco-relatorio'
 import { AdicionarQuestoesDialog } from '@/components/admin/adicionar-questoes-dialog'
 import { BancoQuestoesTable } from '@/components/admin/banco-questoes-table'
+import { BancoGrupos } from '@/components/admin/banco-grupos'
+import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
 import { ArrowLeft, Plus, BookOpen, Layers } from 'lucide-react'
 
 export default async function BancoDetalhePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
@@ -45,6 +47,18 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
     questoes = data ?? []
   }
 
+  // Ordem manual das questões no banco (tolerante: coluna pode não existir até a migration).
+  let ordemQuestoes: string[] = []
+  {
+    const { data: oRow, error: oErr } = await svc.from('simulado_pastas').select('ordem_questoes').eq('id', id).maybeSingle()
+    if (!oErr && Array.isArray((oRow as any)?.ordem_questoes)) ordemQuestoes = (oRow as any).ordem_questoes
+  }
+  if (ordemQuestoes.length && questoes.length) {
+    const pos = new Map(ordemQuestoes.map((qid, i) => [qid, i]))
+    const FIM = Number.MAX_SAFE_INTEGER
+    questoes = [...questoes].sort((a, b) => (pos.has(a.id) ? pos.get(a.id)! : FIM) - (pos.has(b.id) ? pos.get(b.id)! : FIM))
+  }
+
   // Agregações por disciplina e assunto.
   const porDisciplina = new Map<string, number>()
   const porAssunto = new Map<string, number>()
@@ -56,6 +70,13 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
   }
   const disc = [...porDisciplina.entries()].sort((a, b) => b[1] - a[1])
   const ass = [...porAssunto.entries()].sort((a, b) => b[1] - a[1])
+
+  // Grupos de disciplinas do banco (tolerante: coluna pode não existir até rodar a migration).
+  let gruposIniciais: GrupoBanco[] = []
+  {
+    const { data: gRow, error: gErr } = await svc.from('simulado_pastas').select('grupos').eq('id', id).maybeSingle()
+    if (!gErr && Array.isArray((gRow as any)?.grupos)) gruposIniciais = (gRow as any).grupos
+  }
 
   // Todas as questões do tenant (para o pop-up de adicionar) + disciplinas (filtro).
   const { data: todasRaw } = await svc
@@ -163,6 +184,9 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
               </CardContent>
             </Card>
           </div>
+
+          {/* Grupos de disciplinas (usados nos relatórios por grupo) */}
+          <BancoGrupos bancoId={id} disciplinas={disc.map(([nome]) => nome)} gruposIniciais={gruposIniciais} />
         </TabsContent>
 
         <TabsContent value="questoes" className="space-y-3">

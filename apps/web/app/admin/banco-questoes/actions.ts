@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
+import type { AnaliseImport, QuestaoImport, AltImport, ResultadoImport } from './import-types'
 
 async function guard() {
   if (!(await checkPermission('questoes:view'))) {
@@ -153,6 +154,229 @@ export async function removerQuestao(bancoId: string, questaoId: string): Promis
     .eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
 
+  revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  return { ok: true }
+}
+
+// ───────────────────────── Importação de questões ─────────────────────────
+
+function norm(s: string) {
+  return (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+}
+function normEnun(s: string) {
+  return norm(s).replace(/\s+/g, ' ')
+}
+
+/** Mapeia um cabeçalho da planilha para o campo interno. */
+function mapHeader(h: string): string | null {
+  const n = norm(h).replace(/[\s_]+/g, '')
+  if (['enunciado', 'questao', 'pergunta'].includes(n)) return 'enunciado'
+  if (n === 'tipo') return 'tipo'
+  if (['disciplina', 'materia'].includes(n)) return 'disciplina'
+  if (n === 'banca') return 'banca'
+  if (n === 'orgao') return 'orgao'
+  if (n === 'ano') return 'ano'
+  if (['dificuldade', 'nivel', 'niveldificuldade'].includes(n)) return 'dificuldade'
+  if (['comentario', 'comentarioprofessor', 'resolucao', 'comentarios'].includes(n)) return 'comentario'
+  if (['correta', 'gabarito', 'resposta', 'alternativacorreta'].includes(n)) return 'correta'
+  const m = n.match(/^(?:alternativa|alt)?([a-e])$/)
+  if (m) return 'alt_' + m[1]
+  return null
+}
+
+/** Parser CSV simples com suporte a aspas e delimitador , ou ; */
+function parseCSV(txt: string): string[][] {
+  const primeira = txt.split(/\r?\n/)[0] ?? ''
+  const delim = primeira.split(';').length > primeira.split(',').length ? ';' : ','
+  const linhas: string[][] = []
+  let campo = '', linha: string[] = [], aspas = false
+  for (let i = 0; i < txt.length; i++) {
+    const c = txt[i]
+    if (aspas) {
+      if (c === '"') { if (txt[i + 1] === '"') { campo += '"'; i++ } else aspas = false }
+      else campo += c
+    } else if (c === '"') aspas = true
+    else if (c === delim) { linha.push(campo); campo = '' }
+    else if (c === '\n') { linha.push(campo); linhas.push(linha); linha = []; campo = '' }
+    else if (c !== '\r') campo += c
+  }
+  if (campo.length || linha.length) { linha.push(campo); linhas.push(linha) }
+  return linhas.map((l) => l.map((x) => x.trim()))
+}
+
+/** Lê o arquivo (.xlsx/.xls via exceljs, ou .csv/.txt) em uma matriz de células. */
+async function lerLinhas(arquivo: File): Promise<string[][]> {
+  const nome = (arquivo.name || '').toLowerCase()
+  if (nome.endsWith('.xlsx') || nome.endsWith('.xls')) {
+    const ExcelJS = (await import('exceljs')).default
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(await arquivo.arrayBuffer())
+    const ws = wb.worksheets[0]
+    const linhas: string[][] = []
+    ws?.eachRow((row) => {
+      const vals: string[] = []
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        const v: any = cell.value
+        const s = v && typeof v === 'object' && 'text' in v ? v.text : v
+        vals.push(s == null ? '' : String(s).trim())
+      })
+      linhas.push(vals)
+    })
+    return linhas
+  }
+  return parseCSV(await arquivo.text())
+}
+
+/** Constrói as questões a partir das linhas da planilha (1ª linha = cabeçalho). */
+function montarQuestoes(linhas: string[][]): QuestaoImport[] {
+  if (linhas.length < 2) return []
+  const header = linhas[0].map(mapHeader)
+  const letras = ['a', 'b', 'c', 'd', 'e']
+  const out: QuestaoImport[] = []
+  for (let r = 1; r < linhas.length; r++) {
+    const row = linhas[r]
+    if (!row.some((c) => c && c.trim())) continue
+    const get = (campo: string) => { const idx = header.indexOf(campo); return idx >= 0 ? (row[idx] ?? '').trim() : '' }
+
+    const enunciado = get('enunciado')
+    const tipoRaw = norm(get('tipo'))
+    const tipo: 'objetiva' | 'discursiva' = tipoRaw.startsWith('disc') ? 'discursiva' : 'objetiva'
+    const difRaw = norm(get('dificuldade'))
+    const dif = difRaw.startsWith('fac') ? 'facil' : difRaw.startsWith('dif') ? 'dificil' : difRaw.startsWith('med') ? 'medio' : null
+    const anoNum = parseInt(get('ano'), 10)
+    const corretaLetra = norm(get('correta')).replace(/[^a-e]/g, '').charAt(0)
+    const alternativas: AltImport[] = []
+    letras.forEach((L, i) => { const t = get('alt_' + L); if (t) alternativas.push({ texto: t, correta: L === corretaLetra, ordem: i }) })
+
+    let erro: string | null = null
+    if (!enunciado) erro = 'Enunciado vazio'
+    else if (tipo === 'objetiva') {
+      if (alternativas.length < 2) erro = 'Menos de 2 alternativas'
+      else if (!alternativas.some((a) => a.correta)) erro = 'Alternativa correta não indicada'
+    }
+
+    out.push({
+      linha: r + 1, enunciado, tipo,
+      disciplina: get('disciplina') || null, banca: get('banca') || null, orgao: get('orgao') || null,
+      ano: Number.isFinite(anoNum) ? anoNum : null, nivel_dificuldade: dif,
+      comentario_professor: get('comentario') || null, alternativas, erro,
+    })
+  }
+  return out
+}
+
+/** Resolve/cria taxonomia por nome (versão service-role para a importação). */
+async function resolveNome(svc: ReturnType<typeof createAdminClient>, table: 'simulado_bancas' | 'simulado_orgaos' | 'simulado_disciplinas', tenantId: string, nome?: string | null): Promise<string | null> {
+  const n = nome?.trim(); if (!n) return null
+  const { data: ex } = await svc.from(table).select('id').eq('tenant_id', tenantId).ilike('nome', n).maybeSingle()
+  if (ex) return (ex as any).id
+  const { data: cr, error } = await svc.from(table).insert({ nome: n, tenant_id: tenantId }).select('id').single()
+  if (error) { const { data: again } = await svc.from(table).select('id').eq('tenant_id', tenantId).ilike('nome', n).maybeSingle(); return (again as any)?.id ?? null }
+  return (cr as any).id
+}
+
+/** Lê o arquivo enviado e devolve a relação de questões, marcando as que já existem. */
+export async function analisarQuestoesImport(formData: FormData): Promise<AnaliseImport> {
+  const g = await guard(); if (!g.ok) return { ok: false, error: g.error }
+  const arquivo = formData.get('arquivo') as File | null
+  if (!arquivo || arquivo.size === 0) return { ok: false, error: 'Selecione um arquivo.' }
+
+  let linhas: string[][]
+  try { linhas = await lerLinhas(arquivo) } catch (e: any) { return { ok: false, error: 'Falha ao ler o arquivo: ' + (e?.message ?? '') } }
+  const questoes = montarQuestoes(linhas)
+  if (!questoes.length) return { ok: false, error: 'Nenhuma questão encontrada. Confira se há um cabeçalho e ao menos uma linha.' }
+
+  // Dedupe por enunciado normalizado (contra as questões já cadastradas no tenant).
+  const svc = createAdminClient()
+  const { data: existentes } = await svc.from('simulado_questoes').select('id, enunciado').eq('tenant_id', g.tenantId).eq('deletado', false)
+  const mapa = new Map<string, string>()
+  for (const e of existentes ?? []) mapa.set(normEnun((e as any).enunciado ?? ''), (e as any).id)
+  for (const q of questoes) {
+    const id = mapa.get(normEnun(q.enunciado))
+    if (id) { q.jaExiste = true; q.questaoIdExistente = id }
+  }
+
+  const resumo = {
+    total: questoes.length,
+    novas: questoes.filter((q) => !q.jaExiste && !q.erro).length,
+    jaExistem: questoes.filter((q) => q.jaExiste).length,
+    comErro: questoes.filter((q) => q.erro).length,
+  }
+  return { ok: true, questoes, resumo }
+}
+
+/** Cria as questões novas no sistema, ignora as já existentes e (se houver banco) vincula todas a ele. */
+export async function confirmarImportQuestoes(bancoId: string | null, questoes: QuestaoImport[]): Promise<ResultadoImport> {
+  const g = await guard(); if (!g.ok) return { ok: false, error: g.error }
+  if (!questoes?.length) return { ok: false, error: 'Nada para importar.' }
+  const svc = createAdminClient()
+
+  const idsParaVincular: string[] = []
+  let criadas = 0, jaExistiam = 0
+
+  for (const q of questoes) {
+    if (q.erro) continue
+    if (q.jaExiste && q.questaoIdExistente) { idsParaVincular.push(q.questaoIdExistente); jaExistiam++; continue }
+
+    const banca_id = await resolveNome(svc, 'simulado_bancas', g.tenantId, q.banca)
+    const orgao_id = await resolveNome(svc, 'simulado_orgaos', g.tenantId, q.orgao)
+    const disciplina_id = await resolveNome(svc, 'simulado_disciplinas', g.tenantId, q.disciplina)
+
+    const { data: nova, error } = await svc.from('simulado_questoes').insert({
+      tenant_id: g.tenantId, tipo: q.tipo, enunciado: q.enunciado, banca_id, orgao_id, disciplina_id,
+      ano: q.ano ?? null, nivel_dificuldade: q.nivel_dificuldade ?? null, gabarito_tipo: 'oficial',
+      comentario_professor: q.comentario_professor ?? null, status: 'publicada',
+    }).select('id').single()
+    if (error || !nova) continue
+
+    if (q.tipo === 'objetiva' && q.alternativas.length) {
+      await svc.from('simulado_alternativas').insert(
+        q.alternativas.map((a) => ({ tenant_id: g.tenantId, questao_id: (nova as any).id, texto: a.texto, correta: a.correta, ordem: a.ordem })),
+      )
+    }
+    idsParaVincular.push((nova as any).id); criadas++
+  }
+
+  // Vincula ao banco (ignora as já vinculadas) — só quando há banco de destino.
+  let vinculadas = 0
+  if (bancoId && idsParaVincular.length) {
+    const { data: jaTem } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).in('questao_id', idsParaVincular)
+    const existSet = new Set((jaTem ?? []).map((r: any) => r.questao_id))
+    const novos = idsParaVincular.filter((id) => !existSet.has(id))
+    if (novos.length) {
+      const { error } = await svc.from('simulado_questao_pasta').insert(novos.map((questao_id) => ({ tenant_id: g.tenantId, pasta_id: bancoId, questao_id })))
+      if (!error) vinculadas = novos.length
+    }
+  }
+
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_questoes', entidadeId: bancoId ?? 'sistema', depois: { importadas: criadas, jaExistiam, vinculadas } })
+  revalidatePath('/admin/questoes')
+  if (bancoId) revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  return { ok: true, criadas, jaExistiam, vinculadas }
+}
+
+/** Salva a ordem manual das questões dentro de um banco (lista de questao_id). */
+export async function reordenarQuestoesBanco(bancoId: string, ordemIds: string[]): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard(); if (!g.ok) return g
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_pastas').update({ ordem_questoes: ordemIds }).eq('id', bancoId).eq('tenant_id', g.tenantId)
+  if (error) {
+    if (/ordem_questoes/i.test(error.message)) return { ok: false, error: 'Rode a migration ordem_questoes no banco.' }
+    return { ok: false, error: error.message }
+  }
+  revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  return { ok: true }
+}
+
+export type GrupoBanco = { id: string; nome: string; disciplinas: string[] }
+
+/** Salva os grupos de disciplinas de um banco (pasta). */
+export async function salvarGruposBanco(bancoId: string, grupos: GrupoBanco[]): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_pastas').update({ grupos }).eq('id', bancoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return { ok: true }
 }

@@ -1,5 +1,5 @@
 import type { ComponentType, CSSProperties } from 'react'
-import { Heading1, Type, AlignLeft, ListChecks, Grid3x3, IdCard, Image as ImageIcon, Minus, MoveVertical, Square, Columns2, Wallpaper, Repeat, Rows3, ClipboardCheck, PenLine } from 'lucide-react'
+import { Heading1, Type, AlignLeft, ListChecks, Grid3x3, IdCard, Image as ImageIcon, Minus, MoveVertical, Square, Columns2, Wallpaper, Repeat, Rows3, ClipboardCheck, PenLine, Scissors, Signature, LayoutGrid } from 'lucide-react'
 import { cssDaFonte, type CadernoTheme } from './theme'
 import { type Block, type BlockCategory, type CadernoData, type QuestaoData, genId } from './types'
 
@@ -43,6 +43,10 @@ export const BLOCKS: BlockMeta[] = [
   // Identificação
   { type: 'identificacao', title: 'Identificação', icon: IdCard, category: 'identificacao', dynamic: true,
     defaults: { titulo: 'Identificação do Candidato', campos: ['Nome completo', 'Nº de inscrição', 'Data'] } },
+  { type: 'cabecalho-prova', title: 'Cabeçalho de prova', icon: LayoutGrid, category: 'identificacao', supportsVars: true,
+    defaults: { campos: [{ rotulo: 'Banca', valor: '' }, { rotulo: 'Órgão', valor: '' }, { rotulo: 'Cargo', valor: '' }, { rotulo: 'Ano', valor: '' }], colunas: 2 } },
+  { type: 'assinatura', title: 'Assinatura', icon: Signature, category: 'identificacao', supportsVars: true,
+    defaults: { assinaturas: ['Assinatura do candidato'], align: 'left', larguraLinha: 220 } },
   // Estrutura
   { type: 'card', title: 'Card', icon: Square, category: 'estrutura', container: true, supportsVars: true,
     defaults: { corFundo: '#f8fafc', bordaCor: '', bordaLargura: 1, bordaRaio: 8, padding: 14, largura: 100, alinhamento: 'center' } },
@@ -56,6 +60,8 @@ export const BLOCKS: BlockMeta[] = [
     defaults: { espessura: 1, estilo: 'solido', cor: '' } },
   { type: 'espacador', title: 'Espaçador', icon: MoveVertical, category: 'estrutura',
     defaults: { altura: 24 } },
+  { type: 'quebra-pagina', title: 'Quebra de página', icon: Scissors, category: 'estrutura',
+    defaults: {} },
   { type: 'linhas-resposta', title: 'Linhas p/ resposta', icon: PenLine, category: 'conteudo', supportsVars: true,
     defaults: { quantidade: 6, rotulo: 'Resposta:', altura: 28, cor: '' } },
 ]
@@ -325,6 +331,45 @@ export function BlockRender({ block, theme, data }: { block: Block; theme: Cader
         </div>
       )
     }
+    case 'cabecalho-prova': {
+      const campos: { rotulo: string; valor: string }[] = a.campos ?? []
+      const cols = Math.max(1, Math.min(4, Number(a.colunas ?? 2)))
+      return (
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, border: `1px solid ${c.secundaria}`, borderRadius: 6, overflow: 'hidden', fontFamily: theme.tipografia.familia }}>
+          {campos.map((f, i) => (
+            <div key={i} style={{ padding: '6px 10px', fontSize: 12, color: c.texto, borderTop: i >= cols ? `1px solid ${c.secundaria}` : 'none', borderLeft: i % cols !== 0 ? `1px solid ${c.secundaria}` : 'none' }}>
+              <span style={{ fontWeight: 700, color: c.primaria }}>{f.rotulo}: </span>
+              <span>{applyVars(String(f.valor ?? ''), data.vars)}</span>
+            </div>
+          ))}
+        </div>
+      )
+    }
+    case 'assinatura': {
+      const items: string[] = a.assinaturas?.length ? a.assinaturas : ['Assinatura']
+      const al = ALIN[a.align as keyof typeof ALIN] ?? 'left'
+      const w = Number(a.larguraLinha ?? 220)
+      return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 40, marginTop: 12, justifyContent: al === 'center' ? 'center' : al === 'right' ? 'flex-end' : 'flex-start', fontFamily: theme.tipografia.familia }}>
+          {items.map((label, i) => (
+            <div key={i} style={{ textAlign: 'center' }}>
+              <div style={{ width: w, maxWidth: '100%', borderTop: `1px solid ${c.texto}`, marginBottom: 4 }} />
+              <span style={{ fontSize: 11, color: c.texto }}>{applyVars(String(label ?? ''), data.vars)}</span>
+            </div>
+          ))}
+        </div>
+      )
+    }
+    case 'quebra-pagina':
+      return (
+        <div style={{ breakAfter: 'page' }}>
+          <div className="print:hidden" style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#94a3b8', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, margin: '4px 0' }}>
+            <div style={{ flex: 1, borderTop: '1px dashed #cbd5e1' }} />
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>✂ quebra de página</span>
+            <div style={{ flex: 1, borderTop: '1px dashed #cbd5e1' }} />
+          </div>
+        </div>
+      )
     case 'plano-fundo':
       return null // full-bleed: renderizado como camada de fundo da página
     default:

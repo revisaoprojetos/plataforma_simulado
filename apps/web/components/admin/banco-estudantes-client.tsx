@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { desvincularEstudante } from '@/app/admin/banco-questoes/estudantes-actions'
 import { AdicionarEstudantesDialog } from '@/components/admin/adicionar-estudantes-dialog'
+import { AdicionarGrupoBancoDialog, type GrupoOpc } from '@/components/admin/adicionar-grupo-banco-dialog'
 
 interface Aluno { id: string; nome: string; email?: string | null; telefone?: string | null; cpf?: string | null; ultimo_acesso?: string | null }
 interface AlunoSel { id: string; nome: string; email?: string | null; telefone?: string | null; classificacao?: string | null; jaVinculado: boolean }
@@ -21,7 +22,7 @@ function fmtAcesso(d?: string | null) {
   return `${dt.toLocaleDateString('pt-BR')} ${dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-export function BancoEstudantesClient({ bancoId, vinculados, alunos }: { bancoId: string; vinculados: Aluno[]; alunos: AlunoSel[] }) {
+export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = [] }: { bancoId: string; vinculados: Aluno[]; alunos: AlunoSel[]; grupos?: GrupoOpc[] }) {
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
@@ -60,6 +61,7 @@ export function BancoEstudantesClient({ bancoId, vinculados, alunos }: { bancoId
             Desvincular {sel.size}
           </Button>
         )}
+        <AdicionarGrupoBancoDialog bancoId={bancoId} grupos={grupos} />
         <AdicionarEstudantesDialog bancoId={bancoId} alunos={alunos} />
       </div>
 

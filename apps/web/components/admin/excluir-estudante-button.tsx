@@ -1,4 +1,5 @@
 'use client'
+import { confirmar } from '@/components/ui/confirm-dialog'
 
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -12,8 +13,8 @@ export function ExcluirEstudanteButton({ id, nome }: { id: string; nome: string 
   const router = useRouter()
   const [pending, start] = useTransition()
 
-  function excluir() {
-    if (!confirm(`Excluir o estudante "${nome}"?\n\nVai para a Lixeira (recuperável). As sessões e vínculos são preservados.`)) return
+  async function excluir() {
+    if (!(await confirmar({ mensagem: `Excluir o estudante "${nome}"?\n\nVai para a Lixeira (recuperável). As sessões e vínculos são preservados.`, destrutivo: true }))) return
     start(async () => {
       const r = await deleteEstudanteAction(id)
       if (r?.error) toast.error(r.error)

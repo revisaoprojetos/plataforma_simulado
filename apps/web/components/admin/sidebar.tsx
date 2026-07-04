@@ -45,19 +45,28 @@ import {
 import { cn } from '@/lib/utils'
 import { useCan } from '@/components/auth/can-provider'
 
+type IconType = React.ComponentType<{ className?: string; style?: React.CSSProperties }>
+
 interface NavItem {
   label: string
   href: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: IconType
   exact?: boolean
   perm?: string // permissão necessária para ver o item
 }
 
 interface NavGroup {
   label: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: IconType
   items: NavItem[]
 }
+
+// Cores por estado do item da sidebar. O HOVER usa a MESMA cor do ATIVO (assim,
+// ao passar o mouse, já aparece a cor de destaque — sem precisar clicar/pressionar).
+// Texto no próprio botão; ícone mirando o <svg> filho com especificidade certa.
+const NAV_STATES =
+  'hover:text-[color:var(--sidebar-text-active)] data-active:text-[color:var(--sidebar-text-active)] ' +
+  '[&>svg]:text-[color:var(--sidebar-icon)] [&:hover>svg]:text-[color:var(--sidebar-icon-active)] [&[data-active]>svg]:text-[color:var(--sidebar-icon-active)]'
 
 // Item solto no topo (sem filhos).
 const dashboard: NavItem = { label: 'Dashboard', href: '/admin', icon: LayoutDashboard, exact: true }
@@ -80,8 +89,8 @@ const navGroups: NavGroup[] = [
     icon: GraduationCap,
     items: [
       { label: 'Estudantes', href: '/admin/estudantes', icon: Users, perm: 'estudantes:view' },
-      { label: 'Matrículas', href: '/admin/matriculas', icon: CreditCard, perm: 'matriculas:view' },
       { label: 'Grupos', href: '/admin/grupos', icon: UsersRound, perm: 'grupos:view' },
+      { label: 'Matrículas', href: '/admin/matriculas', icon: CreditCard, perm: 'matriculas:view' },
     ],
   },
   {
@@ -140,7 +149,14 @@ function frameLogo(estilo?: string): string {
   return 'rounded-lg'
 }
 
-export function AdminSidebar({ logo, nome = 'Plataforma', logoBg = '#ffffff', logoEstilo = 'arredondado' }: { logo?: string | null; nome?: string; logoBg?: string; logoEstilo?: string }) {
+/** Filtro CSS que força a logo a branco/preto (útil em sidebar escura/clara). */
+function filtroLogo(f?: string): string | undefined {
+  if (f === 'branco') return 'brightness(0) invert(1)'
+  if (f === 'preto') return 'brightness(0)'
+  return undefined
+}
+
+export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none' }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string }) {
   const pathname = usePathname()
   const search = useSearchParams()
   const can = useCan()
@@ -162,29 +178,34 @@ export function AdminSidebar({ logo, nome = 'Plataforma', logoBg = '#ffffff', lo
   }
 
   return (
-    <Sidebar>
-      <SidebarHeader className="flex h-14 flex-row items-center border-b px-4">
-        <Link href="/admin" className="flex items-center gap-2">
-          <div className={cn('flex h-8 w-8 items-center justify-center overflow-hidden', frameLogo(logoEstilo), !logo && 'bg-primary text-primary-foreground')}
+    <Sidebar className="border-sidebar-border">
+      <SidebarHeader className="flex h-14 flex-row items-center border-b border-sidebar-border px-4">
+        <Link href="/admin" className="flex min-w-0 items-center gap-2">
+          <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden', frameLogo(logoEstilo), !logo && 'bg-primary text-primary-foreground')}
             style={logo ? { background: logoBg } : undefined}>
             {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logo} alt={nome} className="h-full w-full object-contain" />
+              <img src={logo} alt={nome} className="h-full w-full object-contain" style={{ filter: filtroLogo(logoFiltro) }} />
             ) : (
               <BookOpen className="h-4 w-4" />
             )}
           </div>
-          <span className="truncate font-semibold text-sm">{nome}</span>
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate font-semibold text-sm leading-tight">{nome}</span>
+            {subtitulo && (
+              <span className="truncate text-[11px] leading-tight text-sidebar-foreground/60">{subtitulo}</span>
+            )}
+          </div>
         </Link>
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
+        <SidebarGroup className="px-3">
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1">
               {/* Dashboard (item solto) */}
               <SidebarMenuItem>
-                <SidebarMenuButton render={<Link href={dashboard.href} />} isActive={itemAtivo(dashboard, pathname, search)}>
+                <SidebarMenuButton className={NAV_STATES} render={<Link href={dashboard.href} />} isActive={itemAtivo(dashboard, pathname, search)}>
                   <dashboard.icon className="h-4 w-4" />
                   <span>{dashboard.label}</span>
                 </SidebarMenuButton>
@@ -197,6 +218,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', logoBg = '#ffffff', lo
                 return (
                   <SidebarMenuItem key={group.label}>
                     <SidebarMenuButton
+                      className={NAV_STATES}
                       onClick={() => toggle(group.label)}
                       isActive={ativo}
                       aria-expanded={aberto}
@@ -209,10 +231,11 @@ export function AdminSidebar({ logo, nome = 'Plataforma', logoBg = '#ffffff', lo
                     </SidebarMenuButton>
 
                     {aberto && (
-                      <SidebarMenuSub>
+                      <SidebarMenuSub className="mr-0 pr-0">
                         {group.items.map((item) => (
                           <SidebarMenuSubItem key={item.href}>
                             <SidebarMenuSubButton
+                              className={NAV_STATES}
                               render={<Link href={item.href} />}
                               isActive={itemAtivo(item, pathname, search)}
                             >

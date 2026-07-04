@@ -4,6 +4,7 @@ import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/providers'
 import { Toaster } from 'sonner'
+import { ConfirmHost } from '@/components/ui/confirm-dialog'
 import { getTenantTheme } from '@/lib/tenant-theme'
 
 const inter = Inter({
@@ -73,6 +74,7 @@ export default async function RootLayout({
         <Providers defaultTheme={modoPadrao}>
           {children}
           <Toaster position="bottom-right" richColors />
+          <ConfirmHost />
         </Providers>
       </body>
     </html>

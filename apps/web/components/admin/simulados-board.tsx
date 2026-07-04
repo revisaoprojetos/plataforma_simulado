@@ -1,4 +1,5 @@
 'use client'
+import { confirmar } from '@/components/ui/confirm-dialog'
 
 import { useState, useTransition, useMemo } from 'react'
 import Link from 'next/link'
@@ -137,8 +138,8 @@ function CardItem({ s, appUrl }: { s: SimuladoCard; appUrl: string }) {
     abrirLinkTemado(linkAcesso)
   }
 
-  function excluir() {
-    if (!confirm(`Excluir o simulado "${s.titulo}"? Esta ação não pode ser desfeita.`)) return
+  async function excluir() {
+    if (!(await confirmar({ mensagem: `Excluir o simulado "${s.titulo}"? Esta ação não pode ser desfeita.`, destrutivo: true }))) return
     startTransition(async () => {
       const r = await deleteSimuladoAction(s.id)
       if (r?.error) toast.error(r.error)

@@ -8,10 +8,11 @@ import {
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Search, Check, Loader2 } from 'lucide-react'
+import { Plus, Search, Check, Loader2, Upload, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { adicionarQuestoes } from '@/app/admin/banco-questoes/actions'
+import { ImportarQuestoesTab } from '@/components/admin/importar-questoes-tab'
 
 interface Questao {
   id: string
@@ -41,25 +42,29 @@ export function AdicionarQuestoesDialog({
   disciplinas: string[]
 }) {
   const [open, setOpen] = useState(false)
+  const [modo, setModo] = useState<'existentes' | 'importar'>('existentes')
   const [busca, setBusca] = useState('')
   const [disc, setDisc] = useState('all')
   const [dif, setDif] = useState('all')
+  const [tipoF, setTipoF] = useState('all')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
   const noBanco = useMemo(() => new Set(jaNoBanco), [jaNoBanco])
 
   const discItems = useMemo(() => ({ all: 'Todas disciplinas', ...Object.fromEntries(disciplinas.map((d) => [d, d])) }), [disciplinas])
   const difItems = { all: 'Todas', facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' }
+  const tipoItems = { all: 'Todos tipos', objetiva: 'Objetiva', discursiva: 'Discursiva' }
 
   const filtrados = useMemo(() => {
     const q = busca.toLowerCase().trim()
     return questoes.filter((x) => {
       if (disc !== 'all' && x.disciplina !== disc) return false
       if (dif !== 'all' && x.nivel_dificuldade !== dif) return false
+      if (tipoF !== 'all' && x.tipo !== tipoF) return false
       if (q && !(`${x.enunciado} ${x.external_id ?? ''} ${x.disciplina ?? ''} ${x.assunto ?? ''}`.toLowerCase().includes(q))) return false
       return true
     })
-  }, [questoes, busca, disc, dif])
+  }, [questoes, busca, disc, dif, tipoF])
 
   function toggle(id: string) {
     if (noBanco.has(id)) return
@@ -82,10 +87,28 @@ export function AdicionarQuestoesDialog({
       </DialogTrigger>
       <DialogContent className="flex max-h-[85vh] w-full flex-col gap-0 p-0 sm:max-w-3xl">
         <DialogHeader className="px-6 pt-6">
-          <DialogTitle className="flex items-center gap-2"><Plus className="h-5 w-5" /> Adicionar questões à pasta</DialogTitle>
-          <DialogDescription>Selecione as questões do banco para adicionar a esta pasta.</DialogDescription>
+          <DialogTitle className="flex items-center gap-2"><Plus className="h-5 w-5" /> Adicionar questões ao banco</DialogTitle>
+          <DialogDescription>Importe questões de um arquivo ou selecione questões já existentes no sistema.</DialogDescription>
         </DialogHeader>
 
+        {/* Abas */}
+        <div className="flex gap-1 px-6 pt-4">
+          {([
+            { k: 'importar', label: 'Importar questões', icon: Upload },
+            { k: 'existentes', label: 'Questões do sistema', icon: ListChecks },
+          ] as const).map((t) => (
+            <button key={t.k} type="button" onClick={() => setModo(t.k)}
+              className={cn('inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+                modo === t.k ? 'border-primary bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}>
+              <t.icon className="h-4 w-4" /> {t.label}
+            </button>
+          ))}
+        </div>
+
+        {modo === 'importar' ? (
+          <ImportarQuestoesTab bancoId={bancoId} onDone={() => setOpen(false)} />
+        ) : (
+        <>
         {/* Filtros */}
         <div className="flex flex-wrap gap-2 px-6 pt-4">
           <div className="relative min-w-48 flex-1">
@@ -108,6 +131,14 @@ export function AdicionarQuestoesDialog({
               <SelectItem value="dificil">Difícil</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={tipoF} onValueChange={(v) => setTipoF(v ?? '')} items={tipoItems}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos tipos</SelectItem>
+              <SelectItem value="objetiva">Objetiva</SelectItem>
+              <SelectItem value="discursiva">Discursiva</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <p className="px-6 pb-1 pt-3 text-xs text-muted-foreground">{filtrados.length} questão(ões) disponível(is)</p>
 
@@ -119,12 +150,13 @@ export function AdicionarQuestoesDialog({
                 <TableHead className="w-10"></TableHead>
                 <TableHead className="w-44">Disciplina</TableHead>
                 <TableHead>Questão</TableHead>
+                <TableHead className="w-24">Tipo</TableHead>
                 <TableHead className="w-24 text-right">Dificuldade</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtrados.length === 0 ? (
-                <TableRow><TableCell colSpan={4} className="py-10 text-center text-muted-foreground">Nenhuma questão encontrada.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Nenhuma questão encontrada.</TableCell></TableRow>
               ) : (
                 filtrados.map((q) => {
                   const jaTem = noBanco.has(q.id)
@@ -147,6 +179,12 @@ export function AdicionarQuestoesDialog({
                         {jaTem && <span className="mt-1 block text-xs font-medium text-green-600">já na pasta</span>}
                       </TableCell>
                       <TableCell className="align-top text-sm leading-relaxed">{enun}</TableCell>
+                      <TableCell className="align-top">
+                        <span className={cn('rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase',
+                          q.tipo === 'discursiva' ? 'border-indigo-400 text-indigo-600 dark:text-indigo-300' : 'border-sky-400 text-sky-600 dark:text-sky-300')}>
+                          {q.tipo === 'discursiva' ? 'Discursiva' : 'Objetiva'}
+                        </span>
+                      </TableCell>
                       <TableCell className="align-top text-right text-sm">{d ? <span className={cn('font-medium', d.cls)}>{d.label}</span> : '—'}</TableCell>
                     </TableRow>
                   )
@@ -166,6 +204,8 @@ export function AdicionarQuestoesDialog({
             </Button>
           </div>
         </div>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   )

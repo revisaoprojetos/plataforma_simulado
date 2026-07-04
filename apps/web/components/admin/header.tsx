@@ -32,13 +32,23 @@ function getInitials(name: string) {
 
 export function AdminHeader({ userName, userEmail }: AdminHeaderProps) {
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background px-4">
+    <header
+      className={
+        'sticky top-0 z-40 flex h-14 items-center gap-4 border-b border-sidebar-border px-4 ' +
+        // Ícones da topbar seguem a sidebar: normal = --sidebar-icon; no hover/menu-aberto
+        // espelham o item ativo da sidebar (fundo = --sidebar-accent, ícone = --sidebar-icon-active).
+        '[&_svg]:text-[color:var(--sidebar-icon)] ' +
+        '[&_button:hover]:bg-[color:var(--sidebar-accent)] [&_button:hover_svg]:text-[color:var(--sidebar-icon-active)] ' +
+        '[&_button[aria-expanded=true]]:bg-[color:var(--sidebar-accent)] [&_button[aria-expanded=true]_svg]:text-[color:var(--sidebar-icon-active)]'
+      }
+      style={{ background: 'var(--topbar)', color: 'var(--sidebar-icon)' }}
+    >
       <SidebarTrigger />
       <div className="flex-1" />
       <NotificationBell />
       <ThemeToggle />
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <DropdownMenuTrigger className="flex items-center gap-2 rounded-full outline-none hover:bg-transparent! aria-expanded:bg-transparent! focus-visible:ring-2 focus-visible:ring-ring">
           <Avatar className="h-8 w-8">
             <AvatarFallback className="text-xs">
               {getInitials(userName)}

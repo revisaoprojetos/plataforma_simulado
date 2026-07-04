@@ -1,4 +1,5 @@
 'use client'
+import { confirmar } from '@/components/ui/confirm-dialog'
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -41,8 +42,8 @@ export function LixeiraClient({ itens }: { itens: LixeiraItem[] }) {
     })
   }
 
-  function excluir(i: LixeiraItem) {
-    if (!confirm(`Excluir DEFINITIVAMENTE "${i.rotulo}"?\n\nEsta ação é permanente e cascateia os vínculos. Não pode ser desfeita.`)) return
+  async function excluir(i: LixeiraItem) {
+    if (!(await confirmar({ titulo: 'Excluir definitivamente', mensagem: `Excluir DEFINITIVAMENTE "${i.rotulo}"?\n\nEsta ação é permanente e cascateia os vínculos. Não pode ser desfeita.`, confirmar: 'Excluir', destrutivo: true }))) return
     setActing(i.id)
     start(async () => {
       const r = await excluirDefinitivo(i.tabela, i.id)

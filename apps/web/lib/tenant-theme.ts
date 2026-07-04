@@ -101,34 +101,82 @@ function deriveForeground(oklchValue: string): string {
 }
 
 /**
- * Marca = só cor de DESTAQUE (primária/accent), aplicada igual no claro e no escuro.
- * O fundo/texto/cards ficam por conta do modo (claro/escuro de verdade) — definidos
- * em globals.css (:root para claro, .dark para escuro). Por isso NÃO emitimos
- * --background/--foreground/--card aqui (era o que travava o dark mode).
+ * Produz as CSS vars de UMA paleta, separadas em:
+ * - `marca`: destaques (primária, item ativo, hover/ativo) — servem de base nos 2 modos.
+ * - `surf`: superfícies (sidebar/topbar + fundo/texto/cards/bordas) — específicas do modo.
  */
-function construirPaletaCompleta(cores: Record<string, unknown>, fonte: string | null): string {
+function varsDaPaleta(cores: Record<string, unknown>): { marca: string[]; surf: string[] } {
   const v = (x: unknown) => safeColor(typeof x === 'string' ? x : undefined)
-  const btn = v(cores.btn), accent = v(cores.accent), active = v(cores.active)
   const ok = (c: string) => hexToOklch(c)
+  const fg = (c: string) => deriveForeground(ok(c))
+  const mix = (a: string, pct: number, b: string) => `color-mix(in oklab, ${ok(a)} ${pct}%, ${ok(b)})`
+
+  const btn = v(cores.btn), accent = v(cores.accent), active = v(cores.active)
+  const sidebar = v(cores.sidebar), sidetext = v(cores.sidetext), topbar = v(cores.topbar)
+  const sborder = v(cores.sborder), icon = v(cores.icon), iconAtivo = v(cores.iconAtivo), iconHover = v(cores.iconHover)
+  const sidetextHover = v(cores.sidetextHover), sidetextActive = v(cores.sidetextActive)
+  const bg = v(cores.bg), text = v(cores.text), card = v(cores.card), cborder = v(cores.cborder), titulo = v(cores.titulo)
+  const tabBg = v(cores.tabBg), tabAtivo = v(cores.tabAtivo), tabTexto = v(cores.tabTexto)
+
+  const marca: string[] = []
+  const surf: string[] = []
+  const activeC = active ?? btn
+
+  // ── Marca / destaques ──
+  if (btn) marca.push(`  --primary: ${ok(btn)};`, `  --primary-foreground: ${fg(btn)};`, `  --ring: ${ok(btn)};`, `  --brand-primary: ${ok(btn)};`)
+  if (accent) marca.push(`  --brand-accent: ${ok(accent)};`)
+  if (activeC) marca.push(`  --sidebar-primary: ${ok(activeC)};`, `  --sidebar-primary-foreground: ${fg(activeC)};`, `  --sidebar-accent: ${ok(activeC)};`, `  --sidebar-accent-foreground: ${fg(activeC)};`)
+  if (iconHover) marca.push(`  --sidebar-icon-hover: ${ok(iconHover)};`); else if (activeC) marca.push(`  --sidebar-icon-hover: ${fg(activeC)};`)
+  if (iconAtivo) marca.push(`  --sidebar-icon-active: ${ok(iconAtivo)};`); else if (activeC) marca.push(`  --sidebar-icon-active: ${fg(activeC)};`)
+  if (sidetextHover) marca.push(`  --sidebar-text-hover: ${ok(sidetextHover)};`); else if (activeC) marca.push(`  --sidebar-text-hover: ${fg(activeC)};`)
+  if (sidetextActive) marca.push(`  --sidebar-text-active: ${ok(sidetextActive)};`); else if (activeC) marca.push(`  --sidebar-text-active: ${fg(activeC)};`)
+
+  // ── Superfícies do chrome (lateral + topo) ──
+  if (sidebar) { surf.push(`  --sidebar: ${ok(sidebar)};`); if (!sidetext) surf.push(`  --sidebar-foreground: ${fg(sidebar)};`) }
+  if (sidetext) surf.push(`  --sidebar-foreground: ${ok(sidetext)};`)
+  if (icon) surf.push(`  --sidebar-icon: ${ok(icon)};`); else if (sidetext) surf.push(`  --sidebar-icon: ${ok(sidetext)};`)
+  if (sborder) surf.push(`  --sidebar-border: ${ok(sborder)};`, `  --sidebar-ring: ${ok(activeC ?? sborder)};`)
+  if (topbar) surf.push(`  --topbar: ${ok(topbar)};`, `  --topbar-foreground: ${fg(topbar)};`)
+
+  // ── Superfícies do conteúdo ──
+  const bgC = bg ?? card
+  if (bg) surf.push(`  --background: ${ok(bg)};`)
+  if (text) surf.push(`  --foreground: ${ok(text)};`)
+  if (titulo) surf.push(`  --content-title: ${ok(titulo)};`)
+  if (card) {
+    surf.push(`  --card: ${ok(card)};`, `  --popover: ${ok(card)};`, `  --secondary: ${ok(card)};`, `  --muted: ${ok(card)};`)
+    const cardFg = text ?? sidetext
+    if (cardFg) surf.push(`  --card-foreground: ${ok(cardFg)};`, `  --popover-foreground: ${ok(cardFg)};`, `  --secondary-foreground: ${ok(cardFg)};`)
+  } else if (bgC && text) surf.push(`  --muted: ${mix(text, 7, bgC)};`)
+  if (text && bgC) surf.push(`  --muted-foreground: ${mix(text, 55, bgC)};`, `  --accent: ${mix(text, 10, bgC)};`, `  --accent-foreground: ${ok(text)};`)
+  if (cborder) surf.push(`  --border: ${ok(cborder)};`, `  --input: ${ok(cborder)};`)
+  // Tabs: fundo da lista, tab selecionada, texto (hover/ativo)
+  if (tabBg) surf.push(`  --tab-bg: ${ok(tabBg)};`)
+  if (tabAtivo) surf.push(`  --tab-active: ${ok(tabAtivo)};`)
+  if (tabTexto) surf.push(`  --tab-active-foreground: ${ok(tabTexto)};`)
+
+  return { marca, surf }
+}
+
+/**
+ * Compõe o CSS do tenant: paleta CLARA em `:root:not(.dark)` e ESCURA em `.dark`.
+ * A marca da paleta clara vale como base nos dois modos; quando há paleta escura,
+ * ela sobrescreve tudo no `.dark`. Sem paleta escura, o `.dark` do globals assume.
+ */
+function construirPaletaCompleta(cores: Record<string, unknown>, coresDark: Record<string, unknown> | null, fonte: string | null): string {
   const fontLine = fonte
     ? `  --font-sans: "${fonte}", var(--font-plus-jakarta), var(--font-inter), sans-serif;`
     : `  --font-sans: var(--font-plus-jakarta), var(--font-inter), sans-serif;`
 
-  if (!btn) return `:root, .dark {\n${fontLine}\n}`
+  const L = varsDaPaleta(cores)
+  const D = coresDark && typeof coresDark === 'object' ? varsDaPaleta(coresDark) : null
 
-  const activeC = active ?? btn
-  const lines = [
-    `  --primary: ${ok(btn)};`,
-    `  --primary-foreground: ${deriveForeground(ok(btn))};`,
-    `  --ring: ${ok(btn)};`,
-    `  --sidebar-primary: ${ok(activeC)};`,
-    `  --sidebar-primary-foreground: ${deriveForeground(ok(activeC))};`,
-    `  --brand-primary: ${ok(btn)};`,
-    accent ? `  --brand-accent: ${ok(accent)};` : '',
-    fontLine,
-  ].filter(Boolean)
-
-  return `:root, .dark {\n${lines.join('\n')}\n}`
+  // Marca (clara) + fonte nos dois modos; superfícies claras só no claro.
+  let css = `:root, .dark {\n${[...L.marca, fontLine].join('\n')}\n}`
+  css += `\n:root:not(.dark) {\n${L.surf.join('\n')}\n}`
+  // Paleta escura completa (marca + superfícies) só no .dark, se configurada.
+  if (D) css += `\n.dark {\n${[...D.marca, ...D.surf].join('\n')}\n}`
+  return `${css}\nmain h1 { color: var(--content-title); }`
 }
 
 /**
@@ -168,7 +216,7 @@ export const getTenantTheme = cache(async (): Promise<TenantThemeResult> => {
     // gera só as cores de destaque da marca (fundo/texto seguem o modo).
     const cores = (tema as any).cores
     if (cores && typeof cores === 'object') {
-      const css = construirPaletaCompleta(cores, safeFont((tema as any).fonte))
+      const css = construirPaletaCompleta(cores, (tema as any).cores_dark ?? null, safeFont((tema as any).fonte))
       if (css) {
         return { css, tema, tenantId: data.id as string, tenantNome: data.nome as string, favicon: (tema as any).favicon ?? null, modoPadrao }
       }

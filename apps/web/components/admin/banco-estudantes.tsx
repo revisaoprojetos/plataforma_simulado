@@ -48,5 +48,27 @@ export async function BancoEstudantes({ bancoId }: { bancoId: string }) {
   }
   const vinculados = lista.filter((a: any) => vincSet.has(a.id)).map((a: any) => ({ ...a, ultimo_acesso: ultimoPorAluno.get(a.id) ?? null }))
 
-  return <BancoEstudantesClient bancoId={bancoId} vinculados={vinculados as any} alunos={alunos as any} />
+  // Grupos do tenant (para o botão "Adicionar grupo"), com contagem de membros e vínculo atual.
+  let gruposRaw: any[] | null = null
+  {
+    const r = await svc.from('simulado_grupos').select('id, nome, cor').eq('tenant_id', tenantId ?? '').eq('deletado', false).order('nome')
+    if (r.error && /cor/i.test(r.error.message)) {
+      const r2 = await svc.from('simulado_grupos').select('id, nome').eq('tenant_id', tenantId ?? '').eq('deletado', false).order('nome')
+      gruposRaw = r2.data
+    } else gruposRaw = r.data
+  }
+  const gids = (gruposRaw ?? []).map((x: any) => x.id)
+  const contMembros = new Map<string, number>()
+  if (gids.length) {
+    const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', gids)
+    for (const m of gm ?? []) contMembros.set((m as any).grupo_id, (contMembros.get((m as any).grupo_id) ?? 0) + 1)
+  }
+  let vinculadosSet = new Set<string>()
+  {
+    const { data: links, error: linkErr } = await svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', bancoId)
+    if (!linkErr) vinculadosSet = new Set((links ?? []).map((l: any) => l.grupo_id))
+  }
+  const grupos = (gruposRaw ?? []).map((x: any) => ({ id: x.id, nome: x.nome, cor: x.cor ?? null, membros: contMembros.get(x.id) ?? 0, vinculado: vinculadosSet.has(x.id) }))
+
+  return <BancoEstudantesClient bancoId={bancoId} vinculados={vinculados as any} alunos={alunos as any} grupos={grupos} />
 }

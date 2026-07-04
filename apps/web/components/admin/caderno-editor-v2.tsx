@@ -15,6 +15,8 @@ import { HudSimuladoEditor } from '@/components/admin/hud-simulado-editor'
 import { GerarPdfServidor } from '@/components/admin/gerar-pdf-servidor'
 import { MonitorPlay } from 'lucide-react'
 import { salvarCadernoDesignerV2 } from '@/app/admin/cadernos/actions'
+import { PRESETS_CADERNO, type CadernoPreset } from '@/lib/caderno-designer/presets'
+import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
 
 const CAT_NOMES: Record<string, string> = { conteudo: 'Conteúdo', avaliacao: 'Avaliação', identificacao: 'Identificação', estrutura: 'Estrutura' }
 const ZOOM = 0.76
@@ -399,9 +401,17 @@ export function CadernoEditorV2({
   function removePage(pageId: string) { setDoc((d) => d.pages.length <= 1 ? d : ({ ...d, pages: d.pages.filter((p) => p.id !== pageId) })) }
 
   // modalidades
-  function addModalidade() { const nm = prompt('Nome da modalidade (ex.: Gabarito Discursivo):')?.trim(); if (!nm) return; const m = { id: genId('mod'), nome: nm }; setModalidades((ms) => [...ms, m]); setDocs((d) => ({ ...d, [m.id]: novoDoc() })); setModAtiva(m.id) }
-  function renameModalidade(id: string) { const atual = modalidades.find((m) => m.id === id)?.nome ?? ''; const nm = prompt('Renomear modalidade:', atual)?.trim(); if (!nm) return; setModalidades((ms) => ms.map((m) => m.id === id ? { ...m, nome: nm } : m)) }
-  function removeModalidade(id: string) { if (modalidades.length <= 1) { toast.error('Mantenha ao menos uma modalidade.'); return } if (!confirm('Excluir esta modalidade e seu documento?')) return; setModalidades((ms) => ms.filter((m) => m.id !== id)); setDocs((d) => { const cp = { ...d }; delete cp[id]; return cp }); setModAtiva((cur) => cur === id ? modalidades.filter((m) => m.id !== id)[0].id : cur) }
+  async function addModalidade() { const nm = (await pedirTexto({ titulo: 'Nova modalidade', label: 'Nome', placeholder: 'ex.: Gabarito Discursivo', confirmar: 'Criar' }))?.trim(); if (!nm) return; const m = { id: genId('mod'), nome: nm }; setModalidades((ms) => [...ms, m]); setDocs((d) => ({ ...d, [m.id]: novoDoc() })); setModAtiva(m.id) }
+  async function renameModalidade(id: string) { const atual = modalidades.find((m) => m.id === id)?.nome ?? ''; const nm = (await pedirTexto({ titulo: 'Renomear modalidade', label: 'Nome', valorInicial: atual, confirmar: 'Salvar' }))?.trim(); if (!nm) return; setModalidades((ms) => ms.map((m) => m.id === id ? { ...m, nome: nm } : m)) }
+  async function removeModalidade(id: string) { if (modalidades.length <= 1) { toast.error('Mantenha ao menos uma modalidade.'); return } if (!(await confirmar({ mensagem: 'Excluir esta modalidade e seu documento?', destrutivo: true }))) return; setModalidades((ms) => ms.filter((m) => m.id !== id)); setDocs((d) => { const cp = { ...d }; delete cp[id]; return cp }); setModAtiva((cur) => cur === id ? modalidades.filter((m) => m.id !== id)[0].id : cur) }
+
+  async function aplicarPreset(p: CadernoPreset) {
+    const nomeMod = modalidades.find((m) => m.id === modAtiva)?.nome ?? 'atual'
+    if (!(await confirmar({ titulo: 'Aplicar modelo', mensagem: `Aplicar o modelo "${p.nome}"? Isso substitui todo o conteúdo da modalidade "${nomeMod}".`, confirmar: 'Aplicar' }))) return
+    setDocs((d) => ({ ...d, [modAtiva]: p.build() }))
+    setSelBlock(null); setSelPage(null); setRegiao('pagina')
+    toast.success(`Modelo "${p.nome}" aplicado`)
+  }
 
   function salvar() {
     start(async () => {
@@ -427,13 +437,13 @@ export function CadernoEditorV2({
         onDragOver={(e) => { e.preventDefault(); setOver(`regiao:${reg}`) }}
         onDrop={(e) => ctx.drop(e, { kind: 'regiao', regiao: reg })}
         style={{ width: SHEET_W * ZOOM }}
-        className={cn('rounded-md border border-dashed bg-white/70 p-2 transition-colors', overReg ? 'border-primary ring-2 ring-primary/40' : ativa ? 'border-primary ring-1 ring-primary/30' : 'border-slate-300')}>
+        className={cn('rounded-md border border-dashed bg-white/70 p-2 transition-colors', overReg ? 'border-primary ring-2 ring-primary/40' : ativa ? 'border-primary ring-1 ring-primary/30' : 'border-border')}>
         <p className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           {reg === 'cabecalho' ? <PanelTop className="h-3 w-3" /> : <PanelBottom className="h-3 w-3" />} {reg === 'cabecalho' ? 'Cabeçalho' : 'Rodapé'}
         </p>
         <div style={{ transform: `scale(${ZOOM})`, transformOrigin: 'top left', width: SHEET_W - PAD_H * 2 }}>
           <div className="flex flex-col">
-            {blocks.length === 0 ? <p className="text-xs text-slate-400">Clique aqui e adicione blocos à esquerda.</p> : <ListaBlocos blocks={blocks} ctx={ctx} />}
+            {blocks.length === 0 ? <p className="text-xs text-muted-foreground">Clique aqui e adicione blocos à esquerda.</p> : <ListaBlocos blocks={blocks} ctx={ctx} />}
           </div>
         </div>
       </div>
@@ -509,6 +519,19 @@ export function CadernoEditorV2({
           </div>
 
           <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Modelos prontos</p>
+            <div className="flex flex-col gap-1.5">
+              {PRESETS_CADERNO.map((p) => (
+                <button key={p.id} type="button" onClick={() => aplicarPreset(p)} title={p.descricao}
+                  className="rounded-lg border bg-background px-2.5 py-2 text-left shadow-sm transition-all hover:border-primary hover:bg-primary/5">
+                  <span className="block text-xs font-medium leading-tight">{p.nome}</span>
+                  <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground">{p.descricao}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Adicionar bloco</p>
             <div className="space-y-3">
               {(['conteudo', 'avaliacao', 'identificacao', 'estrutura'] as const).map((cat) => (
@@ -576,7 +599,7 @@ export function CadernoEditorV2({
                       })()}
                       <AutoAnim ativo={!arrastando} className="relative flex flex-col">
                         {conteudo.length === 0 && !bg && (
-                          <div className={cn('flex h-[200px] items-center justify-center rounded-lg border-2 border-dashed text-sm transition-colors', arrastando ? 'border-primary/50 bg-primary/5 text-primary' : 'text-slate-400')}>{arrastando ? 'Solte o bloco aqui' : 'Arraste um bloco ou clique para começar'}</div>
+                          <div className={cn('flex h-[200px] items-center justify-center rounded-lg border-2 border-dashed text-sm transition-colors', arrastando ? 'border-primary/50 bg-primary/5 text-primary' : 'border-border text-muted-foreground')}>{arrastando ? 'Solte o bloco aqui' : 'Arraste um bloco ou clique para começar'}</div>
                         )}
                         <ListaBlocos blocks={conteudo} ctx={ctx} />
                       </AutoAnim>
@@ -621,7 +644,10 @@ export function CadernoEditorV2({
                 {([['primaria', 'Primária'], ['secundaria', 'Secundária'], ['acento', 'Acento'], ['texto', 'Texto'], ['fundo', 'Fundo']] as const).map(([k, label]) => (
                   <label key={k} className="flex items-center justify-between gap-2 text-sm">
                     <span className="text-muted-foreground">{label}</span>
-                    <input type="color" value={cores[k] ?? theme.cores[k]} onChange={(e) => setCores((c) => ({ ...c, [k]: e.target.value }))} className="h-8 w-12 cursor-pointer rounded border" />
+                    <span className="flex items-center gap-2">
+                      <span className="font-mono text-[11px] uppercase text-muted-foreground">{cores[k] ?? theme.cores[k]}</span>
+                      <input type="color" value={cores[k] ?? theme.cores[k]} onChange={(e) => setCores((c) => ({ ...c, [k]: e.target.value }))} className="h-8 w-12 cursor-pointer rounded border" />
+                    </span>
                   </label>
                 ))}
                 <button onClick={() => setCores({})} className="text-xs text-muted-foreground hover:underline">Restaurar padrão</button>
@@ -651,7 +677,7 @@ export function CadernoEditorV2({
                   <input type="checkbox" checked={running.rodapeAtivo} onChange={(e) => setDoc((d) => ({ ...d, running: { ...(d.running ?? RUNNING_PADRAO), rodapeAtivo: e.target.checked } }))} /></label>
                 <label className="flex items-center justify-between gap-2 text-sm"><span>Mostrar número de página</span>
                   <input type="checkbox" checked={running.mostrarNumeroPagina} onChange={(e) => setDoc((d) => ({ ...d, running: { ...(d.running ?? RUNNING_PADRAO), mostrarNumeroPagina: e.target.checked } }))} /></label>
-                <p className="rounded bg-blue-50 px-2 py-1.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">Ative a faixa, clique nela no canvas e adicione blocos (logo, texto, imagem…). Aparecem em todas as páginas na impressão.</p>
+                <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Ative a faixa, clique nela no canvas e adicione blocos (logo, texto, imagem…). Aparecem em todas as páginas na impressão.</p>
               </div>
             )}
           </div>

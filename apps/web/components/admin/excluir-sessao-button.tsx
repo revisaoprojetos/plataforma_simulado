@@ -1,4 +1,5 @@
 'use client'
+import { confirmar } from '@/components/ui/confirm-dialog'
 
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -12,8 +13,8 @@ export function ExcluirSessaoButton({ sessaoId, simuladoId, estudanteId }: { ses
   const router = useRouter()
   const [pending, start] = useTransition()
 
-  function excluir() {
-    if (!confirm('Excluir esta tentativa?\n\nEla sai do histórico, dos resultados e do ranking (recalculado), e vai para a Lixeira — pode ser restaurada.')) return
+  async function excluir() {
+    if (!(await confirmar({ mensagem: 'Excluir esta tentativa?\n\nEla sai do histórico, dos resultados e do ranking (recalculado), e vai para a Lixeira — pode ser restaurada.', destrutivo: true }))) return
     start(async () => {
       const r = await excluirSessaoAction(sessaoId, simuladoId, estudanteId)
       if (r?.error) toast.error(r.error)

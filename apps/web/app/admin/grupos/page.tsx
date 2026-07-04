@@ -1,73 +1,30 @@
-import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
+import { createAdminClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
+import { GruposClient } from '@/components/admin/grupos-client'
 
 export default async function GruposPage() {
-  const supabase = await createClient()
+  const svc = createAdminClient()
+  const tenantId = await getCurrentTenantId()
 
-  const { data: grupos } = await supabase
-    .from('simulado_grupos')
-    .select('id, nome, criado_em')
-    .eq('deletado', false)
-    .order('criado_em', { ascending: false })
+  // Seleciona com `cor` — se a coluna ainda não existe (migration pendente), refaz sem ela.
+  let grupos: any[] | null = null
+  {
+    const r = await svc.from('simulado_grupos').select('id, nome, criado_em, cor').eq('tenant_id', tenantId ?? '').eq('deletado', false).order('criado_em', { ascending: false })
+    if (r.error && /cor/i.test(r.error.message)) {
+      const r2 = await svc.from('simulado_grupos').select('id, nome, criado_em').eq('tenant_id', tenantId ?? '').eq('deletado', false).order('criado_em', { ascending: false })
+      grupos = r2.data
+    } else grupos = r.data
+  }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Grupos</h1>
-          <p className="text-muted-foreground">
-            Gerencie grupos de estudantes para atribuição de simulados
-          </p>
-        </div>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Grupo
-        </Button>
-      </div>
+  // Contagem de membros por grupo (tolerante).
+  const ids = (grupos ?? []).map((g: any) => g.id)
+  const membros = new Map<string, number>()
+  if (ids.length) {
+    const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', ids)
+    for (const m of gm ?? []) membros.set((m as any).grupo_id, (membros.get((m as any).grupo_id) ?? 0) + 1)
+  }
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Grupos cadastrados</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Membros</TableHead>
-                <TableHead>Simulados</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!grupos || grupos.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                    Nenhum grupo cadastrado.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                grupos.map((g) => (
-                  <TableRow key={g.id}>
-                    <TableCell className="font-medium">{g.nome}</TableCell>
-                    <TableCell className="text-muted-foreground">—</TableCell>
-                    <TableCell className="text-muted-foreground">—</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
-  )
+  const rows = (grupos ?? []).map((g: any) => ({ id: g.id, nome: g.nome, membros: membros.get(g.id) ?? 0, cor: g.cor ?? null }))
+
+  return <GruposClient grupos={rows} />
 }

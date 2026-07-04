@@ -2,7 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import Link from 'next/link'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import {
   Table,
   TableBody,
@@ -16,11 +16,6 @@ import { Plus, Upload } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ExcluirEstudanteButton } from '@/components/admin/excluir-estudante-button'
-
-const classificacaoConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
-  passaporte: { label: 'Passaporte', variant: 'default' },
-  normal: { label: 'Normal', variant: 'secondary' },
-}
 
 export default async function EstudantesPage() {
   const supabase = await createServiceClient()
@@ -65,8 +60,9 @@ export default async function EstudantesPage() {
           <CardTitle className="text-base">Listagem</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
+          <div className="max-h-[65vh] overflow-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>E-mail</TableHead>
@@ -85,8 +81,6 @@ export default async function EstudantesPage() {
                 </TableRow>
               ) : (
                 estudantes.map((e) => {
-                  const classCfg = classificacaoConfig[e.classificacao ?? ''] ?? { label: e.classificacao ?? '—', variant: 'outline' as const }
-
                   return (
                     <TableRow key={e.id}>
                       <TableCell className="font-medium">
@@ -101,11 +95,7 @@ export default async function EstudantesPage() {
                         {e.cpf ?? '—'}
                       </TableCell>
                       <TableCell>
-                        {e.classificacao ? (
-                          <Badge variant={classCfg.variant}>{classCfg.label}</Badge>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">—</span>
-                        )}
+                        <ClassificacaoBadge classificacao={e.classificacao} />
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {formatDate(e.created_at)}
@@ -119,6 +109,7 @@ export default async function EstudantesPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

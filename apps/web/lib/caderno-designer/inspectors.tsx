@@ -187,7 +187,7 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
     case 'lista-questoes':
       return (
         <div className="space-y-3">
-          <p className="rounded bg-blue-50 px-2 py-1.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">Puxa as questões reais do simulado/pasta vinculado.</p>
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Puxa as questões reais do simulado/pasta vinculado.</p>
           <Row label="Título (opcional)"><input value={a.titulo} onChange={(e) => set('titulo', e.target.value)} className={inputCls} /></Row>
           <Row label="Quantidade (vazio = todas)"><input type="number" min={1} value={a.quantidade ?? ''} onChange={(e) => set('quantidade', e.target.value ? Number(e.target.value) : null)} className={inputCls} /></Row>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarAlternativas} onChange={(e) => set('mostrarAlternativas', e.target.checked)} /> Mostrar alternativas</label>
@@ -252,7 +252,7 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
     case 'repeticao':
       return (
         <div className="space-y-3">
-          <p className="rounded bg-blue-50 px-2 py-1.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">Desenhe o template dentro do bloco (textos, cards, alternativas). Ele se repete para cada questão do banco. Use as variáveis <code>{'{q_num}'}</code>, <code>{'{q_enunciado}'}</code> e o bloco <strong>Alternativas</strong>.</p>
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Desenhe o template dentro do bloco (textos, cards, alternativas). Ele se repete para cada questão do banco. Use as variáveis <code>{'{q_num}'}</code>, <code>{'{q_enunciado}'}</code> e o bloco <strong>Alternativas</strong>.</p>
           <Row label="Quantidade (vazio = todas)"><input type="number" min={1} value={a.quantidade ?? ''} onChange={(e) => set('quantidade', e.target.value ? Number(e.target.value) : null)} className={inputCls} /></Row>
           <Row label={`Espaço entre questões: ${a.gap ?? 16}px`}><input type="range" min={0} max={48} value={a.gap ?? 16} onChange={(e) => set('gap', Number(e.target.value))} className="w-full" /></Row>
         </div>
@@ -260,7 +260,7 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
     case 'alternativas':
       return (
         <div className="space-y-3">
-          <p className="rounded bg-blue-50 px-2 py-1.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">Mostra as alternativas da questão atual (uma embaixo da outra). Use dentro do bloco <strong>Repetir por questão</strong>.</p>
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Mostra as alternativas da questão atual (uma embaixo da outra). Use dentro do bloco <strong>Repetir por questão</strong>.</p>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarGabarito} onChange={(e) => set('mostrarGabarito', e.target.checked)} /> Marcar gabarito</label>
         </div>
       )
@@ -275,7 +275,7 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
     case 'card':
       return (
         <div className="space-y-3">
-          <p className="rounded bg-blue-50 px-2 py-1.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">Use os botões no card (canvas) para inserir blocos dentro dele.</p>
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Use os botões no card (canvas) para inserir blocos dentro dele.</p>
           <Cor label="Cor de fundo" value={a.corFundo} onChange={(v) => set('corFundo', v)} />
           <Cor label="Cor da borda" value={a.bordaCor} onChange={(v) => set('bordaCor', v)} />
           <Row label={`Espessura da borda: ${a.bordaLargura}px`}><input type="range" min={0} max={6} value={a.bordaLargura} onChange={(e) => set('bordaLargura', Number(e.target.value))} className="w-full" /></Row>
@@ -288,7 +288,7 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
     case 'colunas':
       return (
         <div className="space-y-3">
-          <p className="rounded bg-blue-50 px-2 py-1.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">Use “+ coluna / − coluna” no bloco (canvas) e adicione blocos dentro de cada coluna.</p>
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Use “+ coluna / − coluna” no bloco (canvas) e adicione blocos dentro de cada coluna.</p>
           <Row label={`Espaço entre colunas: ${a.gap}px`}><input type="range" min={0} max={48} value={a.gap} onChange={(e) => set('gap', Number(e.target.value))} className="w-full" /></Row>
         </div>
       )
@@ -299,6 +299,43 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
           <Row label={`Opacidade: ${a.opacidade}%`}><input type="range" min={5} max={100} value={a.opacidade} onChange={(e) => set('opacidade', Number(e.target.value))} className="w-full" /></Row>
         </div>
       )
+    case 'cabecalho-prova':
+      return (
+        <div className="space-y-3">
+          <Row label="Colunas"><input type="number" min={1} max={4} value={a.colunas ?? 2} onChange={(e) => set('colunas', Number(e.target.value))} className={inputCls} /></Row>
+          <div className="space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Campos (rótulo + valor)</span>
+            {(a.campos ?? []).map((f: { rotulo: string; valor: string }, i: number) => (
+              <div key={i} className="flex items-center gap-1">
+                <input value={f.rotulo} onChange={(e) => { const cp = [...a.campos]; cp[i] = { ...cp[i], rotulo: e.target.value }; set('campos', cp) }} placeholder="Rótulo" className={inputCls} />
+                <input value={f.valor} onChange={(e) => { const cp = [...a.campos]; cp[i] = { ...cp[i], valor: e.target.value }; set('campos', cp) }} placeholder="Valor" className={inputCls} />
+                <button type="button" onClick={() => set('campos', a.campos.filter((_: unknown, j: number) => j !== i))} className="text-destructive hover:opacity-70"><Trash2 className="h-4 w-4" /></button>
+              </div>
+            ))}
+            <button type="button" onClick={() => set('campos', [...(a.campos ?? []), { rotulo: 'Campo', valor: '' }])} className="flex items-center gap-1 text-xs text-primary hover:underline"><Plus className="h-3.5 w-3.5" /> Adicionar campo</button>
+          </div>
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">O valor aceita variáveis (ex.: <code>{'{nome}'}</code>).</p>
+        </div>
+      )
+    case 'assinatura':
+      return (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Assinaturas (rótulo sob cada linha)</span>
+            {(a.assinaturas ?? []).map((label: string, i: number) => (
+              <div key={i} className="flex items-center gap-1">
+                <input value={label} onChange={(e) => { const cp = [...a.assinaturas]; cp[i] = e.target.value; set('assinaturas', cp) }} className={inputCls} />
+                <button type="button" onClick={() => set('assinaturas', a.assinaturas.filter((_: string, j: number) => j !== i))} className="text-destructive hover:opacity-70"><Trash2 className="h-4 w-4" /></button>
+              </div>
+            ))}
+            <button type="button" onClick={() => set('assinaturas', [...(a.assinaturas ?? []), 'Assinatura'])} className="flex items-center gap-1 text-xs text-primary hover:underline"><Plus className="h-3.5 w-3.5" /> Adicionar assinatura</button>
+          </div>
+          <Align value={a.align} onChange={(v) => set('align', v)} />
+          <Row label={`Largura da linha: ${a.larguraLinha ?? 220}px`}><input type="range" min={100} max={400} value={a.larguraLinha ?? 220} onChange={(e) => set('larguraLinha', Number(e.target.value))} className="w-full" /></Row>
+        </div>
+      )
+    case 'quebra-pagina':
+      return <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Força o conteúdo seguinte a começar numa nova página na impressão/PDF. O marcador tracejado não aparece no PDF.</p>
     default:
       return <p className="text-sm text-muted-foreground">Sem opções.</p>
   }
