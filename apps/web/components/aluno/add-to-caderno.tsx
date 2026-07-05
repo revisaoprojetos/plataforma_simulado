@@ -86,7 +86,7 @@ export function AddToCaderno({ questaoId }: { questaoId: string }) {
           </div>
           <form onSubmit={criarEAdicionar} className="flex gap-1 border-t p-2">
             <input value={novo} onChange={(e) => setNovo(e.target.value)} placeholder="Novo caderno…" maxLength={120}
-              className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring" />
+              className="min-w-0 flex-1 rounded-md border bg-[var(--input-bg,transparent)] px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring" />
             <button type="submit" disabled={busy || !novo.trim()} className="shrink-0 rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50">
               <Plus className="h-3.5 w-3.5" />
             </button>

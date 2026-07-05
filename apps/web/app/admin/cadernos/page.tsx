@@ -27,14 +27,17 @@ export default async function CadernosAdminPage() {
   }
 
   const svc = createAdminClient()
-  const { data: cadernos } = await svc
-    .from('simulado_cadernos_designer')
-    .select('id, nome, config, atualizado_em')
-    .eq('deletado', false)
-    .eq('tenant_id', access.tenantId ?? '')
-    .order('atualizado_em', { ascending: false })
+  // Personalização (cor/ícone/capa) — tolerante caso a migration ainda não tenha rodado.
+  let cadernos: any[] | null = null
+  {
+    const r = await svc.from('simulado_cadernos_designer').select('id, nome, config, atualizado_em, cor, icone, capa_url').eq('deletado', false).eq('tenant_id', access.tenantId ?? '').order('atualizado_em', { ascending: false })
+    if (r.error && /cor|icone|capa_url|column/i.test(r.error.message)) {
+      const r2 = await svc.from('simulado_cadernos_designer').select('id, nome, config, atualizado_em').eq('deletado', false).eq('tenant_id', access.tenantId ?? '').order('atualizado_em', { ascending: false })
+      cadernos = r2.data
+    } else cadernos = r.data
+  }
 
-  const lista = (cadernos ?? []).map((c: any) => ({ id: c.id, nome: c.nome, blocos: contarBlocos(c.config) }))
+  const lista = (cadernos ?? []).map((c: any) => ({ id: c.id, nome: c.nome, blocos: contarBlocos(c.config), cor: c.cor ?? null, icone: c.icone ?? null, capa: c.capa_url ?? null }))
 
   return (
     <div className="space-y-6">

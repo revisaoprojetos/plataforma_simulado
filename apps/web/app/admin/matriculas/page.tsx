@@ -6,13 +6,14 @@ import { Badge } from '@/components/ui/badge'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Plus, GraduationCap } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { MatriculasFilters } from '@/components/admin/matriculas-filters'
 import { MatriculaActions } from '@/components/admin/matricula-actions'
 import { PaginationControls } from '@/components/admin/pagination-controls'
+import { SecaoHeader } from '@/components/admin/secao-header'
 
 const ITEMS_PER_PAGE = 30
 
@@ -62,10 +63,8 @@ export default async function MatriculasPage({ searchParams }: PageProps) {
 
       <MatriculasFilters />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Listagem</CardTitle>
-        </CardHeader>
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader icon={GraduationCap} titulo="Matrículas" subtitulo={`${count ?? 0} registrada(s)`} />
         <CardContent className="p-0">
           <Table>
             <TableHeader>

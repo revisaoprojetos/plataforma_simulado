@@ -10,10 +10,16 @@ export default async function BancoQuestoesPage() {
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
-  const [{ data: bancos }, { data: vinculos }] = await Promise.all([
-    svc.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome'),
-    svc.from('simulado_questao_pasta').select('pasta_id').eq('tenant_id', tenantId ?? ''),
-  ])
+  // Bancos com personalização (cor/ícone) — tolerante caso a migration ainda não tenha rodado.
+  let bancos: any[] | null = null
+  {
+    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome')
+    if (r.error && /cor|icone|capa_url|column/i.test(r.error.message)) {
+      const r2 = await svc.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome')
+      bancos = r2.data
+    } else bancos = r.data
+  }
+  const { data: vinculos } = await svc.from('simulado_questao_pasta').select('pasta_id').eq('tenant_id', tenantId ?? '')
 
   // Contagem de questões por banco.
   const contagem = new Map<string, number>()
@@ -33,7 +39,7 @@ export default async function BancoQuestoesPage() {
         <NovoBancoForm />
       </div>
 
-      <BancosGrid bancos={lista.map((b: any) => ({ id: b.id, nome: b.nome, total: contagem.get(b.id) ?? 0 }))} />
+      <BancosGrid bancos={lista.map((b: any) => ({ id: b.id, nome: b.nome, total: contagem.get(b.id) ?? 0, cor: b.cor ?? null, icone: b.icone ?? null, capa: b.capa_url ?? null }))} />
     </div>
   )
 }

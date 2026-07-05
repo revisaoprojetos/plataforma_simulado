@@ -3,7 +3,11 @@
 import { useRef } from 'react'
 import { Plus, Trash2, Upload, Image as ImageIcon, Bold, Italic, Underline } from 'lucide-react'
 import type { Block } from './types'
+import { SHEET_H, PAD_V } from './types'
 import { FONTES_CADERNO } from './theme'
+
+// Altura máxima do espaçador = altura útil da página (folha − margens sup./inf.).
+const ESPACADOR_MAX = SHEET_H - 2 * PAD_V
 
 const VARIAVEIS = [
   { token: '{nome}', label: 'Nome' },
@@ -45,13 +49,13 @@ function Grupo({ label, children }: { label: string; children: React.ReactNode }
     </div>
   )
 }
-const inputCls = 'w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring'
+const inputCls = 'w-full rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring'
 
 function Cor({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <Row label={label}>
       <div className="flex items-center gap-2">
-        <input type="color" value={value || '#000000'} onChange={(e) => onChange(e.target.value)} className="h-8 w-10 cursor-pointer rounded border bg-background" />
+        <input type="color" value={value || '#000000'} onChange={(e) => onChange(e.target.value)} className="h-8 w-10 cursor-pointer rounded border bg-[var(--input-bg,transparent)]" />
         <input value={value} onChange={(e) => onChange(e.target.value)} placeholder="auto (tema)" className={inputCls} />
         {value && <button type="button" onClick={() => onChange('')} className="text-xs text-muted-foreground hover:text-foreground">limpar</button>}
       </div>
@@ -60,11 +64,12 @@ function Cor({ label, value, onChange }: { label: string; value: string; onChang
 }
 
 const ALIN = [{ v: 'left', n: 'Esq.' }, { v: 'center', n: 'Centro' }, { v: 'right', n: 'Dir.' }]
-function Align({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+const ALIN_JUST = [...ALIN, { v: 'justify', n: 'Justif.' }]
+function Align({ value, onChange, comJustificar }: { value: string; onChange: (v: string) => void; comJustificar?: boolean }) {
   return (
     <Grupo label="Alinhamento">
       <div className="flex gap-1">
-        {ALIN.map((o) => (
+        {(comJustificar ? ALIN_JUST : ALIN).map((o) => (
           <button key={o.v} type="button" onClick={() => onChange(o.v)} className={`flex-1 rounded-md border px-2 py-1 text-xs ${value === o.v ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted'}`}>{o.n}</button>
         ))}
       </div>
@@ -87,6 +92,33 @@ function UploadImagem({ url, onChange }: { url: string; onChange: (v: string) =>
   )
 }
 
+type Campo = { rotulo: string; valor: string }
+/** Aceita formato antigo (string[]) e normaliza para { rotulo, valor }. */
+export const normCampos = (arr: any[]): Campo[] =>
+  (arr ?? []).map((x) => (typeof x === 'string' ? { rotulo: x, valor: '' } : { rotulo: x?.rotulo ?? '', valor: x?.valor ?? '' }))
+
+/** Editor de um grupo de campos: cada um com rótulo (texto) + variável embaixo. */
+function GrupoCampos({ label, items, onChange, exemplos }: { label: string; items: Campo[]; onChange: (v: Campo[]) => void; exemplos?: string }) {
+  const lista = items ?? []
+  const upd = (i: number, patch: Partial<Campo>) => onChange(lista.map((f, j) => (j === i ? { ...f, ...patch } : f)))
+  return (
+    <div className="space-y-2">
+      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+      {lista.map((f, i) => (
+        <div key={i} className="space-y-1 rounded-md border bg-muted/20 p-2">
+          <div className="flex items-center gap-1">
+            <input value={f.rotulo} onChange={(e) => upd(i, { rotulo: e.target.value })} placeholder="Rótulo (ex.: Nome)" className={inputCls} />
+            <button type="button" title="Remover" onClick={() => onChange(lista.filter((_, j) => j !== i))} className="shrink-0 text-destructive hover:opacity-70"><Trash2 className="h-4 w-4" /></button>
+          </div>
+          <input value={f.valor} onChange={(e) => upd(i, { valor: e.target.value })} placeholder="Variável (ex.: {{nome}})" className={`${inputCls} font-mono text-xs`} />
+        </div>
+      ))}
+      <button type="button" onClick={() => onChange([...lista, { rotulo: 'Campo', valor: '' }])} className="flex items-center gap-1 text-xs text-primary hover:underline"><Plus className="h-3.5 w-3.5" /> Adicionar campo</button>
+      {exemplos && <p className="text-[10px] leading-snug text-muted-foreground">Variáveis: {exemplos}</p>}
+    </div>
+  )
+}
+
 function FonteSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <Row label="Fonte">
@@ -95,6 +127,56 @@ function FonteSelect({ value, onChange }: { value: string; onChange: (v: string)
         {FONTES_CADERNO.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
       </select>
     </Row>
+  )
+}
+
+/** Slider + campo numérico para digitar o valor exato (com clamp em [min,max]). */
+function Faixa({ label, min, max, step = 1, value, onChange }: { label: string; min: number; max: number; step?: number; value: number; onChange: (v: number) => void }) {
+  const aplicar = (raw: string) => { const n = Number(raw); if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n))) }
+  return (
+    <Row label={label}>
+      <div className="flex items-center gap-2">
+        <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => aplicar(e.target.value)} className="w-full" />
+        <input type="number" min={min} max={max} step={step} value={value} onChange={(e) => aplicar(e.target.value)} className="w-16 shrink-0 rounded border bg-transparent px-1 py-1 text-center text-xs outline-none focus:ring-1 focus:ring-ring" />
+      </div>
+    </Row>
+  )
+}
+
+/** Altura mínima do bloco + alinhamento vertical do conteúdo dentro dela. */
+function AlturaVertical({ a, set }: { a: any; set: (k: string, v: any) => void }) {
+  return (
+    <>
+      <Faixa label="Altura mínima (px)" min={0} max={1000} value={a.alturaMin ?? 0} onChange={(v) => set('alturaMin', v)} />
+      <Row label="Alinhamento vertical">
+        <div className="flex gap-1">
+          {([['top', 'Topo'], ['center', 'Centro'], ['bottom', 'Rodapé']] as const).map(([v, l]) => (
+            <button key={v} type="button" onClick={() => set('valignV', v)}
+              className={`flex-1 rounded border px-2 py-1 text-xs transition-colors ${(a.valignV ?? 'top') === v ? 'border-primary bg-primary/10 font-medium text-primary' : 'text-muted-foreground hover:bg-muted'}`}>{l}</button>
+          ))}
+        </div>
+      </Row>
+    </>
+  )
+}
+
+/** Largura do bloco (%) + posição horizontal quando menor que 100%. */
+function LarguraBloco({ a, set }: { a: any; set: (k: string, v: any) => void }) {
+  const larg = a.largura ?? 100
+  return (
+    <>
+      <Faixa label="Largura (%)" min={10} max={100} value={larg} onChange={(v) => set('largura', v)} />
+      {larg < 100 && (
+        <Row label="Posição">
+          <div className="flex gap-1">
+            {([['left', 'Esquerda'], ['center', 'Centro'], ['right', 'Direita']] as const).map(([v, l]) => (
+              <button key={v} type="button" onClick={() => set('alinhamentoBloco', v)}
+                className={`flex-1 rounded border px-2 py-1 text-xs transition-colors ${(a.alinhamentoBloco ?? 'left') === v ? 'border-primary bg-primary/10 font-medium text-primary' : 'text-muted-foreground hover:bg-muted'}`}>{l}</button>
+            ))}
+          </div>
+        </Row>
+      )}
+    </>
   )
 }
 
@@ -143,15 +225,17 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
             </select>
           </Row>
           <FonteSelect value={a.fonte} onChange={(v) => set('fonte', v)} />
+          <AlturaVertical a={a} set={set} />
+          <LarguraBloco a={a} set={set} />
           <Grupo label="Estilo">
             <div className="flex gap-1">
               <button type="button" onClick={() => set('italico', !a.italico)} className={estiloBtn(a.italico)}><Italic className="mx-auto h-4 w-4" /></button>
               <button type="button" onClick={() => set('sublinhado', !a.sublinhado)} className={estiloBtn(a.sublinhado)}><Underline className="mx-auto h-4 w-4" /></button>
             </div>
           </Grupo>
-          <Align value={a.align} onChange={(v) => set('align', v)} />
+          <Align value={a.align} onChange={(v) => set('align', v)} comJustificar />
           <Cor label="Cor" value={a.cor} onChange={(v) => set('cor', v)} />
-          <Row label={`Espaçamento entre letras: ${a.espacamento ?? 0}px`}><input type="range" min={0} max={8} value={a.espacamento ?? 0} onChange={(e) => set('espacamento', Number(e.target.value))} className="w-full" /></Row>
+          <Faixa label="Espaçamento entre letras (px)" min={0} max={8} value={a.espacamento ?? 0} onChange={(v) => set('espacamento', v)} />
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarLinha} onChange={(e) => set('mostrarLinha', e.target.checked)} /> Linha sob o título</label>
         </div>
       )
@@ -161,6 +245,8 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
           <Row label="Texto"><textarea ref={fieldRef as React.RefObject<HTMLTextAreaElement>} value={a.texto} onChange={(e) => set('texto', e.target.value)} rows={4} className={inputCls} /></Row>
           <Variaveis />
           <FonteSelect value={a.fonte} onChange={(v) => set('fonte', v)} />
+          <AlturaVertical a={a} set={set} />
+          <LarguraBloco a={a} set={set} />
           <Grupo label="Estilo">
             <div className="flex gap-1">
               <button type="button" onClick={() => set('bold', !a.bold)} className={estiloBtn(a.bold)}><Bold className="mx-auto h-4 w-4" /></button>
@@ -168,11 +254,11 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
               <button type="button" onClick={() => set('sublinhado', !a.sublinhado)} className={estiloBtn(a.sublinhado)}><Underline className="mx-auto h-4 w-4" /></button>
             </div>
           </Grupo>
-          <Align value={a.align} onChange={(v) => set('align', v)} />
+          <Align value={a.align} onChange={(v) => set('align', v)} comJustificar />
           <Row label="Tamanho (pt)"><input type="number" min={8} max={48} value={a.size} onChange={(e) => set('size', Number(e.target.value))} className={inputCls} /></Row>
-          <Row label={`Altura da linha: ${a.lineHeight ?? 1.5}`}><input type="range" min={1} max={2.5} step={0.1} value={a.lineHeight ?? 1.5} onChange={(e) => set('lineHeight', Number(e.target.value))} className="w-full" /></Row>
+          <Faixa label="Altura da linha" min={1} max={4} step={0.1} value={a.lineHeight ?? 1.5} onChange={(v) => set('lineHeight', v)} />
           <Cor label="Cor" value={a.color} onChange={(v) => set('color', v)} />
-          <Row label={`Espaçamento entre letras: ${a.espacamento ?? 0}px`}><input type="range" min={0} max={8} value={a.espacamento ?? 0} onChange={(e) => set('espacamento', Number(e.target.value))} className="w-full" /></Row>
+          <Faixa label="Espaçamento entre letras (px)" min={0} max={8} value={a.espacamento ?? 0} onChange={(v) => set('espacamento', v)} />
         </div>
       )
     case 'instrucoes':
@@ -180,6 +266,9 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
         <div className="space-y-3">
           <Row label="Título"><input value={a.titulo} onChange={(e) => set('titulo', e.target.value)} className={inputCls} /></Row>
           <Row label="Texto"><textarea value={a.texto} onChange={(e) => set('texto', e.target.value)} rows={4} className={inputCls} /></Row>
+          <FonteSelect value={a.fonte} onChange={(v) => set('fonte', v)} />
+          <AlturaVertical a={a} set={set} />
+          <LarguraBloco a={a} set={set} />
           <Cor label="Cor de fundo" value={a.corFundo} onChange={(v) => set('corFundo', v)} />
           <Cor label="Cor da borda" value={a.corBorda} onChange={(v) => set('corBorda', v)} />
         </div>
@@ -197,36 +286,58 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
     case 'gabarito-grid':
       return (
         <div className="space-y-3">
-          <Row label="Título"><input value={a.titulo} onChange={(e) => set('titulo', e.target.value)} className={inputCls} /></Row>
-          <Row label="Nº de questões (vazio = real)"><input type="number" min={1} value={a.numQuestoes ?? ''} onChange={(e) => set('numQuestoes', e.target.value ? Number(e.target.value) : null)} className={inputCls} /></Row>
-          <Row label="Alternativas por questão"><input type="number" min={2} max={6} value={a.numAlternativas} onChange={(e) => set('numAlternativas', Number(e.target.value))} className={inputCls} /></Row>
-          <Row label="Colunas"><input type="number" min={1} max={5} value={a.colunas} onChange={(e) => set('colunas', Number(e.target.value))} className={inputCls} /></Row>
-          <Row label="Estilo das bolhas">
-            <select value={a.estilo} onChange={(e) => set('estilo', e.target.value)} className={inputCls}><option value="circulo">Círculo</option><option value="quadrado">Quadrado</option></select>
+          <Row label="Mostrar">
+            <select value={a.origem ?? 'marcado'} onChange={(e) => set('origem', e.target.value)} className={inputCls}>
+              <option value="marcado">Respostas do aluno</option>
+              <option value="oficial">Gabarito oficial</option>
+            </select>
           </Row>
+          <Row label="Título (vazio = automático)"><input value={a.titulo ?? ''} onChange={(e) => set('titulo', e.target.value)} placeholder={(a.origem ?? 'marcado') === 'oficial' ? 'Gabarito Oficial' : 'Gabarito de Alternativas'} className={inputCls} /></Row>
+          <Faixa label="Questões por linha" min={4} max={20} value={a.porLinha ?? 10} onChange={(v) => set('porLinha', v)} />
+          <Faixa label="Arredondamento das bordas (0 = retas)" min={0} max={16} value={a.bordaRaio ?? 8} onChange={(v) => set('bordaRaio', v)} />
+          <Row label="Nº de questões (vazio = real)"><input type="number" min={1} value={a.numQuestoes ?? ''} onChange={(e) => set('numQuestoes', e.target.value ? Number(e.target.value) : null)} className={inputCls} /></Row>
+          <Row label="Alternativas por questão"><input type="number" min={2} max={6} value={a.numAlternativas ?? 5} onChange={(e) => set('numAlternativas', Number(e.target.value))} className={inputCls} /></Row>
+          <p className="pt-1 text-xs font-semibold text-muted-foreground">Fonte</p>
+          <FonteSelect value={a.fonte ?? ''} onChange={(v) => set('fonte', v)} />
+          <p className="pt-1 text-xs font-semibold text-muted-foreground">Cabeçalho</p>
+          <Cor label="Fundo do cabeçalho" value={a.corHeader} onChange={(v) => set('corHeader', v)} />
+          <Cor label="Cor do texto do cabeçalho" value={a.corHeaderTexto} onChange={(v) => set('corHeaderTexto', v)} />
+          <p className="pt-1 text-xs font-semibold text-muted-foreground">Respostas</p>
+          <Cor label="Cor do texto (respostas marcadas)" value={a.corMarcadas ?? a.corLetra} onChange={(v) => set('corMarcadas', v)} />
+          <p className="pt-1 text-xs font-semibold text-muted-foreground">Linhas ímpares (1ª, 3ª…)</p>
+          <Cor label="Cor do fundo — linha ímpar" value={a.fundoImpar ?? a.corLinhaImpar} onChange={(v) => set('fundoImpar', v)} />
+          <Cor label="Cor do texto (nº) — linha ímpar" value={a.textoImpar} onChange={(v) => set('textoImpar', v)} />
+          <p className="pt-1 text-xs font-semibold text-muted-foreground">Linhas pares (2ª, 4ª…)</p>
+          <Cor label="Cor do fundo — linha par" value={a.fundoPar ?? a.corLinhaPar ?? a.corListra} onChange={(v) => set('fundoPar', v)} />
+          <Cor label="Cor do texto (nº) — linha par" value={a.textoPar} onChange={(v) => set('textoPar', v)} />
         </div>
       )
     case 'identificacao':
       return (
         <div className="space-y-3">
-          <Row label="Título"><input value={a.titulo} onChange={(e) => set('titulo', e.target.value)} className={inputCls} /></Row>
-          <div className="space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Campos</span>
-            {(a.campos ?? []).map((campo: string, i: number) => (
-              <div key={i} className="flex items-center gap-1">
-                <input value={campo} onChange={(e) => { const cp = [...a.campos]; cp[i] = e.target.value; set('campos', cp) }} className={inputCls} />
-                <button type="button" onClick={() => set('campos', a.campos.filter((_: string, j: number) => j !== i))} className="text-destructive hover:opacity-70"><Trash2 className="h-4 w-4" /></button>
-              </div>
-            ))}
-            <button type="button" onClick={() => set('campos', [...(a.campos ?? []), 'Novo campo'])} className="flex items-center gap-1 text-xs text-primary hover:underline"><Plus className="h-3.5 w-3.5" /> Adicionar campo</button>
-          </div>
+          <Row label="Título"><input value={a.titulo ?? ''} onChange={(e) => set('titulo', e.target.value)} placeholder="Dados do Candidato" className={inputCls} /></Row>
+          <Faixa label="Arredondamento das bordas (0 = retas)" min={0} max={16} value={a.bordaRaio ?? 8} onChange={(v) => set('bordaRaio', v)} />
+          <p className="pt-1 text-xs font-semibold text-muted-foreground">Fonte</p>
+          <FonteSelect value={a.fonte ?? ''} onChange={(v) => set('fonte', v)} />
+          <p className="pt-1 text-xs font-semibold text-muted-foreground">Cabeçalho</p>
+          <Cor label="Fundo do cabeçalho" value={a.corHeader} onChange={(v) => set('corHeader', v)} />
+          <Cor label="Texto do cabeçalho" value={a.corHeaderTexto} onChange={(v) => set('corHeaderTexto', v)} />
+          <p className="pt-1 text-xs font-semibold text-muted-foreground">Campos</p>
+          <Cor label="Cor do rótulo" value={a.corRotulo} onChange={(v) => set('corRotulo', v)} />
+          <Cor label="Cor do valor" value={a.corValor} onChange={(v) => set('corValor', v)} />
+          <Cor label="Fundo da linha de destaque" value={a.corDestaque} onChange={(v) => set('corDestaque', v)} />
+          <p className="pt-1 text-xs font-semibold text-muted-foreground">Detalhes</p>
+          <Cor label="Cor da borda" value={a.corBorda} onChange={(v) => set('corBorda', v)} />
+          <Cor label="Linha inferior (destaque)" value={a.corAcento} onChange={(v) => set('corAcento', v)} />
+          <GrupoCampos label="Destaque (linha de cima, maior)" items={normCampos(a.destaque)} onChange={(v) => set('destaque', v)} exemplos="{{nome}} {{email}} {{telefone}} {{simulado}} {{classificacao}}" />
+          <GrupoCampos label="Estatísticas (linha de baixo)" items={normCampos(a.campos)} onChange={(v) => set('campos', v)} exemplos="{{data}} {{inicio}} {{termino}} {{tempo_total}} {{respondidas}} {{em_branco}} {{nota}} {{percentual}}" />
         </div>
       )
     case 'imagem':
       return (
         <div className="space-y-3">
           <UploadImagem url={a.url} onChange={(v) => set('url', v)} />
-          <Row label={`Largura: ${a.largura}%`}><input type="range" min={10} max={100} value={a.largura} onChange={(e) => set('largura', Number(e.target.value))} className="w-full" /></Row>
+          <Faixa label="Largura (%)" min={10} max={100} value={a.largura} onChange={(v) => set('largura', v)} />
           <Align value={a.align} onChange={(v) => set('align', v)} />
         </div>
       )
@@ -239,13 +350,13 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
         </div>
       )
     case 'espacador':
-      return <Row label={`Altura: ${a.altura}px`}><input type="range" min={4} max={400} value={a.altura} onChange={(e) => set('altura', Number(e.target.value))} className="w-full" /></Row>
+      return <Faixa label="Altura (px)" min={4} max={ESPACADOR_MAX} value={Math.min(a.altura, ESPACADOR_MAX)} onChange={(v) => set('altura', v)} />
     case 'linhas-resposta':
       return (
         <div className="space-y-3">
           <Row label="Rótulo"><input value={a.rotulo ?? ''} onChange={(e) => set('rotulo', e.target.value)} placeholder="Resposta:" className={inputCls} /></Row>
           <Row label="Nº de linhas"><input type="number" min={1} max={40} value={a.quantidade ?? 6} onChange={(e) => set('quantidade', Number(e.target.value))} className={inputCls} /></Row>
-          <Row label={`Altura da linha: ${a.altura ?? 28}px`}><input type="range" min={16} max={60} value={a.altura ?? 28} onChange={(e) => set('altura', Number(e.target.value))} className="w-full" /></Row>
+          <Faixa label="Altura da linha (px)" min={16} max={120} value={a.altura ?? 28} onChange={(v) => set('altura', v)} />
           <Cor label="Cor da linha" value={a.cor} onChange={(v) => set('cor', v)} />
         </div>
       )
@@ -254,7 +365,7 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
         <div className="space-y-3">
           <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Desenhe o template dentro do bloco (textos, cards, alternativas). Ele se repete para cada questão do banco. Use as variáveis <code>{'{q_num}'}</code>, <code>{'{q_enunciado}'}</code> e o bloco <strong>Alternativas</strong>.</p>
           <Row label="Quantidade (vazio = todas)"><input type="number" min={1} value={a.quantidade ?? ''} onChange={(e) => set('quantidade', e.target.value ? Number(e.target.value) : null)} className={inputCls} /></Row>
-          <Row label={`Espaço entre questões: ${a.gap ?? 16}px`}><input type="range" min={0} max={48} value={a.gap ?? 16} onChange={(e) => set('gap', Number(e.target.value))} className="w-full" /></Row>
+          <Faixa label="Espaço entre questões (px)" min={0} max={48} value={a.gap ?? 16} onChange={(v) => set('gap', v)} />
         </div>
       )
     case 'alternativas':
@@ -278,25 +389,32 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
           <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Use os botões no card (canvas) para inserir blocos dentro dele.</p>
           <Cor label="Cor de fundo" value={a.corFundo} onChange={(v) => set('corFundo', v)} />
           <Cor label="Cor da borda" value={a.bordaCor} onChange={(v) => set('bordaCor', v)} />
-          <Row label={`Espessura da borda: ${a.bordaLargura}px`}><input type="range" min={0} max={6} value={a.bordaLargura} onChange={(e) => set('bordaLargura', Number(e.target.value))} className="w-full" /></Row>
-          <Row label={`Cantos arredondados: ${a.bordaRaio}px`}><input type="range" min={0} max={28} value={a.bordaRaio} onChange={(e) => set('bordaRaio', Number(e.target.value))} className="w-full" /></Row>
-          <Row label={`Espaçamento interno: ${a.padding}px`}><input type="range" min={0} max={40} value={a.padding} onChange={(e) => set('padding', Number(e.target.value))} className="w-full" /></Row>
-          <Row label={`Largura: ${a.largura}%`}><input type="range" min={20} max={100} value={a.largura} onChange={(e) => set('largura', Number(e.target.value))} className="w-full" /></Row>
+          <Faixa label="Espessura da borda (px)" min={0} max={6} value={a.bordaLargura} onChange={(v) => set('bordaLargura', v)} />
+          <Faixa label="Cantos arredondados (px)" min={0} max={28} value={a.bordaRaio} onChange={(v) => set('bordaRaio', v)} />
+          <Faixa label="Espaçamento interno (px)" min={0} max={40} value={a.padding} onChange={(v) => set('padding', v)} />
+          <Faixa label="Largura (%)" min={5} max={100} value={a.largura} onChange={(v) => set('largura', v)} />
           <Align value={a.alinhamento} onChange={(v) => set('alinhamento', v)} />
         </div>
       )
     case 'colunas':
       return (
         <div className="space-y-3">
-          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Use “+ coluna / − coluna” no bloco (canvas) e adicione blocos dentro de cada coluna.</p>
-          <Row label={`Espaço entre colunas: ${a.gap}px`}><input type="range" min={0} max={48} value={a.gap} onChange={(e) => set('gap', Number(e.target.value))} className="w-full" /></Row>
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Use “+ coluna / − coluna” no bloco (canvas) e adicione blocos dentro de cada coluna. Clique numa coluna para ajustar a largura dela.</p>
+          <Faixa label="Espaço entre colunas (px)" min={0} max={48} value={a.gap} onChange={(v) => set('gap', v)} />
+        </div>
+      )
+    case 'coluna':
+      return (
+        <div className="space-y-3">
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Largura desta coluna. <strong>0 = automática</strong> (divide o espaço igualmente com as demais).</p>
+          <Faixa label="Largura da coluna (%)" min={0} max={100} value={a.largura ?? 0} onChange={(v) => set('largura', v)} />
         </div>
       )
     case 'plano-fundo':
       return (
         <div className="space-y-3">
           <UploadImagem url={a.url} onChange={(v) => set('url', v)} />
-          <Row label={`Opacidade: ${a.opacidade}%`}><input type="range" min={5} max={100} value={a.opacidade} onChange={(e) => set('opacidade', Number(e.target.value))} className="w-full" /></Row>
+          <Faixa label="Opacidade (%)" min={5} max={100} value={a.opacidade} onChange={(v) => set('opacidade', v)} />
         </div>
       )
     case 'cabecalho-prova':
@@ -331,7 +449,7 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
             <button type="button" onClick={() => set('assinaturas', [...(a.assinaturas ?? []), 'Assinatura'])} className="flex items-center gap-1 text-xs text-primary hover:underline"><Plus className="h-3.5 w-3.5" /> Adicionar assinatura</button>
           </div>
           <Align value={a.align} onChange={(v) => set('align', v)} />
-          <Row label={`Largura da linha: ${a.larguraLinha ?? 220}px`}><input type="range" min={100} max={400} value={a.larguraLinha ?? 220} onChange={(e) => set('larguraLinha', Number(e.target.value))} className="w-full" /></Row>
+          <Faixa label="Largura da linha (px)" min={100} max={400} value={a.larguraLinha ?? 220} onChange={(v) => set('larguraLinha', v)} />
         </div>
       )
     case 'quebra-pagina':

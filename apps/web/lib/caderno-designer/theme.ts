@@ -6,9 +6,28 @@ export type CadernoTheme = {
 }
 
 export const FONTES_CADERNO: { id: string; nome: string; css: string }[] = [
-  { id: 'serif', nome: 'Serifada (Times)', css: 'Georgia, "Times New Roman", serif' },
+  // Serifadas
+  { id: 'serif', nome: 'Serifada (Georgia)', css: 'Georgia, "Times New Roman", serif' },
+  { id: 'times', nome: 'Times New Roman', css: '"Times New Roman", Times, serif' },
+  { id: 'georgia', nome: 'Georgia', css: 'Georgia, serif' },
+  { id: 'garamond', nome: 'Garamond', css: 'Garamond, "EB Garamond", "Times New Roman", serif' },
+  { id: 'palatino', nome: 'Palatino', css: 'Palatino, "Palatino Linotype", "Book Antiqua", serif' },
+  { id: 'cambria', nome: 'Cambria', css: 'Cambria, Georgia, serif' },
+  { id: 'bookman', nome: 'Bookman', css: '"Bookman Old Style", "Book Antiqua", serif' },
+  // Sem serifa
+  { id: 'montserrat', nome: 'Montserrat', css: '"Montserrat", "Segoe UI", Arial, sans-serif' },
   { id: 'sans', nome: 'Sem serifa (Helvetica)', css: 'Helvetica, Arial, sans-serif' },
+  { id: 'arial', nome: 'Arial', css: 'Arial, Helvetica, sans-serif' },
+  { id: 'verdana', nome: 'Verdana', css: 'Verdana, Geneva, sans-serif' },
+  { id: 'tahoma', nome: 'Tahoma', css: 'Tahoma, Geneva, sans-serif' },
+  { id: 'trebuchet', nome: 'Trebuchet MS', css: '"Trebuchet MS", Helvetica, sans-serif' },
+  { id: 'calibri', nome: 'Calibri', css: 'Calibri, "Segoe UI", Arial, sans-serif' },
+  { id: 'segoe', nome: 'Segoe UI', css: '"Segoe UI", Roboto, Arial, sans-serif' },
+  { id: 'century-gothic', nome: 'Century Gothic', css: '"Century Gothic", "Apple SD Gothic Neo", Futura, sans-serif' },
+  { id: 'gill-sans', nome: 'Gill Sans', css: '"Gill Sans", "Gill Sans MT", Calibri, sans-serif' },
+  // Monoespaçadas
   { id: 'mono', nome: 'Monoespaçada (Courier)', css: '"Courier New", Courier, monospace' },
+  { id: 'consolas', nome: 'Consolas', css: 'Consolas, "Courier New", monospace' },
 ]
 
 export const TEMA_PADRAO: CadernoTheme = {

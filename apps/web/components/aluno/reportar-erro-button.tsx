@@ -76,7 +76,7 @@ export function ReportarErroButton({ sessaoId, questaoId }: { sessaoId: string; 
         placeholder="Descreva o problema (opcional)"
         rows={2}
         maxLength={1000}
-        className="w-full resize-none rounded-md border bg-background px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+        className="w-full resize-none rounded-md border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
       />
       <div className="flex items-center gap-2">
         <button

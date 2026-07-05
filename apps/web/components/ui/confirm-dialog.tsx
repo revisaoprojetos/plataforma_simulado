@@ -133,7 +133,7 @@ export function ConfirmHost() {
               <input ref={inputRef} value={texto} placeholder={o.placeholder}
                 onChange={(e) => setTexto(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit() } }}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
+                className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
               <div className="mt-5 flex justify-end gap-2">
                 <button type="button" onClick={() => fecharPrompt(null)}
                   className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>

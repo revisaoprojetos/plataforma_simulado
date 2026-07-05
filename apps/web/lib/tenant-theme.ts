@@ -115,7 +115,7 @@ function varsDaPaleta(cores: Record<string, unknown>): { marca: string[]; surf: 
   const sidebar = v(cores.sidebar), sidetext = v(cores.sidetext), topbar = v(cores.topbar)
   const sborder = v(cores.sborder), icon = v(cores.icon), iconAtivo = v(cores.iconAtivo), iconHover = v(cores.iconHover)
   const sidetextHover = v(cores.sidetextHover), sidetextActive = v(cores.sidetextActive)
-  const bg = v(cores.bg), text = v(cores.text), card = v(cores.card), cborder = v(cores.cborder), titulo = v(cores.titulo)
+  const bg = v(cores.bg), text = v(cores.text), card = v(cores.card), cborder = v(cores.cborder), titulo = v(cores.titulo), inputBg = v(cores.inputBg)
   const tabBg = v(cores.tabBg), tabAtivo = v(cores.tabAtivo), tabTexto = v(cores.tabTexto)
 
   const marca: string[] = []
@@ -150,6 +150,7 @@ function varsDaPaleta(cores: Record<string, unknown>): { marca: string[]; surf: 
   } else if (bgC && text) surf.push(`  --muted: ${mix(text, 7, bgC)};`)
   if (text && bgC) surf.push(`  --muted-foreground: ${mix(text, 55, bgC)};`, `  --accent: ${mix(text, 10, bgC)};`, `  --accent-foreground: ${ok(text)};`)
   if (cborder) surf.push(`  --border: ${ok(cborder)};`, `  --input: ${ok(cborder)};`)
+  if (inputBg) surf.push(`  --input-bg: ${ok(inputBg)};`)
   // Tabs: fundo da lista, tab selecionada, texto (hover/ativo)
   if (tabBg) surf.push(`  --tab-bg: ${ok(tabBg)};`)
   if (tabAtivo) surf.push(`  --tab-active: ${ok(tabAtivo)};`)

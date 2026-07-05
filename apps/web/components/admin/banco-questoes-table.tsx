@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Search, Check, Trash2, Loader2, GripVertical, ChevronUp, ChevronDown } from 'lucide-react'
+import { Search, Check, Trash2, Loader2, GripVertical, ChevronUp, ChevronDown, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { removerQuestoes, reordenarQuestoesBanco } from '@/app/admin/banco-questoes/actions'
+import { CopiarCodigo } from '@/components/admin/copiar-codigo'
+import { codigoQuestao } from '@/lib/codigo-questao'
 
 interface Q { id: string; enunciado: string; tipo?: string | null; nivel_dificuldade?: string | null; status?: string | null; disciplina?: string | null; assunto?: string | null }
 
@@ -24,7 +26,7 @@ const statusCfg: Record<string, { label: string; cls: string }> = {
   arquivada: { label: 'Arquivada', cls: 'bg-muted text-muted-foreground' },
 }
 
-export function BancoQuestoesTable({ bancoId, questoes, acao }: { bancoId: string; questoes: Q[]; acao?: React.ReactNode }) {
+export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }: { bancoId: string; questoes: Q[]; acao?: React.ReactNode; cor?: string }) {
   const [busca, setBusca] = useState('')
   const [disc, setDisc] = useState('all')
   const [status, setStatus] = useState('all')
@@ -88,9 +90,18 @@ export function BancoQuestoesTable({ bancoId, questoes, acao }: { bancoId: strin
   }
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+      {/* Cabeçalho da seção */}
+      <div className="flex items-center gap-3 border-b px-4 py-3.5" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent 55%)` }}>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}><ListChecks className="h-5 w-5" /></span>
+        <div>
+          <h3 className="text-sm font-semibold leading-tight">Questões do banco</h3>
+          <p className="text-xs text-muted-foreground">{ordered.length} {ordered.length === 1 ? 'questão' : 'questões'} · filtre, reordene e importe</p>
+        </div>
+      </div>
+
       {/* Linha 1: busca + remover + adicionar */}
-      <div className="flex flex-wrap items-center gap-2 border-b px-3 pt-0 pb-3">
+      <div className="flex flex-wrap items-center gap-2 border-b px-3 pb-3 pt-3">
         <div className="relative min-w-48 flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar enunciado, assunto…" className="pl-8" />
@@ -194,7 +205,10 @@ export function BancoQuestoesTable({ bancoId, questoes, acao }: { bancoId: strin
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{i + 1}</TableCell>
-                      <TableCell className="text-sm">{enun}</TableCell>
+                      <TableCell className="text-sm">
+                        <div className="mb-1"><CopiarCodigo codigo={codigoQuestao(q.id)} /></div>
+                        {enun}
+                      </TableCell>
                       <TableCell className="text-xs font-medium uppercase text-muted-foreground">{q.disciplina ?? '—'}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{q.assunto ?? '—'}</TableCell>
                       <TableCell className="text-center font-bold">{d ? <span className={d.cls}>{d.letra}</span> : '—'}</TableCell>

@@ -1,12 +1,13 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { NovoTenantForm } from '@/components/admin/novo-tenant-form'
-import { ShieldAlert } from 'lucide-react'
+import { SecaoHeader } from '@/components/admin/secao-header'
+import { ShieldAlert, Building2, Plus } from 'lucide-react'
 
 export default async function TenantsPage() {
   const access = await getCurrentAccess()
@@ -47,22 +48,15 @@ export default async function TenantsPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Nova plataforma</CardTitle>
-          <CardDescription>
-            Ao criar, a plataforma já recebe perfis de acesso, mensagens padrão e um administrador inicial.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader icon={Plus} titulo="Nova plataforma" subtitulo="Já recebe perfis de acesso, mensagens padrão e um admin inicial." />
+        <CardContent className="px-4 py-4">
           <NovoTenantForm />
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Plataformas cadastradas ({tenants?.length ?? 0})</CardTitle>
-        </CardHeader>
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader icon={Building2} titulo="Plataformas cadastradas" subtitulo={`${tenants?.length ?? 0} plataforma(s)`} />
         <CardContent className="p-0">
           <Table>
             <TableHeader>

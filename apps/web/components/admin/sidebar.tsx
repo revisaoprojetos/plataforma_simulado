@@ -28,6 +28,8 @@ import {
   FilePen,
   ChevronDown,
   Trash2,
+  PieChart,
+  Trophy,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -97,7 +99,11 @@ const navGroups: NavGroup[] = [
     label: 'Análise',
     icon: BarChart3,
     items: [
-      { label: 'Relatórios', href: '/admin/relatorios', icon: BarChart3, perm: 'relatorios:view' },
+      { label: 'Relatório Gráfico', href: '/admin/relatorios/graficos', icon: PieChart, perm: 'relatorios:view' },
+      { label: 'Relatório Simulado', href: '/admin/relatorios/simulados', icon: ClipboardList, perm: 'relatorios:view' },
+      { label: 'Relatório Disciplina', href: '/admin/relatorios/disciplinas', icon: BookOpen, perm: 'relatorios:view' },
+      { label: 'Relatório Estudantes', href: '/admin/relatorios/estudantes', icon: GraduationCap, perm: 'relatorios:view' },
+      { label: 'Ranking', href: '/admin/relatorios/ranking', icon: Trophy, perm: 'relatorios:view' },
     ],
   },
   {

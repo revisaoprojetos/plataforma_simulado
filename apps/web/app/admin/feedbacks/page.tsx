@@ -1,7 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { FeedbackItem } from '@/components/admin/feedback-item'
+import { SecaoHeader } from '@/components/admin/secao-header'
 import { ShieldAlert, Inbox } from 'lucide-react'
 
 export default async function FeedbacksPage() {
@@ -65,11 +66,9 @@ export default async function FeedbacksPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Fila de moderação</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader icon={Inbox} titulo="Fila de moderação" subtitulo={`${pendentes} pendente(s) de ${feedbacks.length}`} />
+        <CardContent className="space-y-3 px-4 py-4">
           {feedbacks.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
               <Inbox className="h-8 w-8" />

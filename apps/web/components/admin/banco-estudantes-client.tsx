@@ -6,14 +6,19 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Search, Check, Eye, Trash2, Loader2 } from 'lucide-react'
+import { Search, Check, Eye, Trash2, Loader2, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { desvincularEstudante } from '@/app/admin/banco-questoes/estudantes-actions'
 import { AdicionarEstudantesDialog } from '@/components/admin/adicionar-estudantes-dialog'
 import { AdicionarGrupoBancoDialog, type GrupoOpc } from '@/components/admin/adicionar-grupo-banco-dialog'
+import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 
-interface Aluno { id: string; nome: string; email?: string | null; telefone?: string | null; cpf?: string | null; ultimo_acesso?: string | null }
+interface Aluno { id: string; nome: string; email?: string | null; telefone?: string | null; cpf?: string | null; classificacao?: string | null; ultimo_acesso?: string | null }
+
+function iniciais(n: string) {
+  return n.split(' ').filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join('')
+}
 interface AlunoSel { id: string; nome: string; email?: string | null; telefone?: string | null; classificacao?: string | null; jaVinculado: boolean }
 
 function fmtAcesso(d?: string | null) {
@@ -22,7 +27,7 @@ function fmtAcesso(d?: string | null) {
   return `${dt.toLocaleDateString('pt-BR')} ${dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = [] }: { bancoId: string; vinculados: Aluno[]; alunos: AlunoSel[]; grupos?: GrupoOpc[] }) {
+export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = [], cor = '#6d28d9' }: { bancoId: string; vinculados: Aluno[]; alunos: AlunoSel[]; grupos?: GrupoOpc[]; cor?: string }) {
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
@@ -48,9 +53,18 @@ export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = []
   }
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+      {/* Cabeçalho da seção */}
+      <div className="flex items-center gap-3 border-b px-4 py-3.5" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent 55%)` }}>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}><Users className="h-5 w-5" /></span>
+        <div>
+          <h3 className="text-sm font-semibold leading-tight">Estudantes vinculados</h3>
+          <p className="text-xs text-muted-foreground">{vinculados.length} aluno(s) neste banco</p>
+        </div>
+      </div>
+
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 border-b px-3 pt-0 pb-3">
+      <div className="flex flex-wrap items-center gap-2 border-b px-3 pb-3 pt-3">
         <div className="relative min-w-48 flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou e-mail…" className="pl-8" />
@@ -96,7 +110,17 @@ export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = []
                           {on && <Check className="h-3 w-3" />}
                         </span>
                       </TableCell>
-                      <TableCell className="font-medium">{a.nome}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold" style={{ backgroundColor: `${cor}1a`, color: cor }}>{iniciais(a.nome)}</span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate font-medium">{a.nome}</span>
+                              <ClassificacaoBadge classificacao={a.classificacao} />
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{a.email ?? '—'}</TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">{a.cpf ?? '—'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{fmtAcesso(a.ultimo_acesso)}</TableCell>

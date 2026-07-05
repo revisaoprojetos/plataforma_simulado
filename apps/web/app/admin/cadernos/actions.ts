@@ -69,6 +69,30 @@ export async function salvarCadernoDesignerV2(
   return { ok: true }
 }
 
+/** Atualiza nome + personalização (cor/ícone/capa) do caderno. Tolerante caso as colunas não existam. */
+export async function atualizarCaderno(id: string, nome: string, cor: string | null, icone: string | null, capaUrl?: string | null): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  const titulo = nome.trim()
+  if (!titulo) return { ok: false, error: 'Informe um nome.' }
+
+  const svc = createAdminClient()
+  const { error } = await svc
+    .from('simulado_cadernos_designer')
+    .update({ nome: titulo, cor: cor || null, icone: icone || null, capa_url: capaUrl || null })
+    .eq('id', id).eq('tenant_id', access.tenantId ?? '')
+  if (error && /cor|icone|capa_url|column/i.test(error.message)) {
+    const { error: e2 } = await svc.from('simulado_cadernos_designer').update({ nome: titulo }).eq('id', id).eq('tenant_id', access.tenantId ?? '')
+    if (e2) return { ok: false, error: e2.message }
+  } else if (error) {
+    return { ok: false, error: error.message }
+  }
+
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: id, depois: { nome: titulo, cor, icone, capa: !!capaUrl } })
+  revalidatePath('/admin/cadernos')
+  return { ok: true }
+}
+
 export async function excluirCaderno(id: string): Promise<{ ok: boolean; error?: string }> {
   if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
   const { error } = await softDelete('simulado_cadernos_designer', id)

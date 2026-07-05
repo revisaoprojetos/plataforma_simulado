@@ -4,10 +4,11 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { criarGrupo, excluirGrupo } from '@/app/admin/grupos/actions'
 import { pedirTexto, confirmar } from '@/components/ui/confirm-dialog'
 import { EditarGrupoDialog } from '@/components/admin/editar-grupo-dialog'
+import { SecaoHeader } from '@/components/admin/secao-header'
 import { Plus, Users, Pencil, Trash2, Loader2, UsersRound, ChevronRight } from 'lucide-react'
 
 type Grupo = { id: string; nome: string; membros: number; cor: string | null }
@@ -40,8 +41,8 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
         </button>
       </div>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Grupos cadastrados ({grupos.length})</CardTitle></CardHeader>
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader icon={UsersRound} titulo="Grupos cadastrados" subtitulo={`${grupos.length} grupo(s)`} />
         <CardContent className="p-0">
           {grupos.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">

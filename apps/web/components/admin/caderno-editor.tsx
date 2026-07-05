@@ -93,7 +93,7 @@ export function CadernoEditor({
             <label className="text-sm font-medium">Instruções</label>
             <textarea value={instrucoes} onChange={(e) => setInstrucoes(e.target.value)} rows={2}
               placeholder="Ex.: Leia atentamente. Duração 4h…"
-              className="w-full resize-y rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+              className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
           </div>
         </CardContent>
       </Card>
@@ -117,7 +117,7 @@ export function CadernoEditor({
                 {b.tipo === 'texto' ? (
                   <textarea value={b.conteudo ?? ''} onChange={(e) => setTexto(b.id, e.target.value)} rows={2}
                     placeholder="Texto / enunciado de bloco…"
-                    className="w-full resize-y rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+                    className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
                 ) : (
                   <div className="text-sm">
                     <span className="mr-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
@@ -143,7 +143,7 @@ export function CadernoEditor({
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar questão pelo enunciado…"
-              className="w-full rounded-md border bg-background py-2 pl-8 pr-3 text-sm outline-none focus:ring-1 focus:ring-ring" />
+              className="w-full rounded-md border bg-[var(--input-bg,transparent)] py-2 pl-8 pr-3 text-sm outline-none focus:ring-1 focus:ring-ring" />
           </div>
           <div className="max-h-64 space-y-1 overflow-auto">
             {filtradas.length === 0 ? (

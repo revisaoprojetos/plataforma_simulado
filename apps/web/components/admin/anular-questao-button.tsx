@@ -42,7 +42,7 @@ export function AnularQuestaoButton({ simuladoId, questaoId }: { simuladoId: str
         value={motivo}
         onChange={(e) => setMotivo(e.target.value)}
         placeholder="Motivo (ex.: questão sem resposta correta)"
-        className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+        className="w-full rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
       />
       <div className="flex flex-wrap gap-1.5">
         {([['pontua_todos', 'Pontua todos'], ['desconsidera', 'Desconsidera']] as const).map(([v, l]) => (

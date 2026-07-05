@@ -26,7 +26,7 @@ function paraDataInput(d: string | null) {
   return d.length >= 10 ? d.slice(0, 10) : d
 }
 
-const inputCls = 'w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring'
+const inputCls = 'w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring'
 
 // Definido fora do componente: se ficar dentro, é recriado a cada tecla e os inputs perdem o foco.
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {

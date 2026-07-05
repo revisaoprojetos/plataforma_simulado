@@ -24,6 +24,8 @@ import { ptBR } from 'date-fns/locale'
 import Link from 'next/link'
 import { ChevronLeft, Code, Layers, CalendarClock, Clock, KeyRound, Link2 } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
+import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
+import { tipoDoSimulado } from '@/lib/simulado/tipo'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -98,7 +100,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
       .from('simulado_prova_questoes')
       .select(`
         id, ordem, peso, anulada,
-        questoes:simulado_questoes(id, enunciado, disciplinas:simulado_disciplinas(nome))
+        questoes:simulado_questoes(id, tipo, enunciado, disciplinas:simulado_disciplinas(nome))
       `, { count: 'exact' })
       .eq('simulado_id', id)
       .order('ordem'),
@@ -125,6 +127,9 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
     .order('atualizado_em', { ascending: false })
   const cadernos = (cadernosRaw ?? []).map((c: any) => ({ id: c.id as string, nome: (c.nome as string) ?? 'Caderno' }))
   const cadernoVinculado = ((simulado.regras as Record<string, unknown> | null)?.caderno_id as string | undefined) ?? null
+
+  // Tipo do simulado (objetiva/discursiva/mista) derivado das questões vinculadas.
+  const tipoSim = tipoDoSimulado((questoes ?? []).map((sq: any) => sq.questoes?.tipo))
 
   const questoesNoSimulado = (questoes ?? []).map((sq: any) => ({
     id: sq.id,
@@ -190,6 +195,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.class}`}>
               {statusCfg.label}
             </span>
+            <TipoSimuladoBadge tipo={tipoSim} />
           </div>
         </div>
         <SimuladoActions simuladoId={id} status={simulado.status} />

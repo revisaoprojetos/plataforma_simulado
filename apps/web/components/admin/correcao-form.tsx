@@ -82,7 +82,7 @@ export function CorrecaoForm({
                 type="number" step="0.5" min="0" max={c.pontos}
                 value={c.nota ?? ''}
                 onChange={(e) => setNota(c.id, Math.min(c.pontos, Math.max(0, Number(e.target.value))))}
-                className="w-20 rounded-md border bg-background px-2 py-1 text-right outline-none focus:ring-1 focus:ring-ring"
+                className="w-20 rounded-md border bg-[var(--input-bg,transparent)] px-2 py-1 text-right outline-none focus:ring-1 focus:ring-ring"
               />
               <span className="text-muted-foreground">/ {c.pontos}</span>
             </div>
@@ -91,7 +91,7 @@ export function CorrecaoForm({
             value={c.comentario}
             onChange={(e) => setComentario(c.id, e.target.value)}
             placeholder="Comentário do critério (opcional)"
-            className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+            className="w-full rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
       ))}
@@ -103,7 +103,7 @@ export function CorrecaoForm({
           onChange={(e) => setFeedback(e.target.value)}
           rows={3}
           placeholder="Observações gerais para o aluno…"
-          className="w-full resize-y rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+          className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
         />
       </div>
 

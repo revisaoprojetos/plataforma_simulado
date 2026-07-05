@@ -1,14 +1,15 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
+import { BarChart3, Users } from 'lucide-react'
 
 /**
  * Relatório por aluno vinculado ao banco: desempenho nas questões do banco
  * (acertos/erros/em branco/nota), se finalizou (respondeu todas) e acertos
  * por disciplina do bloco. Baseado nas respostas reais dos simulados.
  */
-export async function BancoRelatorio({ bancoId }: { bancoId: string }) {
+export async function BancoRelatorio({ bancoId, cor = '#6d28d9' }: { bancoId: string; cor?: string }) {
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
@@ -108,11 +109,31 @@ export async function BancoRelatorio({ bancoId }: { bancoId: string }) {
     )
   }
 
+  const mediaGeral = linhas.length ? linhas.reduce((s, l) => s + l.nota, 0) / linhas.length : 0
+  const tone = (n: number) => (n >= 7 ? 'text-emerald-600 dark:text-emerald-400' : n >= 5 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
+  const pill = 'inline-flex min-w-7 justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold'
+
   return (
-    <Card>
-      <CardContent className="overflow-x-auto p-0">
+    <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+      {/* Cabeçalho + resumo */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3.5" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent 55%)` }}>
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}><BarChart3 className="h-5 w-5" /></span>
+          <div>
+            <h3 className="text-sm font-semibold leading-tight">Desempenho por aluno</h3>
+            <p className="text-xs text-muted-foreground">Acertos, erros e nota nas questões do banco</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground"><Users className="h-3 w-3" /> {alunos.length} aluno(s)</span>
+          <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground">Média <span className={tone(mediaGeral)}>{mediaGeral.toFixed(1)}</span></span>
+          <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground">{totalQ} questões</span>
+        </div>
+      </div>
+
+      <CardContent className="max-h-[65vh] overflow-auto p-0">
         <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-xs text-muted-foreground">
+          <thead className="sticky top-0 z-10 bg-muted/80 text-xs text-muted-foreground backdrop-blur">
             <tr>
               <th className="px-3 py-2 text-left font-medium">Nome</th>
               <th className="px-3 py-2 text-left font-medium">E-mail</th>
@@ -122,25 +143,25 @@ export async function BancoRelatorio({ bancoId }: { bancoId: string }) {
               <th className="px-3 py-2 text-center font-medium">Em branco</th>
               <th className="px-3 py-2 text-center font-medium">Pontuação</th>
               <th className="px-3 py-2 text-center font-medium">Finalizado</th>
-              {disciplinas.map((d) => <th key={d} className="px-3 py-2 text-center font-medium whitespace-nowrap">{d}</th>)}
+              {disciplinas.map((d) => <th key={d} className="whitespace-nowrap px-3 py-2 text-center font-medium">{d}</th>)}
             </tr>
           </thead>
           <tbody>
             {linhas.map(({ a, acertos, incorretas, emBranco, nota, finalizadoData, porDisc }) => (
-              <tr key={a.id} className="border-t">
-                <td className="px-3 py-2 font-medium whitespace-nowrap">{a.nome}</td>
+              <tr key={a.id} className="border-t transition-colors hover:bg-muted/40">
+                <td className="whitespace-nowrap px-3 py-2 font-medium">{a.nome}</td>
                 <td className="px-3 py-2 text-muted-foreground">{a.email ?? '—'}</td>
-                <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{a.telefone ?? '—'}</td>
-                <td className="px-3 py-2 text-center font-medium text-green-600">{acertos}</td>
-                <td className="px-3 py-2 text-center text-red-600">{incorretas}</td>
-                <td className="px-3 py-2 text-center font-medium text-yellow-500">{emBranco}</td>
-                <td className="px-3 py-2 text-center font-semibold">{nota.toFixed(1)}</td>
-                <td className="px-3 py-2 text-center whitespace-nowrap text-sm">
+                <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{a.telefone ?? '—'}</td>
+                <td className="px-3 py-2 text-center"><span className={cn(pill, 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400')}>{acertos}</span></td>
+                <td className="px-3 py-2 text-center"><span className={cn(pill, 'bg-rose-500/10 text-rose-600 dark:text-rose-400')}>{incorretas}</span></td>
+                <td className="px-3 py-2 text-center"><span className={cn(pill, 'bg-amber-500/10 text-amber-600 dark:text-amber-400')}>{emBranco}</span></td>
+                <td className={cn('px-3 py-2 text-center font-bold', tone(nota))}>{nota.toFixed(1)}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-center text-sm">
                   {finalizadoData ? <span className="text-foreground">{finalizadoData}</span> : <span className="text-muted-foreground">—</span>}
                 </td>
                 {disciplinas.map((d) => (
-                  <td key={d} className="px-3 py-2 text-center whitespace-nowrap text-muted-foreground">
-                    {porDisc.get(d) ?? 0}<span className="opacity-50">/{discTotais.get(d)}</span>
+                  <td key={d} className="whitespace-nowrap px-3 py-2 text-center text-muted-foreground">
+                    <span className="font-medium text-foreground">{porDisc.get(d) ?? 0}</span><span className="opacity-50">/{discTotais.get(d)}</span>
                   </td>
                 ))}
               </tr>

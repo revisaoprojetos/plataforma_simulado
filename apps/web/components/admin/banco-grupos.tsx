@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { salvarGruposBanco, type GrupoBanco } from '@/app/admin/banco-questoes/actions'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { Plus, Trash2, Loader2, Layers, Check, PencilLine, AlertTriangle } from 'lucide-react'
@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 const CORES = ['#4f7fff', '#8b5cf6', '#ef4444', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#84cc16']
 const ROMANOS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
 
-export function BancoGrupos({ bancoId, disciplinas, gruposIniciais }: { bancoId: string; disciplinas: string[]; gruposIniciais: GrupoBanco[] }) {
+export function BancoGrupos({ bancoId, disciplinas, gruposIniciais, cor = '#6d28d9' }: { bancoId: string; disciplinas: string[]; gruposIniciais: GrupoBanco[]; cor?: string }) {
   const [grupos, setGrupos] = useState<GrupoBanco[]>(gruposIniciais)
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'erro'>('idle')
   const primeira = useRef(true)
@@ -49,20 +49,23 @@ export function BancoGrupos({ bancoId, disciplinas, gruposIniciais }: { bancoId:
     }))
   }
   return (
-    <Card>
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
-        <div>
-          <CardTitle className="text-base">Grupos de disciplinas</CardTitle>
-          <p className="mt-0.5 text-xs text-muted-foreground">Agrupe as disciplinas do banco (ex.: Grupo I, II, III) — cada disciplina fica em um grupo. As alterações são salvas automaticamente.</p>
+    <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3.5" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent 55%)` }}>
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}><Layers className="h-5 w-5" /></span>
+          <div>
+            <h3 className="text-sm font-semibold leading-tight">Grupos de disciplinas</h3>
+            <p className="text-xs text-muted-foreground">Agrupe as disciplinas do banco — salvas automaticamente.</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           {status === 'saving' && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Salvando…</span>}
           {status === 'saved' && <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"><Check className="h-3.5 w-3.5" /> Salvo</span>}
           {status === 'erro' && <span className="inline-flex items-center gap-1 text-xs text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> Não salvo</span>}
-          <button type="button" onClick={addGrupo} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors hover:border-primary hover:text-primary"><Plus className="h-4 w-4" /> Grupo</button>
+          <button type="button" onClick={addGrupo} className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-sm transition-colors hover:border-primary hover:text-primary"><Plus className="h-4 w-4" /> Grupo</button>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      </div>
+      <CardContent className="space-y-3 px-4 py-4">
         {disciplinas.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">O banco não tem disciplinas ainda.</p>
         ) : grupos.length === 0 ? (

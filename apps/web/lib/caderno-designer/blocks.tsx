@@ -1,4 +1,4 @@
-import type { ComponentType, CSSProperties } from 'react'
+import type { ComponentType, CSSProperties, ReactNode } from 'react'
 import { Heading1, Type, AlignLeft, ListChecks, Grid3x3, IdCard, Image as ImageIcon, Minus, MoveVertical, Square, Columns2, Wallpaper, Repeat, Rows3, ClipboardCheck, PenLine, Scissors, Signature, LayoutGrid } from 'lucide-react'
 import { cssDaFonte, type CadernoTheme } from './theme'
 import { type Block, type BlockCategory, type CadernoData, type QuestaoData, genId } from './types'
@@ -24,11 +24,11 @@ export function isContainer(type: string) { return CONTAINERS.has(type) }
 export const BLOCKS: BlockMeta[] = [
   // Conteúdo
   { type: 'titulo-secao', title: 'Título de seção', icon: Heading1, category: 'conteudo', supportsVars: true,
-    defaults: { texto: 'Título da Seção', nivel: 1, align: 'left', cor: '', mostrarLinha: true, fonte: '', italico: false, sublinhado: false, espacamento: 0 } },
+    defaults: { texto: 'Título da Seção', nivel: 1, align: 'left', cor: '', mostrarLinha: true, fonte: '', italico: false, sublinhado: false, espacamento: 0, alturaMin: 0, valignV: 'top', largura: 100, alinhamentoBloco: 'left' } },
   { type: 'texto-livre', title: 'Texto livre', icon: Type, category: 'conteudo', supportsVars: true,
-    defaults: { texto: 'Digite o texto aqui…', align: 'left', size: 12, bold: false, italico: false, sublinhado: false, color: '', fonte: '', lineHeight: 1.5, espacamento: 0 } },
+    defaults: { texto: 'Digite o texto aqui…', align: 'left', size: 12, bold: false, italico: false, sublinhado: false, color: '', fonte: '', lineHeight: 1.5, espacamento: 0, alturaMin: 0, valignV: 'top', largura: 100, alinhamentoBloco: 'left' } },
   { type: 'instrucoes', title: 'Instruções', icon: AlignLeft, category: 'conteudo', supportsVars: true,
-    defaults: { titulo: 'Instruções', texto: 'Leia atentamente antes de começar.', corFundo: '#f7fafc', corBorda: '' } },
+    defaults: { titulo: 'Instruções', texto: 'Leia atentamente antes de começar.', corFundo: '#f7fafc', corBorda: '', fonte: '', alturaMin: 0, valignV: 'top', largura: 100, alinhamentoBloco: 'left' } },
   { type: 'lista-questoes', title: 'Lista de questões', icon: ListChecks, category: 'conteudo', dynamic: true, unico: true,
     defaults: { titulo: '', quantidade: null, mostrarAlternativas: true, mostrarGabarito: false } },
   { type: 'repeticao', title: 'Repetir por questão', icon: Repeat, category: 'conteudo', container: true, dynamic: true, unico: true,
@@ -37,19 +37,21 @@ export const BLOCKS: BlockMeta[] = [
     defaults: { mostrarGabarito: false } },
   // Avaliação
   { type: 'gabarito-grid', title: 'Grade de gabarito', icon: Grid3x3, category: 'avaliacao', dynamic: true, unico: true,
-    defaults: { titulo: 'Folha de Respostas', numQuestoes: null, numAlternativas: 5, colunas: 2, estilo: 'circulo' } },
+    defaults: { titulo: '', origem: 'marcado', numQuestoes: null, numAlternativas: 5, porLinha: 10, fonte: '', corHeader: '', corHeaderTexto: '', corMarcadas: '', fundoImpar: '', textoImpar: '', fundoPar: '', textoPar: '', bordaRaio: 8 } },
   { type: 'gabarito-correcao', title: 'Correção (marcada × correta)', icon: ClipboardCheck, category: 'avaliacao', dynamic: true,
     defaults: { rotulo: 'Sua resposta:', mostrarCorreta: true } },
   // Identificação
-  { type: 'identificacao', title: 'Identificação', icon: IdCard, category: 'identificacao', dynamic: true,
-    defaults: { titulo: 'Identificação do Candidato', campos: ['Nome completo', 'Nº de inscrição', 'Data'] } },
+  { type: 'identificacao', title: 'Identificação', icon: IdCard, category: 'identificacao', dynamic: true, supportsVars: true,
+    defaults: { titulo: 'Dados do Candidato', bordaRaio: 8, fonte: '', corBorda: '', corHeader: '', corHeaderTexto: '', corRotulo: '', corValor: '', corDestaque: '', corAcento: '',
+      destaque: [{ rotulo: 'Nome', valor: '{{nome}}' }, { rotulo: 'E-mail', valor: '{{email}}' }],
+      campos: [{ rotulo: 'Data', valor: '{{data}}' }, { rotulo: 'Início', valor: '{{inicio}}' }, { rotulo: 'Término', valor: '{{termino}}' }, { rotulo: 'Tempo total', valor: '{{tempo_total}}' }, { rotulo: 'Respondidas', valor: '{{respondidas}}' }, { rotulo: 'Em branco', valor: '{{em_branco}}' }] } },
   { type: 'cabecalho-prova', title: 'Cabeçalho de prova', icon: LayoutGrid, category: 'identificacao', supportsVars: true,
     defaults: { campos: [{ rotulo: 'Banca', valor: '' }, { rotulo: 'Órgão', valor: '' }, { rotulo: 'Cargo', valor: '' }, { rotulo: 'Ano', valor: '' }], colunas: 2 } },
   { type: 'assinatura', title: 'Assinatura', icon: Signature, category: 'identificacao', supportsVars: true,
     defaults: { assinaturas: ['Assinatura do candidato'], align: 'left', larguraLinha: 220 } },
   // Estrutura
   { type: 'card', title: 'Card', icon: Square, category: 'estrutura', container: true, supportsVars: true,
-    defaults: { corFundo: '#f8fafc', bordaCor: '', bordaLargura: 1, bordaRaio: 8, padding: 14, largura: 100, alinhamento: 'center' } },
+    defaults: { corFundo: '#f8fafc', bordaCor: '', bordaLargura: 1, bordaRaio: 8, padding: 8, largura: 100, alinhamento: 'center' } },
   { type: 'colunas', title: 'Colunas (lado a lado)', icon: Columns2, category: 'estrutura', container: true,
     defaults: { gap: 16 } },
   { type: 'imagem', title: 'Imagem', icon: ImageIcon, category: 'estrutura',
@@ -127,38 +129,60 @@ export function applyVars(texto: string, vars: Record<string, string>): string {
     .replace(/\{\s*([\w-]+)\s*\}/g, (m, k) => (k in vars ? vars[k] : m))
 }
 
-const ALIN = { left: 'left', center: 'center', right: 'right' } as const
+const ALIN = { left: 'left', center: 'center', right: 'right', justify: 'justify' } as const
+
+/** Envolve o bloco numa caixa de largura % com posição horizontal (só quando < 100%). */
+function comLargura(largura: number | undefined, pos: string | undefined, node: ReactNode): ReactNode {
+  const w = largura ?? 100
+  if (!w || w >= 100) return node
+  const jc = pos === 'center' ? 'center' : pos === 'right' ? 'flex-end' : 'flex-start'
+  return <div style={{ display: 'flex', justifyContent: jc }}><div style={{ width: `${w}%`, minWidth: 0 }}>{node}</div></div>
+}
+
+/** Largura efetiva de uma coluna: a própria (se definida) ou, se tem um único filho, a largura dele.
+ *  Assim, encolher o bloco encolhe a coluna e o vizinho (flex automático) ocupa o espaço liberado. */
+export function larguraDaColuna(col: Block): number | undefined {
+  const own = (col.attributes as any)?.largura
+  if (own && own < 100) return own
+  const filhos = col.innerBlocks ?? []
+  if (filhos.length === 1) { const l = (filhos[0].attributes as any)?.largura; if (l && l < 100) return l }
+  return undefined
+}
 
 /** Renderer único (sem hooks): usado no canvas do editor E na impressão/PDF. */
-export function BlockRender({ block, theme, data }: { block: Block; theme: CadernoTheme; data: CadernoData }) {
+export function BlockRender({ block, theme, data, full }: { block: Block; theme: CadernoTheme; data: CadernoData; full?: boolean }) {
   const a = block.attributes as any
   const c = theme.cores
 
   switch (block.type) {
     case 'titulo-secao': {
       const sizes = { 1: 22, 2: 17, 3: 14 } as Record<number, number>
-      return (
-        <div style={{ textAlign: ALIN[a.align as keyof typeof ALIN] ?? 'left' }}>
-          <span style={{ fontSize: sizes[a.nivel] ?? 22, fontWeight: 700, color: a.cor || c.primaria, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia, fontStyle: a.italico ? 'italic' : 'normal', textDecoration: a.sublinhado ? 'underline' : 'none', letterSpacing: a.espacamento ? `${a.espacamento}px` : undefined }}>
-            {applyVars(a.texto ?? '', data.vars)}
-          </span>
-          {a.mostrarLinha && <div style={{ height: 2, background: a.cor || c.acento, marginTop: 4, borderRadius: 2 }} />}
+      return comLargura(full ? undefined : a.largura, a.alinhamentoBloco, (
+        <div style={{ minHeight: a.alturaMin || undefined, display: a.alturaMin ? 'flex' : undefined, flexDirection: 'column', justifyContent: a.valignV === 'center' ? 'center' : a.valignV === 'bottom' ? 'flex-end' : 'flex-start' }}>
+          <div style={{ textAlign: ALIN[a.align as keyof typeof ALIN] ?? 'left' }}>
+            <span style={{ fontSize: sizes[a.nivel] ?? 22, fontWeight: 700, color: a.cor || c.primaria, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia, fontStyle: a.italico ? 'italic' : 'normal', textDecoration: a.sublinhado ? 'underline' : 'none', letterSpacing: a.espacamento ? `${a.espacamento}px` : undefined }}>
+              {applyVars(a.texto ?? '', data.vars)}
+            </span>
+            {a.mostrarLinha && <div style={{ height: 2, background: a.cor || c.acento, marginTop: 4, borderRadius: 2 }} />}
+          </div>
         </div>
-      )
+      ))
     }
     case 'texto-livre':
-      return (
-        <p style={{ textAlign: ALIN[a.align as keyof typeof ALIN] ?? 'left', fontSize: a.size ?? 12, fontWeight: a.bold ? 700 : 400, fontStyle: a.italico ? 'italic' : 'normal', textDecoration: a.sublinhado ? 'underline' : 'none', color: a.color || c.texto, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia, whiteSpace: 'pre-wrap', lineHeight: a.lineHeight ?? 1.5, letterSpacing: a.espacamento ? `${a.espacamento}px` : undefined, margin: 0 }}>
-          {applyVars(a.texto ?? '', data.vars)}
-        </p>
-      )
+      return comLargura(full ? undefined : a.largura, a.alinhamentoBloco, (
+        <div style={{ minHeight: a.alturaMin || undefined, display: a.alturaMin ? 'flex' : undefined, flexDirection: 'column', justifyContent: a.valignV === 'center' ? 'center' : a.valignV === 'bottom' ? 'flex-end' : 'flex-start' }}>
+          <p style={{ textAlign: ALIN[a.align as keyof typeof ALIN] ?? 'left', fontSize: a.size ?? 12, fontWeight: a.bold ? 700 : 400, fontStyle: a.italico ? 'italic' : 'normal', textDecoration: a.sublinhado ? 'underline' : 'none', color: a.color || c.texto, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia, whiteSpace: 'pre-wrap', lineHeight: a.lineHeight ?? 1.5, letterSpacing: a.espacamento ? `${a.espacamento}px` : undefined, margin: 0 }}>
+            {applyVars(a.texto ?? '', data.vars)}
+          </p>
+        </div>
+      ))
     case 'instrucoes':
-      return (
-        <div style={{ background: a.corFundo || '#f7fafc', border: `1px solid ${a.corBorda || c.primaria}`, borderRadius: 6, padding: 12, fontFamily: theme.tipografia.familia }}>
+      return comLargura(full ? undefined : a.largura, a.alinhamentoBloco, (
+        <div style={{ background: a.corFundo || '#f7fafc', border: `1px solid ${a.corBorda || c.primaria}`, borderRadius: 6, padding: 8, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia, minHeight: a.alturaMin || undefined, display: a.alturaMin ? 'flex' : undefined, flexDirection: 'column', justifyContent: a.valignV === 'center' ? 'center' : a.valignV === 'bottom' ? 'flex-end' : 'flex-start' }}>
           {a.titulo && <p style={{ fontWeight: 700, color: c.primaria, margin: '0 0 4px' }}>{applyVars(a.titulo, data.vars)}</p>}
           <p style={{ fontSize: 12, color: c.texto, whiteSpace: 'pre-wrap', margin: 0, lineHeight: 1.5 }}>{applyVars(a.texto ?? '', data.vars)}</p>
         </div>
-      )
+      ))
     case 'lista-questoes': {
       const qs = a.quantidade ? data.questoes.slice(0, a.quantidade) : data.questoes
       return (
@@ -188,47 +212,108 @@ export function BlockRender({ block, theme, data }: { block: Block; theme: Cader
       )
     }
     case 'gabarito-grid': {
-      const total = a.numQuestoes ?? data.numQuestoes ?? 20
       const nAlt = a.numAlternativas ?? data.numAlternativas ?? 5
-      const cols = a.colunas ?? 2
       const letras = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, nAlt)
-      const perCol = Math.ceil(total / cols)
-      const colArrays = Array.from({ length: cols }, (_, ci) => Array.from({ length: perCol }, (_, ri) => ci * perCol + ri + 1).filter((n) => n <= total))
-      const redondo = a.estilo !== 'quadrado'
+      const origem = a.origem ?? 'marcado' // 'marcado' = respostas do aluno | 'oficial' = gabarito correto
+      const usarDados = data.questoes.length > 0
+      const total = a.numQuestoes ?? (usarDados ? data.questoes.length : (data.numQuestoes ?? 100))
+      const porLinha = Math.max(4, Math.min(20, a.porLinha ?? 10))
+      const temResp = !!data.respostas && Object.keys(data.respostas).length > 0
+      const qDe = (n: number) => (usarDados ? (data.questoes.find((x) => x.numero === n) ?? data.questoes[n - 1]) : undefined)
+      const letraDe = (n: number): string => {
+        const q = qDe(n)
+        if (origem === 'oficial') {
+          const of = q?.alternativas.find((al) => al.correta)?.letra
+          if (of) return of
+          if (q) return '—'
+          return letras[(n - 1) % letras.length] // amostra p/ preview no editor
+        }
+        if (temResp) return (q && data.respostas?.[q.id]) || '—'
+        return letras[(n - 1) % letras.length] // amostra p/ preview no editor
+      }
+      const nums = Array.from({ length: total }, (_, i) => i + 1)
+      const linhas: number[][] = []
+      for (let i = 0; i < nums.length; i += porLinha) linhas.push(nums.slice(i, i + porLinha))
+      const borda = `${c.secundaria}2b`
+      const titulo = a.titulo || (origem === 'oficial' ? 'Gabarito Oficial' : 'Gabarito de Alternativas')
+      const corHeader = a.corHeader || c.primaria
+      const corHeaderTexto = a.corHeaderTexto || '#ffffff'
+      const corMarcadas = a.corMarcadas || a.corLetra || c.primaria // cor da letra respondida
+      // Linhas alternadas (fundo + cor do número): ímpar = 1ª, 3ª… (ri par) | par = 2ª, 4ª… (ri ímpar)
+      const fundoImpar = a.fundoImpar || a.corLinhaImpar || `${c.acento}26`
+      const textoImpar = a.textoImpar || c.texto
+      const fundoPar = a.fundoPar || a.corLinhaPar || a.corListra || `${c.acento}4d`
+      const textoPar = a.textoPar || c.texto
+      const fontFamily = cssDaFonte(a.fonte) || theme.tipografia.familia
+      const raio = a.bordaRaio ?? 8
       return (
-        <div style={{ fontFamily: theme.tipografia.familia }}>
-          {a.titulo && <p style={{ fontWeight: 700, color: c.primaria, fontSize: 15, margin: '0 0 8px', textAlign: 'center' }}>{a.titulo}</p>}
-          <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
-            {colArrays.map((col, ci) => (
-              <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {col.map((n) => (
-                  <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 22, fontSize: 11, fontWeight: 700, color: c.texto, textAlign: 'right' }}>{n}</span>
-                    {letras.map((l) => (
-                      <span key={l} style={{ width: 17, height: 17, borderRadius: redondo ? '50%' : 3, border: `1.5px solid ${c.secundaria}`, fontSize: 9, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: c.secundaria }}>{l}</span>
-                    ))}
+        <div style={{ fontFamily, border: `1px solid ${borda}`, borderRadius: raio, overflow: 'hidden', breakInside: 'avoid' }}>
+          <div style={{ background: corHeader, color: corHeaderTexto, fontWeight: 800, textAlign: 'center', padding: '7px 10px', fontSize: 12.5, letterSpacing: 1, textTransform: 'uppercase' }}>{titulo}</div>
+          {linhas.map((linha, ri) => {
+            const impar = ri % 2 === 0
+            const fundoLinha = impar ? fundoImpar : fundoPar
+            const corNum = impar ? textoImpar : textoPar
+            return (
+            <div key={ri} style={{ display: 'flex', borderTop: ri ? `1px solid ${borda}` : 'none' }}>
+              {linha.map((n, idx) => {
+                const letra = letraDe(n)
+                const vazia = letra === '—'
+                return (
+                  <div key={n} style={{ display: 'flex', flex: 1, minWidth: 0, borderLeft: idx ? `1px solid ${borda}` : 'none' }}>
+                    <span style={{ background: fundoLinha, color: corNum, fontWeight: 700, fontSize: 10, width: 24, minWidth: 24, textAlign: 'center', padding: '4px 0', borderRight: `1px solid ${borda}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{String(n).padStart(2, '0')}</span>
+                    <span style={{ flex: 1, minWidth: 0, color: vazia ? '#9aa5b1' : corMarcadas, fontWeight: 700, fontSize: 11, textAlign: 'center', padding: '4px 2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{letra}</span>
                   </div>
-                ))}
-              </div>
-            ))}
-          </div>
+                )
+              })}
+              {linha.length < porLinha && Array.from({ length: porLinha - linha.length }).map((_, k) => (
+                <div key={`e${k}`} style={{ flex: 1, borderLeft: `1px solid ${borda}` }} />
+              ))}
+            </div>
+            )
+          })}
         </div>
       )
     }
-    case 'identificacao':
-      return (
-        <div style={{ border: `1px solid ${c.primaria}`, borderRadius: 6, padding: 14, fontFamily: theme.tipografia.familia }}>
-          {a.titulo && <p style={{ fontWeight: 700, color: c.primaria, margin: '0 0 10px', fontSize: 14 }}>{a.titulo}</p>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {(a.campos ?? []).map((campo: string, i: number) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
-                <span style={{ fontSize: 11, color: c.texto, whiteSpace: 'nowrap' }}>{campo}:</span>
-                <span style={{ flex: 1, borderBottom: '1px solid #94a3b8', height: '1.2em' }} />
-              </div>
-            ))}
-          </div>
+    case 'identificacao': {
+      // Campos = { rotulo, valor } (valor é template: {{nome}}, {{email}}…). Aceita formato antigo (string[]).
+      const norm = (arr: any[]): { rotulo: string; valor: string }[] =>
+        (arr ?? []).map((x) => (typeof x === 'string' ? { rotulo: x, valor: '' } : { rotulo: x?.rotulo ?? '', valor: x?.valor ?? '' }))
+      const destaque = norm(a.destaque)
+      const campos = norm(a.campos)
+      const titulo = a.titulo || 'Dados do Candidato'
+      const raio = a.bordaRaio ?? 8
+      const fontFamily = cssDaFonte(a.fonte) || theme.tipografia.familia
+      const borda = a.corBorda || `${c.secundaria}33`
+      const corHeader = a.corHeader || c.primaria
+      const corHeaderTexto = a.corHeaderTexto || '#ffffff'
+      const corRotulo = a.corRotulo || '#94a3b8'
+      const corValor = a.corValor || c.texto
+      const corDestaque = a.corDestaque || `${corHeader}0a`
+      const corAcento = a.corAcento || c.acento
+      const val = (v: string) => applyVars(String(v ?? ''), data.vars)
+      const celula = (f: { rotulo: string; valor: string }, i: number, cols: number, big: boolean) => (
+        <div key={i} style={{ padding: big ? '8px 12px' : '7px 10px', minWidth: 0, borderLeft: i % cols !== 0 ? `1px solid ${borda}` : 'none' }}>
+          <div style={{ fontSize: 8.5, color: corRotulo, marginBottom: 2, letterSpacing: 0.4, textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.rotulo}</div>
+          <div style={{ fontSize: big ? 13 : 11.5, fontWeight: 700, color: corValor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{val(f.valor) || '—'}</div>
         </div>
       )
+      return (
+        <div style={{ border: `1px solid ${borda}`, borderRadius: raio, overflow: 'hidden', fontFamily }}>
+          <div style={{ background: corHeader, color: corHeaderTexto, fontWeight: 800, textAlign: 'center', padding: '6px 10px', fontSize: 11.5, letterSpacing: 1, textTransform: 'uppercase' }}>{titulo}</div>
+          {destaque.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${destaque.length}, 1fr)`, background: corDestaque }}>
+              {destaque.map((f, i) => celula(f, i, destaque.length, true))}
+            </div>
+          )}
+          {campos.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${campos.length}, 1fr)`, borderTop: destaque.length ? `1px solid ${borda}` : 'none' }}>
+              {campos.map((f, i) => celula(f, i, campos.length, false))}
+            </div>
+          )}
+          <div style={{ height: 3, background: corAcento }} />
+        </div>
+      )
+    }
     case 'imagem':
       if (!a.url) return <div style={{ border: '1px dashed #cbd5e1', borderRadius: 6, padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>Sem imagem (envie no inspetor)</div>
       return (
@@ -255,10 +340,12 @@ export function BlockRender({ block, theme, data }: { block: Block; theme: Cader
       )
     }
     case 'card': {
+      // Card em coluna preenche a coluna (a coluna já tem a largura); senão respeita a própria largura %.
+      const cardA = full ? { ...a, largura: 100 } : a
       const al = (a.alinhamento as keyof typeof ALIN) ?? 'center'
       return (
         <div style={{ display: 'flex', justifyContent: al === 'left' ? 'flex-start' : al === 'right' ? 'flex-end' : 'center' }}>
-          <div style={cardStyle(a, theme)}>
+          <div style={cardStyle(cardA, theme)}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} />)}
             </div>
@@ -269,15 +356,16 @@ export function BlockRender({ block, theme, data }: { block: Block; theme: Cader
     case 'colunas':
       return (
         <div style={{ display: 'flex', gap: a.gap ?? 16, alignItems: 'flex-start' }}>
-          {(block.innerBlocks ?? []).map((col) => (
-            <div key={col.id} style={{ flex: 1, minWidth: 0 }}><BlockRender block={col} theme={theme} data={data} /></div>
-          ))}
+          {(block.innerBlocks ?? []).map((col) => {
+            const cl = larguraDaColuna(col)
+            return <div key={col.id} style={{ flex: cl ? `0 0 ${cl}%` : '1 1 0%', minWidth: 0 }}><BlockRender block={col} theme={theme} data={data} /></div>
+          })}
         </div>
       )
     case 'coluna':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} />)}
+          {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} full />)}
         </div>
       )
     case 'repeticao': {

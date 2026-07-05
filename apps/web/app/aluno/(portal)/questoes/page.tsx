@@ -82,13 +82,13 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input name="busca" defaultValue={params.busca ?? ''} placeholder="Palavra no enunciado…"
-              className="w-full rounded-md border bg-background py-2 pl-8 pr-3 text-sm outline-none focus:ring-1 focus:ring-ring" />
+              className="w-full rounded-md border bg-[var(--input-bg,transparent)] py-2 pl-8 pr-3 text-sm outline-none focus:ring-1 focus:ring-ring" />
           </div>
         </div>
         <div className="min-w-[160px]">
           <label className="mb-1 block text-xs font-medium text-muted-foreground">Matéria</label>
           <select name="disciplina" defaultValue={params.disciplina ?? ''}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring">
+            className="w-full rounded-md border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring">
             <option value="">Todas</option>
             {(disciplinas ?? []).map((d: any) => <option key={d.id} value={d.id}>{d.nome}</option>)}
           </select>

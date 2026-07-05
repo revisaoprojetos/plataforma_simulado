@@ -115,7 +115,7 @@ export function QuestaoDiscursiva({ questao, numero }: { questao: QuestaoDiscurs
               placeholder="Escreva sua resposta…"
               rows={8}
               maxLength={20000}
-              className="w-full resize-y rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+              className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
             />
             <button onClick={enviar} disabled={enviando || !texto.trim()}
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">

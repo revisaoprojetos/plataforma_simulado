@@ -43,7 +43,7 @@ export function SimuladoCadernoLink({ simuladoId, cadernos, atual }: {
           value={val}
           onChange={(e) => salvar(e.target.value)}
           disabled={pending}
-          className="h-9 flex-1 rounded-md border bg-background px-3 text-sm disabled:opacity-60"
+          className="h-9 flex-1 rounded-md border bg-[var(--input-bg,transparent)] px-3 text-sm disabled:opacity-60"
         >
           <option value="">Automático (pelo banco das questões)</option>
           {cadernos.map((c) => (

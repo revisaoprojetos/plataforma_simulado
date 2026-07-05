@@ -77,7 +77,7 @@ export function ImportarMembrosDialog({ grupoId, onClose }: { grupoId: string; o
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Colar lista</label>
             <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={5} placeholder={'joao@email.com\n123.456.789-00\nMaria Silva'}
-              className="w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
+              className="w-full resize-y rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
           </div>
 
           <div className="space-y-1.5">

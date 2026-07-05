@@ -4,6 +4,8 @@ import { Fragment, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SessaoAcoesMenu } from './sessao-acoes-menu'
+import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
+import type { TipoSimulado } from '@/lib/simulado/tipo'
 import { Search, ChevronDown, Clock, Timer, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -28,6 +30,7 @@ export type SessaoRow = {
   mods: { id: string; nome: string }[]
   simuladoId: string
   temResultado: boolean
+  tipo?: TipoSimulado | null
 }
 
 const pctTone = (p: number) =>
@@ -35,7 +38,7 @@ const pctTone = (p: number) =>
 
 const GRUPO_CORES = ['#4f7fff', '#8b5cf6', '#ef4444', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#84cc16']
 
-export function HistoricoEstudante({ rows, estudanteId }: { rows: SessaoRow[]; estudanteId: string }) {
+export function HistoricoEstudante({ rows, estudanteId, estudanteNome }: { rows: SessaoRow[]; estudanteId: string; estudanteNome?: string }) {
   const [busca, setBusca] = useState('')
   const [aberto, setAberto] = useState<string | null>(null)
   const q = busca.trim().toLowerCase()
@@ -52,7 +55,7 @@ export function HistoricoEstudante({ rows, estudanteId }: { rows: SessaoRow[]; e
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar simulado…"
-            className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+            className="w-full rounded-lg border bg-[var(--input-bg,transparent)] py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
         </div>
 
         {/* Tabela rolável */}
@@ -79,7 +82,7 @@ export function HistoricoEstudante({ rows, estudanteId }: { rows: SessaoRow[]; e
                 return (
                   <Fragment key={r.id}>
                     <tr className={cn('transition-colors hover:bg-muted/40', exp && 'bg-muted/30')}>
-                      <td className="px-3 py-2.5 font-medium">{r.titulo}</td>
+                      <td className="px-3 py-2.5 font-medium"><span className="inline-flex items-center gap-2">{r.titulo}<TipoSimuladoBadge tipo={r.tipo} /></span></td>
                       <td className="px-3 py-2.5"><Badge variant={r.statusVariant}>{r.statusLabel}</Badge></td>
                       <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{r.iniciado}</td>
                       <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{r.finalizado}</td>
@@ -92,7 +95,7 @@ export function HistoricoEstudante({ rows, estudanteId }: { rows: SessaoRow[]; e
                         ) : <span className="text-muted-foreground">—</span>}
                       </td>
                       <td className="px-3 py-2.5 text-center font-semibold tabular-nums">{r.nota != null ? r.nota.toFixed(2) : '—'}</td>
-                      <td className="px-3 py-2.5"><div className="flex justify-center"><SessaoAcoesMenu cadId={r.cadId} mods={r.mods} estudanteId={estudanteId} sessaoId={r.id} simuladoId={r.simuladoId} temResultado={r.temResultado} /></div></td>
+                      <td className="px-3 py-2.5"><div className="flex justify-center"><SessaoAcoesMenu cadId={r.cadId} mods={r.mods} estudanteId={estudanteId} sessaoId={r.id} simuladoId={r.simuladoId} temResultado={r.temResultado} estudanteNome={estudanteNome} simuladoTitulo={r.titulo} /></div></td>
                       <td className="px-3 py-2.5 text-center">
                         <button type="button" onClick={() => setAberto(exp ? null : r.id)} aria-expanded={exp} title={exp ? 'Ocultar' : 'Expandir'}
                           className={cn('inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors', exp ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:border-primary hover:text-primary')}>

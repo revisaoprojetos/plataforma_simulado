@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { SimuladosBoard, type SimuladoCard } from '@/components/admin/simulados-board'
+import { tiposDeSimulados } from '@/lib/simulado/tipo'
 
 export default async function SimuladosPage() {
   const supabase = await createServiceClient()
@@ -15,6 +16,10 @@ export default async function SimuladosPage() {
     .eq('deletado', false)
     .eq('tenant_id', tenantId ?? '')
     .order('created_at', { ascending: false })
+
+  // Tipo (objetiva/discursiva/mista) derivado das questões de cada simulado.
+  const tipos = await tiposDeSimulados(supabase, (simulados ?? []).map((s: any) => s.id))
+  const comTipo = (simulados ?? []).map((s: any) => ({ ...s, tipo: tipos.get(s.id) ?? null }))
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
@@ -31,7 +36,7 @@ export default async function SimuladosPage() {
         </Link>
       </div>
 
-      <SimuladosBoard simulados={(simulados ?? []) as SimuladoCard[]} appUrl={appUrl} />
+      <SimuladosBoard simulados={comTipo as SimuladoCard[]} appUrl={appUrl} />
     </div>
   )
 }

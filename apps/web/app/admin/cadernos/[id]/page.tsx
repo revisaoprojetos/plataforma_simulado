@@ -66,8 +66,10 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
       alternativas: (altMap.get(q.id) ?? []).sort((x, y) => x.ordem - y.ordem).map((a, j) => ({ letra: LETRAS[j] ?? '?', texto: a.texto ?? '', correta: !!a.correta })),
     })),
     vars: {
-      nome: 'João da Silva', simulado: bancoNome ?? caderno.nome, acertos: '14', total_questoes: String((questoes ?? []).length || 20),
+      nome: 'João da Silva', email: 'joao.silva@email.com', telefone: '(11) 90000-0000', classificacao: '',
+      simulado: bancoNome ?? caderno.nome, acertos: '14', total_questoes: String((questoes ?? []).length || 20),
       nota: '7,0', percentual: '70%',
+      data: '14/06/2026', inicio: '09:42', termino: '12:56', tempo_total: '194min', respondidas: '98', em_branco: '2',
     },
   }
 

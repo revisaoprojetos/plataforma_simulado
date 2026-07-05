@@ -1,9 +1,10 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { RbacMatrix } from '@/components/admin/rbac-matrix'
 import { NovoPerfilForm } from '@/components/admin/novo-perfil-form'
-import { AlertTriangle } from 'lucide-react'
+import { SecaoHeader } from '@/components/admin/secao-header'
+import { AlertTriangle, UserCog, Shield } from 'lucide-react'
 
 async function getRbacData(tenantId: string) {
   const supabase = await createServiceClient()
@@ -93,25 +94,17 @@ export default async function RbacPage() {
       )}
 
       {data && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Perfis</CardTitle>
-            <CardDescription>Crie perfis e ajuste as permissões na matriz abaixo.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+          <SecaoHeader icon={UserCog} titulo="Perfis" subtitulo="Crie perfis e ajuste as permissões na matriz abaixo." />
+          <CardContent className="px-4 py-4">
             <NovoPerfilForm />
           </CardContent>
         </Card>
       )}
 
       {data && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Matriz de Permissões</CardTitle>
-            <CardDescription>
-              Cada coluna é um perfil. Cada linha é uma permissão. Clique para ativar/desativar.
-            </CardDescription>
-          </CardHeader>
+        <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+          <SecaoHeader icon={Shield} titulo="Matriz de Permissões" subtitulo="Cada coluna é um perfil, cada linha uma permissão — clique para ativar/desativar." />
           <CardContent className="p-0">
             <RbacMatrix
               roles={data.roles}

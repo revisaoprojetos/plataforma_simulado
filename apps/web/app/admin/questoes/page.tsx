@@ -12,13 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Pencil } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Pencil, BookOpen } from 'lucide-react'
 import { QuestoesFilters } from '@/components/admin/questoes-filters'
 import { PaginationControls } from '@/components/admin/pagination-controls'
 import { CopiarCodigo } from '@/components/admin/copiar-codigo'
 import { codigoQuestao } from '@/lib/codigo-questao'
 import { NovaQuestaoDialog } from '@/components/admin/nova-questao-dialog'
+import { SecaoHeader } from '@/components/admin/secao-header'
 
 const ITEMS_PER_PAGE = 20
 
@@ -104,13 +105,17 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
         <NovaQuestaoDialog />
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <CardTitle className="shrink-0 text-base">Listagem</CardTitle>
-          <Suspense fallback={<div className="h-10 w-full animate-pulse rounded-lg bg-muted lg:max-w-2xl" />}>
-            <QuestoesFilters disciplinas={disciplinas ?? []} />
-          </Suspense>
-        </CardHeader>
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader
+          icon={BookOpen}
+          titulo="Questões"
+          subtitulo={`${count ?? 0} cadastrada(s)`}
+          acao={
+            <Suspense fallback={<div className="h-10 w-full animate-pulse rounded-lg bg-muted lg:w-[520px]" />}>
+              <QuestoesFilters disciplinas={disciplinas ?? []} />
+            </Suspense>
+          }
+        />
         <CardContent className="p-0">
           <Table>
             <TableHeader>

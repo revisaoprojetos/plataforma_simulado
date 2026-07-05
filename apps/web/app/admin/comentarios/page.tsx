@@ -1,7 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { ComentarioModerar } from '@/components/admin/comentario-moderar'
+import { SecaoHeader } from '@/components/admin/secao-header'
 import { ShieldAlert, MessageSquare } from 'lucide-react'
 
 export default async function ComentariosModeracaoPage() {
@@ -58,11 +59,9 @@ export default async function ComentariosModeracaoPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Fila</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader icon={MessageSquare} titulo="Fila de moderação" subtitulo={`${pendentes} pendente(s) de ${comentarios.length}`} />
+        <CardContent className="space-y-3 px-4 py-4">
           {comentarios.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
               <MessageSquare className="h-8 w-8" />

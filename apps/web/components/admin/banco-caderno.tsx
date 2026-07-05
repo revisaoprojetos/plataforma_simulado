@@ -3,7 +3,7 @@ import { getCurrentTenantId } from '@/lib/tenant'
 import { BancoCadernoClient } from '@/components/admin/banco-caderno-client'
 import { AlertTriangle } from 'lucide-react'
 
-export async function BancoCaderno({ bancoId }: { bancoId: string }) {
+export async function BancoCaderno({ bancoId, cor = '#6d28d9' }: { bancoId: string; cor?: string }) {
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
@@ -28,5 +28,5 @@ export async function BancoCaderno({ bancoId }: { bancoId: string }) {
     .eq('tenant_id', tenantId ?? '')
     .order('nome')
 
-  return <BancoCadernoClient bancoId={bancoId} cadernoAtualId={(banco?.caderno_id as string) ?? null} cadernos={(cadernos ?? []) as any} />
+  return <BancoCadernoClient bancoId={bancoId} cadernoAtualId={(banco?.caderno_id as string) ?? null} cadernos={(cadernos ?? []) as any} cor={cor} />
 }

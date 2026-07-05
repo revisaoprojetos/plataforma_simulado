@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { Save, RotateCcw, ImageIcon, Loader2, Bell, Moon, Sun, FolderOpen, MoreVertical, Menu, ArrowLeft, Upload, X, Copy, Check, ClipboardPaste, Palette, ChevronDown, PanelLeft, LayoutGrid, Sparkles, Trash2, Monitor } from 'lucide-react'
+import { Save, RotateCcw, ImageIcon, Loader2, Bell, Moon, Sun, Menu, ArrowLeft, Upload, X, Copy, Check, ClipboardPaste, Palette, ChevronDown, PanelLeft, LayoutGrid, Sparkles, Trash2, Monitor, BookOpen, ClipboardList, Users, Activity, GraduationCap, BarChart3, Database, PenLine, LayoutDashboard, ClipboardCheck, MessagesSquare, SlidersHorizontal, FileText } from 'lucide-react'
 
 /**
  * Lê uma variável CSS do sistema e converte para hex. Renderiza a cor (lab,
@@ -43,7 +43,7 @@ function contraste(hex: string): string {
 
 interface Cores {
   sidebar: string; sidetext: string; sidetextHover: string; sidetextActive: string; icon: string; iconHover: string; iconAtivo: string; active: string; topbar: string; sborder: string
-  bg: string; text: string; titulo: string; card: string; cborder: string; btn: string; accent: string
+  bg: string; text: string; titulo: string; card: string; cborder: string; inputBg: string; btn: string; accent: string
   tabBg: string; tabAtivo: string; tabTexto: string  // fundo das tabs, tab selecionada, texto (hover/ativo)
 }
 
@@ -61,7 +61,7 @@ function cssVarsFromCores(c: Cores): string {
     `--card:${c.card}`, `--popover:${c.card}`, `--secondary:${c.card}`, `--muted:${c.card}`,
     `--card-foreground:${c.text}`, `--popover-foreground:${c.text}`, `--secondary-foreground:${c.text}`,
     `--muted-foreground:color-mix(in srgb, ${c.text} 55%, ${c.bg})`, `--accent:color-mix(in srgb, ${c.text} 12%, ${c.bg})`, `--accent-foreground:${c.text}`,
-    `--border:${c.cborder}`, `--input:${c.cborder}`,
+    `--border:${c.cborder}`, `--input:${c.cborder}`, `--input-bg:${c.inputBg}`,
     `--tab-bg:${c.tabBg}`, `--tab-active:${c.tabAtivo}`, `--tab-active-foreground:${c.tabTexto}`,
   ].join(';')
 }
@@ -78,7 +78,7 @@ function derivarEscuro(c: Cores): Cores {
     sidebar: '#141420', sidetext: '#c8c8d0', icon: '#c8c8d0',
     topbar: '#141420', sborder: '#2a2a38',
     bg: '#0f0f16', text: '#e8e8ee', titulo: '#e8e8ee',
-    card: '#1a1a26', cborder: '#2a2a38',
+    card: '#1a1a26', cborder: '#2a2a38', inputBg: '#14121d',
     tabBg: '#24242e', tabAtivo: '#33333f', tabTexto: '#e8e8ee',
   }
 }
@@ -131,9 +131,9 @@ const DEFAULT: Tema = {
   logo_estilo: 'arredondado',
   logo_filtro: 'none',
   logo_selecao_estilo: 'redonda',
-  cores: { sidebar: '#0f0f13', sidetext: '#c8c8d0', sidetextHover: '#ffffff', sidetextActive: '#ffffff', icon: '#c8c8d0', iconHover: '#ffffff', iconAtivo: '#ffffff', active: '#7f77dd', topbar: '#111118', sborder: '#35353f', bg: '#18181f', text: '#e8e8ee', titulo: '#e8e8ee', card: '#26262f', cborder: '#35353f', btn: '#7f77dd', accent: '#7f77dd', tabBg: '#26262f', tabAtivo: '#3a3a48', tabTexto: '#ffffff' },
+  cores: { sidebar: '#0f0f13', sidetext: '#c8c8d0', sidetextHover: '#ffffff', sidetextActive: '#ffffff', icon: '#c8c8d0', iconHover: '#ffffff', iconAtivo: '#ffffff', active: '#7f77dd', topbar: '#111118', sborder: '#35353f', bg: '#18181f', text: '#e8e8ee', titulo: '#e8e8ee', card: '#26262f', cborder: '#35353f', inputBg: '#1f1f28', btn: '#7f77dd', accent: '#7f77dd', tabBg: '#26262f', tabAtivo: '#3a3a48', tabTexto: '#ffffff' },
   // Paleta escura padrão (roxo escuro) — base do modo escuro.
-  coresDark: { sidebar: '#161421', sidetext: '#c8c8d0', sidetextHover: '#ffffff', sidetextActive: '#ffffff', icon: '#c8c8d0', iconHover: '#ffffff', iconAtivo: '#ffffff', active: '#7f77dd', topbar: '#161421', sborder: '#2b2838', bg: '#0f0e16', text: '#e8e8ee', titulo: '#e8e8ee', card: '#1b1926', cborder: '#2b2838', btn: '#7f77dd', accent: '#7f77dd', tabBg: '#1b1926', tabAtivo: '#2b2838', tabTexto: '#ffffff' },
+  coresDark: { sidebar: '#161421', sidetext: '#c8c8d0', sidetextHover: '#ffffff', sidetextActive: '#ffffff', icon: '#c8c8d0', iconHover: '#ffffff', iconAtivo: '#ffffff', active: '#7f77dd', topbar: '#161421', sborder: '#2b2838', bg: '#0f0e16', text: '#e8e8ee', titulo: '#e8e8ee', card: '#1b1926', cborder: '#2b2838', inputBg: '#14121d', btn: '#7f77dd', accent: '#7f77dd', tabBg: '#1b1926', tabAtivo: '#2b2838', tabTexto: '#ffffff' },
 }
 
 type BuiltinPreset = { id: string; nome: string; cores: Cores; coresDark: Cores }
@@ -143,8 +143,8 @@ function esquema(nome: string, o: { btn: string; active?: string; accent?: strin
   const active = o.active ?? o.btn
   const accent = o.accent ?? o.btn
   const aFg = o.ativoFg ?? '#ffffff' // cor do texto/ícone sobre o item ativo
-  const claro: Cores = { sidebar: '#ffffff', sidetext: '#444b58', sidetextHover: aFg, sidetextActive: aFg, icon: active, iconHover: aFg, iconAtivo: aFg, active, topbar: '#ffffff', sborder: '#e5e7eb', bg: '#f6f7f9', text: '#1a1d24', titulo: '#1a1d24', card: '#ffffff', cborder: '#e5e7eb', btn: o.btn, accent, tabBg: '#eef1f5', tabAtivo: '#ffffff', tabTexto: '#1a1d24' }
-  const escuro: Cores = { sidebar: '#141420', sidetext: '#c8c8d0', sidetextHover: aFg, sidetextActive: aFg, icon: '#c8c8d0', iconHover: aFg, iconAtivo: aFg, active, topbar: '#141420', sborder: '#2a2a38', bg: '#0f0f16', text: '#e8e8ee', titulo: '#e8e8ee', card: '#1a1a26', cborder: '#2a2a38', btn: o.btn, accent, tabBg: '#24242e', tabAtivo: '#33333f', tabTexto: '#e8e8ee' }
+  const claro: Cores = { sidebar: '#ffffff', sidetext: '#444b58', sidetextHover: aFg, sidetextActive: aFg, icon: active, iconHover: aFg, iconAtivo: aFg, active, topbar: '#ffffff', sborder: '#e5e7eb', bg: '#f6f7f9', text: '#1a1d24', titulo: '#1a1d24', card: '#ffffff', cborder: '#e5e7eb', inputBg: '#f1f3f6', btn: o.btn, accent, tabBg: '#eef1f5', tabAtivo: '#ffffff', tabTexto: '#1a1d24' }
+  const escuro: Cores = { sidebar: '#141420', sidetext: '#c8c8d0', sidetextHover: aFg, sidetextActive: aFg, icon: '#c8c8d0', iconHover: aFg, iconAtivo: aFg, active, topbar: '#141420', sborder: '#2a2a38', bg: '#0f0f16', text: '#e8e8ee', titulo: '#e8e8ee', card: '#1a1a26', cborder: '#2a2a38', inputBg: '#12121b', btn: o.btn, accent, tabBg: '#24242e', tabAtivo: '#33333f', tabTexto: '#e8e8ee' }
   return { id: nome, nome, cores: claro, coresDark: escuro }
 }
 
@@ -152,8 +152,8 @@ function esquema(nome: string, o: { btn: string; active?: string; accent?: strin
 const ROXO_AMBAR: BuiltinPreset = {
   id: 'Roxo & Âmbar',
   nome: 'Roxo & Âmbar',
-  cores: { sidebar: '#3b3260', sidetext: '#e7e3f5', sidetextHover: '#241f33', sidetextActive: '#241f33', icon: '#f4c430', iconHover: '#241f33', iconAtivo: '#241f33', active: '#f4c430', topbar: '#453a63', sborder: '#4c4276', bg: '#f7f3ec', text: '#241f33', titulo: '#5a4b9a', card: '#ffffff', cborder: '#e8e2d5', btn: '#5a4b9a', accent: '#f4c430', tabBg: '#efeae0', tabAtivo: '#ffffff', tabTexto: '#241f33' },
-  coresDark: { sidebar: '#241f33', sidetext: '#e7e3f5', sidetextHover: '#241f33', sidetextActive: '#241f33', icon: '#f4c430', iconHover: '#241f33', iconAtivo: '#241f33', active: '#f4c430', topbar: '#241f33', sborder: '#3a3450', bg: '#15121e', text: '#e8e6f0', titulo: '#b7a6ff', card: '#1e1a2b', cborder: '#332d47', btn: '#8b7fd6', accent: '#f4c430', tabBg: '#2a2540', tabAtivo: '#372f52', tabTexto: '#e8e6f0' },
+  cores: { sidebar: '#3b3260', sidetext: '#e7e3f5', sidetextHover: '#241f33', sidetextActive: '#241f33', icon: '#f4c430', iconHover: '#241f33', iconAtivo: '#241f33', active: '#f4c430', topbar: '#453a63', sborder: '#4c4276', bg: '#f7f3ec', text: '#241f33', titulo: '#5a4b9a', card: '#ffffff', cborder: '#e8e2d5', inputBg: '#f3eee3', btn: '#5a4b9a', accent: '#f4c430', tabBg: '#efeae0', tabAtivo: '#ffffff', tabTexto: '#241f33' },
+  coresDark: { sidebar: '#241f33', sidetext: '#e7e3f5', sidetextHover: '#241f33', sidetextActive: '#241f33', icon: '#f4c430', iconHover: '#241f33', iconAtivo: '#241f33', active: '#f4c430', topbar: '#241f33', sborder: '#3a3450', bg: '#15121e', text: '#e8e6f0', titulo: '#b7a6ff', card: '#1e1a2b', cborder: '#332d47', inputBg: '#17131f', btn: '#8b7fd6', accent: '#f4c430', tabBg: '#2a2540', tabAtivo: '#372f52', tabTexto: '#e8e6f0' },
 }
 
 const PRESETS: BuiltinPreset[] = [
@@ -167,7 +167,7 @@ const PRESETS: BuiltinPreset[] = [
 ]
 
 const SIDEBAR_CAMPOS: [keyof Cores, string][] = [['sidebar', 'Fundo da sidebar'], ['sidetext', 'Texto (normal)'], ['sidetextActive', 'Texto (hover/ativo)'], ['icon', 'Ícones (normal)'], ['iconAtivo', 'Ícones (hover/ativo)'], ['active', 'Item ativo (tabs)'], ['topbar', 'Fundo da topbar'], ['sborder', 'Cor da borda']]
-const CONTEUDO_CAMPOS: [keyof Cores, string][] = [['bg', 'Fundo'], ['text', 'Texto'], ['titulo', 'Cor dos títulos'], ['card', 'Cor do card'], ['cborder', 'Borda do card'], ['btn', 'Botão'], ['accent', 'Destaque'], ['tabBg', 'Fundo das tabs'], ['tabAtivo', 'Tab selecionada'], ['tabTexto', 'Texto tab (hover/ativo)']]
+const CONTEUDO_CAMPOS: [keyof Cores, string][] = [['bg', 'Fundo'], ['text', 'Texto'], ['titulo', 'Cor dos títulos'], ['card', 'Cor do card'], ['cborder', 'Borda do card'], ['inputBg', 'Caixas de texto/busca'], ['btn', 'Botão'], ['accent', 'Destaque'], ['tabBg', 'Fundo das tabs'], ['tabAtivo', 'Fundo da tab ativa'], ['tabTexto', 'Texto da tab ativa']]
 
 function Swatch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
@@ -220,7 +220,7 @@ function ColorControl({ value, onChange }: { value: string; onChange: (v: string
         onBlur={aplicarTexto}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicarTexto() } }}
         spellCheck={false}
-        className="w-16 rounded-md border bg-background px-1.5 py-1 text-center font-mono text-[11px] uppercase outline-none focus:ring-1 focus:ring-ring"
+        className="w-16 rounded-md border bg-[var(--input-bg,transparent)] px-1.5 py-1 text-center font-mono text-[11px] uppercase outline-none focus:ring-1 focus:ring-ring"
       />
       <button type="button" onClick={copiar} title="Copiar cor"
         className="flex h-6 w-6 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:border-primary hover:text-primary">
@@ -320,7 +320,7 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
         active: corDoSistema('--sidebar-accent', '--sidebar') ?? fb.active,
         topbar: g('--sidebar', fb.topbar), sborder: corDoSistema('--sidebar-border', '--sidebar') ?? fb.sborder,
         bg: g('--background', fb.bg), text: g('--foreground', fb.text), titulo: corDoSistema('--content-title') ?? g('--foreground', fb.titulo),
-        card: g('--card', fb.card), cborder: corDoSistema('--border', '--card') ?? fb.cborder, btn: g('--primary', fb.btn), accent: g('--primary', fb.accent),
+        card: g('--card', fb.card), cborder: corDoSistema('--border', '--card') ?? fb.cborder, inputBg: corDoSistema('--input-bg', '--card') ?? g('--card', fb.inputBg), btn: g('--primary', fb.btn), accent: g('--primary', fb.accent),
         tabBg: corDoSistema('--tab-bg', '--muted') ?? g('--muted', fb.tabBg), tabAtivo: corDoSistema('--tab-active', '--background') ?? g('--background', fb.tabAtivo), tabTexto: corDoSistema('--tab-active-foreground') ?? g('--foreground', fb.tabTexto),
       } }))
     }
@@ -483,7 +483,7 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
             <div className="mt-3 flex gap-1.5">
               <input value={nomePreset} onChange={(e) => setNomePreset(e.target.value)} placeholder="Novo preset das cores atuais"
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); salvarPreset() } }}
-                className="min-w-0 flex-1 rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring" />
+                className="min-w-0 flex-1 rounded-lg border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring" />
               <button type="button" onClick={salvarPreset} disabled={pending || !nomePreset.trim()}
                 className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">
                 <Save className="h-3.5 w-3.5" /> Criar
@@ -525,11 +525,11 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
             </div>
             <div className="space-y-2.5 border-t pt-3">
               <div className="space-y-1.5"><label className="text-xs text-muted-foreground">Nome do site</label>
-                <input value={t.nome_site} onChange={(e) => setT((p) => ({ ...p, nome_site: e.target.value }))} className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" /></div>
+                <input value={t.nome_site} onChange={(e) => setT((p) => ({ ...p, nome_site: e.target.value }))} className="w-full rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" /></div>
               <div className="space-y-1.5"><label className="text-xs text-muted-foreground">Subtítulo (abaixo do nome, na sidebar)</label>
-                <input value={t.subtitulo_site} onChange={(e) => setT((p) => ({ ...p, subtitulo_site: e.target.value }))} placeholder="ex.: Ensino Jurídico" className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" /></div>
+                <input value={t.subtitulo_site} onChange={(e) => setT((p) => ({ ...p, subtitulo_site: e.target.value }))} placeholder="ex.: Ensino Jurídico" className="w-full rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" /></div>
               <div className="space-y-1.5"><label className="text-xs text-muted-foreground">Título da página</label>
-                <input value={t.titulo_pagina} onChange={(e) => setT((p) => ({ ...p, titulo_pagina: e.target.value }))} className="w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" /></div>
+                <input value={t.titulo_pagina} onChange={(e) => setT((p) => ({ ...p, titulo_pagina: e.target.value }))} className="w-full rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" /></div>
             </div>
           </Secao>
 
@@ -693,13 +693,27 @@ function PreviewLogin({ t, cores, dark }: { t: Tema; cores: Cores; dark: boolean
 function Preview({ t, cores }: { t: Tema; cores: Cores }) {
   const c = cores
   const menu = [
-    { nome: 'Dashboard' }, { nome: 'Simulado', sub: ['Aplicação', 'Questões', 'Banco de questões', 'Correção'] },
-    { nome: 'Alunos' }, { nome: 'Análise' }, { nome: 'Configuração' },
+    { nome: 'Dashboard', icon: LayoutDashboard, ativo: true },
+    { nome: 'Simulado', icon: BookOpen, sub: [
+      { nome: 'Aplicação', icon: ClipboardList },
+      { nome: 'Questões', icon: BookOpen },
+      { nome: 'Banco de questões', icon: Database },
+      { nome: 'Correção', icon: PenLine },
+      { nome: 'Cadernos', icon: FileText },
+    ] },
+    { nome: 'Alunos', icon: GraduationCap }, { nome: 'Análise', icon: BarChart3 },
+    { nome: 'Auditoria', icon: ClipboardCheck }, { nome: 'Feedback', icon: MessagesSquare },
+    { nome: 'Configuração', icon: SlidersHorizontal },
   ]
+  const stats = [
+    { icon: BookOpen, val: '4', label: 'Questões' }, { icon: ClipboardList, val: '1', label: 'Simulados' },
+    { icon: Users, val: '1', label: 'Estudantes' }, { icon: Activity, val: '0', label: 'Sessões hoje' },
+  ]
+  const fgBtn = contraste(c.btn)
   return (
-    <div className="flex h-[420px] text-[12px]" style={{ background: c.bg, color: c.text, fontFamily: 'system-ui, sans-serif' }}>
+    <div className="flex h-[540px] text-[13px]" style={{ background: c.bg, color: c.text, fontFamily: 'system-ui, sans-serif' }}>
       {/* sidebar */}
-      <div className="flex w-[150px] shrink-0 flex-col" style={{ background: c.sidebar, borderRight: `1px solid ${c.sborder}` }}>
+      <div className="flex w-[180px] shrink-0 flex-col" style={{ background: c.sidebar, borderRight: `1px solid ${c.sborder}` }}>
         <div className="flex items-center gap-2 px-3 py-3" style={{ borderBottom: `1px solid ${c.sborder}` }}>
           <span className={`flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden text-[11px] font-bold ${frameLogo(t.logo_estilo)}`} style={{ background: t.logo_url ? t.logo_png_bg : c.btn, color: contraste(t.logo_url ? t.logo_png_bg : c.btn), borderColor: c.cborder }}>
             {t.logo_url ? <img src={t.logo_url} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogoCss(t.logo_filtro) }} /> : (t.nome_site[0] ?? 'P').toUpperCase()}
@@ -713,15 +727,18 @@ function Preview({ t, cores }: { t: Tema; cores: Cores }) {
           <p className="px-1.5 py-1 text-[9px] font-semibold uppercase opacity-50" style={{ color: c.sidetext }}>Menu</p>
           {menu.map((m) => (
             <div key={m.nome}>
-              <div className="rounded-md px-2 py-1.5" style={{ color: c.sidetext }}>{m.nome}</div>
+              <div className="flex items-center gap-1.5 rounded-md px-2 py-1.5" style={m.ativo ? { background: c.active, color: c.sidetextActive } : { color: c.sidetext }}>
+                <m.icon className="h-3 w-3 shrink-0" style={{ color: m.ativo ? c.iconAtivo : c.icon }} />
+                {m.nome}
+              </div>
               {m.sub && (
-                <div className="ml-2 space-y-0.5 border-l pl-2" style={{ borderColor: c.sborder }}>
-                  {m.sub.map((s) => {
-                    const ativo = s === 'Banco de questões'
-                    return (
-                      <div key={s} className="rounded-md px-2 py-1" style={ativo ? { background: c.active, color: c.sidetextActive } : { color: c.sidetext, opacity: 0.85 }}>{s}</div>
-                    )
-                  })}
+                <div className="ml-2.5 mt-0.5 space-y-0.5 border-l pl-2" style={{ borderColor: c.sborder }}>
+                  {m.sub.map((s) => (
+                    <div key={s.nome} className="flex items-center gap-1.5 rounded-md px-2 py-1" style={{ color: c.sidetext, opacity: 0.85 }}>
+                      <s.icon className="h-3 w-3 shrink-0" style={{ color: c.icon }} />
+                      {s.nome}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -732,30 +749,89 @@ function Preview({ t, cores }: { t: Tema; cores: Cores }) {
       {/* área principal */}
       <div className="flex flex-1 flex-col">
         {/* topbar */}
-        <div className="flex items-center justify-between px-4 py-2.5" style={{ background: c.topbar, borderBottom: `1px solid ${c.sborder}` }}>
+        <div className="flex items-center justify-between px-4 py-3" style={{ background: c.topbar, borderBottom: `1px solid ${c.sborder}` }}>
           <Menu className="h-4 w-4" style={{ color: c.icon }} />
-          <div className="flex items-center gap-3">
-            <Bell className="h-4 w-4" style={{ color: c.icon }} />
+          <div className="flex items-center gap-3.5">
+            <span className="relative">
+              <Bell className="h-4 w-4" style={{ color: c.icon }} />
+              <span className="absolute -right-1.5 -top-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-red-500 text-[6px] font-bold text-white">5</span>
+            </span>
             <Moon className="h-4 w-4" style={{ color: c.icon }} />
             <span className="h-6 w-6 rounded-full" style={{ background: c.accent }} />
           </div>
         </div>
-        {/* conteúdo */}
-        <div className="flex-1 overflow-hidden p-4">
-          <div className="mb-1 flex items-center justify-between">
-            <h2 className="text-base font-bold" style={{ color: c.titulo }}>{t.titulo_pagina}</h2>
-            <button className="rounded-md px-3 py-1.5 text-[11px] font-medium" style={{ background: c.btn, color: contraste(c.btn) }}>+ Criar banco</button>
+        {/* conteúdo: Dashboard */}
+        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+          <div>
+            <h2 className="text-lg font-bold leading-tight" style={{ color: c.titulo }}>Dashboard</h2>
+            <p className="text-[11px] opacity-60">Visão geral da plataforma</p>
           </div>
-          <p className="mb-3 text-[11px] opacity-60">Crie bancos para organizar suas questões.</p>
-          <div className="grid grid-cols-3 gap-2.5">
-            {['Test 1', 'Test 2', 'Test 3'].map((n, i) => (
-              <div key={n} className="rounded-lg p-2.5" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
-                <div className="mb-2 flex items-start justify-between">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-md" style={{ background: `color-mix(in oklab, ${c.accent} 22%, transparent)`, color: c.accent }}><FolderOpen className="h-4 w-4" /></span>
-                  <MoreVertical className="h-4 w-4 opacity-40" />
+
+          {/* stat cards em gradiente */}
+          <div className="grid grid-cols-4 gap-3">
+            {stats.map((s) => (
+              <div key={s.label} className="relative overflow-hidden rounded-xl p-3" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
+                <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${c.btn}1f, transparent 70%)` }} />
+                <s.icon className="absolute -right-2 -top-2 h-12 w-12" style={{ color: c.btn, opacity: 0.08 }} />
+                <div className="relative flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-sm" style={{ background: c.btn, color: fgBtn }}><s.icon className="h-5 w-5" /></span>
+                  <div className="min-w-0">
+                    <p className="text-xl font-bold leading-none">{s.val}</p>
+                    <p className="mt-0.5 truncate text-[8px] font-medium uppercase tracking-wide opacity-60">{s.label}</p>
+                  </div>
                 </div>
-                <p className="font-medium">{n}</p>
-                <p className="text-[10px] opacity-60">{[12, 8, 20][i]} questões</p>
+              </div>
+            ))}
+          </div>
+
+          {/* gráfico */}
+          <div className="overflow-hidden rounded-xl" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
+            <div className="flex items-center gap-2 border-b px-3 py-2.5" style={{ background: `linear-gradient(90deg, ${c.btn}1f, transparent 55%)`, borderColor: c.cborder }}>
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: c.btn, color: fgBtn }}><Activity className="h-4 w-4" /></span>
+              <div className="leading-tight">
+                <p className="text-[12px] font-semibold">Sessões nos últimos 7 dias</p>
+                <p className="text-[9px] opacity-60">Sessões de prova iniciadas por dia</p>
+              </div>
+            </div>
+            <div className="p-3">
+              <div className="flex gap-2">
+                <div className="flex w-5 flex-col justify-between text-right text-[8px] opacity-50" style={{ height: 120 }}>
+                  {[160, 120, 80, 40, 0].map((y) => <span key={y}>{y}</span>)}
+                </div>
+                <div className="relative flex-1">
+                  <div className="absolute inset-0 flex flex-col justify-between">
+                    {[0, 1, 2, 3, 4].map((i) => <div key={i} className="border-t border-dashed" style={{ borderColor: c.cborder }} />)}
+                  </div>
+                  <div className="relative flex h-[120px] items-end gap-2">
+                    {[22, 8, 84, 16, 98, 142, 150].map((b, i) => <div key={i} className="flex-1 rounded-t" style={{ height: `${(b / 160) * 100}%`, background: c.btn }} />)}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-1 flex gap-2">
+                <div className="w-5" />
+                <div className="flex flex-1 gap-2 text-[8px] opacity-50">
+                  {['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'].map((d) => <span key={d} className="flex-1 text-center">{d}</span>)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* últimos simulados */}
+          <div className="overflow-hidden rounded-xl" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
+            <div className="flex items-center gap-2 border-b px-3 py-2.5" style={{ background: `linear-gradient(90deg, ${c.btn}1f, transparent 55%)`, borderColor: c.cborder }}>
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: c.btn, color: fgBtn }}><ClipboardList className="h-4 w-4" /></span>
+              <div className="leading-tight">
+                <p className="text-[12px] font-semibold">Últimos simulados</p>
+                <p className="text-[9px] opacity-60">Os 5 mais recentes</p>
+              </div>
+            </div>
+            {([['Concurso TJ Rascunho', '#94a3b8', 'Rascunho'], ['Simulado OAB 2026', '#f59e0b', 'Encerrado'], ['Simulado Teste THEME', '#22c55e', 'Publicado']] as [string, string, string][]).map(([n, cor, st], i) => (
+              <div key={n} className="flex items-center justify-between px-3 py-2.5" style={i > 0 ? { borderTop: `1px solid ${c.cborder}` } : undefined}>
+                <div className="min-w-0">
+                  <p className="truncate text-[11px] font-medium">{n}</p>
+                  <p className="text-[8px] opacity-50">Criado em 26/06/2026</p>
+                </div>
+                <span className="shrink-0 rounded-full px-2 py-0.5 text-[8px] font-medium" style={{ background: `${cor}22`, color: cor }}>{st}</span>
               </div>
             ))}
           </div>

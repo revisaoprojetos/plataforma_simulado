@@ -1,4 +1,4 @@
-import 'dotenv/config'
+import './load-env' // 1º de tudo: carrega o .env (raiz do monorepo) antes dos processors
 import { Worker } from 'bullmq'
 import IORedis from 'ioredis'
 import { autoEncerramentoProcessor } from './processors/auto-encerramento'

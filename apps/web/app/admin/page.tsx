@@ -1,7 +1,8 @@
 import { createServiceClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { BookOpen, ClipboardList, Users, Activity } from 'lucide-react'
 import { SessionsChart } from '@/components/admin/sessions-chart'
+import { SecaoHeader } from '@/components/admin/secao-header'
 
 async function getDashboardStats() {
   const supabase = await createServiceClient()
@@ -95,39 +96,34 @@ export default async function AdminDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statsCards.map((card) => (
-          <Card key={card.title}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-              <card.icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{card.value.toLocaleString('pt-BR')}</div>
-              <p className="text-xs text-muted-foreground">{card.description}</p>
-            </CardContent>
-          </Card>
+          <div key={card.title} className="relative overflow-hidden rounded-2xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.08] to-transparent" />
+            <card.icon className="pointer-events-none absolute -right-3 -top-3 h-20 w-20 text-primary opacity-[0.06]" />
+            <div className="relative flex items-center gap-3">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm"><card.icon className="h-6 w-6" /></span>
+              <div className="min-w-0">
+                <p className="text-3xl font-bold leading-none tracking-tight">{card.value.toLocaleString('pt-BR')}</p>
+                <p className="mt-1 truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">{card.title}</p>
+              </div>
+            </div>
+          </div>
         ))}
       </div>
 
       {/* Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Sessões nos últimos 7 dias</CardTitle>
-          <CardDescription>Número de sessões de prova iniciadas por dia</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader icon={Activity} titulo="Sessões nos últimos 7 dias" subtitulo="Sessões de prova iniciadas por dia" />
+        <CardContent className="px-4 py-4">
           <SessionsChart />
         </CardContent>
       </Card>
 
       {/* Recent Simulados */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Últimos Simulados</CardTitle>
-          <CardDescription>Os 5 simulados mais recentes</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader icon={ClipboardList} titulo="Últimos simulados" subtitulo="Os 5 mais recentes" />
+        <CardContent className="px-4 py-4">
           {recentSimulados.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhum simulado criado ainda.</p>
           ) : (

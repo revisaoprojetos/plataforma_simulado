@@ -12,7 +12,7 @@ function SqlPendente() {
   )
 }
 
-export async function BancoEstudantes({ bancoId }: { bancoId: string }) {
+export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: string; cor?: string }) {
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
@@ -70,5 +70,5 @@ export async function BancoEstudantes({ bancoId }: { bancoId: string }) {
   }
   const grupos = (gruposRaw ?? []).map((x: any) => ({ id: x.id, nome: x.nome, cor: x.cor ?? null, membros: contMembros.get(x.id) ?? 0, vinculado: vinculadosSet.has(x.id) }))
 
-  return <BancoEstudantesClient bancoId={bancoId} vinculados={vinculados as any} alunos={alunos as any} grupos={grupos} />
+  return <BancoEstudantesClient bancoId={bancoId} vinculados={vinculados as any} alunos={alunos as any} grupos={grupos} cor={cor} />
 }

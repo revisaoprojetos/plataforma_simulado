@@ -1,7 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { SecaoHeader } from '@/components/admin/secao-header'
+import { ScrollText } from 'lucide-react'
 import { AuditoriaFilters } from '@/components/admin/auditoria-filters'
 import { AuditoriaDiff } from '@/components/admin/auditoria-diff'
 import {
@@ -83,10 +85,8 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
 
       <AuditoriaFilters />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Registros</CardTitle>
-        </CardHeader>
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader icon={ScrollText} titulo="Registros" subtitulo={`${count ?? 0} entrada(s)`} />
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>

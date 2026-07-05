@@ -24,7 +24,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
+import { SecaoHeader } from '@/components/admin/secao-header'
 import { criarApiKey, revogarApiKey } from './actions'
 
 const AVAILABLE_SCOPES = [
@@ -232,10 +233,8 @@ export function ApiKeysManager({ initialKeys }: Props) {
         </Dialog>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Chaves registradas</CardTitle>
-        </CardHeader>
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader icon={Key} titulo="Chaves registradas" subtitulo={`${keys.length} chave(s)`} />
         <CardContent className="p-0">
           <Table>
             <TableHeader>

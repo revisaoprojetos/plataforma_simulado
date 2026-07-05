@@ -3,6 +3,7 @@
 import { useState, useTransition, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -24,10 +25,12 @@ export function BancoCadernoClient({
   bancoId,
   cadernoAtualId,
   cadernos,
+  cor = '#6d28d9',
 }: {
   bancoId: string
   cadernoAtualId: string | null
   cadernos: Caderno[]
+  cor?: string
 }) {
   const [open, setOpen] = useState(false)
   const [atual, setAtual] = useState(cadernoAtualId)
@@ -51,11 +54,19 @@ export function BancoCadernoClient({
   }
 
   return (
-    <div className="max-w-xl space-y-2">
+    <Card className="max-w-xl overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+      <div className="flex items-center gap-3 border-b px-4 py-3.5" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent 55%)` }}>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}><FileText className="h-5 w-5" /></span>
+        <div>
+          <h3 className="text-sm font-semibold leading-tight">Moldura do caderno</h3>
+          <p className="text-xs text-muted-foreground">Capa, contracapa e fundo dos documentos</p>
+        </div>
+      </div>
+      <CardContent className="space-y-3 px-4 pb-4 pt-4">
       <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) setEscolha(atual ?? SEM) }}>
         {/* Barra de seleção */}
         <DialogTrigger
-          className="flex w-full items-center justify-between gap-2 rounded-lg border bg-background px-4 py-3 text-left text-sm outline-none hover:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex w-full items-center justify-between gap-2 rounded-lg border bg-[var(--input-bg,transparent)] px-4 py-3 text-left text-sm outline-none hover:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring"
         >
           <span className="flex items-center gap-2 truncate">
             <FileText className="h-4 w-4 shrink-0 text-primary" />
@@ -121,6 +132,7 @@ export function BancoCadernoClient({
       <p className="text-sm text-muted-foreground">
         Caderno usado como <strong>moldura dos documentos</strong> deste banco (capa, contracapa e fundo).
       </p>
-    </div>
+      </CardContent>
+    </Card>
   )
 }

@@ -63,6 +63,10 @@ export default async function RootLayout({
         />
         {/* Dynamic white-label theme — overrides shadcn CSS variable defaults */}
         <style dangerouslySetInnerHTML={{ __html: themeCSS }} />
+        {/* Fontes do Google usadas nos cadernos de prova (editor + impressão/PDF) */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&display=swap" />
         {/* Favicon: use tenant's if available, otherwise fall back to default */}
         {favicon && <link rel="icon" href={favicon} />}
         {/* Page title reflects tenant name when available */}

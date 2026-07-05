@@ -4,6 +4,7 @@ import { ThemeProvider } from 'next-themes'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { ThemeCookieSync } from '@/components/theme-cookie-sync'
+import { PdfDownloadsProvider } from '@/components/pdf-downloads-provider'
 
 export function Providers({ children, defaultTheme = 'light' }: { children: React.ReactNode; defaultTheme?: 'light' | 'dark' }) {
   const [queryClient] = useState(
@@ -27,7 +28,7 @@ export function Providers({ children, defaultTheme = 'light' }: { children: Reac
         disableTransitionOnChange
       >
         <ThemeCookieSync />
-        {children}
+        <PdfDownloadsProvider>{children}</PdfDownloadsProvider>
       </ThemeProvider>
     </QueryClientProvider>
   )

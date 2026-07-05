@@ -76,7 +76,7 @@ export function FeedbackItem({ fb }: { fb: Feedback }) {
         onChange={(e) => setResposta(e.target.value)}
         placeholder="Resposta / observação interna (opcional)"
         rows={2}
-        className="w-full resize-none rounded-md border bg-background px-2.5 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+        className="w-full resize-none rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
       />
 
       <div className="flex flex-wrap items-center gap-2">

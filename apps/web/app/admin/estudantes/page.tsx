@@ -11,11 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Plus, Upload } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ExcluirEstudanteButton } from '@/components/admin/excluir-estudante-button'
+import { SecaoHeader } from '@/components/admin/secao-header'
+import { GraduationCap } from 'lucide-react'
 
 export default async function EstudantesPage() {
   const supabase = await createServiceClient()
@@ -55,10 +57,8 @@ export default async function EstudantesPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Listagem</CardTitle>
-        </CardHeader>
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader icon={GraduationCap} titulo="Estudantes" subtitulo={`${estudantes?.length ?? 0} cadastrado(s)`} />
         <CardContent className="p-0">
           <div className="max-h-[65vh] overflow-auto">
           <Table>

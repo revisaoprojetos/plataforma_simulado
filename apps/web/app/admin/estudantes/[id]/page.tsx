@@ -12,6 +12,7 @@ import { EditarEstudanteButton } from '@/components/admin/editar-estudante-butto
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
 import { mesclarModalidades } from '@/lib/caderno-designer/types'
+import { tipoDoSimulado, filtrarModsPorTipo, type TipoSimulado } from '@/lib/simulado/tipo'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -93,6 +94,7 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
   const simIds = [...new Set(reais.map((s: any) => s.simulado_id).filter(Boolean))] as string[]
   const cadernoPorSim = new Map<string, string>()
   const modsPorCad = new Map<string, { id: string; nome: string }[]>()
+  const tipoSimPorSim = new Map<string, TipoSimulado | null>()  // objetiva/discursiva/mista
   const pastaPorSim = new Map<string, string>()                 // banco que mais cobre o simulado
   const gruposPorPasta = new Map<string, GrupoBanco[]>()        // grupos de disciplinas por banco
   if (simIds.length) {
@@ -101,6 +103,11 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
     for (const r of pq ?? []) { const arr = qPorSim.get((r as any).simulado_id) ?? []; arr.push((r as any).questao_id); qPorSim.set((r as any).simulado_id, arr) }
     const allQ = [...new Set((pq ?? []).map((r: any) => r.questao_id))]
     if (allQ.length) {
+      // Tipo de cada questão → tipo de cada simulado (para o selo e o filtro de cadernos).
+      const tipoDeQ = new Map<string, string>()
+      const { data: qTipos } = await svc.from('simulado_questoes').select('id, tipo').in('id', allQ)
+      for (const q of qTipos ?? []) tipoDeQ.set((q as any).id, (q as any).tipo)
+      for (const [sim, qs] of qPorSim) tipoSimPorSim.set(sim, tipoDoSimulado(qs.map((q) => tipoDeQ.get(q))))
       const { data: qp } = await svc.from('simulado_questao_pasta').select('questao_id, pasta_id').in('questao_id', allQ)
       const pastaIds = [...new Set((qp ?? []).map((r: any) => r.pasta_id))]
       const { data: pastas } = pastaIds.length ? await svc.from('simulado_pastas').select('id, caderno_id').in('id', pastaIds) : { data: [] as any[] }
@@ -170,12 +177,13 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
       return { nome: g.nome, ac: gac, tt: gtt }
     }).filter((g) => g.tt > 0)
     const cadId = cadernoPorSim.get(s.simulado_id) ?? null
+    const tipoS = tipoSimPorSim.get(s.simulado_id) ?? null
     return {
       id: s.id, titulo: s.simulados?.titulo ?? '—', statusLabel: cfg.label, statusVariant: cfg.variant,
       iniciado: fmt(s.iniciado_em), finalizado: fmt(s.finalizado_em), ac, tt,
       nota: s.nota != null ? Number(s.nota) : null, posicao: s.posicao_ranking ?? null, tentativa: s.tentativa_num ?? 1,
       tempoLabel: tempoMs ? fmtDur(tempoMs) : '—', mediaLabel: tempoMs && tt ? fmtDur(Math.round(tempoMs / tt)) : '—',
-      porGrupo, porDisciplina, cadId, mods: cadId ? modsPorCad.get(cadId) ?? [] : [], simuladoId: s.simulado_id, temResultado: tt > 0,
+      porGrupo, porDisciplina, cadId, mods: cadId ? filtrarModsPorTipo(modsPorCad.get(cadId) ?? [], tipoS) : [], simuladoId: s.simulado_id, temResultado: tt > 0, tipo: tipoS,
     }
   })
 
@@ -268,7 +276,7 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
       </div>
 
       {/* HISTÓRICO (client: busca + rolagem + expandir) */}
-      <HistoricoEstudante rows={rows} estudanteId={id} />
+      <HistoricoEstudante rows={rows} estudanteId={id} estudanteNome={est.nome} />
     </div>
   )
 }

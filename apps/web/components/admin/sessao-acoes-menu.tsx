@@ -1,9 +1,10 @@
 'use client'
 import { confirmar } from '@/components/ui/confirm-dialog'
 
-import { useTransition } from 'react'
+import { useTransition, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { usePdfDownloads } from '@/components/pdf-downloads-provider'
 import { MoreHorizontal, Trash2, ListChecks, ClipboardList, FileText, FileCheck2, Loader2, FileSpreadsheet } from 'lucide-react'
 import {
   DropdownMenu,
@@ -25,7 +26,7 @@ function IconeMod({ nome }: { nome: string }) {
 }
 
 export function SessaoAcoesMenu({
-  cadId, mods, estudanteId, sessaoId, simuladoId, temResultado,
+  cadId, mods, estudanteId, sessaoId, simuladoId, temResultado, estudanteNome, simuladoTitulo,
 }: {
   cadId: string | null
   mods: Mod[]
@@ -33,17 +34,48 @@ export function SessaoAcoesMenu({
   sessaoId: string
   simuladoId: string
   temResultado: boolean
+  estudanteNome?: string
+  simuladoTitulo?: string
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
+  // O acompanhamento/baixa fica no provider global (continua mesmo trocando de página).
+  const { registrar } = usePdfDownloads()
+  // Estado local só durante o POST de enfileiramento (evita clique-duplo na MESMA modalidade).
+  const [enviando, setEnviando] = useState<Set<string>>(new Set())
+  const marcarEnviando = (id: string, on: boolean) => setEnviando((prev) => { const n = new Set(prev); if (on) n.add(id); else n.delete(id); return n })
 
-  function abrir(url: string) {
-    window.open(url, '_blank', 'noopener')
-  }
   function baixar(url: string) {
     const a = document.createElement('a')
     a.href = url; a.rel = 'noopener'
     document.body.appendChild(a); a.click(); a.remove()
+  }
+
+  function urlNavegador(m: Mod) {
+    return `/imprimir/caderno/${cadId}?aluno=${estudanteId}&mod=${m.id}&sessao=${sessaoId}`
+  }
+  // Nome do arquivo: {estudante}_{simulado}_{caderno} (limpa caracteres inválidos).
+  const limpar = (s?: string) => (s ?? '').trim().replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_')
+  const nomeArquivo = (m: Mod) => [estudanteNome, simuladoTitulo, m.nome].map(limpar).filter(Boolean).join('_')
+  // Ação "abrir no navegador" (dentro de um clique do usuário — nunca bloqueado).
+  const acaoNavegador = (url: string) => ({ label: 'Abrir no navegador', onClick: () => window.open(url, '_blank', 'noopener,noreferrer') })
+
+  async function gerarCaderno(m: Mod) {
+    if (!cadId || enviando.has(m.id)) return
+    const fallbackUrl = urlNavegador(m)
+    marcarEnviando(m.id, true)
+    try {
+      const res = await fetch('/api/pdf/gerar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: 'caderno', cadernoId: cadId, mod: m.id, aluno: estudanteId, sessao: sessaoId, titulo: m.nome }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.jobId) { toast.error(data.message ?? 'Servidor de PDF indisponível.', { action: acaoNavegador(fallbackUrl) }); return }
+      // Entrega ao provider global → baixa quando pronto, mesmo que você saia da página.
+      registrar({ id: data.jobId, nome: m.nome, arquivo: nomeArquivo(m), statusUrl: `/api/pdf/jobs/${data.jobId}` })
+    } catch { toast.error('Erro de rede ao iniciar a geração.', { action: acaoNavegador(fallbackUrl) }) }
+    finally { marcarEnviando(m.id, false) }
   }
 
   async function excluir() {
@@ -66,11 +98,12 @@ export function SessaoAcoesMenu({
         {temResultado && (
           <>
             <DropdownMenuGroup>
-              <DropdownMenuLabel>Cadernos</DropdownMenuLabel>
+              <DropdownMenuLabel>Baixar caderno (PDF)</DropdownMenuLabel>
               {cadId && mods.length ? (
+                // Cada modalidade gera o PDF no servidor (worker + Gotenberg); se indisponível, abre no navegador.
                 mods.map((m) => (
-                  <DropdownMenuItem key={m.id} onClick={() => abrir(`/imprimir/caderno/${cadId}?aluno=${estudanteId}&mod=${m.id}&sessao=${sessaoId}`)}>
-                    <IconeMod nome={m.nome} /> {m.nome}
+                  <DropdownMenuItem key={m.id} disabled={enviando.has(m.id)} onClick={() => gerarCaderno(m)}>
+                    {enviando.has(m.id) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <IconeMod nome={m.nome} />} {m.nome}
                   </DropdownMenuItem>
                 ))
               ) : (

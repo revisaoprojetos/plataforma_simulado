@@ -2,15 +2,15 @@
 
 import { Fragment, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, Printer, Plus, Trash2, ArrowUp, ArrowDown, FileText, Palette, LayoutTemplate, ChevronLeft, ChevronRight, Columns2, PanelTop, PanelBottom, Minus, Wallpaper, Database, Users, Repeat, Copy } from 'lucide-react'
+import { Loader2, Save, Printer, Plus, Trash2, ArrowUp, ArrowDown, FileText, Palette, LayoutTemplate, ChevronLeft, ChevronRight, Columns2, PanelTop, PanelBottom, Minus, Wallpaper, Database, Users, Repeat, Copy, GripVertical } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { BLOCKS, blocksByCategory, createBlock, getBlockMeta, BlockRender, cardStyle, dataComQuestao } from '@/lib/caderno-designer/blocks'
+import { BLOCKS, blocksByCategory, createBlock, getBlockMeta, BlockRender, cardStyle, dataComQuestao, larguraDaColuna } from '@/lib/caderno-designer/blocks'
 import { BlockInspector } from '@/lib/caderno-designer/inspectors'
 import { resolveTheme, type CadernoTheme } from '@/lib/caderno-designer/theme'
 import * as tree from '@/lib/caderno-designer/block-tree'
-import { SHEET_W, SHEET_H, PAD_H, PAD_V, PAGE_KINDS, RUNNING_PADRAO, HUD_CORES_PADRAO, novoDoc, docCadernoCompleto, genId, mesclarModalidades, type CadernoDoc, type Modalidade, type Block, type PageKind, type CadernoData, type HudCores, type HudPorPagina } from '@/lib/caderno-designer/types'
+import { SHEET_W, SHEET_H, PAD_H, PAD_V, PAGE_KINDS, RUNNING_PADRAO, HUD_CORES_PADRAO, novoDoc, docCadernoCompleto, genId, mesclarModalidades, faixaNaPagina, type CadernoDoc, type Modalidade, type Block, type PageKind, type CadernoData, type HudCores, type HudPorPagina, type FaixaPaginas } from '@/lib/caderno-designer/types'
 import { HudSimuladoEditor } from '@/components/admin/hud-simulado-editor'
 import { GerarPdfServidor } from '@/components/admin/gerar-pdf-servidor'
 import { MonitorPlay } from 'lucide-react'
@@ -34,14 +34,21 @@ const REALCE = 'var(--primary)' // segue a cor primária configurada do sistema
 function useFlip(ativo: boolean) {
   const ref = useRef<HTMLDivElement>(null)
   const pos = useRef(new Map<string, DOMRect>())
+  const ordem = useRef('')
   const montado = useRef(false)
   useLayoutEffect(() => {
     const el = ref.current; if (!el || !ativo) return // durante o arrasto os slots já animam
+    const filhos = Array.from(el.children) as HTMLElement[]
+    const assinatura = filhos.map((c) => c.dataset.flipKey ?? '').filter(Boolean).join('|')
+    // Só anima quando o CONJUNTO/ORDEM de blocos muda (adicionar/remover/reordenar).
+    // Em mudança de tamanho (ex.: arrastar a altura do espaçador) apenas registra as
+    // posições — evita o "piscar" do FLIP re-disparando a cada passo do slider.
+    const anima = montado.current && assinatura !== ordem.current
     const novo = new Map<string, DOMRect>()
-    for (const c of Array.from(el.children) as HTMLElement[]) {
+    for (const c of filhos) {
       const key = c.dataset.flipKey; if (!key) continue
       const r = c.getBoundingClientRect(); novo.set(key, r)
-      if (!montado.current) continue
+      if (!anima) continue
       const old = pos.current.get(key)
       if (old) {
         const dx = old.left - r.left, dy = old.top - r.top
@@ -53,6 +60,7 @@ function useFlip(ativo: boolean) {
       }
     }
     pos.current = novo
+    ordem.current = assinatura
     montado.current = true
   })
   return ref
@@ -109,20 +117,20 @@ function InsertSlot({ ctx, blockId, pos, active }: { ctx: NodeCtx; blockId: stri
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); ctx.setOver(blockId, pos) }}
       onDrop={(e) => ctx.drop(e, pos === 'top' ? { kind: 'before', blockId } : { kind: 'after', blockId })}
       className={cn('flex shrink-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-md border-dashed text-[10px] font-medium text-primary transition-all duration-200 ease-out',
-        active ? 'my-0.5 h-9 border-2 border-primary bg-primary/10 opacity-100' : 'h-1 border-0 opacity-0')}>
+        active ? 'my-0.5 h-9 border-2 border-primary bg-primary/10 opacity-100' : 'h-[3px] border-0 opacity-0')}>
       soltar aqui
     </div>
   )
 }
 
 // Lista de blocos com slots (top/bottom) sempre presentes, animando na posição do cursor.
-function ListaBlocos({ blocks, ctx }: { blocks: Block[]; ctx: NodeCtx }) {
+function ListaBlocos({ blocks, ctx, emColuna }: { blocks: Block[]; ctx: NodeCtx; emColuna?: boolean }) {
   return (
     <>
       {blocks.map((block) => (
         <Fragment key={block.id}>
           <InsertSlot ctx={ctx} blockId={block.id} pos="top" active={ctx.overId === block.id && ctx.overPos === 'top'} />
-          <EditorNode block={block} ctx={ctx} />
+          <EditorNode block={block} ctx={ctx} emColuna={emColuna} />
           <InsertSlot ctx={ctx} blockId={block.id} pos="bottom" active={ctx.overId === block.id && ctx.overPos === 'bottom'} />
         </Fragment>
       ))}
@@ -130,7 +138,7 @@ function ListaBlocos({ blocks, ctx }: { blocks: Block[]; ctx: NodeCtx }) {
   )
 }
 
-function EditorNode({ block, ctx }: { block: Block; ctx: NodeCtx }) {
+function EditorNode({ block, ctx, emColuna }: { block: Block; ctx: NodeCtx; emColuna?: boolean }) {
   const a = block.attributes as any
   const selected = ctx.selId === block.id
 
@@ -139,13 +147,14 @@ function EditorNode({ block, ctx }: { block: Block; ctx: NodeCtx }) {
   if (block.type === 'coluna') {
     const filhos = block.innerBlocks ?? []
     const vazia = filhos.length === 0
+    const colLarg = larguraDaColuna(block)
     return (
       <div data-flip-key={block.id} onClick={(e) => { e.stopPropagation(); ctx.select(block) }}
         onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); ctx.setOver(block.id) }}
         onDrop={(e) => ctx.drop(e, { kind: 'into', containerId: block.id })}
-        style={over ? { outline: `2px solid ${REALCE}`, outlineOffset: -2, borderRadius: 6 } : undefined}
-        className={cn('min-w-0 flex-1 rounded transition-colors', over && 'bg-primary/10')}>
-        {vazia ? <DropZoneVazia onClick={() => ctx.addInto(block.id)} /> : <AutoAnim ativo={!ctx.arrastando} className="flex flex-col"><ListaBlocos blocks={filhos} ctx={ctx} /></AutoAnim>}
+        style={{ flex: colLarg ? `0 0 ${colLarg}%` : '1 1 0%', ...(over ? { outline: `2px solid ${REALCE}`, outlineOffset: -2, borderRadius: 6 } : {}) }}
+        className={cn('min-w-0 rounded transition-colors', over && 'bg-primary/10')}>
+        {vazia ? <DropZoneVazia onClick={() => ctx.addInto(block.id)} /> : <AutoAnim ativo={!ctx.arrastando} className="flex flex-col"><ListaBlocos blocks={filhos} ctx={ctx} emColuna /></AutoAnim>}
       </div>
     )
   }
@@ -169,9 +178,10 @@ function EditorNode({ block, ctx }: { block: Block; ctx: NodeCtx }) {
   if (block.type === 'card') {
     const al = a.alinhamento ?? 'center'
     const filhos = block.innerBlocks ?? []
+    const cardA = emColuna ? { ...a, largura: 100 } : a // em coluna, o card preenche (a coluna já define a largura)
     inner = (
       <div style={{ display: 'flex', justifyContent: al === 'left' ? 'flex-start' : al === 'right' ? 'flex-end' : 'center' }}>
-        <div style={cardStyle(a, ctx.theme)}>
+        <div style={cardStyle(cardA, ctx.theme)}>
           {filhos.length > 0 ? (
             <AutoAnim ativo={!ctx.arrastando} className="flex flex-col"><ListaBlocos blocks={filhos} ctx={ctx} /></AutoAnim>
           ) : <DropZoneVazia onClick={() => ctx.addInto(block.id)} />}
@@ -190,7 +200,7 @@ function EditorNode({ block, ctx }: { block: Block; ctx: NodeCtx }) {
     const ctxQ: NodeCtx = ctx.data.questoes[0] ? { ...ctx, data: dataComQuestao(ctx.data, ctx.data.questoes[0]) } : ctx
     const n = ctx.data.questoes.length || ctx.data.numQuestoes
     inner = (
-      <div style={{ border: `1.5px dashed ${ctx.theme.cores.secundaria}`, borderRadius: 8, padding: 12, background: 'color-mix(in oklab, var(--primary) 4%, transparent)' }}>
+      <div style={{ border: `1.5px dashed ${ctx.theme.cores.secundaria}`, borderRadius: 8, padding: 8, background: 'color-mix(in oklab, var(--primary) 4%, transparent)' }}>
         <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: ctx.theme.cores.secundaria }}>
           <Repeat className="h-3.5 w-3.5" /> Repete por questão — {n} no banco
         </div>
@@ -200,7 +210,7 @@ function EditorNode({ block, ctx }: { block: Block; ctx: NodeCtx }) {
       </div>
     )
   } else {
-    inner = <BlockRender block={block} theme={ctx.theme} data={ctx.data} />
+    inner = <BlockRender block={block} theme={ctx.theme} data={ctx.data} full={emColuna} />
   }
 
   return (
@@ -216,14 +226,16 @@ function EditorNode({ block, ctx }: { block: Block; ctx: NodeCtx }) {
       style={ehContainer && overIn ? { outline: `2px solid ${REALCE}`, outlineOffset: -1, borderRadius: 8 } : undefined}
       className={cn('group/b relative cursor-grab rounded active:cursor-grabbing',
         ehContainer && overIn ? 'bg-primary/5' : isCard && ctx.arrastando ? 'outline outline-1 outline-dashed outline-primary/40' : selected ? 'outline outline-2 outline-primary' : 'hover:outline hover:outline-1 hover:outline-primary/40')}>
-      {/* conteúdo + espaço lateral que encolhe/expande com animação */}
+      {/* conteúdo + espaço lateral que encolhe/expande com animação.
+          A zona lateral só renderiza conteúdo (e min-h) quando ativa — senão, com items-stretch,
+          o min-h-[44px] empurraria a altura de TODO bloco para ≥44px (só no editor), criando falso espaçamento. */}
       <div className="flex items-stretch">
         <div className={cn('overflow-hidden transition-all duration-200 ease-out', guiaLado === 'left' ? 'mr-2 w-[44%]' : 'w-0')}>
-          <div className="flex h-full min-h-[44px] items-center justify-center whitespace-nowrap rounded-md border-2 border-dashed border-primary bg-primary/10 text-[10px] font-medium text-primary">soltar aqui</div>
+          {guiaLado === 'left' && <div className="flex h-full min-h-[44px] items-center justify-center whitespace-nowrap rounded-md border-2 border-dashed border-primary bg-primary/10 text-[10px] font-medium text-primary">soltar aqui</div>}
         </div>
         <div className="min-w-0 flex-1">{inner}</div>
         <div className={cn('overflow-hidden transition-all duration-200 ease-out', guiaLado === 'right' ? 'ml-2 w-[44%]' : 'w-0')}>
-          <div className="flex h-full min-h-[44px] items-center justify-center whitespace-nowrap rounded-md border-2 border-dashed border-primary bg-primary/10 text-[10px] font-medium text-primary">soltar aqui</div>
+          {guiaLado === 'right' && <div className="flex h-full min-h-[44px] items-center justify-center whitespace-nowrap rounded-md border-2 border-dashed border-primary bg-primary/10 text-[10px] font-medium text-primary">soltar aqui</div>}
         </div>
       </div>
       <NodeToolbar block={block} ctx={ctx} />
@@ -262,6 +274,8 @@ export function CadernoEditorV2({
   const [regIndex, setRegIndex] = useState(0)
   const [modAtiva, setModAtiva] = useState<string>(mods0[0].id)
   const [selPage, setSelPage] = useState<string | null>(null)
+  const [pageDrag, setPageDrag] = useState<number | null>(null)
+  const [pageOver, setPageOver] = useState<number | null>(null)
   const [selBlock, setSelBlock] = useState<string | null>(null)
   const [regiao, setRegiao] = useState<Regiao>('pagina')
   const [overId, setOverId] = useState<string | null>(null)
@@ -303,10 +317,15 @@ export function CadernoEditorV2({
     const novo = createBlock(type)
     // Imagem de fundo (full-bleed) sempre no nível da página — nunca dentro de container.
     if (meta?.fullBleed) {
-      const pid = selPage ?? doc.pages[0]?.id; if (!pid) { toast.error('Selecione uma página primeiro.'); return }
+      let pid = selPage ?? doc.pages[0]?.id; if (!pid) { toast.error('Selecione uma página primeiro.'); return }
       if (meta.unicoPorPagina) {
-        const pg = doc.pages.find((p) => p.id === pid)
-        if (pg?.blocks.some((b) => b.type === type)) { toast.error(`Esta página já tem "${meta.title}". Selecione outra página para adicionar mais um.`); return }
+        const pgSel = doc.pages.find((p) => p.id === pid)
+        if (pgSel?.blocks.some((b) => b.type === type)) {
+          // Página atual já tem imagem de fundo → adiciona na primeira página sem uma.
+          const livre = doc.pages.find((p) => !p.blocks.some((b) => b.type === type))
+          if (!livre) { toast.error('Todas as páginas já têm imagem de fundo. Adicione uma nova página.'); return }
+          pid = livre.id
+        }
       }
       setDoc((d) => ({ ...d, pages: d.pages.map((p) => p.id === pid ? { ...p, blocks: [novo, ...p.blocks] } : p) }))
       setSelBlock(novo.id); setSelPage(pid); setAba('bloco')
@@ -399,6 +418,10 @@ export function CadernoEditorV2({
   function patchBlock(blockId: string, patch: Record<string, unknown>) { mutarTudo((bs) => tree.updateAttrs(bs, blockId, patch)) }
   function addPage(kind: PageKind) { setDoc((d) => ({ ...d, pages: [...d.pages, { id: genId('page'), kind, titulo: `Página ${d.pages.length + 1}`, blocks: [] }] })) }
   function removePage(pageId: string) { setDoc((d) => d.pages.length <= 1 ? d : ({ ...d, pages: d.pages.filter((p) => p.id !== pageId) })) }
+  function moverPagina(from: number, to: number) {
+    if (to < 0 || from === to) return
+    setDoc((d) => { if (to >= d.pages.length) return d; const arr = [...d.pages]; const [it] = arr.splice(from, 1); arr.splice(to, 0, it); return { ...d, pages: arr } })
+  }
 
   // modalidades
   async function addModalidade() { const nm = (await pedirTexto({ titulo: 'Nova modalidade', label: 'Nome', placeholder: 'ex.: Gabarito Discursivo', confirmar: 'Criar' }))?.trim(); if (!nm) return; const m = { id: genId('mod'), nome: nm }; setModalidades((ms) => [...ms, m]); setDocs((d) => ({ ...d, [m.id]: novoDoc() })); setModAtiva(m.id) }
@@ -428,32 +451,46 @@ export function CadernoEditorV2({
     })
   }
 
-  // ---- faixa cabeçalho/rodapé (zona editável) ----
-  function FaixaRegiao({ reg, blocks }: { reg: 'cabecalho' | 'rodape'; blocks: Block[] }) {
+  // ---- zona de cabeçalho/rodapé DENTRO da folha (área reservada; conteúdo não invade) ----
+  function ZonaFaixa({ reg, blocks, altura }: { reg: 'cabecalho' | 'rodape'; blocks: Block[]; altura?: number }) {
     const ativa = regiao === reg
     const overReg = overId === `regiao:${reg}`
+    const isCab = reg === 'cabecalho'
+    const temAltura = !!altura && altura > 0
+    const h = temAltura ? { minHeight: altura, display: 'flex', flexDirection: 'column' as const, justifyContent: isCab ? 'flex-start' as const : 'flex-end' as const } : {}
     return (
-      <div onClick={() => { setRegiao(reg); setSelBlock(null) }}
-        onDragOver={(e) => { e.preventDefault(); setOver(`regiao:${reg}`) }}
-        onDrop={(e) => ctx.drop(e, { kind: 'regiao', regiao: reg })}
-        style={{ width: SHEET_W * ZOOM }}
-        className={cn('rounded-md border border-dashed bg-white/70 p-2 transition-colors', overReg ? 'border-primary ring-2 ring-primary/40' : ativa ? 'border-primary ring-1 ring-primary/30' : 'border-border')}>
-        <p className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          {reg === 'cabecalho' ? <PanelTop className="h-3 w-3" /> : <PanelBottom className="h-3 w-3" />} {reg === 'cabecalho' ? 'Cabeçalho' : 'Rodapé'}
-        </p>
-        <div style={{ transform: `scale(${ZOOM})`, transformOrigin: 'top left', width: SHEET_W - PAD_H * 2 }}>
-          <div className="flex flex-col">
-            {blocks.length === 0 ? <p className="text-xs text-muted-foreground">Clique aqui e adicione blocos à esquerda.</p> : <ListaBlocos blocks={blocks} ctx={ctx} />}
-          </div>
-        </div>
+      <div
+        onClick={(e) => { e.stopPropagation(); setRegiao(reg); setSelBlock(null); setSelPage(null) }}
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setOver(`regiao:${reg}`) }}
+        onDrop={(e) => { e.stopPropagation(); ctx.drop(e, { kind: 'regiao', regiao: reg }) }}
+        style={{
+          transition: 'min-height 0.25s ease-out, background-color 0.15s, box-shadow 0.15s',
+          // Área reservada visível (editor): tint + contorno tracejado para VER a faixa crescer.
+          ...(temAltura ? { background: 'color-mix(in oklab, var(--primary) 7%, transparent)' } : {}),
+          ...(isCab
+            ? { borderBottom: `1px solid ${theme.cores.secundaria}55`, paddingTop: 10, paddingBottom: 8, marginBottom: 8, ...h }
+            : { borderTop: `1px solid ${theme.cores.secundaria}55`, paddingTop: 8, paddingBottom: 10, marginTop: 8, ...h }),
+        }}
+        className={cn('relative z-[1] shrink-0 cursor-pointer rounded-sm',
+          temAltura && 'outline-dashed outline-1 -outline-offset-1 outline-primary/30',
+          overReg ? 'ring-2 ring-primary/50' : ativa ? 'ring-1 ring-primary/40' : 'hover:ring-1 hover:ring-primary/25')}>
+        {/* Selo com a altura reservada — cresce junto e deixa claro que a faixa está aumentando. */}
+        {temAltura && (
+          <span className={cn('pointer-events-none absolute right-1.5 z-[2] rounded bg-primary/80 px-1.5 py-0.5 text-[9px] font-semibold text-primary-foreground', isCab ? 'top-1.5' : 'bottom-1.5')}>
+            {isCab ? 'Cabeçalho' : 'Rodapé'} · {altura}px
+          </span>
+        )}
+        {blocks.length === 0
+          ? <div className={cn('flex items-center justify-center gap-1.5 text-[11px] font-medium text-muted-foreground', temAltura ? 'flex-1' : 'py-3')}>{isCab ? <PanelTop className="h-3.5 w-3.5" /> : <PanelBottom className="h-3.5 w-3.5" />} Área de {isCab ? 'cabeçalho' : 'rodapé'}{temAltura ? '' : ' — clique e adicione blocos'}</div>
+          : <div className="flex flex-col"><ListaBlocos blocks={blocks} ctx={ctx} /></div>}
       </div>
     )
   }
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] flex-col" onDragEnd={() => { setArrastando(false); setOver(null) }}>
+    <div className="-m-6 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden bg-background" onDragEnd={() => { setArrastando(false); setOver(null) }}>
       {/* Topo */}
-      <div className="flex items-center justify-between gap-3 border-b pb-3">
+      <div className="flex items-center justify-between gap-3 border-b bg-card/60 px-4 py-2.5">
         <div className="flex items-center gap-3">
           <Link href="/admin/cadernos" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
           <div>
@@ -469,6 +506,10 @@ export function CadernoEditorV2({
               {bancos.map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}
             </select>
           </label>
+          <button onClick={() => setHudMode(true)} title="Personalizar as cores da interface da prova (HUD do simulado)"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/50 bg-gradient-to-r from-primary/20 to-primary/5 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm transition-all hover:-translate-y-px hover:from-primary/30 hover:to-primary/10 hover:shadow">
+            <MonitorPlay className="h-4 w-4" /> HUD de Simulado
+          </button>
         </div>
         <div className="flex items-center gap-2">
           {registros.length > 0 && (
@@ -499,9 +540,9 @@ export function CadernoEditorV2({
       {hudMode ? (
         <HudSimuladoEditor base={hudCores} porPagina={hudPorPagina} onChangePorPagina={setHudPorPagina} onVoltar={() => setHudMode(false)} titulo={nome} branding={branding} />
       ) : (
-      <div className="grid min-h-0 flex-1 grid-cols-[188px_1fr_236px]">
+      <div className="grid min-h-0 flex-1 grid-cols-[208px_1fr_248px]">
         {/* Esquerda */}
-        <div className="scroll-claro flex min-h-0 flex-col gap-4 overflow-y-auto border-r bg-muted/20 p-2.5">
+        <div className="scroll-claro flex min-h-0 flex-col gap-4 overflow-y-auto border-r bg-muted/20 p-3">
           <div>
             <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Modalidade</p>
             <select value={modAtiva} onChange={(e) => { setModAtiva(e.target.value); setSelBlock(null) }} className="w-full rounded-lg border bg-background px-2.5 py-2 text-sm shadow-sm">
@@ -512,10 +553,6 @@ export function CadernoEditorV2({
               <button onClick={() => renameModalidade(modAtiva)} className="text-muted-foreground hover:underline">Renomear</button>
               <button onClick={() => removeModalidade(modAtiva)} className="text-destructive hover:underline">Excluir</button>
             </div>
-            <button onClick={() => setHudMode(true)} title="Personalizar as cores da interface da prova"
-              className="mt-2.5 flex w-full items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-2.5 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-primary/10">
-              <MonitorPlay className="h-4 w-4 text-primary" /> HUD de Simulado
-            </button>
           </div>
 
           <div>
@@ -540,8 +577,7 @@ export function CadernoEditorV2({
                   <div className="flex flex-col gap-1.5">
                     {cats[cat].map((b) => {
                       const Icon = b.icon
-                      const pgSel = doc.pages.find((p) => p.id === (selPage ?? doc.pages[0]?.id))
-                      const dis = (b.unico && tiposUsados.has(b.type)) || (b.unicoPorPagina && !!pgSel?.blocks.some((x) => x.type === b.type))
+                      const dis = (b.unico && tiposUsados.has(b.type)) || (b.unicoPorPagina && doc.pages.length > 0 && doc.pages.every((p) => p.blocks.some((x) => x.type === b.type)))
                       return (
                         <button key={b.type} disabled={dis} onClick={() => addBlock(b.type)}
                           draggable={!dis} onDragStart={(e) => { setArrastando(true); e.dataTransfer.setData('text/plain', `novo:${b.type}`) }}
@@ -561,11 +597,11 @@ export function CadernoEditorV2({
         {/* Centro: canvas */}
         <div className="scroll-claro min-h-0 overflow-auto bg-[radial-gradient(circle,theme(colors.slate.300)_1px,transparent_1px)] [background-size:18px_18px] px-4 py-5 dark:bg-[radial-gradient(circle,theme(colors.slate.700)_1px,transparent_1px)]">
           <div className="mx-auto flex flex-col items-center gap-3" style={{ width: SHEET_W * ZOOM }}>
-            {running.cabecalhoAtivo && <FaixaRegiao reg="cabecalho" blocks={doc.cabecalho ?? []} />}
-
             {doc.pages.map((page, pi) => {
               const bg = page.blocks.find((b) => b.type === 'plano-fundo')
               const conteudo = page.blocks.filter((b) => b.type !== 'plano-fundo')
+              const mostraCab = running.cabecalhoAtivo && faixaNaPagina(running.cabecalhoPaginas, pi, page.kind)
+              const mostraRod = running.rodapeAtivo && faixaNaPagina(running.rodapePaginas, pi, page.kind)
               return (
                 <div key={page.id} className="group/p relative">
                   <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground" style={{ width: SHEET_W * ZOOM }}>
@@ -576,7 +612,7 @@ export function CadernoEditorV2({
                     <div onClick={() => { setSelPage(page.id); setSelBlock(null); setRegiao('pagina') }}
                       onDragOver={(e) => { e.preventDefault(); setOver(page.id) }}
                       onDrop={(e) => ctx.drop(e, { kind: 'page', pageId: page.id })}
-                      style={{ width: SHEET_W, height: SHEET_H, padding: `${PAD_V}px ${PAD_H}px`, transform: `scale(${ZOOM})`, transformOrigin: 'top left', background: theme.cores.fundo, boxShadow: '0 2px 16px rgba(0,0,0,.13)',
+                      style={{ width: SHEET_W, height: SHEET_H, transform: `scale(${ZOOM})`, transformOrigin: 'top left', background: theme.cores.fundo, boxShadow: '0 2px 16px rgba(0,0,0,.13)',
                         ...(overId === page.id ? { outline: `2.5px solid ${REALCE}`, outlineOffset: -2 } : arrastando ? { outline: `1.5px solid ${REALCE}`, outlineOffset: -2 } : {}) }}
                       className={cn('relative overflow-hidden', !arrastando && selPage === page.id && regiao === 'pagina' && 'ring-2 ring-primary/40')}>
                       {/* camada de fundo full-bleed (com placeholder quando sem imagem) */}
@@ -597,19 +633,23 @@ export function CadernoEditorV2({
                           </div>
                         )
                       })()}
-                      <AutoAnim ativo={!arrastando} className="relative flex flex-col">
-                        {conteudo.length === 0 && !bg && (
-                          <div className={cn('flex h-[200px] items-center justify-center rounded-lg border-2 border-dashed text-sm transition-colors', arrastando ? 'border-primary/50 bg-primary/5 text-primary' : 'border-border text-muted-foreground')}>{arrastando ? 'Solte o bloco aqui' : 'Arraste um bloco ou clique para começar'}</div>
-                        )}
-                        <ListaBlocos blocks={conteudo} ctx={ctx} />
-                      </AutoAnim>
+                      {/* Coluna da folha: faixas usam a LARGURA TODA (borda a borda); só o conteúdo do meio tem margem lateral/vertical. */}
+                      <div className="relative flex h-full flex-col">
+                        {mostraCab && <ZonaFaixa reg="cabecalho" blocks={doc.cabecalho ?? []} altura={running.cabecalhoAltura} />}
+                        {/* Conteúdo do meio: preso entre cabeçalho e rodapé; overflow recortado para não invadir as áreas. */}
+                        <AutoAnim ativo={!arrastando} style={{ paddingTop: mostraCab ? 0 : PAD_V, paddingBottom: mostraRod ? 0 : PAD_V, paddingLeft: PAD_H, paddingRight: PAD_H }} className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden', page.valign === 'center' && 'justify-center', page.valign === 'bottom' && 'justify-end')}>
+                          {conteudo.length === 0 && !bg && (
+                            <div className={cn('flex h-[200px] items-center justify-center rounded-lg border-2 border-dashed text-sm transition-colors', arrastando ? 'border-primary/50 bg-primary/5 text-primary' : 'border-border text-muted-foreground')}>{arrastando ? 'Solte o bloco aqui' : 'Arraste um bloco ou clique para começar'}</div>
+                          )}
+                          <ListaBlocos blocks={conteudo} ctx={ctx} />
+                        </AutoAnim>
+                        {mostraRod && <ZonaFaixa reg="rodape" blocks={doc.rodape ?? []} altura={running.rodapeAltura} />}
+                      </div>
                     </div>
                   </div>
                 </div>
               )
             })}
-
-            {running.rodapeAtivo && <FaixaRegiao reg="rodape" blocks={doc.rodape ?? []} />}
 
             <div className="flex flex-wrap justify-center gap-1.5 py-2 pb-10">
               {PAGE_KINDS.map((k) => (
@@ -655,14 +695,42 @@ export function CadernoEditorV2({
             )}
 
             {aba === 'pagina' && (
-              <div className="space-y-3">
-                <p className="text-sm font-semibold">Páginas ({doc.pages.length})</p>
-                {doc.pages.map((p) => (
-                  <div key={p.id} className={cn('rounded-md border bg-background p-2', selPage === p.id && 'border-primary')}>
-                    <input value={p.titulo ?? ''} onChange={(e) => setDoc((d) => ({ ...d, pages: d.pages.map((x) => x.id === p.id ? { ...x, titulo: e.target.value } : x) }))} className="w-full bg-transparent text-sm font-medium outline-none" />
-                    <select value={p.kind} onChange={(e) => setDoc((d) => ({ ...d, pages: d.pages.map((x) => x.id === p.id ? { ...x, kind: e.target.value as PageKind } : x) }))} className="mt-1 w-full rounded border bg-background px-1.5 py-1 text-xs">
-                      {PAGE_KINDS.map((k) => <option key={k.id} value={k.id}>{k.nome}</option>)}
-                    </select>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold">Páginas ({doc.pages.length})</p>
+                  <span className="text-[10px] text-muted-foreground">arraste ou use as setas</span>
+                </div>
+                {doc.pages.map((p, i) => (
+                  <div key={p.id}
+                    draggable
+                    onDragStart={() => setPageDrag(i)}
+                    onDragOver={(e) => { if (pageDrag !== null) { e.preventDefault(); setPageOver(i) } }}
+                    onDrop={(e) => { if (pageDrag !== null) { e.preventDefault(); moverPagina(pageDrag, i); setPageDrag(null); setPageOver(null) } }}
+                    onDragEnd={() => { setPageDrag(null); setPageOver(null) }}
+                    onClick={() => setSelPage(p.id)}
+                    className={cn('flex items-start gap-1.5 rounded-md border bg-background p-2 transition-colors', selPage === p.id && 'border-primary', pageOver === i && pageDrag !== null && 'border-t-2 border-t-primary', pageDrag === i && 'opacity-50')}>
+                    <span className="mt-1 flex cursor-grab flex-col items-center gap-0.5 text-muted-foreground active:cursor-grabbing" title="Arraste para reordenar">
+                      <GripVertical className="h-3.5 w-3.5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <input value={p.titulo ?? ''} onChange={(e) => setDoc((d) => ({ ...d, pages: d.pages.map((x) => x.id === p.id ? { ...x, titulo: e.target.value } : x) }))} onClick={(e) => e.stopPropagation()} className="w-full bg-transparent text-sm font-medium outline-none" />
+                      <select value={p.kind} onChange={(e) => setDoc((d) => ({ ...d, pages: d.pages.map((x) => x.id === p.id ? { ...x, kind: e.target.value as PageKind } : x) }))} onClick={(e) => e.stopPropagation()} className="mt-1 w-full rounded border bg-background px-1.5 py-1 text-xs">
+                        {PAGE_KINDS.map((k) => <option key={k.id} value={k.id}>{k.nome}</option>)}
+                      </select>
+                      <div className="mt-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <span className="mr-0.5 text-[9px] uppercase tracking-wide text-muted-foreground">Alinh. vertical</span>
+                        {([['top', 'Topo'], ['center', 'Centro'], ['bottom', 'Rodapé']] as const).map(([v, label]) => (
+                          <button key={v} type="button" onClick={() => setDoc((d) => ({ ...d, pages: d.pages.map((x) => x.id === p.id ? { ...x, valign: v } : x) }))}
+                            className={cn('flex-1 rounded border px-1 py-0.5 text-[10px] transition-colors', (p.valign ?? 'top') === v ? 'border-primary bg-primary/10 font-medium text-primary' : 'text-muted-foreground hover:bg-muted')}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="mt-0.5 flex flex-col">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); moverPagina(i, i - 1) }} disabled={i === 0} title="Subir" className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); moverPagina(i, i + 1) }} disabled={i === doc.pages.length - 1} title="Descer" className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -671,13 +739,47 @@ export function CadernoEditorV2({
             {aba === 'layout' && (
               <div className="space-y-4">
                 <p className="text-sm font-semibold">Cabeçalho e rodapé</p>
-                <label className="flex items-center justify-between gap-2 text-sm"><span className="flex items-center gap-1.5"><PanelTop className="h-4 w-4" /> Cabeçalho</span>
-                  <input type="checkbox" checked={running.cabecalhoAtivo} onChange={(e) => setDoc((d) => ({ ...d, running: { ...(d.running ?? RUNNING_PADRAO), cabecalhoAtivo: e.target.checked } }))} /></label>
-                <label className="flex items-center justify-between gap-2 text-sm"><span className="flex items-center gap-1.5"><PanelBottom className="h-4 w-4" /> Rodapé</span>
-                  <input type="checkbox" checked={running.rodapeAtivo} onChange={(e) => setDoc((d) => ({ ...d, running: { ...(d.running ?? RUNNING_PADRAO), rodapeAtivo: e.target.checked } }))} /></label>
+                {(() => {
+                  const setRun = (patch: Partial<typeof running>) => setDoc((d) => ({ ...d, running: { ...(d.running ?? RUNNING_PADRAO), ...patch } }))
+                  const FaixaCfg = ({ reg }: { reg: 'cabecalho' | 'rodape' }) => {
+                    const isCab = reg === 'cabecalho'
+                    const ativo = isCab ? running.cabecalhoAtivo : running.rodapeAtivo
+                    const altura = (isCab ? running.cabecalhoAltura : running.rodapeAltura) ?? 0
+                    const paginas = (isCab ? running.cabecalhoPaginas : running.rodapePaginas) ?? 'todas'
+                    return (
+                      <div className="rounded-lg border p-2.5">
+                        <label className="flex items-center justify-between gap-2 text-sm font-medium">
+                          <span className="flex items-center gap-1.5">{isCab ? <PanelTop className="h-4 w-4" /> : <PanelBottom className="h-4 w-4" />} {isCab ? 'Cabeçalho' : 'Rodapé'}</span>
+                          <input type="checkbox" checked={ativo} onChange={(e) => setRun(isCab ? { cabecalhoAtivo: e.target.checked } : { rodapeAtivo: e.target.checked })} />
+                        </label>
+                        {ativo && (
+                          <div className="mt-2.5 space-y-2.5 border-t pt-2.5">
+                            <div>
+                              <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground"><span>Altura (px) — 0 = automática</span><span className="font-medium">{altura || 'auto'}</span></div>
+                              <div className="flex items-center gap-2">
+                                <input type="range" min={0} max={Math.round(SHEET_H / 2)} value={altura} onChange={(e) => setRun(isCab ? { cabecalhoAltura: Number(e.target.value) } : { rodapeAltura: Number(e.target.value) })} className="flex-1" />
+                                <input type="number" min={0} max={Math.round(SHEET_H / 2)} value={altura} onChange={(e) => setRun(isCab ? { cabecalhoAltura: Number(e.target.value) } : { rodapeAltura: Number(e.target.value) })} className="w-16 rounded-md border bg-[var(--input-bg,transparent)] px-2 py-1 text-sm" />
+                              </div>
+                            </div>
+                            <label className="block text-xs text-muted-foreground">
+                              <span className="mb-1 block">Aparece em</span>
+                              <select value={paginas} onChange={(e) => setRun(isCab ? { cabecalhoPaginas: e.target.value as FaixaPaginas } : { rodapePaginas: e.target.value as FaixaPaginas })} className="w-full rounded-md border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm text-foreground">
+                                <option value="todas">Todas as páginas</option>
+                                <option value="exceto_capa">Todas, exceto a capa</option>
+                                <option value="exceto_primeira">Todas, exceto a 1ª</option>
+                                <option value="somente_primeira">Somente a 1ª página</option>
+                              </select>
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+                  return (<div className="space-y-2.5"><FaixaCfg reg="cabecalho" /><FaixaCfg reg="rodape" /></div>)
+                })()}
                 <label className="flex items-center justify-between gap-2 text-sm"><span>Mostrar número de página</span>
                   <input type="checkbox" checked={running.mostrarNumeroPagina} onChange={(e) => setDoc((d) => ({ ...d, running: { ...(d.running ?? RUNNING_PADRAO), mostrarNumeroPagina: e.target.checked } }))} /></label>
-                <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Ative a faixa, clique nela no canvas e adicione blocos (logo, texto, imagem…). Aparecem em todas as páginas na impressão.</p>
+                <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Ative a faixa, clique nela na folha e adicione blocos (logo, texto, imagem…). A área fica reservada — o conteúdo do meio não a invade.</p>
               </div>
             )}
           </div>

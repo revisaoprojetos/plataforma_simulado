@@ -82,7 +82,7 @@ export function ComentariosQuestao({ questaoId }: { questaoId: string }) {
               placeholder="Escreva um comentário…"
               rows={2}
               maxLength={2000}
-              className="flex-1 resize-none rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+              className="flex-1 resize-none rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
             />
             <button
               onClick={enviar}

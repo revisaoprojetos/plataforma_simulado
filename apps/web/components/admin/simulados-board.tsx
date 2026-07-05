@@ -5,6 +5,8 @@ import { useState, useTransition, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
+import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
+import type { TipoSimulado } from '@/lib/simulado/tipo'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,6 +53,7 @@ export interface SimuladoCard {
   embed_token: string | null
   created_at: string
   regras?: { gabarito_liberado?: boolean } | null
+  tipo?: TipoSimulado | null
 }
 
 const modoLabel: Record<string, string> = {
@@ -173,6 +176,7 @@ function CardItem({ s, appUrl }: { s: SimuladoCard; appUrl: string }) {
         <div className="flex items-start justify-between gap-2">
           <Link href={`/admin/simulados/${s.id}`} className="min-w-0 flex-1">
             <h3 className="truncate font-semibold leading-tight hover:underline">{s.titulo}</h3>
+            {s.tipo && <div className="mt-1"><TipoSimuladoBadge tipo={s.tipo} /></div>}
           </Link>
 
           <DropdownMenu>
@@ -288,7 +292,7 @@ export function SimuladosBoard({ simulados, appUrl }: { simulados: SimuladoCard[
               onClick={() => setModo(f.v)}
               className={cn(
                 'rounded-md px-3 py-1 text-sm font-medium transition-colors',
-                modo === f.v ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                modo === f.v ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:bg-[var(--tab-active,var(--background))] hover:text-[color:var(--tab-active-foreground,var(--foreground))]',
               )}
             >
               {f.label}

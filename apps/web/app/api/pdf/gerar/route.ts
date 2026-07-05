@@ -13,6 +13,7 @@ const WEB_INTERNAL = process.env.WEB_INTERNAL_URL ?? 'http://localhost:3000'
 type Body =
   | { tipo: 'caderno'; cadernoId: string; mod?: string; todos?: boolean; aluno?: string; sessao?: string; gabarito?: boolean; titulo?: string }
   | { tipo: 'resultado'; sessaoToken: string; titulo?: string }
+  | { tipo: 'ranking'; simuladoId: string; ate?: number; titulo?: string }
 
 /**
  * POST /api/pdf/gerar — enfileira a geração de um PDF no worker (Gotenberg).
@@ -81,6 +82,26 @@ export async function POST(request: NextRequest) {
     url = `${WEB_INTERNAL}/imprimir/resultado/${body.sessaoToken}`
     referencia = body.sessaoToken
     titulo = body.titulo ?? 'Resultado do simulado'
+  } else if (body.tipo === 'ranking') {
+    if (!body.simuladoId) return NextResponse.json({ message: 'simuladoId obrigatório.' }, { status: 400 })
+
+    // Confere que o simulado é do tenant do usuário.
+    const { data: sim } = await svc
+      .from('simulado_simulados')
+      .select('id, titulo')
+      .eq('id', body.simuladoId)
+      .eq('tenant_id', access.tenantId)
+      .maybeSingle()
+    if (!sim) return NextResponse.json({ message: 'Simulado não encontrado.' }, { status: 404 })
+
+    const token = assinarRenderToken({ t: access.tenantId, r: 'ranking', id: body.simuladoId })
+    const qs = new URLSearchParams()
+    if (body.ate) qs.set('ate', String(body.ate))
+    qs.set('pdftoken', token)
+
+    url = `${WEB_INTERNAL}/imprimir/ranking/${body.simuladoId}?${qs.toString()}`
+    referencia = body.simuladoId
+    titulo = body.titulo ?? `Ranking: ${sim.titulo ?? ''}`
   } else {
     return NextResponse.json({ message: 'tipo inválido.' }, { status: 400 })
   }

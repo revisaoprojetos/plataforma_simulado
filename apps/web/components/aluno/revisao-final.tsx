@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
+import { usePdfDownloads } from '@/components/pdf-downloads-provider'
 import { Card, CardContent } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -15,6 +17,7 @@ import {
   FileStack,
   Trophy,
   RefreshCw,
+  Loader2,
 } from 'lucide-react'
 import { FitaTopo } from '@/components/prova/fita-topo'
 import { ThemeToggle } from '@/components/prova/theme-toggle'
@@ -113,6 +116,11 @@ export function RevisaoFinal({
   const [data, setData] = useState<Resultado | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(false)
+  // O acompanhamento/baixa fica no provider global (continua mesmo trocando de página).
+  const { registrar } = usePdfDownloads()
+  // Estado local só durante o POST de enfileiramento (evita clique-duplo no mesmo botão).
+  const [gerandoPdf, setGerandoPdf] = useState<Set<'gabarito' | 'completo'>>(new Set())
+  const marcarPdf = (id: 'gabarito' | 'completo', on: boolean) => setGerandoPdf((prev) => { const n = new Set(prev); if (on) n.add(id); else n.delete(id); return n })
 
   useEffect(() => {
     if (!sessionToken) {
@@ -213,6 +221,31 @@ export function RevisaoFinal({
     ? `/imprimir/caderno/${data.caderno_id}?mod=caderno_completo&sessao=${sessionToken}${data.estudante_id ? `&aluno=${data.estudante_id}` : ''}`
     : urlGabarito
 
+  const acaoNav = (url: string) => ({ label: 'Abrir no navegador', onClick: () => window.open(url, '_blank', 'noopener,noreferrer') })
+
+  async function baixarPdf(qual: 'gabarito' | 'completo') {
+    if (gerandoPdf.has(qual)) return // o outro botão pode rodar junto
+    const fallbackUrl = qual === 'gabarito' ? urlGabarito : urlCompleto
+    const nome = qual === 'gabarito' ? 'Gabarito' : 'Caderno completo'
+    // Nome do arquivo: {estudante}_{simulado}_{caderno}.
+    const limpar = (s?: string) => (s ?? '').trim().replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_')
+    const arquivo = [data?.aluno_nome, data?.titulo, nome].map(limpar).filter(Boolean).join('_')
+    // Caderno completo sem caderno vinculado → não há o que gerar no servidor: abre o gabarito.
+    if (qual === 'completo' && !data?.caderno_id) { window.open(urlCompleto, '_blank', 'noopener,noreferrer'); return }
+    const payload = qual === 'gabarito'
+      ? { sessaoToken: sessionToken, tipo: 'resultado' as const, titulo: 'Gabarito' }
+      : { sessaoToken: sessionToken, tipo: 'caderno' as const, cadernoId: data?.caderno_id, mod: 'caderno_completo', titulo: 'Caderno completo' }
+    marcarPdf(qual, true)
+    try {
+      const res = await fetch('/api/pdf/publico', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const d = await res.json()
+      if (!res.ok || !d.jobId) { toast.error('Servidor de PDF indisponível.', { action: acaoNav(fallbackUrl) }); return }
+      // Entrega ao provider global → baixa quando pronto, mesmo que você saia da página.
+      registrar({ id: d.jobId, nome, arquivo, statusUrl: `/api/pdf/publico/${d.jobId}?sessao=${sessionToken}` })
+    } catch { toast.error('Erro de rede ao iniciar a geração.', { action: acaoNav(fallbackUrl) }) }
+    finally { marcarPdf(qual, false) }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
       {/* Cabeçalho fixo — top bar com cor própria (HUD) */}
@@ -298,12 +331,12 @@ export function RevisaoFinal({
 
             {/* Dois downloads lado a lado */}
             <div className="grid grid-cols-2 gap-2">
-              <a href={urlGabarito} target="_blank" rel="noreferrer" className={BTN_CADERNO} style={CADERNO_STYLE}>
-                <FileText className="mr-1.5 h-4 w-4" /> Caderno de gabarito PDF
-              </a>
-              <a href={urlCompleto} target="_blank" rel="noreferrer" className={BTN_CADERNO} style={CADERNO_STYLE}>
-                <FileStack className="mr-1.5 h-4 w-4" /> Caderno completo PDF
-              </a>
+              <button type="button" onClick={() => baixarPdf('gabarito')} disabled={gerandoPdf.has('gabarito')} className={cn(BTN_CADERNO, 'disabled:opacity-60')} style={CADERNO_STYLE}>
+                {gerandoPdf.has('gabarito') ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileText className="mr-1.5 h-4 w-4" />} Caderno de gabarito PDF
+              </button>
+              <button type="button" onClick={() => baixarPdf('completo')} disabled={gerandoPdf.has('completo')} className={cn(BTN_CADERNO, 'disabled:opacity-60')} style={CADERNO_STYLE}>
+                {gerandoPdf.has('completo') ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileStack className="mr-1.5 h-4 w-4" />} Caderno completo PDF
+              </button>
             </div>
 
             {/* Voltar ao menu — logo abaixo dos downloads */}

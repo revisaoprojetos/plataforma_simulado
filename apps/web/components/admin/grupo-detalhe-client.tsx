@@ -70,7 +70,7 @@ export function GrupoDetalheClient({ grupo, membros, naoMembros }: { grupo: { id
               <>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <input value={buscaMembros} onChange={(e) => setBuscaMembros(e.target.value)} placeholder="Buscar participante…" className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+                  <input value={buscaMembros} onChange={(e) => setBuscaMembros(e.target.value)} placeholder="Buscar participante…" className="w-full rounded-lg border bg-[var(--input-bg,transparent)] py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
                 </div>
                 <ul className="scroll-claro max-h-[360px] divide-y overflow-auto rounded-lg border">
                   {membrosFiltrados.length === 0 ? (
@@ -100,7 +100,7 @@ export function GrupoDetalheClient({ grupo, membros, naoMembros }: { grupo: { id
           <CardContent className="space-y-3">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar estudante…" className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+              <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar estudante…" className="w-full rounded-lg border bg-[var(--input-bg,transparent)] py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
             </div>
             <div className="scroll-claro max-h-[360px] space-y-1.5 overflow-auto">
               {disponiveis.length === 0 ? (

@@ -33,7 +33,7 @@ export function ConcederAcessoForm({ simuladoId, estudantes }: { simuladoId: str
       <div className="space-y-1">
         <label className="text-xs font-medium text-muted-foreground">Aluno</label>
         <select value={estudanteId} onChange={(e) => setEstudanteId(e.target.value)}
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring">
+          className="w-full rounded-md border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring">
           <option value="">Selecione…</option>
           {estudantes.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
         </select>
@@ -43,7 +43,7 @@ export function ConcederAcessoForm({ simuladoId, estudantes }: { simuladoId: str
         <div className="flex gap-1">
           <Input type="number" min={1} value={prazo} onChange={(e) => setPrazo(Number(e.target.value))} className="w-16" />
           <select value={unidade} onChange={(e) => setUnidade(e.target.value as any)}
-            className="rounded-md border bg-background px-2 py-2 text-sm outline-none focus:ring-1 focus:ring-ring">
+            className="rounded-md border bg-[var(--input-bg,transparent)] px-2 py-2 text-sm outline-none focus:ring-1 focus:ring-ring">
             <option value="horas">horas</option>
             <option value="dias">dias</option>
             <option value="meses">meses</option>

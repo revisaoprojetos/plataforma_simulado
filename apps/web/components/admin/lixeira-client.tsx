@@ -65,7 +65,7 @@ export function LixeiraClient({ itens }: { itens: LixeiraItem[] }) {
         <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
           {abas.map((a) => (
             <button key={a.k} onClick={() => setAba(a.k)}
-              className={cn('rounded-md px-3 py-1 text-sm font-medium transition-colors', aba === a.k ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+              className={cn('rounded-md px-3 py-1 text-sm font-medium transition-colors', aba === a.k ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:bg-[var(--tab-active,var(--background))] hover:text-[color:var(--tab-active-foreground,var(--foreground))]')}>
               {a.label} <span className="text-muted-foreground">({a.n})</span>
             </button>
           ))}

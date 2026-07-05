@@ -54,8 +54,9 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
   // assim acerto e letra marcada vêm sempre da MESMA tentativa (nunca se mistura).
   const respPorAluno = new Map<string, Map<string, boolean>>()
   const marcadaPorAluno = new Map<string, Map<string, string>>() // est → (questaoId → letra)
+  const infoPorAluno = new Map<string, Record<string, string>>() // est → { data, inicio, termino, tempo_total, respondidas, em_branco }
   if (qids.length) {
-    let sq = svc.from('simulado_sessoes_prova').select('id, estudante_id, iniciado_em, status').in('estudante_id', estIds).eq('is_teste', false).eq('deletado', false)
+    let sq = svc.from('simulado_sessoes_prova').select('id, estudante_id, iniciado_em, finalizado_em, status').in('estudante_id', estIds).eq('is_teste', false).eq('deletado', false)
     if (sessaoId) sq = sq.eq('id', sessaoId)
     const { data: sessoes } = await sq
     const allSessIds = (sessoes ?? []).map((s: any) => s.id)
@@ -98,6 +99,23 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
       }
       respPorAluno.set(est, m)
       marcadaPorAluno.set(est, mm)
+
+      // Dados da sessão para o bloco Identificação (data/horários/contagens).
+      const sess: any = lista[0]
+      const tz = 'America/Sao_Paulo'
+      const ini = sess?.iniciado_em ? new Date(sess.iniciado_em) : null
+      const fim = sess?.finalizado_em ? new Date(sess.finalizado_em) : null
+      const hhmm = (dt: Date | null) => (dt ? dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: tz }) : '')
+      const tempoMin = ini && fim ? Math.max(0, Math.round((fim.getTime() - ini.getTime()) / 60000)) : null
+      const respondidas = mm.size
+      infoPorAluno.set(est, {
+        data: ini ? ini.toLocaleDateString('pt-BR', { timeZone: tz }) : '',
+        inicio: hhmm(ini),
+        termino: hhmm(fim),
+        tempo_total: tempoMin != null ? `${tempoMin}min` : '',
+        respondidas: String(respondidas),
+        em_branco: String(Math.max(0, totalQ - respondidas)),
+      })
     }
   }
 
@@ -112,6 +130,7 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
       nome: a.nome ?? '', email: a.email ?? '', telefone: a.telefone ?? '', cpf: a.cpf ?? '', classificacao: a.classificacao ?? '',
       simulado: bancoNome, acertos: String(acertos), total_questoes: String(totalQ),
       nota: nota.toFixed(1).replace('.', ','), percentual: totalQ ? `${Math.round((acertos / totalQ) * 100)}%` : '0%',
+      ...(infoPorAluno.get(a.id) ?? { data: '', inicio: '', termino: '', tempo_total: '', respondidas: '', em_branco: '' }),
     }
     for (const [d, tot] of discTotais) {
       const s = slug(d)

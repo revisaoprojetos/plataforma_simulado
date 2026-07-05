@@ -6,7 +6,8 @@ import { CadernoPrintControls } from '@/components/admin/caderno-print-controls'
 import { BlockRender, dataComQuestao } from '@/lib/caderno-designer/blocks'
 import { resolveTheme } from '@/lib/caderno-designer/theme'
 import { carregarRegistros } from '@/lib/caderno-designer/merge'
-import type { CadernoData, CadernoDoc } from '@/lib/caderno-designer/types'
+import { hospedarImagensDoc } from '@/lib/caderno-designer/hospedar-imagens'
+import { faixaNaPagina, RUNNING_PADRAO, type CadernoData, type CadernoDoc } from '@/lib/caderno-designer/types'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 
@@ -116,9 +117,18 @@ export default async function CadernoImprimirPage({
   }
 
   const estilo = `
-    @media print { .no-print { display: none !important; } @page { size: A4; margin: 0; } body { background: #fff; } }
-    .folha { width: 210mm; min-height: 297mm; padding: 14mm 16mm; box-sizing: border-box; margin: 0 auto 8mm; background: #fff; }
+    .impressao-wrap { padding: 24px 0; }
+    .folha { width: 210mm; min-height: 297mm; padding: 0; box-sizing: border-box; margin: 0 auto 8mm; background: #fff; }
     @media screen { .folha { box-shadow: 0 1px 10px rgba(0,0,0,.15); } }
+    @media print {
+      .no-print { display: none !important; }
+      @page { size: A4; margin: 0; }
+      html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+      .impressao-wrap { padding: 0 !important; background: #fff !important; }
+      /* Sem margem entre folhas e quebra de página por folha (evita estouro p/ páginas extras). */
+      .folha { margin: 0 !important; break-after: page; page-break-after: always; }
+      .folha:last-child { break-after: auto; page-break-after: auto; }
+    }
   `
 
   // ---- Render v2 (editor de blocos) ----
@@ -127,7 +137,9 @@ export default async function CadernoImprimirPage({
     const primeira = modalidadesV2.find((m) => docsV2[m.id])?.id
     const modId = (mod && docsV2[mod] ? mod : primeira) ?? Object.keys(docsV2)[0]
     const doc = docsV2[modId]
-    const running = doc?.running ?? { cabecalhoAtivo: false, rodapeAtivo: false, mostrarNumeroPagina: true }
+    // Troca imagens base64 (fundo) por URLs hospedadas → HTML leve, geração muito mais rápida.
+    await hospedarImagensDoc(doc, svc)
+    const running = doc?.running ?? RUNNING_PADRAO
     const cabecalho = (doc?.cabecalho ?? []) as any[]
     const rodape = (doc?.rodape ?? []) as any[]
     const totalPag = doc?.pages.length ?? 0
@@ -135,36 +147,36 @@ export default async function CadernoImprimirPage({
     const paginas = (d: CadernoData, prefix: string) => doc.pages.map((page, pi) => {
       const bg = page.blocks.find((b: any) => b.type === 'plano-fundo') as any
       const conteudo = page.blocks.filter((b: any) => b.type !== 'plano-fundo')
+      // Cabeçalho/rodapé só ocupam espaço quando TÊM blocos (evita faixas vazias no PDF).
+      const mostraCab = running.cabecalhoAtivo && cabecalho.length > 0 && faixaNaPagina(running.cabecalhoPaginas, pi, page.kind)
+      const mostraRod = running.rodapeAtivo && rodape.length > 0 && faixaNaPagina(running.rodapePaginas, pi, page.kind)
       return (
         <div key={prefix + page.id} className="folha" style={{ position: 'relative', background: theme.cores.fundo }}>
           {bg?.attributes?.url && (
             <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${bg.attributes.url})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: (bg.attributes.opacidade ?? 100) / 100 }} />
           )}
           <div style={{ position: 'relative', display: 'flex', minHeight: '100%', flexDirection: 'column' }}>
-            {running.cabecalhoAtivo && cabecalho.length > 0 && (
-              <div style={{ borderBottom: `1px solid ${theme.cores.secundaria}33`, paddingBottom: 8, marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {mostraCab && (
+              <div style={{ borderBottom: `1px solid ${theme.cores.secundaria}33`, paddingTop: '10mm', paddingBottom: 8, marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'flex-start', ...(running.cabecalhoAltura ? { minHeight: running.cabecalhoAltura } : {}) }}>
                 {cabecalho.map((b) => <BlockRender key={b.id} block={b} theme={theme} data={d} />)}
               </div>
             )}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: '16mm', paddingRight: '16mm', paddingTop: mostraCab ? 0 : '14mm', paddingBottom: mostraRod ? 0 : '14mm' }}>
               {conteudo.map((block: any) => <BlockRender key={block.id} block={block} theme={theme} data={d} />)}
             </div>
-            {running.rodapeAtivo && rodape.length > 0 && (
-              <div style={{ borderTop: `1px solid ${theme.cores.secundaria}33`, paddingTop: 8, marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {mostraRod && (
+              <div style={{ borderTop: `1px solid ${theme.cores.secundaria}33`, paddingTop: 8, paddingBottom: '10mm', marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'flex-end', ...(running.rodapeAltura ? { minHeight: running.rodapeAltura } : {}) }}>
                 {rodape.map((b) => <BlockRender key={b.id} block={b} theme={theme} data={d} />)}
               </div>
-            )}
-            {running.mostrarNumeroPagina && (
-              <div style={{ textAlign: 'center', fontSize: 10, color: theme.cores.texto, opacity: 0.6, marginTop: 6 }}>{pi + 1} / {totalPag}</div>
             )}
           </div>
         </div>
       )
     })
     return (
-      <div className="min-h-screen bg-neutral-100 py-6 text-black">
+      <div className="impressao-wrap min-h-screen bg-neutral-100 text-black">
         <style>{`${estilo} .aluno-quebra { break-before: page; }`}</style>
-        <CadernoPrintControls cadernoId={caderno.id} gabarito={gabarito} />
+        <CadernoPrintControls />
         {copias.length > 1 && <div className="no-print mx-auto mb-3 max-w-[210mm] rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">Mala direta — {copias.length} aluno(s). Cada um começa em uma nova página.</div>}
         {vazio ? (
           <div className="folha flex items-center justify-center text-slate-400">Este caderno está vazio. Adicione blocos no editor.</div>
@@ -181,9 +193,9 @@ export default async function CadernoImprimirPage({
   const qMap = new Map((questoes ?? []).map((q: any) => [q.id, q]))
   let numero = 0
   return (
-    <div className="min-h-screen bg-neutral-100 py-6 text-black">
+    <div className="impressao-wrap min-h-screen bg-neutral-100 text-black">
       <style>{estilo}</style>
-      <CadernoPrintControls cadernoId={caderno.id} gabarito={gabarito} />
+      <CadernoPrintControls />
       <div className="folha" style={{ fontFamily: theme.tipografia.familia }}>
         <h1 className="mb-1 text-center text-xl font-bold">{config.cabecalho || caderno.nome}</h1>
         {gabarito && <p className="mb-3 text-center text-sm font-semibold text-red-600">— GABARITO —</p>}

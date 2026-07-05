@@ -74,7 +74,7 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
               <p className="mb-3 text-xs text-muted-foreground">Os estudantes do grupo são ligados a este banco. Novos membros do grupo passam a ser ligados <strong>automaticamente</strong>.</p>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar grupo…" className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+                <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar grupo…" className="w-full rounded-lg border bg-[var(--input-bg,transparent)] py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
               </div>
             </div>
 

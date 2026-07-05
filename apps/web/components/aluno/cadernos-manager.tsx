@@ -39,7 +39,7 @@ export function CadernosManager() {
           onChange={(e) => setNome(e.target.value)}
           placeholder="Nome do novo caderno (ex.: Revisão de erros)"
           maxLength={120}
-          className="flex-1 rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+          className="flex-1 rounded-md border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
         />
         <button type="submit" disabled={criando || !nome.trim()} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
           {criando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Criar

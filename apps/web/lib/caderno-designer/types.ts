@@ -26,15 +26,34 @@ export type Page = {
   kind: PageKind
   titulo?: string
   blocks: Block[]
+  /** Alinhamento vertical do conteúdo na folha. Padrão: 'top'. */
+  valign?: 'top' | 'center' | 'bottom'
 }
 
 /** Cabeçalho/rodapé correntes (repetidos nas páginas). */
+export type FaixaPaginas = 'todas' | 'exceto_capa' | 'exceto_primeira' | 'somente_primeira'
 export type RunningConfig = {
   cabecalhoAtivo: boolean
   rodapeAtivo: boolean
   mostrarNumeroPagina: boolean
+  /** Altura reservada (px) da faixa; 0 = automática (altura do conteúdo). */
+  cabecalhoAltura?: number
+  rodapeAltura?: number
+  /** Em quais páginas a faixa aparece. */
+  cabecalhoPaginas?: FaixaPaginas
+  rodapePaginas?: FaixaPaginas
 }
-export const RUNNING_PADRAO: RunningConfig = { cabecalhoAtivo: false, rodapeAtivo: false, mostrarNumeroPagina: true }
+export const RUNNING_PADRAO: RunningConfig = { cabecalhoAtivo: false, rodapeAtivo: false, mostrarNumeroPagina: true, cabecalhoAltura: 0, rodapeAltura: 0, cabecalhoPaginas: 'todas', rodapePaginas: 'todas' }
+
+/** Decide se a faixa (cabeçalho/rodapé) aparece na página `idx` (kind = tipo da página). */
+export function faixaNaPagina(modo: FaixaPaginas | undefined, idx: number, kind: string): boolean {
+  switch (modo) {
+    case 'exceto_capa': return kind !== 'capa'
+    case 'exceto_primeira': return idx !== 0
+    case 'somente_primeira': return idx === 0
+    default: return true
+  }
+}
 
 export type CadernoDoc = {
   versao: 1

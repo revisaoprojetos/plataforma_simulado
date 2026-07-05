@@ -53,6 +53,28 @@ export async function renomearBanco(id: string, nome: string): Promise<{ ok: boo
   return { ok: true }
 }
 
+/** Atualiza nome + personalização (cor/ícone/capa) de um banco. Tolerante caso as colunas não existam. */
+export async function atualizarBanco(id: string, nome: string, cor: string | null, icone: string | null, capaUrl?: string | null): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const titulo = nome.trim()
+  if (!titulo) return { ok: false, error: 'Informe um nome.' }
+
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_pastas').update({ nome: titulo, cor: cor || null, icone: icone || null, capa_url: capaUrl || null }).eq('id', id).eq('tenant_id', g.tenantId)
+  if (error && /cor|icone|capa_url|column/i.test(error.message)) {
+    const { error: e2 } = await svc.from('simulado_pastas').update({ nome: titulo }).eq('id', id).eq('tenant_id', g.tenantId)
+    if (e2) return { ok: false, error: e2.message }
+  } else if (error) {
+    return { ok: false, error: error.message }
+  }
+
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: id, depois: { nome: titulo, cor, icone, capa: !!capaUrl } })
+  revalidatePath('/admin/banco-questoes')
+  revalidatePath(`/admin/banco-questoes/${id}`)
+  return { ok: true }
+}
+
 /** Duplica um banco: cria uma cópia com os mesmos vínculos de questões. */
 export async function duplicarBanco(id: string): Promise<{ ok: boolean; id?: string; error?: string }> {
   const g = await guard()
