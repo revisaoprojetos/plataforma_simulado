@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { X } from 'lucide-react'
 import { useCallback } from 'react'
 
@@ -76,7 +77,7 @@ export function QuestoesFilters({ disciplinas = [] }: { disciplinas?: Disciplina
         <SelectContent>
           <SelectItem value="all">Todos os tipos</SelectItem>
           <SelectItem value="objetiva">Objetiva</SelectItem>
-          <SelectItem value="discursiva">Discursiva</SelectItem>
+          {!OCULTAR_DISCURSIVA && <SelectItem value="discursiva">Discursiva</SelectItem>}
         </SelectContent>
       </Select>
 

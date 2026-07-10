@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { tipoDoSimulado, type TipoSimulado } from '@/lib/simulado/tipo'
+import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 
 export type ResumoSimulado = {
   id: string
@@ -72,5 +73,5 @@ export async function resumosSimulados(svc: SupabaseClient, tenantId: string | n
       notaMedia: notas.length ? notas.reduce((x, y) => x + y, 0) / notas.length : null,
       ultimaAtividade: a?.ult ?? null,
     }
-  })
+  }).filter((r) => !OCULTAR_DISCURSIVA || r.tipo !== 'discursiva')
 }

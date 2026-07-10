@@ -197,7 +197,10 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
   const supabase = await createClient()
   const fields = await buildQuestaoFields(supabase, tenantId, data)
 
+  // Posse: com createClient (RLS), a questão só é visível se for do tenant. Se não achar, bloqueia
+  // (impede que um id estrangeiro caia nas exclusões de alternativas/competências abaixo).
   const { data: antes } = await supabase.from('simulado_questoes').select('*').eq('id', id).maybeSingle()
+  if (!antes) return { error: 'Questão não encontrada.' }
 
   const { error } = await supabase
     .from('simulado_questoes')
@@ -225,7 +228,7 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
 
   if (data.tipo === 'discursiva' && data.competencias) {
     const admin = createAdminClient()
-    await admin.from('simulado_competencias').delete().eq('questao_id', id)
+    await admin.from('simulado_competencias').delete().eq('questao_id', id).eq('tenant_id', tenantId)
     const comps = data.competencias.filter((c) => c.nome?.trim())
     if (comps.length) {
       await admin.from('simulado_competencias').insert(

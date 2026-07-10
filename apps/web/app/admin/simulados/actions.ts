@@ -67,6 +67,7 @@ export async function createSimuladoAction(data: SimuladoData) {
 }
 
 export async function updateSimuladoAction(id: string, data: SimuladoData) {
+  if (!(await checkPermission('simulados:update'))) return { error: 'Você não tem permissão para editar simulados.' }
   const supabase = await createClient()
 
   const { error } = await supabase
@@ -95,6 +96,7 @@ export async function updateSimuladoAction(id: string, data: SimuladoData) {
 
 /** Vincula (ou desvincula) explicitamente um caderno de design ao simulado — define o tema/HUD aplicado. */
 export async function vincularCadernoSimulado(simuladoId: string, cadernoId: string | null) {
+  if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const supabase = await createClient()
   const { data: sim } = await supabase.from('simulado_simulados').select('regras').eq('id', simuladoId).maybeSingle()
   const regras: Record<string, unknown> = { ...((sim?.regras as Record<string, unknown>) ?? {}) }
@@ -108,6 +110,7 @@ export async function vincularCadernoSimulado(simuladoId: string, cadernoId: str
 }
 
 export async function addQuestaoToSimulado(simuladoId: string, questaoId: string) {
+  if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { error: 'Tenant não resolvido.' }
 
@@ -130,6 +133,7 @@ export async function addQuestaoToSimulado(simuladoId: string, questaoId: string
 }
 
 export async function removeQuestaoFromSimulado(simuladoQuestaoId: string, simuladoId: string) {
+  if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const supabase = await createClient()
   const { error } = await supabase
     .from('simulado_prova_questoes')
@@ -142,6 +146,7 @@ export async function removeQuestaoFromSimulado(simuladoQuestaoId: string, simul
 }
 
 export async function publishSimuladoAction(id: string) {
+  if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const supabase = await createClient()
   await supabase.from('simulado_simulados').update({ status: 'publicado' }).eq('id', id)
   await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'publicado' } })
@@ -150,6 +155,7 @@ export async function publishSimuladoAction(id: string) {
 }
 
 export async function encerrarSimuladoAction(id: string) {
+  if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const supabase = await createClient()
   await supabase.from('simulado_simulados').update({ status: 'encerrado' }).eq('id', id)
   await registrarAudit({ operacao: 'BLOQUEAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'encerrado' } })
@@ -158,6 +164,7 @@ export async function encerrarSimuladoAction(id: string) {
 }
 
 export async function reabrirSimuladoAction(id: string) {
+  if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const supabase = await createClient()
   await supabase.from('simulado_simulados').update({ status: 'publicado' }).eq('id', id)
   await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'publicado', reaberto: true } })
@@ -167,6 +174,7 @@ export async function reabrirSimuladoAction(id: string) {
 
 /** Libera (ou bloqueia) manualmente o gabarito do simulado — grava regras.gabarito_liberado. */
 export async function liberarGabaritoAction(id: string, liberado: boolean) {
+  if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const supabase = await createClient()
   const { data: s } = await supabase.from('simulado_simulados').select('regras').eq('id', id).maybeSingle()
   const regras = { ...(((s?.regras as Record<string, unknown>) ?? {})), gabarito_liberado: liberado }

@@ -9,7 +9,8 @@
 #     senão o Swarm não consegue baixar.
 #  2) Rode a migration supabase/migrations/20260701000001_pdf_worker_gotenberg.sql
 #     no SQL Editor do Supabase (bucket `pdfs` + tabela simulado_pdf_jobs).
-#  3) Preencha as 4 variáveis em "Environment variables" no Portainer (ver README/guia).
+#  3) Preencha as variáveis em "Environment variables" no Portainer (ver README/guia).
+#     Inclua CRON_SECRET (qualquer segredo forte) — habilita o auto-encerramento server-side.
 #
 # Coloque seu proxy/HTTPS (Cloudflare, Nginx Proxy Manager, Traefik…) na frente do `web`.
 # =====================================================================
@@ -26,6 +27,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - PDF_RENDER_SECRET=${PDF_RENDER_SECRET}
       - WEB_INTERNAL_URL=http://web:3000
+      - CRON_SECRET=${CRON_SECRET}
     ports:
       - "3000:3000"
     deploy:
@@ -43,6 +45,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - GOTENBERG_URL=http://gotenberg:3000
       - WEB_INTERNAL_URL=http://web:3000
+      # Auto-encerramento: mesmo valor do CRON_SECRET do web (worker chama /api/cron/encerrar-expirados a cada 60s)
+      - CRON_SECRET=${CRON_SECRET}
       # PDF_PUBLIC_BASE é opcional: sem ela, o worker usa o getPublicUrl do Supabase.
     deploy:
       replicas: 1

@@ -66,14 +66,24 @@ export async function calcularRanking(svc: AnyClient, simuladoId: string): Promi
   }))
 }
 
+/** Executa thunks com concorrência limitada (evita centenas de updates paralelos). */
+async function comLimite<T>(tarefas: (() => Promise<T>)[], limite: number): Promise<void> {
+  let i = 0
+  async function worker() { while (i < tarefas.length) { const idx = i++; await tarefas[idx]() } }
+  await Promise.all(Array.from({ length: Math.min(limite, tarefas.length) }, worker))
+}
+
 /**
  * Recalcula e GRAVA o ranking: posicao_ranking igual em todas as sessões do
  * aluno. Retorna o ranking deduplicado.
+ * Faz 1 update por ALUNO (todas as sessões dele de uma vez, via `.in`) com
+ * concorrência limitada — em vez de 1 update por sessão em paralelo (N+1).
  */
 export async function rankearSimulado(svc: AnyClient, simuladoId: string): Promise<AlunoRank[]> {
   const ranks = await calcularRanking(svc, simuladoId)
-  await Promise.all(
-    ranks.flatMap((a) => a.sessaoIds.map((id) => svc.from('simulado_sessoes_prova').update({ posicao_ranking: a.posicao }).eq('id', id))),
-  )
+  const tarefas = ranks
+    .filter((a) => a.sessaoIds.length)
+    .map((a) => () => svc.from('simulado_sessoes_prova').update({ posicao_ranking: a.posicao }).in('id', a.sessaoIds))
+  await comLimite(tarefas, 20)
   return ranks
 }

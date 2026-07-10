@@ -14,12 +14,14 @@ export async function assumirCorrecao(respostaId: string): Promise<{ ok: boolean
     return { ok: false, error: 'Sem permissão para corrigir.' }
   }
   const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
 
   const { data: r } = await svc
     .from('simulado_respostas_discursivas')
     .select('id, status, em_correcao_por, lock_expira_em, sessao_id')
     .eq('id', respostaId)
+    .eq('tenant_id', access.tenantId)
     .maybeSingle()
   if (!r) return { ok: false, error: 'Resposta não encontrada.' }
   if (r.status === 'corrigida') return { ok: false, error: 'Já corrigida.' }
@@ -48,12 +50,14 @@ export async function salvarCorrecao(
     return { ok: false, error: 'Sem permissão para corrigir.' }
   }
   const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
 
   const { data: r } = await svc
     .from('simulado_respostas_discursivas')
     .select('id, status, em_correcao_por, lock_expira_em, sessao_id')
     .eq('id', respostaId)
+    .eq('tenant_id', access.tenantId)
     .maybeSingle()
   if (!r) return { ok: false, error: 'Resposta não encontrada.' }
 

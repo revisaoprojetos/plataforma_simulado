@@ -14,6 +14,7 @@ type Body =
   | { tipo: 'caderno'; cadernoId: string; mod?: string; todos?: boolean; aluno?: string; sessao?: string; gabarito?: boolean; titulo?: string }
   | { tipo: 'resultado'; sessaoToken: string; titulo?: string }
   | { tipo: 'ranking'; simuladoId: string; ate?: number; titulo?: string }
+  | { tipo: 'relatorio'; sub: 'simulado' | 'disciplina' | 'estudante' | 'grafico'; ref: string; titulo?: string }
 
 /**
  * POST /api/pdf/gerar — enfileira a geração de um PDF no worker (Gotenberg).
@@ -102,6 +103,36 @@ export async function POST(request: NextRequest) {
     url = `${WEB_INTERNAL}/imprimir/ranking/${body.simuladoId}?${qs.toString()}`
     referencia = body.simuladoId
     titulo = body.titulo ?? `Ranking: ${sim.titulo ?? ''}`
+  } else if (body.tipo === 'relatorio') {
+    const subs = ['simulado', 'disciplina', 'estudante', 'grafico']
+    if (!subs.includes(body.sub) || !body.ref) {
+      return NextResponse.json({ message: 'sub/ref obrigatórios.' }, { status: 400 })
+    }
+
+    // Confere que o recurso é do tenant do usuário (grafico é escopado ao próprio tenant).
+    let rotulo = 'Relatório'
+    if (body.sub === 'simulado') {
+      const { data } = await svc.from('simulado_simulados').select('titulo').eq('id', body.ref).eq('tenant_id', access.tenantId).maybeSingle()
+      if (!data) return NextResponse.json({ message: 'Simulado não encontrado.' }, { status: 404 })
+      rotulo = `Relatório do simulado: ${data.titulo ?? ''}`
+    } else if (body.sub === 'disciplina') {
+      const { data } = await svc.from('simulado_disciplinas').select('nome').eq('id', body.ref).eq('tenant_id', access.tenantId).maybeSingle()
+      if (!data) return NextResponse.json({ message: 'Disciplina não encontrada.' }, { status: 404 })
+      rotulo = `Relatório da disciplina: ${data.nome ?? ''}`
+    } else if (body.sub === 'estudante') {
+      const { data } = await svc.from('simulado_estudantes').select('nome').eq('id', body.ref).eq('tenant_id', access.tenantId).maybeSingle()
+      if (!data) return NextResponse.json({ message: 'Estudante não encontrado.' }, { status: 404 })
+      rotulo = `Relatório do estudante: ${data.nome ?? ''}`
+    } else {
+      // grafico: ref precisa ser o próprio tenant.
+      if (body.ref !== access.tenantId) return NextResponse.json({ message: 'Referência inválida.' }, { status: 400 })
+      rotulo = 'Relatório gráfico (visão geral)'
+    }
+
+    const token = assinarRenderToken({ t: access.tenantId, r: `rel-${body.sub}`, id: body.ref })
+    url = `${WEB_INTERNAL}/imprimir/relatorio/${body.sub}/${body.ref}?pdftoken=${encodeURIComponent(token)}`
+    referencia = body.ref
+    titulo = body.titulo ?? rotulo
   } else {
     return NextResponse.json({ message: 'tipo inválido.' }, { status: 400 })
   }

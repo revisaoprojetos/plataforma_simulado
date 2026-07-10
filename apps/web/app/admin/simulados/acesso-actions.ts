@@ -51,8 +51,10 @@ export async function concederAcesso(
 
 export async function revogarAcesso(acessoId: string, simuladoId: string): Promise<{ ok: boolean; error?: string }> {
   if (!(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
-  const { error } = await svc.from('simulado_acessos').delete().eq('id', acessoId)
+  const { error } = await svc.from('simulado_acessos').delete().eq('id', acessoId).eq('tenant_id', access.tenantId)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'BLOQUEAR', entidade: 'simulado_acessos', entidadeId: acessoId })
   revalidatePath(`/admin/simulados/${simuladoId}`)

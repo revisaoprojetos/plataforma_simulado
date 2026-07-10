@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
+import { tipoEhCertoErrado, alternativasSaoCertoErrado } from '@/lib/simulado/formato'
 import type { AnaliseImport, QuestaoImport, AltImport, ResultadoImport } from './import-types'
 
 async function guard() {
@@ -189,18 +190,35 @@ function normEnun(s: string) {
   return norm(s).replace(/\s+/g, ' ')
 }
 
+/** Extrai o nome da coluna ausente de um erro do PostgREST/Postgres (para o insert tolerante). */
+function colFaltante(msg?: string): string | null {
+  if (!msg) return null
+  return msg.match(/'([a-z0-9_]+)' column/i)?.[1] ?? msg.match(/column "?([a-z0-9_]+)"? does not exist/i)?.[1] ?? null
+}
+
 /** Mapeia um cabeçalho da planilha para o campo interno. */
 function mapHeader(h: string): string | null {
   const n = norm(h).replace(/[\s_]+/g, '')
+  if (['numero', 'num', 'no'].includes(n)) return 'numero'
   if (['enunciado', 'questao', 'pergunta'].includes(n)) return 'enunciado'
   if (n === 'tipo') return 'tipo'
   if (['disciplina', 'materia'].includes(n)) return 'disciplina'
+  if (n === 'categoria') return 'categoria'
+  if (['assuntoprincipal', 'assunto'].includes(n)) return 'assunto'
+  if (['assuntodetalhe', 'assuntodetalhado', 'detalhe'].includes(n)) return 'assunto_detalhe'
+  if (n === 'grupo') return 'grupo'
+  if (['pilar1', 'pilarum'].includes(n)) return 'pilar_1'
+  if (['pilar2', 'pilardois'].includes(n)) return 'pilar_2'
   if (n === 'banca') return 'banca'
-  if (n === 'orgao') return 'orgao'
+  if (['orgao', 'orgaos'].includes(n)) return 'orgao'
+  if (n === 'cargo') return 'cargo'
   if (n === 'ano') return 'ano'
   if (['dificuldade', 'nivel', 'niveldificuldade'].includes(n)) return 'dificuldade'
+  if (['correta', 'gabarito', 'resposta', 'alternativacorreta', 'alternativascorretas'].includes(n)) return 'correta'
+  if (['alternativasincorretas', 'incorretas', 'incorreta'].includes(n)) return 'incorretas'
+  const lei = n.match(/^lei([a-e])$/); if (lei) return 'lei_' + lei[1]
+  const com = n.match(/^comentario([a-e])$/); if (com) return 'com_' + com[1]
   if (['comentario', 'comentarioprofessor', 'resolucao', 'comentarios'].includes(n)) return 'comentario'
-  if (['correta', 'gabarito', 'resposta', 'alternativacorreta'].includes(n)) return 'correta'
   const m = n.match(/^(?:alternativa|alt)?([a-e])$/)
   if (m) return 'alt_' + m[1]
   return null
@@ -261,14 +279,38 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
     const get = (campo: string) => { const idx = header.indexOf(campo); return idx >= 0 ? (row[idx] ?? '').trim() : '' }
 
     const enunciado = get('enunciado')
-    const tipoRaw = norm(get('tipo'))
+    const tipoCell = get('tipo')
+    const tipoRaw = norm(tipoCell)
+    // Certo/Errado é uma OBJETIVA de 2 opções, marcada por formato — não é um tipo separado.
+    const ehCE = tipoEhCertoErrado(tipoCell)
     const tipo: 'objetiva' | 'discursiva' = tipoRaw.startsWith('disc') ? 'discursiva' : 'objetiva'
     const difRaw = norm(get('dificuldade'))
     const dif = difRaw.startsWith('fac') ? 'facil' : difRaw.startsWith('dif') ? 'dificil' : difRaw.startsWith('med') ? 'medio' : null
     const anoNum = parseInt(get('ano'), 10)
-    const corretaLetra = norm(get('correta')).replace(/[^a-e]/g, '').charAt(0)
-    const alternativas: AltImport[] = []
-    letras.forEach((L, i) => { const t = get('alt_' + L); if (t) alternativas.push({ texto: t, correta: L === corretaLetra, ordem: i }) })
+    // Gabarito: aceita letra (A–E) OU "Certo"/"Errado".
+    const corretaNorm = norm(get('correta'))
+    const corretaLetra = corretaNorm.replace(/[^a-e]/g, '').charAt(0)
+    const corretaCE = corretaNorm.startsWith('cert') ? 'certo' : corretaNorm.startsWith('err') ? 'errado' : null
+    let alternativas: AltImport[] = []
+    letras.forEach((L, i) => {
+      const t = get('alt_' + L)
+      if (!t) return
+      const correta = corretaCE ? norm(t) === corretaCE : L === corretaLetra
+      alternativas.push({ texto: t, correta, ordem: i, lei: get('lei_' + L) || null, comentario: get('com_' + L) || null })
+    })
+
+    // Formato: explícito (Tipo = Certo/Errado) ou deduzido (2 alternativas Certo/Errado).
+    let formato: 'multipla' | 'certo_errado' = 'multipla'
+    if (tipo === 'objetiva' && (ehCE || alternativasSaoCertoErrado(alternativas.map((a) => a.texto)))) formato = 'certo_errado'
+
+    // Atalho: Tipo = Certo/Errado sem A/B preenchidos → cria as 2 alternativas automaticamente.
+    if (formato === 'certo_errado' && alternativas.length === 0) {
+      const certoCerto = corretaCE ? corretaCE === 'certo' : corretaLetra !== 'b'
+      alternativas = [
+        { texto: 'Certo', correta: certoCerto, ordem: 0, lei: null, comentario: get('com_a') || null },
+        { texto: 'Errado', correta: !certoCerto, ordem: 1, lei: null, comentario: get('com_b') || null },
+      ]
+    }
 
     let erro: string | null = null
     if (!enunciado) erro = 'Enunciado vazio'
@@ -278,8 +320,11 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
     }
 
     out.push({
-      linha: r + 1, enunciado, tipo,
-      disciplina: get('disciplina') || null, banca: get('banca') || null, orgao: get('orgao') || null,
+      linha: r + 1, numero: get('numero') || null, enunciado, tipo, formato,
+      disciplina: get('disciplina') || null, categoria: get('categoria') || null,
+      assunto: get('assunto') || null, assunto_detalhe: get('assunto_detalhe') || null, grupo: get('grupo') || null,
+      pilar_1: get('pilar_1') || null, pilar_2: get('pilar_2') || null,
+      banca: get('banca') || null, orgao: get('orgao') || null, cargo: get('cargo') || null,
       ano: Number.isFinite(anoNum) ? anoNum : null, nivel_dificuldade: dif,
       comentario_professor: get('comentario') || null, alternativas, erro,
     })
@@ -294,6 +339,18 @@ async function resolveNome(svc: ReturnType<typeof createAdminClient>, table: 'si
   if (ex) return (ex as any).id
   const { data: cr, error } = await svc.from(table).insert({ nome: n, tenant_id: tenantId }).select('id').single()
   if (error) { const { data: again } = await svc.from(table).select('id').eq('tenant_id', tenantId).ilike('nome', n).maybeSingle(); return (again as any)?.id ?? null }
+  return (cr as any).id
+}
+
+/** Resolve/cria um assunto (filho de disciplina) por nome. */
+async function resolveAssunto(svc: ReturnType<typeof createAdminClient>, tenantId: string, nome?: string | null, disciplinaId?: string | null): Promise<string | null> {
+  const n = nome?.trim(); if (!n) return null
+  let q = svc.from('simulado_assuntos').select('id').eq('tenant_id', tenantId).ilike('nome', n)
+  if (disciplinaId) q = q.eq('disciplina_id', disciplinaId)
+  const { data: ex } = await q.maybeSingle()
+  if (ex) return (ex as any).id
+  const { data: cr, error } = await svc.from('simulado_assuntos').insert({ nome: n, tenant_id: tenantId, disciplina_id: disciplinaId ?? null }).select('id').single()
+  if (error) { const { data: again } = await svc.from('simulado_assuntos').select('id').eq('tenant_id', tenantId).ilike('nome', n).maybeSingle(); return (again as any)?.id ?? null }
   return (cr as any).id
 }
 
@@ -343,20 +400,45 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
     const banca_id = await resolveNome(svc, 'simulado_bancas', g.tenantId, q.banca)
     const orgao_id = await resolveNome(svc, 'simulado_orgaos', g.tenantId, q.orgao)
     const disciplina_id = await resolveNome(svc, 'simulado_disciplinas', g.tenantId, q.disciplina)
+    const assunto_id = await resolveAssunto(svc, g.tenantId, q.assunto, disciplina_id)
 
-    const { data: nova, error } = await svc.from('simulado_questoes').insert({
-      tenant_id: g.tenantId, tipo: q.tipo, enunciado: q.enunciado, banca_id, orgao_id, disciplina_id,
+    const base: Record<string, unknown> = {
+      tenant_id: g.tenantId, tipo: q.tipo, enunciado: q.enunciado, banca_id, orgao_id, disciplina_id, assunto_id,
       ano: q.ano ?? null, nivel_dificuldade: q.nivel_dificuldade ?? null, gabarito_tipo: 'oficial',
       comentario_professor: q.comentario_professor ?? null, status: 'publicada',
-    }).select('id').single()
-    if (error || !nova) continue
+    }
+    // Campos novos (existem após a migration). Se a coluna não existir ainda, reenvia só o base.
+    const extra: Record<string, unknown> = {
+      numero: q.numero ?? null, grupo: q.grupo ?? null, categoria: q.categoria ?? null,
+      assunto_detalhe: q.assunto_detalhe ?? null, pilar_1: q.pilar_1 ?? null, pilar_2: q.pilar_2 ?? null, cargo: q.cargo ?? null,
+      formato: q.formato ?? 'multipla',
+    }
+    // Insere a questão. Se alguma coluna nova ainda não existir no banco, remove SÓ ela e tenta de novo
+    // (não perde os outros campos). Assim funciona antes e depois das migrations.
+    let payloadQ: Record<string, unknown> = { ...base, ...extra }
+    let novaId: string | null = null
+    for (let tent = 0; tent < 10; tent++) {
+      const r = await svc.from('simulado_questoes').insert(payloadQ).select('id').single()
+      if (!r.error && r.data) { novaId = (r.data as any).id; break }
+      const col = colFaltante(r.error?.message)
+      if (col && col in payloadQ && !(col in base)) { delete payloadQ[col]; continue }
+      break
+    }
+    if (!novaId) continue
 
     if (q.tipo === 'objetiva' && q.alternativas.length) {
-      await svc.from('simulado_alternativas').insert(
-        q.alternativas.map((a) => ({ tenant_id: g.tenantId, questao_id: (nova as any).id, texto: a.texto, correta: a.correta, ordem: a.ordem })),
-      )
+      let payloadA: Record<string, unknown>[] = q.alternativas.map((a) => ({
+        tenant_id: g.tenantId, questao_id: novaId, texto: a.texto, correta: a.correta, ordem: a.ordem, lei: a.lei ?? null, comentario: a.comentario ?? null,
+      }))
+      for (let tent = 0; tent < 6; tent++) {
+        const r = await svc.from('simulado_alternativas').insert(payloadA)
+        if (!r.error) break
+        const col = colFaltante(r.error?.message)
+        if (col && payloadA[0] && col in payloadA[0]) { payloadA = payloadA.map((x) => { const y = { ...x }; delete y[col]; return y }); continue }
+        break
+      }
     }
-    idsParaVincular.push((nova as any).id); criadas++
+    idsParaVincular.push(novaId); criadas++
   }
 
   // Vincula ao banco (ignora as já vinculadas) — só quando há banco de destino.

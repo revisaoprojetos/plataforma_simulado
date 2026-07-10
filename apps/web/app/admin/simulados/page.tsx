@@ -5,6 +5,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { SimuladosBoard, type SimuladoCard } from '@/components/admin/simulados-board'
 import { tiposDeSimulados } from '@/lib/simulado/tipo'
+import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 
 export default async function SimuladosPage() {
   const supabase = await createServiceClient()
@@ -20,6 +21,7 @@ export default async function SimuladosPage() {
   // Tipo (objetiva/discursiva/mista) derivado das questões de cada simulado.
   const tipos = await tiposDeSimulados(supabase, (simulados ?? []).map((s: any) => s.id))
   const comTipo = (simulados ?? []).map((s: any) => ({ ...s, tipo: tipos.get(s.id) ?? null }))
+    .filter((s: any) => !OCULTAR_DISCURSIVA || s.tipo !== 'discursiva')
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 

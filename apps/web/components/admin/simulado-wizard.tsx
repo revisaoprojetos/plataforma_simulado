@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ListChecks, PenLine, Check, ChevronLeft, ChevronRight, Loader2, Search, Settings2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { toast } from 'sonner'
 
 interface Questao { id: string; enunciado: string; tipo: string; nivel_dificuldade?: string | null; disciplina?: string | null; banca?: string | null; bancoIds: string[] }
@@ -113,7 +114,8 @@ export function SimuladoWizard({
               <p className="text-sm text-muted-foreground">Que tipo de prova será este simulado?</p>
               <div className="grid gap-4 sm:grid-cols-2">
                 {([['objetivo', ListChecks, 'Objetivo', 'Questões de múltipla escolha (A–E), correção automática.'],
-                   ['discursivo', PenLine, 'Discursivo', 'Questões dissertativas, correção manual por competências.']] as const).map(([val, Icon, titulo, desc]) => (
+                   ['discursivo', PenLine, 'Discursivo', 'Questões dissertativas, correção manual por competências.']] as const)
+                  .filter(([val]) => !OCULTAR_DISCURSIVA || val !== 'discursivo').map(([val, Icon, titulo, desc]) => (
                   <button key={val} type="button" onClick={() => setTipo(val as any)}
                     className={cn('flex flex-col items-start gap-2 rounded-xl border-2 p-5 text-left transition-colors',
                       tipo === val ? 'border-primary bg-primary/5' : 'hover:border-primary/50')}>
@@ -128,11 +130,11 @@ export function SimuladoWizard({
 
           {/* STEP 1 — Informações */}
           {step === 1 && (
-            <div className="space-y-4">
+            <div className="space-y-4" data-tour="wizard-info">
               <div className="space-y-2"><Label>Título *</Label><Input value={info.titulo} onChange={(e) => set('titulo', e.target.value)} placeholder="Ex.: Simulado PGE — 1ª fase" /></div>
               <div className="space-y-2"><Label>Descrição</Label><Textarea value={info.descricao} onChange={(e) => set('descricao', e.target.value)} rows={2} /></div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
+                <div className="space-y-2" data-tour="modo-aplicacao">
                   <Label>Modo de aplicação</Label>
                   <Select value={info.modo_aplicacao} onValueChange={(v) => set('modo_aplicacao', v)} items={{ janela_fixa: 'Janela fixa', prazo_relativo: 'Prazo relativo', aberto: 'Aberto' }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>

@@ -1,8 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Kpi, Grafico, Barras, Linha, Rosca, baixarCsv } from '@/components/admin/relatorios/kit'
-import { ClipboardList, Users, Activity, CheckCircle2, Trophy, Target, BookOpen, ListChecks, FileSpreadsheet } from 'lucide-react'
+import { KpiCard, Painel, Hero, BarrasH, Colunas, AreaSpark, Donut, BotaoExportar, baixarCsv } from '@/components/admin/relatorios/viz'
+import { ClipboardList, Users, Activity, CheckCircle2, Trophy, Target, BookOpen, ListChecks, LayoutDashboard, TrendingUp, PieChart, BarChart3 } from 'lucide-react'
 
 type SessaoLite = { data: string | null; nota: number | null; acerto: number | null }
 export type DadosRelatorioGrafico = {
@@ -28,7 +28,7 @@ function chaveErotulo(iso: string, g: Gran): { k: string; r: string } {
   return { k: `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`, r: `${MESES[d.getMonth()]}/${String(d.getFullYear()).slice(2)}` }
 }
 
-export function RelatorioGraficoView({ d }: { d: DadosRelatorioGrafico }) {
+export function RelatorioGraficoView({ d, print }: { d: DadosRelatorioGrafico; print?: boolean }) {
   const [g, setG] = useState<Gran>('mes')
   const nota = (n: number | null) => (n == null ? '—' : n.toFixed(1).replace('.', ','))
 
@@ -50,6 +50,8 @@ export function RelatorioGraficoView({ d }: { d: DadosRelatorioGrafico }) {
     }))
   }, [d.sessoes, g])
 
+  const granLabel = GRANS.find((x) => x.id === g)?.label.toLowerCase()
+
   function exportar() {
     const linhas: (string | number | null)[][] = [
       ['Relatório gráfico — visão geral'],
@@ -66,53 +68,49 @@ export function RelatorioGraficoView({ d }: { d: DadosRelatorioGrafico }) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-lg border p-0.5">
-          {GRANS.map((x) => (
-            <button key={x.id} type="button" onClick={() => setG(x.id)}
-              className={`rounded-md px-3 py-1 text-sm transition-colors ${g === x.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>{x.label}</button>
-          ))}
-        </div>
-        <button type="button" onClick={exportar} className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-muted">
-          <FileSpreadsheet className="h-4 w-4" /> Exportar (CSV/Excel)
-        </button>
-      </div>
+    <div className="space-y-5">
+      <Hero icon={<LayoutDashboard className="h-6 w-6" />} tom="primary" titulo="Visão geral da plataforma"
+        subtitulo="Tendências e desempenho consolidados"
+        acoes={print ? undefined : (
+          <>
+            <div className="inline-flex rounded-xl border bg-card/80 p-0.5 shadow-sm backdrop-blur">
+              {GRANS.map((x) => (
+                <button key={x.id} type="button" onClick={() => setG(x.id)}
+                  className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${g === x.id ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted'}`}>{x.label}</button>
+              ))}
+            </div>
+            <BotaoExportar onClick={exportar} />
+          </>
+        )} />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-        <Kpi label="Simulados" valor={d.totais.simulados} icon={<ClipboardList className="h-4 w-4" />} tom="primary" />
-        <Kpi label="Estudantes" valor={d.totais.estudantes} icon={<Users className="h-4 w-4" />} tom="sky" />
-        <Kpi label="Sessões" valor={d.totais.sessoes} icon={<Activity className="h-4 w-4" />} tom="violet" />
-        <Kpi label="Finalizadas" valor={d.totais.finalizadas} icon={<CheckCircle2 className="h-4 w-4" />} tom="emerald" />
-        <Kpi label="Nota média" valor={nota(d.notaMediaGeral)} icon={<Trophy className="h-4 w-4" />} tom="amber" />
-        <Kpi label="Acerto médio" valor={d.acertoMedioGeral != null ? `${d.acertoMedioGeral}%` : '—'} icon={<Target className="h-4 w-4" />} tom="emerald" />
-        <Kpi label="Questões" valor={d.totais.questoes} icon={<BookOpen className="h-4 w-4" />} tom="primary" />
-        <Kpi label="Respostas" valor={d.totais.respostas} icon={<ListChecks className="h-4 w-4" />} tom="sky" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+        <KpiCard label="Simulados" valor={d.totais.simulados} icon={<ClipboardList className="h-4 w-4" />} tom="primary" />
+        <KpiCard label="Estudantes" valor={d.totais.estudantes} icon={<Users className="h-4 w-4" />} tom="sky" />
+        <KpiCard label="Sessões" valor={d.totais.sessoes} icon={<Activity className="h-4 w-4" />} tom="violet" />
+        <KpiCard label="Finalizadas" valor={d.totais.finalizadas} icon={<CheckCircle2 className="h-4 w-4" />} tom="emerald" />
+        <KpiCard label="Nota média" valor={nota(d.notaMediaGeral)} icon={<Trophy className="h-4 w-4" />} tom="amber" />
+        <KpiCard label="Acerto médio" valor={d.acertoMedioGeral != null ? `${d.acertoMedioGeral}%` : '—'} icon={<Target className="h-4 w-4" />} tom="emerald" />
+        <KpiCard label="Questões" valor={d.totais.questoes} icon={<BookOpen className="h-4 w-4" />} tom="primary" />
+        <KpiCard label="Respostas" valor={d.totais.respostas} icon={<ListChecks className="h-4 w-4" />} tom="sky" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Grafico titulo={`Sessões por período (${GRANS.find((x) => x.id === g)?.label.toLowerCase()})`}>
-          <Barras data={serie} x="periodo" series={[{ key: 'sessoes', nome: 'Sessões' }]} />
-        </Grafico>
-        <Grafico titulo="Nota e acerto médios por período">
-          <Linha data={serie} x="periodo" series={[{ key: 'notaMedia', nome: 'Nota média' }, { key: 'acertoMedio', nome: 'Acerto %', cor: '#22c55e' }]} />
-        </Grafico>
-        {d.porDisciplina.length > 0 && (
-          <Grafico titulo="Acerto por disciplina (%)">
-            <Barras data={d.porDisciplina} x="nome" series={[{ key: 'pct', nome: 'Acerto %', cor: '#f59e0b' }]} />
-          </Grafico>
-        )}
+        <Painel titulo={`Sessões por período`} sub={`Agrupado por ${granLabel}`} tom="primary" icon={<Activity className="h-4 w-4" />}>
+          <Colunas itens={serie.map((x) => ({ rotulo: x.periodo, valor: x.sessoes }))} tom="primary" altura={200} formato={(n) => `${n} sessão(ões)`} />
+        </Painel>
+        <Painel titulo="Acerto médio por período" sub={`Média de acerto (%) por ${granLabel}`} tom="emerald" icon={<TrendingUp className="h-4 w-4" />}>
+          <AreaSpark pontos={serie.map((x) => ({ rotulo: x.periodo, valor: x.acertoMedio }))} tom="emerald" min={0} max={100} formato={(n) => `${n}%`} />
+        </Painel>
+        <Painel titulo="Acerto por disciplina" sub="Verde = domínio alto · vermelho = ponto fraco" tom="amber" icon={<BookOpen className="h-4 w-4" />}>
+          <BarrasH itens={d.porDisciplina.map((x) => ({ rotulo: x.nome, valor: x.pct, sub: `${x.tt} resp.` }))} pct heat />
+        </Painel>
         <div className="grid gap-4 sm:grid-cols-2">
-          {d.porStatus.length > 0 && (
-            <Grafico titulo="Sessões por status" altura={220}>
-              <Rosca data={d.porStatus} nameKey="nome" valueKey="valor" />
-            </Grafico>
-          )}
-          {d.distribuicaoNotas.length > 0 && (
-            <Grafico titulo="Distribuição de notas" altura={220}>
-              <Barras data={d.distribuicaoNotas} x="faixa" series={[{ key: 'alunos', nome: 'Estudantes', cor: '#8b5cf6' }]} />
-            </Grafico>
-          )}
+          <Painel titulo="Sessões por status" tom="sky" icon={<PieChart className="h-4 w-4" />}>
+            <Donut itens={d.porStatus.map((x) => ({ rotulo: x.nome, valor: x.valor }))} />
+          </Painel>
+          <Painel titulo="Distribuição de notas" sub="Estudantes por faixa" tom="violet" icon={<BarChart3 className="h-4 w-4" />}>
+            <Colunas itens={d.distribuicaoNotas.map((x) => ({ rotulo: x.faixa, valor: x.alunos }))} tom="violet" altura={150} formato={(n) => `${n} aluno(s)`} />
+          </Painel>
         </div>
       </div>
     </div>

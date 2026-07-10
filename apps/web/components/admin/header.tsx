@@ -15,6 +15,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
 import { LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { NotificationBell } from '@/components/admin/notification-bell'
+import { AjudaButton } from '@/components/admin/ajuda-center'
 
 interface AdminHeaderProps {
   userName: string
@@ -45,6 +46,7 @@ export function AdminHeader({ userName, userEmail }: AdminHeaderProps) {
     >
       <SidebarTrigger />
       <div className="flex-1" />
+      <AjudaButton />
       <NotificationBell />
       <ThemeToggle />
       <DropdownMenu>

@@ -30,11 +30,14 @@ export async function createRoleAction(
 
 export async function deleteRoleAction(roleId: string): Promise<{ ok: boolean; error?: string }> {
   if (!(await checkPermission('rbac:manage'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const supabase = createAdminClient()
-  // Não permite excluir perfis de sistema.
-  const { data: role } = await supabase.from('simulado_roles').select('is_sistema, nome').eq('id', roleId).maybeSingle()
-  if (role?.is_sistema) return { ok: false, error: 'Perfil de sistema não pode ser excluído.' }
-  const { error } = await supabase.from('simulado_roles').delete().eq('id', roleId)
+  // Só perfis do próprio tenant (nunca de outro tenant, nem os de sistema).
+  const { data: role } = await supabase.from('simulado_roles').select('is_sistema, nome').eq('id', roleId).eq('tenant_id', tenantId).maybeSingle()
+  if (!role) return { ok: false, error: 'Perfil não encontrado.' }
+  if (role.is_sistema) return { ok: false, error: 'Perfil de sistema não pode ser excluído.' }
+  const { error } = await supabase.from('simulado_roles').delete().eq('id', roleId).eq('tenant_id', tenantId)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_roles', entidadeId: roleId, antes: role ?? undefined })
   revalidatePath('/admin/rbac')
@@ -44,20 +47,24 @@ export async function deleteRoleAction(roleId: string): Promise<{ ok: boolean; e
 export async function saveRolePermissions(
   roleId: string,
   permissionIds: string[],
-  tenantId: string,
+  _tenantIdCliente?: string, // ignorado: o tenant é sempre derivado da sessão (não confiar no cliente)
 ): Promise<{ ok: boolean; error?: string }> {
   try {
+    if (!(await checkPermission('rbac:manage'))) return { ok: false, error: 'Sem permissão.' }
+    const tenantId = await getCurrentTenantId()
+    if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
     const supabase = createAdminClient()
 
-    // Verify role belongs to this tenant (or is a system role)
+    // Só permite editar permissões de um perfil DO PRÓPRIO TENANT (perfis de sistema
+    // são globais e não são editáveis por aqui, para não afetar outros tenants).
     const { data: role } = await supabase
       .from('simulado_roles')
       .select('id, is_sistema')
       .eq('id', roleId)
-      .or(`tenant_id.eq.${tenantId},is_sistema.eq.true`)
-      .single()
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
 
-    if (!role) return { ok: false, error: 'Perfil não encontrado' }
+    if (!role) return { ok: false, error: 'Perfil não encontrado neste tenant.' }
 
     // Delete existing role permissions
     await supabase.from('simulado_role_permissions').delete().eq('role_id', roleId)

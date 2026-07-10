@@ -9,7 +9,6 @@ services:
       - ./docker/certs:/etc/nginx/certs:ro
     depends_on:
       - web
-      - api
     restart: unless-stopped
 
   web:
@@ -25,6 +24,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - PDF_RENDER_SECRET=${PDF_RENDER_SECRET}
       - WEB_INTERNAL_URL=http://web:3000
+      - CRON_SECRET=${CRON_SECRET}
     expose:
       - "3000"
     depends_on:
@@ -32,28 +32,6 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  api:
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile
-    environment:
-      - NODE_ENV=production
-      - PORT=3001
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      - JWT_SECRET=${JWT_SECRET}
-      - REDIS_URL=redis://redis:6379
-    expose:
-      - "3001"
-    depends_on:
-      - redis
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -70,6 +48,8 @@ services:
       - GOTENBERG_URL=http://gotenberg:3000
       # URL interna que o Gotenberg usa p/ buscar as páginas /imprimir do web
       - WEB_INTERNAL_URL=http://web:3000
+      # Auto-encerramento: mesmo segredo do web (o worker chama /api/cron/encerrar-expirados a cada 60s)
+      - CRON_SECRET=${CRON_SECRET}
       # Base pública dos PDFs no storage (Supabase). Ex.: https://<proj>.supabase.co/storage/v1/object/public/pdfs
       - PDF_PUBLIC_BASE=${PDF_PUBLIC_BASE}
     depends_on:

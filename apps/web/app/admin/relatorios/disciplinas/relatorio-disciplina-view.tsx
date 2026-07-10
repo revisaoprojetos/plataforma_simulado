@@ -1,7 +1,7 @@
 'use client'
 
-import { Kpi, Grafico, Barras, Linha, baixarCsv } from '@/components/admin/relatorios/kit'
-import { BookOpen, Target, XCircle, ClipboardList, Users, ListChecks, FileSpreadsheet } from 'lucide-react'
+import { KpiCard, Painel, Hero, BarrasH, AreaSpark, ListaBusca, BotaoExportar, heatBar, baixarCsv } from '@/components/admin/relatorios/viz'
+import { BookOpen, Target, XCircle, ClipboardList, Users, ListChecks, Layers, TrendingUp } from 'lucide-react'
 
 export type DadosRelatorioDisciplina = {
   nome: string
@@ -15,7 +15,7 @@ export type DadosRelatorioDisciplina = {
   evolucao: { mes: string; pct: number }[]
 }
 
-export function RelatorioDisciplinaView({ d }: { d: DadosRelatorioDisciplina }) {
+export function RelatorioDisciplinaView({ d, print }: { d: DadosRelatorioDisciplina; print?: boolean }) {
   const erro = d.acertoPct != null ? 100 - d.acertoPct : null
 
   function exportar() {
@@ -33,61 +33,45 @@ export function RelatorioDisciplinaView({ d }: { d: DadosRelatorioDisciplina }) 
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">{d.nome}</h2>
-        <button type="button" onClick={exportar} className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-muted">
-          <FileSpreadsheet className="h-4 w-4" /> Exportar (CSV/Excel)
-        </button>
-      </div>
+    <div className="space-y-5">
+      <Hero icon={<BookOpen className="h-6 w-6" />} tom="primary" titulo={d.nome}
+        subtitulo="Desempenho da turma na disciplina" acoes={print ? undefined : <BotaoExportar onClick={exportar} />} />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <Kpi label="Questões" valor={d.totalQuestoes} icon={<BookOpen className="h-4 w-4" />} tom="primary" />
-        <Kpi label="Respostas" valor={d.respostas} icon={<ListChecks className="h-4 w-4" />} tom="sky" />
-        <Kpi label="Acerto" valor={d.acertoPct != null ? `${d.acertoPct}%` : '—'} icon={<Target className="h-4 w-4" />} tom="emerald" />
-        <Kpi label="Erro" valor={erro != null ? `${erro}%` : '—'} icon={<XCircle className="h-4 w-4" />} tom="rose" />
-        <Kpi label="Simulados" valor={d.numSimulados} icon={<ClipboardList className="h-4 w-4" />} tom="amber" />
-        <Kpi label="Estudantes" valor={d.numEstudantes} icon={<Users className="h-4 w-4" />} tom="violet" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <KpiCard label="Questões" valor={d.totalQuestoes} icon={<BookOpen className="h-4 w-4" />} tom="primary" />
+        <KpiCard label="Respostas" valor={d.respostas} icon={<ListChecks className="h-4 w-4" />} tom="sky" />
+        <KpiCard label="Acerto" valor={d.acertoPct != null ? `${d.acertoPct}%` : '—'} icon={<Target className="h-4 w-4" />} tom="emerald" />
+        <KpiCard label="Erro" valor={erro != null ? `${erro}%` : '—'} icon={<XCircle className="h-4 w-4" />} tom="rose" />
+        <KpiCard label="Simulados" valor={d.numSimulados} icon={<ClipboardList className="h-4 w-4" />} tom="amber" />
+        <KpiCard label="Estudantes" valor={d.numEstudantes} icon={<Users className="h-4 w-4" />} tom="violet" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {d.porAssunto.length > 0 && (
-          <Grafico titulo="Acerto por assunto (%)">
-            <Barras data={d.porAssunto} x="nome" series={[{ key: 'pct', nome: 'Acerto %' }]} />
-          </Grafico>
-        )}
-        {d.evolucao.length > 0 && (
-          <Grafico titulo="Evolução do acerto (por mês)">
-            <Linha data={d.evolucao} x="mes" series={[{ key: 'pct', nome: 'Acerto %', cor: '#22c55e' }]} area />
-          </Grafico>
-        )}
+        <Painel titulo="Acerto por assunto" sub="Onde a turma vai bem e onde precisa reforçar" tom="emerald" icon={<Layers className="h-4 w-4" />}>
+          <BarrasH itens={d.porAssunto.map((x) => ({ rotulo: x.nome, valor: x.pct, sub: `${x.ac}/${x.tt}` }))} pct heat />
+        </Painel>
+        <Painel titulo="Evolução do acerto" sub="Média de acerto da disciplina por mês" tom="sky" icon={<TrendingUp className="h-4 w-4" />}>
+          <AreaSpark pontos={d.evolucao.map((x) => ({ rotulo: x.mes, valor: x.pct }))} tom="emerald" min={0} max={100} formato={(n) => `${n}%`} />
+        </Painel>
       </div>
 
-      <div className="rounded-xl border bg-card">
-        <div className="border-b px-4 py-3"><h3 className="text-sm font-semibold">Desempenho por simulado</h3></div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs text-muted-foreground">
-              <tr className="border-b">
-                <th className="px-4 py-2 font-medium">Simulado</th>
-                <th className="px-4 py-2 font-medium">Questões respondidas</th>
-                <th className="px-4 py-2 font-medium">Acerto</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.porSimulado.length === 0 ? (
-                <tr><td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">Sem respostas para esta disciplina ainda.</td></tr>
-              ) : d.porSimulado.map((x, i) => (
-                <tr key={i} className="border-b last:border-0 hover:bg-muted/40">
-                  <td className="px-4 py-2 font-medium">{x.titulo}</td>
-                  <td className="px-4 py-2 tabular-nums text-muted-foreground">{x.tt}</td>
-                  <td className="px-4 py-2 tabular-nums">{x.pct}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <Painel titulo="Desempenho por simulado" sub="Em quais simulados a disciplina apareceu" tom="amber" icon={<ClipboardList className="h-4 w-4" />}>
+        <ListaBusca itens={d.porSimulado} placeholder="Buscar simulado pelo título…" vazio="Sem respostas para esta disciplina ainda." print={print}
+          filtro={(x, t) => x.titulo.toLowerCase().includes(t)}>
+          {(x, i) => (
+            <div key={i} className="flex items-center gap-4 rounded-xl border bg-card p-3">
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{x.titulo}</div>
+                <div className="text-xs text-muted-foreground">{x.ac}/{x.tt} respondidas</div>
+              </div>
+              <div className="hidden w-40 shrink-0 sm:block">
+                <div className="h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${heatBar(x.pct)}`} style={{ width: `${x.pct}%` }} /></div>
+              </div>
+              <div className="w-14 shrink-0 text-right text-sm font-bold tabular-nums">{x.pct}%</div>
+            </div>
+          )}
+        </ListaBusca>
+      </Painel>
     </div>
   )
 }

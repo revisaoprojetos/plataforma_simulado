@@ -22,13 +22,16 @@ export async function anularQuestao(
     return { ok: false, error: 'Sem permissão.' }
   }
   const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
 
+  // Gate de tenant: só age em simulado do próprio tenant (as etapas seguintes derivam deste vínculo).
   const { data: vinculo } = await svc
     .from('simulado_prova_questoes')
     .select('id, anulada, tenant_id')
     .eq('simulado_id', simuladoId)
     .eq('questao_id', questaoId)
+    .eq('tenant_id', access.tenantId)
     .maybeSingle()
   if (!vinculo) return { ok: false, error: 'Questão não pertence a este simulado.' }
   if (vinculo.anulada) return { ok: false, error: 'Questão já anulada.' }
@@ -75,14 +78,13 @@ export async function anularQuestao(
   const anuladasSet = new Set((pq ?? []).filter((x: any) => x.anulada).map((x: any) => x.questao_id))
   const nAnuladas = anuladasSet.size
 
-  // 4) Recalcula a nota de cada sessão.
-  for (const s of lista) {
+  // 4) Recalcula a nota de cada sessão (concorrência limitada — evita N+1 sequencial em provas grandes).
+  const recalcular = async (s: any) => {
     const { data: resp } = await svc
       .from('simulado_respostas_objetivas')
       .select('questao_id, correta')
       .eq('sessao_id', s.id)
     const corretasReais = (resp ?? []).filter((r: any) => r.correta && !anuladasSet.has(r.questao_id)).length
-
     let nota = 0
     if (politica === 'pontua_todos') {
       nota = totalQ > 0 ? ((corretasReais + nAnuladas) / totalQ) * 10 : 0
@@ -92,6 +94,7 @@ export async function anularQuestao(
     }
     await svc.from('simulado_sessoes_prova').update({ nota: Math.round(nota * 100) / 100 }).eq('id', s.id)
   }
+  for (let i = 0; i < lista.length; i += 15) await Promise.all(lista.slice(i, i + 15).map(recalcular))
 
   // 5) Recalcula ranking (dedup por aluno conforme a política de nota).
   await rankearSimulado(svc, simuladoId)

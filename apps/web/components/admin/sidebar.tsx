@@ -30,6 +30,8 @@ import {
   Trash2,
   PieChart,
   Trophy,
+  HelpCircle,
+  DownloadCloud,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -45,6 +47,7 @@ import {
   SidebarHeader,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
+import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { useCan } from '@/components/auth/can-provider'
 
 type IconType = React.ComponentType<{ className?: string; style?: React.CSSProperties }>
@@ -93,6 +96,7 @@ const navGroups: NavGroup[] = [
       { label: 'Estudantes', href: '/admin/estudantes', icon: Users, perm: 'estudantes:view' },
       { label: 'Grupos', href: '/admin/grupos', icon: UsersRound, perm: 'grupos:view' },
       { label: 'Matrículas', href: '/admin/matriculas', icon: CreditCard, perm: 'matriculas:view' },
+      { label: 'Curseduca', href: '/admin/curseduca', icon: DownloadCloud, perm: 'estudantes:create' },
     ],
   },
   {
@@ -132,6 +136,7 @@ const navGroups: NavGroup[] = [
       { label: 'Configurações', href: '/admin/configuracoes', icon: Settings, exact: true, perm: 'configuracoes:view' },
       { label: 'Mensagens', href: '/admin/configuracoes/mensagens', icon: MessageSquare, perm: 'configuracoes:view' },
       { label: 'Lixeira', href: '/admin/lixeira', icon: Trash2, perm: 'questoes:view' },
+      { label: 'Ajuda', href: '/admin/ajuda', icon: HelpCircle },
     ],
   },
 ]
@@ -167,9 +172,9 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
   const search = useSearchParams()
   const can = useCan()
 
-  // Filtra itens/grupos por permissão do usuário.
+  // Filtra itens/grupos por permissão do usuário (e oculta a parte discursiva quando a flag está ligada).
   const gruposVisiveis = navGroups
-    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm)) }))
+    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !(OCULTAR_DISCURSIVA && i.href === '/admin/correcao')) }))
     .filter((g) => g.items.length > 0)
 
   const grupoAtivo = (group: NavGroup) => group.items.some((i) => itemAtivo(i, pathname, search))

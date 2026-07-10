@@ -16,7 +16,51 @@ import { GerarPdfServidor } from '@/components/admin/gerar-pdf-servidor'
 import { MonitorPlay } from 'lucide-react'
 import { salvarCadernoDesignerV2 } from '@/app/admin/cadernos/actions'
 import { PRESETS_CADERNO, type CadernoPreset } from '@/lib/caderno-designer/presets'
+import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
+
+/** Camada de fundo full-bleed da página. Detecta imagem quebrada (404) e mostra
+ * um aviso claro para reenviar. Como a coluna de conteúdo cobre a folha inteira,
+ * a camada só captura clique no estado placeholder (sem imagem/erro); com imagem
+ * válida ela fica não-interativa e a seleção acontece pelo chip “Fundo” do canto. */
+function FundoPagina({ bloco, selecionado, corPrimaria, onSelect }: { bloco: Block; selecionado: boolean; corPrimaria: string; onSelect: () => void }) {
+  const a = bloco.attributes as any
+  const [erro, setErro] = useState(false)
+  const temImagem = !!a.url && !erro
+  const placeholder = !temImagem
+  return (
+    <div onClick={placeholder ? (e) => { e.stopPropagation(); onSelect() } : undefined}
+      style={{ position: 'absolute', inset: 0, zIndex: placeholder ? 4 : 0, pointerEvents: placeholder ? 'auto' : 'none',
+        cursor: placeholder ? 'pointer' : 'default', outline: selecionado ? `3px solid ${corPrimaria}` : 'none' }}>
+      {a.url && (
+        <img src={a.url} alt="" onError={() => setErro(true)} onLoad={() => setErro(false)}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: (a.opacidade ?? 100) / 100, display: erro ? 'none' : 'block' }} />
+      )}
+      {placeholder && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, textAlign: 'center', padding: 16,
+          border: `2px dashed ${erro ? '#f59e0b' : selecionado ? corPrimaria : '#cbd5e1'}`, background: erro ? 'rgba(245,158,11,0.10)' : 'rgba(148,163,184,0.07)' }}>
+          <Wallpaper className="h-9 w-9" style={{ color: erro ? '#f59e0b' : '#94a3b8' }} />
+          <span style={{ fontSize: 17, fontWeight: 600, color: erro ? '#b45309' : '#94a3b8' }}>{erro ? 'Imagem de fundo não encontrada' : 'Imagem de fundo'}</span>
+          <span style={{ fontSize: 13, color: erro ? '#b45309' : '#94a3b8' }}>{erro ? 'O arquivo não existe mais no servidor — clique aqui e reenvie (ou remova) no inspetor.' : 'Clique aqui e envie a imagem no inspetor (aba “Bloco”).'}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Chip “Fundo” — fica acima do conteúdo (z alto) para sempre permitir selecionar
+ * a camada de fundo e trocar/remover a imagem no inspetor. */
+function ChipFundo({ selecionado, corPrimaria, onSelect }: { selecionado: boolean; corPrimaria: string; onSelect: () => void }) {
+  return (
+    <button type="button" onClick={(e) => { e.stopPropagation(); onSelect() }}
+      style={{ position: 'absolute', top: 8, left: 8, zIndex: 20, display: 'inline-flex', alignItems: 'center', gap: 5,
+        padding: '3px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#fff',
+        background: selecionado ? corPrimaria : 'rgba(15,23,42,0.72)', border: '1px solid rgba(255,255,255,.25)', backdropFilter: 'blur(2px)' }}
+      title="Selecionar a imagem de fundo (trocar/remover)">
+      <Wallpaper style={{ width: 13, height: 13 }} /> Fundo
+    </button>
+  )
+}
 
 const CAT_NOMES: Record<string, string> = { conteudo: 'Conteúdo', avaliacao: 'Avaliação', identificacao: 'Identificação', estrutura: 'Estrutura' }
 const ZOOM = 0.76
@@ -256,8 +300,11 @@ export function CadernoEditorV2({
   registros?: { id: string; nome: string; vars: Record<string, string>; respostas?: Record<string, string> }[]
   branding?: { nome?: string; logoUrl?: string | null; logoGrandeUrl?: string | null; logoBg?: string; logoEstilo?: string } | null
 }) {
+  const ehDiscursiva = (m: Modalidade) => /discursiv|reda[çc][ãa]o/i.test(`${m.id} ${m.nome}`)
   const mods0 = mesclarModalidades(inicial.modalidadesV2)
+  const mods0Vis = OCULTAR_DISCURSIVA ? mods0.filter((m) => !ehDiscursiva(m)) : mods0
   const [modalidades, setModalidades] = useState<Modalidade[]>(mods0)
+  const modalidadesVisiveis = OCULTAR_DISCURSIVA ? modalidades.filter((m) => !ehDiscursiva(m)) : modalidades
   const [docs, setDocs] = useState<Record<string, CadernoDoc>>(() => {
     const d = { ...(inicial.docsV2 ?? {}) }
     for (const m of mods0) {
@@ -272,7 +319,7 @@ export function CadernoEditorV2({
   const [hudMode, setHudMode] = useState(false)
   const [bancoId, setBancoId] = useState<string | null>(bancoIdInicial)
   const [regIndex, setRegIndex] = useState(0)
-  const [modAtiva, setModAtiva] = useState<string>(mods0[0].id)
+  const [modAtiva, setModAtiva] = useState<string>((mods0Vis[0] ?? mods0[0]).id)
   const [selPage, setSelPage] = useState<string | null>(null)
   const [pageDrag, setPageDrag] = useState<number | null>(null)
   const [pageOver, setPageOver] = useState<number | null>(null)
@@ -495,7 +542,7 @@ export function CadernoEditorV2({
           <Link href="/admin/cadernos" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
           <div>
             <h1 className="text-lg font-bold leading-tight">{nome}</h1>
-            <p className="text-xs text-muted-foreground">Editor de blocos · {modalidades.length} modalidade(s)</p>
+            <p className="text-xs text-muted-foreground">Editor de blocos · {modalidadesVisiveis.length} modalidade(s)</p>
           </div>
           {/* Vínculo com banco: alimenta as variáveis com os dados reais daquele banco */}
           <label className="ml-3 flex items-center gap-1.5 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs">
@@ -546,7 +593,7 @@ export function CadernoEditorV2({
           <div>
             <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Modalidade</p>
             <select value={modAtiva} onChange={(e) => { setModAtiva(e.target.value); setSelBlock(null) }} className="w-full rounded-lg border bg-background px-2.5 py-2 text-sm shadow-sm">
-              {modalidades.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+              {modalidadesVisiveis.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
             </select>
             <div className="mt-1.5 flex gap-2 text-[11px]">
               <button onClick={addModalidade} className="text-primary hover:underline">+ Nova</button>
@@ -558,7 +605,7 @@ export function CadernoEditorV2({
           <div>
             <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Modelos prontos</p>
             <div className="flex flex-col gap-1.5">
-              {PRESETS_CADERNO.map((p) => (
+              {PRESETS_CADERNO.filter((p) => !OCULTAR_DISCURSIVA || !/discursiv|reda[çc][ãa]o/i.test(`${p.id} ${p.nome}`)).map((p) => (
                 <button key={p.id} type="button" onClick={() => aplicarPreset(p)} title={p.descricao}
                   className="rounded-lg border bg-background px-2.5 py-2 text-left shadow-sm transition-all hover:border-primary hover:bg-primary/5">
                   <span className="block text-xs font-medium leading-tight">{p.nome}</span>
@@ -615,24 +662,11 @@ export function CadernoEditorV2({
                       style={{ width: SHEET_W, height: SHEET_H, transform: `scale(${ZOOM})`, transformOrigin: 'top left', background: theme.cores.fundo, boxShadow: '0 2px 16px rgba(0,0,0,.13)',
                         ...(overId === page.id ? { outline: `2.5px solid ${REALCE}`, outlineOffset: -2 } : arrastando ? { outline: `1.5px solid ${REALCE}`, outlineOffset: -2 } : {}) }}
                       className={cn('relative overflow-hidden', !arrastando && selPage === page.id && regiao === 'pagina' && 'ring-2 ring-primary/40')}>
-                      {/* camada de fundo full-bleed (com placeholder quando sem imagem) */}
-                      {bg && (() => {
-                        const ba = bg.attributes as any
-                        const sel = selBlock === bg.id
-                        return (
-                          <div onClick={(e) => { e.stopPropagation(); setSelBlock(bg.id); setAba('bloco') }}
-                            style={{ position: 'absolute', inset: 0, cursor: 'pointer', outline: sel ? `3px solid ${theme.cores.primaria}` : 'none',
-                              ...(ba.url ? { backgroundImage: `url(${ba.url})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: (ba.opacidade ?? 100) / 100 } : {}) }}>
-                            {!ba.url && (
-                              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, border: `2px dashed ${sel ? theme.cores.primaria : '#cbd5e1'}`, background: 'rgba(148,163,184,0.07)' }}>
-                                <Wallpaper className="h-9 w-9 text-slate-400" />
-                                <span style={{ fontSize: 17, color: '#94a3b8', fontWeight: 600 }}>Imagem de fundo</span>
-                                <span style={{ fontSize: 13, color: '#94a3b8' }}>Clique aqui e envie a imagem no inspetor (aba “Bloco”)</span>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })()}
+                      {/* camada de fundo full-bleed (placeholder quando sem imagem ou url quebrada) */}
+                      {bg && (
+                        <FundoPagina key={(bg.attributes as any).url || 'sem'} bloco={bg} selecionado={selBlock === bg.id}
+                          corPrimaria={theme.cores.primaria} onSelect={() => { setSelBlock(bg.id); setAba('bloco') }} />
+                      )}
                       {/* Coluna da folha: faixas usam a LARGURA TODA (borda a borda); só o conteúdo do meio tem margem lateral/vertical. */}
                       <div className="relative flex h-full flex-col">
                         {mostraCab && <ZonaFaixa reg="cabecalho" blocks={doc.cabecalho ?? []} altura={running.cabecalhoAltura} />}
@@ -645,6 +679,7 @@ export function CadernoEditorV2({
                         </AutoAnim>
                         {mostraRod && <ZonaFaixa reg="rodape" blocks={doc.rodape ?? []} altura={running.rodapeAltura} />}
                       </div>
+                      {bg && <ChipFundo selecionado={selBlock === bg.id} corPrimaria={theme.cores.primaria} onSelect={() => { setSelBlock(bg.id); setAba('bloco') }} />}
                     </div>
                   </div>
                 </div>

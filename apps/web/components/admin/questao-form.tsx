@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 
 const alternativaSchema = z.object({
   texto: z.string(),
@@ -162,7 +163,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="objetiva">Objetiva</SelectItem>
-                  <SelectItem value="discursiva">Discursiva</SelectItem>
+                  {!OCULTAR_DISCURSIVA && <SelectItem value="discursiva">Discursiva</SelectItem>}
                 </SelectContent>
               </Select>
             </div>

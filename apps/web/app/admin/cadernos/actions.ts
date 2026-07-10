@@ -41,11 +41,14 @@ export async function criarCaderno(nome: string): Promise<{ ok: boolean; id?: st
 
 export async function salvarCadernoConfig(id: string, config: CadernoConfig): Promise<{ ok: boolean; error?: string }> {
   if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
   const { error } = await svc
     .from('simulado_cadernos_designer')
     .update({ config, atualizado_em: new Date().toISOString() })
     .eq('id', id)
+    .eq('tenant_id', access.tenantId)
   if (error) return { ok: false, error: error.message }
   revalidatePath(`/admin/cadernos/${id}`)
   return { ok: true }
@@ -57,13 +60,17 @@ export async function salvarCadernoDesignerV2(
   payload: { docsV2: Record<string, unknown>; modalidadesV2: unknown[]; cores: Record<string, string>; bancoId?: string | null; hudCores?: Record<string, string>; hudPorPagina?: Record<string, Record<string, string>> },
 ): Promise<{ ok: boolean; error?: string }> {
   if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
-  const { data: atual } = await svc.from('simulado_cadernos_designer').select('config').eq('id', id).maybeSingle()
-  const merged = { ...(((atual?.config as Record<string, unknown>) ?? {})), ...payload }
+  const { data: atual } = await svc.from('simulado_cadernos_designer').select('config').eq('id', id).eq('tenant_id', access.tenantId).maybeSingle()
+  if (!atual) return { ok: false, error: 'Caderno não encontrado.' }
+  const merged = { ...((atual.config as Record<string, unknown>) ?? {}), ...payload }
   const { error } = await svc
     .from('simulado_cadernos_designer')
     .update({ config: merged, atualizado_em: new Date().toISOString() })
     .eq('id', id)
+    .eq('tenant_id', access.tenantId)
   if (error) return { ok: false, error: error.message }
   revalidatePath(`/admin/cadernos/${id}`)
   return { ok: true }
