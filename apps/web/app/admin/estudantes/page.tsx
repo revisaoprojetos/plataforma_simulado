@@ -1,23 +1,11 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import Link from 'next/link'
-import { Button, buttonVariants } from '@/components/ui/button'
-import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Card, CardContent } from '@/components/ui/card'
+import { buttonVariants } from '@/components/ui/button'
 import { Plus, Upload } from 'lucide-react'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
-import { ExcluirEstudanteButton } from '@/components/admin/excluir-estudante-button'
-import { SecaoHeader } from '@/components/admin/secao-header'
-import { GraduationCap } from 'lucide-react'
+import { EstudantesLista, type EstudanteRow } from '@/components/admin/estudantes-lista'
+
+export const dynamic = 'force-dynamic'
 
 export default async function EstudantesPage() {
   const supabase = await createServiceClient()
@@ -29,89 +17,56 @@ export default async function EstudantesPage() {
     .eq('deletado', false)
     .eq('tenant_id', tenantId ?? '')
     .order('created_at', { ascending: false })
-    .limit(100)
+    .limit(500)
 
-  function formatDate(date: string | null) {
-    if (!date) return '—'
-    return format(new Date(date), 'dd/MM/yyyy', { locale: ptBR })
+  // Simulados feitos + média por estudante (sessões finalizadas, exceto testes).
+  const ids = (estudantes ?? []).map((e: any) => e.id)
+  const feitos = new Map<string, number>()
+  const somaNota = new Map<string, number>()
+  const contNota = new Map<string, number>()
+  if (ids.length) {
+    const { data: sess } = await supabase
+      .from('simulado_sessoes_prova')
+      .select('estudante_id, nota, status, is_teste')
+      .in('estudante_id', ids)
+      .eq('status', 'finalizada')
+      .eq('is_teste', false)
+      .eq('deletado', false)
+    for (const s of sess ?? []) {
+      const id = (s as any).estudante_id
+      feitos.set(id, (feitos.get(id) ?? 0) + 1)
+      if ((s as any).nota != null) {
+        somaNota.set(id, (somaNota.get(id) ?? 0) + Number((s as any).nota))
+        contNota.set(id, (contNota.get(id) ?? 0) + 1)
+      }
+    }
   }
 
+  const rows: EstudanteRow[] = (estudantes ?? []).map((e: any) => ({
+    id: e.id, nome: e.nome, email: e.email ?? null, cpf: e.cpf ?? null, telefone: e.telefone ?? null,
+    classificacao: e.classificacao ?? null, created_at: e.created_at ?? null,
+    feitos: feitos.get(e.id) ?? 0,
+    media: contNota.get(e.id) ? Math.round(((somaNota.get(e.id) ?? 0) / (contNota.get(e.id) ?? 1)) * 10) / 10 : null,
+  }))
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="animate-page space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Estudantes</h1>
-          <p className="text-muted-foreground">
-            {estudantes?.length ?? 0} estudantes cadastrados
-          </p>
+          <p className="text-muted-foreground">Gerencie os alunos e acesse o dashboard pessoal de cada um.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
-            <Upload className="mr-2 h-4 w-4" />
-            Importar CSV
-          </Button>
+          <Link href="/admin/estudantes/novo?tab=csv" className={buttonVariants({ variant: 'outline' })}>
+            <Upload className="mr-2 h-4 w-4" /> Importar
+          </Link>
           <Link href="/admin/estudantes/novo" className={buttonVariants()}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Estudante
+            <Plus className="mr-2 h-4 w-4" /> Novo Estudante
           </Link>
         </div>
       </div>
 
-      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
-        <SecaoHeader icon={GraduationCap} titulo="Estudantes" subtitulo={`${estudantes?.length ?? 0} cadastrado(s)`} />
-        <CardContent className="p-0">
-          <div className="max-h-[65vh] overflow-auto">
-          <Table>
-            <TableHeader className="sticky top-0 z-10 bg-background">
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>CPF</TableHead>
-                <TableHead>Classificação</TableHead>
-                <TableHead>Cadastrado</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!estudantes || estudantes.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    Nenhum estudante cadastrado.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                estudantes.map((e) => {
-                  return (
-                    <TableRow key={e.id}>
-                      <TableCell className="font-medium">
-                        <Link href={`/admin/estudantes/${e.id}`} className="text-primary hover:underline">
-                          {e.nome}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {e.email}
-                      </TableCell>
-                      <TableCell className="text-sm font-mono">
-                        {e.cpf ?? '—'}
-                      </TableCell>
-                      <TableCell>
-                        <ClassificacaoBadge classificacao={e.classificacao} />
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDate(e.created_at)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <ExcluirEstudanteButton id={e.id} nome={e.nome} />
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
-          </Table>
-          </div>
-        </CardContent>
-      </Card>
+      <EstudantesLista estudantes={rows} />
     </div>
   )
 }

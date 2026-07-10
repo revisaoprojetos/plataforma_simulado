@@ -149,6 +149,24 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
   for (const s of reais) { const tt = totais.get(s.id) ?? 0; if (tt > 0) { somaAc += acertos.get(s.id) ?? 0; somaTt += tt } }
   const acertoMedio = somaTt > 0 ? Math.round((somaAc / somaTt) * 100) : null
 
+  // ── Simulados PENDENTES: atribuídos por matrícula/acesso e ainda não finalizados ──
+  const feitosSimIds = new Set(reais.filter((s: any) => s.status === 'finalizada').map((s: any) => s.simulado_id).filter(Boolean))
+  const emAndamentoSimIds = new Set((sessoes ?? []).filter((s: any) => s.status === 'em_andamento').map((s: any) => s.simulado_id).filter(Boolean))
+  const atribuidos = new Map<string, string | null>() // simulado_id → expira_em (acesso avulso)
+  const [{ data: mats }, { data: aces }] = await Promise.all([
+    svc.from('simulado_matriculas').select('simulado_id').eq('estudante_id', id),
+    svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', id),
+  ])
+  for (const m of mats ?? []) if ((m as any).simulado_id) atribuidos.set((m as any).simulado_id, atribuidos.get((m as any).simulado_id) ?? null)
+  for (const a of aces ?? []) if ((a as any).simulado_id) atribuidos.set((a as any).simulado_id, (a as any).expira_em ?? null)
+  const pendentesIds = [...atribuidos.keys()].filter((sid) => !feitosSimIds.has(sid))
+  let pendentes: { id: string; titulo: string; status: string; expira: string | null; iniciado: boolean }[] = []
+  if (pendentesIds.length) {
+    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, status').in('id', pendentesIds).eq('deletado', false)
+    pendentes = (sims ?? []).map((s: any) => ({ id: s.id, titulo: s.titulo, status: s.status, expira: atribuidos.get(s.id) ?? null, iniciado: emAndamentoSimIds.has(s.id) }))
+      .sort((a, b) => Number(b.iniciado) - Number(a.iniciado))
+  }
+
   // ── Breakdown por disciplina + tempo, por sessão (detalhe expansível) ──
   const discPorQ = new Map<string, string>()
   const qIds = [...new Set(respAll.map((r) => r.questao_id).filter(Boolean))]
@@ -242,6 +260,31 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
         <Stat icon={Trophy} label="Melhor nota" value={melhorNota != null ? melhorNota.toFixed(1) : '—'} tone={melhorNota != null ? notaTone(melhorNota) : undefined} />
         <Stat icon={Target} label="Acerto médio" value={acertoMedio != null ? `${acertoMedio}%` : '—'} />
       </div>
+
+      {/* SIMULADOS PENDENTES (atribuídos por matrícula/acesso, ainda não concluídos) */}
+      {pendentes.length > 0 && (
+        <Card>
+          <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+            <CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4 text-amber-500" /> Simulados pendentes ({pendentes.length})</CardTitle>
+            <span className="hidden text-xs text-muted-foreground sm:block">Atribuídos por matrícula/acesso e ainda não concluídos</span>
+          </CardHeader>
+          <CardContent className="grid gap-2 sm:grid-cols-2">
+            {pendentes.map((p) => (
+              <Link key={p.id} href={`/admin/simulados/${p.id}`} className="flex items-center gap-3 rounded-xl border p-3 transition hover:border-primary hover:bg-primary/5">
+                <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', p.iniciado ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-muted text-muted-foreground')}>
+                  <ClipboardList className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{p.titulo}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {p.iniciado ? 'Em andamento' : 'Não iniciado'}{p.expira ? ` · expira ${fmtData(p.expira)}` : ''}
+                  </span>
+                </span>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* INFO + BANCOS */}
       <div className="grid gap-4 lg:grid-cols-3">

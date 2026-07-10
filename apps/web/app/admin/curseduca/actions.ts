@@ -4,26 +4,29 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
-import { curseducaConfigurado, listarTodosGrupos, contarMembros, listarMembrosDoGrupo, mapaMatriculasGrupo, contarMuitosGrupos, detalheMembro, type MembroCurseduca, type DetalheMembro } from '@/lib/curseduca/client'
+import { configDoEnv, testarCredenciais, listarTodosGrupos, contarMembros, listarMembrosDoGrupo, mapaMatriculasGrupo, contarMuitosGrupos } from '@/lib/curseduca/client'
+import { resolverCfg, executarImport, envAplicaAoTenant } from '@/lib/curseduca/import-core'
+import type { DestinoImport, ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
+import { criptografar, descriptografar, estaCriptografado, criptografiaAtiva } from '@/lib/crypto'
 
 export type GrupoCurseducaDTO = { id: number; nome: string; criadoEm: string | null }
 export type GrupoSistema = { id: string; nome: string }
-export type DestinoImport = { tipo: 'nenhum' | 'existente' | 'novo'; grupoId?: string; nomeNovo?: string }
-export type ResultadoImportCurseduca = { ok: boolean; error?: string; total?: number; novos?: number; jaExistiam?: number; atualizados?: number; vinculados?: number; semIdentificador?: number; semDetalhe?: number; restante?: number; grupoNome?: string | null }
 
-async function guard() {
+/** Contexto: tenant resolvido + credenciais Curseduca (do tenant ou do .env). */
+async function ctx() {
   const access = await getCurrentAccess()
   if (!access.tenantId) return { ok: false as const, error: 'Tenant não resolvido.' }
-  return { ok: true as const, tenantId: access.tenantId, userId: access.userId }
+  const cfg = await resolverCfg(access.tenantId)
+  if (!cfg) return { ok: false as const, error: 'Integração Curseduca não configurada. Configure as credenciais nesta tela (aba Credenciais).' }
+  return { ok: true as const, tenantId: access.tenantId, userId: access.userId, cfg }
 }
 
 /** Lista os grupos de acesso da Curseduca + os grupos do sistema (para destino). */
 export async function listarGruposCurseduca(): Promise<{ ok: boolean; error?: string; grupos?: GrupoCurseducaDTO[]; sistema?: GrupoSistema[] }> {
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
-  if (!curseducaConfigurado()) return { ok: false, error: 'Integração Curseduca não configurada (credenciais ausentes no servidor).' }
-  const g = await guard(); if (!g.ok) return { ok: false, error: g.error }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
   try {
-    const grupos = (await listarTodosGrupos())
+    const grupos = (await listarTodosGrupos(g.cfg))
       .map((x) => ({ id: x.id, nome: x.nome, criadoEm: x.criadoEm }))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
     const svc = createAdminClient()
@@ -37,10 +40,11 @@ export async function listarGruposCurseduca(): Promise<{ ok: boolean; error?: st
 /** Conta quantos membros há nos grupos selecionados (rápido). */
 export async function contarMembrosGrupos(ids: number[]): Promise<{ ok: boolean; total?: number; porGrupo?: Record<number, number>; error?: string }> {
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
   try {
     const porGrupo: Record<number, number> = {}
     let total = 0
-    for (const id of ids) { const n = await contarMembros(id); porGrupo[id] = n; total += n }
+    for (const id of ids) { const n = await contarMembros(g.cfg, id); porGrupo[id] = n; total += n }
     return { ok: true, total, porGrupo }
   } catch (e: any) {
     return { ok: false, error: e?.message ?? 'Falha ao contar membros.' }
@@ -50,11 +54,71 @@ export async function contarMembrosGrupos(ids: number[]): Promise<{ ok: boolean;
 /** Conta membros de TODOS os grupos informados (para exibir a coluna de contagem na lista). */
 export async function contarTodosGrupos(ids: number[]): Promise<{ ok: boolean; contagens?: Record<number, number>; error?: string }> {
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
-  if (!curseducaConfigurado()) return { ok: false, error: 'Integração Curseduca não configurada.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
   try {
-    return { ok: true, contagens: await contarMuitosGrupos(ids) }
+    return { ok: true, contagens: await contarMuitosGrupos(g.cfg, ids) }
   } catch (e: any) {
     return { ok: false, error: e?.message ?? 'Falha ao contar membros.' }
+  }
+}
+
+// ── Credenciais por tenant ──────────────────────────────────────────────────
+export type CurseducaConfigDTO = { base_url: string; usuario: string; ativo: boolean; temApiKey: boolean; temSenha: boolean; usandoEnv: boolean; existe: boolean; criptografado: boolean; criptografiaAtiva: boolean }
+
+/** Estado da config Curseduca do tenant (nunca devolve api_key/senha — só se estão preenchidas). */
+export async function getCurseducaConfig(): Promise<{ ok: boolean; error?: string; config?: CurseducaConfigDTO }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  // O .env global só vale para o tenant designado (evita uma empresa usar a conta de outra).
+  const env = envAplicaAoTenant(access.tenantId) ? configDoEnv() : null
+  const cripAtiva = criptografiaAtiva()
+  const doEnv = (): CurseducaConfigDTO => ({ base_url: env?.base || 'https://prof.curseduca.pro', usuario: env?.user || '', ativo: !!env, temApiKey: !!env?.apiKey, temSenha: !!env?.pass, usandoEnv: !!env, existe: false, criptografado: false, criptografiaAtiva: cripAtiva })
+  try {
+    const svc = createAdminClient()
+    const { data } = await svc.from('simulado_curseduca_config').select('base_url, api_key, usuario, senha, ativo').eq('tenant_id', access.tenantId).maybeSingle()
+    const d = data as any
+    if (d) return { ok: true, config: { base_url: d.base_url || 'https://prof.curseduca.pro', usuario: d.usuario || '', ativo: !!d.ativo, temApiKey: !!d.api_key, temSenha: !!d.senha, usandoEnv: false, existe: true, criptografado: estaCriptografado(d.api_key) || estaCriptografado(d.senha), criptografiaAtiva: cripAtiva } }
+    return { ok: true, config: doEnv() }
+  } catch {
+    return { ok: true, config: doEnv() } // tabela ainda não existe → usa env
+  }
+}
+
+/** Salva as credenciais do tenant (testa login antes de gravar). Campos em branco preservam o valor atual. */
+export async function salvarCurseducaConfig(dados: { base_url?: string; api_key?: string; usuario?: string; senha?: string; ativo?: boolean }): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  try {
+    const { data: atual } = await svc.from('simulado_curseduca_config').select('base_url, api_key, usuario, senha, ativo').eq('tenant_id', access.tenantId).maybeSingle()
+    const a = atual as any
+    const base = dados.base_url?.trim() || a?.base_url || 'https://prof.curseduca.pro'
+    const usuario = dados.usuario?.trim() || a?.usuario || ''
+    // Valores em PLAINTEXT: do formulário, ou os já salvos (descriptografados) quando o campo vem em branco.
+    const apiKey = dados.api_key?.trim() || (descriptografar(a?.api_key) ?? '')
+    const senha = dados.senha?.trim() || (descriptografar(a?.senha) ?? '')
+    const ativo = dados.ativo ?? a?.ativo ?? true
+    if (!apiKey || !usuario || !senha) return { ok: false, error: 'Informe API key, usuário e senha.' }
+    if (ativo) {
+      const teste = await testarCredenciais({ base, apiKey, user: usuario, pass: senha })
+      if (!teste.ok) return { ok: false, error: `Credenciais inválidas: ${teste.error ?? 'login falhou'}` }
+    }
+    // Grava CRIPTOGRAFADO em repouso (AES-256-GCM). Sem APP_ENCRYPTION_KEY, cai para texto puro (com aviso).
+    const { error } = await svc.from('simulado_curseduca_config').upsert(
+      { tenant_id: access.tenantId, base_url: base, api_key: criptografar(apiKey), usuario, senha: criptografar(senha), ativo, atualizado_em: new Date().toISOString() },
+      { onConflict: 'tenant_id' },
+    )
+    if (error) {
+      if (/relation|does not exist|schema cache|column/i.test(error.message)) return { ok: false, error: 'Rode a migration da tabela simulado_curseduca_config (SQL fornecido) e tente de novo.' }
+      return { ok: false, error: error.message }
+    }
+    await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_curseduca_config', entidadeId: access.tenantId, depois: { usuario, ativo, base } })
+    revalidatePath('/admin/curseduca')
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? 'Falha ao salvar credenciais.' }
   }
 }
 
@@ -69,9 +133,9 @@ export type MembroPreview = {
 /** Lista os membros de um grupo (perfil + matrícula: entrada/expiração no grupo) para pré-visualização. */
 export async function previewMembrosGrupo(groupId: number): Promise<{ ok: boolean; error?: string; membros?: MembroPreview[] }> {
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
-  if (!curseducaConfigurado()) return { ok: false, error: 'Integração Curseduca não configurada.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
   try {
-    const [lista, matriculas] = await Promise.all([listarMembrosDoGrupo(groupId), mapaMatriculasGrupo(groupId)])
+    const [lista, matriculas] = await Promise.all([listarMembrosDoGrupo(g.cfg, groupId), mapaMatriculasGrupo(g.cfg, groupId)])
     const membros = lista.map((m) => {
       const mat = matriculas.get(m.id)
       return {
@@ -91,142 +155,130 @@ export async function previewMembrosGrupo(groupId: number): Promise<{ ok: boolea
  * - Cria só quem ainda não existe (dedupe por matrícula Curseduca, e-mail ou CPF).
  * - Se um destino de grupo for informado, VINCULA todos (novos e já existentes) a ele.
  */
-export async function importarGruposCurseduca(ids: number[], destino: DestinoImport): Promise<ResultadoImportCurseduca> {
+export async function importarGruposCurseduca(ids: number[], destino: DestinoImport, sincronizar = false): Promise<ResultadoImportCurseduca> {
   if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão para cadastrar estudantes.' }
-  if (!curseducaConfigurado()) return { ok: false, error: 'Integração Curseduca não configurada.' }
-  const g = await guard(); if (!g.ok) return { ok: false, error: g.error }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  if (!ids?.length) return { ok: false, error: 'Selecione ao menos um grupo.' }
+  return executarImport({ tenantId: g.tenantId, cfg: g.cfg }, ids, destino, sincronizar, 400)
+}
+
+// ── Import em segundo plano (job) ────────────────────────────────────────────
+/** Agenda uma importação para rodar em segundo plano (worker → /api/cron/curseduca-jobs). */
+export async function agendarImportacaoCurseduca(ids: number[], destino: DestinoImport, sincronizar = false): Promise<{ ok: boolean; jobId?: string; error?: string }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
   if (!ids?.length) return { ok: false, error: 'Selecione ao menos um grupo.' }
   const svc = createAdminClient()
-
-  try {
-    // 1) Coleta os membros de todos os grupos (dedupe entre grupos pelo id da Curseduca).
-    const porId = new Map<number, MembroCurseduca>()
-    for (const gid of ids) for (const m of await listarMembrosDoGrupo(gid)) if (!porId.has(m.id)) porId.set(m.id, m)
-    const membros = [...porId.values()]
-    const total = membros.length
-
-    // 2) Quem já existe no sistema (por matrícula Curseduca, e-mail ou CPF).
-    const { data: existentes } = await svc.from('simulado_estudantes').select('id, email, cpf, telefone, classificacao, matricula_externa').eq('tenant_id', g.tenantId).eq('deletado', false)
-    const porEmail = new Map<string, string>(), porCpf = new Map<string, string>(), porExt = new Map<string, string>()
-    const recPorId = new Map<string, any>()
-    for (const e of existentes ?? []) {
-      recPorId.set((e as any).id, e)
-      if ((e as any).email) porEmail.set(String((e as any).email).toLowerCase(), (e as any).id)
-      if ((e as any).cpf) porCpf.set(String((e as any).cpf).replace(/\D/g, ''), (e as any).id)
-      if ((e as any).matricula_externa) porExt.set(String((e as any).matricula_externa), (e as any).id)
-    }
-    const acharExistente = (m: MembroCurseduca) =>
-      porExt.get(String(m.id)) || (m.email ? porEmail.get(m.email) : null) || (m.cpf ? porCpf.get(m.cpf) : null) || null
-
-    // Classificação: se o aluno está em algum grupo de "Passaporte/Passe" → passaporte; senão normal (assinatura).
-    const classificar = (nomes: string[]): string => (/passaporte|passe/i.test(nomes.join(' ')) ? 'passaporte' : 'normal')
-
-    // 3) Separa novos × existentes. Já existentes SEM CPF/telefone entram no backfill.
-    const idsResolvidos: string[] = []
-    let novos = 0, jaExistiam = 0, semIdentificador = 0
-    const novosMembros: MembroCurseduca[] = []
-    const paraBackfill: { estudanteId: string; curseducaId: number }[] = []
-    for (const m of membros) {
-      const ex = acharExistente(m)
-      if (ex) {
-        idsResolvidos.push(ex); jaExistiam++
-        const rec = recPorId.get(ex)
-        if (rec && (!rec.cpf || !rec.telefone || !rec.classificacao)) paraBackfill.push({ estudanteId: ex, curseducaId: m.id })
-        continue
-      }
-      if (!m.email) { semIdentificador++; continue } // sem e-mail → não dá pra cadastrar (a lista não traz CPF)
-      novosMembros.push(m)
-    }
-
-    // Orçamento de buscas de DETALHE por execução — evita timeout da server action em grupos grandes.
-    // O que passar do limite entra com dados básicos (contado em `restante`); reimportar completa via backfill.
-    const LIMITE_DETALHE = 400
-    let usadosDetalhe = 0
-    let restante = 0 // membros que ficaram sem detalhe por causa do limite (não é falha da API)
-
-    // 3b) Enriquece os novos com o DETALHE de cada membro (CPF, telefone, grupos → classificação).
-    //     A lista de membros não traz CPF/telefone — só o endpoint /members/{id}. Busca em blocos.
-    let semDetalhe = 0 // detalhes que FALHARAM (ex.: rate limit) → CPF/telefone podem faltar
-    const detalhePorId = new Map<number, DetalheMembro>()
-    for (let i = 0; i < novosMembros.length && usadosDetalhe < LIMITE_DETALHE; i += 8) {
-      const bloco = novosMembros.slice(i, i + 8)
-      usadosDetalhe += bloco.length
-      const res = await Promise.all(bloco.map((m) => detalheMembro(m.id)))
-      bloco.forEach((m, k) => { detalhePorId.set(m.id, res[k]); if (!res[k].ok) semDetalhe++ })
-    }
-    restante += Math.max(0, novosMembros.length - detalhePorId.size)
-
-    // 3c) Backfill: preenche CPF/telefone/classificação de quem já existia mas estava vazio.
-    let atualizados = 0
-    for (let i = 0; i < paraBackfill.length && usadosDetalhe < LIMITE_DETALHE; i += 8) {
-      const bloco = paraBackfill.slice(i, i + 8)
-      usadosDetalhe += bloco.length
-      const res = await Promise.all(bloco.map((b) => detalheMembro(b.curseducaId)))
-      for (let k = 0; k < bloco.length; k++) {
-        const rec = recPorId.get(bloco[k].estudanteId); const d = res[k]; const patch: Record<string, unknown> = {}
-        if (!d.ok) semDetalhe++
-        if (!rec?.cpf && d.cpf) patch.cpf = d.cpf
-        if (!rec?.telefone && d.telefone) patch.telefone = d.telefone
-        if (!rec?.classificacao) patch.classificacao = classificar(d.gruposNomes)
-        if (Object.keys(patch).length) {
-          const { error } = await svc.from('simulado_estudantes').update(patch).eq('id', bloco[k].estudanteId).eq('tenant_id', g.tenantId)
-          if (!error) atualizados++
-        }
-      }
-    }
-
-    const paraInserir: Record<string, unknown>[] = novosMembros.map((m) => {
-      const d = detalhePorId.get(m.id)
-      return {
-        tenant_id: g.tenantId, user_id: null,
-        nome: m.nome || m.email || 'Aluno', email: m.email,
-        cpf: m.cpf ?? d?.cpf ?? null,
-        telefone: m.telefone ?? d?.telefone ?? null,
-        classificacao: classificar(d?.gruposNomes ?? []),
-        matricula_externa: String(m.id),
-      }
-    })
-
-    for (let i = 0; i < paraInserir.length; i += 200) {
-      const lote = paraInserir.slice(i, i + 200)
-      const { data, error } = await svc.from('simulado_estudantes').insert(lote).select('id')
-      if (!error && data) { idsResolvidos.push(...data.map((r: any) => r.id)); novos += data.length; continue }
-      // Lote falhou (ex.: conflito de e-mail/CPF) → insere um a um, pulando/vinculando conflitos.
-      for (const row of lote) {
-        const { data: d1, error: e1 } = await svc.from('simulado_estudantes').insert(row).select('id').single()
-        if (!e1 && d1) { idsResolvidos.push((d1 as any).id); novos++; continue }
-        let found: string | null = null
-        if (row.email) { const { data: f } = await svc.from('simulado_estudantes').select('id').eq('tenant_id', g.tenantId).eq('email', row.email as string).eq('deletado', false).maybeSingle(); found = (f as any)?.id ?? null }
-        if (!found && row.cpf) { const { data: f } = await svc.from('simulado_estudantes').select('id').eq('tenant_id', g.tenantId).eq('cpf', row.cpf as string).eq('deletado', false).maybeSingle(); found = (f as any)?.id ?? null }
-        if (found) { idsResolvidos.push(found); jaExistiam++ }
-      }
-    }
-
-    // 4) Vincula ao grupo do sistema (novo ou existente), se solicitado.
-    let grupoNome: string | null = null, vinculados = 0, grupoDestinoId: string | null = null
-    if (destino.tipo === 'existente' && destino.grupoId) {
-      grupoDestinoId = destino.grupoId
-      const { data: gr } = await svc.from('simulado_grupos').select('nome').eq('id', grupoDestinoId).maybeSingle()
-      grupoNome = (gr as any)?.nome ?? null
-    } else if (destino.tipo === 'novo' && destino.nomeNovo?.trim()) {
-      const { data: gr } = await svc.from('simulado_grupos').insert({ tenant_id: g.tenantId, nome: destino.nomeNovo.trim() }).select('id, nome').single()
-      grupoDestinoId = (gr as any)?.id ?? null; grupoNome = (gr as any)?.nome ?? null
-    }
-    if (grupoDestinoId && idsResolvidos.length) {
-      const unicos = [...new Set(idsResolvidos)]
-      const { data: jaTem } = await svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoDestinoId).in('estudante_id', unicos)
-      const set = new Set((jaTem ?? []).map((r: any) => r.estudante_id))
-      const novosVinc = unicos.filter((id) => !set.has(id))
-      if (novosVinc.length) {
-        const { error } = await svc.from('simulado_grupo_membros').insert(novosVinc.map((estudante_id) => ({ tenant_id: g.tenantId, grupo_id: grupoDestinoId, estudante_id })))
-        if (!error) vinculados = novosVinc.length
-      }
-    }
-
-    await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_estudantes', entidadeId: grupoDestinoId ?? 'curseduca', depois: { curseduca_grupos: ids, total, novos, jaExistiam, atualizados, vinculados, semDetalhe, restante } })
-    revalidatePath('/admin/estudantes'); revalidatePath('/admin/grupos')
-    return { ok: true, total, novos, jaExistiam, atualizados, vinculados, semIdentificador, semDetalhe, restante, grupoNome }
-  } catch (e: any) {
-    return { ok: false, error: e?.message ?? 'Falha na importação.' }
+  const { data, error } = await svc
+    .from('simulado_curseduca_jobs')
+    .insert({ tenant_id: g.tenantId, status: 'pendente', grupos: ids, destino, sincronizar, criado_por: g.userId ?? null })
+    .select('id')
+    .single()
+  if (error) {
+    if (/relation|does not exist|schema cache|column/i.test(error.message)) return { ok: false, error: 'Rode a migration da tabela simulado_curseduca_jobs (SQL fornecido).' }
+    return { ok: false, error: error.message }
   }
+  return { ok: true, jobId: (data as any).id }
+}
+
+/** Status de um job de importação (para a UI acompanhar). */
+export async function statusImportacaoCurseduca(jobId: string): Promise<{ ok: boolean; status?: string; resultado?: ResultadoImportCurseduca | null; erro?: string | null; error?: string }> {
+  if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const { data } = await svc.from('simulado_curseduca_jobs').select('status, resultado, erro').eq('id', jobId).eq('tenant_id', access.tenantId).maybeSingle()
+  if (!data) return { ok: false, error: 'Job não encontrado.' }
+  const d = data as any
+  return { ok: true, status: d.status, resultado: d.resultado ?? null, erro: d.erro ?? null }
+}
+
+// ── Sincronização automática (regras de polling) ────────────────────────────
+export type RegraSyncDTO = {
+  id: string; grupos: number[]; destino: DestinoImport; sincronizar: boolean; intervalo_min: number
+  ativo: boolean; ultima_execucao: string | null; ultimo_resultado: ResultadoImportCurseduca | null; grupoDestinoNome: string | null
+}
+const INTERVALOS_OK = new Set([15, 30, 60, 120, 240])
+
+/** Lista as regras de sincronização automática do tenant (com nome do grupo de destino). */
+export async function listarRegrasSync(): Promise<{ ok: boolean; error?: string; regras?: RegraSyncDTO[] }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  try {
+    const { data } = await svc.from('simulado_curseduca_sync').select('id, grupos, destino, sincronizar, intervalo_min, ativo, ultima_execucao, ultimo_resultado').eq('tenant_id', access.tenantId).order('created_at', { ascending: false })
+    const rows = (data ?? []) as any[]
+    const gids = [...new Set(rows.map((r) => r.destino?.grupoId).filter(Boolean))]
+    const nomes = new Map<string, string>()
+    if (gids.length) {
+      const { data: gs } = await svc.from('simulado_grupos').select('id, nome').in('id', gids)
+      for (const g of gs ?? []) nomes.set((g as any).id, (g as any).nome)
+    }
+    const regras: RegraSyncDTO[] = rows.map((r) => ({
+      id: r.id, grupos: r.grupos ?? [], destino: r.destino ?? { tipo: 'nenhum' }, sincronizar: !!r.sincronizar,
+      intervalo_min: r.intervalo_min ?? 30, ativo: !!r.ativo, ultima_execucao: r.ultima_execucao ?? null,
+      ultimo_resultado: r.ultimo_resultado ?? null, grupoDestinoNome: r.destino?.grupoId ? (nomes.get(r.destino.grupoId) ?? null) : null,
+    }))
+    return { ok: true, regras }
+  } catch {
+    return { ok: false, error: 'Rode a migration da tabela simulado_curseduca_sync (SQL fornecido).' }
+  }
+}
+
+/** Cria uma regra de sincronização automática. */
+export async function criarRegraSync(grupos: number[], destino: DestinoImport, sincronizar: boolean, intervaloMin: number): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  if (!grupos?.length) return { ok: false, error: 'Selecione ao menos um grupo.' }
+  if (destino.tipo === 'novo') return { ok: false, error: 'Sincronização automática só aceita destino “nenhum” ou grupo existente (não criar novo a cada ciclo).' }
+  const intervalo = INTERVALOS_OK.has(intervaloMin) ? intervaloMin : 30
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_curseduca_sync').insert({
+    tenant_id: g.tenantId, grupos, destino: { tipo: destino.tipo, grupoId: destino.grupoId }, sincronizar: destino.tipo === 'existente' && sincronizar,
+    intervalo_min: intervalo, ativo: true, criado_por: g.userId ?? null,
+  })
+  if (error) {
+    if (/relation|does not exist|schema cache|column/i.test(error.message)) return { ok: false, error: 'Rode a migration da tabela simulado_curseduca_sync (SQL fornecido).' }
+    return { ok: false, error: error.message }
+  }
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_curseduca_sync', depois: { grupos, destino, intervalo } })
+  revalidatePath('/admin/curseduca/sincronizacao')
+  return { ok: true }
+}
+
+export async function toggleRegraSync(id: string, ativo: boolean): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_curseduca_sync').update({ ativo }).eq('id', id).eq('tenant_id', access.tenantId)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/admin/curseduca/sincronizacao')
+  return { ok: true }
+}
+
+export async function excluirRegraSync(id: string): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_curseduca_sync').delete().eq('id', id).eq('tenant_id', access.tenantId)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/admin/curseduca/sincronizacao')
+  return { ok: true }
+}
+
+/** Roda uma regra AGORA (manual), independentemente do intervalo. */
+export async function rodarRegraSyncAgora(id: string): Promise<{ ok: boolean; error?: string; resultado?: ResultadoImportCurseduca }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data } = await svc.from('simulado_curseduca_sync').select('grupos, destino, sincronizar').eq('id', id).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!data) return { ok: false, error: 'Regra não encontrada.' }
+  const r = data as any
+  const resultado = await executarImport({ tenantId: g.tenantId, cfg: g.cfg }, r.grupos ?? [], r.destino ?? { tipo: 'nenhum' }, !!r.sincronizar, Number.MAX_SAFE_INTEGER)
+  await svc.from('simulado_curseduca_sync').update({ ultima_execucao: new Date().toISOString(), ultimo_resultado: resultado }).eq('id', id).eq('tenant_id', g.tenantId)
+  revalidatePath('/admin/curseduca/sincronizacao'); revalidatePath('/admin/estudantes')
+  return { ok: true, resultado }
 }

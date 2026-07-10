@@ -48,27 +48,24 @@ workers.forEach((w) => {
 // então múltiplas réplicas do worker chamando em paralelo são seguras.
 const WEB_INTERNAL_URL = process.env.WEB_INTERNAL_URL
 const CRON_SECRET = process.env.CRON_SECRET
-async function tickEncerramento() {
+async function chamarCron(caminho: string, rotulo: string, relevante: (j: any) => boolean) {
   if (!WEB_INTERNAL_URL || !CRON_SECRET) return
   try {
-    const r = await fetch(`${WEB_INTERNAL_URL}/api/cron/encerrar-expirados`, {
-      method: 'POST',
-      headers: { 'x-cron-secret': CRON_SECRET },
-    })
-    if (!r.ok) console.error(`[cron encerramento] HTTP ${r.status}`)
-    else {
-      const j: any = await r.json().catch(() => null)
-      if (j && (j.sessoesEncerradas || j.simuladosEncerrados)) console.log('[cron encerramento]', j)
-    }
+    const r = await fetch(`${WEB_INTERNAL_URL}${caminho}`, { method: 'POST', headers: { 'x-cron-secret': CRON_SECRET } })
+    if (!r.ok) { console.error(`[${rotulo}] HTTP ${r.status}`); return }
+    const j: any = await r.json().catch(() => null)
+    if (j && relevante(j)) console.log(`[${rotulo}]`, j)
   } catch (e) {
-    console.error('[cron encerramento] erro:', (e as Error).message)
+    console.error(`[${rotulo}] erro:`, (e as Error).message)
   }
 }
 if (WEB_INTERNAL_URL && CRON_SECRET) {
-  setInterval(tickEncerramento, 60_000)
-  console.log('[cron encerramento] agendado a cada 60s')
+  setInterval(() => { void chamarCron('/api/cron/encerrar-expirados', 'cron encerramento', (j) => !!(j.sessoesEncerradas || j.simuladosEncerrados)) }, 60_000)
+  setInterval(() => { void chamarCron('/api/cron/curseduca-jobs', 'cron curseduca', (j) => !!j.processados) }, 60_000)
+  setInterval(() => { void chamarCron('/api/cron/curseduca-sync', 'cron curseduca-sync', (j) => !!j.rodadas) }, 60_000)
+  console.log('[cron] agendado a cada 60s: encerramento + import + sync Curseduca')
 } else {
-  console.warn('[cron encerramento] DESATIVADO — defina WEB_INTERNAL_URL e CRON_SECRET')
+  console.warn('[cron] DESATIVADO — defina WEB_INTERNAL_URL e CRON_SECRET')
 }
 
 process.on('SIGTERM', async () => {

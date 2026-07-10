@@ -25,6 +25,10 @@ services:
       - PDF_RENDER_SECRET=${PDF_RENDER_SECRET}
       - WEB_INTERNAL_URL=http://web:3000
       - CRON_SECRET=${CRON_SECRET}
+      # Criptografa em repouso os segredos no banco (credenciais Curseduca por tenant)
+      - APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY}
+      # Opcional: tenant que pode usar as credenciais Curseduca do .env (os demais usam o banco)
+      - CURSEDUCA_ENV_TENANT_ID=${CURSEDUCA_ENV_TENANT_ID}
     expose:
       - "3000"
     depends_on:

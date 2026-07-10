@@ -6,7 +6,8 @@ import { Search, Users, Loader2, DownloadCloud, Check, CheckCircle2, FolderPlus,
 import { cn } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { contarMembrosGrupos, contarTodosGrupos, importarGruposCurseduca, previewMembrosGrupo, type GrupoCurseducaDTO, type GrupoSistema, type ResultadoImportCurseduca, type MembroPreview } from '@/app/admin/curseduca/actions'
+import { contarMembrosGrupos, contarTodosGrupos, importarGruposCurseduca, agendarImportacaoCurseduca, statusImportacaoCurseduca, previewMembrosGrupo, type GrupoCurseducaDTO, type GrupoSistema, type MembroPreview } from '@/app/admin/curseduca/actions'
+import type { ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
 
 type Destino = 'nenhum' | 'existente' | 'novo'
 type Ordem = 'nome' | 'nome_desc' | 'id' | 'id_desc' | 'recentes'
@@ -32,6 +33,9 @@ export function CurseducaImport({ grupos, sistema }: { grupos: GrupoCurseducaDTO
   const [destino, setDestino] = useState<Destino>('nenhum')
   const [grupoId, setGrupoId] = useState('')
   const [nomeNovo, setNomeNovo] = useState('')
+  const [sincronizar, setSincronizar] = useState(false)
+  const [segundoPlano, setSegundoPlano] = useState(false)
+  const [jobStatus, setJobStatus] = useState<string | null>(null)
   const [importando, setImportando] = useState(false)
   const [res, setRes] = useState<ResultadoImportCurseduca | null>(null)
   const [verGrupo, setVerGrupo] = useState<GrupoCurseducaDTO | null>(null)
@@ -95,12 +99,34 @@ export function CurseducaImport({ grupos, sistema }: { grupos: GrupoCurseducaDTO
     if (!sel.size) return
     if (destino === 'existente' && !grupoId) { toast.error('Escolha o grupo de destino.'); return }
     if (destino === 'novo' && !nomeNovo.trim()) { toast.error('Informe o nome do novo grupo.'); return }
-    setImportando(true); setRes(null)
-    const r = await importarGruposCurseduca([...sel], { tipo: destino, grupoId: grupoId || undefined, nomeNovo: nomeNovo || undefined })
+    setImportando(true); setRes(null); setJobStatus(null)
+    const dest = { tipo: destino, grupoId: grupoId || undefined, nomeNovo: nomeNovo || undefined }
+    const sync = destino === 'existente' && sincronizar
+
+    if (segundoPlano) {
+      const ag = await agendarImportacaoCurseduca([...sel], dest, sync)
+      if (!ag.ok || !ag.jobId) { setImportando(false); toast.error(ag.error ?? 'Falha ao agendar.'); return }
+      toast.success('Importação agendada — rodando em segundo plano.')
+      setJobStatus('pendente')
+      // Poll do status até concluir/erro (o worker processa a cada ~60s).
+      const jobId = ag.jobId
+      const poll = async () => {
+        const s = await statusImportacaoCurseduca(jobId)
+        if (!s.ok) { setJobStatus(null); setImportando(false); toast.error(s.error ?? 'Falha no acompanhamento.'); return }
+        setJobStatus(s.status ?? null)
+        if (s.status === 'concluido') { setImportando(false); if (s.resultado) setRes(s.resultado); toast.success('Importação concluída.'); return }
+        if (s.status === 'erro') { setImportando(false); toast.error(s.erro ?? 'Falha na importação.'); return }
+        setTimeout(poll, 5000)
+      }
+      setTimeout(poll, 5000)
+      return
+    }
+
+    const r = await importarGruposCurseduca([...sel], dest, sync)
     setImportando(false)
     if (!r.ok) { toast.error(r.error ?? 'Falha na importação.'); return }
     setRes(r)
-    toast.success(`${r.novos ?? 0} novo(s) · ${r.jaExistiam ?? 0} já existia(m)${r.vinculados ? ` · ${r.vinculados} vinculado(s)` : ''}`)
+    toast.success(`${r.novos ?? 0} novo(s) · ${r.jaExistiam ?? 0} já existia(m)${r.vinculados ? ` · ${r.vinculados} vinculado(s)` : ''}${r.removidos ? ` · ${r.removidos} removido(s)` : ''}`)
   }
 
   const temFiltro = !!q || soSelecionados || ocultarDesatualizados
@@ -220,6 +246,15 @@ export function CurseducaImport({ grupos, sistema }: { grupos: GrupoCurseducaDTO
                 </SelectContent>
               </Select>
             )}
+            {destino === 'existente' && (
+              <label className="ml-7 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs">
+                <input type="checkbox" checked={sincronizar} onChange={(e) => setSincronizar(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border" />
+                <span>
+                  <b>Sincronizar</b> — remove do grupo quem veio da Curseduca e <b>saiu</b> dos grupos selecionados.
+                  <span className="block text-muted-foreground">Só desvincula do grupo (não apaga o aluno) e preserva quem foi adicionado manualmente.</span>
+                </span>
+              </label>
+            )}
             <Opcao ativo={destino === 'novo'} onClick={() => setDestino('novo')} icon={<FolderPlus className="h-4 w-4" />} titulo="Criar um novo grupo" desc="Cria um grupo daqui e vincula todos." />
             {destino === 'novo' && (
               <input value={nomeNovo} onChange={(e) => setNomeNovo(e.target.value)} placeholder="Nome do novo grupo"
@@ -228,9 +263,19 @@ export function CurseducaImport({ grupos, sistema }: { grupos: GrupoCurseducaDTO
           </div>
         </div>
 
+        <label className="flex items-start gap-2 px-1 text-xs">
+          <input type="checkbox" checked={segundoPlano} onChange={(e) => setSegundoPlano(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border" />
+          <span>
+            <b>Importar em segundo plano</b> — recomendado para grupos grandes (milhares).
+            <span className="block text-muted-foreground">Roda no servidor sem travar a tela; você pode sair e voltar.</span>
+          </span>
+        </label>
+
         <button type="button" onClick={importar} disabled={sel.size === 0 || importando}
           className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-violet-600 px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:shadow-primary/40 disabled:opacity-60 disabled:shadow-none">
-          {importando ? <><Loader2 className="h-4 w-4 animate-spin" /> Importando…</> : <><DownloadCloud className="h-4 w-4 transition-transform group-hover:translate-y-0.5" /> Importar membros</>}
+          {importando
+            ? <><Loader2 className="h-4 w-4 animate-spin" /> {jobStatus ? `Em segundo plano (${jobStatus})…` : 'Importando…'}</>
+            : <><DownloadCloud className="h-4 w-4 transition-transform group-hover:translate-y-0.5" /> Importar membros</>}
         </button>
 
         <p className="px-1 text-[11px] leading-snug text-muted-foreground">
@@ -246,6 +291,7 @@ export function CurseducaImport({ grupos, sistema }: { grupos: GrupoCurseducaDTO
               <li><b className="tabular-nums">{res.jaExistiam}</b> já existia(m) — não duplicado(s)</li>
               {!!res.atualizados && <li><b className="tabular-nums text-sky-600 dark:text-sky-400">{res.atualizados}</b> atualizado(s) (CPF/telefone/classificação)</li>}
               {res.grupoNome && <li><b className="tabular-nums">{res.vinculados}</b> vinculado(s) ao grupo “{res.grupoNome}”</li>}
+              {!!res.removidos && <li className="text-rose-600 dark:text-rose-400"><b className="tabular-nums">{res.removidos}</b> removido(s) do grupo (saíram na Curseduca)</li>}
               {!!res.semIdentificador && <li className="text-amber-600 dark:text-amber-400">{res.semIdentificador} sem e-mail (ignorado[s])</li>}
               {!!res.semDetalhe && <li className="text-amber-600 dark:text-amber-400">{res.semDetalhe} detalhe(s) falharam (CPF/telefone podem faltar — tente reimportar)</li>}
               {!!res.restante && <li className="text-sky-600 dark:text-sky-400">{res.restante} sem detalhe (limite por importação) — <b>reimporte o grupo</b> para completar CPF/telefone</li>}
