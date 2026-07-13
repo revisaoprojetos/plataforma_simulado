@@ -3,6 +3,9 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { assinarRenderToken } from '@/lib/pdf/render-token'
 import { enfileirarPdfCaderno } from '@/lib/queue/pdf-queue'
+import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
+import { dispararWebhook } from '@/lib/webhooks/dispatch'
+import { dadosProgressao } from '@/lib/webhooks/payload'
 
 export const runtime = 'nodejs'
 
@@ -73,12 +76,18 @@ export async function POST(request: NextRequest) {
     // Confere que a sessão é do tenant.
     const { data: sessao } = await svc
       .from('simulado_sessoes_prova')
-      .select('id, tenant_id')
+      .select('id, tenant_id, simulado_id, estudante_id')
       .eq('id', body.sessaoToken)
       .maybeSingle()
     if (!sessao || sessao.tenant_id !== access.tenantId) {
       return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
     }
+
+    // Engajamento: baixar o PDF do resultado conta como download do relatório do aluno.
+    await registrarRelatorioEvento(svc, {
+      tenantId: access.tenantId, simuladoId: sessao.simulado_id, estudanteId: sessao.estudante_id, sessaoId: sessao.id, tipo: 'baixou',
+    })
+    await dispararWebhook(access.tenantId, 'estudante.baixou_relatorio', await dadosProgressao(svc, sessao as any))
 
     url = `${WEB_INTERNAL}/imprimir/resultado/${body.sessaoToken}`
     referencia = body.sessaoToken

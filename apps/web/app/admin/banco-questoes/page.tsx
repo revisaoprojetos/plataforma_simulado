@@ -13,8 +13,8 @@ export default async function BancoQuestoesPage() {
   // Bancos com personalização (cor/ícone) — tolerante caso a migration ainda não tenha rodado.
   let bancos: any[] | null = null
   {
-    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome')
-    if (r.error && /cor|icone|capa_url|column/i.test(r.error.message)) {
+    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, tipo').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome')
+    if (r.error && /cor|icone|capa_url|tipo|column/i.test(r.error.message)) {
       const r2 = await svc.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome')
       bancos = r2.data
     } else bancos = r.data
@@ -31,15 +31,15 @@ export default async function BancoQuestoesPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Banco de Questões</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Banco de Simulado</h1>
           <p className="text-muted-foreground">
-            Crie bancos para organizar suas questões. Uma questão pode estar em vários bancos.
+            Monte e organize seus simulados: disciplinas/conteúdo, questões, estudantes e cadernos. Depois é só selecionar o banco pronto na Aplicação de Simulado.
           </p>
         </div>
         <NovoBancoForm />
       </div>
 
-      <BancosGrid bancos={lista.map((b: any) => ({ id: b.id, nome: b.nome, total: contagem.get(b.id) ?? 0, cor: b.cor ?? null, icone: b.icone ?? null, capa: b.capa_url ?? null }))} />
+      <BancosGrid bancos={lista.map((b: any) => ({ id: b.id, nome: b.nome, total: contagem.get(b.id) ?? 0, cor: b.cor ?? null, icone: b.icone ?? null, capa: b.capa_url ?? null, tipo: b.tipo ?? null }))} />
     </div>
   )
 }

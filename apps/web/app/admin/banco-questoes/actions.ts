@@ -18,21 +18,26 @@ async function guard() {
 }
 
 /** Cria um banco (pasta) de questões. */
-export async function criarBanco(nome: string): Promise<{ ok: boolean; id?: string; error?: string }> {
+export async function criarBanco(nome: string, tipo: string = 'objetiva'): Promise<{ ok: boolean; id?: string; error?: string }> {
   const g = await guard()
   if (!g.ok) return g
   const titulo = nome.trim()
   if (!titulo) return { ok: false, error: 'Informe um nome.' }
+  const tp = tipo === 'discursiva' ? 'discursiva' : 'objetiva'
 
   const svc = createAdminClient()
-  const { data, error } = await svc
+  let { data, error } = await svc
     .from('simulado_pastas')
-    .insert({ tenant_id: g.tenantId, nome: titulo })
+    .insert({ tenant_id: g.tenantId, nome: titulo, tipo: tp })
     .select('id')
     .single()
-  if (error) return { ok: false, error: error.message }
+  // Tolerante: se a coluna `tipo` ainda não foi migrada, cria sem ela.
+  if (error && /tipo|column/i.test(error.message)) {
+    ({ data, error } = await svc.from('simulado_pastas').insert({ tenant_id: g.tenantId, nome: titulo }).select('id').single())
+  }
+  if (error || !data) return { ok: false, error: error?.message ?? 'Erro ao criar' }
 
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_pastas', entidadeId: data.id, depois: { nome: titulo } })
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_pastas', entidadeId: data.id, depois: { nome: titulo, tipo: tp } })
   revalidatePath('/admin/banco-questoes')
   return { ok: true, id: data.id }
 }

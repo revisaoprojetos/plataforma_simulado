@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getTenantMensagem, getTenantContato, type TenantContato } from '@/lib/tenant-messages'
 import { rateLimit } from '@/lib/rate-limit'
+import { dispararWebhook } from '@/lib/webhooks/dispatch'
 
 interface RequestBody {
   embed_token?: string
@@ -234,6 +235,20 @@ export async function POST(request: NextRequest) {
     }
 
     sessaoId = novaSessao.id
+
+    // Notifica sistemas externos (webhooks/n8n): estudante iniciou o simulado.
+    await dispararWebhook(simulado.tenant_id, 'estudante.iniciou', {
+      contact: {
+        id: estudante.id,
+        name: estudante.nome ?? null,
+        email: (estudante as any).email ?? null,
+        doc: (estudante as any).cpf ?? null,
+        phone_number: (estudante as any).telefone ?? null,
+      },
+      simulado: { id: simulado.id, name: tituloSimulado },
+      sessao_id: sessaoId,
+      tentativa: tentativaNum,
+    })
   }
 
   return NextResponse.json({

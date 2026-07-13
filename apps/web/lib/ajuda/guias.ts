@@ -87,9 +87,9 @@ export const GUIAS: GuiaAjuda[] = [
     icone: Database,
     categoria: 'Simulados',
     rotas: ['/admin/simulados', '/admin/banco-questoes'],
-    link: { label: 'Ver Banco de Questões', href: '/admin/banco-questoes' },
+    link: { label: 'Ver Banco de Simulado', href: '/admin/banco-questoes' },
     passos: [
-      { titulo: 'As questões ficam no banco', texto: 'Primeiro, as questões precisam estar cadastradas no “Banco de Questões”. Elas ficam organizadas em bancos (que funcionam como pastas).', rota: '/admin/banco-questoes' },
+      { titulo: 'As questões ficam no banco', texto: 'Primeiro, as questões precisam estar cadastradas no “Banco de Simulado”. Elas ficam organizadas em bancos (que funcionam como pastas).', rota: '/admin/banco-questoes' },
       { titulo: 'Abra a prova na aba “Questões”', texto: 'Entre na prova e clique na aba “Questões”. Depois clique no botão “Adicionar Questões”.', rota: '/admin/simulados', alvo: { txt: 'Novo simulado' } },
       { titulo: 'Procure as questões', texto: 'Vai abrir uma janela com as questões disponíveis. Use a busca e os filtros (banco, matéria) para encontrar as que você quer.' },
       { titulo: 'Marque e adicione', texto: 'Selecione as questões desejadas e confirme. Elas entram na prova na hora.' },
@@ -119,9 +119,9 @@ export const GUIAS: GuiaAjuda[] = [
     icone: BookOpen,
     categoria: 'Conteúdo',
     rotas: ['/admin/banco-questoes'],
-    link: { label: 'Ir para Banco de Questões', href: '/admin/banco-questoes' },
+    link: { label: 'Ir para Banco de Simulado', href: '/admin/banco-questoes' },
     passos: [
-      { titulo: 'Abra o Banco de Questões', texto: 'Clique em “Simulado” → “Banco de Questões”. Pense em cada banco como uma pasta que junta questões do mesmo tema.', rota: '/admin/banco-questoes', alvo: { txt: 'Novo' } },
+      { titulo: 'Abra o Banco de Simulado', texto: 'Clique em “Simulado” → “Banco de Simulado”. Pense em cada banco como uma pasta que junta questões do mesmo tema.', rota: '/admin/banco-questoes', alvo: { txt: 'Novo' } },
       { titulo: 'Crie um banco', texto: 'Clique em “Novo banco”, dê um nome (ex.: “Direito Constitucional”) e salve.' },
       { titulo: 'Coloque questões dentro', texto: 'Abra o banco e adicione as questões que fazem parte dele.' },
       { titulo: 'Use na hora de montar a prova', texto: 'Ao criar uma prova, é só filtrar por esse banco para achar as questões rapidinho.' },

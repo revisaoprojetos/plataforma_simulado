@@ -23,13 +23,15 @@ function Tabs({
   )
 }
 
+// Estilo padronizado (igual ao tab do Webhook): sublinhado com cor primária no ativo.
 const tabsListVariants = cva(
-  "group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-muted-foreground group-data-horizontal/tabs:h-8 group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col data-[variant=line]:rounded-none",
+  "group/tabs-list inline-flex items-center text-muted-foreground",
   {
     variants: {
       variant: {
-        default: "bg-[var(--tab-bg,var(--muted))]",
-        line: "gap-1 bg-transparent",
+        default:
+          "w-full gap-5 border-b group-data-vertical/tabs:w-fit group-data-vertical/tabs:flex-col group-data-vertical/tabs:items-stretch group-data-vertical/tabs:gap-1 group-data-vertical/tabs:border-b-0 group-data-vertical/tabs:border-l",
+        line: "w-full gap-5 border-b",
       },
     },
     defaultVariants: {
@@ -41,15 +43,27 @@ const tabsListVariants = cva(
 function TabsList({
   className,
   variant = "default",
+  children,
   ...props
 }: TabsPrimitive.List.Props & VariantProps<typeof tabsListVariants>) {
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
       data-variant={variant}
-      className={cn(tabsListVariants({ variant }), className)}
+      className={cn("relative", tabsListVariants({ variant }), className)}
       {...props}
-    />
+    >
+      {children}
+      {/* Indicador que desliza suavemente entre os tabs (movimento). */}
+      <TabsPrimitive.Indicator
+        data-slot="tabs-indicator"
+        className={cn(
+          "pointer-events-none absolute rounded-full bg-primary transition-all duration-300 ease-out motion-reduce:transition-none",
+          "group-data-horizontal/tabs:bottom-[-1px] group-data-horizontal/tabs:left-0 group-data-horizontal/tabs:h-0.5 group-data-horizontal/tabs:w-[var(--active-tab-width)] group-data-horizontal/tabs:translate-x-[var(--active-tab-left)]",
+          "group-data-vertical/tabs:left-[-1px] group-data-vertical/tabs:top-0 group-data-vertical/tabs:w-0.5 group-data-vertical/tabs:h-[var(--active-tab-height)] group-data-vertical/tabs:translate-y-[var(--active-tab-top)]"
+        )}
+      />
+    </TabsPrimitive.List>
   )
 }
 
@@ -58,10 +72,9 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
     <TabsPrimitive.Tab
       data-slot="tabs-trigger"
       className={cn(
-        "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:bg-[color:var(--tab-active,var(--background))] hover:text-[color:var(--tab-active-foreground,var(--foreground))] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 aria-disabled:pointer-events-none aria-disabled:opacity-50 dark:text-muted-foreground dark:hover:text-[color:var(--tab-active-foreground,var(--foreground))] group-data-[variant=default]/tabs-list:data-active:shadow-sm group-data-[variant=line]/tabs-list:data-active:shadow-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:hover:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent",
-        "data-active:bg-[color:var(--tab-active,var(--background))] data-active:text-[color:var(--tab-active-foreground,var(--foreground))] dark:data-active:border-input dark:data-active:text-[color:var(--tab-active-foreground,var(--foreground))]",
-        "after:absolute after:bg-foreground after:opacity-0 after:transition-opacity group-data-horizontal/tabs:after:inset-x-0 group-data-horizontal/tabs:after:bottom-[-5px] group-data-horizontal/tabs:after:h-0.5 group-data-vertical/tabs:after:inset-y-0 group-data-vertical/tabs:after:-right-1 group-data-vertical/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-active:after:opacity-100",
+        "-mb-px inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 border-transparent pb-2.5 pt-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground data-active:text-primary focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50",
+        "group-data-vertical/tabs:w-full group-data-vertical/tabs:-ml-px group-data-vertical/tabs:justify-start group-data-vertical/tabs:border-b-0 group-data-vertical/tabs:border-l-2 group-data-vertical/tabs:pb-0 group-data-vertical/tabs:pt-0 group-data-vertical/tabs:pl-3",
+        "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
@@ -73,7 +86,11 @@ function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
   return (
     <TabsPrimitive.Panel
       data-slot="tabs-content"
-      className={cn("flex-1 text-sm outline-none", className)}
+      className={cn(
+        "flex-1 text-sm outline-none",
+        "data-active:animate-in data-active:fade-in-0 data-active:slide-in-from-bottom-1 data-active:duration-200 motion-reduce:animate-none",
+        className
+      )}
       {...props}
     />
   )

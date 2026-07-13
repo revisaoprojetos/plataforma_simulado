@@ -106,7 +106,7 @@ export function HistoricoEstudante({ rows, estudanteId, estudanteNome }: { rows:
                     {exp && (
                       <tr>
                         <td colSpan={8} className="bg-muted/20 px-3 pb-4 pt-2">
-                          <Detalhe r={r} />
+                          <DetalheSessao r={r} />
                         </td>
                       </tr>
                     )}
@@ -121,7 +121,7 @@ export function HistoricoEstudante({ rows, estudanteId, estudanteNome }: { rows:
   )
 }
 
-function Detalhe({ r }: { r: SessaoRow }) {
+export function DetalheSessao({ r }: { r: SessaoRow }) {
   const pct = r.tt > 0 ? Math.round((r.ac / r.tt) * 100) : 0
   return (
     <div className="animate-page space-y-3">

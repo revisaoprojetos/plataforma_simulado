@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
@@ -21,6 +21,10 @@ interface SimuladoData {
   status?: string
   /** Questões selecionadas (dos bancos) para já compor a prova na criação. */
   questaoIds?: string[]
+  /** Banco base (pasta) do qual herdar estudantes/config — o banco é o pré-preparatório. */
+  bancoBaseId?: string
+  /** Estudantes escolhidos manualmente para matricular (modo "criar do zero"). */
+  estudanteIds?: string[]
 }
 
 export async function createSimuladoAction(data: SimuladoData) {
@@ -42,7 +46,7 @@ export async function createSimuladoAction(data: SimuladoData) {
       tempo_limite_min: data.tempo_limite_min || null,
       metodo_identificacao: data.metodo_identificacao || null,
       embed_ativo: data.embed_ativo ?? false,
-      regras: data.regras ?? {},
+      regras: data.bancoBaseId ? { ...(data.regras ?? {}), banco_base_id: data.bancoBaseId } : (data.regras ?? {}),
       status: 'rascunho',
     })
     .select()
@@ -60,7 +64,28 @@ export async function createSimuladoAction(data: SimuladoData) {
     )
   }
 
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_simulados', entidadeId: simulado.id, depois: { ...simulado, questoes: ids.length } })
+  // Matricula os estudantes: herdados do banco base (pré-preparatório) + escolhidos manualmente.
+  let herdados = 0
+  const aMatricular = new Set<string>((data.estudanteIds ?? []).filter(Boolean))
+  if (data.bancoBaseId || aMatricular.size) {
+    const svc = await createServiceClient()
+    if (data.bancoBaseId) {
+      const { data: alunos } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', data.bancoBaseId).eq('tenant_id', tenantId)
+      for (const a of (alunos ?? []) as any[]) if (a.estudante_id) aMatricular.add(a.estudante_id)
+    }
+    const estIds = [...aMatricular]
+    if (estIds.length) {
+      const { data: ja } = await svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simulado.id).in('estudante_id', estIds)
+      const jaSet = new Set((ja ?? []).map((m: any) => m.estudante_id))
+      const novos = estIds.filter((e) => !jaSet.has(e))
+      if (novos.length) {
+        await svc.from('simulado_matriculas').insert(novos.map((estudante_id) => ({ tenant_id: tenantId, estudante_id, simulado_id: simulado.id, liberado: true })))
+        herdados = novos.length
+      }
+    }
+  }
+
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_simulados', entidadeId: simulado.id, depois: { ...simulado, questoes: ids.length, estudantes_matriculados: herdados } })
 
   revalidatePath('/admin/simulados')
   redirect(`/admin/simulados/${simulado.id}`)
@@ -172,16 +197,22 @@ export async function reabrirSimuladoAction(id: string) {
   revalidatePath('/admin/simulados')
 }
 
-/** Libera (ou bloqueia) manualmente o gabarito do simulado — grava regras.gabarito_liberado. */
-export async function liberarGabaritoAction(id: string, liberado: boolean) {
+/** Libera (ou bloqueia) manualmente um item do simulado (nota, gabarito ou caderno). */
+export async function liberarItemAction(id: string, item: 'nota' | 'gabarito' | 'caderno', liberado: boolean) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
+  const flag = { nota: 'nota_liberada', gabarito: 'gabarito_liberado', caderno: 'caderno_liberado' }[item]
   const supabase = await createClient()
   const { data: s } = await supabase.from('simulado_simulados').select('regras').eq('id', id).maybeSingle()
-  const regras = { ...(((s?.regras as Record<string, unknown>) ?? {})), gabarito_liberado: liberado }
+  const regras = { ...(((s?.regras as Record<string, unknown>) ?? {})), [flag]: liberado }
   await supabase.from('simulado_simulados').update({ regras }).eq('id', id)
-  await registrarAudit({ operacao: liberado ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_simulados', entidadeId: id, depois: { gabarito_liberado: liberado } })
+  await registrarAudit({ operacao: liberado ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_simulados', entidadeId: id, depois: { [flag]: liberado } })
   revalidatePath('/admin/simulados')
   revalidatePath(`/admin/simulados/${id}`)
+}
+
+/** Libera (ou bloqueia) manualmente o gabarito do simulado — grava regras.gabarito_liberado. */
+export async function liberarGabaritoAction(id: string, liberado: boolean) {
+  return liberarItemAction(id, 'gabarito', liberado)
 }
 
 export async function deleteSimuladoAction(id: string) {

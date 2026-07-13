@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { rankearSimulado } from '@/lib/ranking'
+import { dispararWebhook } from '@/lib/webhooks/dispatch'
+import { dadosProgressao } from '@/lib/webhooks/payload'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +21,7 @@ function autorizado(req: NextRequest): boolean {
 }
 
 type AnyClient = ReturnType<typeof createAdminClient>
-type SessaoMin = { id: string; simulado_id: string; tenant_id: string | null; iniciado_em?: string | null }
+type SessaoMin = { id: string; simulado_id: string; tenant_id: string | null; estudante_id?: string | null; iniciado_em?: string | null }
 
 async function totalValidas(svc: AnyClient, simuladoId: string, cache: Map<string, number>): Promise<number> {
   const cached = cache.get(simuladoId)
@@ -48,6 +50,11 @@ async function finalizarSessao(svc: AnyClient, s: SessaoMin, cache: Map<string, 
     .select('id')
   if (!upd?.length) return false
   await svc.from('simulado_sessao_eventos').insert({ tenant_id: s.tenant_id, sessao_id: s.id, tipo: 'auto_finalizou' })
+  // Notifica sistemas externos (webhooks/n8n): estudante não finalizou (auto-encerrado por tempo/janela).
+  if (s.estudante_id) {
+    await dispararWebhook(s.tenant_id, 'estudante.nao_finalizou',
+      await dadosProgressao(svc as any, { id: s.id, simulado_id: s.simulado_id, estudante_id: s.estudante_id }, { nota, motivo: 'auto_encerramento' }))
+  }
   return true
 }
 
@@ -70,7 +77,7 @@ async function processar() {
   for (const sim of (sims ?? []) as any[]) {
     const { data: sess } = await svc
       .from('simulado_sessoes_prova')
-      .select('id, simulado_id, tenant_id')
+      .select('id, simulado_id, tenant_id, estudante_id')
       .eq('simulado_id', sim.id)
       .eq('status', 'em_andamento')
       .eq('deletado', false)
@@ -89,7 +96,7 @@ async function processar() {
   // 2) Sessões em andamento com tempo individual (ou data_fim) estourado — qualquer modo.
   const { data: emAndamento } = await svc
     .from('simulado_sessoes_prova')
-    .select('id, simulado_id, tenant_id, iniciado_em')
+    .select('id, simulado_id, tenant_id, estudante_id, iniciado_em')
     .eq('status', 'em_andamento')
     .eq('deletado', false)
     .limit(5000)

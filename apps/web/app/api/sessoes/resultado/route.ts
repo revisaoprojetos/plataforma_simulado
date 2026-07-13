@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
+import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
+import { dispararWebhook } from '@/lib/webhooks/dispatch'
+import { dadosProgressao } from '@/lib/webhooks/payload'
+import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 
 // GET /api/sessoes/resultado?st={sessao_id}
 // Dados da central de revisão: resumo + questões com resposta do aluno.
@@ -13,10 +17,19 @@ export async function GET(request: NextRequest) {
 
   const { data: sessao } = await supabase
     .from('simulado_sessoes_prova')
-    .select('id, simulado_id, status, nota, posicao_ranking, iniciado_em, finalizado_em, estudante_id')
+    .select('id, tenant_id, simulado_id, status, nota, posicao_ranking, iniciado_em, finalizado_em, estudante_id')
     .eq('id', st)
     .maybeSingle()
   if (!sessao) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+
+  // Engajamento: registra a visualização do relatório (só quando já finalizado).
+  if (sessao.status === 'finalizada' && sessao.tenant_id) {
+    const admin = createAdminClient()
+    await registrarRelatorioEvento(admin, {
+      tenantId: sessao.tenant_id, simuladoId: sessao.simulado_id, estudanteId: sessao.estudante_id, sessaoId: sessao.id, tipo: 'visualizou',
+    })
+    await dispararWebhook(sessao.tenant_id, 'estudante.visualizou_relatorio', await dadosProgressao(admin, sessao as any))
+  }
 
   // Total de participantes (alunos distintos finalizados, exceto testes) — contexto do ranking.
   const { data: participantes } = await supabase
@@ -34,17 +47,14 @@ export async function GET(request: NextRequest) {
     .eq('id', sessao.simulado_id)
     .single()
 
-  const regras = (simulado?.regras as { liberar_gabarito?: string; gabarito_liberado?: boolean }) ?? {}
-  const liberar = regras.liberar_gabarito ?? 'apos_janela'
-  const agora = new Date()
-  let gabaritoLiberado = false
-  if (regras.gabarito_liberado) gabaritoLiberado = true // liberação manual (qualquer modo)
-  else if (liberar === 'imediato') gabaritoLiberado = true
-  else if (liberar === 'apos_janela') {
-    gabaritoLiberado =
-      simulado?.status === 'encerrado' ||
-      (!!simulado?.data_fim && new Date(simulado.data_fim) < agora)
+  // Classificação do aluno (para o público do caderno: todos | só passaporte).
+  let classificacao: string | null = null
+  if (sessao.estudante_id) {
+    const { data: est } = await supabase.from('simulado_estudantes').select('classificacao').eq('id', sessao.estudante_id).maybeSingle()
+    classificacao = (est as any)?.classificacao ?? null
   }
+  const liberacoes = resolverLiberacoes(simulado?.regras as any, simulado ?? {}, { classificacao })
+  const gabaritoLiberado = liberacoes.gabaritoLiberado
 
   const { data: sq } = await supabase
     .from('simulado_prova_questoes')
@@ -198,6 +208,8 @@ export async function GET(request: NextRequest) {
     total_participantes: totalParticipantes ?? 0,
     stats_por_disciplina: statsPorDisciplina,
     gabarito_liberado: gabaritoLiberado,
+    nota_liberada: liberacoes.notaLiberada,
+    caderno_liberado: liberacoes.cadernoParaAluno,
     questoes,
   })
 }

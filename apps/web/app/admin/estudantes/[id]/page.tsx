@@ -7,7 +7,10 @@ import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { ArrowLeft, Mail, Phone, IdCard, Calendar, FolderOpen, User, ListChecks, ClipboardList, FileText, FileCheck2, Star, Trophy, Target, GraduationCap, Hash } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { HistoricoEstudante, type SessaoRow } from '@/components/admin/historico-estudante'
+import { type SessaoRow } from '@/components/admin/historico-estudante'
+import { SimuladosFeitosCards } from '@/components/admin/simulados-feitos-cards'
+import { HistoricoSimples } from '@/components/admin/historico-simples'
+import { BancosVinculadosPopup } from '@/components/admin/bancos-vinculados-popup'
 import { EditarEstudanteButton } from '@/components/admin/editar-estudante-button'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
@@ -97,6 +100,7 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
   const tipoSimPorSim = new Map<string, TipoSimulado | null>()  // objetiva/discursiva/mista
   const pastaPorSim = new Map<string, string>()                 // banco que mais cobre o simulado
   const gruposPorPasta = new Map<string, GrupoBanco[]>()        // grupos de disciplinas por banco
+  const visualPorPasta = new Map<string, { cor: string | null; icone: string | null; capa: string | null }>() // capa/cor/ícone do banco
   if (simIds.length) {
     const { data: pq } = await svc.from('simulado_prova_questoes').select('simulado_id, questao_id').in('simulado_id', simIds)
     const qPorSim = new Map<string, string[]>()
@@ -137,6 +141,11 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
       if (pastasUsadas.length) {
         const { data: gRows, error: gErr } = await svc.from('simulado_pastas').select('id, grupos').in('id', pastasUsadas)
         if (!gErr) for (const p of gRows ?? []) if (Array.isArray((p as any).grupos)) gruposPorPasta.set((p as any).id, (p as any).grupos)
+        // Visual do banco (capa/cor/ícone) — para os cards de simulado feito ficarem iguais ao do banco.
+        try {
+          const { data: vRows } = await svc.from('simulado_pastas').select('id, cor, icone, capa_url').in('id', pastasUsadas)
+          for (const p of vRows ?? []) visualPorPasta.set((p as any).id, { cor: (p as any).cor ?? null, icone: (p as any).icone ?? null, capa: (p as any).capa_url ?? null })
+        } catch { /* colunas de personalização podem não existir */ }
       }
     }
   }
@@ -165,6 +174,13 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
     const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, status').in('id', pendentesIds).eq('deletado', false)
     pendentes = (sims ?? []).map((s: any) => ({ id: s.id, titulo: s.titulo, status: s.status, expira: atribuidos.get(s.id) ?? null, iniciado: emAndamentoSimIds.has(s.id) }))
       .sort((a, b) => Number(b.iniciado) - Number(a.iniciado))
+  }
+
+  // Visual do banco (capa/cor/ícone) por simulado — usado no card de "simulado feito".
+  const visualPorSim: Record<string, { cor: string | null; icone: string | null; capa: string | null; bancoId: string | null }> = {}
+  for (const [sim, pid] of pastaPorSim) {
+    const v = visualPorPasta.get(pid)
+    visualPorSim[sim] = { cor: v?.cor ?? null, icone: v?.icone ?? null, capa: v?.capa ?? null, bancoId: pid }
   }
 
   // ── Breakdown por disciplina + tempo, por sessão (detalhe expansível) ──
@@ -214,61 +230,66 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
       <div className="min-w-0"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p><p className="truncate text-sm font-medium">{value}</p></div>
     </div>
   )
-  const Stat = ({ icon: Icon, label, value, tone }: { icon: any; label: string; value: React.ReactNode; tone?: string }) => (
-    <div className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-5 w-5" /></span>
-      <div className="min-w-0">
-        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className={cn('text-xl font-bold leading-tight', tone)}>{value}</p>
+  const Kpi = ({ icon: Icon, label, value, tone, chip }: { icon: any; label: string; value: React.ReactNode; tone?: string; chip: string }) => (
+    <div className="group relative overflow-hidden rounded-2xl border bg-card/70 p-4 shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-md">
+      <div className="relative flex items-center gap-3">
+        <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', chip)}><Icon className="h-5 w-5" /></span>
+        <div className="min-w-0">
+          <p className={cn('text-2xl font-extrabold leading-none tracking-tight tabular-nums', tone)}>{value}</p>
+          <p className="mt-1 truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+        </div>
       </div>
     </div>
   )
 
   return (
     <div className="animate-page space-y-5">
-      {/* HERO */}
-      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <div className="flex flex-wrap items-center gap-4 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-5">
-          <Link href="/admin/estudantes" className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'shrink-0')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary text-xl font-bold text-primary-foreground shadow-sm">
-            {iniciais || <User className="h-7 w-7" />}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-2xl font-bold tracking-tight">{est.nome}</h1>
-              <ClassificacaoBadge classificacao={est.classificacao} className="text-[11px]" />
+      {/* HERO com destaque */}
+      <div className="relative overflow-hidden rounded-3xl border bg-card shadow-sm">
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent" />
+        <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-primary/25 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-28 left-1/4 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative p-5 sm:p-6">
+          <div className="flex flex-wrap items-center gap-4">
+            <Link href="/admin/estudantes" className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'shrink-0')}>
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+            <div className="relative shrink-0">
+              <div aria-hidden className="absolute -inset-1 rounded-[1.4rem] bg-gradient-to-br from-primary to-primary/30 opacity-70 blur-[6px]" />
+              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-2xl font-bold text-primary-foreground ring-2 ring-background sm:h-20 sm:w-20">
+                {iniciais || <User className="h-8 w-8" />}
+              </div>
             </div>
-            <p className="truncate text-muted-foreground">{est.email}</p>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <Badge variant="secondary" className="gap-1"><GraduationCap className="h-3 w-3" /> {classLabel}</Badge>
-              {est.cpf && <Badge variant="outline" className="gap-1"><IdCard className="h-3 w-3" /> {est.cpf}</Badge>}
-              <span className="text-xs text-muted-foreground">Cadastrado em {fmtData(est.created_at)}</span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="truncate text-2xl font-bold tracking-tight sm:text-3xl">{est.nome}</h1>
+                <ClassificacaoBadge classificacao={est.classificacao} className="text-[11px]" />
+              </div>
+              <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-muted-foreground"><Mail className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{est.email}</span></p>
+            </div>
+            <div className="ml-auto shrink-0">
+              <EditarEstudanteButton estudante={{ id: est.id, nome: est.nome, email: est.email, cpf: est.cpf, telefone: est.telefone, data_nascimento: est.data_nascimento, classificacao: est.classificacao, matricula_externa: est.matricula_externa, created_at: est.created_at }} />
             </div>
           </div>
-          <div className="ml-auto shrink-0">
-            <EditarEstudanteButton estudante={{ id: est.id, nome: est.nome, email: est.email, cpf: est.cpf, telefone: est.telefone, data_nascimento: est.data_nascimento, classificacao: est.classificacao, matricula_externa: est.matricula_externa, created_at: est.created_at }} />
+
+          {/* KPIs em destaque */}
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Kpi icon={ListChecks} label="Simulados feitos" value={reais.length} chip="bg-indigo-500/15 text-indigo-600 dark:text-indigo-400" tone="text-indigo-600 dark:text-indigo-400" />
+            <Kpi icon={Star} label="Nota média" value={notaMedia != null ? notaMedia.toFixed(1) : '—'} chip="bg-violet-500/15 text-violet-600 dark:text-violet-400" tone={notaMedia != null ? notaTone(notaMedia) : undefined} />
+            <Kpi icon={Trophy} label="Melhor nota" value={melhorNota != null ? melhorNota.toFixed(1) : '—'} chip="bg-amber-500/15 text-amber-600 dark:text-amber-400" tone={melhorNota != null ? notaTone(melhorNota) : undefined} />
+            <Kpi icon={Target} label="Acerto médio" value={acertoMedio != null ? `${acertoMedio}%` : '—'} chip="bg-sky-500/15 text-sky-600 dark:text-sky-400" tone="text-sky-600 dark:text-sky-400" />
           </div>
         </div>
       </div>
 
-      {/* MÉTRICAS */}
-      <div className="stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat icon={ListChecks} label="Simulados feitos" value={reais.length} />
-        <Stat icon={Star} label="Nota média" value={notaMedia != null ? notaMedia.toFixed(1) : '—'} tone={notaMedia != null ? notaTone(notaMedia) : undefined} />
-        <Stat icon={Trophy} label="Melhor nota" value={melhorNota != null ? melhorNota.toFixed(1) : '—'} tone={melhorNota != null ? notaTone(melhorNota) : undefined} />
-        <Stat icon={Target} label="Acerto médio" value={acertoMedio != null ? `${acertoMedio}%` : '—'} />
-      </div>
-
       {/* SIMULADOS PENDENTES (atribuídos por matrícula/acesso, ainda não concluídos) */}
       {pendentes.length > 0 && (
-        <Card>
-          <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+        <Card className="overflow-hidden border-amber-500/30">
+          <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b border-amber-500/20 bg-amber-500/5">
             <CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4 text-amber-500" /> Simulados pendentes ({pendentes.length})</CardTitle>
             <span className="hidden text-xs text-muted-foreground sm:block">Atribuídos por matrícula/acesso e ainda não concluídos</span>
           </CardHeader>
-          <CardContent className="grid gap-2 sm:grid-cols-2">
+          <CardContent className="grid gap-2 pt-4 sm:grid-cols-2">
             {pendentes.map((p) => (
               <Link key={p.id} href={`/admin/simulados/${p.id}`} className="flex items-center gap-3 rounded-xl border p-3 transition hover:border-primary hover:bg-primary/5">
                 <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', p.iniciado ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-muted text-muted-foreground')}>
@@ -286,40 +307,32 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
         </Card>
       )}
 
-      {/* INFO + BANCOS */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader><CardTitle className="text-base">Informações</CardTitle></CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
-            <Info icon={Mail} label="E-mail" value={est.email ?? '—'} />
-            <Info icon={Phone} label="Telefone" value={est.telefone ?? '—'} />
-            <Info icon={IdCard} label="CPF" value={est.cpf ?? '—'} />
-            <Info icon={Calendar} label="Nascimento" value={fmtData(est.data_nascimento)} />
-            <Info icon={Hash} label="Matrícula externa" value={est.matricula_externa ?? '—'} />
-            <Info icon={GraduationCap} label="Classificação" value={classLabel} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-base">Bancos vinculados ({bancos.length})</CardTitle></CardHeader>
-          <CardContent>
-            {bancos.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Não vinculado a nenhum banco.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {bancos.map((b) => (
-                  <Link key={b.id} href={`/admin/banco-questoes/${b.id}`}
-                    className="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 px-3 py-1 text-sm transition-colors hover:border-primary hover:bg-primary/5">
-                    <FolderOpen className="h-3.5 w-3.5 text-primary" /> {b.nome}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* Conteúdo: esquerda (Informações + Simulados feitos) | direita (Bancos + Histórico) */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0 space-y-5">
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary"><User className="h-4 w-4" /></span> Informações</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Info icon={Mail} label="E-mail" value={est.email ?? '—'} />
+              <Info icon={Phone} label="Telefone" value={est.telefone ?? '—'} />
+              <Info icon={IdCard} label="CPF" value={est.cpf ?? '—'} />
+              <Info icon={Calendar} label="Nascimento" value={fmtData(est.data_nascimento)} />
+              <Info icon={Hash} label="Matrícula externa" value={est.matricula_externa ?? '—'} />
+              <Info icon={GraduationCap} label="Classificação" value={classLabel} />
+            </CardContent>
+          </Card>
 
-      {/* HISTÓRICO (client: busca + rolagem + expandir) */}
-      <HistoricoEstudante rows={rows} estudanteId={id} estudanteNome={est.nome} />
+          {rows.length > 0
+            ? <SimuladosFeitosCards rows={rows} estudanteId={id} estudanteNome={est.nome} visuais={visualPorSim} sempreAberto />
+            : <div className="rounded-2xl border bg-card p-8 text-center text-sm text-muted-foreground">Nenhum simulado realizado ainda.</div>}
+        </div>
+        <div className="space-y-4">
+          <BancosVinculadosPopup bancos={bancos} />
+          <HistoricoSimples rows={rows} estudanteId={id} />
+        </div>
+      </div>
     </div>
   )
 }

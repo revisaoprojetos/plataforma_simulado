@@ -32,6 +32,8 @@ import {
   Trophy,
   HelpCircle,
   DownloadCloud,
+  Webhook,
+  Share2,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -84,7 +86,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Aplicação de Simulado', href: '/admin/simulados', icon: ClipboardList, perm: 'simulados:view' },
       { label: 'Questões', href: '/admin/questoes', icon: BookOpen, perm: 'questoes:view' },
-      { label: 'Banco de Questões', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
+      { label: 'Banco de Simulado', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
       { label: 'Correção (discursivas)', href: '/admin/correcao', icon: PenLine, perm: 'questoes:view' },
       { label: 'Cadernos de Prova', href: '/admin/cadernos', icon: FileText, perm: 'questoes:view' },
     ],
@@ -96,7 +98,14 @@ const navGroups: NavGroup[] = [
       { label: 'Estudantes', href: '/admin/estudantes', icon: Users, perm: 'estudantes:view' },
       { label: 'Grupos', href: '/admin/grupos', icon: UsersRound, perm: 'grupos:view' },
       { label: 'Matrículas', href: '/admin/matriculas', icon: CreditCard, perm: 'matriculas:view' },
+    ],
+  },
+  {
+    label: 'Conexões',
+    icon: Share2,
+    items: [
       { label: 'Curseduca', href: '/admin/curseduca', icon: DownloadCloud, perm: 'estudantes:create' },
+      { label: 'Webhooks & n8n', href: '/admin/conexoes/webhooks', icon: Webhook, perm: 'estudantes:create' },
     ],
   },
   {

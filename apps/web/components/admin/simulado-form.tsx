@@ -42,7 +42,10 @@ const simuladoSchema = z.object({
       revisao_antes_enviar: z.boolean().optional(),
       retentativas: z.number().optional(),
       politica_nota: z.enum(['ultima', 'melhor', 'media']).optional(),
+      liberar_nota: z.enum(['imediato', 'apos_janela', 'manual']).optional(),
       liberar_gabarito: z.enum(['imediato', 'apos_janela', 'manual']).optional(),
+      liberar_caderno: z.enum(['imediato', 'apos_janela', 'manual']).optional(),
+      caderno_publico: z.enum(['todos', 'passaporte']).optional(),
       iniciar_atrasado: z.boolean().optional(),
       politica_anulacao: z.enum(['pontua_todos', 'desconsidera']).optional(),
     })
@@ -76,7 +79,10 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
         revisao_antes_enviar: true,
         retentativas: 1,
         politica_nota: 'ultima',
+        liberar_nota: 'imediato',
         liberar_gabarito: 'apos_janela',
+        liberar_caderno: 'apos_janela',
+        caderno_publico: 'todos',
         iniciar_atrasado: false,
         politica_anulacao: 'pontua_todos',
       },
@@ -275,21 +281,60 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
             </AccordionItem>
 
             <AccordionItem value="gabarito">
-              <AccordionTrigger>Gabarito e Resultados</AccordionTrigger>
+              <AccordionTrigger>Liberações (nota, gabarito e caderno)</AccordionTrigger>
               <AccordionContent className="space-y-3">
                 <div className="space-y-2">
-                  <Label>Liberação de Gabarito</Label>
+                  <Label>Liberação da nota / desempenho</Label>
                   <Select
-                    defaultValue={initialData?.regras?.liberar_gabarito ?? 'apos_janela'}
-                    onValueChange={(v) => setValue('regras.liberar_gabarito', v as any)}
+                    defaultValue={initialData?.regras?.liberar_nota ?? 'imediato'}
+                    onValueChange={(v) => setValue('regras.liberar_nota', v as any)}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="imediato">Imediato (ao finalizar)</SelectItem>
                       <SelectItem value="apos_janela">Após encerramento da janela</SelectItem>
                       <SelectItem value="manual">Manual (admin libera)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Liberação de gabarito</Label>
+                  <Select
+                    defaultValue={initialData?.regras?.liberar_gabarito ?? 'apos_janela'}
+                    onValueChange={(v) => setValue('regras.liberar_gabarito', v as any)}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="imediato">Imediato (ao finalizar)</SelectItem>
+                      <SelectItem value="apos_janela">Após encerramento da janela</SelectItem>
+                      <SelectItem value="manual">Manual (admin libera)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Liberação do caderno (PDF)</Label>
+                  <Select
+                    defaultValue={initialData?.regras?.liberar_caderno ?? 'apos_janela'}
+                    onValueChange={(v) => setValue('regras.liberar_caderno', v as any)}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="imediato">Imediato (ao finalizar)</SelectItem>
+                      <SelectItem value="apos_janela">Após encerramento da janela</SelectItem>
+                      <SelectItem value="manual">Manual (admin libera)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Público do caderno</Label>
+                  <Select
+                    defaultValue={initialData?.regras?.caderno_publico ?? 'todos'}
+                    onValueChange={(v) => setValue('regras.caderno_publico', v as any)}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os alunos</SelectItem>
+                      <SelectItem value="passaporte">Só alunos passaporte</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

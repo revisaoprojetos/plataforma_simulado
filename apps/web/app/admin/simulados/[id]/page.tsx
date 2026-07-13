@@ -17,6 +17,7 @@ import { SimuladoCadernoLink } from '@/components/admin/simulado-caderno-link'
 import { SimuladoRelatorio } from '@/components/admin/simulado-relatorio'
 import { SimuladoRecorrecao } from '@/components/admin/simulado-recorrecao'
 import { SimuladoAcessos } from '@/components/admin/simulado-acessos'
+import { SimuladoLiberacoes } from '@/components/admin/simulado-liberacoes'
 import { CopyLink } from '@/components/admin/copy-link'
 import { updateSimuladoAction } from '../actions'
 import { format } from 'date-fns'
@@ -327,6 +328,23 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
                   <p className="text-sm text-muted-foreground">Token de acesso indisponível.</p>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Liberações para o aluno</CardTitle>
+              <CardDescription>
+                Controle o que cada aluno vê. Os modos vêm da configuração; aqui você libera ou bloqueia manualmente a qualquer momento.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SimuladoLiberacoes
+                simuladoId={id}
+                regras={simulado.regras as any}
+                status={simulado.status}
+                dataFim={simulado.data_fim}
+              />
             </CardContent>
           </Card>
         </TabsContent>

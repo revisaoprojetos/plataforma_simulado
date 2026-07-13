@@ -30,6 +30,8 @@ import {
   Unlock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { iconeBanco } from '@/lib/banco-visual'
+import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { abrirLinkTemado } from '@/lib/hud/abrir-temado'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -39,7 +41,7 @@ import {
   reabrirSimuladoAction,
   publishSimuladoAction,
   deleteSimuladoAction,
-  liberarGabaritoAction,
+  liberarItemAction,
 } from '@/app/admin/simulados/actions'
 
 export interface SimuladoCard {
@@ -52,9 +54,12 @@ export interface SimuladoCard {
   tempo_limite_min: number | null
   embed_token: string | null
   created_at: string
-  regras?: { gabarito_liberado?: boolean } | null
+  regras?: { nota_liberada?: boolean; gabarito_liberado?: boolean; caderno_liberado?: boolean } | null
   tipo?: TipoSimulado | null
+  vis?: { cor: string | null; icone: string | null; capa: string | null } | null
 }
+
+const tipoLabel = (t?: TipoSimulado | null) => (t === 'discursiva' ? 'Discursiva' : t === 'mista' ? 'Mista' : 'Objetiva')
 
 const modoLabel: Record<string, string> = {
   janela_fixa: 'Janela fixa',
@@ -106,19 +111,35 @@ const statusText: Record<string, string> = {
   encerrado: 'text-red-600 dark:text-red-400',
 }
 
+function SeloLib({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur" title={`${label} liberado(a) para os alunos`}>
+      <Unlock className="h-3 w-3" /> {label}
+    </span>
+  )
+}
+
 function CardItem({ s, appUrl }: { s: SimuladoCard; appUrl: string }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
-  const [gabLiberado, setGabLiberado] = useState(!!s.regras?.gabarito_liberado)
+  // Estado efetivo (modo configurado + override manual do admin).
+  const efetivo = resolverLiberacoes(s.regras, { status: s.status, data_fim: s.data_fim })
+  const [override, setOverride] = useState<Partial<Record<'nota' | 'gabarito' | 'caderno', boolean>>>({})
+  const estado = {
+    nota: override.nota ?? efetivo.notaLiberada,
+    gabarito: override.gabarito ?? efetivo.gabaritoLiberado,
+    caderno: override.caderno ?? efetivo.cadernoLiberado,
+  }
 
   const linkAcesso = s.embed_token ? `${appUrl}/aluno/login?token=${s.embed_token}` : null
 
-  function toggleGabarito() {
-    const novo = !gabLiberado
-    setGabLiberado(novo)
+  const rotulo = { nota: 'Nota/desempenho', gabarito: 'Gabarito', caderno: 'Caderno (PDF)' }
+  function toggleLib(item: 'nota' | 'gabarito' | 'caderno') {
+    const novo = !estado[item]
+    setOverride((p) => ({ ...p, [item]: novo }))
     startTransition(async () => {
-      await liberarGabaritoAction(s.id, novo)
-      toast.success(novo ? 'Gabarito liberado para os alunos' : 'Gabarito bloqueado')
+      await liberarItemAction(s.id, item, novo)
+      toast.success(`${rotulo[item]} ${novo ? 'liberado(a) para os alunos' : 'bloqueado(a)'}`)
       router.refresh()
     })
   }
@@ -151,107 +172,75 @@ function CardItem({ s, appUrl }: { s: SimuladoCard; appUrl: string }) {
     })
   }
 
+  const cor = s.vis?.cor ?? '#6d28d9'
+  const BancoIcon = iconeBanco(s.vis?.icone)
+  const capa = s.vis?.capa
+
   return (
-    <div className="group flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md">
-      {/* Capa estilo caderno (altura fixa) */}
-      <Link href={`/admin/simulados/${s.id}`} className="block">
-        <div className={cn('relative flex h-32 items-center justify-center overflow-hidden', coverClass[s.status] ?? coverClass.rascunho)}>
-          <div className="absolute left-2 top-0 bottom-0 flex flex-col justify-center gap-2.5">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <span key={i} className="h-2 w-2 rounded-full bg-black/25 ring-1 ring-white/20" />
-            ))}
+    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+      {/* Fundo: imagem do banco ou degradê da cor */}
+      {capa
+        ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+
+      {/* Link cobre o card (abaixo do kebab) */}
+      <Link href={`/admin/simulados/${s.id}`} className="absolute inset-0 z-10" aria-label={s.titulo} />
+
+      {/* Chip do ícone */}
+      <span className="pointer-events-none absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: cor }}>
+        <BancoIcon className="h-4 w-4" />
+      </span>
+
+      {/* Ações (kebab) */}
+      <div className="absolute right-2 top-2 z-30 rounded-lg bg-black/40 backdrop-blur [&_button:hover]:!bg-white/20 [&_button]:!text-white/90">
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/50" title="Mais ações">
+            <MoreHorizontal className="h-4 w-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52">
+            <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}`)}><Pencil className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}`)}><Trophy className="mr-2 h-4 w-4" /> Ranking</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={copiarLink}><Copy className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
+            <DropdownMenuItem onClick={abrirSimulado}><ExternalLink className="mr-2 h-4 w-4" /> Abrir simulado</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {s.status === 'publicado' && <DropdownMenuItem onClick={() => acao(encerrarSimuladoAction, 'Simulado encerrado')}><Square className="mr-2 h-4 w-4" /> Encerrar</DropdownMenuItem>}
+            {s.status === 'encerrado' && <DropdownMenuItem onClick={() => acao(reabrirSimuladoAction, 'Simulado reaberto')}><Play className="mr-2 h-4 w-4" /> Reabrir</DropdownMenuItem>}
+            {s.status === 'rascunho' && <DropdownMenuItem onClick={() => acao(publishSimuladoAction, 'Simulado publicado')}><Send className="mr-2 h-4 w-4" /> Publicar</DropdownMenuItem>}
+            {s.status !== 'rascunho' && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => toggleLib('nota')}>{estado.nota ? <Unlock className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />} {estado.nota ? 'Bloquear nota' : 'Liberar nota'}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => toggleLib('gabarito')}>{estado.gabarito ? <Unlock className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />} {estado.gabarito ? 'Bloquear gabarito' : 'Liberar gabarito'}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => toggleLib('caderno')}>{estado.caderno ? <Unlock className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />} {estado.caderno ? 'Bloquear caderno' : 'Liberar caderno'}</DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            <DropdownMenuItem onClick={excluir} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Rodapé */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
+        <span className="mb-1 inline-flex items-center gap-1 rounded-md bg-black/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/85 backdrop-blur">
+          <span className={cn('h-1.5 w-1.5 rounded-full', dotClass[s.status])} /> {statusLabel[s.status]}
+        </span>
+        <h3 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{s.titulo}</h3>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">{tipoLabel(s.tipo)}</span>
+          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">{modoLabel[s.modo_aplicacao] ?? s.modo_aplicacao}</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur"><Clock className="h-3 w-3" /> {formatDur(s.tempo_limite_min)}</span>
+        </div>
+        {(estado.nota || estado.gabarito || estado.caderno) && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {estado.nota && <SeloLib label="Nota" />}
+            {estado.gabarito && <SeloLib label="Gabarito" />}
+            {estado.caderno && <SeloLib label="Caderno" />}
           </div>
-          <span className="text-5xl font-extrabold tracking-widest text-white/30 select-none">
-            {iniciais(s.titulo)}
-          </span>
-          <span className={cn('absolute right-3 top-3 h-3 w-3 rounded-full ring-2 ring-white/50', dotClass[s.status])} />
-          <span className="absolute bottom-2 left-3 rounded-md bg-black/35 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white backdrop-blur-sm">
-            {modoLabel[s.modo_aplicacao] ?? s.modo_aplicacao}
-          </span>
-        </div>
-      </Link>
-
-      {/* Corpo padronizado */}
-      <div className="flex flex-1 flex-col p-3">
-        <div className="flex items-start justify-between gap-2">
-          <Link href={`/admin/simulados/${s.id}`} className="min-w-0 flex-1">
-            <h3 className="truncate font-semibold leading-tight hover:underline">{s.titulo}</h3>
-            {s.tipo && <div className="mt-1"><TipoSimuladoBadge tipo={s.tipo} /></div>}
-          </Link>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className="shrink-0 rounded-md p-1 text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              title="Mais ações"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}`)}>
-                <Pencil className="mr-2 h-4 w-4" /> Editar
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}`)}>
-                <Trophy className="mr-2 h-4 w-4" /> Ranking
-              </DropdownMenuItem>
-
-              <DropdownMenuSeparator />
-
-              <DropdownMenuItem onClick={copiarLink}>
-                <Copy className="mr-2 h-4 w-4" /> Copiar link
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={abrirSimulado}>
-                <ExternalLink className="mr-2 h-4 w-4" /> Abrir simulado
-              </DropdownMenuItem>
-
-              <DropdownMenuSeparator />
-
-              {s.status === 'publicado' && (
-                <DropdownMenuItem onClick={() => acao(encerrarSimuladoAction, 'Simulado encerrado')}>
-                  <Square className="mr-2 h-4 w-4" /> Encerrar
-                </DropdownMenuItem>
-              )}
-              {s.status === 'encerrado' && (
-                <DropdownMenuItem onClick={() => acao(reabrirSimuladoAction, 'Simulado reaberto')}>
-                  <Play className="mr-2 h-4 w-4" /> Reabrir
-                </DropdownMenuItem>
-              )}
-              {s.status === 'rascunho' && (
-                <DropdownMenuItem onClick={() => acao(publishSimuladoAction, 'Simulado publicado')}>
-                  <Send className="mr-2 h-4 w-4" /> Publicar
-                </DropdownMenuItem>
-              )}
-
-              <DropdownMenuItem onClick={excluir} className="text-destructive focus:text-destructive">
-                <Trash2 className="mr-2 h-4 w-4" /> Excluir
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        <p className={cn('mt-1 text-xs font-medium', statusText[s.status])}>{statusLabel[s.status]}</p>
-
-        {/* Liberar gabarito — só quando encerrado */}
-        {s.status === 'encerrado' && (
-          <button onClick={toggleGabarito} disabled={pending} title={gabLiberado ? 'Gabarito liberado para os alunos — clique para bloquear' : 'Liberar o gabarito para os alunos verem suas respostas'}
-            className={cn('mt-2 inline-flex items-center gap-1.5 self-start rounded-md border px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50',
-              gabLiberado ? 'border-green-500/60 bg-background text-green-700 dark:border-green-600/50 dark:text-green-400' : 'text-muted-foreground hover:border-primary hover:bg-primary/5 hover:text-foreground')}>
-            {gabLiberado ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-            {gabLiberado ? 'Gabarito liberado' : 'Liberar gabarito'}
-          </button>
         )}
-
-        {/* Rodapé sempre na base, formato único */}
-        <div className="mt-auto flex items-center gap-2 pt-3 text-[11px] whitespace-nowrap text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
-            {formatDur(s.tempo_limite_min)}
-          </span>
-          <span>·</span>
-          <span className="flex items-center gap-1">
-            <Calendar className="h-3.5 w-3.5" />
-            {formatData(s)}
-          </span>
-        </div>
       </div>
     </div>
   )

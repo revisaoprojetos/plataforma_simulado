@@ -6,6 +6,9 @@ import { resumosSimulados } from '../_resumos'
 import { RelatorioSimuladoView } from './relatorio-simulado-view'
 import { montarRelatorioSimulado } from './_dados'
 
+// Sempre renderiza com dados frescos (reflete matrículas/sessões recém-criadas).
+export const dynamic = 'force-dynamic'
+
 export default async function RelatorioSimuladoPage({ searchParams }: { searchParams: Promise<{ simulado?: string }> }) {
   const { simulado: simId } = await searchParams
   const svc = await createServiceClient()

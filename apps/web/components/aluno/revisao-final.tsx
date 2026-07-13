@@ -72,6 +72,8 @@ interface Resultado {
   total_participantes: number
   stats_por_disciplina: StatDisciplina[]
   gabarito_liberado: boolean
+  nota_liberada?: boolean
+  caderno_liberado?: boolean
   questoes: QuestaoRev[]
 }
 
@@ -178,7 +180,9 @@ export function RevisaoFinal({
     )
   }
 
-  const liberado = data?.gabarito_liberado ?? false
+  const liberado = data?.gabarito_liberado ?? false      // gabarito: revela a alternativa correta
+  const notaLiberada = data?.nota_liberada ?? false       // nota/desempenho: acertos, erros, média
+  const cadernoLiberado = data?.caderno_liberado ?? false // downloads de caderno/gabarito em PDF
   const qs = data?.questoes ?? []
   // Acerto efetivo por questão: na alt. trocada, mantém o ponto quem marcou a correta ANTES ou DEPOIS.
   const acertoEfetivo = (q: QuestaoRev): boolean | null => {
@@ -289,8 +293,8 @@ export function RevisaoFinal({
               <div><p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tempo utilizado</p><p className="text-sm font-semibold">{fmtDur(data?.iniciado_em, data?.finalizado_em)}</p></div>
             </div>
 
-            {liberado ? (
-              // Gabarito liberado: acertadas / erradas / em branco / média (cores editáveis)
+            {notaLiberada ? (
+              // Nota liberada: acertadas / erradas / em branco / média (cores editáveis)
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <div className="rounded-xl border p-3 text-center" style={cardStat(COR_ACERTO)}>
                   <CheckCircle2 className="mx-auto mb-1 h-4 w-4" style={{ color: COR_ACERTO }} />
@@ -329,15 +333,17 @@ export function RevisaoFinal({
               </div>
             )}
 
-            {/* Dois downloads lado a lado */}
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => baixarPdf('gabarito')} disabled={gerandoPdf.has('gabarito')} className={cn(BTN_CADERNO, 'disabled:opacity-60')} style={CADERNO_STYLE}>
-                {gerandoPdf.has('gabarito') ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileText className="mr-1.5 h-4 w-4" />} Caderno de gabarito PDF
-              </button>
-              <button type="button" onClick={() => baixarPdf('completo')} disabled={gerandoPdf.has('completo')} className={cn(BTN_CADERNO, 'disabled:opacity-60')} style={CADERNO_STYLE}>
-                {gerandoPdf.has('completo') ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileStack className="mr-1.5 h-4 w-4" />} Caderno completo PDF
-              </button>
-            </div>
+            {/* Dois downloads lado a lado — só quando o caderno está liberado para este aluno */}
+            {cadernoLiberado && (
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => baixarPdf('gabarito')} disabled={gerandoPdf.has('gabarito')} className={cn(BTN_CADERNO, 'disabled:opacity-60')} style={CADERNO_STYLE}>
+                  {gerandoPdf.has('gabarito') ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileText className="mr-1.5 h-4 w-4" />} Caderno de gabarito PDF
+                </button>
+                <button type="button" onClick={() => baixarPdf('completo')} disabled={gerandoPdf.has('completo')} className={cn(BTN_CADERNO, 'disabled:opacity-60')} style={CADERNO_STYLE}>
+                  {gerandoPdf.has('completo') ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileStack className="mr-1.5 h-4 w-4" />} Caderno completo PDF
+                </button>
+              </div>
+            )}
 
             {/* Voltar ao menu — logo abaixo dos downloads */}
             <a href={voltarUrl} className={BTN_VOLTAR} style={VOLTAR_STYLE}>

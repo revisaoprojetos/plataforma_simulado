@@ -9,23 +9,47 @@ export default async function NovoSimuladoPage() {
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
-  const [{ data: bancos }, { data: questoesRaw }, { data: vinculos }] = await Promise.all([
-    svc.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome'),
+  const [{ data: questoesRaw }, { data: vinculos }, { data: pastaEst }, { data: estudantesRaw }] = await Promise.all([
     svc.from('simulado_questoes')
       .select('id, enunciado, tipo, nivel_dificuldade, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)')
       .eq('tenant_id', tenantId ?? '')
       .order('created_at', { ascending: false })
       .limit(1000),
     svc.from('simulado_questao_pasta').select('questao_id, pasta_id').eq('tenant_id', tenantId ?? ''),
+    svc.from('simulado_pasta_estudantes').select('pasta_id, estudante_id').eq('tenant_id', tenantId ?? ''),
+    svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tenantId ?? '').order('nome'),
   ])
 
-  // Mapa questão -> bancos a que pertence.
+  // Bancos: tolerante à coluna `tipo` (migration pode não ter rodado).
+  let bancos: any[] | null = null
+  {
+    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, tipo').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome')
+    if (r.error && /tipo|column/i.test(r.error.message)) {
+      const r2 = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome')
+      bancos = r2.data
+    } else bancos = r.data
+  }
+
+  // Mapa questão -> bancos a que pertence + contagens por banco.
   const bancosPorQuestao = new Map<string, string[]>()
+  const qCount = new Map<string, number>()
   for (const v of vinculos ?? []) {
     const arr = bancosPorQuestao.get((v as any).questao_id) ?? []
     arr.push((v as any).pasta_id)
     bancosPorQuestao.set((v as any).questao_id, arr)
+    qCount.set((v as any).pasta_id, (qCount.get((v as any).pasta_id) ?? 0) + 1)
   }
+  const eCount = new Map<string, Set<string>>()
+  for (const pe of pastaEst ?? []) {
+    const s = eCount.get((pe as any).pasta_id) ?? new Set<string>()
+    if ((pe as any).estudante_id) s.add((pe as any).estudante_id)
+    eCount.set((pe as any).pasta_id, s)
+  }
+
+  const bancosDetalhe = (bancos ?? []).map((b: any) => ({
+    id: b.id, nome: b.nome, cor: b.cor ?? null, icone: b.icone ?? null, capa: b.capa_url ?? null, tipo: b.tipo ?? 'objetiva',
+    nQuestoes: qCount.get(b.id) ?? 0, nEstudantes: eCount.get(b.id)?.size ?? 0,
+  }))
 
   const questoes = (questoesRaw ?? []).map((q: any) => ({
     id: q.id,
@@ -37,6 +61,8 @@ export default async function NovoSimuladoPage() {
     bancoIds: bancosPorQuestao.get(q.id) ?? [],
   }))
 
+  const estudantes = (estudantesRaw ?? []).map((e: any) => ({ id: e.id, nome: e.nome ?? 'Estudante', email: e.email ?? null }))
+
   return (
     <div className="space-y-6">
       <div>
@@ -46,7 +72,7 @@ export default async function NovoSimuladoPage() {
         <h1 className="text-2xl font-bold tracking-tight">Novo Simulado</h1>
       </div>
 
-      <SimuladoWizard bancos={bancos ?? []} questoes={questoes} onSubmit={createSimuladoAction} />
+      <SimuladoWizard bancos={bancosDetalhe} questoes={questoes} estudantes={estudantes} onSubmit={createSimuladoAction} />
     </div>
   )
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { rankearSimulado } from '@/lib/ranking'
+import { dispararWebhook } from '@/lib/webhooks/dispatch'
+import { dadosProgressao } from '@/lib/webhooks/payload'
 
 // POST /api/sessoes/finalizar — finaliza a sessão e calcula a nota.
 export async function POST(request: NextRequest) {
@@ -20,7 +22,7 @@ export async function POST(request: NextRequest) {
 
   const { data: sessao } = await supabase
     .from('simulado_sessoes_prova')
-    .select('id, simulado_id, status')
+    .select('id, simulado_id, status, tenant_id, estudante_id')
     .eq('id', sessao_id)
     .maybeSingle()
 
@@ -51,12 +53,16 @@ export async function POST(request: NextRequest) {
       .eq('id', sessao_id)
 
     await supabase.from('simulado_sessao_eventos').insert({
-      tenant_id: (await supabase.from('simulado_sessoes_prova').select('tenant_id').eq('id', sessao_id).single()).data?.tenant_id,
+      tenant_id: sessao.tenant_id,
       sessao_id,
       tipo: 'finalizou',
     })
 
     await rankearSimulado(supabase, sessao.simulado_id)
+
+    // Notifica sistemas externos (webhooks/n8n): estudante finalizou.
+    await dispararWebhook(sessao.tenant_id, 'estudante.finalizou',
+      await dadosProgressao(supabase, sessao, { nota: Math.round(nota * 100) / 100, acertos, total: totalQ }))
   }
 
   // Posição final do aluno (após o recálculo).

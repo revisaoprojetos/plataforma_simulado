@@ -9,13 +9,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Palette, Trash2, Copy, ExternalLink, MoreVertical, Check, Loader2 } from 'lucide-react'
+import { Palette, Trash2, Copy, ExternalLink, MoreVertical, Check, Loader2, ListChecks, PenLine } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { excluirBanco, duplicarBanco } from '@/app/admin/banco-questoes/actions'
 import { iconeBanco } from '@/lib/banco-visual'
 
-export function BancoCard({ id, nome, total, cor, icone, capa }: { id: string; nome: string; total: number; cor?: string | null; icone?: string | null; capa?: string | null }) {
+export function BancoCard({ id, nome, total, cor, icone, capa, tipo }: { id: string; nome: string; total: number; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null }) {
   const [confirmar, setConfirmar] = useState(false)
   const [pending, start] = useTransition()
 
@@ -101,9 +101,14 @@ export function BancoCard({ id, nome, total, cor, icone, capa }: { id: string; n
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
         <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">Banco de questões</p>
         <h3 className="mt-0.5 line-clamp-2 text-lg font-bold leading-tight text-white drop-shadow-sm">{nome}</h3>
-        <span className="mt-2 inline-flex items-center rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur">
-          {total} {total === 1 ? 'questão' : 'questões'}
-        </span>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur">
+            {total} {total === 1 ? 'questão' : 'questões'}
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur">
+            {tipo === 'discursiva' ? <><PenLine className="h-3 w-3" /> Discursiva</> : <><ListChecks className="h-3 w-3" /> Objetiva</>}
+          </span>
+        </div>
       </div>
     </div>
   )
