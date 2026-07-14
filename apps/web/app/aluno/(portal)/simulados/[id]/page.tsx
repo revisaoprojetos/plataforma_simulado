@@ -8,6 +8,8 @@ import { montarComparativo } from '@/lib/simulado/comparativo'
 import { montarResultadoAluno, type SessaoInput } from '@/lib/simulado/resultado-aluno'
 import { montarDesempenhoAluno } from '@/lib/simulado/desempenho-aluno'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
+import { filtrarModsPorTipo, tiposDeSimulados } from '@/lib/simulado/tipo'
+import { mesclarModalidades } from '@/lib/caderno-designer/types'
 import { MeuSimuladoView } from '@/components/aluno/meu-simulado-view'
 
 const notaTone = (n: number) => (n >= 7 ? 'text-emerald-600 dark:text-emerald-400' : n >= 5 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
@@ -41,7 +43,14 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
   // Liberações independentes (nota / gabarito / caderno) — considerando a classificação do aluno.
   const { data: estRow } = await svc.from('simulado_estudantes').select('classificacao').eq('id', estId).maybeSingle()
   const { notaLiberada, gabaritoLiberado, cadernoParaAluno } = resolverLiberacoes(sim.regras as any, sim, { classificacao: (estRow as any)?.classificacao ?? null })
-  const cadernoId = ((sim.regras as any)?.caderno_id as string | undefined) ?? null
+  // Caderno do designer: direto em regras.caderno_id ou herdado do banco de simulado
+  // (banco_base_id → simulado_pastas.caderno_id).
+  let cadernoId = ((sim.regras as any)?.caderno_id as string | undefined) ?? null
+  const bancoBaseId = (sim.regras as any)?.banco_base_id as string | undefined
+  if (!cadernoId && bancoBaseId) {
+    const { data: banco } = await svc.from('simulado_pastas').select('caderno_id').eq('id', bancoBaseId).maybeSingle()
+    cadernoId = ((banco as any)?.caderno_id as string | undefined) ?? null
+  }
 
   const sessoesInput: SessaoInput[] = finalizadas.map((s) => ({
     id: s.id, tentativa_num: s.tentativa_num, nota: s.nota, iniciado_em: s.iniciado_em, finalizado_em: s.finalizado_em, posicao_ranking: s.posicao_ranking,
@@ -52,6 +61,19 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
     montarComparativo(svc, id, { minhaNota: melhor.nota != null ? Number(melhor.nota) : null, minhaSessaoId: melhor.id }),
     montarDesempenhoAluno(svc, estId),
   ])
+
+  // Modalidades do CADERNO DO DESIGNER (as que têm documento), filtradas pelo tipo do
+  // simulado. `temGabarito` = tem versão com correção (o Diagnóstico não tem).
+  const tipo = (await tiposDeSimulados(svc, [id])).get(id) ?? null
+  let modalidades: { id: string; nome: string; temGabarito: boolean }[] = []
+  if (cadernoId) {
+    const { data: cad } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoId).maybeSingle()
+    const cfg = ((cad as any)?.config ?? {}) as any
+    const docs = (cfg.docsV2 ?? {}) as Record<string, unknown>
+    modalidades = filtrarModsPorTipo(mesclarModalidades(cfg.modalidadesV2), tipo)
+      .filter((m) => docs[m.id])
+      .map((m) => ({ id: m.id, nome: m.nome, temGabarito: m.id !== 'diagnostico' }))
+  }
 
   return (
     <div className="animate-page space-y-5">
@@ -89,6 +111,7 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
         gabaritoLiberado={gabaritoLiberado}
         cadernoLiberado={cadernoParaAluno}
         cadernoId={cadernoId}
+        modalidades={modalidades}
         estId={estId}
         simuladoId={id}
         simuladoTitulo={sim.titulo}

@@ -4,8 +4,9 @@ import { PrintButton } from '@/components/aluno/print-button'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 
-export default async function ResultadoImprimirPage({ params }: { params: Promise<{ st: string }> }) {
+export default async function ResultadoImprimirPage({ params, searchParams }: { params: Promise<{ st: string }>; searchParams: Promise<{ sem?: string; mod?: string }> }) {
   const { st } = await params
+  const { sem, mod } = await searchParams
   const svc = await createServiceClient()
 
   const { data: sessao } = await svc
@@ -27,10 +28,14 @@ export default async function ResultadoImprimirPage({ params }: { params: Promis
   const agora = new Date()
   let gabaritoLiberado = liberar === 'imediato'
   if (liberar === 'apos_janela') gabaritoLiberado = simulado?.status === 'encerrado' || (!!simulado?.data_fim && new Date(simulado.data_fim) < agora)
+  // ?sem=1 força a versão SEM gabarito (o caderno que o aluno fez, só com as marcações).
+  if (sem === '1') gabaritoLiberado = false
+  // ?mod=completo → caderno completo (com comentário do professor, quando há gabarito).
+  const completo = mod === 'completo'
 
   const { data: sq } = await svc
     .from('simulado_prova_questoes')
-    .select('ordem, questoes:simulado_questoes(id, tipo, enunciado, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, correta))')
+    .select('ordem, questoes:simulado_questoes(id, tipo, enunciado, comentario_professor, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, correta))')
     .eq('simulado_id', sessao.simulado_id)
     .eq('anulada', false)
     .order('ordem')
@@ -133,6 +138,12 @@ export default async function ResultadoImprimirPage({ params }: { params: Promis
                         </p>
                       )
                     })}
+                  </div>
+                )}
+                {completo && gabaritoLiberado && q?.comentario_professor && (
+                  <div className="ml-4 mt-1 rounded border border-black/10 bg-black/[0.03] p-2 text-sm">
+                    <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-black/50">Comentário</p>
+                    <p className="whitespace-pre-wrap">{q.comentario_professor}</p>
                   </div>
                 )}
               </div>

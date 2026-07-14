@@ -1,7 +1,10 @@
 'use client'
 
-import { KpiCard, Painel, Hero, BarrasH, AreaSpark, ListaBusca, BotaoExportar, heatBar, baixarCsv } from '@/components/admin/relatorios/viz'
-import { BookOpen, Target, XCircle, ClipboardList, Users, ListChecks, Layers, TrendingUp } from 'lucide-react'
+import { useState } from 'react'
+import { toast } from 'sonner'
+import { KpiCard, Painel, Hero, BarrasH, AreaSpark, ListaBusca, heatBar, baixarCsv } from '@/components/admin/relatorios/viz'
+import { novoWorkbook, cabecalho, secao, titulo, corPct, dropdown, baixarWorkbook, nomeArquivo } from '@/lib/relatorios/excel-kit'
+import { BookOpen, Target, XCircle, ClipboardList, Users, ListChecks, Layers, TrendingUp, FileText, FileSpreadsheet, Loader2 } from 'lucide-react'
 
 export type DadosRelatorioDisciplina = {
   nome: string
@@ -17,6 +20,7 @@ export type DadosRelatorioDisciplina = {
 
 export function RelatorioDisciplinaView({ d, print }: { d: DadosRelatorioDisciplina; print?: boolean }) {
   const erro = d.acertoPct != null ? 100 - d.acertoPct : null
+  const [gerando, setGerando] = useState(false)
 
   function exportar() {
     const linhas: (string | number | null)[][] = [
@@ -32,10 +36,68 @@ export function RelatorioDisciplinaView({ d, print }: { d: DadosRelatorioDiscipl
     baixarCsv(`${d.nome}_relatorio`, linhas)
   }
 
+  async function exportarExcel() {
+    if (gerando) return
+    setGerando(true)
+    try {
+      const wb = await novoWorkbook()
+
+      // Aba 1 — Resumo
+      const ws = wb.addWorksheet('Resumo', { views: [{ showGridLines: false }] })
+      ws.columns = [{ width: 34 }, { width: 18 }]
+      titulo(ws, d.nome, 'Relatório da disciplina — desempenho da turma', 2)
+      secao(ws, 'Resumo', 2)
+      cabecalho(ws, ['Indicador', 'Valor'])
+      ws.addRow(['Questões', d.totalQuestoes])
+      ws.addRow(['Respostas', d.respostas])
+      ws.addRow(['Acerto médio (%)', d.acertoPct ?? '—'])
+      ws.addRow(['Simulados', d.numSimulados])
+      ws.addRow(['Estudantes', d.numEstudantes])
+
+      // Aba 2 — Por assunto (estilo verticalizado: % colorido + prioridade/status)
+      const wa = wb.addWorksheet('Por assunto', { views: [{ state: 'frozen', ySplit: 1 }] })
+      cabecalho(wa, ['Assunto', 'Acerto (%)', 'Acertos', 'Total', 'Prioridade', 'Status'])
+      for (const x of d.porAssunto) {
+        const row = wa.addRow([x.nome, x.pct, x.ac, x.tt, '', ''])
+        const c = row.getCell(2); c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: corPct(x.pct) } }; c.alignment = { horizontal: 'center' }
+      }
+      wa.getColumn(1).width = 44; wa.getColumn(2).width = 12; wa.getColumn(3).width = 10; wa.getColumn(4).width = 10; wa.getColumn(5).width = 14; wa.getColumn(6).width = 16
+      wa.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 6 } }
+      dropdown(wa, 5, d.porAssunto.length + 1, ['Alta', 'Média', 'Baixa'])
+      dropdown(wa, 6, d.porAssunto.length + 1, ['Não estudado', 'Estudando', 'Revisar', 'Dominado'])
+
+      // Aba 3 — Por simulado
+      const wsm = wb.addWorksheet('Por simulado', { views: [{ state: 'frozen', ySplit: 1 }] })
+      cabecalho(wsm, ['Simulado', 'Acerto (%)', 'Acertos', 'Total'])
+      for (const x of d.porSimulado) {
+        const row = wsm.addRow([x.titulo, x.pct, x.ac, x.tt])
+        row.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: corPct(x.pct) } }
+      }
+      wsm.getColumn(1).width = 44; wsm.getColumn(2).width = 12; wsm.getColumn(3).width = 10; wsm.getColumn(4).width = 10
+
+      await baixarWorkbook(wb, nomeArquivo(d.nome, 'relatorio'))
+    } catch {
+      toast.error('Erro ao gerar o Excel.')
+    } finally {
+      setGerando(false)
+    }
+  }
+
+  const botoes = (
+    <div className="flex gap-2">
+      <button type="button" onClick={exportar} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted">
+        <FileText className="h-4 w-4" /> CSV
+      </button>
+      <button type="button" onClick={exportarExcel} disabled={gerando} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-60">
+        {gerando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />} Excel
+      </button>
+    </div>
+  )
+
   return (
     <div className="space-y-5">
       <Hero icon={<BookOpen className="h-6 w-6" />} tom="primary" titulo={d.nome}
-        subtitulo="Desempenho da turma na disciplina" acoes={print ? undefined : <BotaoExportar onClick={exportar} />} />
+        subtitulo="Desempenho da turma na disciplina" acoes={print ? undefined : botoes} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard label="Questões" valor={d.totalQuestoes} icon={<BookOpen className="h-4 w-4" />} tom="primary" />

@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, ClipboardCheck, Users, BarChart3, Target, Clock, Crown, BookOpen, Lock, Check, MessageSquare, ListChecks, FileText, FileStack, ScrollText, Award, TrendingUp, MoreVertical } from 'lucide-react'
+import { LayoutDashboard, ClipboardCheck, Users, BarChart3, Target, Clock, Crown, BookOpen, Lock, Check, MessageSquare, ListChecks, FileText, ScrollText, Award, TrendingUp, MoreVertical, Download } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { ComparativoTurma } from '@/components/simulado/comparativo-turma'
 import type { Comparativo } from '@/lib/simulado/comparativo'
 import type { TentativaResumo, QuestaoAgregada } from '@/lib/simulado/resultado-aluno'
@@ -17,7 +17,7 @@ const fmtData = (d?: string | null) => (d ? new Date(d).toLocaleDateString('pt-B
 const nota = (n: number | null) => (n == null ? '—' : Number(n).toFixed(1).replace('.', ','))
 
 export function MeuSimuladoView({
-  tentativas, questoes, comparativo, desempenho, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, estId, simuladoId, simuladoTitulo,
+  tentativas, questoes, comparativo, desempenho, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo,
 }: {
   tentativas: TentativaResumo[]
   questoes: QuestaoAgregada[]
@@ -27,49 +27,64 @@ export function MeuSimuladoView({
   gabaritoLiberado: boolean
   cadernoLiberado: boolean
   cadernoId: string | null
+  modalidades: { id: string; nome: string; temGabarito: boolean }[]
   estId: string
   simuladoId: string
   simuladoTitulo: string
 }) {
   const ordenadas = useMemo(() => [...tentativas].sort((a, b) => (a.n ?? 0) - (b.n ?? 0)), [tentativas])
-  const melhorId = useMemo(() => {
-    if (!tentativas.length) return null
-    return [...tentativas].sort((a, b) => (Number(b.nota ?? -1) - Number(a.nota ?? -1)) || (new Date(b.finalizado ?? 0).getTime() - new Date(a.finalizado ?? 0).getTime()))[0].id
-  }, [tentativas])
-  const [selId, setSelId] = useState<string | null>(melhorId)
-  const sel = tentativas.find((t) => t.id === selId) ?? ordenadas[0]
 
-  // Seleção da métrica — todos os simulados já vêm marcados.
-  const [metrica, setMetrica] = useState<Set<string>>(() => new Set(desempenho.map((s) => s.id)))
-  const toggleMetrica = (id: string) => setMetrica((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n })
-  const selecionarTodos = () => setMetrica(new Set(desempenho.map((s) => s.id)))
-  const limparSelecao = () => setMetrica(new Set())
+  // Multi-seleção de tentativas DESTE simulado (padrão: todas marcadas).
+  const [selTents, setSelTents] = useState<Set<string>>(() => new Set(tentativas.map((t) => t.id)))
+  const toggleTent = (id: string) => setSelTents((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const selTodasTent = () => setSelTents(new Set(tentativas.map((t) => t.id)))
+  const limparTent = () => setSelTents(new Set())
+  const tentSel = useMemo(() => ordenadas.filter((t) => selTents.has(t.id)), [ordenadas, selTents])
+  const todasTentMarcadas = tentativas.length > 0 && selTents.size === tentativas.length
+  const nenhumaTentMarcada = selTents.size === 0
 
-  const listaM = useMemo(() => desempenho.filter((s) => metrica.has(s.id)), [desempenho, metrica])
-  const notasM = listaM.map((s) => s.nota).filter((n): n is number => n != null)
+  // Tentativa em foco para os KPIs do topo: a melhor entre as selecionadas.
+  const foco = useMemo(() => {
+    const pool = tentSel.length ? tentSel : ordenadas
+    return [...pool].sort((a, b) => (Number(b.nota ?? -1) - Number(a.nota ?? -1)) || (new Date(b.finalizado ?? 0).getTime() - new Date(a.finalizado ?? 0).getTime()))[0]
+  }, [tentSel, ordenadas])
+
+  // Comparação cruzada opcional com OUTROS simulados (padrão: nenhum).
+  const outros = useMemo(() => desempenho.filter((s) => s.id !== simuladoId), [desempenho, simuladoId])
+  const [metrica, setMetrica] = useState<Set<string>>(() => new Set())
+  const toggleMetrica = (id: string) => setMetrica((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const outrosSel = useMemo(() => outros.filter((s) => metrica.has(s.id)), [outros, metrica])
+
+  // Pontos do gráfico = tentativas selecionadas deste simulado + tentativas dos outros marcados.
+  const pontos = useMemo(() => {
+    const daqui = tentSel.map((t) => ({ nota: t.nota, n: t.n, simulado: simuladoTitulo, simId: simuladoId, finalizado: t.finalizado }))
+    const fora = outrosSel.flatMap((s) => s.tentativas.map((t) => ({ nota: t.nota, n: t.n, simulado: s.titulo, simId: s.id, finalizado: t.finalizado })))
+    return [...daqui, ...fora].sort((a, b) => new Date(a.finalizado ?? 0).getTime() - new Date(b.finalizado ?? 0).getTime())
+  }, [tentSel, outrosSel, simuladoTitulo, simuladoId])
+
+  const notasM = pontos.map((p) => p.nota).filter((n): n is number => n != null)
   const notaMedia = notasM.length ? Math.round((notasM.reduce((a, b) => a + b, 0) / notasM.length) * 10) / 10 : null
   const melhorNota = notasM.length ? Math.max(...notasM) : null
-  const pontos = useMemo(() => listaM
-    .flatMap((s) => s.tentativas.map((t) => ({ ...t, simulado: s.titulo, simId: s.id })))
-    .sort((a, b) => new Date(a.finalizado ?? 0).getTime() - new Date(b.finalizado ?? 0).getTime()), [listaM])
+  const nSimulados = new Set(pontos.map((p) => p.simId)).size
+
   const porDiscM = useMemo(() => {
     const m = new Map<string, { ac: number; tt: number }>()
-    for (const s of listaM) for (const d of s.porDisc) { const v = m.get(d.nome) ?? { ac: 0, tt: 0 }; v.ac += d.ac; v.tt += d.tt; m.set(d.nome, v) }
+    const add = (ds: { nome: string; ac: number; tt: number }[]) => { for (const d of ds) { const v = m.get(d.nome) ?? { ac: 0, tt: 0 }; v.ac += d.ac; v.tt += d.tt; m.set(d.nome, v) } }
+    for (const t of tentSel) add(t.porDisc)
+    for (const s of outrosSel) add(s.porDisc)
     return [...m.entries()].map(([nome, v]) => ({ nome, ac: v.ac, tt: v.tt, pct: v.tt ? Math.round((v.ac / v.tt) * 100) : 0 })).sort((a, b) => b.pct - a.pct)
-  }, [listaM])
-
-  const outros = useMemo(() => desempenho.filter((s) => s.id !== simuladoId), [desempenho, simuladoId])
-  const atualNaMetrica = desempenho.some((s) => s.id === simuladoId)
-  const todosMarcados = desempenho.length > 0 && metrica.size === desempenho.length
-  const nenhumMarcado = metrica.size === 0
-  const notaAtual = desempenho.find((s) => s.id === simuladoId)?.nota ?? (notaLiberada ? (sel?.nota ?? null) : null)
+  }, [tentSel, outrosSel])
 
   // URLs de impressão (PDF) por tentativa.
   const gabaritoUrl = (id: string) => `/imprimir/resultado/${id}`
-  const cadUrl = (id: string, mod?: string) => (cadernoId ? `/imprimir/caderno/${cadernoId}?sessao=${id}&aluno=${estId}${mod ? `&mod=${mod}` : ''}` : gabaritoUrl(id))
+  const cadUrl = (id: string, mod: string, gab = false) => `/imprimir/caderno/${cadernoId}?sessao=${id}&aluno=${estId}&mod=${mod}${gab ? '&gabarito=1' : ''}`
   const abrir = (url: string) => window.open(url, '_blank', 'noopener,noreferrer')
 
+  // Modal de download de cadernos (por tentativa).
+  const [modalTent, setModalTent] = useState<TentativaResumo | null>(null)
+
   return (
+    <>
     <Tabs defaultValue="geral">
       <TabsList>
         <TabsTrigger value="geral"><LayoutDashboard className="h-4 w-4" /> Visão geral</TabsTrigger>
@@ -81,37 +96,35 @@ export function MeuSimuladoView({
         <div className="grid gap-5 lg:grid-cols-3">
           {/* ESQUERDA: desempenho da tentativa + métrica consolidada */}
           <div className="space-y-5 lg:col-span-2">
-            {!notaLiberada ? (
+            {!notaLiberada && (
               <Bloqueado titulo="Desempenho ainda não liberado" msg="Você concluiu este simulado. Os acertos, o tempo e o desempenho por disciplina aparecem assim que o professor liberar a nota." />
-            ) : sel ? (
-              <>
-                <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                  <Kpi icon={Target} label="Acerto" value={`${sel.pct}%`} sub={`${sel.acertos}/${sel.total}`} chip="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" />
-                  <Kpi icon={Clock} label="Tempo" value={sel.tempoMs ? fmtDur(sel.tempoMs) : '—'} chip="bg-violet-500/15 text-violet-600 dark:text-violet-400" />
-                  <Kpi icon={Crown} label="Posição" value={sel.posicao ? `${sel.posicao}º` : '—'} chip="bg-amber-500/15 text-amber-600 dark:text-amber-400" />
-                  <Kpi icon={ListChecks} label="Nota" value={nota(sel.nota)} chip="bg-sky-500/15 text-sky-600 dark:text-sky-400" />
-                </div>
-              </>
-            ) : null}
+            )}
 
-            {/* MÉTRICA DE DESEMPENHO — reflete os simulados marcados ao lado */}
+            {/* MÉTRICA DE DESEMPENHO — reflete as tentativas/simulados marcados ao lado */}
             <div className="overflow-hidden rounded-2xl border bg-card">
               <div className="flex items-center gap-2 border-b px-4 py-3">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary"><BarChart3 className="h-4 w-4" /></span>
                 <div>
                   <h2 className="text-sm font-semibold leading-tight">Métrica de desempenho</h2>
-                  <p className="text-[11px] text-muted-foreground">Progresso entre os simulados marcados</p>
+                  <p className="text-[11px] text-muted-foreground">Comparação das tentativas selecionadas</p>
                 </div>
               </div>
 
-              {desempenho.length === 0 ? (
-                <p className="p-8 text-center text-sm text-muted-foreground">Conclua simulados com nota liberada para ver sua métrica consolidada.</p>
-              ) : listaM.length === 0 ? (
-                <p className="p-8 text-center text-sm text-muted-foreground">Nenhum simulado selecionado. Marque na lista ao lado.</p>
+              {pontos.length === 0 ? (
+                <p className="p-8 text-center text-sm text-muted-foreground">Nenhuma tentativa selecionada. Marque na lista ao lado.</p>
               ) : (
                 <div className="space-y-5 p-4">
+                  {foco && notaLiberada && (
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-xl border bg-muted/20 px-3.5 py-2.5 text-sm">
+                      <span className="inline-flex items-center gap-1.5 font-semibold"><Crown className="h-4 w-4 text-amber-500" /> Melhor tentativa <span className="font-normal text-muted-foreground">#{foco.n}</span></span>
+                      <span className="text-muted-foreground"><Target className="mr-1 inline h-3.5 w-3.5" />Acerto <b className="text-foreground">{foco.pct}%</b> <span className="text-xs">({foco.acertos}/{foco.total})</span></span>
+                      <span className="text-muted-foreground"><Clock className="mr-1 inline h-3.5 w-3.5" />Tempo <b className="text-foreground">{foco.tempoMs ? fmtDur(foco.tempoMs) : '—'}</b></span>
+                      <span className="text-muted-foreground">Posição <b className="text-foreground">{foco.posicao ? `${foco.posicao}º` : '—'}</b></span>
+                      <span className="text-muted-foreground">Nota <b className={cn('tabular-nums', foco.nota != null ? notaTone(Number(foco.nota)) : 'text-foreground')}>{nota(foco.nota)}</b></span>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                    <Kpi icon={ListChecks} label="Simulados" value={listaM.length} chip="bg-indigo-500/15 text-indigo-600 dark:text-indigo-400" />
+                    <Kpi icon={ListChecks} label="Simulados" value={nSimulados} chip="bg-indigo-500/15 text-indigo-600 dark:text-indigo-400" />
                     <Kpi icon={TrendingUp} label="Tentativas" value={pontos.length} chip="bg-sky-500/15 text-sky-600 dark:text-sky-400" />
                     <Kpi icon={Award} label="Nota média" value={nota(notaMedia)} chip="bg-violet-500/15 text-violet-600 dark:text-violet-400" />
                     <Kpi icon={Crown} label="Melhor nota" value={nota(melhorNota)} chip="bg-amber-500/15 text-amber-600 dark:text-amber-400" />
@@ -169,35 +182,28 @@ export function MeuSimuladoView({
               <div className="border-b px-4 py-3">
                 <div className="flex items-center gap-2">
                   <ListChecks className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold">Histórico e simulados</h3>
+                  <h3 className="text-sm font-semibold">Tentativas</h3>
+                  <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{selTents.size}/{tentativas.length}</span>
                 </div>
-                {desempenho.length > 0 && (
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Marque tentativas para comparar no gráfico.</p>
+                {tentativas.length > 1 && (
                   <div className="mt-2 flex gap-2">
-                    <button type="button" onClick={selecionarTodos} className={cn('flex-1 rounded-lg border px-2 py-1 text-xs font-medium transition-colors', todosMarcados ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>Selecionar todos</button>
-                    <button type="button" onClick={limparSelecao} className={cn('flex-1 rounded-lg border px-2 py-1 text-xs font-medium transition-colors', nenhumMarcado ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>Limpar seleção</button>
+                    <button type="button" onClick={selTodasTent} className={cn('flex-1 rounded-lg border px-2 py-1 text-xs font-medium transition-colors', todasTentMarcadas ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>Selecionar todas</button>
+                    <button type="button" onClick={limparTent} className={cn('flex-1 rounded-lg border px-2 py-1 text-xs font-medium transition-colors', nenhumaTentMarcada ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>Limpar</button>
                   </div>
                 )}
               </div>
 
               <div className="max-h-[560px] overflow-y-auto">
-                {/* Simulado atual + tentativas (histórico com kebab de download) */}
-                <div className="border-l-2 border-primary">
-                  <button type="button" onClick={() => atualNaMetrica && toggleMetrica(simuladoId)} disabled={!atualNaMetrica}
-                    className={cn('flex w-full items-center gap-2.5 bg-primary/5 px-3 py-2.5 text-left', atualNaMetrica && 'hover:bg-primary/10')}>
-                    <CheckBox on={metrica.has(simuladoId)} disabled={!atualNaMetrica} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold leading-tight">{simuladoTitulo}</p>
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-primary/80">Este simulado</p>
-                    </div>
-                    <span className={cn('shrink-0 text-sm font-bold tabular-nums', notaAtual != null ? notaTone(notaAtual) : 'text-muted-foreground')}>{nota(notaAtual)}</span>
-                  </button>
-
+                {/* Tentativas deste simulado — multi-seleção + kebab de download */}
+                <div>
                   <div className="divide-y">
                     {ordenadas.map((t) => {
-                      const on = t.id === sel?.id
+                      const on = selTents.has(t.id)
                       return (
-                        <div key={t.id} className={cn('flex items-center gap-1 pr-2 transition-colors', on ? 'bg-primary/10' : 'hover:bg-muted/50')}>
-                          <button type="button" onClick={() => setSelId(t.id)} className="flex min-w-0 flex-1 items-center gap-2.5 py-2 pl-6 text-left">
+                        <div key={t.id} className={cn('flex items-center gap-1 pr-2 transition-colors', on ? 'bg-primary/5' : 'hover:bg-muted/50')}>
+                          <button type="button" onClick={() => toggleTent(t.id)} className="flex min-w-0 flex-1 items-center gap-2.5 py-2.5 pl-3 text-left">
+                            <CheckBox on={on} />
                             <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-bold tabular-nums', on ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>#{t.n}</span>
                             <div className="min-w-0 flex-1">
                               <p className="text-xs font-medium leading-tight">Tentativa {t.n}</p>
@@ -207,22 +213,10 @@ export function MeuSimuladoView({
                               ? <span className={cn('shrink-0 text-sm font-bold tabular-nums', t.nota != null && notaTone(Number(t.nota)))}>{nota(t.nota)}</span>
                               : <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
                           </button>
-                          {cadernoLiberado ? (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground" title="Baixar cadernos">
-                                <MoreVertical className="h-4 w-4" />
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuLabel>Cadernos · Tentativa {t.n}</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => abrir(gabaritoUrl(t.id))}><FileText className="mr-2 h-4 w-4" /> Gabarito</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => abrir(cadUrl(t.id, 'caderno_completo'))}><FileStack className="mr-2 h-4 w-4" /> Caderno completo</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => abrir(cadUrl(t.id))}><ScrollText className="mr-2 h-4 w-4" /> Prova realizada</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : (
-                            <span className="flex h-7 w-7 shrink-0 items-center justify-center text-muted-foreground/40" title="Cadernos ainda não liberados"><Lock className="h-3.5 w-3.5" /></span>
-                          )}
+                          <button type="button" onClick={() => setModalTent(t)} title="Baixar cadernos"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground">
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
                         </div>
                       )
                     })}
@@ -260,6 +254,74 @@ export function MeuSimuladoView({
         {notaLiberada ? <ComparativoTurma c={comparativo} /> : <Bloqueado titulo="Comparativo indisponível" msg="O comparativo com a turma aparece quando o resultado for liberado." />}
       </TabsContent>
     </Tabs>
+
+    {/* MODAL — download de cadernos (sem gabarito × com gabarito) */}
+    <Dialog open={!!modalTent} onOpenChange={(o) => { if (!o) setModalTent(null) }}>
+      <DialogContent className="gap-0 p-0 sm:max-w-2xl">
+        <DialogHeader className="border-b px-5 py-4">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><Download className="h-4 w-4" /></span>
+            Baixar cadernos
+          </DialogTitle>
+          <DialogDescription>
+            {modalTent && `Tentativa ${modalTent.n} · ${fmtData(modalTent.finalizado)}${modalTent.nota != null && notaLiberada ? ` · nota ${nota(modalTent.nota)}` : ''}`}
+          </DialogDescription>
+        </DialogHeader>
+        {modalTent && (
+          <div className="grid gap-3 p-5 sm:grid-cols-2">
+            {/* Como você fez — sem gabarito (sempre disponível) */}
+            <section className="rounded-2xl border bg-muted/20 p-3">
+              <div className="mb-2.5 flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-background text-muted-foreground shadow-sm"><ScrollText className="h-4 w-4" /></span>
+                <div className="leading-tight">
+                  <h4 className="text-sm font-semibold">Como você fez</h4>
+                  <p className="text-[11px] text-muted-foreground">Sem gabarito · sempre disponível</p>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {modalidades.length > 0
+                  ? modalidades.map((m) => <BtnCaderno key={m.id} nome={m.nome} onClick={() => abrir(cadUrl(modalTent.id, m.id))} />)
+                  : <BtnCaderno nome="Prova que você fez" onClick={() => abrir(`${gabaritoUrl(modalTent.id)}?sem=1`)} />}
+              </div>
+            </section>
+
+            {/* Com correção — só com liberação do gabarito */}
+            <section className="rounded-2xl border border-primary/25 bg-primary/[0.04] p-3">
+              <div className="mb-2.5 flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm"><FileText className="h-4 w-4" /></span>
+                <div className="leading-tight">
+                  <h4 className="text-sm font-semibold">Com correção</h4>
+                  <p className="text-[11px] text-muted-foreground">Gabarito</p>
+                </div>
+              </div>
+              {!gabaritoLiberado ? (
+                <p className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground"><Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Disponível quando o professor liberar o gabarito.</p>
+              ) : modalidades.length > 0 ? (
+                <div className="space-y-1.5">
+                  {modalidades.filter((m) => m.temGabarito).map((m) => <BtnCaderno key={m.id} nome={m.nome} gab onClick={() => abrir(cadUrl(modalTent.id, m.id, true))} />)}
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <BtnCaderno nome="Espelho da prova (com correção)" gab onClick={() => abrir(gabaritoUrl(modalTent.id))} />
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
+  )
+}
+
+function BtnCaderno({ nome, onClick, gab }: { nome: string; onClick: () => void; gab?: boolean }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={cn('group flex w-full items-center gap-2.5 rounded-xl border bg-card p-2.5 text-left text-sm shadow-sm transition-all hover:shadow-md', gab ? 'border-primary/20 hover:border-primary/50' : 'hover:border-foreground/20')}>
+      <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', gab ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}><FileText className="h-4 w-4" /></span>
+      <span className="min-w-0 flex-1 truncate font-medium">{nome}</span>
+      <Download className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-y-0.5 group-hover:text-foreground" />
+    </button>
   )
 }
 
