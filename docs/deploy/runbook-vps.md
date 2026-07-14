@@ -91,9 +91,9 @@ Espere os 4 serviços ficarem com réplicas `1/1` em `docker service ls`.
 As imagens são publicadas com 2 tags a cada push: `:latest` e `:<sha-do-commit>`.
 Para reverter para um commit anterior específico:
 
-1. Descubra o SHA do commit desejado (`git log --oneline` no repositório).
+1. Descubra o SHA do commit desejado (`git log --format=%H -n 5` no repositório).
 2. No Portainer, edite a stack `plataforma-simulado` → **Environment variables**
-   → mude `IMAGE_TAG` para esse SHA (ex.: `IMAGE_TAG=a1b2c3d...`).
+   → mude `IMAGE_TAG` para esse SHA (ex.: `IMAGE_TAG=1a2b3c4d5e6f7890abcdef1234567890abcdef12`).
 3. **Update the stack** (com "Re-pull image" habilitado).
 
 Não há rollback de banco necessário neste deploy (nenhuma migration foi
