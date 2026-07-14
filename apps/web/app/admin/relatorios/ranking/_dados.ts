@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { normalizarCriterios, idadeEmAnos, type CriteriosRanking, type EntradaRanking } from '@/lib/simulado/ranking'
 
 type GrupoBanco = { id: string; nome: string; disciplinas: string[] }
@@ -59,9 +60,10 @@ export async function montarRankingSimulado(svc: SupabaseClient, simId: string, 
   const acTotal = new Map<string, number>(), ttTotal = new Map<string, number>()
   const acGrupo = new Map<string, Record<string, number>>()
   if (sessIds.length) {
-    const { data: resp } = await svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', sessIds)
+    const resp = await fetchAllByIn<any>(sessIds, (chunk) =>
+      svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).order('id'))
     const estDaSess = new Map<string, string>(sessEscolhidas.map((s) => [s.id, s.estudante_id]))
-    for (const r of (resp ?? []) as any[]) {
+    for (const r of resp as any[]) {
       const est = estDaSess.get(r.sessao_id); if (!est) continue
       ttTotal.set(est, (ttTotal.get(est) ?? 0) + 1)
       if (r.correta) {

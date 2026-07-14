@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { rankearSimulado } from '@/lib/ranking'
+import { contextoNota, calcularNota } from '@/lib/simulado/nota'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
 
@@ -30,21 +31,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
   }
 
-  // Total de questões válidas do simulado (denominador da nota).
-  const { count: total } = await supabase
-    .from('simulado_prova_questoes')
-    .select('*', { count: 'exact', head: true })
-    .eq('simulado_id', sessao.simulado_id)
-    .eq('anulada', false)
-
+  // Nota canônica (mesma regra de anulação usada na re-correção — fonte única).
+  const ctx = await contextoNota(supabase, sessao.simulado_id)
   const { data: respostas } = await supabase
     .from('simulado_respostas_objetivas')
-    .select('correta')
+    .select('questao_id, correta')
     .eq('sessao_id', sessao_id)
-
-  const totalQ = total ?? 0
-  const acertos = (respostas ?? []).filter((r) => r.correta).length
-  const nota = totalQ > 0 ? (acertos / totalQ) * 10 : 0
+  const totalQ = ctx.totalQuestoes - [...ctx.anuladas.values()].filter((p) => p === 'desconsidera').length
+  const acertos = (respostas ?? []).filter((r: any) => r.correta && !ctx.anuladas.has(r.questao_id)).length
+    + [...ctx.anuladas.values()].filter((p) => p === 'pontua_todos').length
+  const nota = calcularNota((respostas ?? []) as any[], ctx)
 
   if (sessao.status !== 'finalizada') {
     await supabase

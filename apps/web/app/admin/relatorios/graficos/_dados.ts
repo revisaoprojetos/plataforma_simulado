@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { DadosRelatorioGrafico } from './relatorio-grafico-view'
 
 const STATUS_LABEL: Record<string, string> = { finalizada: 'Finalizadas', em_andamento: 'Em andamento', aguardando: 'Aguardando' }
@@ -28,8 +29,8 @@ export async function montarRelatorioGrafico(svc: SupabaseClient, tenantId: stri
   let totRespostas = 0, totAc = 0
   const sessIds = sessoes.map((s) => s.id)
   if (sessIds.length) {
-    const { data: resp } = await svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', sessIds).limit(50000)
-    const respArr = (resp ?? []) as any[]
+    const respArr = await fetchAllByIn<any>(sessIds, (chunk) =>
+      svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).order('id'))
     const qids = [...new Set(respArr.map((r) => r.questao_id))]
     const discDeQ = new Map<string, string>()
     if (qids.length) { const { data: qs } = await svc.from('simulado_questoes').select('id, disciplinas:simulado_disciplinas(nome)').in('id', qids); for (const q of (qs ?? []) as any[]) discDeQ.set(q.id, q.disciplinas?.nome ?? 'Sem disciplina') }

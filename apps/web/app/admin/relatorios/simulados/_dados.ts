@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
 import type { DadosRelatorioSimulado, LinhaExportSimulado } from './relatorio-simulado-view'
 
@@ -78,8 +79,13 @@ export async function montarRelatorioSimulado(svc: SupabaseClient, simId: string
   const allFinIds = finalizadasAll.map((s) => s.id)
   let respAll: any[] = []
   if (allFinIds.length) {
-    const { data: resp } = await svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, alternativa_id, correta, snapshot_gabarito, tempo_resposta_seg').in('sessao_id', allFinIds)
-    respAll = (resp ?? []) as any[]
+    // Lotes + paginação: evita URL gigante e o teto de 1000 do PostgREST
+    // (simulado grande = dezenas de milhares de respostas).
+    respAll = await fetchAllByIn<any>(allFinIds, (chunk) =>
+      svc.from('simulado_respostas_objetivas')
+        .select('sessao_id, questao_id, alternativa_id, correta, snapshot_gabarito, tempo_resposta_seg')
+        .in('sessao_id', chunk)
+        .order('id'))
     for (const r of respAll) {
       ttPorSess.set(r.sessao_id, (ttPorSess.get(r.sessao_id) ?? 0) + 1)
       if (r.correta) acPorSess.set(r.sessao_id, (acPorSess.get(r.sessao_id) ?? 0) + 1)

@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { rankearSimulado } from '@/lib/ranking'
+import { contextoNota, calcularNotaSessao } from '@/lib/simulado/nota'
 
 type Politica = 'pontua_todos' | 'desconsidera'
 
@@ -69,30 +70,12 @@ export async function anularQuestao(
   const lista = sessoes ?? []
   const antes = new Map(lista.map((s: any) => [s.id, { nota: Number(s.nota ?? 0), ranking: s.posicao_ranking }]))
 
-  // Questões válidas/anuladas do simulado (após esta anulação).
-  const { data: pq } = await svc
-    .from('simulado_prova_questoes')
-    .select('questao_id, anulada')
-    .eq('simulado_id', simuladoId)
-  const totalQ = (pq ?? []).length
-  const anuladasSet = new Set((pq ?? []).filter((x: any) => x.anulada).map((x: any) => x.questao_id))
-  const nAnuladas = anuladasSet.size
-
-  // 4) Recalcula a nota de cada sessão (concorrência limitada — evita N+1 sequencial em provas grandes).
+  // 4) Recalcula a nota de cada sessão pela regra CANÔNICA (respeita política
+  //    por questão anulada). Concorrência limitada — evita N+1 em provas grandes.
+  const ctx = await contextoNota(svc, simuladoId)
   const recalcular = async (s: any) => {
-    const { data: resp } = await svc
-      .from('simulado_respostas_objetivas')
-      .select('questao_id, correta')
-      .eq('sessao_id', s.id)
-    const corretasReais = (resp ?? []).filter((r: any) => r.correta && !anuladasSet.has(r.questao_id)).length
-    let nota = 0
-    if (politica === 'pontua_todos') {
-      nota = totalQ > 0 ? ((corretasReais + nAnuladas) / totalQ) * 10 : 0
-    } else {
-      const denom = totalQ - nAnuladas
-      nota = denom > 0 ? (corretasReais / denom) * 10 : 0
-    }
-    await svc.from('simulado_sessoes_prova').update({ nota: Math.round(nota * 100) / 100 }).eq('id', s.id)
+    const nota = await calcularNotaSessao(svc, s.id, ctx)
+    await svc.from('simulado_sessoes_prova').update({ nota }).eq('id', s.id)
   }
   for (let i = 0; i < lista.length; i += 15) await Promise.all(lista.slice(i, i + 15).map(recalcular))
 
@@ -212,24 +195,11 @@ export async function trocarAlternativa(
   const lista = sessoes ?? []
   const antes = new Map(lista.map((s: any) => [s.id, { nota: Number(s.nota ?? 0), ranking: s.posicao_ranking }]))
 
-  // Questões válidas/anuladas (denominador da nota, mesmo critério de anularQuestao).
-  const { data: pq } = await svc
-    .from('simulado_prova_questoes')
-    .select('questao_id, anulada')
-    .eq('simulado_id', simuladoId)
-  const totalQ = (pq ?? []).length
-  const anuladasSet = new Set((pq ?? []).filter((x: any) => x.anulada).map((x: any) => x.questao_id))
-  const nAnuladas = anuladasSet.size
-
-  // 5) Recalcula a nota (anuladas pontuam todos — regra do sistema).
+  // 5) Recalcula a nota pela regra CANÔNICA (respeita política por questão).
+  const ctx = await contextoNota(svc, simuladoId)
   const recalcular = async (s: any) => {
-    const { data: resp } = await svc
-      .from('simulado_respostas_objetivas')
-      .select('questao_id, correta')
-      .eq('sessao_id', s.id)
-    const corretasReais = (resp ?? []).filter((r: any) => r.correta && !anuladasSet.has(r.questao_id)).length
-    const nota = totalQ > 0 ? ((corretasReais + nAnuladas) / totalQ) * 10 : 0
-    await svc.from('simulado_sessoes_prova').update({ nota: Math.round(nota * 100) / 100 }).eq('id', s.id)
+    const nota = await calcularNotaSessao(svc, s.id, ctx)
+    await svc.from('simulado_sessoes_prova').update({ nota }).eq('id', s.id)
   }
   for (let i = 0; i < lista.length; i += 15) await Promise.all(lista.slice(i, i + 15).map(recalcular))
 
@@ -315,12 +285,15 @@ export async function removerCorrecao(
       .eq('correta', true)
     const corretasResp = [...new Set((rc ?? []).map((r: any) => r.alternativa_id))].filter(Boolean)
     const antigaId = corretasResp.find((id) => id !== novaId)
-    if (antigaId && novaId) {
-      await svc.from('simulado_alternativas').update({ correta: false }).eq('id', novaId)
-      await svc.from('simulado_alternativas').update({ correta: true }).eq('id', antigaId)
-      await svc.from('simulado_respostas_objetivas').update({ correta: true }).eq('questao_id', questaoId).eq('alternativa_id', antigaId)
-      await svc.from('simulado_respostas_objetivas').update({ correta: false }).eq('questao_id', questaoId).neq('alternativa_id', antigaId)
+    // Sem a antiga não dá pra reverter com segurança (ninguém marcou a original).
+    // Aborta ANTES de apagar qualquer coisa, para não deixar o gabarito inconsistente.
+    if (!novaId || !antigaId) {
+      return { ok: false, error: 'Não foi possível reverter o gabarito (a alternativa correta anterior não pôde ser identificada). Ajuste-a manualmente e tente de novo.' }
     }
+    await svc.from('simulado_alternativas').update({ correta: false }).eq('id', novaId)
+    await svc.from('simulado_alternativas').update({ correta: true }).eq('id', antigaId)
+    await svc.from('simulado_respostas_objetivas').update({ correta: true }).eq('questao_id', questaoId).eq('alternativa_id', antigaId)
+    await svc.from('simulado_respostas_objetivas').update({ correta: false }).eq('questao_id', questaoId).neq('alternativa_id', antigaId)
   }
 
   // 3) Apaga impactos + registros de re-correção desta questão.
@@ -338,19 +311,10 @@ export async function removerCorrecao(
     .eq('deletado', false)
   const lista = sessoes ?? []
 
-  const { data: pq } = await svc
-    .from('simulado_prova_questoes')
-    .select('questao_id, anulada')
-    .eq('simulado_id', simuladoId)
-  const totalQ = (pq ?? []).length
-  const anuladasSet = new Set((pq ?? []).filter((x: any) => x.anulada).map((x: any) => x.questao_id))
-  const nAnuladas = anuladasSet.size
-
+  const ctx = await contextoNota(svc, simuladoId)
   const recalcular = async (s: any) => {
-    const { data: resp } = await svc.from('simulado_respostas_objetivas').select('questao_id, correta').eq('sessao_id', s.id)
-    const corretasReais = (resp ?? []).filter((r: any) => r.correta && !anuladasSet.has(r.questao_id)).length
-    const nota = totalQ > 0 ? ((corretasReais + nAnuladas) / totalQ) * 10 : 0
-    await svc.from('simulado_sessoes_prova').update({ nota: Math.round(nota * 100) / 100 }).eq('id', s.id)
+    const nota = await calcularNotaSessao(svc, s.id, ctx)
+    await svc.from('simulado_sessoes_prova').update({ nota }).eq('id', s.id)
   }
   for (let i = 0; i < lista.length; i += 15) await Promise.all(lista.slice(i, i + 15).map(recalcular))
   await rankearSimulado(svc, simuladoId)

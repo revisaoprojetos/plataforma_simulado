@@ -23,3 +23,31 @@ export async function fetchAll<T = any>(
   }
   return all
 }
+
+/**
+ * Busca todas as linhas de um `.in(coluna, ids)` com lista GRANDE de ids,
+ * contornando dois limites do PostgREST: (1) URL gigante quando há centenas de
+ * ids no `.in()`, e (2) o teto de ~1000 linhas por resposta. Fatia os ids em
+ * lotes e pagina cada lote.
+ *
+ * `build(idsChunk)` deve montar a query já com `.in(coluna, idsChunk)` e demais
+ * filtros/select. Um `.order()` estável é recomendado para paginação consistente.
+ */
+export async function fetchAllByIn<T = any>(
+  ids: string[],
+  build: (idsChunk: string[]) => { range: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }> },
+  { chunk = 80, pageSize = 1000 }: { chunk?: number; pageSize?: number } = {},
+): Promise<T[]> {
+  const all: T[] = []
+  for (let i = 0; i < ids.length; i += chunk) {
+    const idsChunk = ids.slice(i, i + chunk)
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await build(idsChunk).range(from, from + pageSize - 1)
+      if (error) throw error
+      if (!data || data.length === 0) break
+      all.push(...data)
+      if (data.length < pageSize) break
+    }
+  }
+  return all
+}
