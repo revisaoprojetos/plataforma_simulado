@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { Voltar } from '@/components/admin/relatorios/voltar'
 import { RelatorioEstudanteView, type DadosRelatorioEstudante } from './relatorio-estudante-view'
@@ -10,28 +11,28 @@ export default async function RelatorioEstudantesPage({ searchParams }: { search
   const svc = await createServiceClient()
   const tenantId = await getCurrentTenantId()
 
-  const { data: estudantes } = await svc
-    .from('simulado_estudantes').select('id, nome').eq('tenant_id', tenantId ?? '').order('nome')
+  // Pagina para trazer TODOS os estudantes (PostgREST trunca em ~1000/resposta).
+  const estudantes = await fetchAll<any>(() => svc
+    .from('simulado_estudantes').select('id, nome').eq('tenant_id', tenantId ?? '').order('nome').order('id'))
 
   let dados: DadosRelatorioEstudante | null = null
 
   // Resumo de todos os estudantes (nº simulados, nota média, última atividade) para a listagem.
   let resumos: ResumoEstudante[] = []
   if (!estId) {
-    const estIds = (estudantes ?? []).map((e: any) => e.id)
     const agg = new Map<string, { n: number; notas: number[]; ult: string | null }>()
-    if (estIds.length) {
-      const { data: sess } = await svc.from('simulado_sessoes_prova')
-        .select('estudante_id, nota, iniciado_em')
-        .in('estudante_id', estIds).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada').limit(20000)
-      for (const s of (sess ?? []) as any[]) {
-        const a = agg.get(s.estudante_id) ?? { n: 0, notas: [], ult: null }
-        a.n++; if (s.nota != null) a.notas.push(Number(s.nota))
-        if (s.iniciado_em && (!a.ult || s.iniciado_em > a.ult)) a.ult = s.iniciado_em
-        agg.set(s.estudante_id, a)
-      }
+    // Busca por tenant (não por lista de ids) para evitar URL gigante / erro 400 no `.in()`.
+    const sess = await fetchAll<any>(() => svc.from('simulado_sessoes_prova')
+      .select('estudante_id, nota, iniciado_em')
+      .eq('tenant_id', tenantId ?? '').eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada')
+      .order('estudante_id'))
+    for (const s of sess) {
+      const a = agg.get(s.estudante_id) ?? { n: 0, notas: [], ult: null }
+      a.n++; if (s.nota != null) a.notas.push(Number(s.nota))
+      if (s.iniciado_em && (!a.ult || s.iniciado_em > a.ult)) a.ult = s.iniciado_em
+      agg.set(s.estudante_id, a)
     }
-    resumos = (estudantes ?? []).map((e: any) => {
+    resumos = estudantes.map((e: any) => {
       const a = agg.get(e.id)
       return { id: e.id, nome: e.nome ?? 'Estudante', simulados: a?.n ?? 0, notaMedia: a && a.notas.length ? a.notas.reduce((x, y) => x + y, 0) / a.notas.length : null, ultima: a?.ult ?? null }
     })

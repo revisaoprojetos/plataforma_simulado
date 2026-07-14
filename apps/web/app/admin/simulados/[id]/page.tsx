@@ -181,28 +181,29 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <Link
-            href="/admin/simulados"
-            className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Voltar para Simulados
-          </Link>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight">{simulado.titulo}</h1>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.class}`}>
-              {statusCfg.label}
-            </span>
-            <TipoSimuladoBadge tipo={tipoSim} />
+    <Tabs defaultValue="visao-geral">
+      {/* Cabeçalho + abas — fixos no topo ao rolar o conteúdo */}
+      <div className="sticky -top-6 z-40 -mx-6 -mt-6 space-y-3 border-b bg-background px-6 pb-3 pt-6 shadow-sm">
+        <div className="flex items-start justify-between">
+          <div>
+            <Link
+              href="/admin/simulados"
+              className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Voltar para Simulados
+            </Link>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold tracking-tight">{simulado.titulo}</h1>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.class}`}>
+                {statusCfg.label}
+              </span>
+              <TipoSimuladoBadge tipo={tipoSim} />
+            </div>
           </div>
+          <SimuladoActions simuladoId={id} status={simulado.status} />
         </div>
-        <SimuladoActions simuladoId={id} status={simulado.status} />
-      </div>
 
-      <Tabs defaultValue="visao-geral">
         <div className="flex items-center justify-between">
           <TabsList>
             <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
@@ -218,7 +219,9 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
             Embed
           </Link>
         </div>
+      </div>
 
+      <div className="pt-6">
         {/* Visão Geral */}
         <TabsContent value="visao-geral" className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -443,7 +446,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
             onSubmit={updateSimuladoAction.bind(null, id)}
           />
         </TabsContent>
-      </Tabs>
-    </div>
+      </div>
+    </Tabs>
   )
 }

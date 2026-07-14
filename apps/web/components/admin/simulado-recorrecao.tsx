@@ -1,8 +1,22 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { AnularQuestaoButton } from '@/components/admin/anular-questao-button'
-import { TrendingUp, TrendingDown, Minus, Ban } from 'lucide-react'
+import { AdicionarCorrecao, type QuestaoCorrecao } from '@/components/admin/adicionar-correcao'
+import { RemoverCorrecaoButton } from '@/components/admin/remover-correcao-button'
+import { TrendingUp, TrendingDown, Ban, Repeat, Users } from 'lucide-react'
+
+/** Busca nomes de estudantes por id em lotes (evita URL gigante no .in()). */
+async function nomesPorIds(svc: ReturnType<typeof createAdminClient>, ids: string[]) {
+  const map = new Map<string, string>()
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data } = await svc.from('simulado_estudantes').select('id, nome').in('id', ids.slice(i, i + 100))
+    for (const e of data ?? []) map.set((e as any).id, (e as any).nome)
+  }
+  return map
+}
+
+const nota1 = (n: any) => Number(n ?? 0).toFixed(1)
 
 export async function SimuladoRecorrecao({ simuladoId }: { simuladoId: string }) {
   const svc = createAdminClient()
@@ -14,112 +28,159 @@ export async function SimuladoRecorrecao({ simuladoId }: { simuladoId: string })
     .eq('simulado_id', simuladoId)
     .order('ordem')
   const qIds = (pq ?? []).map((x: any) => x.questao_id)
+  const ordemMap = new Map((pq ?? []).map((x: any) => [x.questao_id, x.ordem]))
+
   const { data: questoes } = qIds.length
     ? await svc.from('simulado_questoes').select('id, enunciado').in('id', qIds)
     : { data: [] as any[] }
   const enunMap = new Map((questoes ?? []).map((q: any) => [q.id, q.enunciado]))
 
-  // Histórico de re-correções + impactos.
+  const { data: alternativas } = qIds.length
+    ? await svc.from('simulado_alternativas').select('id, questao_id, texto, ordem, correta').in('questao_id', qIds)
+    : { data: [] as any[] }
+  const altsPorQ = new Map<string, any[]>()
+  for (const a of alternativas ?? []) {
+    const arr = altsPorQ.get(a.questao_id) ?? []; arr.push(a); altsPorQ.set(a.questao_id, arr)
+  }
+
+  // Re-correções + impactos (paginado — pode passar de 1000).
   const { data: recs } = await svc
     .from('simulado_recorrecoes')
     .select('id, questao_id, tipo, motivo, politica, executado_em')
     .eq('simulado_id', simuladoId)
     .order('executado_em', { ascending: false })
+  const corrigidasIds = new Set((recs ?? []).map((r: any) => r.questao_id))
   const recIds = (recs ?? []).map((r: any) => r.id)
-  const { data: impactos } = recIds.length
-    ? await svc.from('simulado_recorrecao_impactos').select('recorrecao_id, estudante_id, nota_antes, nota_depois, delta, ranking_antes, ranking_depois, classificacao').in('recorrecao_id', recIds)
-    : { data: [] as any[] }
-  const estIds = [...new Set((impactos ?? []).map((i: any) => i.estudante_id))]
-  const { data: ests } = estIds.length
-    ? await svc.from('simulado_estudantes').select('id, nome').in('id', estIds)
-    : { data: [] as any[] }
-  const estMap = new Map((ests ?? []).map((e: any) => [e.id, e.nome]))
+
+  const impactos = recIds.length
+    ? await fetchAll<any>(() => svc
+        .from('simulado_recorrecao_impactos')
+        .select('recorrecao_id, estudante_id, nota_antes, nota_depois, delta, ranking_antes, ranking_depois, classificacao')
+        .in('recorrecao_id', recIds)
+        .order('recorrecao_id'))
+    : []
+  const estMap = await nomesPorIds(svc, [...new Set(impactos.map((i: any) => i.estudante_id))])
   const impPorRec = new Map<string, any[]>()
-  for (const im of impactos ?? []) {
+  for (const im of impactos) {
     const arr = impPorRec.get(im.recorrecao_id) ?? []; arr.push(im); impPorRec.set(im.recorrecao_id, arr)
   }
 
-  return (
-    <div className="space-y-5">
-      {/* Anular questões */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Anular questão</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {(pq ?? []).length === 0 && <p className="text-sm text-muted-foreground">Simulado sem questões.</p>}
-          {(pq ?? []).map((x: any) => (
-            <div key={x.questao_id} className="flex items-start justify-between gap-3 rounded-lg border p-3">
-              <p className="line-clamp-2 flex-1 text-sm">
-                <span className="mr-1 font-mono text-xs text-muted-foreground">Q{(x.ordem ?? 0) + 1}.</span>
-                {enunMap.get(x.questao_id) ?? '—'}
-              </p>
-              {x.anulada ? (
-                <Badge variant="destructive"><Ban className="mr-1 h-3 w-3" /> Anulada</Badge>
-              ) : (
-                <AnularQuestaoButton simuladoId={simuladoId} questaoId={x.questao_id} />
-              )}
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+  // Questões ainda SEM correção (para o seletor).
+  const questoesForm: QuestaoCorrecao[] = (pq ?? [])
+    .filter((x: any) => !corrigidasIds.has(x.questao_id) && !x.anulada)
+    .map((x: any) => ({
+      id: x.questao_id,
+      ordem: x.ordem ?? 0,
+      enunciado: enunMap.get(x.questao_id) ?? '—',
+      alternativas: (altsPorQ.get(x.questao_id) ?? []).map((a: any) => ({ id: a.id, ordem: a.ordem ?? 0, texto: a.texto ?? '', correta: !!a.correta })),
+    }))
 
-      {/* Relatório antes/depois */}
-      {(recs ?? []).map((r: any) => {
-        const imp = (impPorRec.get(r.id) ?? []).slice().sort((a, b) => b.delta - a.delta)
-        const benef = imp.filter((i) => i.classificacao === 'beneficiado').length
-        const prej = imp.filter((i) => i.classificacao === 'prejudicado').length
-        return (
-          <Card key={r.id}>
-            <CardHeader>
-              <CardTitle className="text-base">
-                Anulação — Q. {(enunMap.get(r.questao_id) ?? '').slice(0, 50)}…
+  const isTroca = (t: string) => t === 'troca_alternativa'
+  const rotulo = (t: string) => (isTroca(t) ? 'Troca de alternativa' : 'Anulação')
+
+  return (
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+      {/* ESQUERDA: relatórios antes/depois (rola) */}
+      <div className="order-2 space-y-4 lg:order-1">
+        {(recs ?? []).length === 0 && (
+          <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Nenhuma correção aplicada ainda. Use “Adicionar correção”.</CardContent></Card>
+        )}
+        {(recs ?? []).map((r: any) => {
+          const imp = (impPorRec.get(r.id) ?? []).slice().sort((a, b) => b.delta - a.delta)
+          const benef = imp.filter((i) => i.classificacao === 'beneficiado').length
+          const prej = imp.filter((i) => i.classificacao === 'prejudicado').length
+          return (
+            <Card key={r.id} className="overflow-hidden">
+              <CardHeader className="gap-2 border-b bg-muted/30">
+                <div className="flex items-start justify-between gap-3">
+                  <CardTitle className="text-sm font-semibold leading-snug">
+                    <span className="mr-1.5 font-mono text-muted-foreground">Q{ordemMap.get(r.questao_id) ?? '?'}</span>
+                    {(enunMap.get(r.questao_id) ?? '').replace(/\s+/g, ' ').slice(0, 70)}…
+                  </CardTitle>
+                  <Badge variant={isTroca(r.tipo) ? 'secondary' : 'destructive'} className="shrink-0">
+                    {isTroca(r.tipo) ? <><Repeat className="mr-1 h-3 w-3" /> Gabarito</> : <><Ban className="mr-1 h-3 w-3" /> Anulada</>}
+                  </Badge>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 font-medium text-green-600">
+                    <TrendingUp className="h-3 w-3" /> {benef} beneficiado(s)
+                  </span>
+                  {prej > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 font-medium text-red-600">
+                      <TrendingDown className="h-3 w-3" /> {prej} prejudicado(s)
+                    </span>
+                  )}
+                  <span className="text-muted-foreground">
+                    {isTroca(r.tipo) ? 'já acertou ou marcou a nova' : (r.politica === 'pontua_todos' ? 'pontua todos' : 'desconsidera')}
+                    {r.motivo ? ` · ${r.motivo}` : ''}
+                  </span>
+                </div>
+              </CardHeader>
+              {imp.length > 0 && (
+                <CardContent className="p-0">
+                  <div className="max-h-80 overflow-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 z-10 bg-card text-xs text-muted-foreground shadow-[inset_0_-1px_0_var(--border)]">
+                        <tr>
+                          <th className="px-4 py-2 text-left font-medium">Aluno</th>
+                          <th className="px-3 py-2 text-right font-medium">Antes</th>
+                          <th className="px-3 py-2 text-right font-medium">Depois</th>
+                          <th className="px-4 py-2 text-right font-medium">Δ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {imp.map((i, idx) => (
+                          <tr key={idx} className="border-t transition-colors hover:bg-muted/40">
+                            <td className="px-4 py-1.5 font-medium">{estMap.get(i.estudante_id) ?? '—'}</td>
+                            <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{nota1(i.nota_antes)}</td>
+                            <td className="px-3 py-1.5 text-right font-semibold tabular-nums">{nota1(i.nota_depois)}</td>
+                            <td className="px-4 py-1.5 text-right">
+                              <span className={`tabular-nums ${i.delta > 0 ? 'text-green-600' : i.delta < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                {i.delta > 0 ? '+' : ''}{nota1(i.delta)}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )
+        })}
+      </div>
+
+      {/* DIREITA: fixa no topo — adicionar + questões corrigidas */}
+      <div className="order-1 space-y-4 lg:order-2 lg:sticky lg:top-[148px]">
+        <div>
+          <h3 className="text-base font-semibold">Re-correção</h3>
+          <p className="text-xs text-muted-foreground">Anulações e trocas de gabarito.</p>
+        </div>
+
+        <AdicionarCorrecao simuladoId={simuladoId} questoes={questoesForm} />
+
+        {(recs ?? []).length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Users className="h-4 w-4" /> Questões corrigidas
+                <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">{(recs ?? []).length}</span>
               </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Política: {r.politica === 'pontua_todos' ? 'Pontua todos' : 'Desconsidera'}
-                {r.motivo ? ` · ${r.motivo}` : ''} · {new Date(r.executado_em).toLocaleString('pt-BR')}
-              </p>
-              <div className="flex gap-3 pt-1 text-xs">
-                <span className="text-green-600">↑ {benef} beneficiado(s)</span>
-                <span className="text-red-600">↓ {prej} prejudicado(s)</span>
-              </div>
             </CardHeader>
-            <CardContent className="p-0">
-              <div className="max-h-72 overflow-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-muted/50 text-xs text-muted-foreground">
-                    <tr>
-                      <th className="px-4 py-2 text-left font-medium">Aluno</th>
-                      <th className="px-4 py-2 text-right font-medium">Nota antes</th>
-                      <th className="px-4 py-2 text-right font-medium">Nota depois</th>
-                      <th className="px-4 py-2 text-right font-medium">Δ</th>
-                      <th className="px-4 py-2 text-right font-medium">Posição</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {imp.map((i, idx) => (
-                      <tr key={idx} className="border-t">
-                        <td className="px-4 py-2 font-medium">{estMap.get(i.estudante_id) ?? 'Aluno'}</td>
-                        <td className="px-4 py-2 text-right text-muted-foreground">{Number(i.nota_antes).toFixed(1)}</td>
-                        <td className="px-4 py-2 text-right font-semibold">{Number(i.nota_depois).toFixed(1)}</td>
-                        <td className="px-4 py-2 text-right">
-                          <span className={`inline-flex items-center gap-1 ${i.delta > 0 ? 'text-green-600' : i.delta < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
-                            {i.delta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : i.delta < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
-                            {i.delta > 0 ? '+' : ''}{Number(i.delta).toFixed(1)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 text-right text-muted-foreground">
-                          {i.ranking_antes ?? '—'}º → <strong className="text-foreground">{i.ranking_depois ?? '—'}º</strong>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <CardContent className="flex flex-col gap-1.5 pt-0">
+              {(recs ?? []).map((r: any) => (
+                <div key={r.id} className={`flex w-full items-center gap-2 rounded-lg border py-1.5 pl-2.5 pr-1 text-xs ${isTroca(r.tipo) ? 'border-secondary-foreground/20 bg-secondary/40' : 'border-destructive/20 bg-destructive/5'}`}>
+                  {isTroca(r.tipo) ? <Repeat className="h-3.5 w-3.5 shrink-0 text-secondary-foreground" /> : <Ban className="h-3.5 w-3.5 shrink-0 text-destructive" />}
+                  <span className="font-mono font-medium">Q{ordemMap.get(r.questao_id) ?? '?'}</span>
+                  <span className="text-muted-foreground">{isTroca(r.tipo) ? 'gabarito' : 'anulada'}</span>
+                  <span className="ml-auto"><RemoverCorrecaoButton simuladoId={simuladoId} questaoId={r.questao_id} /></span>
+                </div>
+              ))}
             </CardContent>
           </Card>
-        )
-      })}
+        )}
+      </div>
     </div>
   )
 }
