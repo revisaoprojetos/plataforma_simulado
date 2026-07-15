@@ -7,18 +7,21 @@
 #     (publica as imagens web e worker no ghcr.io). Deixe os 2 pacotes PÚBLICOS
 #     (GitHub → Packages → cada pacote → Package settings → Change visibility → Public),
 #     senão o Swarm não consegue baixar.
-#  2) Rode a migration supabase/migrations/20260701000001_pdf_worker_gotenberg.sql
-#     no SQL Editor do Supabase (bucket `pdfs` + tabela simulado_pdf_jobs).
-#  3) Preencha as variáveis em "Environment variables" no Portainer (ver README/guia).
-#     Inclua CRON_SECRET (qualquer segredo forte) — habilita o auto-encerramento server-side.
+#  2) O schema do Supabase de produção já está aplicado — não rode migrations
+#     como parte deste deploy (ver docs/deploy/runbook-vps.md).
+#  3) Preencha as variáveis em "Environment variables" no Portainer (ver
+#     docs/deploy/runbook-vps.md), incluindo TRAEFIK_NETWORK, TRAEFIK_CERTRESOLVER
+#     e APP_DOMAIN — descobertos rodando `docker network ls` / inspecionando o
+#     serviço do Traefik já rodando na VPS.
 #
-# Coloque seu proxy/HTTPS (Cloudflare, Nginx Proxy Manager, Traefik…) na frente do `web`.
+# Roteamento HTTPS é feito pelo Traefik já existente na VPS (rede externa
+# TRAEFIK_NETWORK) — este compose não publica porta nenhuma diretamente.
 # =====================================================================
 
 services:
   # App Next.js — UI, enfileira PDFs e serve as páginas /imprimir
   web:
-    image: ghcr.io/revisaoprojetos/plataforma_simulado:latest
+    image: ghcr.io/revisaoprojetos/plataforma_simulado:${IMAGE_TAG:-latest}
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
@@ -30,18 +33,30 @@ services:
       - CRON_SECRET=${CRON_SECRET}
       # Criptografa em repouso os segredos no banco (credenciais Curseduca por tenant)
       - APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY}
+      # Assina/verifica os JWTs de sessão do portal do aluno (evita acoplar a validade
+      # da sessão à SUPABASE_SERVICE_ROLE_KEY, usada como fallback se ausente)
+      - ALUNO_SESSION_SECRET=${ALUNO_SESSION_SECRET}
       # Opcional: tenant que pode usar as credenciais Curseduca do .env (os demais usam o banco)
       - CURSEDUCA_ENV_TENANT_ID=${CURSEDUCA_ENV_TENANT_ID}
-    ports:
-      - "3000:3000"
+    networks:
+      - default
+      - traefik
     deploy:
       replicas: 1
       restart_policy:
         condition: any
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik-public}"
+        - "traefik.http.routers.plataforma-simulado.rule=Host(`${APP_DOMAIN:-simulado.revisaopge.com.br}`)"
+        - "traefik.http.routers.plataforma-simulado.entrypoints=websecure"
+        - "traefik.http.routers.plataforma-simulado.tls=true"
+        - "traefik.http.routers.plataforma-simulado.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+        - "traefik.http.services.plataforma-simulado.loadbalancer.server.port=3000"
 
   # Consome a fila, chama o Gotenberg, sobe o PDF no bucket `pdfs`
   worker:
-    image: ghcr.io/revisaoprojetos/plataforma_simulado-worker:latest
+    image: ghcr.io/revisaoprojetos/plataforma_simulado-worker:${IMAGE_TAG:-latest}
     environment:
       - NODE_ENV=production
       - SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
@@ -52,6 +67,8 @@ services:
       # Auto-encerramento: mesmo valor do CRON_SECRET do web (worker chama /api/cron/encerrar-expirados a cada 60s)
       - CRON_SECRET=${CRON_SECRET}
       # PDF_PUBLIC_BASE é opcional: sem ela, o worker usa o getPublicUrl do Supabase.
+    networks:
+      - default
     deploy:
       replicas: 1
       restart_policy:
@@ -64,6 +81,8 @@ services:
       - gotenberg
       - --chromium-allow-list=.*
       - --api-timeout=120s
+    networks:
+      - default
     deploy:
       replicas: 1
       restart_policy:
@@ -75,10 +94,18 @@ services:
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
+    networks:
+      - default
     deploy:
       replicas: 1
       restart_policy:
         condition: any
+
+networks:
+  default:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik-public}
 
 volumes:
   redis_data:
