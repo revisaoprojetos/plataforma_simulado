@@ -269,7 +269,25 @@ async function lerLinhas(arquivo: File): Promise<string[][]> {
     })
     return linhas
   }
-  return parseCSV(await arquivo.text())
+  return parseCSV(await lerTextoCsv(arquivo))
+}
+
+/**
+ * Lê o texto do CSV tolerando o encoding: UTF-8 (com ou sem BOM) ou, se os bytes
+ * não forem UTF-8 válido (ex.: "CSV ANSI"/Windows-1252 exportado do Excel), refaz
+ * a decodificação em Windows-1252. Evita cabeçalhos acentuados (Número, Nível,
+ * Órgão, Comentário…) chegarem corrompidos e não serem reconhecidos.
+ */
+async function lerTextoCsv(arquivo: File): Promise<string> {
+  const buf = new Uint8Array(await arquivo.arrayBuffer())
+  // Remove BOM UTF-8, se houver.
+  const bytes = buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf ? buf.subarray(3) : buf
+  const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(bytes)
+  // O caractere de substituição (�) indica bytes que não eram UTF-8 → tenta Windows-1252.
+  if (utf8.includes('�')) {
+    try { return new TextDecoder('windows-1252').decode(bytes) } catch { return utf8 }
+  }
+  return utf8
 }
 
 /** Constrói as questões a partir das linhas da planilha (1ª linha = cabeçalho). */

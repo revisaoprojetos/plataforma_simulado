@@ -103,16 +103,31 @@ const GRUPOS: { titulo: string; pages: ScreenKey[] | 'all'; desc?: string; campo
   },
   // ——— prova encerrada ———
   {
-    titulo: 'Encerrada · barra e botões',
+    titulo: 'Encerrada · barra e cards',
     pages: ['encerrada'],
     campos: [
       { k: 'card', label: 'Fundo dos cards', desc: 'Resumo, questões e navegador' },
       { k: 'topbar', label: 'Fundo da barra', desc: 'Cor da top bar (header)' },
       { k: 'topbarTexto', label: 'Texto da barra', desc: 'Texto/ícone da barra superior' },
-      { k: 'cadernoBtn', label: 'Caderno — texto/borda', desc: 'Texto e borda dos botões de caderno (PDF)' },
-      { k: 'cadernoBtnFundo', label: 'Caderno — fundo', desc: 'Fundo dos botões de caderno (PDF)' },
-      { k: 'voltarBtn', label: 'Voltar ao menu — texto', desc: 'Cor do texto do botão Voltar ao menu' },
-      { k: 'voltarBtnFundo', label: 'Voltar ao menu — fundo', desc: 'Fundo do botão Voltar ao menu' },
+    ],
+  },
+  {
+    titulo: 'Encerrada · botões (normal e ao passar o mouse)',
+    pages: ['encerrada'],
+    desc: 'Cada botão tem cor de texto e de fundo no estado normal e no estado ativo (ao passar o mouse).',
+    campos: [
+      { k: 'cadernoBtn', label: 'Caderno — texto (normal)', desc: 'Texto/borda dos botões de caderno' },
+      { k: 'cadernoBtnFundo', label: 'Caderno — fundo (normal)', desc: 'Fundo dos botões de caderno' },
+      { k: 'cadernoBtnAtivo', label: 'Caderno — texto (ativo)', desc: 'Texto/borda ao passar o mouse' },
+      { k: 'cadernoBtnFundoAtivo', label: 'Caderno — fundo (ativo)', desc: 'Fundo ao passar o mouse' },
+      { k: 'inicioBtn', label: 'Voltar ao início — texto (normal)', desc: 'Texto/borda do botão Voltar ao início' },
+      { k: 'inicioBtnFundo', label: 'Voltar ao início — fundo (normal)', desc: 'Fundo do botão Voltar ao início' },
+      { k: 'inicioBtnAtivo', label: 'Voltar ao início — texto (ativo)', desc: 'Texto/borda ao passar o mouse' },
+      { k: 'inicioBtnFundoAtivo', label: 'Voltar ao início — fundo (ativo)', desc: 'Fundo ao passar o mouse' },
+      { k: 'voltarBtn', label: 'Meus simulados — texto (normal)', desc: 'Texto do botão Meus simulados' },
+      { k: 'voltarBtnFundo', label: 'Meus simulados — fundo (normal)', desc: 'Fundo do botão Meus simulados' },
+      { k: 'voltarBtnAtivo', label: 'Meus simulados — texto (ativo)', desc: 'Texto ao passar o mouse' },
+      { k: 'voltarBtnFundoAtivo', label: 'Meus simulados — fundo (ativo)', desc: 'Fundo ao passar o mouse' },
     ],
   },
   {

@@ -19,7 +19,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
         <div className="flex h-screen w-full overflow-hidden">
           <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <AlunoTopbar nome={sessao.nome} />
+            <AlunoTopbar nome={sessao.nome} email={sessao.email} />
             <main className="flex-1 overflow-y-auto p-6">{children}</main>
           </div>
         </div>

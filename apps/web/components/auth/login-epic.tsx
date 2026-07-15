@@ -79,7 +79,7 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
 
   const adminBtn = (
     <button
-      onClick={() => { setErro(null); setSenha(''); setModo(modo === 'admin' ? 'select' : 'admin') }}
+      onClick={() => { setErro(null); setSenha(''); setModo(modo === 'admin' ? 'aluno' : 'admin') }}
       className={cn(
         'fixed bottom-5 right-5 z-20 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium shadow-lg backdrop-blur transition-colors',
         modo === 'admin' ? 'border-primary/60 bg-primary/15 text-primary hover:bg-primary/25' : 'border-border bg-card text-muted-foreground hover:border-primary/60 hover:text-foreground',

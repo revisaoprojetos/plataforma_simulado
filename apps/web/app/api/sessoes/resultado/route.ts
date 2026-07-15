@@ -4,6 +4,8 @@ import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
+import { mesclarModalidades } from '@/lib/caderno-designer/types'
+import { tipoDoSimulado, filtrarModsPorTipo } from '@/lib/simulado/tipo'
 
 // GET /api/sessoes/resultado?st={sessao_id}
 // Dados da central de revisão: resumo + questões com resposta do aluno.
@@ -175,8 +177,9 @@ export async function GET(request: NextRequest) {
     }
   } catch { /* sem estudante */ }
 
-  // Caderno vinculado (para o download do "Caderno completo").
+  // Caderno vinculado + suas modalidades (para o download "como você fez" por modalidade).
   let cadernoId: string | null = null
+  let modalidades: { id: string; nome: string }[] = []
   try {
     const qids = questoes.map((q: any) => q.id).filter(Boolean)
     if (qids.length) {
@@ -186,6 +189,15 @@ export async function GET(request: NextRequest) {
         const { data: cads } = await admin.from('simulado_cadernos_designer').select('id, config').order('atualizado_em', { ascending: false })
         const cad = (cads ?? []).find((c: any) => c.config?.bancoId && pastaIds.includes(c.config.bancoId))
         cadernoId = (cad?.id as string) ?? null
+        if (cad) {
+          const cfg = (cad.config ?? {}) as any
+          const docs = (cfg.docsV2 ?? {}) as Record<string, any>
+          const temConteudo = (d: any) => !!d && Array.isArray(d.pages) && d.pages.some((p: any) => (p.blocks ?? []).some((b: any) => b.type !== 'plano-fundo'))
+          const tipo = tipoDoSimulado(questoes.map((q: any) => q.tipo))
+          modalidades = filtrarModsPorTipo(mesclarModalidades(cfg.modalidadesV2), tipo)
+            .filter((m) => temConteudo(docs[m.id]))
+            .map((m) => ({ id: m.id, nome: m.nome }))
+        }
       }
     }
   } catch { /* sem caderno */ }
@@ -204,6 +216,7 @@ export async function GET(request: NextRequest) {
     finalizado_em: sessao.finalizado_em ?? null,
     estudante_id: sessao.estudante_id ?? null,
     caderno_id: cadernoId,
+    modalidades,
     posicao: sessao.posicao_ranking ?? null,
     total_participantes: totalParticipantes ?? 0,
     stats_por_disciplina: statsPorDisciplina,

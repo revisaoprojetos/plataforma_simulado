@@ -5,14 +5,14 @@ import { toast } from 'sonner'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { LogOut } from 'lucide-react'
 
 function iniciais(nome: string) {
   return nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 }
 
-export function AlunoTopbar({ nome }: { nome: string }) {
+export function AlunoTopbar({ nome, email }: { nome: string; email?: string }) {
   const router = useRouter()
   async function sair() {
     toast.success('Saindo… logout realizado.')
@@ -39,7 +39,12 @@ export function AlunoTopbar({ nome }: { nome: string }) {
           <Avatar className="h-8 w-8"><AvatarFallback className="text-xs">{iniciais(nome)}</AvatarFallback></Avatar>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel className="truncate">{nome}</DropdownMenuLabel>
+          <div className="px-2 py-1.5">
+            <div className="flex flex-col space-y-1">
+              <p className="truncate text-sm font-medium leading-none">{nome}</p>
+              {email && <p className="truncate text-xs leading-none text-muted-foreground">{email}</p>}
+            </div>
+          </div>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={sair}><LogOut className="mr-2 h-4 w-4" /> Sair</DropdownMenuItem>
         </DropdownMenuContent>

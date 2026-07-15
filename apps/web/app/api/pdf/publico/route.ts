@@ -10,7 +10,7 @@ const WEB_INTERNAL = process.env.WEB_INTERNAL_URL ?? 'http://localhost:3000'
 
 // Geração de PDF iniciada pelo PRÓPRIO ALUNO, autorizada pelo id da sessão
 // (mesmo modelo de /imprimir/resultado). Sempre no servidor (worker + Gotenberg).
-type Body = { sessaoToken: string; tipo: 'caderno' | 'resultado'; mod?: string; cadernoId?: string; gabarito?: boolean; titulo?: string }
+type Body = { sessaoToken: string; tipo: 'caderno' | 'resultado'; mod?: string; cadernoId?: string; gabarito?: boolean; semGabarito?: boolean; titulo?: string }
 
 export async function POST(request: NextRequest) {
   let body: Body
@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
     qs.set('sessao', body.sessaoToken)
     if (sessao.estudante_id) qs.set('aluno', String(sessao.estudante_id))
     if (body.gabarito) qs.set('gabarito', '1')
+    if (body.semGabarito) qs.set('semgab', '1') // "como você fez": mostra marcações, oculta a correção
     qs.set('pdftoken', token)
     url = `${WEB_INTERNAL}/imprimir/caderno/${body.cadernoId}?${qs.toString()}`
     titulo = body.titulo ?? `Caderno: ${cad.nome}`

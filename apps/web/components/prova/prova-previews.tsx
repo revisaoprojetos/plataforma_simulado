@@ -1,6 +1,6 @@
 'use client'
 
-import { BookOpen, CheckCircle2, XCircle, Circle, Home, Clock, FileText, FileStack, Trophy, Calendar, Moon, RefreshCw } from 'lucide-react'
+import { BookOpen, CheckCircle2, XCircle, Circle, Home, Clock, FileText, FileStack, Trophy, Calendar, Moon, RefreshCw, ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FitaTopo } from '@/components/prova/fita-topo'
 
@@ -123,14 +123,32 @@ const COR_BRANCO = 'var(--prova-branco, #6b7280)'
 const COR_MEDIA = 'var(--prova-media, #6d28d9)'
 // Card de resultado: fundo = versão clara da própria cor.
 const cardStat = (cor: string) => ({ borderColor: `color-mix(in oklab, ${cor} 30%, var(--border))`, background: `color-mix(in oklab, ${cor} 12%, var(--card))` })
-// Botões da prova encerrada — classes/cores idênticas à tela real.
-const BTN_CADERNO = 'inline-flex h-10 items-center justify-center gap-1.5 rounded-md border px-4 text-sm font-medium'
-const CADERNO_STYLE = {
-  background: 'var(--prova-caderno-btn-fundo, var(--background))',
-  borderColor: 'var(--prova-caderno-btn, var(--border))',
-  color: 'var(--prova-caderno-btn, var(--foreground))',
-}
-const VOLTAR_STYLE = { background: 'var(--prova-voltar-btn-fundo, var(--primary))', color: 'var(--prova-voltar-btn, #fff)' }
+// Botões da prova encerrada — mesma classe .hud-btn da tela real (normal + hover editável no HUD).
+const BTN_CADERNO = 'hud-btn inline-flex h-10 items-center justify-center gap-1.5 rounded-md border px-4 text-sm font-medium'
+const STYLE_CADERNO = {
+  '--btn-bg': 'var(--prova-caderno-btn-fundo, var(--background))',
+  '--btn-fg': 'var(--prova-caderno-btn, var(--foreground))',
+  '--btn-bd': 'var(--prova-caderno-btn, var(--border))',
+  '--btn-bg-ativo': 'var(--prova-caderno-btn-fundo-ativo, var(--prova-caderno-btn, var(--primary)))',
+  '--btn-fg-ativo': 'var(--prova-caderno-btn-ativo, #fff)',
+  '--btn-bd-ativo': 'var(--prova-caderno-btn-fundo-ativo, var(--prova-caderno-btn))',
+} as React.CSSProperties
+const STYLE_INICIO = {
+  '--btn-bg': 'var(--prova-inicio-btn-fundo, var(--background))',
+  '--btn-fg': 'var(--prova-inicio-btn, var(--foreground))',
+  '--btn-bd': 'var(--prova-inicio-btn, var(--border))',
+  '--btn-bg-ativo': 'var(--prova-inicio-btn-fundo-ativo, var(--prova-inicio-btn, var(--primary)))',
+  '--btn-fg-ativo': 'var(--prova-inicio-btn-ativo, #fff)',
+  '--btn-bd-ativo': 'var(--prova-inicio-btn-fundo-ativo, var(--prova-inicio-btn))',
+} as React.CSSProperties
+const STYLE_VOLTAR = {
+  '--btn-bg': 'var(--prova-voltar-btn-fundo, var(--background))',
+  '--btn-fg': 'var(--prova-voltar-btn, var(--foreground))',
+  '--btn-bd': 'var(--prova-voltar-btn-fundo, var(--border))',
+  '--btn-bg-ativo': 'var(--prova-voltar-btn-fundo-ativo, var(--prova-voltar-btn-fundo))',
+  '--btn-fg-ativo': 'var(--prova-voltar-btn-ativo, var(--prova-voltar-btn, #fff))',
+  '--btn-bd-ativo': 'var(--prova-voltar-btn-fundo-ativo, var(--prova-voltar-btn-fundo))',
+} as React.CSSProperties
 
 /** Prévia (estática) da tela de prova encerrada — igual ao real: resumo + navegador + primeira questão de revisão + voltar. */
 export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, liberado = true }: {
@@ -173,8 +191,10 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
             <CheckCircle2 className="h-5 w-5 text-green-600" />
             <span className="text-sm font-semibold">Simulado finalizado</span>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium"
-            style={{ background: 'var(--prova-voltar-btn-fundo, var(--background))', borderColor: 'var(--prova-voltar-btn-fundo, var(--border))', color: 'var(--prova-voltar-btn, var(--foreground))' }}><Home className="h-3.5 w-3.5" /> Voltar ao menu</span>
+          <div className="flex items-center gap-1.5">
+            <span className="hud-btn inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium" style={STYLE_INICIO}><ArrowLeft className="h-3.5 w-3.5" /> Voltar ao início</span>
+            <span className="hud-btn inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium" style={STYLE_VOLTAR}><Home className="h-3.5 w-3.5" /> Meus simulados</span>
+          </div>
         </div>
       </header>
 
@@ -226,12 +246,16 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
           )}
 
           <div className="mt-5 grid grid-cols-2 gap-2">
-            <div className={BTN_CADERNO} style={CADERNO_STYLE}><FileText className="mr-1.5 h-4 w-4" /> Caderno de gabarito PDF</div>
-            <div className={BTN_CADERNO} style={CADERNO_STYLE}><FileStack className="mr-1.5 h-4 w-4" /> Caderno completo PDF</div>
+            <div className={BTN_CADERNO} style={STYLE_CADERNO}><FileText className="mr-1.5 h-4 w-4" /> Caderno de gabarito PDF</div>
+            <div className={BTN_CADERNO} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Caderno completo PDF</div>
           </div>
 
           {/* Voltar ao menu — logo abaixo dos downloads */}
-          <div className="mt-2 inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-md text-sm font-medium" style={VOLTAR_STYLE}><Home className="h-4 w-4" /> Voltar ao menu</div>
+          {/* Cadernos "como você fez" (sem gabarito), um por modalidade — a navegação fica na barra superior. */}
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Caderno Objetivo</div>
+            <div className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Caderno Completo</div>
+          </div>
         </div>
 
         {/* Desempenho por matéria — só quando o gabarito está liberado */}
