@@ -25,6 +25,11 @@ rodou com sucesso no commit mais recente da `main`. Em seguida, em
 `plataforma_simulado-worker` estão como **Public** (Package settings →
 Change visibility).
 
+Note que `NEXT_PUBLIC_APP_URL` já vem embutida na imagem em build-time (como
+build-arg no workflow, fixada para `https://simulado.revisaopge.com.br`) —
+não é necessário (nem tem efeito) defini-la nas variáveis de ambiente do
+Portainer.
+
 ## 3. Descobrir a rede e o certresolver do Traefik
 
 Via SSH na VPS:
@@ -59,6 +64,7 @@ Procure um argumento `--certificatesresolvers.<nome>.acme...` — esse
    | `SUPABASE_SERVICE_ROLE_KEY` | do `.env` local |
    | `PDF_RENDER_SECRET` | do `.env` local |
    | `CRON_SECRET` | do `.env` local |
+   | `ALUNO_SESSION_SECRET` | do `.env` local |
    | `APP_ENCRYPTION_KEY` | **exatamente** o mesmo valor do `.env` local (protege dados já criptografados no banco) |
    | `CURSEDUCA_ENV_TENANT_ID` | do `.env` local (se aplicável) |
    | `TRAEFIK_NETWORK` | nome descoberto no passo 3 |

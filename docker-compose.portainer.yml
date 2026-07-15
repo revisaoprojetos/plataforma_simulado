@@ -33,6 +33,9 @@ services:
       - CRON_SECRET=${CRON_SECRET}
       # Criptografa em repouso os segredos no banco (credenciais Curseduca por tenant)
       - APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY}
+      # Assina/verifica os JWTs de sessão do portal do aluno (evita acoplar a validade
+      # da sessão à SUPABASE_SERVICE_ROLE_KEY, usada como fallback se ausente)
+      - ALUNO_SESSION_SECRET=${ALUNO_SESSION_SECRET}
       # Opcional: tenant que pode usar as credenciais Curseduca do .env (os demais usam o banco)
       - CURSEDUCA_ENV_TENANT_ID=${CURSEDUCA_ENV_TENANT_ID}
     networks:
