@@ -11,11 +11,14 @@
 #     como parte deste deploy (ver docs/deploy/runbook-vps.md).
 #  3) Preencha as variáveis em "Environment variables" no Portainer (ver
 #     docs/deploy/runbook-vps.md), incluindo TRAEFIK_NETWORK, TRAEFIK_CERTRESOLVER
-#     e APP_DOMAIN — descobertos rodando `docker network ls` / inspecionando o
-#     serviço do Traefik já rodando na VPS.
+#     e APP_DOMAIN — os defaults abaixo já refletem a stack Traefik real desta VPS
+#     (rede `network_swarm_public`, resolver `letsencryptresolver`).
 #
 # Roteamento HTTPS é feito pelo Traefik já existente na VPS (rede externa
 # TRAEFIK_NETWORK) — este compose não publica porta nenhuma diretamente.
+#
+# Todos os serviços desta stack rodam no node WORKER do Swarm (node.role ==
+# worker) — o manager é reservado para o Traefik e outras stacks de infra.
 # =====================================================================
 
 services:
@@ -45,13 +48,16 @@ services:
       replicas: 1
       restart_policy:
         condition: any
+      placement:
+        constraints:
+          - node.role == worker
       labels:
         - "traefik.enable=true"
-        - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik-public}"
+        - "traefik.docker.network=${TRAEFIK_NETWORK:-network_swarm_public}"
         - "traefik.http.routers.plataforma-simulado.rule=Host(`${APP_DOMAIN:-simulado.revisaopge.com.br}`)"
         - "traefik.http.routers.plataforma-simulado.entrypoints=websecure"
         - "traefik.http.routers.plataforma-simulado.tls=true"
-        - "traefik.http.routers.plataforma-simulado.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+        - "traefik.http.routers.plataforma-simulado.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencryptresolver}"
         - "traefik.http.services.plataforma-simulado.loadbalancer.server.port=3000"
 
   # Consome a fila, chama o Gotenberg, sobe o PDF no bucket `pdfs`
@@ -73,6 +79,9 @@ services:
       replicas: 1
       restart_policy:
         condition: any
+      placement:
+        constraints:
+          - node.role == worker
 
   # Motor de PDF (Chromium embutido) — renderiza /imprimir fora do app
   gotenberg:
@@ -87,6 +96,9 @@ services:
       replicas: 1
       restart_policy:
         condition: any
+      placement:
+        constraints:
+          - node.role == worker
 
   # Fila (compartilhada web=produtor / worker=consumidor)
   redis:
@@ -100,12 +112,15 @@ services:
       replicas: 1
       restart_policy:
         condition: any
+      placement:
+        constraints:
+          - node.role == worker
 
 networks:
   default:
   traefik:
     external: true
-    name: ${TRAEFIK_NETWORK:-traefik-public}
+    name: ${TRAEFIK_NETWORK:-network_swarm_public}
 
 volumes:
   redis_data:

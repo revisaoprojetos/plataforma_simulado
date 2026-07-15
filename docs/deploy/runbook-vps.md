@@ -30,24 +30,26 @@ build-arg no workflow, fixada para `https://simulado.revisaopge.com.br`) —
 não é necessário (nem tem efeito) defini-la nas variáveis de ambiente do
 Portainer.
 
-## 3. Descobrir a rede e o certresolver do Traefik
+## 3. Rede e certresolver do Traefik
 
-Via SSH na VPS:
+Já conhecidos a partir da stack Traefik desta VPS — não é preciso descobrir
+nada, os defaults do `docker-compose.portainer.yml` já usam esses valores:
 
-```bash
-docker network ls --filter driver=overlay
-```
+- `TRAEFIK_NETWORK` = `network_swarm_public` (rede overlay externa que o
+  Traefik escuta — `--providers.docker.network=network_swarm_public` na
+  stack do Traefik).
+- `TRAEFIK_CERTRESOLVER` = `letsencryptresolver` (nome do resolver ACME
+  configurado no Traefik — `--certificatesresolvers.letsencryptresolver.*`).
 
-Anote o nome da rede overlay usada pelo Traefik (ex.: `traefik-public`,
-`traefik_default`) — esse valor vai na variável `TRAEFIK_NETWORK`.
+Só é preciso preenchê-las explicitamente no Portainer (passo 4) se algum dia
+esses nomes mudarem na stack do Traefik; caso contrário os defaults do
+compose já bastam.
 
-```bash
-docker service ls --filter name=traefik
-docker service inspect <nome_do_servico_traefik> --format '{{json .Spec.TaskTemplate.ContainerSpec.Args}}'
-```
-
-Procure um argumento `--certificatesresolvers.<nome>.acme...` — esse
-`<nome>` vai na variável `TRAEFIK_CERTRESOLVER`.
+**Placement:** esta VPS tem 2 nodes no Swarm — o manager (`node.role ==
+manager`, onde o Traefik está fixado) e um worker. O
+`docker-compose.portainer.yml` já restringe os 4 serviços desta stack a
+`node.role == worker`, então não é preciso nenhuma configuração adicional
+para garantir que rodem no node correto.
 
 ## 4. Criar a Stack no Portainer
 
@@ -67,8 +69,8 @@ Procure um argumento `--certificatesresolvers.<nome>.acme...` — esse
    | `ALUNO_SESSION_SECRET` | do `.env` local |
    | `APP_ENCRYPTION_KEY` | **exatamente** o mesmo valor do `.env` local (protege dados já criptografados no banco) |
    | `CURSEDUCA_ENV_TENANT_ID` | do `.env` local (se aplicável) |
-   | `TRAEFIK_NETWORK` | nome descoberto no passo 3 |
-   | `TRAEFIK_CERTRESOLVER` | nome descoberto no passo 3 |
+   | `TRAEFIK_NETWORK` | opcional — default já é `network_swarm_public` (ver passo 3) |
+   | `TRAEFIK_CERTRESOLVER` | opcional — default já é `letsencryptresolver` (ver passo 3) |
    | `APP_DOMAIN` | `simulado.revisaopge.com.br` |
    | `IMAGE_TAG` | `latest` (mudar para um SHA específico só em rollback) |
 
