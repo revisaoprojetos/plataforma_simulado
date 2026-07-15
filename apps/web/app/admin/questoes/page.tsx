@@ -62,7 +62,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
   const { data: disciplinas } = await supabase
     .from('simulado_disciplinas')
     .select('id, nome')
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('nome')
 
   // Busca por código OU enunciado. Tolerante: se a coluna `codigo` ainda não
@@ -75,7 +75,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       .from('simulado_questoes')
       .select(sel, { count: 'exact' })
       .eq('deletado', false)
-      .eq('tenant_id', tenantId ?? '')
+      .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
       .order('created_at', { ascending: false })
       .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)
 

@@ -25,7 +25,7 @@ export default async function FeedbacksPage() {
   const { data } = await svc
     .from('simulado_feedbacks_questao')
     .select('id, tipo, mensagem, status, resposta_admin, criado_em, questao_id, estudante_id')
-    .eq('tenant_id', access.tenantId ?? '')
+    .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('criado_em', { ascending: false })
     .limit(100)
 

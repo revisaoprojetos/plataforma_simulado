@@ -16,9 +16,9 @@ export default async function RelatorioDisciplinaPage({ searchParams }: { search
   let resumos: ResumoDisciplina[] = []
   if (!discId) {
     const { data: disciplinas } = await svc
-      .from('simulado_disciplinas').select('id, nome').eq('tenant_id', tenantId ?? '').order('nome')
+      .from('simulado_disciplinas').select('id, nome').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome')
     const { data: qs } = await svc.from('simulado_questoes')
-      .select('disciplina_id, assunto_id').eq('tenant_id', tenantId ?? '').eq('deletado', false)
+      .select('disciplina_id, assunto_id').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').eq('deletado', false)
     const contQ = new Map<string, number>()
     const assuntos = new Map<string, Set<string>>()
     for (const r of (qs ?? []) as any[]) {

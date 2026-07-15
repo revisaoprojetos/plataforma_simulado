@@ -21,7 +21,7 @@ export async function salvarContatos(formData: FormData) {
   const { data: existing } = await supabase
     .from('simulado_tenant_contatos')
     .select('id')
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .limit(1)
     .single()
 

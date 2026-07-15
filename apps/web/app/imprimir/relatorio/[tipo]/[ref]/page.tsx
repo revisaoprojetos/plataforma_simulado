@@ -34,7 +34,7 @@ export default async function ImprimirRelatorioPage({
     access = await getCurrentAccess()
     if (!access.isAdmin && !access.permissions.includes('questoes:view')) notFound()
   }
-  const tenantId = access.tenantId ?? ''
+  const tenantId = access.tenantId ?? '00000000-0000-0000-0000-000000000000'
   const svc = createAdminClient()
 
   // Marca do tenant (logo + cor primária).

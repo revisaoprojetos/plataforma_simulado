@@ -13,13 +13,13 @@ export default async function BancoQuestoesPage() {
   // Bancos com personalização (cor/ícone) — tolerante caso a migration ainda não tenha rodado.
   let bancos: any[] | null = null
   {
-    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, tipo').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome')
+    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, tipo').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome')
     if (r.error && /cor|icone|capa_url|tipo|column/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome')
+      const r2 = await svc.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome')
       bancos = r2.data
     } else bancos = r.data
   }
-  const { data: vinculos } = await svc.from('simulado_questao_pasta').select('pasta_id').eq('tenant_id', tenantId ?? '')
+  const { data: vinculos } = await svc.from('simulado_questao_pasta').select('pasta_id').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
 
   // Contagem de questões por banco.
   const contagem = new Map<string, number>()

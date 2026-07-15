@@ -14,7 +14,7 @@ export default async function CorrigirPage({ params }: { params: Promise<{ id: s
     .from('simulado_respostas_discursivas')
     .select('id, questao_id, estudante_id, texto, status, nota, feedback')
     .eq('id', id)
-    .eq('tenant_id', access.tenantId ?? '')
+    .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
     .maybeSingle()
   if (!r) notFound()
 

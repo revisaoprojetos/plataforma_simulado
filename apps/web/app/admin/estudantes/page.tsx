@@ -17,7 +17,7 @@ export default async function EstudantesPage() {
     .from('simulado_estudantes')
     .select('id, nome, email, cpf, telefone, classificacao, matricula_externa, created_at')
     .eq('deletado', false)
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('created_at', { ascending: false })
     .order('id', { ascending: true }))
 
@@ -29,7 +29,7 @@ export default async function EstudantesPage() {
   const sess = await fetchAll<any>(() => supabase
     .from('simulado_sessoes_prova')
     .select('estudante_id, nota, status, is_teste')
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .eq('status', 'finalizada')
     .eq('is_teste', false)
     .eq('deletado', false)

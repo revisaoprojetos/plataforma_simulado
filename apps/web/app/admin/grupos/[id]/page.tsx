@@ -11,9 +11,9 @@ export default async function GrupoDetalhePage({ params }: { params: Promise<{ i
   // Grupo (cor é tolerante caso a migration ainda não tenha rodado).
   let grupo: any = null
   {
-    const r = await svc.from('simulado_grupos').select('id, nome, cor').eq('id', id).eq('tenant_id', tenantId ?? '').eq('deletado', false).maybeSingle()
+    const r = await svc.from('simulado_grupos').select('id, nome, cor').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').eq('deletado', false).maybeSingle()
     if (r.error && /cor/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_grupos').select('id, nome').eq('id', id).eq('tenant_id', tenantId ?? '').eq('deletado', false).maybeSingle()
+      const r2 = await svc.from('simulado_grupos').select('id, nome').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').eq('deletado', false).maybeSingle()
       grupo = r2.data
     } else grupo = r.data
   }
@@ -22,7 +22,7 @@ export default async function GrupoDetalhePage({ params }: { params: Promise<{ i
   const { data: gm } = await svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', id)
   const memberIds = new Set((gm ?? []).map((r: any) => r.estudante_id))
 
-  const { data: todos } = await svc.from('simulado_estudantes').select('id, nome, email, classificacao').eq('tenant_id', tenantId ?? '').eq('deletado', false).order('nome')
+  const { data: todos } = await svc.from('simulado_estudantes').select('id, nome, email, classificacao').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').eq('deletado', false).order('nome')
   const membros = (todos ?? []).filter((e: any) => memberIds.has(e.id)).map((e: any) => ({ id: e.id, nome: e.nome, email: e.email ?? null, classificacao: e.classificacao ?? null }))
   const naoMembros = (todos ?? []).filter((e: any) => !memberIds.has(e.id)).map((e: any) => ({ id: e.id, nome: e.nome, email: e.email ?? null, classificacao: e.classificacao ?? null }))
 

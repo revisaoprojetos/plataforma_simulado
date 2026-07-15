@@ -11,7 +11,7 @@ export async function SimuladoAcessos({ simuladoId, modoAplicacao }: { simuladoI
   const svc = createAdminClient()
 
   const [{ data: estudantes }, { data: acessos }] = await Promise.all([
-    svc.from('simulado_estudantes').select('id, nome').eq('tenant_id', access.tenantId ?? '').order('nome').limit(500),
+    svc.from('simulado_estudantes').select('id, nome').eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome').limit(500),
     svc.from('simulado_acessos').select('id, estudante_id, expira_em, tentativas_permitidas, tentativas_usadas, liberado_em').eq('simulado_id', simuladoId).order('criado_em', { ascending: false }),
   ])
 

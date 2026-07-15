@@ -38,6 +38,12 @@ export async function getCurrentTenant(): Promise<Tenant | null> {
     .eq('slug', slug)
     .maybeSingle()
 
+  if (!data) {
+    // Tenant não resolvido: as queries caem no uuid-nulo (estado vazio) em vez de estourar.
+    // Aviso visível no log para diagnosticar slug/subdomínio errado (ver NEXT_PUBLIC_DEFAULT_TENANT_SLUG).
+    console.warn(`[tenant] nenhum tenant com slug "${slug}" (host "${host}") — verifique NEXT_PUBLIC_DEFAULT_TENANT_SLUG ou o subdomínio.`)
+  }
+
   return (data as Tenant | null) ?? null
 }
 

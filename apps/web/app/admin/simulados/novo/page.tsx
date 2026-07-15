@@ -12,20 +12,21 @@ export default async function NovoSimuladoPage() {
   const [{ data: questoesRaw }, { data: vinculos }, { data: pastaEst }, { data: estudantesRaw }] = await Promise.all([
     svc.from('simulado_questoes')
       .select('id, enunciado, tipo, nivel_dificuldade, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)')
-      .eq('tenant_id', tenantId ?? '')
-      .order('created_at', { ascending: false })
+      .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+      // Ordem de leitura (1ª questão importada primeiro) — casa com a listagem do banco.
+      .order('created_at', { ascending: true })
       .limit(1000),
-    svc.from('simulado_questao_pasta').select('questao_id, pasta_id').eq('tenant_id', tenantId ?? ''),
-    svc.from('simulado_pasta_estudantes').select('pasta_id, estudante_id').eq('tenant_id', tenantId ?? ''),
-    svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tenantId ?? '').order('nome'),
+    svc.from('simulado_questao_pasta').select('questao_id, pasta_id').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000'),
+    svc.from('simulado_pasta_estudantes').select('pasta_id, estudante_id').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000'),
+    svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome'),
   ])
 
   // Bancos: tolerante à coluna `tipo` (migration pode não ter rodado).
   let bancos: any[] | null = null
   {
-    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, tipo').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome')
+    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, tipo').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome')
     if (r.error && /tipo|column/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome')
+      const r2 = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome')
       bancos = r2.data
     } else bancos = r.data
   }
@@ -51,6 +52,16 @@ export default async function NovoSimuladoPage() {
     nQuestoes: qCount.get(b.id) ?? 0, nEstudantes: eCount.get(b.id)?.size ?? 0,
   }))
 
+  // Ordem manual das questões por banco (arrastar) — para o simulado herdar exatamente
+  // a mesma ordem exibida no banco. Tolerante: a coluna pode não existir até a migration.
+  const ordemPorBanco: Record<string, string[]> = {}
+  {
+    const { data: ord } = await svc.from('simulado_pastas').select('id, ordem_questoes').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+    for (const p of ord ?? []) {
+      if (Array.isArray((p as any).ordem_questoes)) ordemPorBanco[(p as any).id] = (p as any).ordem_questoes
+    }
+  }
+
   const questoes = (questoesRaw ?? []).map((q: any) => ({
     id: q.id,
     enunciado: q.enunciado ?? '',
@@ -72,7 +83,7 @@ export default async function NovoSimuladoPage() {
         <h1 className="text-2xl font-bold tracking-tight">Novo Simulado</h1>
       </div>
 
-      <SimuladoWizard bancos={bancosDetalhe} questoes={questoes} estudantes={estudantes} onSubmit={createSimuladoAction} />
+      <SimuladoWizard bancos={bancosDetalhe} questoes={questoes} ordemPorBanco={ordemPorBanco} estudantes={estudantes} onSubmit={createSimuladoAction} />
     </div>
   )
 }

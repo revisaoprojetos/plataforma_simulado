@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Search, Users, Crown, ClipboardCheck, X, ArrowUpRight, GraduationCap } from 'lucide-react'
+import { Search, Users, Crown, ClipboardCheck, X, ArrowUpRight, GraduationCap, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { ExcluirEstudanteButton } from '@/components/admin/excluir-estudante-button'
@@ -13,6 +13,8 @@ export type EstudanteRow = {
 }
 
 type Filtro = 'todos' | 'passaporte' | 'estudante'
+type SortKey = 'nome' | 'classificacao' | 'feitos' | 'media' | 'created_at'
+type Sort = { key: SortKey; dir: 'asc' | 'desc' } | null
 
 function iniciais(nome: string) {
   return (nome || '?').split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]?.toUpperCase()).join('')
@@ -30,6 +32,11 @@ function notaTom(n: number | null) {
 export function EstudantesLista({ estudantes }: { estudantes: EstudanteRow[] }) {
   const [q, setQ] = useState('')
   const [filtro, setFiltro] = useState<Filtro>('todos')
+  const [sort, setSort] = useState<Sort>(null)
+
+  function ordenarPor(key: SortKey) {
+    setSort((prev) => (prev?.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }))
+  }
 
   const filtrados = useMemo(() => {
     const t = q.trim().toLowerCase()
@@ -39,6 +46,32 @@ export function EstudantesLista({ estudantes }: { estudantes: EstudanteRow[] }) 
       return okFiltro && okBusca
     })
   }, [estudantes, q, filtro])
+
+  const ordenados = useMemo(() => {
+    if (!sort) return filtrados
+    const dir = sort.dir === 'asc' ? 1 : -1
+    const arr = [...filtrados]
+    arr.sort((a, b) => {
+      switch (sort.key) {
+        case 'nome': return (a.nome || '').localeCompare(b.nome || '', 'pt-BR') * dir
+        case 'classificacao': return (a.classificacao || '').localeCompare(b.classificacao || '', 'pt-BR') * dir
+        case 'feitos': return (a.feitos - b.feitos) * dir
+        case 'media': {
+          // Sem média vai sempre para o fim, independente da direção.
+          if (a.media == null && b.media == null) return 0
+          if (a.media == null) return 1
+          if (b.media == null) return -1
+          return (a.media - b.media) * dir
+        }
+        case 'created_at': {
+          const av = a.created_at ? Date.parse(a.created_at) : 0
+          const bv = b.created_at ? Date.parse(b.created_at) : 0
+          return (av - bv) * dir
+        }
+      }
+    })
+    return arr
+  }, [filtrados, sort])
 
   const totalPass = estudantes.filter((e) => e.classificacao === 'passaporte').length
   const totalFeitos = estudantes.reduce((a, e) => a + e.feitos, 0)
@@ -79,19 +112,19 @@ export function EstudantesLista({ estudantes }: { estudantes: EstudanteRow[] }) 
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-muted/60 text-left text-[11px] uppercase tracking-wide text-muted-foreground backdrop-blur">
               <tr className="border-b">
-                <th className="px-4 py-2.5 font-medium">Estudante</th>
+                <Th label="Estudante" k="nome" sort={sort} onSort={ordenarPor} />
                 <th className="hidden px-4 py-2.5 font-medium lg:table-cell">CPF / Telefone</th>
-                <th className="px-4 py-2.5 font-medium">Plano</th>
-                <th className="whitespace-nowrap px-4 py-2.5 text-center font-medium">Simulados</th>
-                <th className="whitespace-nowrap px-4 py-2.5 text-center font-medium">Média</th>
-                <th className="hidden whitespace-nowrap px-4 py-2.5 font-medium sm:table-cell">Cadastrado</th>
+                <Th label="Plano" k="classificacao" sort={sort} onSort={ordenarPor} />
+                <Th label="Simulados" k="feitos" sort={sort} onSort={ordenarPor} align="center" className="whitespace-nowrap" />
+                <Th label="Média" k="media" sort={sort} onSort={ordenarPor} align="center" className="whitespace-nowrap" />
+                <Th label="Cadastrado" k="created_at" sort={sort} onSort={ordenarPor} className="hidden whitespace-nowrap sm:table-cell" />
                 <th className="px-4 py-2.5 text-right font-medium">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {filtrados.length === 0 ? (
+              {ordenados.length === 0 ? (
                 <tr><td colSpan={7} className="py-12 text-center text-muted-foreground">Nenhum estudante encontrado.</td></tr>
-              ) : filtrados.map((e) => (
+              ) : ordenados.map((e) => (
                 <tr key={e.id} className="group border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40">
                   <td className="px-4 py-2.5">
                     <Link href={`/admin/estudantes/${e.id}`} className="flex items-center gap-3">
@@ -123,6 +156,23 @@ export function EstudantesLista({ estudantes }: { estudantes: EstudanteRow[] }) 
         </div>
       </div>
     </div>
+  )
+}
+
+/** Cabeçalho de coluna ordenável — mostra ↑ (asc), ↓ (desc) ou ⇅ (inativo) ao lado do texto. */
+function Th({ label, k, sort, onSort, align = 'left', className }: {
+  label: string; k: SortKey; sort: Sort; onSort: (k: SortKey) => void; align?: 'left' | 'center'; className?: string
+}) {
+  const ativo = sort?.key === k
+  const Icon = ativo ? (sort!.dir === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown
+  return (
+    <th className={cn('px-4 py-2.5 font-medium', align === 'center' && 'text-center', className)}>
+      <button type="button" onClick={() => onSort(k)}
+        className={cn('inline-flex items-center gap-1 uppercase tracking-wide transition-colors hover:text-foreground', align === 'center' && 'mx-auto', ativo && 'text-foreground')}>
+        {label}
+        <Icon className={cn('h-3.5 w-3.5', ativo ? 'opacity-100' : 'opacity-40')} />
+      </button>
+    </th>
   )
 }
 

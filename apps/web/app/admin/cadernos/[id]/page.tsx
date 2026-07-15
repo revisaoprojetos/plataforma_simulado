@@ -18,7 +18,7 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
     .from('simulado_cadernos_designer')
     .select('id, nome, config')
     .eq('id', id)
-    .eq('tenant_id', access.tenantId ?? '')
+    .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
     .maybeSingle()
   if (!caderno) notFound()
 
@@ -29,7 +29,7 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
   const { data: bancos } = await svc
     .from('simulado_pastas')
     .select('id, nome')
-    .eq('tenant_id', access.tenantId ?? '')
+    .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('nome')
   const bancoNome = bancoId ? (bancos ?? []).find((b: any) => b.id === bancoId)?.nome ?? null : null
 
@@ -45,7 +45,7 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
     questoes = (await svc
       .from('simulado_questoes')
       .select('id, enunciado, tipo')
-      .eq('tenant_id', access.tenantId ?? '')
+      .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
       .eq('status', 'publicada')
       .order('created_at', { ascending: false })
       .limit(60)).data
@@ -74,7 +74,7 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
   }
 
   // Mala direta: alunos do banco vinculado, com suas variáveis reais.
-  const registros = bancoId ? await carregarRegistros(svc, access.tenantId ?? '', bancoId, bancoNome ?? caderno.nome) : []
+  const registros = bancoId ? await carregarRegistros(svc, access.tenantId ?? '00000000-0000-0000-0000-000000000000', bancoId, bancoNome ?? caderno.nome) : []
   if (registros.length) previewData.vars = { ...previewData.vars, ...registros[0].vars }
 
   previewData.gabaritoLiberado = true // no editor a correção sempre aparece (para desenhar)

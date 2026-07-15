@@ -7,12 +7,12 @@ const STATUS_LABEL: Record<string, string> = { finalizada: 'Finalizadas', em_and
 
 /** Monta a visão geral da plataforma (totais, séries temporais, disciplinas, distribuição). */
 export async function montarRelatorioGrafico(svc: SupabaseClient, tenantId: string | null): Promise<DadosRelatorioGrafico> {
-  const { data: sims } = await svc.from('simulado_simulados').select('id').eq('deletado', false).eq('tenant_id', tenantId ?? '')
+  const { data: sims } = await svc.from('simulado_simulados').select('id').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
   const simIds = (sims ?? []).map((s: any) => s.id)
 
   const [{ count: nEst }, { count: nQ }] = await Promise.all([
-    svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId ?? ''),
-    svc.from('simulado_questoes').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId ?? '').eq('deletado', false),
+    svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000'),
+    svc.from('simulado_questoes').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').eq('deletado', false),
   ])
 
   let sessoes: any[] = []

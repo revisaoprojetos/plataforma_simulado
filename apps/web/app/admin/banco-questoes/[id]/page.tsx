@@ -39,9 +39,9 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
   // Banco + personalização (cor/ícone/capa) — tolerante caso a migration ainda não tenha rodado.
   let banco: any = null
   {
-    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url').eq('id', id).eq('tenant_id', tenantId ?? '').maybeSingle()
+    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
     if (r.error && /cor|icone|capa_url|column/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_pastas').select('id, nome').eq('id', id).eq('tenant_id', tenantId ?? '').maybeSingle()
+      const r2 = await svc.from('simulado_pastas').select('id, nome').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
       banco = r2.data
     } else banco = r.data
   }
@@ -51,7 +51,7 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
     .from('simulado_questao_pasta')
     .select('questao_id')
     .eq('pasta_id', id)
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
   const ids = (vinculos ?? []).map((v: any) => v.questao_id)
 
   let questoes: any[] = []
@@ -60,7 +60,10 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
       .from('simulado_questoes')
       .select('id, enunciado, tipo, nivel_dificuldade, status, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
       .in('id', ids)
-      .order('created_at', { ascending: false })
+      // Ordem de leitura (a 1ª questão importada aparece primeiro). Import insere 1→100
+      // com created_at crescente; ASC preserva a ordem do CSV. `ordem_questoes` (abaixo)
+      // ainda sobrepõe quando o admin reordena manualmente.
+      .order('created_at', { ascending: true })
     questoes = data ?? []
   }
 
@@ -101,7 +104,7 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
   const { data: todasRaw } = await svc
     .from('simulado_questoes')
     .select('id, external_id, enunciado, tipo, nivel_dificuldade, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('created_at', { ascending: false })
     .limit(500)
   const todasQuestoes = (todasRaw ?? []).map((q: any) => ({

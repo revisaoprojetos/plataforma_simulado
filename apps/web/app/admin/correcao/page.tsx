@@ -25,7 +25,7 @@ export default async function CorrecaoPage() {
   const { data } = await svc
     .from('simulado_respostas_discursivas')
     .select('id, questao_id, estudante_id, status, lock_expira_em, criado_em')
-    .eq('tenant_id', access.tenantId ?? '')
+    .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
     .in('status', ['pendente', 'em_correcao'])
     .order('criado_em', { ascending: true })
     .limit(100)

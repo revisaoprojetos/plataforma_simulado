@@ -13,7 +13,7 @@ export default async function RelatorioEstudantesPage({ searchParams }: { search
 
   // Pagina para trazer TODOS os estudantes (PostgREST trunca em ~1000/resposta).
   const estudantes = await fetchAll<any>(() => svc
-    .from('simulado_estudantes').select('id, nome').eq('tenant_id', tenantId ?? '').order('nome').order('id'))
+    .from('simulado_estudantes').select('id, nome').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome').order('id'))
 
   let dados: DadosRelatorioEstudante | null = null
 
@@ -24,7 +24,7 @@ export default async function RelatorioEstudantesPage({ searchParams }: { search
     // Busca por tenant (não por lista de ids) para evitar URL gigante / erro 400 no `.in()`.
     const sess = await fetchAll<any>(() => svc.from('simulado_sessoes_prova')
       .select('estudante_id, nota, iniciado_em')
-      .eq('tenant_id', tenantId ?? '').eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada')
+      .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada')
       .order('estudante_id'))
     for (const s of sess) {
       const a = agg.get(s.estudante_id) ?? { n: 0, notas: [], ult: null }

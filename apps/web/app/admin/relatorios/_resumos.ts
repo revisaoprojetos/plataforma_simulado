@@ -22,7 +22,7 @@ export async function resumosSimulados(svc: SupabaseClient, tenantId: string | n
     .from('simulado_simulados')
     .select('id, titulo, status, created_at')
     .eq('deletado', false)
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('created_at', { ascending: false })
   const simulados = (sims ?? []) as any[]
   if (!simulados.length) return []

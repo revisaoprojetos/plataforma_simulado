@@ -54,7 +54,7 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
     .from('simulado_estudantes')
     .select('id, nome, email, cpf, telefone, data_nascimento, classificacao, matricula_externa, created_at')
     .eq('id', id)
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .maybeSingle()
   if (!est) notFound()
 

@@ -12,13 +12,13 @@ export default async function AdicionarEstudantesPage({ params }: { params: Prom
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
-  const { data: banco } = await svc.from('simulado_pastas').select('id, nome').eq('id', id).eq('tenant_id', tenantId ?? '').maybeSingle()
+  const { data: banco } = await svc.from('simulado_pastas').select('id, nome').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
   if (!banco) notFound()
 
   // Todos os estudantes da plataforma (tenant) + quem já está vinculado.
   const [{ data: todos }, { data: vinc }] = await Promise.all([
-    svc.from('simulado_estudantes').select('id, nome, email, telefone, classificacao').eq('tenant_id', tenantId ?? '').order('nome').limit(2000),
-    svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', id).eq('tenant_id', tenantId ?? ''),
+    svc.from('simulado_estudantes').select('id, nome, email, telefone, classificacao').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome').limit(2000),
+    svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000'),
   ])
   const vinculados = new Set((vinc ?? []).map((v: any) => v.estudante_id))
   const alunos = (todos ?? []).map((a: any) => ({ ...a, jaVinculado: vinculados.has(a.id) }))

@@ -31,11 +31,11 @@ export default async function ImprimirRankingPage({
   const svc = createAdminClient()
 
   // Confere que o simulado é do tenant.
-  const { data: simCheck } = await svc.from('simulado_simulados').select('id').eq('id', simId).eq('tenant_id', access.tenantId ?? '').maybeSingle()
+  const { data: simCheck } = await svc.from('simulado_simulados').select('id').eq('id', simId).eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
   if (!simCheck) notFound()
 
   // Marca do tenant (logo + cor primária).
-  const { data: tenant } = await svc.from('simulado_tenants').select('nome, tema').eq('id', access.tenantId ?? '').maybeSingle()
+  const { data: tenant } = await svc.from('simulado_tenants').select('nome, tema').eq('id', access.tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
   const tema = ((tenant as any)?.tema ?? {}) as { logo_url?: string; cor_primaria?: string; cores?: { primaria?: string } }
   const cor = tema.cores?.primaria || tema.cor_primaria || '#6d28d9'
   const logo = tema.logo_url || null

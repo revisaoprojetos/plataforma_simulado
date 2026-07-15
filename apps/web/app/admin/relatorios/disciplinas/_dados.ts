@@ -6,7 +6,7 @@ const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'o
 
 /** Monta o relatório completo de uma disciplina (KPIs, por assunto, por simulado, evolução). */
 export async function montarRelatorioDisciplina(svc: SupabaseClient, discId: string, tenantId: string | null): Promise<DadosRelatorioDisciplina | null> {
-  const { data: alvo } = await svc.from('simulado_disciplinas').select('id, nome').eq('id', discId).eq('tenant_id', tenantId ?? '').maybeSingle()
+  const { data: alvo } = await svc.from('simulado_disciplinas').select('id, nome').eq('id', discId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
   if (!alvo) return null
 
   // Questões da disciplina.

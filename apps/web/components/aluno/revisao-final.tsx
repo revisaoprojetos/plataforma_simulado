@@ -173,7 +173,7 @@ export function RevisaoFinal({
     // Tela de carregamento do caderno (mesma "página Carregamento" — estilo + cor).
     const cores = efetivarHud(hudCores, hudPorPagina, 'loading')
     return (
-      <div style={hudCssVars(cores) as React.CSSProperties}>
+      <div style={hudCssVars(cores, dark) as React.CSSProperties}>
         <ProvaLoading
           mensagem="Carregando resultado do simulado..."
           tipo={cores.loadingTipo as EstiloProvaLoading}

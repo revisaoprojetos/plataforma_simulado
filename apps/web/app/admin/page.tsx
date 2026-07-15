@@ -67,7 +67,7 @@ const statusLabels: Record<string, { label: string; class: string }> = {
 
 export default async function AdminDashboard() {
   const tenantId = await getCurrentTenantId()
-  const d = await getDados(tenantId ?? '')
+  const d = await getDados(tenantId ?? '00000000-0000-0000-0000-000000000000')
   const fmtNota = (n: number | null) => (n == null ? '—' : n.toFixed(1).replace('.', ','))
 
   const cards = [

@@ -52,7 +52,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
   let query = supabase
     .from('simulado_audit_logs')
     .select('id, ator_tipo, ator_id, operacao, entidade, entidade_id, dados_anteriores, dados_novos, detalhes, ip, user_agent, criado_em', { count: 'exact' })
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('criado_em', { ascending: false })
     .range(offset, offset + ITEMS_PER_PAGE - 1)
 

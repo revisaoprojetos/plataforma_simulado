@@ -31,10 +31,10 @@ export default async function EmbedLayout({
       : "frame-ancestors *"
 
   const headersList = await headers()
-  // Next.js does not allow mutating response headers in layouts directly — the middleware
-  // already set a permissive default. The frameAncestors value is injected via meta tag
-  // as a best-effort hint (real enforcement is middleware-level).
-  // For production, set headers from the middleware using a lookup or edge config.
+  // Next.js does not allow mutating response headers in layouts directly — the proxy
+  // (apps/web/proxy.ts) already set a permissive default. The frameAncestors value is
+  // injected via meta tag as a best-effort hint (real enforcement is proxy-level).
+  // For production, set headers from the proxy using a lookup or edge config.
   void headersList
 
   return (
@@ -91,7 +91,7 @@ async function fetchEmbedConfig(): Promise<{
     const { data } = await supabase
       .from('simulado_embed_config')
       .select('ativo, origens_permitidas, metodo_identificacao, otp_email')
-      .eq('tenant_id', tenantId ?? '')
+      .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
       .limit(1)
       .single()
 

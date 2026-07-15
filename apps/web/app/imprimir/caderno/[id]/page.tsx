@@ -16,11 +16,12 @@ export default async function CadernoImprimirPage({
   params, searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ gabarito?: string; mod?: string; aluno?: string; todos?: string; sessao?: string; pdftoken?: string; semgab?: string; rawimg?: string }>
+  searchParams: Promise<{ gabarito?: string; mod?: string; aluno?: string; todos?: string; sessao?: string; pdftoken?: string; semgab?: string; rawimg?: string; embed?: string }>
 }) {
   const { id } = await params
-  const { gabarito: g, mod, aluno, todos, sessao, pdftoken, semgab, rawimg } = await searchParams
+  const { gabarito: g, mod, aluno, todos, sessao, pdftoken, semgab, rawimg, embed: embedParam } = await searchParams
   const gabarito = g === '1'
+  const embed = embedParam === '1' // preview embutido (iframe): oculta a barra de controles de impressão
   const forcarSemGabarito = semgab === '1' // "como você fez": mostra marcações, oculta a correção
   const rawImg = rawimg === '1' // mantém fundos em base64 (não depende do Storage)
 
@@ -47,7 +48,7 @@ export default async function CadernoImprimirPage({
     .from('simulado_cadernos_designer')
     .select('id, nome, config')
     .eq('id', id)
-    .eq('tenant_id', access.tenantId ?? '')
+    .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
     .maybeSingle()
   if (!caderno) notFound()
 
@@ -67,7 +68,7 @@ export default async function CadernoImprimirPage({
     questoes = (await svc
       .from('simulado_questoes')
       .select('id, enunciado, tipo')
-      .eq('tenant_id', access.tenantId ?? '')
+      .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
       .eq('status', 'publicada')
       .order('created_at', { ascending: false })
       .limit(120)).data
@@ -121,7 +122,7 @@ export default async function CadernoImprimirPage({
   let copias: { rotulo: string; data: CadernoData }[] = [{ rotulo: '', data }]
   if (bancoId && (todos === '1' || aluno)) {
     const { data: banco } = await svc.from('simulado_pastas').select('nome').eq('id', bancoId).maybeSingle()
-    const registros = await carregarRegistros(svc, access.tenantId ?? '', bancoId, (banco as any)?.nome ?? caderno.nome, sessao)
+    const registros = await carregarRegistros(svc, access.tenantId ?? '00000000-0000-0000-0000-000000000000', bancoId, (banco as any)?.nome ?? caderno.nome, sessao)
     const escolhidos = todos === '1' ? registros : registros.filter((r) => r.id === aluno)
     if (escolhidos.length) copias = escolhidos.map((r) => ({ rotulo: r.nome, data: { ...data, vars: { ...data.vars, ...r.vars }, respostas: r.respostas } }))
   }
@@ -223,7 +224,7 @@ export default async function CadernoImprimirPage({
       return (
         <div className="impressao-wrap min-h-screen bg-neutral-100 text-black">
           <style>{estiloAluno}</style>
-          <CadernoPrintControls />
+          {!embed && <CadernoPrintControls />}
           {copias.map((c, ci) => {
             // Cada questão é um item próprio (a repetição é expandida) para o paginador
             // poder distribuí-las por página; os demais blocos (banner, tabela) são itens únicos.
@@ -274,7 +275,7 @@ export default async function CadernoImprimirPage({
     return (
       <div className="impressao-wrap min-h-screen bg-neutral-100 text-black">
         <style>{`${estilo} .aluno-quebra { break-before: page; }`}</style>
-        <CadernoPrintControls />
+        {!embed && <CadernoPrintControls />}
         {copias.length > 1 && <div className="no-print mx-auto mb-3 max-w-[210mm] rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">Mala direta — {copias.length} aluno(s). Cada um começa em uma nova página.</div>}
         {vazio ? (
           <div className="folha flex items-center justify-center text-slate-400">Este caderno está vazio. Adicione blocos no editor.</div>
@@ -293,7 +294,7 @@ export default async function CadernoImprimirPage({
   return (
     <div className="impressao-wrap min-h-screen bg-neutral-100 text-black">
       <style>{estilo}</style>
-      <CadernoPrintControls />
+      {!embed && <CadernoPrintControls />}
       <div className="folha" style={{ fontFamily: theme.tipografia.familia }}>
         <h1 className="mb-1 text-center text-xl font-bold">{config.cabecalho || caderno.nome}</h1>
         {gabarito && <p className="mb-3 text-center text-sm font-semibold text-red-600">— GABARITO —</p>}

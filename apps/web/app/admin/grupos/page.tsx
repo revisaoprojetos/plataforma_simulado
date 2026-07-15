@@ -9,9 +9,9 @@ export default async function GruposPage() {
   // Seleciona com `cor` — se a coluna ainda não existe (migration pendente), refaz sem ela.
   let grupos: any[] | null = null
   {
-    const r = await svc.from('simulado_grupos').select('id, nome, criado_em, cor').eq('tenant_id', tenantId ?? '').eq('deletado', false).order('criado_em', { ascending: false })
+    const r = await svc.from('simulado_grupos').select('id, nome, criado_em, cor').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').eq('deletado', false).order('criado_em', { ascending: false })
     if (r.error && /cor/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_grupos').select('id, nome, criado_em').eq('tenant_id', tenantId ?? '').eq('deletado', false).order('criado_em', { ascending: false })
+      const r2 = await svc.from('simulado_grupos').select('id, nome, criado_em').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').eq('deletado', false).order('criado_em', { ascending: false })
       grupos = r2.data
     } else grupos = r.data
   }

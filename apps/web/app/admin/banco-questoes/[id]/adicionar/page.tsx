@@ -22,21 +22,21 @@ export default async function AdicionarPage({ params, searchParams }: PageProps)
     .from('simulado_pastas')
     .select('id, nome')
     .eq('id', id)
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .maybeSingle()
   if (!banco) notFound()
 
   const [{ data: bancas }, { data: disciplinas }, { data: vinculos }] = await Promise.all([
-    svc.from('simulado_bancas').select('id, nome').eq('tenant_id', tenantId ?? '').order('nome'),
-    svc.from('simulado_disciplinas').select('id, nome').eq('tenant_id', tenantId ?? '').order('nome'),
-    svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', id).eq('tenant_id', tenantId ?? ''),
+    svc.from('simulado_bancas').select('id, nome').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome'),
+    svc.from('simulado_disciplinas').select('id, nome').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome'),
+    svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000'),
   ])
   const jaNoBanco = (vinculos ?? []).map((v: any) => v.questao_id)
 
   let query = svc
     .from('simulado_questoes')
     .select('id, enunciado, tipo, nivel_dificuldade, ano, bancas:simulado_bancas(nome), disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('created_at', { ascending: false })
     .limit(50)
 

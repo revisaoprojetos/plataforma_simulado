@@ -7,7 +7,7 @@ const fmtData = (s?: string | null) => (s ? new Date(s).toLocaleDateString('pt-B
 
 /** Monta o relatório completo de um estudante (KPIs, evolução, aluno×turma, histórico). */
 export async function montarRelatorioEstudante(svc: SupabaseClient, estId: string, tenantId: string | null): Promise<DadosRelatorioEstudante | null> {
-  const { data: alvo } = await svc.from('simulado_estudantes').select('id, nome').eq('id', estId).eq('tenant_id', tenantId ?? '').maybeSingle()
+  const { data: alvo } = await svc.from('simulado_estudantes').select('id, nome').eq('id', estId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
   if (!alvo) return null
 
   const { data: sess } = await svc.from('simulado_sessoes_prova')

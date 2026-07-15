@@ -24,7 +24,7 @@ export default async function ComentariosModeracaoPage() {
   const { data } = await svc
     .from('simulado_comentarios_questao')
     .select('id, texto, autor_id, aprovado, criado_em, questao_id')
-    .eq('tenant_id', access.tenantId ?? '')
+    .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
     .eq('tipo', 'aluno')
     .order('aprovado', { ascending: true })
     .order('criado_em', { ascending: false })

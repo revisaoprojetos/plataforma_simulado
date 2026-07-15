@@ -12,7 +12,7 @@ export default async function NovaQuestaoPage() {
   const [{ data: bancas }, { data: disciplinas }, { data: bancosDestino }] = await Promise.all([
     supabase.from('simulado_bancas').select('nome').order('nome'),
     supabase.from('simulado_disciplinas').select('nome').order('nome'),
-    createAdminClient().from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome'),
+    createAdminClient().from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome'),
   ])
 
   const bancasSugestoes = (bancas ?? []).map((b) => b.nome)

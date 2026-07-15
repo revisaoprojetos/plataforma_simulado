@@ -8,8 +8,8 @@ export default async function NovaMatriculaPage() {
   const tenantId = await getCurrentTenantId()
 
   const [{ data: estudantes }, { data: simulados }] = await Promise.all([
-    supabase.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tenantId ?? '').order('nome').limit(500),
-    supabase.from('simulado_simulados').select('id, titulo').eq('tenant_id', tenantId ?? '').order('titulo').limit(200),
+    supabase.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome').limit(500),
+    supabase.from('simulado_simulados').select('id, titulo').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('titulo').limit(200),
   ])
 
   return (

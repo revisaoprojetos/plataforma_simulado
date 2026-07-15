@@ -15,19 +15,19 @@ export default async function WebhooksPage() {
   let r: any = await svc
     .from('simulado_webhook_saida')
     .select('id, nome, url, eventos, secret, ativo, ultimo_status, ultimo_envio, envios_simultaneos, filtro_simulados')
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('criado_em', { ascending: false })
   if (r.error && /envios_simultaneos|filtro_simulados|column/i.test(r.error.message)) {
-    r = await svc.from('simulado_webhook_saida').select('id, nome, url, eventos, secret, ativo, ultimo_status, ultimo_envio').eq('tenant_id', tenantId ?? '').order('criado_em', { ascending: false })
+    r = await svc.from('simulado_webhook_saida').select('id, nome, url, eventos, secret, ativo, ultimo_status, ultimo_envio').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('criado_em', { ascending: false })
   }
   if (r.error) precisaMigrar = /webhook_saida|relation|does not exist/i.test(r.error.message)
   else webhooks = r.data ?? []
 
-  const { data: sims } = await svc.from('simulado_simulados').select('id, titulo').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('titulo')
+  const { data: sims } = await svc.from('simulado_simulados').select('id, titulo').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('titulo')
 
   // Automações (aba n8n) — tolerante se a tabela ainda não foi migrada.
   let automacoes: any[] = []
-  const ra = await svc.from('simulado_automacoes').select('id, nome, ativo, gatilho, passos, ultimo_status, ultimo_run').eq('tenant_id', tenantId ?? '').order('criado_em', { ascending: false })
+  const ra = await svc.from('simulado_automacoes').select('id, nome, ativo, gatilho, passos, ultimo_status, ultimo_run').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('criado_em', { ascending: false })
   if (!ra.error) automacoes = ra.data ?? []
 
   return (

@@ -36,7 +36,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
       .select('*')
       .eq('questao_id', id)
       .order('ordem'),
-    admin.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? '').order('nome'),
+    admin.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome'),
     admin.from('simulado_questao_pasta').select('pasta_id').eq('questao_id', id),
   ])
 

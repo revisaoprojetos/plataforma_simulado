@@ -35,7 +35,7 @@ export default async function MatriculasPage({ searchParams }: PageProps) {
       'id, liberado, created_at, estudante_id, simulado_id, estudantes:simulado_estudantes(nome, email), simulados:simulado_simulados(titulo)',
       { count: 'exact' },
     )
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('created_at', { ascending: false })
     .range(offset, offset + ITEMS_PER_PAGE - 1)
 

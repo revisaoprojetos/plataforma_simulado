@@ -20,7 +20,7 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
     .from('simulado_pasta_estudantes')
     .select('estudante_id')
     .eq('pasta_id', bancoId)
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
   if (error) return <SqlPendente />
 
   const vincIds = (pe ?? []).map((r: any) => r.estudante_id)
@@ -30,7 +30,7 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
   const { data: todos } = await svc
     .from('simulado_estudantes')
     .select('id, nome, email, telefone, cpf, classificacao')
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('nome')
     .limit(2000)
   const lista = todos ?? []
@@ -51,9 +51,9 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
   // Grupos do tenant (para o botão "Adicionar grupo"), com contagem de membros e vínculo atual.
   let gruposRaw: any[] | null = null
   {
-    const r = await svc.from('simulado_grupos').select('id, nome, cor').eq('tenant_id', tenantId ?? '').eq('deletado', false).order('nome')
+    const r = await svc.from('simulado_grupos').select('id, nome, cor').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').eq('deletado', false).order('nome')
     if (r.error && /cor/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_grupos').select('id, nome').eq('tenant_id', tenantId ?? '').eq('deletado', false).order('nome')
+      const r2 = await svc.from('simulado_grupos').select('id, nome').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').eq('deletado', false).order('nome')
       gruposRaw = r2.data
     } else gruposRaw = r.data
   }

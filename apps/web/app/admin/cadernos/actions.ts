@@ -87,9 +87,9 @@ export async function atualizarCaderno(id: string, nome: string, cor: string | n
   const { error } = await svc
     .from('simulado_cadernos_designer')
     .update({ nome: titulo, cor: cor || null, icone: icone || null, capa_url: capaUrl || null })
-    .eq('id', id).eq('tenant_id', access.tenantId ?? '')
+    .eq('id', id).eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
   if (error && /cor|icone|capa_url|column/i.test(error.message)) {
-    const { error: e2 } = await svc.from('simulado_cadernos_designer').update({ nome: titulo }).eq('id', id).eq('tenant_id', access.tenantId ?? '')
+    const { error: e2 } = await svc.from('simulado_cadernos_designer').update({ nome: titulo }).eq('id', id).eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
     if (e2) return { ok: false, error: e2.message }
   } else if (error) {
     return { ok: false, error: error.message }

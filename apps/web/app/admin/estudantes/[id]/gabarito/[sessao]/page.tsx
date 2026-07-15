@@ -19,7 +19,7 @@ export default async function GabaritoEstudantePage({ params }: { params: Promis
     .from('simulado_sessoes_prova')
     .select('id, estudante_id, nota, status, finalizado_em, tentativa_num, simulado_id, simulados:simulado_simulados(titulo), estudantes:simulado_estudantes(nome)')
     .eq('id', sessao)
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .maybeSingle()
   if (!sess || sess.estudante_id !== id) notFound()
 

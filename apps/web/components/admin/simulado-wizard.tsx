@@ -25,11 +25,14 @@ const PASSOS_ZERO = ['Banco', 'Tipo', 'Informações', 'Questões', 'Estudantes'
 export function SimuladoWizard({
   bancos,
   questoes,
+  ordemPorBanco = {},
   estudantes,
   onSubmit,
 }: {
   bancos: Banco[]
   questoes: Questao[]
+  /** Ordem manual das questões por banco (id do banco → lista de questao_id na ordem exibida). */
+  ordemPorBanco?: Record<string, string[]>
   estudantes: Estudante[]
   onSubmit: (data: any) => Promise<{ error?: string } | void>
 }) {
@@ -47,7 +50,7 @@ export function SimuladoWizard({
   const [regras, setRegras] = useState<Record<string, any>>({
     embaralhar_questoes: true, embaralhar_alternativas: true, revisao_antes_enviar: true,
     retentativas: 1, politica_nota: 'ultima',
-    liberar_nota: 'imediato', liberar_gabarito: 'apos_janela', liberar_caderno: 'apos_janela', caderno_publico: 'todos',
+    liberar_nota: 'manual', liberar_gabarito: 'manual', liberar_caderno: 'manual', caderno_publico: 'todos',
     iniciar_atrasado: false, tempo_por_questao_seg: '', exibir_nota: true, mostrar_comentario: true, peso_padrao: 1,
   })
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -71,10 +74,19 @@ export function SimuladoWizard({
   const disciplinas = useMemo(() => [...new Set(disponiveis.map((q) => q.disciplina).filter(Boolean))].sort() as string[], [disponiveis])
 
   // Questões do banco base (do tipo escolhido) — usadas no modo "banco".
-  const questoesDoBanco = useMemo(
-    () => (bancoBase ? disponiveis.filter((q) => q.bancoIds.includes(bancoBase)) : []),
-    [disponiveis, bancoBase],
-  )
+  // Respeita a ordem manual do banco (arrastar); o restante segue a ordem de leitura
+  // (created_at ASC, já vinda do servidor). Assim a prova herda a mesma ordem do banco.
+  const questoesDoBanco = useMemo(() => {
+    if (!bancoBase) return []
+    const doBanco = disponiveis.filter((q) => q.bancoIds.includes(bancoBase))
+    const ordem = ordemPorBanco[bancoBase]
+    if (ordem?.length) {
+      const pos = new Map(ordem.map((qid, i) => [qid, i]))
+      const FIM = Number.MAX_SAFE_INTEGER
+      return [...doBanco].sort((a, b) => (pos.get(a.id) ?? FIM) - (pos.get(b.id) ?? FIM))
+    }
+    return doBanco
+  }, [disponiveis, bancoBase, ordemPorBanco])
   const qtdQuestoes = modo === 'banco' ? questoesDoBanco.length : sel.size
   const bancoAtual = bancos.find((b) => b.id === bancoBase)
 

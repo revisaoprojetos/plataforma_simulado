@@ -29,7 +29,7 @@ export default async function EstudanteSimuladoPage({ params }: { params: Promis
   const svc = createAdminClient()
 
   const [{ data: est }, { data: sim }] = await Promise.all([
-    svc.from('simulado_estudantes').select('id, nome').eq('id', id).eq('tenant_id', tenantId ?? '').maybeSingle(),
+    svc.from('simulado_estudantes').select('id, nome').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle(),
     svc.from('simulado_simulados').select('id, titulo, status').eq('id', simuladoId).maybeSingle(),
   ])
   if (!est || !sim) notFound()

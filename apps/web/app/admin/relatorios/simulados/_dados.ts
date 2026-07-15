@@ -10,7 +10,7 @@ const labelClass = (c?: string | null) => (c === 'passaporte' ? 'Passaporte' : c
 
 /** Monta o relatório completo de um simulado (KPIs, gráficos, ranking e linhas do export). */
 export async function montarRelatorioSimulado(svc: SupabaseClient, simId: string, tenantId: string | null): Promise<DadosRelatorioSimulado | null> {
-  const { data: alvo } = await svc.from('simulado_simulados').select('id, titulo, modo_aplicacao, regras').eq('id', simId).eq('deletado', false).eq('tenant_id', tenantId ?? '').maybeSingle()
+  const { data: alvo } = await svc.from('simulado_simulados').select('id, titulo, modo_aplicacao, regras').eq('id', simId).eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
   if (!alvo) return null
 
   // Questões do simulado (ordem, tipo, disciplina, enunciado).
@@ -182,7 +182,7 @@ export async function montarRelatorioSimulado(svc: SupabaseClient, simId: string
   const acessaramSet = new Set(sess.filter((s) => s.iniciado_em).map((s) => s.estudante_id).filter(Boolean))
   const finalizaramSet = new Set(finalizadas.map((s) => s.estudante_id).filter(Boolean))
   const visSet = new Set<string>(), baixSet = new Set<string>()
-  const { data: eventos } = await svc.from('simulado_relatorio_eventos').select('estudante_id, tipo').eq('simulado_id', simId).eq('tenant_id', tenantId ?? '')
+  const { data: eventos } = await svc.from('simulado_relatorio_eventos').select('estudante_id, tipo').eq('simulado_id', simId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
   for (const ev of (eventos ?? []) as any[]) {
     if (!ev.estudante_id) continue
     if (ev.tipo === 'visualizou') visSet.add(ev.estudante_id)

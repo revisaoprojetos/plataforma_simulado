@@ -16,7 +16,7 @@ export default async function SimuladosPage() {
     .from('simulado_simulados')
     .select('id, titulo, status, data_inicio, data_fim, modo_aplicacao, tempo_limite_min, embed_token, created_at, regras')
     .eq('deletado', false)
-    .eq('tenant_id', tenantId ?? '')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('created_at', { ascending: false })
 
   // Tipo (objetiva/discursiva/mista) derivado das questões de cada simulado.

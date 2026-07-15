@@ -14,7 +14,7 @@ export async function BancoRelatorio({ bancoId, cor = '#6d28d9' }: { bancoId: st
   const svc = createAdminClient()
 
   // Questões do banco + disciplina de cada uma.
-  const { data: vinc } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', tenantId ?? '')
+  const { data: vinc } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
   const qids = (vinc ?? []).map((v: any) => v.questao_id)
   const totalQ = qids.length
 
@@ -33,7 +33,7 @@ export async function BancoRelatorio({ bancoId, cor = '#6d28d9' }: { bancoId: st
   const disciplinas = [...discTotais.keys()].sort()
 
   // Alunos vinculados.
-  const { data: pe, error: peErr } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).eq('tenant_id', tenantId ?? '')
+  const { data: pe, error: peErr } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
   if (peErr) {
     return (
       <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-300">
