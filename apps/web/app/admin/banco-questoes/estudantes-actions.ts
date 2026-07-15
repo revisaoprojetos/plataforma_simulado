@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient, createServiceClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { matricularEmSimuladosDoBanco } from '@/lib/simulado/matricular-banco'
 
 async function guard() {
   if (!(await checkPermission('questoes:view'))) return { ok: false as const, error: 'Sem permissão.' }
@@ -28,6 +29,9 @@ export async function vincularEstudantes(bancoId: string, estudanteIds: string[]
     novos.map((estudante_id) => ({ tenant_id: g.tenantId, pasta_id: bancoId, estudante_id })),
   )
   if (error) return { ok: false, error: error.message }
+
+  // Matricula os novos alunos nos simulados que já herdam deste banco.
+  try { await matricularEmSimuladosDoBanco(svc, g.tenantId, bancoId, novos) } catch {}
 
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_pasta_estudantes', entidadeId: bancoId, depois: { vinculados: novos.length } })
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
@@ -64,6 +68,7 @@ export async function vincularGrupoAoBanco(bancoId: string, grupoId: string): Pr
       const { error } = await svc.from('simulado_pasta_estudantes').insert(novos.map((estudante_id) => ({ tenant_id: g.tenantId, pasta_id: bancoId, estudante_id })))
       if (error) return { ok: false, error: error.message }
       vinculados = novos.length
+      try { await matricularEmSimuladosDoBanco(svc, g.tenantId, bancoId, novos) } catch {}
     }
   }
 
@@ -130,6 +135,8 @@ export async function importarEstudante(
     const { error } = await svc.from('simulado_pasta_estudantes').insert({ tenant_id: g.tenantId, pasta_id: bancoId, estudante_id: estudanteId })
     if (error) return { ok: false, error: error.message }
   }
+  // Matricula nos simulados que já herdam deste banco.
+  try { await matricularEmSimuladosDoBanco(svc, g.tenantId, bancoId, [estudanteId!]) } catch {}
 
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_estudantes', entidadeId: estudanteId, depois: { nome, email, banco: bancoId } })
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
@@ -185,6 +192,8 @@ export async function importarEstudantesLote(
   if (aVincular.length) {
     const { error } = await svc.from('simulado_pasta_estudantes').insert(aVincular.map((estudante_id) => ({ tenant_id: g.tenantId, pasta_id: bancoId, estudante_id })))
     if (error) return { ok: false, error: error.message }
+    // Matricula os recém-vinculados nos simulados que já herdam deste banco.
+    try { await matricularEmSimuladosDoBanco(svc, g.tenantId, bancoId, aVincular) } catch {}
   }
 
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_estudantes', entidadeId: bancoId, depois: { importados: limpos.length, criados, vinculados: aVincular.length } })

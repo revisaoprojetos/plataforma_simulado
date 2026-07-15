@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
   const { data: estudante } = await supabase
     .from('simulado_estudantes')
-    .select('id, nome, cpf, telefone')
+    .select('id, nome, email, cpf, telefone')
     .eq('tenant_id', tenantId)
     .ilike('email', email)
     .maybeSingle()
@@ -55,6 +55,6 @@ export async function POST(request: NextRequest) {
     if (!a || a !== b) return NextResponse.json({ message: 'Telefone não confere com o cadastro.' }, { status: 403 })
   }
 
-  await criarSessaoAluno({ estudanteId: estudante.id, tenantId, nome: estudante.nome ?? 'Aluno' })
+  await criarSessaoAluno({ estudanteId: estudante.id, tenantId, nome: estudante.nome ?? 'Aluno', email: (estudante.email as string | null) ?? email })
   return NextResponse.json({ ok: true })
 }

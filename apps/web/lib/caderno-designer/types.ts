@@ -137,8 +137,17 @@ export type HudCores = {
   sitDisponivel: string  // disponível
   cadernoBtn: string      // botões de caderno — texto/borda (prova encerrada)
   cadernoBtnFundo: string // botões de caderno — fundo
-  voltarBtn: string       // botão Voltar ao menu — texto
-  voltarBtnFundo: string  // botão Voltar ao menu — fundo
+  voltarBtn: string       // botão "Meus simulados" — texto
+  voltarBtnFundo: string  // botão "Meus simulados" — fundo
+  inicioBtn: string       // botão "Voltar ao início do simulado" — texto/borda
+  inicioBtnFundo: string  // botão "Voltar ao início do simulado" — fundo
+  // Estados ATIVO (hover) dos botões da prova encerrada — texto e fundo quando o mouse passa por cima.
+  cadernoBtnAtivo: string       // caderno — texto no hover
+  cadernoBtnFundoAtivo: string  // caderno — fundo no hover
+  voltarBtnAtivo: string        // "Meus simulados" — texto no hover
+  voltarBtnFundoAtivo: string   // "Meus simulados" — fundo no hover
+  inicioBtnAtivo: string        // "Voltar ao início" — texto no hover
+  inicioBtnFundoAtivo: string   // "Voltar ao início" — fundo no hover
   // Fita (barra de gradiente no topo dos cards principais)
   fita1: string
   fita2: string
@@ -155,6 +164,10 @@ export const HUD_CORES_PADRAO: HudCores = {
   loginBotao: '#6d28d9', entradaBotao: '#6d28d9', entradaTempo: '#6d28d9',
   sitNaoIniciado: '#2563eb', sitAndamento: '#e6b83c', sitEncerrado: '#dc2626', sitDisponivel: '#6d28d9',
   cadernoBtn: '#6d28d9', cadernoBtnFundo: '#ffffff', voltarBtn: '#ffffff', voltarBtnFundo: '#6d28d9',
+  inicioBtn: '#6d28d9', inicioBtnFundo: '#ffffff',
+  cadernoBtnAtivo: '#ffffff', cadernoBtnFundoAtivo: '#6d28d9',
+  voltarBtnAtivo: '#ffffff', voltarBtnFundoAtivo: '#5b21b6',
+  inicioBtnAtivo: '#ffffff', inicioBtnFundoAtivo: '#6d28d9',
   fita1: '#2563eb', fita2: '#f59e0b', fita3: '#8b5cf6',
 }
 

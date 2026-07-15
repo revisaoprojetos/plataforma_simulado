@@ -18,6 +18,7 @@ import {
   Trophy,
   RefreshCw,
   Loader2,
+  ArrowLeft,
 } from 'lucide-react'
 import { FitaTopo } from '@/components/prova/fita-topo'
 import { ThemeToggle } from '@/components/prova/theme-toggle'
@@ -68,6 +69,7 @@ interface Resultado {
   finalizado_em: string | null
   estudante_id: string | null
   caderno_id: string | null
+  modalidades?: { id: string; nome: string }[]
   posicao: number | null
   total_participantes: number
   stats_por_disciplina: StatDisciplina[]
@@ -79,15 +81,34 @@ interface Resultado {
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 
-// Botões da prova encerrada — classes/cores idênticas ao preview da HUD.
-const BTN_CADERNO = 'inline-flex h-10 items-center justify-center gap-1.5 rounded-md border px-4 text-sm font-medium transition-colors'
-const CADERNO_STYLE = {
-  background: 'var(--prova-caderno-btn-fundo, var(--background))',
-  borderColor: 'var(--prova-caderno-btn, var(--border))',
-  color: 'var(--prova-caderno-btn, var(--foreground))',
-}
-const BTN_VOLTAR = 'inline-flex h-11 w-full items-center justify-center rounded-md px-6 text-sm font-medium transition-colors'
-const VOLTAR_STYLE = { background: 'var(--prova-voltar-btn-fundo, var(--primary))', color: 'var(--prova-voltar-btn, #fff)' }
+// Botões da prova encerrada — a classe .hud-btn (globals.css) aplica cor normal + estado
+// ATIVO (hover) lendo as variáveis locais --btn-* definidas abaixo (todas editáveis no HUD).
+const BTN_CADERNO = 'hud-btn inline-flex h-10 items-center justify-center gap-1.5 rounded-md border px-4 text-sm font-medium'
+// Cada botão aponta as variáveis locais para os tokens do HUD (normal + "-ativo").
+const STYLE_CADERNO = {
+  '--btn-bg': 'var(--prova-caderno-btn-fundo, var(--background))',
+  '--btn-fg': 'var(--prova-caderno-btn, var(--foreground))',
+  '--btn-bd': 'var(--prova-caderno-btn, var(--border))',
+  '--btn-bg-ativo': 'var(--prova-caderno-btn-fundo-ativo, var(--prova-caderno-btn, var(--primary)))',
+  '--btn-fg-ativo': 'var(--prova-caderno-btn-ativo, #fff)',
+  '--btn-bd-ativo': 'var(--prova-caderno-btn-fundo-ativo, var(--prova-caderno-btn))',
+} as React.CSSProperties
+const STYLE_INICIO = {
+  '--btn-bg': 'var(--prova-inicio-btn-fundo, var(--background))',
+  '--btn-fg': 'var(--prova-inicio-btn, var(--foreground))',
+  '--btn-bd': 'var(--prova-inicio-btn, var(--border))',
+  '--btn-bg-ativo': 'var(--prova-inicio-btn-fundo-ativo, var(--prova-inicio-btn, var(--primary)))',
+  '--btn-fg-ativo': 'var(--prova-inicio-btn-ativo, #fff)',
+  '--btn-bd-ativo': 'var(--prova-inicio-btn-fundo-ativo, var(--prova-inicio-btn))',
+} as React.CSSProperties
+const STYLE_VOLTAR = {
+  '--btn-bg': 'var(--prova-voltar-btn-fundo, var(--background))',
+  '--btn-fg': 'var(--prova-voltar-btn, var(--foreground))',
+  '--btn-bd': 'var(--prova-voltar-btn-fundo, var(--border))',
+  '--btn-bg-ativo': 'var(--prova-voltar-btn-fundo-ativo, var(--prova-voltar-btn-fundo))',
+  '--btn-fg-ativo': 'var(--prova-voltar-btn-ativo, var(--prova-voltar-btn, #fff))',
+  '--btn-bd-ativo': 'var(--prova-voltar-btn-fundo-ativo, var(--prova-voltar-btn-fundo))',
+} as React.CSSProperties
 
 // Estilo da justificativa — segue a cor de acerto/erro do aluno (cores editáveis).
 function justCor(acertou: boolean | null): string {
@@ -101,6 +122,8 @@ function justStyle(acertou: boolean | null): React.CSSProperties {
 export function RevisaoFinal({
   sessionToken,
   voltarUrl,
+  inicioUrl,
+  simuladosUrl,
   hudCores,
   hudPorPagina,
   branding,
@@ -109,20 +132,26 @@ export function RevisaoFinal({
 }: {
   sessionToken: string
   voltarUrl: string
+  /** Destino do botão "Voltar ao início do simulado" (reinício). Fallback: voltarUrl. */
+  inicioUrl?: string
+  /** Destino do botão "Meus simulados" (área do aluno). Fallback: voltarUrl. */
+  simuladosUrl?: string
   hudCores?: Partial<HudCores>
   hudPorPagina?: HudPorPagina
   branding?: { logoUrl?: string | null; logoBg?: string; logoEstilo?: string } | null
   dark?: boolean
   onToggleDark?: () => void
 }) {
+  const urlInicio = inicioUrl ?? voltarUrl
+  const urlSimulados = simuladosUrl ?? voltarUrl
   const [data, setData] = useState<Resultado | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(false)
   // O acompanhamento/baixa fica no provider global (continua mesmo trocando de página).
   const { registrar } = usePdfDownloads()
   // Estado local só durante o POST de enfileiramento (evita clique-duplo no mesmo botão).
-  const [gerandoPdf, setGerandoPdf] = useState<Set<'gabarito' | 'completo'>>(new Set())
-  const marcarPdf = (id: 'gabarito' | 'completo', on: boolean) => setGerandoPdf((prev) => { const n = new Set(prev); if (on) n.add(id); else n.delete(id); return n })
+  const [gerandoPdf, setGerandoPdf] = useState<Set<string>>(new Set())
+  const marcarPdf = (id: string, on: boolean) => setGerandoPdf((prev) => { const n = new Set(prev); if (on) n.add(id); else n.delete(id); return n })
 
   useEffect(() => {
     if (!sessionToken) {
@@ -224,8 +253,50 @@ export function RevisaoFinal({
   const urlCompleto = data?.caderno_id
     ? `/imprimir/caderno/${data.caderno_id}?mod=caderno_completo&sessao=${sessionToken}${data.estudante_id ? `&aluno=${data.estudante_id}` : ''}`
     : urlGabarito
+  // "Como você fez, sem gabarito": modalidades do caderno com as marcações do aluno,
+  // sem revelar a correta (semgab=1). Sempre disponível — não depende do gabarito.
+  const modalidades = data?.modalidades ?? []
+  // Sem caderno vinculado → folha de respostas pública (por sessão).
+  const urlComoFezFallback = `${urlGabarito}?sem=1`
 
   const acaoNav = (url: string) => ({ label: 'Abrir no navegador', onClick: () => window.open(url, '_blank', 'noopener,noreferrer') })
+
+  // Caderno "como você fez" (sem gabarito) de uma modalidade: abre a página de impressão
+  // direto (síncrono, sem popup-blocker) — ela traz o botão "Imprimir / Salvar PDF".
+  // Escopo de acesso é o id da sessão (mesma credencial de /imprimir/resultado).
+  // Baixa o caderno "como você fez" (sem gabarito) como ARQUIVO PDF: a rota gera o PDF
+  // no servidor (Edge headless) e devolve como attachment → o navegador baixa direto.
+  // Fallback: se a geração falhar, abre a página de impressão para salvar manualmente.
+  async function baixarComoFez(mod: string, nome: string) {
+    const key = `pdf:${mod}`
+    if (gerandoPdf.has(key)) return
+    if (!data?.caderno_id) { window.open(`${urlComoFezFallback}&print=1`, '_blank', 'noopener,noreferrer'); return }
+    const limpar = (s?: string) => (s ?? '').trim().replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_')
+    const arquivo = [data?.aluno_nome, data?.titulo, nome].map(limpar).filter(Boolean).join('_') || 'caderno'
+    const qs = new URLSearchParams({ caderno: data.caderno_id, sessao: sessionToken, mod, nome: arquivo })
+    if (data.estudante_id) qs.set('aluno', String(data.estudante_id))
+    marcarPdf(key, true)
+    toast.loading('Download iniciado — gerando PDF…', { id: key })
+    try {
+      const res = await fetch(`/api/aluno/caderno-pdf?${qs.toString()}`)
+      if (!res.ok) throw new Error('falha')
+      const blob = await res.blob()
+      const objUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objUrl
+      a.download = `${arquivo}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(objUrl), 10_000)
+      toast.success('Download concluído', { id: key, description: nome })
+    } catch {
+      toast.error('Não foi possível gerar o PDF. Abrindo para salvar…', { id: key })
+      window.open(`/imprimir/caderno/${data.caderno_id}?mod=${mod}&sessao=${sessionToken}${data.estudante_id ? `&aluno=${data.estudante_id}` : ''}&semgab=1&rawimg=1&print=1`, '_blank', 'noopener,noreferrer')
+    } finally {
+      marcarPdf(key, false)
+    }
+  }
 
   async function baixarPdf(qual: 'gabarito' | 'completo') {
     if (gerandoPdf.has(qual)) return // o outro botão pode rodar junto
@@ -261,10 +332,13 @@ export function RevisaoFinal({
           </div>
           <div className="flex items-center gap-1.5">
             {onToggleDark && <ThemeToggle dark={!!dark} onToggle={onToggleDark} />}
-            <a href={voltarUrl} className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
-              style={{ background: 'var(--prova-voltar-btn-fundo, var(--background))', borderColor: 'var(--prova-voltar-btn-fundo, var(--border))', color: 'var(--prova-voltar-btn, var(--foreground))' }}>
+            <a href={urlInicio} className="hud-btn inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium" style={STYLE_INICIO}>
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Voltar ao início
+            </a>
+            <a href={urlSimulados} className="hud-btn inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium" style={STYLE_VOLTAR}>
               <Home className="h-3.5 w-3.5" />
-              Voltar ao menu
+              Meus simulados
             </a>
           </div>
         </div>
@@ -336,19 +410,31 @@ export function RevisaoFinal({
             {/* Dois downloads lado a lado — só quando o caderno está liberado para este aluno */}
             {cadernoLiberado && (
               <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => baixarPdf('gabarito')} disabled={gerandoPdf.has('gabarito')} className={cn(BTN_CADERNO, 'disabled:opacity-60')} style={CADERNO_STYLE}>
+                <button type="button" onClick={() => baixarPdf('gabarito')} disabled={gerandoPdf.has('gabarito')} className={cn(BTN_CADERNO, 'disabled:opacity-60')} style={STYLE_CADERNO}>
                   {gerandoPdf.has('gabarito') ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileText className="mr-1.5 h-4 w-4" />} Caderno de gabarito PDF
                 </button>
-                <button type="button" onClick={() => baixarPdf('completo')} disabled={gerandoPdf.has('completo')} className={cn(BTN_CADERNO, 'disabled:opacity-60')} style={CADERNO_STYLE}>
+                <button type="button" onClick={() => baixarPdf('completo')} disabled={gerandoPdf.has('completo')} className={cn(BTN_CADERNO, 'disabled:opacity-60')} style={STYLE_CADERNO}>
                   {gerandoPdf.has('completo') ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileStack className="mr-1.5 h-4 w-4" />} Caderno completo PDF
                 </button>
               </div>
             )}
 
-            {/* Voltar ao menu — logo abaixo dos downloads */}
-            <a href={voltarUrl} className={BTN_VOLTAR} style={VOLTAR_STYLE}>
-              <Home className="mr-2 h-4 w-4" /> Voltar ao menu
-            </a>
+            {/* Cadernos "como você fez" (sem gabarito) — um botão por modalidade, sempre
+                disponível. A navegação (voltar/meus simulados) fica na barra superior. */}
+            {modalidades.length > 0 ? (
+              <div className={cn('grid gap-2', modalidades.length > 1 && 'sm:grid-cols-2')}>
+                {modalidades.map((m) => (
+                  <button key={m.id} type="button" onClick={() => baixarComoFez(m.id, m.nome)} disabled={gerandoPdf.has(`pdf:${m.id}`)}
+                    className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}>
+                    {gerandoPdf.has(`pdf:${m.id}`) ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileStack className="mr-1.5 h-4 w-4" />} {m.nome}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <a href={urlComoFezFallback} target="_blank" rel="noopener noreferrer" className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}>
+                <FileStack className="mr-1.5 h-4 w-4" /> Baixar caderno (como você fez)
+              </a>
+            )}
           </CardContent>
         </Card>
 

@@ -16,6 +16,7 @@ export interface AlunoSession {
   estudanteId: string
   tenantId: string
   nome: string
+  email?: string
 }
 
 /** Cria a sessão persistente do aluno (cookie httpOnly assinado). */
@@ -48,6 +49,7 @@ export async function getSessaoAluno(): Promise<AlunoSession | null> {
       estudanteId: String(payload.estudanteId),
       tenantId: String(payload.tenantId),
       nome: String(payload.nome ?? 'Aluno'),
+      email: payload.email ? String(payload.email) : undefined,
     }
   } catch {
     return null

@@ -3,11 +3,12 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, type Access } from '@/lib/auth/permissions'
 import { verificarRenderToken } from '@/lib/pdf/render-token'
 import { CadernoPrintControls } from '@/components/admin/caderno-print-controls'
+import { PaginadorCaderno } from '@/components/caderno/paginador-caderno'
 import { BlockRender, dataComQuestao } from '@/lib/caderno-designer/blocks'
 import { resolveTheme } from '@/lib/caderno-designer/theme'
 import { carregarRegistros } from '@/lib/caderno-designer/merge'
 import { hospedarImagensDoc } from '@/lib/caderno-designer/hospedar-imagens'
-import { faixaNaPagina, RUNNING_PADRAO, type CadernoData, type CadernoDoc } from '@/lib/caderno-designer/types'
+import { faixaNaPagina, RUNNING_PADRAO, PAD_V, PAD_H, type CadernoData, type CadernoDoc } from '@/lib/caderno-designer/types'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 
@@ -15,18 +16,27 @@ export default async function CadernoImprimirPage({
   params, searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ gabarito?: string; mod?: string; aluno?: string; todos?: string; sessao?: string; pdftoken?: string }>
+  searchParams: Promise<{ gabarito?: string; mod?: string; aluno?: string; todos?: string; sessao?: string; pdftoken?: string; semgab?: string; rawimg?: string }>
 }) {
   const { id } = await params
-  const { gabarito: g, mod, aluno, todos, sessao, pdftoken } = await searchParams
+  const { gabarito: g, mod, aluno, todos, sessao, pdftoken, semgab, rawimg } = await searchParams
   const gabarito = g === '1'
+  const forcarSemGabarito = semgab === '1' // "como você fez": mostra marcações, oculta a correção
+  const rawImg = rawimg === '1' // mantém fundos em base64 (não depende do Storage)
 
-  // Acesso: cookie do admin OU token de render assinado (Gotenberg, sem cookie),
-  // escopado a este caderno + tenant.
+  // Acesso: cookie do admin OU token de render assinado (Gotenberg, sem cookie) OU
+  // o id da sessão do aluno (mesma credencial de /imprimir/resultado). Sempre escopado
+  // ao tenant correspondente.
   let access: Access
   const tokenPayload = verificarRenderToken(pdftoken)
   if (tokenPayload && tokenPayload.r === 'caderno' && tokenPayload.id === id) {
     access = { userId: null, tenantId: tokenPayload.t, role: 'render', isAdmin: true, permissions: ['*'] }
+  } else if (sessao) {
+    // Aluno abrindo o próprio caderno: valida a sessão e escopa ao tenant dela.
+    const svcSess = createAdminClient()
+    const { data: sess } = await svcSess.from('simulado_sessoes_prova').select('tenant_id').eq('id', sessao).maybeSingle()
+    if (!sess) notFound()
+    access = { userId: null, tenantId: (sess as any).tenant_id, role: 'render', isAdmin: true, permissions: ['*'] }
   } else {
     access = await getCurrentAccess()
     if (!access.isAdmin && !access.permissions.includes('questoes:view')) notFound()
@@ -79,7 +89,7 @@ export default async function CadernoImprimirPage({
     vars: { nome: '', simulado: caderno.nome, acertos: '', total_questoes: String((questoes ?? []).length || 20), nota: '', percentual: '' },
   }
   // Gating: o gabarito (correção) só aparece se algum simulado vinculado ao banco liberou.
-  if (bancoId) {
+  if (bancoId && !forcarSemGabarito) {
     const { data: vincQ } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId)
     const qs = (vincQ ?? []).map((v: any) => v.questao_id)
     if (qs.length) {
@@ -137,8 +147,10 @@ export default async function CadernoImprimirPage({
     const primeira = modalidadesV2.find((m) => docsV2[m.id])?.id
     const modId = (mod && docsV2[mod] ? mod : primeira) ?? Object.keys(docsV2)[0]
     const doc = docsV2[modId]
-    // Troca imagens base64 (fundo) por URLs hospedadas → HTML leve, geração muito mais rápida.
-    await hospedarImagensDoc(doc, svc)
+    // Troca imagens base64 (fundo) por URLs hospedadas → HTML leve (bom p/ Gotenberg).
+    // Com `?rawimg=1` mantém o base64 embutido: o Edge/navegador renderiza o fundo direto,
+    // sem depender do bucket de Storage (cujas URLs podem estar indisponíveis).
+    if (!rawImg) await hospedarImagensDoc(doc, svc)
     const running = doc?.running ?? RUNNING_PADRAO
     const cabecalho = (doc?.cabecalho ?? []) as any[]
     const rodape = (doc?.rodape ?? []) as any[]
@@ -153,7 +165,9 @@ export default async function CadernoImprimirPage({
       return (
         <div key={prefix + page.id} className="folha" style={{ position: 'relative', background: theme.cores.fundo }}>
           {bg?.attributes?.url && (
-            <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${bg.attributes.url})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: (bg.attributes.opacidade ?? 100) / 100 }} />
+            // Fundo dimensionado a UMA página A4 (sem esticar pela folha nem vazar): o letterhead
+            // fica na 1ª página do conteúdo; o excesso flui para a página seguinte, limpa.
+            <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${bg.attributes.url})`, backgroundSize: '210mm 297mm', backgroundRepeat: 'no-repeat', backgroundPosition: 'top center', opacity: (bg.attributes.opacidade ?? 100) / 100 }} />
           )}
           <div style={{ position: 'relative', display: 'flex', minHeight: '100%', flexDirection: 'column' }}>
             {mostraCab && (
@@ -161,8 +175,8 @@ export default async function CadernoImprimirPage({
                 {cabecalho.map((b) => <BlockRender key={b.id} block={b} theme={theme} data={d} />)}
               </div>
             )}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: '16mm', paddingRight: '16mm', paddingTop: mostraCab ? 0 : '14mm', paddingBottom: mostraRod ? 0 : '14mm' }}>
-              {conteudo.map((block: any) => <BlockRender key={block.id} block={block} theme={theme} data={d} />)}
+            <div style={{ flex: 1, display: 'block', paddingLeft: '16mm', paddingRight: '16mm', paddingTop: mostraCab ? 0 : '14mm', paddingBottom: mostraRod ? 0 : '14mm' }}>
+              {conteudo.map((block: any) => <div key={block.id} style={{ marginBottom: 6 }}><BlockRender block={block} theme={theme} data={d} /></div>)}
             </div>
             {mostraRod && (
               <div style={{ borderTop: `1px solid ${theme.cores.secundaria}33`, paddingTop: 8, paddingBottom: '10mm', marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'flex-end', ...(running.rodapeAltura ? { minHeight: running.rodapeAltura } : {}) }}>
@@ -173,6 +187,90 @@ export default async function CadernoImprimirPage({
         </div>
       )
     })
+    // ---- Layout do download do aluno (rawImg): PAGINADOR determinístico ----
+    // Cada folha A4 mostra o letterhead INTEIRO (cabeçalho com logos + rodapé, sem fatiar em
+    // barra preta) e as questões na área segura. O PaginadorCaderno (cliente) mede as questões
+    // e distribui por página — não depende de @page (que o Chrome ignora em continuações).
+    if (rawImg && doc && !vazio) {
+      const capaPages = doc.pages.filter((p: any) => p.kind === 'capa')
+      const contPages = doc.pages.filter((p: any) => p.kind !== 'capa')
+      const bgCont = contPages.map((p: any) => p.blocks.find((b: any) => b.type === 'plano-fundo')).find(Boolean) as any
+      const letterhead = (bgCont?.attributes?.url as string | undefined) ?? null
+      const opac = bgCont ? (bgCont.attributes?.opacidade ?? 100) / 100 : 1
+      // Área segura reservada em cada folha (px) — IGUAL ao editor: quando a faixa de
+      // cabeçalho/rodapé tem blocos, reserva a altura configurada; senão usa PAD_V. Assim
+      // o PDF fica alinhado com o preview do hub de criação.
+      // Reserva de área segura = altura do cabeçalho/rodapé configurada (quando a faixa está
+      // ATIVA, mesmo sem blocos — a arte já tem cabeçalho/rodapé). Senão, PAD_V. MESMO valor em
+      // TODAS as páginas → idêntico ao hub de criação.
+      const cabH = running.cabecalhoAtivo ? (running.cabecalhoAltura || PAD_V) : PAD_V
+      const rodH = running.rodapeAtivo ? (running.rodapeAltura || PAD_V) : PAD_V
+      const cabHCont = cabH
+      const estiloAluno = `
+        .impressao-wrap { padding: 24px 0; }
+        .folha { width: 210mm; min-height: 297mm; box-sizing: border-box; margin: 0 auto 8mm; background: #fff; overflow: hidden; }
+        @media screen { .folha { box-shadow: 0 1px 10px rgba(0,0,0,.15); } }
+        @media print {
+          .no-print { display: none !important; }
+          @page { size: A4; margin: 0; }
+          html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+          .impressao-wrap { padding: 0 !important; background: #fff !important; }
+          .folha { margin: 0 !important; break-after: page; page-break-after: always; }
+          .folha:last-child { break-after: auto; page-break-after: auto; }
+          .aluno-quebra { break-before: page; }
+        }
+      `
+      return (
+        <div className="impressao-wrap min-h-screen bg-neutral-100 text-black">
+          <style>{estiloAluno}</style>
+          <CadernoPrintControls />
+          {copias.map((c, ci) => {
+            // Cada questão é um item próprio (a repetição é expandida) para o paginador
+            // poder distribuí-las por página; os demais blocos (banner, tabela) são itens únicos.
+            const itens = contPages.flatMap((page: any) =>
+              page.blocks.filter((b: any) => b.type !== 'plano-fundo').flatMap((block: any) => {
+                if (block.type === 'repeticao') {
+                  const qtd = block.attributes?.quantidade as number | null | undefined
+                  const gapQ = (block.attributes?.gap as number | undefined) ?? 16 // espaço ENTRE questões (igual ao editor)
+                  const qs = qtd ? c.data.questoes.slice(0, qtd) : c.data.questoes
+                  return qs.map((q: any) => ({
+                    key: `${ci}-${page.id}-${q.id}`,
+                    gapTop: gapQ,
+                    node: (
+                      // gap: 6 DENTRO da questão (título/enunciado/alternativas), igual ao editor.
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, breakInside: 'avoid' }}>
+                        {(block.innerBlocks ?? []).map((ib: any) => (
+                          <BlockRender key={ib.id} block={ib} theme={theme} data={dataComQuestao(c.data, q)} />
+                        ))}
+                      </div>
+                    ),
+                  }))
+                }
+                return [{ key: `${ci}-${page.id}-${block.id}`, gapTop: 0, node: <BlockRender block={block} theme={theme} data={c.data} /> }]
+              }),
+            )
+            return (
+              <div key={ci} className={ci > 0 ? 'aluno-quebra' : undefined}>
+                {capaPages.map((page: any) => {
+                  const bg = page.blocks.find((b: any) => b.type === 'plano-fundo') as any
+                  const conteudo = page.blocks.filter((b: any) => b.type !== 'plano-fundo')
+                  return (
+                    <div key={page.id} className="folha" style={{ position: 'relative', background: theme.cores.fundo }}>
+                      {bg?.attributes?.url && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${bg.attributes.url})`, backgroundSize: '210mm 297mm', backgroundRepeat: 'no-repeat', backgroundPosition: 'top center', opacity: (bg.attributes.opacidade ?? 100) / 100 }} />}
+                      <div style={{ position: 'relative', display: 'flex', minHeight: '100%', flexDirection: 'column', paddingTop: PAD_V, paddingBottom: PAD_V, paddingLeft: PAD_H, paddingRight: PAD_H }}>
+                        {conteudo.map((block: any) => <BlockRender key={block.id} block={block} theme={theme} data={c.data} />)}
+                      </div>
+                    </div>
+                  )
+                })}
+                <PaginadorCaderno itens={itens} letterhead={letterhead} opac={opac} cabH={cabH} cabHCont={cabHCont} rodH={rodH} fundo={theme.cores.fundo} />
+              </div>
+            )
+          })}
+        </div>
+      )
+    }
+
     return (
       <div className="impressao-wrap min-h-screen bg-neutral-100 text-black">
         <style>{`${estilo} .aluno-quebra { break-before: page; }`}</style>

@@ -72,7 +72,7 @@ export function PdfDownloadsProvider({ children }: { children: React.ReactNode }
     pendentes.current.set(job.id, job)
     tentativas.current.set(job.id, 0)
     salvar()
-    toast.loading(`Gerando download do ${job.nome}`, { id: job.id })
+    toast.loading(`Download iniciado — gerando "${job.nome}"…`, { id: job.id })
     garantirLoop()
   }, [salvar, garantirLoop])
 

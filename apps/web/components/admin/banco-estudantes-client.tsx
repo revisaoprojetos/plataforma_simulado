@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Search, Check, Eye, Trash2, Loader2, Users } from 'lucide-react'
+import { Search, Check, Eye, Trash2, Loader2, Users, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { desvincularEstudante } from '@/app/admin/banco-questoes/estudantes-actions'
@@ -21,6 +21,23 @@ function iniciais(n: string) {
 }
 interface AlunoSel { id: string; nome: string; email?: string | null; telefone?: string | null; classificacao?: string | null; jaVinculado: boolean }
 
+type OrdCampo = 'nome' | 'email' | 'cpf' | 'ultimo_acesso'
+function SortHead({ label, campo, ordCampo, ordDir, onSort }: { label: string; campo: OrdCampo; ordCampo: OrdCampo; ordDir: 'asc' | 'desc'; onSort: (c: OrdCampo) => void }) {
+  const ativo = ordCampo === campo
+  return (
+    <TableHead>
+      <button type="button" onClick={() => onSort(campo)} className={cn('group -ml-1 flex items-center gap-1 rounded px-1 py-0.5 hover:text-foreground', ativo ? 'text-foreground' : 'text-muted-foreground')}>
+        <span>{label}</span>
+        {ativo ? (
+          ordDir === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronsUpDown className="h-3.5 w-3.5 opacity-40 group-hover:opacity-70" />
+        )}
+      </button>
+    </TableHead>
+  )
+}
+
 function fmtAcesso(d?: string | null) {
   if (!d) return '—'
   const dt = new Date(d)
@@ -31,11 +48,28 @@ export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = []
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
+  const [ordCampo, setOrdCampo] = useState<'nome' | 'email' | 'cpf' | 'ultimo_acesso'>('nome')
+  const [ordDir, setOrdDir] = useState<'asc' | 'desc'>('asc')
+
+  function ordenar(campo: 'nome' | 'email' | 'cpf' | 'ultimo_acesso') {
+    if (ordCampo === campo) setOrdDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setOrdCampo(campo); setOrdDir('asc') }
+  }
 
   const filtrados = useMemo(() => {
     const q = busca.toLowerCase().trim()
-    return q ? vinculados.filter((a) => a.nome.toLowerCase().includes(q) || (a.email ?? '').toLowerCase().includes(q)) : vinculados
-  }, [busca, vinculados])
+    const base = q ? vinculados.filter((a) => a.nome.toLowerCase().includes(q) || (a.email ?? '').toLowerCase().includes(q)) : vinculados
+    const dir = ordDir === 'asc' ? 1 : -1
+    const val = (a: Aluno) => {
+      if (ordCampo === 'ultimo_acesso') return a.ultimo_acesso ? new Date(a.ultimo_acesso).getTime() : -1
+      return (a[ordCampo] ?? '').toString().toLowerCase()
+    }
+    return [...base].sort((a, b) => {
+      const va = val(a), vb = val(b)
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir
+      return String(va).localeCompare(String(vb), 'pt-BR') * dir
+    })
+  }, [busca, vinculados, ordCampo, ordDir])
 
   function toggle(id: string) {
     setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -90,10 +124,10 @@ export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = []
                     {filtrados.length > 0 && sel.size === filtrados.length && <Check className="h-3 w-3" />}
                   </button>
                 </TableHead>
-                <TableHead>Nome</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>Documento</TableHead>
-                <TableHead>Último acesso</TableHead>
+                <SortHead label="Nome" campo="nome" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenar} />
+                <SortHead label="E-mail" campo="email" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenar} />
+                <SortHead label="Documento" campo="cpf" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenar} />
+                <SortHead label="Último acesso" campo="ultimo_acesso" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenar} />
                 <TableHead className="w-16 text-center">Perfil</TableHead>
               </TableRow>
             </TableHeader>

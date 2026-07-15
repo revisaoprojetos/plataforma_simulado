@@ -43,13 +43,29 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
   // Liberações independentes (nota / gabarito / caderno) — considerando a classificação do aluno.
   const { data: estRow } = await svc.from('simulado_estudantes').select('classificacao').eq('id', estId).maybeSingle()
   const { notaLiberada, gabaritoLiberado, cadernoParaAluno } = resolverLiberacoes(sim.regras as any, sim, { classificacao: (estRow as any)?.classificacao ?? null })
-  // Caderno do designer: direto em regras.caderno_id ou herdado do banco de simulado
-  // (banco_base_id → simulado_pastas.caderno_id).
+  // Caderno do designer: regras.caderno_id → banco_base_id → banco das questões.
+  // O último caso espelha o admin (simulado → prova_questoes → questao_pasta →
+  // pastas.caderno_id, o banco que mais cobre a prova e tem caderno) para achar o
+  // caderno mesmo quando o vínculo não está em `regras`.
   let cadernoId = ((sim.regras as any)?.caderno_id as string | undefined) ?? null
   const bancoBaseId = (sim.regras as any)?.banco_base_id as string | undefined
   if (!cadernoId && bancoBaseId) {
     const { data: banco } = await svc.from('simulado_pastas').select('caderno_id').eq('id', bancoBaseId).maybeSingle()
     cadernoId = ((banco as any)?.caderno_id as string | undefined) ?? null
+  }
+  if (!cadernoId) {
+    const { data: pq } = await svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', id)
+    const qIds = [...new Set((pq ?? []).map((r: any) => r.questao_id).filter(Boolean))]
+    if (qIds.length) {
+      const { data: qp } = await svc.from('simulado_questao_pasta').select('questao_id, pasta_id').in('questao_id', qIds)
+      const pastaIds = [...new Set((qp ?? []).map((r: any) => r.pasta_id))]
+      const { data: pastas } = pastaIds.length ? await svc.from('simulado_pastas').select('id, caderno_id').in('id', pastaIds) : { data: [] as any[] }
+      const cadDaPasta = new Map<string, string>((pastas ?? []).filter((p: any) => p.caderno_id).map((p: any) => [p.id, p.caderno_id]))
+      const cont = new Map<string, number>()
+      for (const r of qp ?? []) if (cadDaPasta.has((r as any).pasta_id)) cont.set((r as any).pasta_id, (cont.get((r as any).pasta_id) ?? 0) + 1)
+      const melhor = [...cont.entries()].sort((a, b) => b[1] - a[1])[0]
+      if (melhor) cadernoId = cadDaPasta.get(melhor[0])!
+    }
   }
 
   const sessoesInput: SessaoInput[] = finalizadas.map((s) => ({
@@ -62,16 +78,19 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
     montarDesempenhoAluno(svc, estId),
   ])
 
-  // Modalidades do CADERNO DO DESIGNER (as que têm documento), filtradas pelo tipo do
-  // simulado. `temGabarito` = tem versão com correção (o Diagnóstico não tem).
+  // Modalidades do CADERNO DO DESIGNER (só as que têm documento com conteúdo real),
+  // filtradas pelo tipo do simulado. `temGabarito` = tem versão com correção (o
+  // Diagnóstico não tem). Docs vazios (sem blocos além do plano-fundo) são ignorados
+  // para não exibir botão de caderno em branco.
   const tipo = (await tiposDeSimulados(svc, [id])).get(id) ?? null
+  const temConteudo = (d: any) => !!d && Array.isArray(d.pages) && d.pages.some((p: any) => (p.blocks ?? []).some((b: any) => b.type !== 'plano-fundo'))
   let modalidades: { id: string; nome: string; temGabarito: boolean }[] = []
   if (cadernoId) {
     const { data: cad } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoId).maybeSingle()
     const cfg = ((cad as any)?.config ?? {}) as any
     const docs = (cfg.docsV2 ?? {}) as Record<string, unknown>
     modalidades = filtrarModsPorTipo(mesclarModalidades(cfg.modalidadesV2), tipo)
-      .filter((m) => docs[m.id])
+      .filter((m) => temConteudo(docs[m.id]))
       .map((m) => ({ id: m.id, nome: m.nome, temGabarito: m.id !== 'diagnostico' }))
   }
 

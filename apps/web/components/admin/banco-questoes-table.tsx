@@ -100,8 +100,8 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
         </div>
       </div>
 
-      {/* Linha 1: busca + remover + adicionar */}
-      <div className="flex flex-wrap items-center gap-2 border-b px-3 pb-3 pt-3">
+      {/* Linha 1: busca + remover + adicionar (sem borda: agrupa com os filtros abaixo) */}
+      <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pt-3">
         <div className="relative min-w-48 flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar enunciado, assunto…" className="pl-8" />
@@ -117,7 +117,7 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
       </div>
 
       {/* Linha 2: filtros */}
-      <div className="flex flex-wrap items-center gap-2 border-b px-3 pt-0 pb-3">
+      <div className="flex flex-wrap items-center gap-2 border-b px-4 pt-0 pb-3">
         <Select value={disc} onValueChange={(v) => setDisc(v ?? '')} items={discItems}>
           <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
           <SelectContent>

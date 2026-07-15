@@ -287,3 +287,25 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .dark .scroll-claro { scrollbar-color: #475569 #1e293b; }
 .dark .scroll-claro::-webkit-scrollbar-track { background: #1e293b; }
 .dark .scroll-claro::-webkit-scrollbar-thumb { background: #475569; border-color: #1e293b; }
+
+/* Botões da prova encerrada — cores normal + estado ATIVO (hover) via variáveis locais.
+   Cada botão define --btn-* no inline style (apontando para as CSS vars do HUD);
+   o :hover troca para as versões "-ativo". Assim o hover é editável no HUD. */
+.hud-btn {
+  background: var(--btn-bg);
+  border-color: var(--btn-bd, var(--btn-bg));
+  color: var(--btn-fg);
+  transition: background-color .15s, border-color .15s, color .15s;
+  cursor: pointer;
+}
+.hud-btn:hover {
+  background: var(--btn-bg-ativo, var(--btn-bg));
+  border-color: var(--btn-bd-ativo, var(--btn-bg-ativo, var(--btn-bd, var(--btn-bg))));
+  color: var(--btn-fg-ativo, var(--btn-fg));
+}
+.hud-btn:disabled { cursor: not-allowed; opacity: .6; }
+.hud-btn:disabled:hover {
+  background: var(--btn-bg);
+  border-color: var(--btn-bd, var(--btn-bg));
+  color: var(--btn-fg);
+}

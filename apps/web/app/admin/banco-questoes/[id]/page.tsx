@@ -188,48 +188,56 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
-              <CabecalhoSecao icon={Layers} titulo="Por disciplina" subtitulo="Distribuição das questões" cor={corBanco} />
-              <CardContent className="space-y-3.5 px-4 py-4">
-                {disc.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">Sem questões.</p>
-                ) : disc.map(([nome, n], i) => (
-                  <div key={nome}>
-                    <div className="mb-1.5 flex items-center justify-between gap-2 text-sm">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[11px] font-bold text-white" style={{ background: corBanco }}>{i + 1}</span>
-                        <span className="truncate font-medium">{nome}</span>
-                      </span>
-                      <span className="shrink-0 whitespace-nowrap text-muted-foreground"><span className="font-semibold text-foreground">{n}</span> · {Math.round((n / questoes.length) * 100)}%</span>
+            {([
+              { titulo: 'Por disciplina', icon: Layers, dados: disc, max: maxDisc, col: 'Disciplina' },
+              { titulo: 'Por assunto / conteúdo', icon: ListTree, dados: ass, max: maxAss, col: 'Assunto' },
+            ] as const).map((sec) => (
+              <Card key={sec.titulo} className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+                <CabecalhoSecao icon={sec.icon} titulo={sec.titulo} subtitulo={`Distribuição das questões · ${sec.dados.length}`} cor={corBanco} />
+                {/* Tabela com scroll interno — não estica a página quando há muitas linhas. */}
+                <CardContent className="p-0">
+                  {sec.dados.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">Sem questões.</p>
+                  ) : (
+                    <div className="max-h-[340px] overflow-auto">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 z-10 bg-card">
+                          <tr className="border-b text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                            <th className="px-4 py-2 font-medium">{sec.col}</th>
+                            <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Questões</th>
+                            <th className="w-[42%] px-4 py-2 font-medium">%</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sec.dados.map(([nome, n], i) => {
+                            const pct = Math.round((n / questoes.length) * 100)
+                            return (
+                              <tr key={nome} className="border-b last:border-0 hover:bg-muted/40">
+                                <td className="px-4 py-2">
+                                  <span className="flex min-w-0 items-center gap-2">
+                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[11px] font-bold text-white" style={{ background: corBanco }}>{i + 1}</span>
+                                    <span className="truncate font-medium">{nome}</span>
+                                  </span>
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums">{n}</td>
+                                <td className="px-4 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                                      <div className="h-full rounded-full" style={{ width: `${(n / sec.max) * 100}%`, background: corBanco }} />
+                                    </div>
+                                    <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{pct}%</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
                     </div>
-                    <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${(n / maxDisc) * 100}%`, background: corBanco }} />
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-            <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
-              <CabecalhoSecao icon={ListTree} titulo="Por assunto / conteúdo" subtitulo="Distribuição das questões" cor={corBanco} />
-              <CardContent className="space-y-3.5 px-4 py-4">
-                {ass.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">Sem questões.</p>
-                ) : ass.map(([nome, n], i) => (
-                  <div key={nome}>
-                    <div className="mb-1.5 flex items-center justify-between gap-2 text-sm">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[11px] font-bold text-white" style={{ background: corBanco }}>{i + 1}</span>
-                        <span className="truncate font-medium">{nome}</span>
-                      </span>
-                      <span className="shrink-0 whitespace-nowrap text-muted-foreground"><span className="font-semibold text-foreground">{n}</span> · {Math.round((n / questoes.length) * 100)}%</span>
-                    </div>
-                    <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${(n / maxAss) * 100}%`, background: corBanco }} />
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
           {/* Grupos de disciplinas (usados nos relatórios por grupo) */}

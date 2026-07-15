@@ -346,6 +346,8 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
         <RevisaoFinal
           sessionToken={sessionToken ?? ''}
           voltarUrl={`/aluno/login?token=${token}`}
+          inicioUrl={`/simulado/${token}`}
+          simuladosUrl="/aluno/simulados"
           hudCores={sessao?.hudCores ?? hudInicial?.base}
           hudPorPagina={sessao?.hudPorPagina ?? hudInicial?.porPagina}
           branding={sessao?.branding ?? hudInicial?.branding}
