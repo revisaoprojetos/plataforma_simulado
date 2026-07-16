@@ -63,7 +63,9 @@ export function montarItensSimulado(
     }
     const podeFazer = windowOk && s.status === 'publicado' && !!s.embed_token && (restantes > 0 || emAndamento)
     const refazer = finalizadas > 0 && restantes > 0
-    const novo = !!s.created_at && now - new Date(s.created_at).getTime() < UM_DIA_MS
+    // "Novo" = aberto há < 1 dia: prioriza quando foi publicado; cai no created_at.
+    const abertoEm = regras.publicado_em ?? s.created_at
+    const novo = !!abertoEm && now - new Date(abertoEm).getTime() < UM_DIA_MS
     return { ...s, finalizadas, restantes, emAndamento, statusLabel, aoVivo, windowOk, quando, tom, podeFazer, refazer, novo, vis: visual.get(s.id) ?? null }
   })
 }

@@ -170,16 +170,22 @@ export async function removeQuestaoFromSimulado(simuladoQuestaoId: string, simul
   return { ok: true }
 }
 
-/** Gera um embed_token se o simulado ainda não tiver — sem ele o aluno não consegue abrir a prova. */
-async function patchComToken(supabase: any, id: string, base: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { data } = await supabase.from('simulado_simulados').select('embed_token').eq('id', id).maybeSingle()
-  return data?.embed_token ? base : { ...base, embed_token: crypto.randomUUID() }
+/**
+ * Monta o patch de publicação: gera embed_token se faltar (sem ele o aluno não abre a prova)
+ * e carimba `regras.publicado_em` = agora (usado pela fita "novo" no portal do aluno).
+ */
+async function patchPublicar(supabase: any, id: string): Promise<Record<string, unknown>> {
+  const { data } = await supabase.from('simulado_simulados').select('embed_token, regras').eq('id', id).maybeSingle()
+  const regras = { ...((data?.regras as Record<string, unknown>) ?? {}), publicado_em: new Date().toISOString() }
+  const patch: Record<string, unknown> = { status: 'publicado', regras }
+  if (!data?.embed_token) patch.embed_token = crypto.randomUUID()
+  return patch
 }
 
 export async function publishSimuladoAction(id: string) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const supabase = await createClient()
-  const patch = await patchComToken(supabase, id, { status: 'publicado' })
+  const patch = await patchPublicar(supabase, id)
   await supabase.from('simulado_simulados').update(patch).eq('id', id)
   await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'publicado' } })
   revalidatePath(`/admin/simulados/${id}`)
@@ -198,7 +204,7 @@ export async function encerrarSimuladoAction(id: string) {
 export async function reabrirSimuladoAction(id: string) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const supabase = await createClient()
-  const patch = await patchComToken(supabase, id, { status: 'publicado' })
+  const patch = await patchPublicar(supabase, id)
   await supabase.from('simulado_simulados').update(patch).eq('id', id)
   await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'publicado', reaberto: true } })
   revalidatePath(`/admin/simulados/${id}`)
