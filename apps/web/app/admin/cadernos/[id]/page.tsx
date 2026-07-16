@@ -102,7 +102,7 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
     <CadernoEditorV2
       cadernoId={caderno.id}
       nome={caderno.nome}
-      inicial={{ docsV2: config.docsV2, modalidadesV2: config.modalidadesV2, cores: config.cores, hudCores: config.hudCores, hudPorPagina: config.hudPorPagina }}
+      inicial={{ docsV2: config.docsV2, modalidadesV2: config.modalidadesV2, cores: config.cores, hudCores: config.hudCores, hudPorPagina: config.hudPorPagina, loginLayout: config.loginLayout }}
       previewData={previewData}
       bancos={(bancos ?? []) as { id: string; nome: string }[]}
       bancoIdInicial={bancoId}

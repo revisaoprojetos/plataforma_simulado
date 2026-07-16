@@ -15,7 +15,7 @@ import { FitaTopo } from '@/components/prova/fita-topo'
 import { LoginResultado, type LoginResultadoTipo } from '@/components/prova/login-popups'
 import { ProvaLoading, type EstiloProvaLoading } from '@/components/prova/prova-intro'
 import { ThemeToggle } from '@/components/prova/theme-toggle'
-import { efetivarHud, type HudCores, type HudPorPagina } from '@/lib/caderno-designer/types'
+import { efetivarHud, type HudCores, type HudPorPagina, type LoginLayout } from '@/lib/caderno-designer/types'
 import { hudCssVars } from '@/lib/caderno-designer/hud'
 import { useDarkMode } from '@/lib/hud/use-dark'
 
@@ -46,6 +46,8 @@ interface EmbedLoginFormProps {
   hud?: { base: Partial<HudCores>; porPagina: HudPorPagina }
   /** tema inicial (cookie, vindo do servidor) — evita piscada claro→escuro. */
   darkInicial?: boolean
+  /** Layout: 'padrao' (completo) ou 'centralizado' (simples, tudo no centro da tela). */
+  loginLayout?: LoginLayout
 }
 
 /** Formata data/hora "dd/MM/yyyy HH:mm". */
@@ -110,7 +112,7 @@ interface ErroBloqueio {
   tipo?: LoginResultadoTipo
 }
 
-export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova, destino = 'embed', hud, darkInicial = false }: EmbedLoginFormProps) {
+export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova, destino = 'embed', hud, darkInicial = false, loginLayout = 'padrao' }: EmbedLoginFormProps) {
   const [erro, setErro] = useState<ErroBloqueio | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [sucesso, setSucesso] = useState(false)
@@ -177,6 +179,74 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
   const statusSty = statusStyle(statusLabel)
   const duracao = calcDuracao(prova)
 
+  // Formulário de identificação — reutilizado nos dois layouts (padrão e centralizado).
+  const formulario = (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div className="space-y-1.5">
+        <Label htmlFor="email">E-mail cadastrado na <strong className="font-semibold" style={{ color: 'var(--prova-login-destaque, var(--primary))' }}>plataforma do {plataforma}</strong> *</Label>
+        <Input
+          id="email"
+          type="email"
+          placeholder="seu@email.com"
+          autoComplete="email"
+          style={{ background: 'var(--prova-login-input, var(--background))' }}
+          {...register('email')}
+          aria-invalid={!!errors.email}
+        />
+        {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+      </div>
+
+      {metodo === 'email_cpf' && (
+        <div className="space-y-1.5">
+          <Label htmlFor="cpf">CPF</Label>
+          <Input id="cpf" placeholder="000.000.000-00" autoComplete="off" style={{ background: 'var(--prova-login-input, var(--background))' }} {...register('cpf')} aria-invalid={!!errors.cpf} />
+          {errors.cpf && <p className="text-xs text-destructive">{errors.cpf.message}</p>}
+        </div>
+      )}
+
+      {metodo === 'email_telefone' && (
+        <div className="space-y-1.5">
+          <Label htmlFor="telefone">Telefone</Label>
+          <Input id="telefone" placeholder="(00) 00000-0000" autoComplete="tel" style={{ background: 'var(--prova-login-input, var(--background))' }} {...register('telefone')} aria-invalid={!!errors.telefone} />
+          {errors.telefone && <p className="text-xs text-destructive">{errors.telefone.message}</p>}
+        </div>
+      )}
+
+      <Button type="submit" className="w-full" size="lg" disabled={isLoading} style={{ background: 'var(--prova-login-botao, var(--primary))' }}>
+        {isLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verificando...</>) : 'Iniciar simulado'}
+      </Button>
+    </form>
+  )
+
+  // Layout CENTRALIZADO (simples): tudo no centro exato da tela, um único card, mínimo de
+  // elementos — pensado para o aluno não clicar/errar. Escolhido no HUD do caderno.
+  if (loginLayout === 'centralizado') {
+    return (
+      <div className="relative flex min-h-screen items-center justify-center bg-background p-4" style={hudCssVars(coresLogin, dark) as React.CSSProperties}>
+        <ThemeToggle dark={dark} onToggle={toggleDark} className="absolute right-4 top-4" />
+        <div className="w-full max-w-sm animate-in fade-in zoom-in-95 duration-500">
+          <div className="mb-6 flex flex-col items-center text-center">
+            {branding?.logoUrl && (
+              <div className={cn('mb-4 flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden', frameLogo(branding.logoEstilo))} style={{ background: branding.logoBg ?? '#ffffff' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={branding.logoUrl} alt="" className="h-full w-full object-contain" />
+              </div>
+            )}
+            <span className="inline-block rounded-full px-3 py-1 text-xs font-semibold" style={statusSty}>{statusLabel}</span>
+            <h1 className="mt-3 text-2xl font-extrabold uppercase leading-tight tracking-tight" style={{ color: 'var(--prova-titulo, var(--primary))' }}>{simuladoTitulo}</h1>
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><Clock className="h-4 w-4" /> Duração: <strong className="font-semibold text-foreground">{duracao}</strong></p>
+          </div>
+          <div className="relative overflow-hidden rounded-2xl border bg-card p-6 shadow-lg">
+            <FitaTopo />
+            <h2 className="mb-4 text-center text-base font-semibold">Identifique-se para iniciar</h2>
+            {formulario}
+          </div>
+        </div>
+        {erro && <LoginResultado overlay tipo={erro.tipo ?? 'email_invalido'} mensagem={erro.message} contato={erro.contato} plataforma={plataforma} onVoltar={() => setErro(null)} />}
+      </div>
+    )
+  }
+
   // Sucesso: entra na tela "Carregamento" do caderno (mesmo estilo/cor) antes de abrir o simulado.
   if (sucesso) {
     const cores = efetivarHud(hud?.base, hud?.porPagina, 'loading')
@@ -234,68 +304,7 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
         <div className="relative overflow-hidden rounded-2xl border bg-card p-6 shadow-sm">
           <FitaTopo />
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><BookOpen className="h-5 w-5" style={{ color: 'var(--primary)' }} /> Identifique-se para iniciar</h2>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="email">E-mail cadastrado na <strong className="font-semibold" style={{ color: 'var(--prova-login-destaque, var(--primary))' }}>plataforma do {plataforma}</strong> *</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                autoComplete="email"
-                style={{ background: 'var(--prova-login-input, var(--background))' }}
-                {...register('email')}
-                aria-invalid={!!errors.email}
-              />
-              {errors.email && (
-                <p className="text-xs text-destructive">{errors.email.message}</p>
-              )}
-            </div>
-
-            {metodo === 'email_cpf' && (
-              <div className="space-y-1.5">
-                <Label htmlFor="cpf">CPF</Label>
-                <Input
-                  id="cpf"
-                  placeholder="000.000.000-00"
-                  autoComplete="off"
-                  style={{ background: 'var(--prova-login-input, var(--background))' }}
-                  {...register('cpf')}
-                  aria-invalid={!!errors.cpf}
-                />
-                {errors.cpf && (
-                  <p className="text-xs text-destructive">{errors.cpf.message}</p>
-                )}
-              </div>
-            )}
-
-            {metodo === 'email_telefone' && (
-              <div className="space-y-1.5">
-                <Label htmlFor="telefone">Telefone</Label>
-                <Input
-                  id="telefone"
-                  placeholder="(00) 00000-0000"
-                  autoComplete="tel"
-                  style={{ background: 'var(--prova-login-input, var(--background))' }}
-                  {...register('telefone')}
-                  aria-invalid={!!errors.telefone}
-                />
-                {errors.telefone && (
-                  <p className="text-xs text-destructive">{errors.telefone.message}</p>
-                )}
-              </div>
-            )}
-
-            <Button type="submit" className="w-full" size="lg" disabled={isLoading} style={{ background: 'var(--prova-login-botao, var(--primary))' }}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Verificando...
-                </>
-              ) : (
-                'Iniciar simulado'
-              )}
-            </Button>
-          </form>
+          {formulario}
         </div>
       </div>
 

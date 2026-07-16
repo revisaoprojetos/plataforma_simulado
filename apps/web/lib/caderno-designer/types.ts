@@ -103,6 +103,9 @@ export function mesclarModalidades(saved?: Modalidade[]): Modalidade[] {
   return norm
 }
 
+/** Layout da tela de login do aluno: 'padrao' (completo) ou 'centralizado' (simples, no centro). */
+export type LoginLayout = 'padrao' | 'centralizado'
+
 /** Páginas do simulado que podem ter cores próprias. */
 export type HudPagina = 'loading' | 'login' | 'entrada' | 'prova' | 'encerrada'
 /** Cores próprias por página (override sobre a base). */

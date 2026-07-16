@@ -1,20 +1,23 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { HUD_CORES_PADRAO, type HudCores, type HudPorPagina } from '@/lib/caderno-designer/types'
+import { HUD_CORES_PADRAO, type HudCores, type HudPorPagina, type LoginLayout } from '@/lib/caderno-designer/types'
 
 export interface HudConfigResolvido {
   base: HudCores
   porPagina: HudPorPagina
   /** id do caderno cujo tema/HUD foi aplicado (null = padrão) */
   cadernoId: string | null
+  /** layout da tela de login do aluno (padrão = completo; centralizado = simples). */
+  loginLayout: LoginLayout
 }
 
-const VAZIO: HudConfigResolvido = { base: HUD_CORES_PADRAO, porPagina: {}, cadernoId: null }
+const VAZIO: HudConfigResolvido = { base: HUD_CORES_PADRAO, porPagina: {}, cadernoId: null, loginLayout: 'padrao' }
 
 function montar(config: any, cadernoId: string | null): HudConfigResolvido {
   const hc = config?.hudCores
   const base = hc ? { ...HUD_CORES_PADRAO, ...hc } : HUD_CORES_PADRAO
   const porPagina = config?.hudPorPagina && typeof config.hudPorPagina === 'object' ? (config.hudPorPagina as HudPorPagina) : {}
-  return { base, porPagina, cadernoId }
+  const loginLayout: LoginLayout = config?.loginLayout === 'centralizado' ? 'centralizado' : 'padrao'
+  return { base, porPagina, cadernoId, loginLayout }
 }
 
 /**

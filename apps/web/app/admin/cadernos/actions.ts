@@ -57,7 +57,7 @@ export async function salvarCadernoConfig(id: string, config: CadernoConfig): Pr
 /** Salva o documento do editor de blocos v2 (docsV2/modalidadesV2/cores), preservando campos legados. */
 export async function salvarCadernoDesignerV2(
   id: string,
-  payload: { docsV2: Record<string, unknown>; modalidadesV2: unknown[]; cores: Record<string, string>; bancoId?: string | null; hudCores?: Record<string, string>; hudPorPagina?: Record<string, Record<string, string>> },
+  payload: { docsV2: Record<string, unknown>; modalidadesV2: unknown[]; cores: Record<string, string>; bancoId?: string | null; hudCores?: Record<string, string>; hudPorPagina?: Record<string, Record<string, string>>; loginLayout?: string },
 ): Promise<{ ok: boolean; error?: string }> {
   if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
   const access = await getCurrentAccess()
