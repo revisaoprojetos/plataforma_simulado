@@ -1,5 +1,5 @@
 import { headers } from 'next/headers'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export interface Tenant {
   id: string
@@ -15,7 +15,9 @@ export interface Tenant {
  * - Produção: pelo subdomínio do host (`revisaopge.seudominio.com` → slug `revisaopge`).
  * - Desenvolvimento (localhost, sem subdomínio): usa `NEXT_PUBLIC_DEFAULT_TENANT_SLUG`
  *   ou `demo`.
- * Usa service role para a resolução (acontece antes de haver contexto de RLS).
+ * Usa service role REAL (createAdminClient) — a resolução acontece antes de haver
+ * contexto de RLS, e alguns bancos (ex.: migrados) têm RLS incompleto que bloquearia
+ * a leitura do tenant se rodasse como o usuário autenticado.
  */
 export async function getCurrentTenant(): Promise<Tenant | null> {
   const h = await headers()
@@ -31,7 +33,7 @@ export async function getCurrentTenant(): Promise<Tenant | null> {
     slug = parts[0]
   }
 
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
   const { data } = await supabase
     .from('simulado_tenants')
     .select('id, nome, slug, tema, plano, ativo')

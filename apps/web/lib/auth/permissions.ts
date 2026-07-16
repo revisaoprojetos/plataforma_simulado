@@ -1,4 +1,4 @@
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 
 export interface Access {
@@ -24,7 +24,10 @@ export async function getCurrentAccess(): Promise<Access> {
 
   if (!user || !tenantId) return { ...EMPTY, userId: user?.id ?? null, tenantId }
 
-  const svc = await createServiceClient()
+  // Service role REAL: a checagem do próprio acesso (filtrada por user_id+tenant_id) não
+  // pode depender do RLS do banco — em bancos com RLS incompleto (migrados), createServiceClient
+  // rodaria como o usuário e falharia, zerando o acesso do admin.
+  const svc = createAdminClient()
 
   const { data: acesso } = await svc
     .from('simulado_tenant_acessos')
