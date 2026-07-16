@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
     .from('simulado_prova_questoes')
     .select('ordem, questoes:simulado_questoes(id, tipo, enunciado, alternativas:simulado_alternativas(id, texto, ordem))')
     .eq('simulado_id', sessao.simulado_id)
-    .eq('anulada', false)
+    // Tolerante a null: exclui só as explicitamente anuladas (dados migrados vêm com anulada=null).
+    .not('anulada', 'is', true)
     .order('ordem')
 
   const questoes = (sq ?? []).map((row: any) => ({
