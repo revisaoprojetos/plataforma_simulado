@@ -67,6 +67,11 @@ function cssVarsFromCores(c: Cores): string {
 }
 type LogoEstilo = 'quadrado' | 'arredondado' | 'borda'
 type SelecaoEstilo = 'quadrada' | 'redonda' | 'borda'
+type LoginLayout = 'painel' | 'centralizado'
+const LOGIN_LAYOUTS: { id: LoginLayout; nome: string; desc: string }[] = [
+  { id: 'painel', nome: 'Painel', desc: 'Imagem grande ao lado do formulário' },
+  { id: 'centralizado', nome: 'Simples', desc: 'Card único no centro da tela' },
+]
 type LogoFiltro = 'none' | 'branco' | 'preto'
 type PresetCor = { id: string; nome: string; cores: Cores; coresDark: Cores }
 
@@ -86,6 +91,7 @@ interface Tema {
   nome_site: string; subtitulo_site: string; titulo_pagina: string
   logo_url: string | null; logo_grande_url: string | null; logo_selecao_url: string | null
   logo_png_bg: string; logo_estilo: LogoEstilo; logo_filtro: LogoFiltro; logo_selecao_estilo: SelecaoEstilo
+  login_layout: LoginLayout   // layout da tela de login da plataforma
   cores: Cores        // paleta do modo CLARO
   coresDark: Cores    // paleta do modo ESCURO
 }
@@ -131,6 +137,7 @@ const DEFAULT: Tema = {
   logo_estilo: 'arredondado',
   logo_filtro: 'none',
   logo_selecao_estilo: 'redonda',
+  login_layout: 'painel',
   cores: { sidebar: '#0f0f13', sidetext: '#c8c8d0', sidetextHover: '#ffffff', sidetextActive: '#ffffff', icon: '#c8c8d0', iconHover: '#ffffff', iconAtivo: '#ffffff', active: '#7f77dd', topbar: '#111118', sborder: '#35353f', bg: '#18181f', text: '#e8e8ee', titulo: '#e8e8ee', card: '#26262f', cborder: '#35353f', inputBg: '#1f1f28', btn: '#7f77dd', accent: '#7f77dd', tabBg: '#26262f', tabAtivo: '#3a3a48', tabTexto: '#ffffff' },
   // Paleta escura padrão (roxo escuro) — base do modo escuro.
   coresDark: { sidebar: '#161421', sidetext: '#c8c8d0', sidetextHover: '#ffffff', sidetextActive: '#ffffff', icon: '#c8c8d0', iconHover: '#ffffff', iconAtivo: '#ffffff', active: '#7f77dd', topbar: '#161421', sborder: '#2b2838', bg: '#0f0e16', text: '#e8e8ee', titulo: '#e8e8ee', card: '#1b1926', cborder: '#2b2838', inputBg: '#14121d', btn: '#7f77dd', accent: '#7f77dd', tabBg: '#1b1926', tabAtivo: '#2b2838', tabTexto: '#ffffff' },
@@ -284,6 +291,7 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
     logo_estilo: (tema?.logo_estilo as LogoEstilo) ?? DEFAULT.logo_estilo,
     logo_filtro: (tema?.logo_filtro as LogoFiltro) ?? DEFAULT.logo_filtro,
     logo_selecao_estilo: (tema?.logo_selecao_estilo as SelecaoEstilo) ?? DEFAULT.logo_selecao_estilo,
+    login_layout: (tema?.login_layout === 'centralizado' ? 'centralizado' : 'painel'),
     cores: { ...DEFAULT.cores, ...(tema?.cores ?? {}) },
     coresDark: { ...DEFAULT.coresDark, ...(tema?.cores_dark ?? {}) },
   }
@@ -523,6 +531,16 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
             <div className="space-y-1.5"><span className="text-xs text-muted-foreground">Formato da imagem de seleção</span>
               <div className="flex gap-1.5">{SELECAO_ESTILOS.map((e) => (<button key={e.id} type="button" onClick={() => setT((p) => ({ ...p, logo_selecao_estilo: e.id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_selecao_estilo === e.id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{e.nome}</button>))}</div>
             </div>
+            <div className="space-y-1.5"><span className="text-xs text-muted-foreground">Layout da tela de login</span>
+              <div className="grid grid-cols-2 gap-1.5">{LOGIN_LAYOUTS.map((e) => (
+                <button key={e.id} type="button" onClick={() => setT((p) => ({ ...p, login_layout: e.id }))}
+                  className={`rounded-md border px-2 py-1.5 text-left transition-colors ${t.login_layout === e.id ? 'border-primary bg-primary/10' : 'hover:border-primary/50'}`}>
+                  <span className="block text-[11px] font-semibold">{e.nome}</span>
+                  <span className="block text-[10px] leading-tight text-muted-foreground">{e.desc}</span>
+                </button>))}
+              </div>
+              <p className="text-[10px] text-muted-foreground">O "Simples" deixa tudo centralizado no meio da tela — mais fácil para o aluno.</p>
+            </div>
             <div className="space-y-2.5 border-t pt-3">
               <div className="space-y-1.5"><label className="text-xs text-muted-foreground">Nome do site</label>
                 <input value={t.nome_site} onChange={(e) => setT((p) => ({ ...p, nome_site: e.target.value }))} className="w-full rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" /></div>
@@ -661,6 +679,28 @@ function PreviewLogin({ t, cores, dark }: { t: Tema; cores: Cores; dark: boolean
   const border = dark ? '#2a2a35' : '#e5e7eb'
   // No login usa a logo GRANDE; cai na pequena se não houver.
   const bigLogo = t.logo_grande_url ?? t.logo_url
+  const smallLogo = t.logo_url ?? t.logo_grande_url
+
+  // Layout centralizado (simples): card único no meio da tela.
+  if (t.login_layout === 'centralizado') {
+    return (
+      <div className="flex h-[420px] items-center justify-center px-4 text-[12px]" style={{ background: bg, color: text, fontFamily: 'system-ui, sans-serif' }}>
+        <div className="w-[248px] rounded-2xl border p-6 shadow-xl" style={{ background: dark ? '#15151c' : '#ffffff', borderColor: border }}>
+          <div className="mb-4 flex flex-col items-center gap-2 text-center">
+            <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl text-2xl font-bold" style={{ background: c.btn, color: contraste(c.btn) }}>
+              {smallLogo ? <img src={smallLogo} alt="" className="h-full w-full object-contain" /> : (t.nome_site[0] ?? 'P').toUpperCase()}
+            </span>
+            <p className="text-[13px] font-semibold">{t.nome_site}</p>
+          </div>
+          <span className="mb-3 flex items-center gap-1 text-[11px]" style={{ color: muted }}><ArrowLeft className="h-3 w-3" /> Trocar plataforma</span>
+          <p className="mb-3 text-sm font-bold">Acesso administrativo</p>
+          <div className="mb-2 flex h-9 items-center rounded-md px-2.5 text-[11px]" style={{ background: inputBg, border: `1px solid ${border}`, color: muted }}>Endereço de e-mail</div>
+          <div className="mb-2 flex h-9 items-center rounded-md px-2.5 text-[11px]" style={{ background: inputBg, border: `1px solid ${border}`, color: muted }}>Senha</div>
+          <div className="flex h-9 items-center justify-center rounded-md text-[11px] font-semibold" style={{ background: c.btn, color: contraste(c.btn) }}>Entrar no painel</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-[420px] text-[12px]" style={{ background: bg, color: text, fontFamily: 'system-ui, sans-serif' }}>

@@ -7,14 +7,15 @@ import { toast } from 'sonner'
 import { Loader2, ArrowLeft, ShieldCheck, GraduationCap, Mail, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type Plataforma = { id: string; nome: string; dominio: string | null; logo: string | null; logoGrande: string | null; logoSelecao: string | null; selecaoEstilo: 'quadrada' | 'redonda' | 'borda'; cor: string | null; modoPadrao: 'light' | 'dark' }
+export type LoginLayout = 'painel' | 'centralizado'
+export type Plataforma = { id: string; nome: string; dominio: string | null; logo: string | null; logoGrande: string | null; logoSelecao: string | null; selecaoEstilo: 'quadrada' | 'redonda' | 'borda'; loginLayout: LoginLayout; cor: string | null; modoPadrao: 'light' | 'dark' }
 
 function frameSelecao(estilo?: string): string {
   if (estilo === 'quadrada') return 'rounded-xl'
   if (estilo === 'borda') return 'rounded-full border-2'
   return 'rounded-full'
 }
-type Marca = { nome: string; logo: string | null; logoGrande: string | null; cor: string | null; modoPadrao: 'light' | 'dark' }
+type Marca = { nome: string; logo: string | null; logoGrande: string | null; cor: string | null; modoPadrao: 'light' | 'dark'; loginLayout: LoginLayout }
 type Modo = 'select' | 'aluno' | 'admin'
 
 const KEYFRAMES = `
@@ -35,8 +36,9 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
 
   const brand: Marca = modo === 'admin'
     ? marca
-    : { nome: sel?.nome ?? marca.nome, logo: sel?.logo ?? marca.logo, logoGrande: sel?.logoGrande ?? marca.logoGrande, cor: sel?.cor ?? marca.cor, modoPadrao: sel?.modoPadrao ?? marca.modoPadrao }
+    : { nome: sel?.nome ?? marca.nome, logo: sel?.logo ?? marca.logo, logoGrande: sel?.logoGrande ?? marca.logoGrande, cor: sel?.cor ?? marca.cor, modoPadrao: sel?.modoPadrao ?? marca.modoPadrao, loginLayout: sel?.loginLayout ?? marca.loginLayout }
   const cor = brand.cor ?? '#6d28d9'
+  const layout: LoginLayout = brand.loginLayout ?? 'painel'
   const logoLogin = brand.logoGrande ?? brand.logo // grande no painel da esquerda
   // Tema escopado: a plataforma escolhida define claro/escuro do login/admin;
   // a tela de seleção fica sempre neutra (clara), sem herdar o tema de uma plataforma.
@@ -130,8 +132,54 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
     )
   }
 
-  // ---------- LOGIN ESTILO INSTAGRAM (após escolher plataforma / admin) ----------
+  // ---------- LOGIN (após escolher plataforma / admin) ----------
   const titulo = modo === 'admin' ? 'Acesso administrativo' : `Entre na ${sel?.nome ?? 'plataforma'}`
+
+  // Formulário de credenciais — reutilizado nos dois layouts (painel e centralizado).
+  const formLogin = modo === 'aluno' ? (
+    <form onSubmit={entrarAluno} className="space-y-4">
+      <Campo icon={Mail} type="email" placeholder="Endereço de e-mail" value={email} onChange={setEmail} autoComplete="email" />
+      <Submit loading={loading} disabled={!email}>Continuar</Submit>
+      <p className="text-center text-xs text-muted-foreground">Estudantes entram apenas com o e-mail cadastrado.</p>
+    </form>
+  ) : (
+    <form onSubmit={entrarAdmin} className="space-y-4">
+      <Campo icon={Mail} type="email" placeholder="Endereço de e-mail" value={email} onChange={setEmail} autoComplete="email" />
+      <Campo icon={Lock} type="password" placeholder="Senha" value={senha} onChange={setSenha} autoComplete="current-password" />
+      <Submit loading={loading} disabled={!email || !senha}>Entrar no painel</Submit>
+    </form>
+  )
+
+  // LAYOUT CENTRALIZADO (simples): logo + título + formulário num único card no meio da tela.
+  if (layout === 'centralizado') {
+    return (
+      <div className={cn('relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4 text-foreground', temaPlataforma)}>
+        <style>{KEYFRAMES}</style>
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-40 left-1/2 h-[36rem] w-[36rem] -translate-x-1/2 rounded-full blur-[120px]" style={{ background: `${cor}1f` }} />
+        </div>
+        <div className="relative w-full max-w-sm rounded-2xl border bg-card p-8 shadow-2xl" style={{ animation: 'loginPop .4s ease' }}>
+          <div className="mb-6 flex flex-col items-center gap-3 text-center">
+            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
+              {(brand.logo ?? brand.logoGrande) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={(brand.logo ?? brand.logoGrande)!} alt={brand.nome} className="h-full w-full object-contain" />
+              ) : <GraduationCap className="h-10 w-10" style={{ color: cor }} />}
+            </div>
+            <p className="text-lg font-semibold">{brand.nome}</p>
+          </div>
+          <button type="button" onClick={() => { setModo('select'); setErro(null); setSenha('') }} className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" /> Trocar plataforma
+          </button>
+          <h1 className="mb-5 text-xl font-bold tracking-tight">{titulo}</h1>
+          {erro && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{erro}</div>}
+          {formLogin}
+        </div>
+        {adminBtn}
+      </div>
+    )
+  }
+
   return (
     <div className={cn('flex min-h-screen overflow-hidden bg-background text-foreground', temaPlataforma)}>
       <style>{KEYFRAMES}</style>
@@ -176,19 +224,7 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
 
           {erro && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{erro}</div>}
 
-          {modo === 'aluno' ? (
-            <form onSubmit={entrarAluno} className="space-y-4">
-              <Campo icon={Mail} type="email" placeholder="Endereço de e-mail" value={email} onChange={setEmail} autoComplete="email" />
-              <Submit loading={loading} disabled={!email}>Continuar</Submit>
-              <p className="text-center text-xs text-muted-foreground">Estudantes entram apenas com o e-mail cadastrado.</p>
-            </form>
-          ) : (
-            <form onSubmit={entrarAdmin} className="space-y-4">
-              <Campo icon={Mail} type="email" placeholder="Endereço de e-mail" value={email} onChange={setEmail} autoComplete="email" />
-              <Campo icon={Lock} type="password" placeholder="Senha" value={senha} onChange={setSenha} autoComplete="current-password" />
-              <Submit loading={loading} disabled={!email || !senha}>Entrar no painel</Submit>
-            </form>
-          )}
+          {formLogin}
         </div>
       </div>
 

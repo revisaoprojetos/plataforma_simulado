@@ -23,6 +23,7 @@ export default async function LoginPage() {
     logoGrande: comoLogo(t.tema?.logo_grande_url) ?? logoDoTema(t.tema), // grande (painel do login)
     logoSelecao: comoLogo(t.tema?.logo_selecao_url) ?? logoDoTema(t.tema), // bloco de seleção
     selecaoEstilo: (['quadrada', 'redonda', 'borda'].includes(t.tema?.logo_selecao_estilo) ? t.tema.logo_selecao_estilo : 'redonda') as 'quadrada' | 'redonda' | 'borda',
+    loginLayout: (t.tema?.login_layout === 'centralizado' ? 'centralizado' : 'painel') as 'painel' | 'centralizado',
     cor: t.tema?.cor_primaria ?? null,
     modoPadrao: t.tema?.modo_padrao === 'dark' ? 'dark' : 'light',
   }))
@@ -33,6 +34,7 @@ export default async function LoginPage() {
     logoGrande: plataformas[0]?.logoGrande ?? null,
     cor: plataformas[0]?.cor ?? null,
     modoPadrao: plataformas[0]?.modoPadrao ?? 'light',
+    loginLayout: plataformas[0]?.loginLayout ?? 'painel',
   }
 
   return (
