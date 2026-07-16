@@ -10,6 +10,9 @@ import { BancoEstudantes } from '@/components/admin/banco-estudantes'
 import { BancoCaderno } from '@/components/admin/banco-caderno'
 import { BancoRelatorio } from '@/components/admin/banco-relatorio'
 import { AdicionarQuestoesDialog } from '@/components/admin/adicionar-questoes-dialog'
+
+// Sempre fresco: questões, estudantes vinculados e relatório mudam e não podem ficar em cache.
+export const dynamic = 'force-dynamic'
 import { BancoQuestoesTable } from '@/components/admin/banco-questoes-table'
 import { BancoGrupos } from '@/components/admin/banco-grupos'
 import { BancoPersonalizar } from '@/components/admin/banco-personalizar'
