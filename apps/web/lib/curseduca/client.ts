@@ -14,6 +14,9 @@ import { createHash } from 'node:crypto'
 
 export type CurseducaCfg = { base: string; apiKey: string; user: string; pass: string }
 
+/** Teto por request à Curseduca — evita pendurar a UI se a API não responder (rede/firewall). */
+const TIMEOUT_MS = 15_000
+
 /** Config global do .env (fallback quando o tenant não tem credenciais próprias). */
 export function configDoEnv(): CurseducaCfg | null {
   const apiKey = process.env.CURSEDUCA_API_KEY || ''
@@ -67,12 +70,15 @@ async function token(cfg: CurseducaCfg): Promise<string> {
   }
 
   // 2) Login na Curseduca com as credenciais deste tenant.
+  // Timeout obrigatório: sem AbortSignal, um /login lento ou inacessível (rede/firewall
+  // do servidor) pendura a request para sempre — o botão "Validando…" nunca termina.
   const resp = await fetch(`${cfg.base}/login`, {
     method: 'POST',
     headers: { accept: 'application/json', 'content-type': 'application/json', api_key: cfg.apiKey },
     body: JSON.stringify({ username: cfg.user, password: cfg.pass, device: { app: { uuid: 'revisao' }, device: 'server', registrationToken: 'server' }, accessTokenValidity: 'string' }),
     cache: 'no-store',
-  })
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  }).catch((e) => { throw new Error(e?.name === 'TimeoutError' ? 'Curseduca: login expirou (sem resposta em 15s)' : `Curseduca: falha de rede no login (${e?.message ?? e})`) })
   if (!resp.ok) throw new Error(`Curseduca: login falhou (${resp.status})`)
   const j = await resp.json()
   if (!j.accessToken) throw new Error('Curseduca: resposta de login sem accessToken')
@@ -90,11 +96,18 @@ async function token(cfg: CurseducaCfg): Promise<string> {
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 async function api(cfg: CurseducaCfg, path: string): Promise<any> {
-  const fazer = async (t: string) => fetch(`${cfg.base}${path}`, { headers: { accept: 'application/json', api_key: cfg.apiKey, Authorization: `Bearer ${t}` }, cache: 'no-store' })
+  const fazer = async (t: string) => fetch(`${cfg.base}${path}`, { headers: { accept: 'application/json', api_key: cfg.apiKey, Authorization: `Bearer ${t}` }, cache: 'no-store', signal: AbortSignal.timeout(TIMEOUT_MS) })
   let ultimo = 0
   for (let tentativa = 0; tentativa < 4; tentativa++) {
-    let r = await fazer(await token(cfg))
-    if (r.status === 401) { await invalidarToken(cfg); r = await fazer(await token(cfg)) } // token expirou → renova (uma vez)
+    let r: Response
+    try {
+      r = await fazer(await token(cfg))
+      if (r.status === 401) { await invalidarToken(cfg); r = await fazer(await token(cfg)) } // token expirou → renova (uma vez)
+    } catch (e: any) {
+      // Timeout/queda de rede: nunca pendura — faz backoff e tenta de novo; desiste após as tentativas.
+      if (tentativa < 3) { await dormir(Math.min(8_000, 500 * 2 ** tentativa) + Math.floor(Math.random() * 250)); continue }
+      throw new Error(`Curseduca ${path}: ${e?.name === 'TimeoutError' ? 'sem resposta (timeout)' : (e?.message ?? 'falha de rede')}`)
+    }
     if (r.ok) return r.json()
     ultimo = r.status
     // Rate limit / indisponibilidade temporária → backoff exponencial com jitter e tenta de novo.
