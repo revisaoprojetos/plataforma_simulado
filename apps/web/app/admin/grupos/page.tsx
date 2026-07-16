@@ -2,6 +2,9 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { GruposClient } from '@/components/admin/grupos-client'
 
+// Sempre fresco: a contagem de participantes muda por import/vínculo (não pode ficar em cache).
+export const dynamic = 'force-dynamic'
+
 export default async function GruposPage() {
   const svc = createAdminClient()
   const tenantId = await getCurrentTenantId()
