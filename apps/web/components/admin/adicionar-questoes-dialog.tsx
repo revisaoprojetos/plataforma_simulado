@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Search, Check, Loader2, Upload, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 import { adicionarQuestoes } from '@/app/admin/banco-questoes/actions'
 import { ImportarQuestoesTab } from '@/components/admin/importar-questoes-tab'
 
@@ -49,6 +50,7 @@ export function AdicionarQuestoesDialog({
   const [tipoF, setTipoF] = useState('all')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
+  const router = useRouter()
   const noBanco = useMemo(() => new Set(jaNoBanco), [jaNoBanco])
 
   const discItems = useMemo(() => ({ all: 'Todas disciplinas', ...Object.fromEntries(disciplinas.map((d) => [d, d])) }), [disciplinas])
@@ -75,8 +77,14 @@ export function AdicionarQuestoesDialog({
     if (sel.size === 0) return
     start(async () => {
       const r = await adicionarQuestoes(bancoId, [...sel])
-      if (r.ok) { toast.success(`${r.adicionadas ?? 0} questão(ões) adicionada(s)`); window.location.assign(`/admin/banco-questoes/${bancoId}?tab=questoes`) }
-      else toast.error(r.error ?? 'Erro')
+      if (r.ok) {
+        toast.success(`${r.adicionadas ?? 0} questão(ões) adicionada(s)`)
+        setOpen(false)
+        setSel(new Set())
+        // Navegação suave (a action faz revalidatePath): sem window.location.assign / reload total.
+        router.push(`/admin/banco-questoes/${bancoId}?tab=questoes`)
+        router.refresh()
+      } else toast.error(r.error ?? 'Erro')
     })
   }
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,6 +25,7 @@ export function NovoBancoForm() {
   const [nome, setNome] = useState('')
   const [tipo, setTipo] = useState<'objetiva' | 'discursiva'>('objetiva')
   const [pending, start] = useTransition()
+  const router = useRouter()
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -34,8 +36,13 @@ export function NovoBancoForm() {
     start(async () => {
       const r = await criarBanco(nome, tipo)
       if (r.ok) {
-        // Recarrega a lista de forma garantida (router.refresh é instável aqui).
-        window.location.reload()
+        // Refresh suave (a lista é force-dynamic + criarBanco faz revalidatePath):
+        // evita o window.location.reload() que causava a "tela de erro" ao recarregar tudo.
+        toast.success('Banco criado.')
+        setOpen(false)
+        setNome('')
+        setTipo('objetiva')
+        router.refresh()
       } else {
         toast.error(r.error ?? 'Erro ao criar')
       }

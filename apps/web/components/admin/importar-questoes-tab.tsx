@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { FileUp, Download, Loader2, Check, AlertTriangle, RefreshCw, ChevronRight } from 'lucide-react'
@@ -124,6 +125,7 @@ export function ImportarQuestoesTab({ bancoId = null, onDone }: { bancoId?: stri
   const [analisando, startAnalise] = useTransition()
   const [salvando, startSalvar] = useTransition()
   const [baixandoModelo, setBaixandoModelo] = useState(false)
+  const router = useRouter()
 
   async function onBaixarModelo() {
     if (baixandoModelo) return
@@ -153,7 +155,10 @@ export function ImportarQuestoesTab({ bancoId = null, onDone }: { bancoId?: stri
         : `${r.criadas ?? 0} questão(ões) criada(s) no sistema`)
       if (r.jaExistiam) toast.message(`${r.jaExistiam} já existia(m) no sistema — não duplicada(s).`)
       onDone()
-      window.location.assign(bancoId ? `/admin/banco-questoes/${bancoId}?tab=questoes` : '/admin/questoes')
+      // Navegação suave (a action faz revalidatePath): evita o window.location.assign,
+      // que recarregava tudo e causava a "tela de erro/reload".
+      router.push(bancoId ? `/admin/banco-questoes/${bancoId}?tab=questoes` : '/admin/questoes')
+      router.refresh()
     })
   }
 
