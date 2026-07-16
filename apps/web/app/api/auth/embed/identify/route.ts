@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getTenantMensagem, getTenantContato, type TenantContato } from '@/lib/tenant-messages'
 import { rateLimit } from '@/lib/rate-limit'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
+import { contatoEstudante } from '@/lib/webhooks/payload'
 
 interface RequestBody {
   embed_token?: string
@@ -113,7 +114,7 @@ export async function POST(request: NextRequest) {
 
   const { data: estudante } = await supabase
     .from('simulado_estudantes')
-    .select('id, nome, user_id, cpf, telefone')
+    .select('id, nome, email, user_id, cpf, telefone, classificacao')
     .eq('tenant_id', simulado.tenant_id)
     .ilike('email', email.toLowerCase().trim())
     .maybeSingle()
@@ -238,13 +239,7 @@ export async function POST(request: NextRequest) {
 
     // Notifica sistemas externos (webhooks/n8n): estudante iniciou o simulado.
     await dispararWebhook(simulado.tenant_id, 'estudante.iniciou', {
-      contact: {
-        id: estudante.id,
-        name: estudante.nome ?? null,
-        email: (estudante as any).email ?? null,
-        doc: (estudante as any).cpf ?? null,
-        phone_number: (estudante as any).telefone ?? null,
-      },
+      contact: contatoEstudante(estudante),
       simulado: { id: simulado.id, name: tituloSimulado },
       sessao_id: sessaoId,
       tentativa: tentativaNum,

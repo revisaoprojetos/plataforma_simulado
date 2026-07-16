@@ -63,7 +63,8 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   setInterval(() => { void chamarCron('/api/cron/encerrar-expirados', 'cron encerramento', (j) => !!(j.sessoesEncerradas || j.simuladosEncerrados)) }, 60_000)
   setInterval(() => { void chamarCron('/api/cron/curseduca-jobs', 'cron curseduca', (j) => !!j.processados) }, 60_000)
   setInterval(() => { void chamarCron('/api/cron/curseduca-sync', 'cron curseduca-sync', (j) => !!j.rodadas) }, 60_000)
-  console.log('[cron] agendado a cada 60s: encerramento + import + sync Curseduca')
+  setInterval(() => { void chamarCron('/api/cron/integracoes-eventos', 'cron integracoes-eventos', (j) => !!(j.processados || j.erros)) }, 60_000)
+  console.log('[cron] agendado a cada 60s: encerramento + import + sync Curseduca + eventos Integrações')
 } else {
   console.warn('[cron] DESATIVADO — defina WEB_INTERNAL_URL e CRON_SECRET')
 }

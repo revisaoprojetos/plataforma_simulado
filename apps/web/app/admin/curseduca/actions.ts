@@ -85,6 +85,13 @@ export async function getCurseducaConfig(): Promise<{ ok: boolean; error?: strin
   }
 }
 
+/** Checagem LEVE se a integração está configurada (DB/.env) — sem puxar grupos da API. */
+export async function curseducaConfigurado(): Promise<boolean> {
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return false
+  try { return !!(await resolverCfg(access.tenantId)) } catch { return false }
+}
+
 /** Salva as credenciais do tenant (testa login antes de gravar). Campos em branco preservam o valor atual. */
 export async function salvarCurseducaConfig(dados: { base_url?: string; api_key?: string; usuario?: string; senha?: string; ativo?: boolean }): Promise<{ ok: boolean; error?: string }> {
   if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
@@ -245,6 +252,46 @@ export async function criarRegraSync(grupos: number[], destino: DestinoImport, s
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_curseduca_sync', depois: { grupos, destino, intervalo } })
   revalidatePath('/admin/curseduca/sincronizacao')
   return { ok: true }
+}
+
+/** Estado da "sincronização simples" (card do Importar): ativo + intervalo da regra global. */
+export async function getSyncSimples(): Promise<{ ok: boolean; ativo: boolean; intervaloMin: number }> {
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, ativo: false, intervaloMin: 30 }
+  const svc = createAdminClient()
+  try {
+    const { data } = await svc.from('simulado_curseduca_sync').select('ativo, intervalo_min').eq('tenant_id', access.tenantId).order('created_at', { ascending: true }).limit(1).maybeSingle()
+    return { ok: true, ativo: !!(data as any)?.ativo, intervaloMin: (data as any)?.intervalo_min ?? 30 }
+  } catch { return { ok: true, ativo: false, intervaloMin: 30 } }
+}
+
+/**
+ * Card do Importar: liga/desliga a sincronização automática (reimporta os grupos no intervalo)
+ * e define o intervalo. Mantém UMA regra "global" — destino 'nenhum', sincronizar=false
+ * (só adiciona alunos novos, nunca remove). Substitui a UI de regras avançada (oculta por ora).
+ */
+export async function salvarSyncSimples(intervaloMin: number, ativo: boolean, grupos: number[]): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const intervalo = INTERVALOS_OK.has(intervaloMin) ? intervaloMin : 30
+  const svc = createAdminClient()
+  try {
+    const { data: existentes } = await svc.from('simulado_curseduca_sync').select('id').eq('tenant_id', access.tenantId).order('created_at', { ascending: true })
+    const lista = (existentes ?? []) as any[]
+    if (lista.length) {
+      await svc.from('simulado_curseduca_sync').update({ intervalo_min: intervalo, ativo, grupos, destino: { tipo: 'nenhum' }, sincronizar: false }).eq('id', lista[0].id).eq('tenant_id', access.tenantId)
+      if (lista.length > 1) await svc.from('simulado_curseduca_sync').delete().in('id', lista.slice(1).map((r) => r.id)).eq('tenant_id', access.tenantId)
+    } else if (ativo) {
+      if (!grupos.length) return { ok: false, error: 'Carregue os grupos antes de ativar.' }
+      await svc.from('simulado_curseduca_sync').insert({ tenant_id: access.tenantId, grupos, destino: { tipo: 'nenhum' }, sincronizar: false, intervalo_min: intervalo, ativo: true, criado_por: access.userId ?? null })
+    }
+    revalidatePath('/admin/integracoes/curseduca')
+    return { ok: true }
+  } catch (e: any) {
+    if (/relation|does not exist|schema cache|column/i.test(e?.message ?? '')) return { ok: false, error: 'Rode a migration da tabela simulado_curseduca_sync.' }
+    return { ok: false, error: e?.message ?? 'Erro ao salvar.' }
+  }
 }
 
 export async function toggleRegraSync(id: string, ativo: boolean): Promise<{ ok: boolean; error?: string }> {

@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { Webhook, Plus, Trash2, Pencil, Loader2, Check, Zap, RefreshCw, AlertTriangle, Search, X, Lock, ListFilter, ChevronDown } from 'lucide-react'
+import { Webhook, Plus, Trash2, Pencil, Loader2, Check, Zap, RefreshCw, AlertTriangle, Search, X, Lock, ListFilter, ChevronDown, FileJson, Copy } from 'lucide-react'
 import { criarWebhook, atualizarWebhook, toggleWebhook, excluirWebhook } from '@/app/admin/conexoes/webhooks/actions'
 
 type Wh = { id: string; nome: string; url: string; eventos: string[]; secret: string | null; ativo: boolean; ultimoStatus: string | null; ultimoEnvio: string | null; enviosSimultaneos: number; filtroSimulados: string[] }
@@ -23,6 +23,7 @@ function gerarSecret() {
 
 export function WebhooksConfig({ webhooks, eventos, simulados, precisaMigrar }: { webhooks: Wh[]; eventos: Evt[]; simulados: Sim[]; precisaMigrar: boolean }) {
   const [dialog, setDialog] = useState<{ modo: 'novo' | 'editar'; wh?: Wh } | null>(null)
+  const [payloadWh, setPayloadWh] = useState<Wh | null>(null)
   const [busca, setBusca] = useState('')
   const [guiaAberta, setGuiaAberta] = useState(false)
   const [pending, start] = useTransition()
@@ -59,15 +60,8 @@ export function WebhooksConfig({ webhooks, eventos, simulados, precisaMigrar }: 
         </button>
         {guiaAberta && (
           <div className="border-t p-4">
-            <p className="text-sm text-muted-foreground">Crie um workflow no n8n com um nó <b>Webhook</b>, copie a URL de produção e cole aqui. A cada evento assinado enviamos um <code className="rounded bg-muted px-1">POST</code> (formato estilo dos webhooks de venda, fácil de filtrar):</p>
-            <pre className="mt-2 overflow-auto rounded-lg border bg-muted/40 p-3 text-xs leading-relaxed">{`{
-  "id": "sessao-uuid", "type": "estudante",
-  "event": "estudante.finalizou", "status": "finalizado",
-  "dates": { "created_at": "2026-07-13T13:00:00Z" },
-  "contact": { "name": "…", "email": "…", "doc": "00000000000", "phone_number": "5571999670570" },
-  "simulado": { "id": "…", "name": "Simulado PGE — 1ª fase" },
-  "resultado": { "nota": 8.5, "acertos": 17, "total": 20, "tentativa": 1 }
-}`}</pre>
+            <p className="text-sm text-muted-foreground">Crie um workflow no n8n com um nó <b>Webhook</b>, copie a URL de produção e cole aqui. A cada evento assinado enviamos um <code className="rounded bg-muted px-1">POST</code> (formato estilo dos webhooks de venda, fácil de filtrar). Use o botão <b className="inline-flex items-center gap-1"><FileJson className="h-3 w-3" /> Ver payload</b> em cada webhook para inspecionar o JSON completo:</p>
+            <pre className="mt-2 overflow-auto rounded-lg border bg-muted/40 p-3 text-xs leading-relaxed">{JSON.stringify(exemploPayload('estudante.finalizou'), null, 2)}</pre>
             <p className="mt-2 text-xs text-muted-foreground">Com um <b>segredo</b>, o corpo é assinado no header <code className="rounded bg-muted px-1">X-Webhook-Signature: sha256=…</code> (HMAC-SHA256).</p>
           </div>
         )}
@@ -125,6 +119,7 @@ export function WebhooksConfig({ webhooks, eventos, simulados, precisaMigrar }: 
                   <td className="px-4 py-3"><div className="flex justify-center"><Switch checked={w.ativo} onCheckedChange={() => toggle(w)} disabled={pending} /></div></td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1.5">
+                      <Button variant="outline" size="icon" onClick={() => setPayloadWh(w)} aria-label="Ver payload" title="Ver payload enviado"><FileJson className="h-4 w-4" /></Button>
                       <Button variant="outline" size="icon" onClick={() => setDialog({ modo: 'editar', wh: w })} aria-label="Editar"><Pencil className="h-4 w-4" /></Button>
                       <Button variant="outline" size="icon" onClick={() => excluir(w.id)} disabled={pending} aria-label="Excluir" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
                     </div>
@@ -137,6 +132,119 @@ export function WebhooksConfig({ webhooks, eventos, simulados, precisaMigrar }: 
       </div>
 
       {dialog && <WebhookDialog modo={dialog.modo} wh={dialog.wh} eventos={eventos} simulados={simulados} onClose={() => setDialog(null)} />}
+      {payloadWh && <PayloadDialog wh={payloadWh} eventos={eventos} onClose={() => setPayloadWh(null)} />}
+    </div>
+  )
+}
+
+/**
+ * Monta um exemplo do corpo REAL enviado (espelha `lib/webhooks/dispatch.ts`). Estrutura fixa
+ * em todos os eventos; os campos de resultado variam conforme o evento (iniciou → nulls).
+ */
+function exemploPayload(evento: string) {
+  const statusEvento: Record<string, string> = {
+    'estudante.iniciou': 'iniciado',
+    'estudante.finalizou': 'finalizado',
+    'estudante.nao_finalizou': 'nao_finalizado',
+    'estudante.visualizou_relatorio': 'relatorio_visualizado',
+    'estudante.baixou_relatorio': 'relatorio_baixado',
+  }
+  const finalizado = evento === 'estudante.finalizou'
+  return {
+    id: '3f9a1c7e-0b2d-4e6a-9c11-8d5e2a7b4f10',
+    type: 'estudante',
+    webhook_type: 'progressao_estudante',
+    plataforma: { id: 'ce74e4ab-dea1-4aaf-9122-992075d0912a', nome: 'Plataforma Simulado', slug: 'simulado' },
+    event: evento,
+    status: statusEvento[evento] ?? evento,
+    dates: { created_at: '2026-07-16T13:00:00.000Z', occurred_at: '2026-07-16T13:00:00.000Z' },
+    tenant_id: 'ce74e4ab-dea1-4aaf-9122-992075d0912a',
+    contact: {
+      id: 'a17b93c2-4d8e-4f1a-b6c0-2e9f7d3a5c88',
+      name: 'João da Silva',
+      email: 'joao.silva@email.com',
+      doc: '12345678900',
+      phone_number: '5571999670570',
+      phone_local_code: '71',
+      plano: 'passaporte',
+    },
+    simulado: { id: 'b2c4d6e8-1a3b-5c7d-9e0f-2b4d6f8a0c11', name: 'Simulado PGE — 1ª fase' },
+    resultado: {
+      sessao_id: '3f9a1c7e-0b2d-4e6a-9c11-8d5e2a7b4f10',
+      nota: finalizado ? 8.5 : null,
+      acertos: finalizado ? 17 : null,
+      total: finalizado ? 20 : null,
+      tentativa: 1,
+      motivo: evento === 'estudante.nao_finalizou' ? 'tempo_esgotado' : null,
+    },
+  }
+}
+
+/** Pop-up que mostra o CÓDIGO/estrutura do que é enviado (headers + body), estilo n8n. */
+function PayloadDialog({ wh, eventos, onClose }: { wh: Wh; eventos: Evt[]; onClose: () => void }) {
+  const eventosDoWh = wh.eventos.length ? wh.eventos : eventos.map((e) => e.chave)
+  const [evento, setEvento] = useState(eventosDoWh[0] ?? 'estudante.finalizou')
+  const labelEvento = (c: string) => eventos.find((e) => e.chave === c)?.label ?? c
+
+  const corpo = useMemo(() => JSON.stringify(exemploPayload(evento), null, 2), [evento])
+  const headers = useMemo(() => {
+    const h: Record<string, string> = { 'Content-Type': 'application/json', 'X-Webhook-Evento': evento }
+    if (wh.secret) h['X-Webhook-Signature'] = 'sha256=e3b0c44298fc1c149afbf4c8996fb924…'
+    return JSON.stringify(h, null, 2)
+  }, [evento, wh.secret])
+
+  const copiar = (txt: string) => { navigator.clipboard.writeText(txt).then(() => toast.success('Copiado!')).catch(() => toast.error('Não foi possível copiar')) }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent showCloseButton={false} className="max-w-3xl gap-0 overflow-hidden p-0 sm:max-w-3xl">
+        <div className="flex items-center justify-between bg-primary px-5 py-3 text-primary-foreground">
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2 text-base font-semibold"><FileJson className="h-4 w-4" /> Payload enviado</h2>
+            <p className="truncate text-xs text-primary-foreground/70">{wh.nome}</p>
+          </div>
+          <DialogClose render={<button type="button" aria-label="Fechar" className="rounded-md p-1 transition-colors hover:bg-white/20" />}><X className="h-4 w-4" /></DialogClose>
+        </div>
+
+        <div className="max-h-[75vh] space-y-4 overflow-y-auto p-5">
+          <p className="text-xs text-muted-foreground">Exemplo do <code className="rounded bg-muted px-1">POST</code> que este webhook recebe. A estrutura é fixa em todos os eventos (campos que não se aplicam vão <code className="rounded bg-muted px-1">null</code>).</p>
+
+          {/* Seletor de evento */}
+          <div className="space-y-1.5">
+            <Label>Evento</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {eventosDoWh.map((c) => (
+                <button key={c} type="button" onClick={() => setEvento(c)} className={cn('rounded-full border px-3 py-1 text-xs transition-colors', evento === c ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}>{labelEvento(c)}</button>
+              ))}
+            </div>
+          </div>
+
+          <BlocoCodigo titulo="Headers" texto={headers} onCopy={() => copiar(headers)} />
+          <BlocoCodigo titulo="Body (JSON)" texto={corpo} onCopy={() => copiar(corpo)} />
+
+          {wh.secret ? (
+            <p className="flex items-start gap-1.5 text-xs text-muted-foreground"><Lock className="mt-0.5 h-3 w-3 shrink-0" /> Este webhook está assinado: o corpo é validado no header <code className="rounded bg-muted px-1">X-Webhook-Signature</code> com HMAC-SHA256 do segredo.</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">Este webhook não tem segredo, então não enviamos assinatura. Adicione um segredo na edição para assinar o corpo.</p>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t bg-muted/30 p-3">
+          <DialogClose render={<Button type="button" variant="outline" />}>Fechar</DialogClose>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function BlocoCodigo({ titulo, texto, onCopy }: { titulo: string; texto: string; onCopy: () => void }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">{titulo}</Label>
+        <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={onCopy}><Copy className="h-3 w-3" /> Copiar</Button>
+      </div>
+      <pre className="max-h-72 overflow-auto rounded-lg border bg-muted/30 p-3 text-[11px] leading-relaxed"><code>{texto}</code></pre>
     </div>
   )
 }

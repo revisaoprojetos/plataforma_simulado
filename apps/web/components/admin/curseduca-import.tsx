@@ -22,7 +22,7 @@ const ORDENS: { valor: Ordem; label: string }[] = [
 
 const ehDesatualizado = (nome: string) => /desatualizad/i.test(nome)
 
-export function CurseducaImport({ grupos, sistema }: { grupos: GrupoCurseducaDTO[]; sistema: GrupoSistema[] }) {
+export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurseducaDTO[]; sistema: GrupoSistema[]; extra?: React.ReactNode }) {
   const [q, setQ] = useState('')
   const [ordem, setOrdem] = useState<Ordem>('id_desc')
   const [soSelecionados, setSoSelecionados] = useState(false)
@@ -132,9 +132,9 @@ export function CurseducaImport({ grupos, sistema }: { grupos: GrupoCurseducaDTO
   const temFiltro = !!q || soSelecionados || ocultarDesatualizados
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="grid gap-6 lg:h-[calc(100vh-16rem)] lg:grid-cols-[minmax(0,1fr)_420px]">
       {/* Lista de grupos da Curseduca */}
-      <div className="animate-rise overflow-hidden rounded-2xl border bg-card">
+      <div className="animate-rise flex flex-col overflow-hidden rounded-2xl border bg-card">
         {/* barra de busca + ordenação */}
         <div className="flex flex-wrap items-center gap-2 border-b p-3">
           <div className="relative min-w-[200px] flex-1">
@@ -171,8 +171,8 @@ export function CurseducaImport({ grupos, sistema }: { grupos: GrupoCurseducaDTO
           </div>
         </div>
 
-        {/* lista */}
-        <div className="scroll-claro stagger max-h-[calc(100vh-20rem)] min-h-[24rem] overflow-y-auto p-2">
+        {/* lista preenche a altura do card (grid com altura fixa) e rola internamente */}
+        <div className="scroll-claro stagger min-h-0 flex-1 overflow-y-auto p-2 max-lg:max-h-[60vh]">
           {filtrados.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-14 text-center text-sm text-muted-foreground">
               <Search className="h-8 w-8 opacity-40" />
@@ -214,23 +214,19 @@ export function CurseducaImport({ grupos, sistema }: { grupos: GrupoCurseducaDTO
       </div>
 
       {/* Painel de importação */}
-      <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-        <div className="animate-pop relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 to-transparent p-4">
-          <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-primary/15 blur-2xl" />
-          <div className="relative flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Grupos selecionados</span>
-            <span className="bg-gradient-to-br from-primary to-violet-500 bg-clip-text text-3xl font-bold tabular-nums text-transparent">{sel.size}</span>
-          </div>
-          <div className="relative mt-2 flex items-center gap-2 text-sm">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            {sel.size === 0 ? <span className="text-muted-foreground">Selecione um ou mais grupos</span>
-              : contando ? <span className="inline-flex items-center gap-1.5 text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> contando membros…</span>
-              : <span><b className="tabular-nums text-foreground">{total ?? '—'}</b> membro(s) a analisar</span>}
-          </div>
+      <div className="space-y-2.5 lg:sticky lg:top-0 lg:self-start">
+        <div className="flex items-center justify-between rounded-xl border bg-gradient-to-br from-primary/10 to-transparent px-3.5 py-2">
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Users className="h-3.5 w-3.5" />
+            {sel.size === 0 ? 'Selecione grupos'
+              : contando ? <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> contando…</span>
+              : <span><b className="tabular-nums text-foreground">{total ?? '—'}</b> membro(s)</span>}
+          </span>
+          <span className="text-2xl font-bold tabular-nums text-primary">{sel.size}</span>
         </div>
 
-        <div className="rounded-2xl border bg-card p-4">
-          <p className="mb-2 text-sm font-semibold">Destino dos alunos</p>
+        <div className="rounded-2xl border bg-card p-3">
+          <p className="mb-1.5 text-sm font-semibold">Destino dos alunos</p>
           <div className="space-y-1.5">
             <Opcao ativo={destino === 'nenhum'} onClick={() => setDestino('nenhum')} icon={<Ban className="h-4 w-4" />} titulo="Só adicionar ao sistema" desc="Cadastra os alunos (sem vincular a grupo)." />
             <Opcao ativo={destino === 'existente'} onClick={() => setDestino('existente')} icon={<Folder className="h-4 w-4" />} titulo="Vincular a um grupo existente" desc={sistema.length ? undefined : 'Nenhum grupo criado ainda.'} />
@@ -263,12 +259,9 @@ export function CurseducaImport({ grupos, sistema }: { grupos: GrupoCurseducaDTO
           </div>
         </div>
 
-        <label className="flex items-start gap-2 px-1 text-xs">
-          <input type="checkbox" checked={segundoPlano} onChange={(e) => setSegundoPlano(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border" />
-          <span>
-            <b>Importar em segundo plano</b> — recomendado para grupos grandes (milhares).
-            <span className="block text-muted-foreground">Roda no servidor sem travar a tela; você pode sair e voltar.</span>
-          </span>
+        <label className="flex items-center gap-2 px-1 text-xs">
+          <input type="checkbox" checked={segundoPlano} onChange={(e) => setSegundoPlano(e.target.checked)} className="h-4 w-4 rounded border" />
+          <span><b>Importar em segundo plano</b> — para grupos grandes (roda no servidor).</span>
         </label>
 
         <button type="button" onClick={importar} disabled={sel.size === 0 || importando}
@@ -278,9 +271,7 @@ export function CurseducaImport({ grupos, sistema }: { grupos: GrupoCurseducaDTO
             : <><DownloadCloud className="h-4 w-4 transition-transform group-hover:translate-y-0.5" /> Importar membros</>}
         </button>
 
-        <p className="px-1 text-[11px] leading-snug text-muted-foreground">
-          Traz nome, e-mail, CPF, telefone e classificação (passaporte/assinatura). <b>Data de nascimento</b> não é disponibilizada pela Curseduca — cadastre manualmente ou por planilha, se precisar.
-        </p>
+        <p className="px-1 text-[11px] leading-snug text-muted-foreground">Traz nome, e-mail, CPF, telefone e classificação. Data de nascimento não vem da Curseduca.</p>
 
         {res && (
           <div className="animate-pop rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4">
@@ -298,6 +289,9 @@ export function CurseducaImport({ grupos, sistema }: { grupos: GrupoCurseducaDTO
             </ul>
           </div>
         )}
+
+        {/* Slot extra na mesma coluna do card de destino (ex.: card de sincronização). */}
+        {extra}
       </div>
 
       <MembrosDialog grupo={verGrupo} onClose={() => setVerGrupo(null)}

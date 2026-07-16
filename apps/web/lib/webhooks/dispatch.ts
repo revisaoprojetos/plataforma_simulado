@@ -46,18 +46,36 @@ export async function dispararWebhook(tenantId: string | null | undefined, event
     })
     if (!alvos.length) return
 
-    // Envelope no formato "guru" (fácil de filtrar no n8n): id/type/event/status/dates/contact/simulado/resultado.
+    // Nome da plataforma (tenant) — para o payload trazer o NOME, não só o UUID.
+    const { data: tnt } = await svc.from('simulado_tenants').select('nome, slug').eq('id', tenantId).maybeSingle()
+
+    // Envelope no formato "guru" (fácil de filtrar no n8n). Estrutura FIXA e completa em
+    // TODOS os eventos (mesmos campos sempre — os que não se aplicam vão null), para o n8n
+    // não quebrar por campo ausente.
     const d = dados as any
+    const agora = new Date().toISOString()
     const corpo = JSON.stringify({
       id: d.sessao_id ?? null,
       type: 'estudante',
       webhook_type: 'progressao_estudante',
+      plataforma: { id: tenantId, nome: (tnt as any)?.nome ?? null, slug: (tnt as any)?.slug ?? null },
       event: evento,
       status: STATUS_EVENTO[evento] ?? evento,
-      dates: { created_at: new Date().toISOString() },
+      dates: { created_at: agora, occurred_at: agora },
       tenant_id: tenantId,
-      contact: d.contact ?? null,
-      simulado: d.simulado ?? null,
+      contact: {
+        id: d.contact?.id ?? null,
+        name: d.contact?.name ?? null,
+        email: d.contact?.email ?? null,
+        doc: d.contact?.doc ?? null,
+        phone_number: d.contact?.phone_number ?? null,
+        phone_local_code: d.contact?.phone_local_code ?? null,
+        plano: d.contact?.plano ?? null,
+      },
+      simulado: {
+        id: d.simulado?.id ?? null,
+        name: d.simulado?.name ?? null,
+      },
       resultado: {
         sessao_id: d.sessao_id ?? null,
         nota: d.nota ?? null,

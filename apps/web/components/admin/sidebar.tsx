@@ -34,6 +34,7 @@ import {
   DownloadCloud,
   Webhook,
   Share2,
+  Plug,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -104,7 +105,7 @@ const navGroups: NavGroup[] = [
     label: 'Conexões',
     icon: Share2,
     items: [
-      { label: 'Curseduca', href: '/admin/curseduca', icon: DownloadCloud, perm: 'estudantes:create' },
+      { label: 'Integrações', href: '/admin/integracoes', icon: Plug, perm: 'estudantes:create' },
       { label: 'Webhooks & n8n', href: '/admin/conexoes/webhooks', icon: Webhook, perm: 'estudantes:create' },
     ],
   },
