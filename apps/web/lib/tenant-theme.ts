@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export interface TenantTema {
   logo_url?: string
@@ -199,7 +199,9 @@ export const getTenantTheme = cache(async (): Promise<TenantThemeResult> => {
   }
 
   try {
-    const supabase = await createServiceClient()
+    // Service role real: leitura do tema (branding público por subdomínio) não pode depender
+    // do RLS do banco — em bancos com RLS incompleto (migrados) a leitura seria bloqueada.
+    const supabase = createAdminClient()
 
     const { data, error } = await supabase
       .from('simulado_tenants')
