@@ -7,7 +7,7 @@ import { criptografiaAtiva } from '@/lib/crypto'
 import { PROVIDER_META } from '../campos'
 import { IntegracaoProviderClient } from '@/components/admin/integracao-provider-client'
 import { IntegracaoCurseducaTabs } from '@/components/admin/integracao-curseduca-tabs'
-import { curseducaConfigurado, listarRegrasSync } from '../../curseduca/actions'
+import { curseducaEstado, listarRegrasSync } from '../../curseduca/actions'
 import type { Provider } from '@/lib/integracoes/tipos'
 
 export const dynamic = 'force-dynamic'
@@ -43,11 +43,11 @@ export default async function IntegracaoProviderPage({ params }: { params: Promi
   // (client-side) só na aba Importar — assim a página e a aba Credenciais abrem rápido
   // (não esperam a API da Curseduca listar/contar 234 grupos).
   if (prov === 'curseduca') {
-    const [configurado, regras] = await Promise.all([curseducaConfigurado(), listarRegrasSync()])
+    const [estado, regras] = await Promise.all([curseducaEstado(), listarRegrasSync()])
     return (
       <div className="animate-page space-y-6">
         {header}
-        <IntegracaoCurseducaTabs configurado={configurado} regras={(regras as any).regras ?? []} />
+        <IntegracaoCurseducaTabs configurado={estado.configurado} inativo={estado.inativo} regras={(regras as any).regras ?? []} />
       </div>
     )
   }

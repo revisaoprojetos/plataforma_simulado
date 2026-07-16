@@ -16,7 +16,7 @@ import { listarGruposCurseduca } from '@/app/admin/curseduca/actions'
  */
 type Aba = 'importar' | 'credenciais'
 
-export function IntegracaoCurseducaTabs({ configurado, regras }: { configurado: boolean; regras: any[] }) {
+export function IntegracaoCurseducaTabs({ configurado, inativo = false, regras }: { configurado: boolean; inativo?: boolean; regras: any[] }) {
   const [aba, setAba] = useState<Aba>(configurado ? 'importar' : 'credenciais')
   const [grupos, setGrupos] = useState<any[] | null>(null)
   const [sistema, setSistema] = useState<any[]>([])
@@ -60,7 +60,11 @@ export function IntegracaoCurseducaTabs({ configurado, regras }: { configurado: 
       </div>
 
       {aba === 'importar' && (
-        !configurado ? aviso('Integração não configurada', 'Configure as credenciais na aba Credenciais.')
+        !configurado ? (
+          inativo
+            ? aviso('Integração inativa', 'As credenciais estão salvas, mas a integração está desativada. Vá na aba Credenciais, marque “Integração ativa para este cliente” e salve.')
+            : aviso('Integração não configurada', 'Configure as credenciais na aba Credenciais.')
+        )
           : carregando || grupos === null ? (
             <div className="flex flex-col items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin" /> Carregando grupos da Curseduca…

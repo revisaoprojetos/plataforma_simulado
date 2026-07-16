@@ -92,6 +92,24 @@ export async function curseducaConfigurado(): Promise<boolean> {
   try { return !!(await resolverCfg(access.tenantId)) } catch { return false }
 }
 
+/**
+ * Estado da integração para a UI: distingue "não configurada" de "configurada mas INATIVA".
+ * `resolverCfg` só resolve com `ativo=true`; sem isto, a aba Importar dizia "não configurada"
+ * mesmo com as credenciais salvas — mensagem enganosa. `inativo=true` sinaliza esse caso.
+ */
+export async function curseducaEstado(): Promise<{ configurado: boolean; inativo: boolean }> {
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { configurado: false, inativo: false }
+  try {
+    if (await resolverCfg(access.tenantId)) return { configurado: true, inativo: false }
+    // Não resolveu: existe uma linha com credenciais completas porém desativada?
+    const svc = createAdminClient()
+    const { data } = await svc.from('simulado_curseduca_config').select('api_key, usuario, senha, ativo').eq('tenant_id', access.tenantId).maybeSingle()
+    const d = data as any
+    return { configurado: false, inativo: !!(d && d.api_key && d.usuario && d.senha && !d.ativo) }
+  } catch { return { configurado: false, inativo: false } }
+}
+
 /** Salva as credenciais do tenant (testa login antes de gravar). Campos em branco preservam o valor atual. */
 export async function salvarCurseducaConfig(dados: { base_url?: string; api_key?: string; usuario?: string; senha?: string; ativo?: boolean }): Promise<{ ok: boolean; error?: string }> {
   if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
