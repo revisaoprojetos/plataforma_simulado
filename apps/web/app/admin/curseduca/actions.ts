@@ -294,6 +294,14 @@ export async function salvarSyncSimples(intervaloMin: number, ativo: boolean, gr
   if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const intervalo = INTERVALOS_OK.has(intervaloMin) ? intervaloMin : 30
   const svc = createAdminClient()
+  // TRAVA (incidente 17k): a sync só cobre grupos VINCULADOS — logo o nº de grupos jamais
+  // pode exceder o nº de grupos do sistema. Bloqueia qualquer tentativa de sincronizar a
+  // conta inteira da Curseduca (~200 grupos), mesmo por um caminho fora da UI.
+  if (ativo && grupos.length) {
+    const { count } = await svc.from('simulado_grupos').select('id', { count: 'exact', head: true }).eq('tenant_id', access.tenantId).eq('deletado', false)
+    const max = Math.max(1, count ?? 0)
+    if (grupos.length > max) return { ok: false, error: `A sincronização automática só cobre grupos vinculados (máx. ${max} = nº de grupos do sistema). Você tentou sincronizar ${grupos.length}. Crie/renomeie grupos do sistema com o mesmo nome, ou reduza a seleção.` }
+  }
   try {
     const { data: existentes } = await svc.from('simulado_curseduca_sync').select('id').eq('tenant_id', access.tenantId).order('created_at', { ascending: true })
     const lista = (existentes ?? []) as any[]

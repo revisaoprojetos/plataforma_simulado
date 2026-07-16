@@ -71,7 +71,7 @@ export function IntegracaoCurseducaTabs({ configurado, inativo = false, regras }
             </div>
           ) : erroGrupos ? aviso('Não foi possível carregar os grupos', erroGrupos)
             : <CurseducaImport grupos={grupos} sistema={sistema}
-                extra={<CurseducaSyncCard grupos={grupos} inicialAtivo={!!regra0?.ativo} inicialIntervalo={regra0?.intervalo_min ?? 30} />} />
+                extra={<CurseducaSyncCard grupos={grupos} sistema={sistema} inicialAtivo={!!regra0?.ativo} inicialIntervalo={regra0?.intervalo_min ?? 30} inicialGrupos={regra0?.grupos ?? []} />} />
       )}
       {aba === 'credenciais' && <div className="max-w-3xl"><CurseducaConfig inicialAberto semColapso /></div>}
     </div>
