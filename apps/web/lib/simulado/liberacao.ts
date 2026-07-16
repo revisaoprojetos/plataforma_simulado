@@ -54,8 +54,13 @@ export function resolverLiberacoes(
   const r = regras ?? {}
   const fechada = janelaFechada(simulado)
 
-  // Compatibilidade: `exibir_nota === false` mantém a nota escondida como antes.
-  const notaLiberada = r.exibir_nota === false ? false : resolveModo(r.liberar_nota, r.nota_liberada, 'imediato', fechada)
+  // Liberação manual explícita do admin (nota_liberada === true) vence tudo, inclusive o
+  // legado `exibir_nota === false` (que, sozinho, mantém a nota escondida).
+  const notaLiberada = r.nota_liberada === true
+    ? true
+    : r.exibir_nota === false
+      ? false
+      : resolveModo(r.liberar_nota, r.nota_liberada, 'imediato', fechada)
   const gabaritoLiberado = resolveModo(r.liberar_gabarito, r.gabarito_liberado, 'apos_janela', fechada)
   const cadernoLiberado = resolveModo(r.liberar_caderno, r.caderno_liberado, 'apos_janela', fechada)
 
