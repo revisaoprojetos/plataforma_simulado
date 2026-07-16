@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -20,8 +21,8 @@ export async function BancoRelatorio({ bancoId, cor = '#6d28d9' }: { bancoId: st
 
   let questoes: any[] = []
   if (qids.length) {
-    const { data } = await svc.from('simulado_questoes').select('id, disciplinas:simulado_disciplinas(nome)').in('id', qids)
-    questoes = data ?? []
+    questoes = await fetchAllByIn<any>(qids, (chunk) =>
+      svc.from('simulado_questoes').select('id, disciplinas:simulado_disciplinas(nome)').in('id', chunk))
   }
   const discDaQuestao = new Map<string, string>()
   const discTotais = new Map<string, number>()
@@ -44,8 +45,11 @@ export async function BancoRelatorio({ bancoId, cor = '#6d28d9' }: { bancoId: st
   const estIds = (pe ?? []).map((r: any) => r.estudante_id)
   let alunos: any[] = []
   if (estIds.length) {
-    const { data } = await svc.from('simulado_estudantes').select('id, nome, email, telefone').in('id', estIds).order('nome')
-    alunos = data ?? []
+    // fetchAllByIn: estIds pode ter centenas/milhares → `.in()` estoura a URL (400) e o relatório
+    // vinha VAZIO ("nenhum aluno vinculado") mesmo com alunos vinculados.
+    alunos = await fetchAllByIn<any>(estIds, (chunk) =>
+      svc.from('simulado_estudantes').select('id, nome, email, telefone').in('id', chunk))
+    alunos.sort((a, b) => (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR'))
   }
 
   // Respostas dos alunos às questões do banco (via sessões).
@@ -53,19 +57,21 @@ export async function BancoRelatorio({ bancoId, cor = '#6d28d9' }: { bancoId: st
   // Data/hora em que o aluno finalizou (sessão finalizada mais recente com resposta do banco).
   const finalizadoEm = new Map<string, string>()
   if (estIds.length && qids.length) {
-    const { data: sessoes } = await svc
+    // Paginado por chunks de ids (fetchAllByIn) — sessões e respostas podem ter centenas/milhares.
+    const sessoes = await fetchAllByIn<any>(estIds, (chunk) => svc
       .from('simulado_sessoes_prova')
       .select('id, estudante_id, status, finalizado_em')
-      .in('estudante_id', estIds)
+      .in('estudante_id', chunk)
       .eq('is_teste', false)
-      .eq('deletado', false)
+      .eq('deletado', false))
     const sessInfo = new Map<string, { estudante_id: string; status: string; finalizado_em: string | null }>(
-      (sessoes ?? []).map((s: any) => [s.id, { estudante_id: s.estudante_id, status: s.status, finalizado_em: s.finalizado_em }]),
+      sessoes.map((s: any) => [s.id, { estudante_id: s.estudante_id, status: s.status, finalizado_em: s.finalizado_em }]),
     )
     const sessIds = [...sessInfo.keys()]
     if (sessIds.length) {
-      const { data: resp } = await svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', sessIds).in('questao_id', qids)
-      for (const r of resp ?? []) {
+      const resp = await fetchAllByIn<any>(sessIds, (chunk) =>
+        svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).in('questao_id', qids), { chunk: 50 })
+      for (const r of resp) {
         const sess = sessInfo.get((r as any).sessao_id)
         if (!sess) continue
         const est = sess.estudante_id

@@ -138,8 +138,8 @@ export async function montarRelatorioSimulado(svc: SupabaseClient, simId: string
   const estIds = [...new Set(sess.map((s) => s.estudante_id).filter(Boolean))]
   const infoEst = new Map<string, { nome: string; email: string | null; telefone: string | null; classificacao: string | null }>()
   if (estIds.length) {
-    const { data: ests } = await svc.from('simulado_estudantes').select('id, nome, email, telefone, classificacao').in('id', estIds)
-    for (const e of (ests ?? []) as any[]) infoEst.set(e.id, { nome: e.nome ?? 'Estudante', email: e.email ?? null, telefone: e.telefone ?? null, classificacao: e.classificacao ?? null })
+    const ests = await fetchAllByIn<any>(estIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, telefone, classificacao').in('id', chunk))
+    for (const e of ests) infoEst.set(e.id, { nome: e.nome ?? 'Estudante', email: e.email ?? null, telefone: e.telefone ?? null, classificacao: e.classificacao ?? null })
   }
 
   // Config + levantamento de tentativas (para simulados que permitem várias).

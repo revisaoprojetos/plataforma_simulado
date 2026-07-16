@@ -78,8 +78,8 @@ export async function montarRankingSimulado(svc: SupabaseClient, simId: string, 
   const estIds = sessEscolhidas.map((s) => s.estudante_id)
   const infoEst = new Map<string, { nome: string; email: string | null; classificacao: string | null; passaporte: boolean; nasc: string | null }>()
   if (estIds.length) {
-    const { data: ests } = await svc.from('simulado_estudantes').select('id, nome, email, classificacao, data_nascimento').in('id', estIds)
-    for (const e of (ests ?? []) as any[]) infoEst.set(e.id, { nome: e.nome ?? 'Estudante', email: e.email ?? null, classificacao: e.classificacao ?? null, passaporte: e.classificacao === 'passaporte', nasc: e.data_nascimento ?? null })
+    const ests = await fetchAllByIn<any>(estIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, classificacao, data_nascimento').in('id', chunk))
+    for (const e of ests) infoEst.set(e.id, { nome: e.nome ?? 'Estudante', email: e.email ?? null, classificacao: e.classificacao ?? null, passaporte: e.classificacao === 'passaporte', nasc: e.data_nascimento ?? null })
   }
 
   // Impactos de anulação/troca (re-correção): nota_antes por estudante. Tabelas podem estar vazias.
