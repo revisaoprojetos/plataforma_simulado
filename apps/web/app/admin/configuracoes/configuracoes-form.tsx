@@ -688,7 +688,7 @@ function PreviewLogin({ t, cores, dark }: { t: Tema; cores: Cores; dark: boolean
       <div className="relative flex h-[420px] items-center justify-center px-4 text-[12px]" style={{ background: bg, color: text, fontFamily: 'system-ui, sans-serif' }}>
         <div className="w-[248px] rounded-2xl border p-6 shadow-xl" style={{ background: dark ? '#15151c' : '#ffffff', borderColor: border }}>
           <div className="mb-4 flex flex-col items-center gap-2 text-center">
-            <span className={`flex h-16 w-16 items-center justify-center overflow-hidden text-2xl font-bold ${frameLogo(t.logo_estilo)}`} style={{ background: semFundo ? (dark ? '#26262f' : '#e7e7ee') : t.logo_png_bg, color: contraste(c.btn) }}>
+            <span className={`flex h-16 w-16 items-center justify-center overflow-hidden text-2xl font-bold ${semFundo ? '' : frameLogo(t.logo_estilo)}`} style={{ background: semFundo ? 'transparent' : t.logo_png_bg, color: contraste(c.btn) }}>
               {smallLogo ? <img src={smallLogo} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogoCss(t.logo_filtro) }} /> : (t.nome_site[0] ?? 'P').toUpperCase()}
             </span>
             <p className="text-[13px] font-semibold">{t.nome_site}</p>

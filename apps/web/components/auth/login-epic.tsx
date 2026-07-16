@@ -172,13 +172,18 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
         </div>
         <div className="relative w-full max-w-sm rounded-2xl border bg-card p-8 shadow-2xl" style={{ animation: 'loginPop .4s ease' }}>
           <div className="mb-6 flex flex-col items-center gap-3 text-center">
-            <div className={cn('flex h-20 w-20 items-center justify-center overflow-hidden ring-1 ring-border', frameLogo(brand.logoEstilo), (!brand.logoBg || brand.logoBg === 'transparent') && 'bg-muted')}
-              style={brand.logoBg && brand.logoBg !== 'transparent' ? { background: brand.logoBg } : undefined}>
-              {(brand.logo ?? brand.logoGrande) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={(brand.logo ?? brand.logoGrande)!} alt={brand.nome} className="h-full w-full object-contain" style={{ filter: filtroLogo(brand.logoFiltro) }} />
-              ) : <GraduationCap className="h-10 w-10" style={{ color: cor }} />}
-            </div>
+            {(() => {
+              const semFundo = !brand.logoBg || brand.logoBg === 'transparent'
+              return (
+                <div className={cn('flex h-20 w-20 items-center justify-center overflow-hidden', !semFundo && cn('ring-1 ring-border', frameLogo(brand.logoEstilo)))}
+                  style={!semFundo ? { background: brand.logoBg } : undefined}>
+                  {(brand.logo ?? brand.logoGrande) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={(brand.logo ?? brand.logoGrande)!} alt={brand.nome} className="h-full w-full object-contain" style={{ filter: filtroLogo(brand.logoFiltro) }} />
+                  ) : <GraduationCap className="h-10 w-10" style={{ color: cor }} />}
+                </div>
+              )
+            })()}
             <p className="text-lg font-semibold">{brand.nome}</p>
           </div>
           <button type="button" onClick={() => { setModo('select'); setErro(null); setSenha('') }} className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
