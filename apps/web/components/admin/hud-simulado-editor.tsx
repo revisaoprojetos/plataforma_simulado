@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { HexColorField } from '@/components/admin/hex-color-field'
 import { ArrowLeft, RotateCcw, ChevronDown, Loader2, LogIn, DoorOpen, ListChecks, CheckCircle2, Copy, ClipboardPaste } from 'lucide-react'
 import { type HudCores, type HudPorPagina, efetivarHud } from '@/lib/caderno-designer/types'
 import { hudCssVars } from '@/lib/caderno-designer/hud'
@@ -175,14 +176,7 @@ const DEMO_Q = {
   alternativas: [{ id: 'a', texto: 'Londres' }, { id: 'b', texto: 'Paris' }, { id: 'c', texto: 'Roma' }],
 }
 
-function Swatch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <span className="relative inline-flex h-7 w-9 shrink-0 overflow-hidden rounded-md border">
-      <span className="absolute inset-0" style={{ background: value }} />
-      <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
-    </span>
-  )
-}
+const Swatch = HexColorField
 
 export function HudSimuladoEditor({ base, porPagina, onChangePorPagina, onVoltar, titulo = 'Simulado', branding }: {
   base: HudCores; porPagina: HudPorPagina; onChangePorPagina: (p: HudPorPagina) => void; onVoltar: () => void; titulo?: string

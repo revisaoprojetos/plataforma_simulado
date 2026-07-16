@@ -17,8 +17,8 @@ export function tipoDoSimulado(tipos: (string | null | undefined)[]): TipoSimula
 }
 
 /** Filtra as modalidades de caderno conforme o tipo do simulado:
- *  objetiva → sem "Caderno Discursivo"; discursiva → sem "Caderno Objetivo"; mista/nulo → todas.
- *  (Mantém Completo, Diagnóstico e quaisquer modalidades personalizadas.) */
+ *  objetiva → sem "Caderno Discursivo"; discursiva → sem "Folha de Respostas"; mista/nulo → todas.
+ *  (Mantém Completo, Perguntas, Diagnóstico e quaisquer modalidades personalizadas.) */
 export function filtrarModsPorTipo<M extends { id: string }>(mods: M[], tipo: TipoSimulado | null): M[] {
   if (tipo === 'objetiva') return mods.filter((m) => m.id !== 'gabarito_discursivo')
   if (tipo === 'discursiva') return mods.filter((m) => m.id !== 'gabarito_objetivo')

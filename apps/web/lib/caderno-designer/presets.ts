@@ -23,7 +23,7 @@ export type CadernoPreset = { id: string; nome: string; descricao: string; build
 export const PRESETS_CADERNO: CadernoPreset[] = [
   {
     id: 'caderno-objetivo',
-    nome: 'Caderno objetivo',
+    nome: 'Folha de respostas',
     descricao: 'Capa + cabeçalho + dados do estudante + grade de respostas (reenvie as imagens de fundo).',
     build: () => doc([
       page('capa', 'Capa', [
@@ -115,6 +115,21 @@ export const PRESETS_CADERNO: CadernoPreset[] = [
         ]),
       ]),
     ], { cabecalhoAtivo: true, cabecalhoAltura: 75, cabecalhoPaginas: 'exceto_capa', rodapeAtivo: true, rodapeAltura: 40, rodapePaginas: 'exceto_capa', mostrarNumeroPagina: true }),
+  },
+  {
+    id: 'caderno-perguntas',
+    nome: 'Caderno de perguntas',
+    descricao: 'Só as perguntas e as alternativas de cada questão (sem dados do aluno, sem gabarito).',
+    build: () => doc([
+      page('conteudo', 'Perguntas', [
+        blk('titulo-secao', { texto: '{simulado}', nivel: 1, align: 'left', mostrarLinha: true, espacamento: 6 }),
+        blk('repeticao', { gap: 18, quantidade: null }, [
+          blk('titulo-secao', { texto: 'Questão {q_num}', nivel: 2, align: 'left', mostrarLinha: false }),
+          blk('texto-livre', { texto: '{q_enunciado}', size: 12, align: 'justify', lineHeight: 1.5, espacamento: 4 }),
+          blk('alternativas', { mostrarGabarito: false }),
+        ]),
+      ]),
+    ]),
   },
   {
     id: 'prova-completa',

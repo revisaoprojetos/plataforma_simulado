@@ -8,7 +8,11 @@ import { BlockRender, dataComQuestao } from '@/lib/caderno-designer/blocks'
 import { resolveTheme } from '@/lib/caderno-designer/theme'
 import { carregarRegistros } from '@/lib/caderno-designer/merge'
 import { hospedarImagensDoc } from '@/lib/caderno-designer/hospedar-imagens'
-import { faixaNaPagina, RUNNING_PADRAO, PAD_V, PAD_H, type CadernoData, type CadernoDoc } from '@/lib/caderno-designer/types'
+import { faixaNaPagina, RUNNING_PADRAO, PAD_V, PAD_H, docCadernoCompleto, docCadernoPerguntas, type CadernoData, type CadernoDoc } from '@/lib/caderno-designer/types'
+
+// Modalidades-padrão que têm um doc-semente: se o caderno não salvou um documento próprio
+// para elas, entregamos o modelo padrão (mantém as entregas do aluno sempre disponíveis).
+const SEED_DOCS: Record<string, () => CadernoDoc> = { caderno_completo: docCadernoCompleto, caderno_perguntas: docCadernoPerguntas }
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 
@@ -146,8 +150,11 @@ export default async function CadernoImprimirPage({
   if (docsV2) {
     // Default segue a ordem das modalidades (1ª = principal), não a ordem arbitrária das chaves.
     const primeira = modalidadesV2.find((m) => docsV2[m.id])?.id
-    const modId = (mod && docsV2[mod] ? mod : primeira) ?? Object.keys(docsV2)[0]
-    const doc = docsV2[modId]
+    // Modalidade pedida sem doc próprio, mas com semente (ex.: Caderno de Perguntas em
+    // cadernos antigos) → renderiza o modelo-semente em vez de cair na 1ª modalidade.
+    const usarSeed = !!mod && !docsV2[mod] && !!SEED_DOCS[mod]
+    const modId = usarSeed ? mod! : ((mod && docsV2[mod] ? mod : primeira) ?? Object.keys(docsV2)[0])
+    const doc = usarSeed ? SEED_DOCS[mod!]() : docsV2[modId]
     // Troca imagens base64 (fundo) por URLs hospedadas → HTML leve (bom p/ Gotenberg).
     // Com `?rawimg=1` mantém o base64 embutido: o Edge/navegador renderiza o fundo direto,
     // sem depender do bucket de Storage (cujas URLs podem estar indisponíveis).

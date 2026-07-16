@@ -194,8 +194,10 @@ export async function GET(request: NextRequest) {
           const docs = (cfg.docsV2 ?? {}) as Record<string, any>
           const temConteudo = (d: any) => !!d && Array.isArray(d.pages) && d.pages.some((p: any) => (p.blocks ?? []).some((b: any) => b.type !== 'plano-fundo'))
           const tipo = tipoDoSimulado(questoes.map((q: any) => q.tipo))
+          // "Caderno de Perguntas" é entrega-padrão: aparece mesmo sem doc próprio salvo
+          // (o motor de impressão usa a semente). As demais exigem conteúdo desenhado.
           modalidades = filtrarModsPorTipo(mesclarModalidades(cfg.modalidadesV2), tipo)
-            .filter((m) => temConteudo(docs[m.id]))
+            .filter((m) => temConteudo(docs[m.id]) || m.id === 'caderno_perguntas')
             .map((m) => ({ id: m.id, nome: m.nome }))
         }
       }

@@ -10,8 +10,9 @@ import { BLOCKS, blocksByCategory, createBlock, getBlockMeta, BlockRender, cardS
 import { BlockInspector } from '@/lib/caderno-designer/inspectors'
 import { resolveTheme, type CadernoTheme } from '@/lib/caderno-designer/theme'
 import * as tree from '@/lib/caderno-designer/block-tree'
-import { SHEET_W, SHEET_H, PAD_H, PAD_V, PAGE_KINDS, RUNNING_PADRAO, HUD_CORES_PADRAO, novoDoc, docCadernoCompleto, genId, mesclarModalidades, faixaNaPagina, type CadernoDoc, type Modalidade, type Block, type PageKind, type CadernoData, type HudCores, type HudPorPagina, type FaixaPaginas } from '@/lib/caderno-designer/types'
+import { SHEET_W, SHEET_H, PAD_H, PAD_V, PAGE_KINDS, RUNNING_PADRAO, HUD_CORES_PADRAO, novoDoc, docCadernoCompleto, docCadernoPerguntas, genId, mesclarModalidades, faixaNaPagina, type CadernoDoc, type Modalidade, type Block, type PageKind, type CadernoData, type HudCores, type HudPorPagina, type FaixaPaginas } from '@/lib/caderno-designer/types'
 import { HudSimuladoEditor } from '@/components/admin/hud-simulado-editor'
+import { HexColorField } from '@/components/admin/hex-color-field'
 import { GerarPdfServidor } from '@/components/admin/gerar-pdf-servidor'
 import { MonitorPlay } from 'lucide-react'
 import { salvarCadernoDesignerV2 } from '@/app/admin/cadernos/actions'
@@ -308,7 +309,7 @@ export function CadernoEditorV2({
   const [docs, setDocs] = useState<Record<string, CadernoDoc>>(() => {
     const d = { ...(inicial.docsV2 ?? {}) }
     for (const m of mods0) {
-      if (!d[m.id]) d[m.id] = m.id === 'caderno_completo' ? docCadernoCompleto() : novoDoc()
+      if (!d[m.id]) d[m.id] = m.id === 'caderno_completo' ? docCadernoCompleto() : m.id === 'caderno_perguntas' ? docCadernoPerguntas() : novoDoc()
       else d[m.id] = { ...novoDoc(), ...d[m.id], cabecalho: d[m.id].cabecalho ?? [], rodape: d[m.id].rodape ?? [], running: d[m.id].running ?? { ...RUNNING_PADRAO } }
     }
     return d
@@ -719,10 +720,7 @@ export function CadernoEditorV2({
                 {([['primaria', 'Primária'], ['secundaria', 'Secundária'], ['acento', 'Acento'], ['texto', 'Texto'], ['fundo', 'Fundo']] as const).map(([k, label]) => (
                   <label key={k} className="flex items-center justify-between gap-2 text-sm">
                     <span className="text-muted-foreground">{label}</span>
-                    <span className="flex items-center gap-2">
-                      <span className="font-mono text-[11px] uppercase text-muted-foreground">{cores[k] ?? theme.cores[k]}</span>
-                      <input type="color" value={cores[k] ?? theme.cores[k]} onChange={(e) => setCores((c) => ({ ...c, [k]: e.target.value }))} className="h-8 w-12 cursor-pointer rounded border" />
-                    </span>
+                    <HexColorField value={cores[k] ?? theme.cores[k]} onChange={(v) => setCores((c) => ({ ...c, [k]: v }))} />
                   </label>
                 ))}
                 <button onClick={() => setCores({})} className="text-xs text-muted-foreground hover:underline">Restaurar padrão</button>

@@ -67,28 +67,39 @@ export type CadernoDoc = {
 export type Modalidade = { id: string; nome: string }
 
 export const MODALIDADES_PADRAO: Modalidade[] = [
-  { id: 'gabarito_objetivo', nome: 'Caderno Objetivo' },
+  { id: 'gabarito_objetivo', nome: 'Folha de Respostas' },
   { id: 'gabarito_discursivo', nome: 'Caderno Discursivo' },
   { id: 'caderno_completo', nome: 'Caderno Completo' },
+  { id: 'caderno_perguntas', nome: 'Caderno de Perguntas' },
   { id: 'diagnostico', nome: 'Diagnóstico' },
 ]
 
 /** Renomeações de modalidades legadas → nome atual (aplicado ao carregar). */
 export const MODALIDADE_RENOMEAR: Record<string, string> = {
-  'Gabarito Objetivo': 'Caderno Objetivo',
+  'Gabarito Objetivo': 'Folha de Respostas',
+  'Caderno Objetivo': 'Folha de Respostas',
   'Gabarito Discursivo': 'Caderno Discursivo',
 }
 
-/** Aplica renomeações e garante a modalidade "Caderno Completo" em cadernos existentes. */
+/** Garante que uma modalidade-padrão exista, inserindo-a antes do "Diagnóstico" (ou no fim). */
+function garantirMod(norm: Modalidade[], id: string) {
+  if (norm.some((m) => m.id === id)) return
+  const padrao = MODALIDADES_PADRAO.find((m) => m.id === id)
+  if (!padrao) return
+  const idxDiag = norm.findIndex((m) => m.id === 'diagnostico')
+  if (idxDiag >= 0) norm.splice(idxDiag, 0, padrao)
+  else norm.push(padrao)
+}
+
+/**
+ * Aplica renomeações e garante as modalidades "Caderno Completo" e "Caderno de Perguntas"
+ * em cadernos existentes (entregas padrão liberadas ao aluno).
+ */
 export function mesclarModalidades(saved?: Modalidade[]): Modalidade[] {
   const base = saved?.length ? saved : MODALIDADES_PADRAO
   const norm = base.map((m) => ({ ...m, nome: MODALIDADE_RENOMEAR[m.nome] ?? m.nome }))
-  if (!norm.some((m) => m.id === 'caderno_completo')) {
-    const completo = MODALIDADES_PADRAO.find((m) => m.id === 'caderno_completo')!
-    const idxDiag = norm.findIndex((m) => m.id === 'diagnostico')
-    if (idxDiag >= 0) norm.splice(idxDiag, 0, completo)
-    else norm.push(completo)
-  }
+  garantirMod(norm, 'caderno_completo')
+  garantirMod(norm, 'caderno_perguntas')
   return norm
 }
 
@@ -212,6 +223,29 @@ export function docCadernoCompleto(): CadernoDoc {
         b('texto-livre', { texto: 'Aluno(a): {nome}', align: 'left', size: 13, bold: true, italico: false, sublinhado: false, color: '', fonte: '', lineHeight: 1.5, espacamento: 2 }),
         b('identificacao', { titulo: 'Informações do aluno', campos: ['Nome completo', 'CPF', 'Turma', 'Data'] }),
         b('separador', { espessura: 1, estilo: 'solido', cor: '' }),
+        b('repeticao', { quantidade: null, gap: 18 }, [
+          b('titulo-secao', { texto: 'Questão {q_num}', nivel: 2, align: 'left', cor: '', mostrarLinha: false, fonte: '', italico: false, sublinhado: false, espacamento: 0 }),
+          b('texto-livre', { texto: '{q_enunciado}', align: 'left', size: 12, bold: false, italico: false, sublinhado: false, color: '', fonte: '', lineHeight: 1.5, espacamento: 4 }),
+          b('alternativas', { mostrarGabarito: false }),
+        ]),
+      ],
+    }],
+    cabecalho: [], rodape: [], running: { ...RUNNING_PADRAO },
+  }
+}
+
+/**
+ * Doc-semente do "Caderno de Perguntas": só o enunciado e as alternativas de cada questão
+ * (sem dados do aluno, sem resposta marcada, sem gabarito). Um caderno de prova "limpo".
+ */
+export function docCadernoPerguntas(): CadernoDoc {
+  const b = (type: string, attributes: Record<string, unknown>, innerBlocks?: Block[]): Block => ({ id: genId('b'), type, attributes, innerBlocks })
+  return {
+    versao: 1,
+    pages: [{
+      id: genId('page'), kind: 'conteudo', titulo: 'Página 1',
+      blocks: [
+        b('titulo-secao', { texto: '{simulado}', nivel: 1, align: 'left', cor: '', mostrarLinha: true, fonte: '', italico: false, sublinhado: false, espacamento: 6 }),
         b('repeticao', { quantidade: null, gap: 18 }, [
           b('titulo-secao', { texto: 'Questão {q_num}', nivel: 2, align: 'left', cor: '', mostrarLinha: false, fonte: '', italico: false, sublinhado: false, espacamento: 0 }),
           b('texto-livre', { texto: '{q_enunciado}', align: 'left', size: 12, bold: false, italico: false, sublinhado: false, color: '', fonte: '', lineHeight: 1.5, espacamento: 4 }),
