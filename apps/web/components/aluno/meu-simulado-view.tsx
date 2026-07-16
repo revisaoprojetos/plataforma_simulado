@@ -49,18 +49,12 @@ export function MeuSimuladoView({
     return [...pool].sort((a, b) => (Number(b.nota ?? -1) - Number(a.nota ?? -1)) || (new Date(b.finalizado ?? 0).getTime() - new Date(a.finalizado ?? 0).getTime()))[0]
   }, [tentSel, ordenadas])
 
-  // Comparação cruzada opcional com OUTROS simulados (padrão: nenhum).
-  const outros = useMemo(() => desempenho.filter((s) => s.id !== simuladoId), [desempenho, simuladoId])
-  const [metrica, setMetrica] = useState<Set<string>>(() => new Set())
-  const toggleMetrica = (id: string) => setMetrica((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const outrosSel = useMemo(() => outros.filter((s) => metrica.has(s.id)), [outros, metrica])
-
-  // Pontos do gráfico = tentativas selecionadas deste simulado + tentativas dos outros marcados.
+  // Pontos do gráfico = apenas as tentativas selecionadas DESTE simulado (histórico do simulado).
   const pontos = useMemo(() => {
-    const daqui = tentSel.map((t) => ({ nota: t.nota, n: t.n, simulado: simuladoTitulo, simId: simuladoId, finalizado: t.finalizado }))
-    const fora = outrosSel.flatMap((s) => s.tentativas.map((t) => ({ nota: t.nota, n: t.n, simulado: s.titulo, simId: s.id, finalizado: t.finalizado })))
-    return [...daqui, ...fora].sort((a, b) => new Date(a.finalizado ?? 0).getTime() - new Date(b.finalizado ?? 0).getTime())
-  }, [tentSel, outrosSel, simuladoTitulo, simuladoId])
+    return tentSel
+      .map((t) => ({ nota: t.nota, n: t.n, simulado: simuladoTitulo, simId: simuladoId, finalizado: t.finalizado }))
+      .sort((a, b) => new Date(a.finalizado ?? 0).getTime() - new Date(b.finalizado ?? 0).getTime())
+  }, [tentSel, simuladoTitulo, simuladoId])
 
   const notasM = pontos.map((p) => p.nota).filter((n): n is number => n != null)
   const notaMedia = notasM.length ? Math.round((notasM.reduce((a, b) => a + b, 0) / notasM.length) * 10) / 10 : null
@@ -71,13 +65,14 @@ export function MeuSimuladoView({
     const m = new Map<string, { ac: number; tt: number }>()
     const add = (ds: { nome: string; ac: number; tt: number }[]) => { for (const d of ds) { const v = m.get(d.nome) ?? { ac: 0, tt: 0 }; v.ac += d.ac; v.tt += d.tt; m.set(d.nome, v) } }
     for (const t of tentSel) add(t.porDisc)
-    for (const s of outrosSel) add(s.porDisc)
     return [...m.entries()].map(([nome, v]) => ({ nome, ac: v.ac, tt: v.tt, pct: v.tt ? Math.round((v.ac / v.tt) * 100) : 0 })).sort((a, b) => b.pct - a.pct)
-  }, [tentSel, outrosSel])
+  }, [tentSel])
 
   // URLs de impressão (PDF) por tentativa.
   const gabaritoUrl = (id: string) => `/imprimir/resultado/${id}`
-  const cadUrl = (id: string, mod: string, gab = false) => `/imprimir/caderno/${cadernoId}?sessao=${id}&aluno=${estId}&mod=${mod}${gab ? '&gabarito=1' : ''}`
+  // rawimg=1: mantém os fundos em base64 embutido (renderiza direto, sem depender do bucket
+  // de storage — evita fundo branco quando o bucket público não está acessível).
+  const cadUrl = (id: string, mod: string, gab = false) => `/imprimir/caderno/${cadernoId}?sessao=${id}&aluno=${estId}&mod=${mod}&rawimg=1${gab ? '&gabarito=1' : ''}`
   const abrir = (url: string) => window.open(url, '_blank', 'noopener,noreferrer')
 
   // Modal de download de cadernos (por tentativa).
@@ -100,7 +95,8 @@ export function MeuSimuladoView({
               <Bloqueado titulo="Desempenho ainda não liberado" msg="Você concluiu este simulado. Os acertos, o tempo e o desempenho por disciplina aparecem assim que o professor liberar a nota." />
             )}
 
-            {/* MÉTRICA DE DESEMPENHO — reflete as tentativas/simulados marcados ao lado */}
+            {/* MÉTRICA DE DESEMPENHO — só aparece quando a nota está liberada */}
+            {notaLiberada && (
             <div className="overflow-hidden rounded-2xl border bg-card">
               <div className="flex items-center gap-2 border-b px-4 py-3">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary"><BarChart3 className="h-4 w-4" /></span>
@@ -174,9 +170,10 @@ export function MeuSimuladoView({
                 </div>
               )}
             </div>
+            )}
           </div>
 
-          {/* DIREITA: histórico + seleção da métrica (tudo junto) */}
+          {/* DIREITA: histórico do simulado selecionado */}
           <div className="lg:col-span-1">
             <div className="overflow-hidden rounded-2xl border bg-card lg:sticky lg:top-4">
               <div className="border-b px-4 py-3">
@@ -222,22 +219,6 @@ export function MeuSimuladoView({
                     })}
                   </div>
                 </div>
-
-                {/* Demais simulados (selecionáveis para a métrica) */}
-                {outros.length > 0 && (
-                  <div className="border-t">
-                    <p className="bg-muted/30 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Outros simulados</p>
-                    <div className="divide-y">
-                      {outros.map((s) => (
-                        <button key={s.id} type="button" onClick={() => toggleMetrica(s.id)} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/50">
-                          <CheckBox on={metrica.has(s.id)} />
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium">{s.titulo}</span>
-                          <span className={cn('shrink-0 text-xs font-bold tabular-nums', s.nota != null ? notaTone(s.nota) : 'text-muted-foreground')}>{nota(s.nota)}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>
