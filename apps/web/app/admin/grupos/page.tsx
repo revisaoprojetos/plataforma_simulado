@@ -27,7 +27,7 @@ export default async function GruposPage() {
   const membros = new Map<string, number>()
   if (ids.length) {
     const gm = await fetchAll<{ grupo_id: string }>(() =>
-      svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', ids).order('estudante_id', { ascending: true }))
+      svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', ids).order('id', { ascending: true }))
     for (const m of gm) membros.set(m.grupo_id, (membros.get(m.grupo_id) ?? 0) + 1)
   }
 

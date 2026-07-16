@@ -70,7 +70,7 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
     // fetchAll: há >1000 vínculos no total → sem paginar, a contagem por grupo é cortada em 1000
     // (era o bug do "teste simulado" aparecer com 0 membros no diálogo de vincular grupo).
     const gm = await fetchAll<{ grupo_id: string }>(() =>
-      svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', gids).order('estudante_id', { ascending: true }))
+      svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', gids).order('id', { ascending: true }))
     for (const m of gm) contMembros.set(m.grupo_id, (contMembros.get(m.grupo_id) ?? 0) + 1)
   }
   let vinculadosSet = new Set<string>()
