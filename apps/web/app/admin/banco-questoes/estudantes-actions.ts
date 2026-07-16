@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createServiceClient } from '@/lib/supabase/server'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { matricularEmSimuladosDoBanco } from '@/lib/simulado/matricular-banco'
@@ -56,17 +57,24 @@ export async function vincularGrupoAoBanco(bancoId: string, grupoId: string): Pr
     return { ok: false, error: linkErr.message }
   }
 
-  // Liga os membros atuais do grupo ao banco.
-  const { data: membros } = await svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId)
-  const ids = [...new Set((membros ?? []).map((m: any) => m.estudante_id))]
+  // Liga os membros atuais do grupo ao banco. PAGINADO: grupo pode ter >1000 membros
+  // (senão só os 1000 primeiros eram vinculados ao banco).
+  const membros = await fetchAll<{ estudante_id: string }>(() =>
+    svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id', { ascending: true }))
+  const ids = [...new Set(membros.map((m) => m.estudante_id))]
   let vinculados = 0
   if (ids.length) {
-    const { data: ja } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).in('estudante_id', ids)
-    const jaSet = new Set((ja ?? []).map((r: any) => r.estudante_id))
+    const ja = await fetchAllByIn<{ estudante_id: string }>(ids, (chunk) =>
+      svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).in('estudante_id', chunk).order('estudante_id', { ascending: true }))
+    const jaSet = new Set(ja.map((r) => r.estudante_id))
     const novos = ids.filter((id) => !jaSet.has(id))
     if (novos.length) {
-      const { error } = await svc.from('simulado_pasta_estudantes').insert(novos.map((estudante_id) => ({ tenant_id: g.tenantId, pasta_id: bancoId, estudante_id })))
-      if (error) return { ok: false, error: error.message }
+      // Insere em lotes (payload grande com milhares de linhas).
+      for (let i = 0; i < novos.length; i += 500) {
+        const lote = novos.slice(i, i + 500)
+        const { error } = await svc.from('simulado_pasta_estudantes').insert(lote.map((estudante_id) => ({ tenant_id: g.tenantId, pasta_id: bancoId, estudante_id })))
+        if (error) return { ok: false, error: error.message }
+      }
       vinculados = novos.length
       try { await matricularEmSimuladosDoBanco(svc, g.tenantId, bancoId, novos) } catch {}
     }

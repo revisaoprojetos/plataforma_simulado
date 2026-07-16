@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { BancoEstudantesClient } from '@/components/admin/banco-estudantes-client'
 import { AlertTriangle } from 'lucide-react'
@@ -16,35 +17,41 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
-  const { data: pe, error } = await svc
-    .from('simulado_pasta_estudantes')
-    .select('estudante_id')
-    .eq('pasta_id', bancoId)
-    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
-  if (error) return <SqlPendente />
-
-  const vincIds = (pe ?? []).map((r: any) => r.estudante_id)
+  // PAGINADO (fetchAll): pode haver >1000 vínculos/estudantes e o PostgREST corta em ~1000.
+  let vincIds: string[]
+  try {
+    const pe = await fetchAll<{ estudante_id: string }>(() => svc
+      .from('simulado_pasta_estudantes')
+      .select('estudante_id')
+      .eq('pasta_id', bancoId)
+      .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+      .order('estudante_id', { ascending: true }))
+    vincIds = pe.map((r) => r.estudante_id)
+  } catch {
+    return <SqlPendente />
+  }
   const vincSet = new Set(vincIds)
 
-  // Todos os estudantes da plataforma (tenant) — para o pop-up de adicionar.
-  const { data: todos } = await svc
+  // Todos os estudantes da plataforma (tenant) — para o pop-up de adicionar. `.limit(2000)`
+  // NÃO burla o teto de 1000 do PostgREST; por isso fetchAll.
+  const lista = await fetchAll<any>(() => svc
     .from('simulado_estudantes')
     .select('id, nome, email, telefone, cpf, classificacao')
     .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
-    .order('nome')
-    .limit(2000)
-  const lista = todos ?? []
+    .order('nome', { ascending: true })
+    .order('id', { ascending: true }))
   const alunos = lista.map((a: any) => ({ ...a, jaVinculado: vincSet.has(a.id) }))
 
   // Último acesso de cada vinculado = sessão mais recente.
   const ultimoPorAluno = new Map<string, string>()
   if (vincIds.length) {
-    const { data: sess } = await svc
+    // fetchAllByIn: vincIds pode ter centenas/milhares → `.in()` estoura URL e corta em 1000.
+    const sess = await fetchAllByIn<{ estudante_id: string; iniciado_em: string }>(vincIds, (chunk) => svc
       .from('simulado_sessoes_prova')
       .select('estudante_id, iniciado_em')
-      .in('estudante_id', vincIds)
-      .order('iniciado_em', { ascending: false })
-    for (const s of sess ?? []) if (!ultimoPorAluno.has((s as any).estudante_id)) ultimoPorAluno.set((s as any).estudante_id, (s as any).iniciado_em)
+      .in('estudante_id', chunk)
+      .order('iniciado_em', { ascending: false }))
+    for (const s of sess) if (!ultimoPorAluno.has(s.estudante_id)) ultimoPorAluno.set(s.estudante_id, s.iniciado_em)
   }
   const vinculados = lista.filter((a: any) => vincSet.has(a.id)).map((a: any) => ({ ...a, ultimo_acesso: ultimoPorAluno.get(a.id) ?? null }))
 
@@ -60,8 +67,11 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
   const gids = (gruposRaw ?? []).map((x: any) => x.id)
   const contMembros = new Map<string, number>()
   if (gids.length) {
-    const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', gids)
-    for (const m of gm ?? []) contMembros.set((m as any).grupo_id, (contMembros.get((m as any).grupo_id) ?? 0) + 1)
+    // fetchAll: há >1000 vínculos no total → sem paginar, a contagem por grupo é cortada em 1000
+    // (era o bug do "teste simulado" aparecer com 0 membros no diálogo de vincular grupo).
+    const gm = await fetchAll<{ grupo_id: string }>(() =>
+      svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', gids).order('estudante_id', { ascending: true }))
+    for (const m of gm) contMembros.set(m.grupo_id, (contMembros.get(m.grupo_id) ?? 0) + 1)
   }
   let vinculadosSet = new Set<string>()
   {
