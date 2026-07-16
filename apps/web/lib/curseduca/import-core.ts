@@ -198,7 +198,10 @@ export async function executarImport(
     }
 
     await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_estudantes', entidadeId: grupoDestinoId ?? 'curseduca', tenantId: g.tenantId, depois: { curseduca_grupos: ids, total, novos, jaExistiam, atualizados, vinculados, removidos, semDetalhe, restante } })
-    revalidatePath('/admin/estudantes'); revalidatePath('/admin/grupos')
+    // 'layout' cobre também o detalhe /admin/grupos/[id] (senão os membros recém-vinculados
+    // ficam invisíveis por cache até o TTL — foi o que pareceu "não foi pro grupo").
+    revalidatePath('/admin/estudantes'); revalidatePath('/admin/grupos', 'layout')
+    if (grupoDestinoId) revalidatePath(`/admin/grupos/${grupoDestinoId}`)
     return { ok: true, total, novos, jaExistiam, atualizados, vinculados, removidos, semIdentificador, semDetalhe, restante, grupoNome }
   } catch (e: any) {
     return { ok: false, error: e?.message ?? 'Falha na importação.' }

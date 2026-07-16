@@ -3,6 +3,9 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { GrupoDetalheClient } from '@/components/admin/grupo-detalhe-client'
 
+// Sempre fresco: os membros do grupo mudam por import/vínculo e não podem ficar em cache.
+export const dynamic = 'force-dynamic'
+
 export default async function GrupoDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const tenantId = await getCurrentTenantId()
