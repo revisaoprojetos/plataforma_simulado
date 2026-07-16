@@ -38,8 +38,8 @@ function statusStyle(label: string): React.CSSProperties {
 }
 
 /** Prévia (estática) da página de login do simulado. */
-export function ProvaLoginPreview({ branding, titulo = 'Simulado', metodo = 'email_cpf', compact, status = 'Em andamento', layout = 'padrao' }: {
-  branding?: Branding | null; titulo?: string; metodo?: 'email' | 'email_cpf' | 'email_telefone'; compact?: boolean; status?: string; layout?: 'padrao' | 'centralizado'
+export function ProvaLoginPreview({ branding, titulo = 'Simulado', metodo = 'email_cpf', compact, status = 'Em andamento' }: {
+  branding?: Branding | null; titulo?: string; metodo?: 'email' | 'email_cpf' | 'email_telefone'; compact?: boolean; status?: string
 }) {
   const plataforma = (branding?.nome ?? 'Revisão').replace(/^plataforma\s+/i, '')
   const Campo = ({ label, ph }: { label: string; ph: string }) => (
@@ -54,44 +54,6 @@ export function ProvaLoginPreview({ branding, titulo = 'Simulado', metodo = 'ema
       <p className="mt-0.5 text-sm font-semibold">{valor}</p>
     </div>
   )
-  const campos = (
-    <div className="space-y-4">
-      <div className="space-y-1.5">
-        <span className="block text-sm font-medium">E-mail cadastrado na <strong className="font-semibold" style={{ color: 'var(--prova-login-destaque, var(--primary))' }}>plataforma do {plataforma}</strong> *</span>
-        <div className="flex h-9 items-center rounded-md border px-3 text-sm text-muted-foreground" style={{ background: 'var(--prova-login-input, var(--background))' }}>seu@email.com</div>
-      </div>
-      {metodo === 'email_cpf' && <Campo label="CPF" ph="000.000.000-00" />}
-      {metodo === 'email_telefone' && <Campo label="Telefone" ph="(00) 00000-0000" />}
-      <div className="flex h-10 w-full items-center justify-center rounded-md text-sm font-medium text-primary-foreground" style={{ background: 'var(--prova-login-botao, var(--primary))' }}>Iniciar simulado</div>
-    </div>
-  )
-
-  // Layout centralizado (simples): logo + título + duração + card único, tudo no centro.
-  if (layout === 'centralizado') {
-    return (
-      <div className={cn('flex items-center justify-center bg-background p-4 text-foreground', compact ? 'h-full overflow-auto' : 'min-h-screen')}>
-        <div className="w-full max-w-sm">
-          <div className="mb-6 flex flex-col items-center text-center">
-            {branding?.logoUrl && (
-              <div className={cn('mb-4 flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden', frameLogo(branding.logoEstilo))} style={{ background: branding.logoBg ?? '#ffffff' }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={branding.logoUrl} alt="" className="h-full w-full object-contain" />
-              </div>
-            )}
-            <span className="inline-block rounded-full px-3 py-1 text-xs font-semibold" style={statusStyle(status)}>{status}</span>
-            <h1 className="mt-3 text-2xl font-extrabold uppercase leading-tight tracking-tight" style={{ color: 'var(--prova-titulo, var(--primary))' }}>{titulo}</h1>
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><Clock className="h-4 w-4" /> Duração: <strong className="font-semibold text-foreground">42h</strong></p>
-          </div>
-          <div className="relative overflow-hidden rounded-2xl border bg-card p-6 shadow-lg">
-            <FitaTopo />
-            <h2 className="mb-4 text-center text-base font-semibold">Identifique-se para iniciar</h2>
-            {campos}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className={cn('flex items-start justify-center bg-background p-4 text-foreground', compact ? 'h-full overflow-auto' : 'min-h-screen py-10')}>
       <div className="w-full max-w-2xl space-y-6 py-2">
@@ -127,7 +89,15 @@ export function ProvaLoginPreview({ branding, titulo = 'Simulado', metodo = 'ema
         <div className="relative overflow-hidden rounded-2xl border bg-card p-6 shadow-sm">
           <FitaTopo />
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><BookOpen className="h-5 w-5" style={{ color: 'var(--primary)' }} /> Identifique-se para iniciar</h2>
-          {campos}
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <span className="block text-sm font-medium">E-mail cadastrado na <strong className="font-semibold" style={{ color: 'var(--prova-login-destaque, var(--primary))' }}>plataforma do {plataforma}</strong> *</span>
+              <div className="flex h-9 items-center rounded-md border px-3 text-sm text-muted-foreground" style={{ background: 'var(--prova-login-input, var(--background))' }}>seu@email.com</div>
+            </div>
+            {metodo === 'email_cpf' && <Campo label="CPF" ph="000.000.000-00" />}
+            {metodo === 'email_telefone' && <Campo label="Telefone" ph="(00) 00000-0000" />}
+            <div className="flex h-10 w-full items-center justify-center rounded-md text-sm font-medium text-primary-foreground" style={{ background: 'var(--prova-login-botao, var(--primary))' }}>Iniciar simulado</div>
+          </div>
         </div>
       </div>
     </div>

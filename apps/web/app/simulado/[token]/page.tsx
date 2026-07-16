@@ -1,7 +1,7 @@
 import { resolveTemaDark } from '@/lib/hud/resolve-dark'
 import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { resolverHudConfig } from '@/lib/hud/resolve-hud'
-import { HUD_CORES_PADRAO, type HudCores, type HudPorPagina, type LoginLayout } from '@/lib/caderno-designer/types'
+import { HUD_CORES_PADRAO, type HudCores, type HudPorPagina } from '@/lib/caderno-designer/types'
 import { EmbedLoginForm } from '@/components/embed/embed-login-form'
 import { AlertCircle } from 'lucide-react'
 import { ProvaClient } from './prova-client'
@@ -20,13 +20,11 @@ export default async function ProvaPage({ params, searchParams }: { params: Prom
   // HUD (cores/estilo por página) do caderno vinculado — login e prova seguem o designer.
   let base: HudCores = HUD_CORES_PADRAO
   let porPagina: HudPorPagina = {}
-  let loginLayout: LoginLayout = 'padrao'
   if (sim) {
     try {
       const hud = await resolverHudConfig(sim.id, sim.tenant_id)
       base = hud.base
       porPagina = hud.porPagina
-      loginLayout = hud.loginLayout
     } catch { /* fallback padrão */ }
   }
   const branding = sim ? await fetchBranding(sim.tenant_id) : null
@@ -43,7 +41,6 @@ export default async function ProvaPage({ params, searchParams }: { params: Prom
         branding={branding}
         destino="simulado"
         darkInicial={dark}
-        loginLayout={loginLayout}
         hud={{ base, porPagina }}
         prova={{ status: sim.status, dataInicio: sim.data_inicio, dataFim: sim.data_fim, tempoLimiteMin: sim.tempo_limite_min }}
       />

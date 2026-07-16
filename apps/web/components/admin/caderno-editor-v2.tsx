@@ -10,7 +10,7 @@ import { BLOCKS, blocksByCategory, createBlock, getBlockMeta, BlockRender, cardS
 import { BlockInspector } from '@/lib/caderno-designer/inspectors'
 import { resolveTheme, type CadernoTheme } from '@/lib/caderno-designer/theme'
 import * as tree from '@/lib/caderno-designer/block-tree'
-import { SHEET_W, SHEET_H, PAD_H, PAD_V, PAGE_KINDS, RUNNING_PADRAO, HUD_CORES_PADRAO, novoDoc, docCadernoCompleto, docCadernoPerguntas, genId, mesclarModalidades, faixaNaPagina, type CadernoDoc, type Modalidade, type Block, type PageKind, type CadernoData, type HudCores, type HudPorPagina, type LoginLayout, type FaixaPaginas } from '@/lib/caderno-designer/types'
+import { SHEET_W, SHEET_H, PAD_H, PAD_V, PAGE_KINDS, RUNNING_PADRAO, HUD_CORES_PADRAO, novoDoc, docCadernoCompleto, docCadernoPerguntas, genId, mesclarModalidades, faixaNaPagina, type CadernoDoc, type Modalidade, type Block, type PageKind, type CadernoData, type HudCores, type HudPorPagina, type FaixaPaginas } from '@/lib/caderno-designer/types'
 import { HudSimuladoEditor } from '@/components/admin/hud-simulado-editor'
 import { HexColorField } from '@/components/admin/hex-color-field'
 import { GerarPdfServidor } from '@/components/admin/gerar-pdf-servidor'
@@ -294,7 +294,7 @@ export function CadernoEditorV2({
 }: {
   cadernoId: string
   nome: string
-  inicial: { docsV2?: Record<string, CadernoDoc>; modalidadesV2?: Modalidade[]; cores?: Record<string, string>; hudCores?: Partial<HudCores>; hudPorPagina?: HudPorPagina; loginLayout?: LoginLayout }
+  inicial: { docsV2?: Record<string, CadernoDoc>; modalidadesV2?: Modalidade[]; cores?: Record<string, string>; hudCores?: Partial<HudCores>; hudPorPagina?: HudPorPagina }
   previewData: CadernoData
   bancos?: { id: string; nome: string }[]
   bancoIdInicial?: string | null
@@ -317,7 +317,6 @@ export function CadernoEditorV2({
   const [cores, setCores] = useState<Record<string, string>>(inicial.cores ?? {})
   const [hudCores, setHudCores] = useState<HudCores>({ ...HUD_CORES_PADRAO, ...(inicial.hudCores ?? {}) })
   const [hudPorPagina, setHudPorPagina] = useState<HudPorPagina>(inicial.hudPorPagina ?? {})
-  const [loginLayout, setLoginLayout] = useState<LoginLayout>(inicial.loginLayout ?? 'padrao')
   const [hudMode, setHudMode] = useState(false)
   const [bancoId, setBancoId] = useState<string | null>(bancoIdInicial)
   const [regIndex, setRegIndex] = useState(0)
@@ -487,14 +486,14 @@ export function CadernoEditorV2({
 
   function salvar() {
     start(async () => {
-      const r = await salvarCadernoDesignerV2(cadernoId, { docsV2: docs, modalidadesV2: modalidades, cores, hudCores, hudPorPagina, loginLayout, bancoId })
+      const r = await salvarCadernoDesignerV2(cadernoId, { docsV2: docs, modalidadesV2: modalidades, cores, hudCores, hudPorPagina, bancoId })
       r.ok ? toast.success('Caderno salvo') : toast.error(r.error ?? 'Erro ao salvar')
     })
   }
   function vincularBanco(novoId: string | null) {
     setBancoId(novoId)
     start(async () => {
-      const r = await salvarCadernoDesignerV2(cadernoId, { docsV2: docs, modalidadesV2: modalidades, cores, hudCores, hudPorPagina, loginLayout, bancoId: novoId })
+      const r = await salvarCadernoDesignerV2(cadernoId, { docsV2: docs, modalidadesV2: modalidades, cores, hudCores, hudPorPagina, bancoId: novoId })
       if (r.ok) window.location.reload() // refaz o preview com os dados do banco
       else toast.error(r.error ?? 'Erro ao vincular banco')
     })
@@ -587,7 +586,7 @@ export function CadernoEditorV2({
       </div>
 
       {hudMode ? (
-        <HudSimuladoEditor base={hudCores} porPagina={hudPorPagina} onChangePorPagina={setHudPorPagina} loginLayout={loginLayout} onChangeLoginLayout={setLoginLayout} onVoltar={() => setHudMode(false)} titulo={nome} branding={branding} />
+        <HudSimuladoEditor base={hudCores} porPagina={hudPorPagina} onChangePorPagina={setHudPorPagina} onVoltar={() => setHudMode(false)} titulo={nome} branding={branding} />
       ) : (
       <div className="grid min-h-0 flex-1 grid-cols-[208px_1fr_248px]">
         {/* Esquerda */}

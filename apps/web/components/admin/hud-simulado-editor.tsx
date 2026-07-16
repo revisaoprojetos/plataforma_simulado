@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { HexColorField } from '@/components/admin/hex-color-field'
 import { ArrowLeft, RotateCcw, ChevronDown, Loader2, LogIn, DoorOpen, ListChecks, CheckCircle2, Copy, ClipboardPaste } from 'lucide-react'
-import { type HudCores, type HudPorPagina, type LoginLayout, efetivarHud } from '@/lib/caderno-designer/types'
+import { type HudCores, type HudPorPagina, efetivarHud } from '@/lib/caderno-designer/types'
 import { hudCssVars } from '@/lib/caderno-designer/hud'
 import { ProvaHud } from '@/components/prova/prova-hud'
 import { ProvaIntro, ProvaLoading, ESTILOS_PROVA_LOADING, type EstiloProvaLoading } from '@/components/prova/prova-intro'
@@ -178,9 +178,8 @@ const DEMO_Q = {
 
 const Swatch = HexColorField
 
-export function HudSimuladoEditor({ base, porPagina, onChangePorPagina, loginLayout = 'padrao', onChangeLoginLayout, onVoltar, titulo = 'Simulado', branding }: {
+export function HudSimuladoEditor({ base, porPagina, onChangePorPagina, onVoltar, titulo = 'Simulado', branding }: {
   base: HudCores; porPagina: HudPorPagina; onChangePorPagina: (p: HudPorPagina) => void; onVoltar: () => void; titulo?: string
-  loginLayout?: LoginLayout; onChangeLoginLayout?: (v: LoginLayout) => void
   branding?: { nome?: string; logoUrl?: string | null; logoGrandeUrl?: string | null; logoBg?: string; logoEstilo?: string } | null
 }) {
   const [verAcabando, setVerAcabando] = useState(false)
@@ -279,7 +278,7 @@ export function HudSimuladoEditor({ base, porPagina, onChangePorPagina, loginLay
             {verScreen === 'loading' && <ProvaLoading compact loop mensagem="Carregando simulado..." tipo={c.loadingTipo as EstiloProvaLoading} logoUrl={branding?.logoUrl ?? null} logoBg={branding?.logoBg} logoEstilo={branding?.logoEstilo} />}
             {verScreen === 'login' && (
               <div className="relative h-full">
-                <ProvaLoginPreview compact branding={branding} titulo={titulo} status={STATUS_POR_TAB[verLoginTab]} layout={loginLayout} />
+                <ProvaLoginPreview compact branding={branding} titulo={titulo} status={STATUS_POR_TAB[verLoginTab]} />
                 {verLoginTab !== 'form' && (
                   <LoginResultado overlay compact tipo={verLoginTab} nome="Nome do Aluno" quando="01/07/2026 08:00"
                     plataforma={(branding?.nome ?? 'Revisão').replace(/^plataforma\s+/i, '')}
@@ -312,21 +311,6 @@ export function HudSimuladoEditor({ base, porPagina, onChangePorPagina, loginLay
             <h3 className="text-sm font-semibold">Cores · {SCREENS.find((s) => s.key === verScreen)?.label}</h3>
             <p className="text-xs text-muted-foreground">Cada página tem cores próprias. Use copiar/colar para reaproveitar entre campos e páginas.</p>
           </div>
-          {/* Seletor de layout — só na tela de login. */}
-          {verScreen === 'login' && onChangeLoginLayout && (
-            <div className="rounded-md border bg-muted/30 p-2">
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Layout da tela</p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {([['padrao', 'Padrão', 'Completo (info + identificação)'], ['centralizado', 'Simples', 'Centralizado no meio da tela']] as const).map(([val, lbl, desc]) => (
-                  <button key={val} type="button" onClick={() => onChangeLoginLayout(val)}
-                    className={cn('rounded-md border-2 px-2 py-1.5 text-left transition-colors', loginLayout === val ? 'border-primary bg-primary/5' : 'border-transparent hover:border-primary/30')}>
-                    <span className="block text-xs font-semibold">{lbl}</span>
-                    <span className="block text-[10px] leading-tight text-muted-foreground">{desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
           {copiada && (
             <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-2 py-1 text-[11px]">
               <span className="h-4 w-4 rounded border" style={{ background: copiada }} />

@@ -3,7 +3,7 @@ import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { EmbedLoginForm } from '@/components/embed/embed-login-form'
 import { EmbedProvaRunner } from '@/components/embed/embed-prova-runner'
 import { AlertCircle } from 'lucide-react'
-import { type HudCores, type HudPorPagina, type LoginLayout, efetivarHud } from '@/lib/caderno-designer/types'
+import { type HudCores, type HudPorPagina, efetivarHud } from '@/lib/caderno-designer/types'
 import { hudCssVars } from '@/lib/caderno-designer/hud'
 import { resolverHudConfig } from '@/lib/hud/resolve-hud'
 
@@ -78,7 +78,6 @@ export default async function EmbedSimuladoPage({ params, searchParams }: PagePr
       simuladoTitulo={simulado.titulo}
       branding={branding}
       darkInicial={dark}
-      loginLayout={hud.loginLayout}
       hud={{ base: hud.base, porPagina: hud.porPagina }}
       prova={{
         status: simulado.status,
@@ -134,7 +133,7 @@ async function fetchSimuladoPorToken(embedToken: string): Promise<{
 }
 
 /** Cores do HUD do caderno vinculado ao simulado (link explícito ou banco). Fallback p/ o padrão. */
-async function fetchHudCores(simuladoId: string): Promise<{ base: HudCores; porPagina: HudPorPagina; loginLayout: LoginLayout }> {
-  const { base, porPagina, loginLayout } = await resolverHudConfig(simuladoId)
-  return { base, porPagina, loginLayout }
+async function fetchHudCores(simuladoId: string): Promise<{ base: HudCores; porPagina: HudPorPagina }> {
+  const { base, porPagina } = await resolverHudConfig(simuladoId)
+  return { base, porPagina }
 }
