@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useMemo, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -45,6 +46,7 @@ export function AdicionarEstudantesDialog({ bancoId, alunos }: { bancoId: string
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
   const fileRef = useRef<HTMLInputElement>(null)
+  const router = useRouter()
 
   const filtrados = useMemo(() => {
     const q = busca.toLowerCase().trim()
@@ -60,7 +62,7 @@ export function AdicionarEstudantesDialog({ bancoId, alunos }: { bancoId: string
     if (sel.size === 0) { toast.error('Selecione ao menos um estudante.'); return }
     start(async () => {
       const r = await vincularEstudantes(bancoId, [...sel])
-      if (r.ok) { toast.success(`${r.vinculados ?? 0} vinculado(s)`); window.location.assign(`/admin/banco-questoes/${bancoId}?tab=estudantes`) }
+      if (r.ok) { toast.success(`${r.vinculados ?? 0} vinculado(s)`); setOpen(false); setSel(new Set()); router.refresh() }
       else toast.error(r.error ?? 'Erro')
     })
   }
@@ -80,7 +82,7 @@ export function AdicionarEstudantesDialog({ bancoId, alunos }: { bancoId: string
       if (!mapped.some((r) => r.email)) { toast.error('CSV sem coluna "email" ou vazio.'); return }
       start(async () => {
         const res = await importarEstudantesLote(bancoId, mapped)
-        if (res.ok) { toast.success(`${res.criados ?? 0} criado(s), ${res.vinculados ?? 0} vinculado(s)`); window.location.assign(`/admin/banco-questoes/${bancoId}?tab=estudantes`) }
+        if (res.ok) { toast.success(`${res.criados ?? 0} criado(s), ${res.vinculados ?? 0} vinculado(s)`); setOpen(false); router.refresh() }
         else toast.error(res.error ?? 'Erro ao importar')
       })
     }

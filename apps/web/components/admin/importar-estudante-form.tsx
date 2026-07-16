@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,13 +13,14 @@ import { importarEstudante } from '@/app/admin/banco-questoes/estudantes-actions
 export function ImportarEstudanteForm({ bancoId }: { bancoId: string }) {
   const [pending, start] = useTransition()
   const [novo, setNovo] = useState({ nome: '', email: '', telefone: '', cpf: '' })
+  const router = useRouter()
 
   function importar(e: React.FormEvent) {
     e.preventDefault()
     if (!novo.nome.trim() || !novo.email.trim()) { toast.error('Nome e e-mail são obrigatórios.'); return }
     start(async () => {
       const r = await importarEstudante(bancoId, novo)
-      if (r.ok) { toast.success('Aluno importado e vinculado'); window.location.reload() }
+      if (r.ok) { toast.success('Aluno importado e vinculado'); setNovo({ nome: '', email: '', telefone: '', cpf: '' }); router.refresh() }
       else toast.error(r.error ?? 'Erro')
     })
   }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -50,6 +51,7 @@ export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = []
   const [pending, start] = useTransition()
   const [ordCampo, setOrdCampo] = useState<'nome' | 'email' | 'cpf' | 'ultimo_acesso'>('nome')
   const [ordDir, setOrdDir] = useState<'asc' | 'desc'>('asc')
+  const router = useRouter()
 
   function ordenar(campo: 'nome' | 'email' | 'cpf' | 'ultimo_acesso') {
     if (ordCampo === campo) setOrdDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -82,7 +84,8 @@ export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = []
     start(async () => {
       for (const id of sel) await desvincularEstudante(bancoId, id)
       toast.success(`${sel.size} aluno(s) desvinculado(s)`)
-      window.location.assign(`/admin/banco-questoes/${bancoId}?tab=estudantes`)
+      setSel(new Set())
+      router.refresh()
     })
   }
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,6 +34,7 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
   const [dif, setDif] = useState('all')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
+  const router = useRouter()
 
   // Ordem local (permite reordenar com setas/arrastar sem recarregar).
   const [ordered, setOrdered] = useState<Q[]>(questoes)
@@ -68,7 +70,7 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
     if (sel.size === 0) return
     start(async () => {
       const r = await removerQuestoes(bancoId, [...sel])
-      if (r.ok) { toast.success(`${sel.size} questão(ões) removida(s)`); window.location.assign(`/admin/banco-questoes/${bancoId}?tab=questoes`) }
+      if (r.ok) { toast.success(`${sel.size} questão(ões) removida(s)`); setSel(new Set()); router.refresh() }
       else toast.error(r.error ?? 'Erro')
     })
   }

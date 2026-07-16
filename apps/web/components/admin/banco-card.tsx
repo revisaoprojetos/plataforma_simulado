@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   DropdownMenu,
@@ -18,6 +19,7 @@ import { iconeBanco } from '@/lib/banco-visual'
 export function BancoCard({ id, nome, total, cor, icone, capa, tipo }: { id: string; nome: string; total: number; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null }) {
   const [confirmar, setConfirmar] = useState(false)
   const [pending, start] = useTransition()
+  const router = useRouter()
 
   const Icon = iconeBanco(icone)
   const c = cor ?? '#6d28d9'
@@ -25,14 +27,14 @@ export function BancoCard({ id, nome, total, cor, icone, capa, tipo }: { id: str
   function copiar() {
     start(async () => {
       const r = await duplicarBanco(id)
-      if (r.ok) window.location.reload()
+      if (r.ok) router.refresh()
       else toast.error(r.error ?? 'Erro')
     })
   }
   function excluir() {
     start(async () => {
       const r = await excluirBanco(id)
-      if (r.ok) window.location.reload()
+      if (r.ok) router.refresh()
       else toast.error(r.error ?? 'Erro')
     })
   }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,7 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
+  const router = useRouter()
 
   useEffect(() => {
     if (!open) return
@@ -37,7 +39,7 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
       const r = await desvincularGrupoDoBanco(bancoId, id)
       if (!r.ok) { toast.error(r.error ?? 'Erro ao desvincular'); return }
       toast.success(`Grupo "${nome}" desvinculado`)
-      window.location.assign(`/admin/banco-questoes/${bancoId}?tab=estudantes`)
+      router.refresh()
     })
   }
 
@@ -51,7 +53,9 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
         total += r.vinculados ?? 0
       }
       toast.success(`${sel.size} grupo(s) vinculado(s) · ${total} estudante(s) ligado(s) ao banco`)
-      window.location.assign(`/admin/banco-questoes/${bancoId}?tab=estudantes`)
+      setOpen(false)
+      setSel(new Set())
+      router.refresh()
     })
   }
 

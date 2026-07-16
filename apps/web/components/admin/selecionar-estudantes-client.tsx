@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +18,7 @@ export function SelecionarEstudantesClient({ bancoId, alunos }: { bancoId: strin
   const [pending, start] = useTransition()
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
+  const router = useRouter()
 
   const filtrados = useMemo(() => {
     const q = busca.toLowerCase().trim()
@@ -32,7 +34,7 @@ export function SelecionarEstudantesClient({ bancoId, alunos }: { bancoId: strin
     if (sel.size === 0) { toast.error('Selecione ao menos um estudante.'); return }
     start(async () => {
       const r = await vincularEstudantes(bancoId, [...sel])
-      if (r.ok) { toast.success(`${r.vinculados ?? 0} estudante(s) vinculado(s)`); window.location.assign(`/admin/banco-questoes/${bancoId}?tab=estudantes`) }
+      if (r.ok) { toast.success(`${r.vinculados ?? 0} estudante(s) vinculado(s)`); setSel(new Set()); router.refresh() }
       else toast.error(r.error ?? 'Erro')
     })
   }
