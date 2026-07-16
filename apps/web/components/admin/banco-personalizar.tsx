@@ -23,20 +23,25 @@ async function redimensionar(file: File, max = 900): Promise<string> {
   return canvas.toDataURL('image/jpeg', 0.72)
 }
 
-type Banco = { id: string; nome: string; cor: string | null; icone: string | null; capa_url: string | null; total: number }
+type Banco = { id: string; nome: string; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; total: number }
 
 export function BancoPersonalizar({ banco }: { banco: Banco }) {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
+  const cardInputRef = useRef<HTMLInputElement>(null)
   const [nome, setNome] = useState(banco.nome)
   const [cor, setCor] = useState<string | null>(banco.cor)
   const [icone, setIcone] = useState<string>(banco.icone && BANCO_ICONES[banco.icone] ? banco.icone : 'folder')
   const [capa, setCapa] = useState<string | null>(banco.capa_url)
+  const [capaCard, setCapaCard] = useState<string | null>(banco.capa_card_url)
   const [salvando, setSalvando] = useState(false)
   const [processando, setProcessando] = useState(false)
+  const [processandoCard, setProcessandoCard] = useState(false)
 
   const c = cor ?? '#6d28d9'
   const Preview = iconeBanco(icone)
+  // O card (pôster) usa a imagem própria; se vazia, cai para a capa do banner.
+  const imgCard = capaCard ?? capa
 
   async function onFile(f: File | null) {
     if (!f) return
@@ -45,10 +50,18 @@ export function BancoPersonalizar({ banco }: { banco: Banco }) {
     try { setCapa(await redimensionar(f)) } catch { toast.error('Falha ao processar a imagem.') } finally { setProcessando(false) }
   }
 
+  async function onFileCard(f: File | null) {
+    if (!f) return
+    if (!f.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
+    setProcessandoCard(true)
+    // Pôster é vertical (4:5) → redimensiona um pouco maior para manter nitidez.
+    try { setCapaCard(await redimensionar(f, 1000)) } catch { toast.error('Falha ao processar a imagem.') } finally { setProcessandoCard(false) }
+  }
+
   async function salvar() {
     if (!nome.trim()) { toast.error('Informe um nome.'); return }
     setSalvando(true)
-    const r = await atualizarBanco(banco.id, nome, cor, icone, capa)
+    const r = await atualizarBanco(banco.id, nome, cor, icone, capa, capaCard)
     setSalvando(false)
     if (r.ok) { toast.success('Personalização salva'); router.refresh() } else toast.error(r.error ?? 'Erro ao salvar')
   }
@@ -88,7 +101,29 @@ export function BancoPersonalizar({ banco }: { banco: Banco }) {
                 className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:opacity-60">
                 {processando ? <Loader2 className="h-7 w-7 animate-spin" /> : <ImagePlus className="h-7 w-7" />}
                 <span className="text-sm font-medium">{processando ? 'Processando…' : 'Adicionar imagem de capa'}</span>
-                <span className="text-xs">A imagem é redimensionada automaticamente.</span>
+                <span className="text-xs">Usada no banner largo do topo do banco.</span>
+              </button>
+            )}
+          </div>
+
+          {/* Imagem do card (pôster) — separada da capa do banner, para não esticar no formato vertical */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Imagem do card (pôster)</label>
+            <input ref={cardInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFileCard(e.target.files?.[0] ?? null)} />
+            {capaCard ? (
+              <div className="relative overflow-hidden rounded-xl border">
+                <img src={capaCard} alt="Imagem do card" className="h-40 w-full object-cover" />
+                <div className="absolute right-2 top-2 flex gap-1.5">
+                  <button type="button" onClick={() => cardInputRef.current?.click()} className="inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/70"><RefreshCw className="h-3.5 w-3.5" /> Trocar</button>
+                  <button type="button" onClick={() => setCapaCard(null)} className="inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-rose-600"><Trash2 className="h-3.5 w-3.5" /> Remover</button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => cardInputRef.current?.click()} disabled={processandoCard}
+                className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:opacity-60">
+                {processandoCard ? <Loader2 className="h-7 w-7 animate-spin" /> : <ImagePlus className="h-7 w-7" />}
+                <span className="text-sm font-medium">{processandoCard ? 'Processando…' : 'Adicionar imagem do card'}</span>
+                <span className="text-xs">Ideal vertical (pôster 4:5). Se vazio, usa a capa do banner.</span>
               </button>
             )}
           </div>
@@ -137,12 +172,12 @@ export function BancoPersonalizar({ banco }: { banco: Banco }) {
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Prévia do card</p>
         <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl border shadow-sm">
-          {capa ? (
-            <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          {imgCard ? (
+            <img src={imgCard} alt="" className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
           )}
-          {!capa && <Preview className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
+          {!imgCard && <Preview className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
           <span className="absolute left-3 top-3 flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: c }}>
             <Preview className="h-4 w-4" />

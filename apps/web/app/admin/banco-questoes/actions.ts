@@ -59,23 +59,30 @@ export async function renomearBanco(id: string, nome: string): Promise<{ ok: boo
   return { ok: true }
 }
 
-/** Atualiza nome + personalização (cor/ícone/capa) de um banco. Tolerante caso as colunas não existam. */
-export async function atualizarBanco(id: string, nome: string, cor: string | null, icone: string | null, capaUrl?: string | null): Promise<{ ok: boolean; error?: string }> {
+/** Atualiza nome + personalização (cor/ícone/capa + imagem do card) de um banco. Tolerante caso as colunas não existam. */
+export async function atualizarBanco(id: string, nome: string, cor: string | null, icone: string | null, capaUrl?: string | null, capaCardUrl?: string | null): Promise<{ ok: boolean; error?: string }> {
   const g = await guard()
   if (!g.ok) return g
   const titulo = nome.trim()
   if (!titulo) return { ok: false, error: 'Informe um nome.' }
 
   const svc = createAdminClient()
-  const { error } = await svc.from('simulado_pastas').update({ nome: titulo, cor: cor || null, icone: icone || null, capa_url: capaUrl || null }).eq('id', id).eq('tenant_id', g.tenantId)
-  if (error && /cor|icone|capa_url|column/i.test(error.message)) {
-    const { error: e2 } = await svc.from('simulado_pastas').update({ nome: titulo }).eq('id', id).eq('tenant_id', g.tenantId)
-    if (e2) return { ok: false, error: e2.message }
-  } else if (error) {
-    return { ok: false, error: error.message }
-  }
+  const upd = (patch: Record<string, unknown>) => svc.from('simulado_pastas').update(patch).eq('id', id).eq('tenant_id', g.tenantId)
+  const completo = { nome: titulo, cor: cor || null, icone: icone || null, capa_url: capaUrl || null, capa_card_url: capaCardUrl || null }
 
-  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: id, depois: { nome: titulo, cor, icone, capa: !!capaUrl } })
+  let { error } = await upd(completo)
+  // Fallback 1: coluna capa_card_url ainda não migrada → salva o resto (cor/ícone/capa preservados).
+  if (error && /capa_card_url/i.test(error.message)) {
+    const { capa_card_url, ...semCard } = completo
+    ;({ error } = await upd(semCard))
+  }
+  // Fallback 2: outras colunas de personalização ausentes → salva só o nome.
+  if (error && /cor|icone|capa_url|column/i.test(error.message)) {
+    ;({ error } = await upd({ nome: titulo }))
+  }
+  if (error) return { ok: false, error: error.message }
+
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: id, depois: { nome: titulo, cor, icone, capa: !!capaUrl, capaCard: !!capaCardUrl } })
   revalidatePath('/admin/banco-questoes')
   revalidatePath(`/admin/banco-questoes/${id}`)
   return { ok: true }

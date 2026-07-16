@@ -39,8 +39,8 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
   // Banco + personalização (cor/ícone/capa) — tolerante caso a migration ainda não tenha rodado.
   let banco: any = null
   {
-    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
-    if (r.error && /cor|icone|capa_url|column/i.test(r.error.message)) {
+    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, capa_card_url').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
+    if (r.error && /cor|icone|capa_url|capa_card_url|column/i.test(r.error.message)) {
       const r2 = await svc.from('simulado_pastas').select('id, nome').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
       banco = r2.data
     } else banco = r.data
@@ -283,7 +283,7 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
         </TabsContent>
 
         <TabsContent value="personalizar">
-          <BancoPersonalizar banco={{ id: banco.id, nome: banco.nome, cor: banco.cor ?? null, icone: banco.icone ?? null, capa_url: banco.capa_url ?? null, total: questoes.length }} />
+          <BancoPersonalizar banco={{ id: banco.id, nome: banco.nome, cor: banco.cor ?? null, icone: banco.icone ?? null, capa_url: banco.capa_url ?? null, capa_card_url: banco.capa_card_url ?? null, total: questoes.length }} />
         </TabsContent>
       </Tabs>
     </div>
