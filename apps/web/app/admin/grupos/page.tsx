@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { GruposClient } from '@/components/admin/grupos-client'
 
 // Sempre fresco: a contagem de participantes muda por import/vínculo (não pode ficar em cache).
@@ -19,12 +20,15 @@ export default async function GruposPage() {
     } else grupos = r.data
   }
 
-  // Contagem de membros por grupo (tolerante).
+  // Contagem de membros por grupo. IMPORTANTE: pagina com fetchAll — há mais de 1000
+  // vínculos no total e o PostgREST corta em ~1000 por resposta (senão grupos "somem"
+  // da contagem, aparecendo com 0 membros mesmo tendo alunos vinculados).
   const ids = (grupos ?? []).map((g: any) => g.id)
   const membros = new Map<string, number>()
   if (ids.length) {
-    const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', ids)
-    for (const m of gm ?? []) membros.set((m as any).grupo_id, (membros.get((m as any).grupo_id) ?? 0) + 1)
+    const gm = await fetchAll<{ grupo_id: string }>(() =>
+      svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', ids).order('estudante_id', { ascending: true }))
+    for (const m of gm) membros.set(m.grupo_id, (membros.get(m.grupo_id) ?? 0) + 1)
   }
 
   const rows = (grupos ?? []).map((g: any) => ({ id: g.id, nome: g.nome, membros: membros.get(g.id) ?? 0, cor: g.cor ?? null }))

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 
 async function guard() {
@@ -66,8 +67,9 @@ async function sincronizarBancosDoGrupo(svc: ReturnType<typeof createAdminClient
   if (error || !links?.length) return
   for (const l of links) {
     const pastaId = (l as any).pasta_id
-    const { data: ja } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', pastaId).in('estudante_id', estudanteIds)
-    const jaSet = new Set((ja ?? []).map((r: any) => r.estudante_id))
+    const ja = await fetchAllByIn<{ estudante_id: string }>(estudanteIds, (chunk) =>
+      svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', pastaId).in('estudante_id', chunk).order('estudante_id', { ascending: true }))
+    const jaSet = new Set(ja.map((r) => r.estudante_id))
     const novos = estudanteIds.filter((id) => !jaSet.has(id))
     if (novos.length) {
       await svc.from('simulado_pasta_estudantes').insert(novos.map((estudante_id) => ({ tenant_id: tenantId, pasta_id: pastaId, estudante_id })))
@@ -81,8 +83,9 @@ export async function adicionarMembros(grupoId: string, estudanteIds: string[]):
   const g = await guard(); if (!g.ok) return g
   if (!estudanteIds.length) return { ok: true }
   const svc = createAdminClient()
-  const { data: exist } = await svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId)
-  const ja = new Set((exist ?? []).map((r: any) => r.estudante_id))
+  const exist = await fetchAll<{ estudante_id: string }>(() =>
+    svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id', { ascending: true }))
+  const ja = new Set(exist.map((r) => r.estudante_id))
   const idsNovos = estudanteIds.filter((e) => !ja.has(e))
   if (!idsNovos.length) return { ok: true }
   const { error } = await svc.from('simulado_grupo_membros').insert(idsNovos.map((e) => ({ tenant_id: g.tenantId, grupo_id: grupoId, estudante_id: e })))
@@ -130,14 +133,17 @@ export async function importarMembros(formData: FormData): Promise<{ ok: boolean
   if (!tokens.length) return { ok: false, error: 'Cole uma lista ou envie um arquivo.' }
 
   const svc = createAdminClient()
-  // Carrega estudantes do tenant (cpf é tolerante caso não exista).
-  let estudantes: any[] | null = null
-  {
-    const r = await svc.from('simulado_estudantes').select('id, nome, email, cpf').eq('tenant_id', g.tenantId).eq('deletado', false)
-    if (r.error && /cpf/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', g.tenantId).eq('deletado', false)
-      estudantes = r2.data
-    } else estudantes = r.data
+  // Carrega estudantes do tenant, PAGINADO (fetchAll) — senão >1000 alunos são cortados e
+  // muitos "não encontrados" apareceriam falsamente. cpf é tolerante caso a coluna não exista.
+  let estudantes: any[] = []
+  try {
+    estudantes = await fetchAll<any>(() =>
+      svc.from('simulado_estudantes').select('id, nome, email, cpf').eq('tenant_id', g.tenantId).eq('deletado', false).order('id', { ascending: true }))
+  } catch (e: any) {
+    if (/cpf/i.test(e?.message ?? String(e))) {
+      estudantes = await fetchAll<any>(() =>
+        svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', g.tenantId).eq('deletado', false).order('id', { ascending: true }))
+    } else throw e
   }
   const byEmail = new Map<string, string>()
   const byCpf = new Map<string, string>()
@@ -164,8 +170,9 @@ export async function importarMembros(formData: FormData): Promise<{ ok: boolean
   }
   if (!ids.size) return { ok: true, adicionados: 0, jaEram: 0, naoEncontrados }
 
-  const { data: exist } = await svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId)
-  const ja = new Set((exist ?? []).map((r: any) => r.estudante_id))
+  const existM = await fetchAll<{ estudante_id: string }>(() =>
+    svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id', { ascending: true }))
+  const ja = new Set(existM.map((r) => r.estudante_id))
   const encontrados = [...ids]
   const idsAdicionados = encontrados.filter((e) => !ja.has(e))
   if (idsAdicionados.length) {

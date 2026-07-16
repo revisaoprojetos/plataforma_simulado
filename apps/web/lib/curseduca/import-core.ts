@@ -1,6 +1,7 @@
 import 'server-only'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { registrarAudit } from '@/lib/audit'
 import { configDoEnv, listarMembrosDoGrupo, detalheMembro, type CurseducaCfg, type MembroCurseduca, type DetalheMembro } from '@/lib/curseduca/client'
 import type { DestinoImport, ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
@@ -62,7 +63,10 @@ export async function executarImport(
     const total = membros.length
 
     // 2) Quem já existe no sistema (por matrícula Curseduca, e-mail ou CPF).
-    const { data: existentes } = await svc.from('simulado_estudantes').select('id, email, cpf, telefone, classificacao, matricula_externa').eq('tenant_id', g.tenantId).eq('deletado', false)
+    // PAGINA com fetchAll: com >1000 estudantes o PostgREST cortaria em ~1000 e alunos além
+    // disso não seriam reconhecidos → o import criaria DUPLICATAS de quem já existe.
+    const existentes = await fetchAll<any>(() =>
+      svc.from('simulado_estudantes').select('id, email, cpf, telefone, classificacao, matricula_externa').eq('tenant_id', g.tenantId).eq('deletado', false).order('id', { ascending: true }))
     const porEmail = new Map<string, string>(), porCpf = new Map<string, string>(), porExt = new Map<string, string>()
     const recPorId = new Map<string, any>()
     for (const e of existentes ?? []) {
@@ -168,8 +172,11 @@ export async function executarImport(
     }
     if (grupoDestinoId && idsResolvidos.length) {
       const unicos = [...new Set(idsResolvidos)]
-      const { data: jaTem } = await svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoDestinoId).in('estudante_id', unicos)
-      const set = new Set((jaTem ?? []).map((r: any) => r.estudante_id))
+      // Membros já vinculados ao grupo (paginado): grupo pode ter >1000 e `.in(unicos)` com
+      // centenas de ids estoura a URL / dá 400 → sem isto, um grupo grande falhava ao vincular.
+      const jaTem = await fetchAll<{ estudante_id: string }>(() =>
+        svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoDestinoId).order('estudante_id', { ascending: true }))
+      const set = new Set(jaTem.map((r) => r.estudante_id))
       const novosVinc = unicos.filter((id) => !set.has(id))
       if (novosVinc.length) {
         const { error } = await svc.from('simulado_grupo_membros').insert(novosVinc.map((estudante_id) => ({ tenant_id: g.tenantId, grupo_id: grupoDestinoId, estudante_id })))
@@ -183,16 +190,21 @@ export async function executarImport(
     let removidos = 0
     if (sincronizar && destino.tipo === 'existente' && grupoDestinoId) {
       const curseducaIds = new Set(membros.map((m) => String(m.id)))
-      const { data: membrosGrupo } = await svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoDestinoId).eq('tenant_id', g.tenantId)
-      const idsGrupo = (membrosGrupo ?? []).map((r: any) => r.estudante_id)
+      // Paginado: grupo pode ter >1000 membros (senão a remoção só olharia os 1000 primeiros).
+      const membrosGrupo = await fetchAll<{ estudante_id: string }>(() =>
+        svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoDestinoId).eq('tenant_id', g.tenantId).order('estudante_id', { ascending: true }))
+      const idsGrupo = membrosGrupo.map((r) => r.estudante_id)
       if (idsGrupo.length) {
-        const { data: ests } = await svc.from('simulado_estudantes').select('id, matricula_externa').in('id', idsGrupo).eq('tenant_id', g.tenantId)
-        const paraRemover = (ests ?? [])
-          .filter((e: any) => e.matricula_externa && !curseducaIds.has(String(e.matricula_externa)))
-          .map((e: any) => e.id)
-        if (paraRemover.length) {
-          const { error } = await svc.from('simulado_grupo_membros').delete().eq('grupo_id', grupoDestinoId).eq('tenant_id', g.tenantId).in('estudante_id', paraRemover)
-          if (!error) removidos = paraRemover.length
+        const ests = await fetchAllByIn<{ id: string; matricula_externa: string | null }>(idsGrupo, (chunk) =>
+          svc.from('simulado_estudantes').select('id, matricula_externa').in('id', chunk).eq('tenant_id', g.tenantId).order('id', { ascending: true }))
+        const paraRemover = ests
+          .filter((e) => e.matricula_externa && !curseducaIds.has(String(e.matricula_externa)))
+          .map((e) => e.id)
+        // Deleta em lotes (o `.in()` com muitos ids estoura a URL).
+        for (let i = 0; i < paraRemover.length; i += 200) {
+          const lote = paraRemover.slice(i, i + 200)
+          const { error } = await svc.from('simulado_grupo_membros').delete().eq('grupo_id', grupoDestinoId).eq('tenant_id', g.tenantId).in('estudante_id', lote)
+          if (!error) removidos += lote.length
         }
       }
     }
