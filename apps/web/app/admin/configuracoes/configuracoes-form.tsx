@@ -683,12 +683,13 @@ function PreviewLogin({ t, cores, dark }: { t: Tema; cores: Cores; dark: boolean
 
   // Layout centralizado (simples): card único no meio da tela.
   if (t.login_layout === 'centralizado') {
+    const semFundo = !t.logo_png_bg || t.logo_png_bg === 'transparent'
     return (
-      <div className="flex h-[420px] items-center justify-center px-4 text-[12px]" style={{ background: bg, color: text, fontFamily: 'system-ui, sans-serif' }}>
+      <div className="relative flex h-[420px] items-center justify-center px-4 text-[12px]" style={{ background: bg, color: text, fontFamily: 'system-ui, sans-serif' }}>
         <div className="w-[248px] rounded-2xl border p-6 shadow-xl" style={{ background: dark ? '#15151c' : '#ffffff', borderColor: border }}>
           <div className="mb-4 flex flex-col items-center gap-2 text-center">
-            <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl text-2xl font-bold" style={{ background: c.btn, color: contraste(c.btn) }}>
-              {smallLogo ? <img src={smallLogo} alt="" className="h-full w-full object-contain" /> : (t.nome_site[0] ?? 'P').toUpperCase()}
+            <span className={`flex h-16 w-16 items-center justify-center overflow-hidden text-2xl font-bold ${frameLogo(t.logo_estilo)}`} style={{ background: semFundo ? (dark ? '#26262f' : '#e7e7ee') : t.logo_png_bg, color: contraste(c.btn) }}>
+              {smallLogo ? <img src={smallLogo} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogoCss(t.logo_filtro) }} /> : (t.nome_site[0] ?? 'P').toUpperCase()}
             </span>
             <p className="text-[13px] font-semibold">{t.nome_site}</p>
           </div>
@@ -698,6 +699,8 @@ function PreviewLogin({ t, cores, dark }: { t: Tema; cores: Cores; dark: boolean
           <div className="mb-2 flex h-9 items-center rounded-md px-2.5 text-[11px]" style={{ background: inputBg, border: `1px solid ${border}`, color: muted }}>Senha</div>
           <div className="flex h-9 items-center justify-center rounded-md text-[11px] font-semibold" style={{ background: c.btn, color: contraste(c.btn) }}>Entrar no painel</div>
         </div>
+        {/* Botão admin/aluno no canto inferior (mesmo esquema do layout painel). */}
+        <span className="absolute bottom-3 right-3 rounded-full border px-3 py-1 text-[10px] font-medium" style={{ borderColor: border, color: muted, background: dark ? '#15151c' : '#ffffff' }}>Área do aluno</span>
       </div>
     )
   }

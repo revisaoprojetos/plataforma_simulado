@@ -24,6 +24,9 @@ export default async function LoginPage() {
     logoSelecao: comoLogo(t.tema?.logo_selecao_url) ?? logoDoTema(t.tema), // bloco de seleção
     selecaoEstilo: (['quadrada', 'redonda', 'borda'].includes(t.tema?.logo_selecao_estilo) ? t.tema.logo_selecao_estilo : 'redonda') as 'quadrada' | 'redonda' | 'borda',
     loginLayout: (t.tema?.login_layout === 'centralizado' ? 'centralizado' : 'painel') as 'painel' | 'centralizado',
+    logoBg: (t.tema?.logo_png_bg as string) ?? '#ffffff',
+    logoEstilo: (t.tema?.logo_estilo as string) ?? 'arredondado',
+    logoFiltro: (t.tema?.logo_filtro as string) ?? 'none',
     cor: t.tema?.cor_primaria ?? null,
     modoPadrao: t.tema?.modo_padrao === 'dark' ? 'dark' : 'light',
   }))
@@ -35,6 +38,9 @@ export default async function LoginPage() {
     cor: plataformas[0]?.cor ?? null,
     modoPadrao: plataformas[0]?.modoPadrao ?? 'light',
     loginLayout: plataformas[0]?.loginLayout ?? 'painel',
+    logoBg: plataformas[0]?.logoBg ?? '#ffffff',
+    logoEstilo: plataformas[0]?.logoEstilo ?? 'arredondado',
+    logoFiltro: plataformas[0]?.logoFiltro ?? 'none',
   }
 
   return (

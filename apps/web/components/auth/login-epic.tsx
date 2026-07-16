@@ -8,14 +8,26 @@ import { Loader2, ArrowLeft, ShieldCheck, GraduationCap, Mail, Lock } from 'luci
 import { cn } from '@/lib/utils'
 
 export type LoginLayout = 'painel' | 'centralizado'
-export type Plataforma = { id: string; nome: string; dominio: string | null; logo: string | null; logoGrande: string | null; logoSelecao: string | null; selecaoEstilo: 'quadrada' | 'redonda' | 'borda'; loginLayout: LoginLayout; cor: string | null; modoPadrao: 'light' | 'dark' }
+export type Plataforma = { id: string; nome: string; dominio: string | null; logo: string | null; logoGrande: string | null; logoSelecao: string | null; selecaoEstilo: 'quadrada' | 'redonda' | 'borda'; loginLayout: LoginLayout; logoBg: string; logoEstilo: string; logoFiltro: string; cor: string | null; modoPadrao: 'light' | 'dark' }
 
 function frameSelecao(estilo?: string): string {
   if (estilo === 'quadrada') return 'rounded-xl'
   if (estilo === 'borda') return 'rounded-full border-2'
   return 'rounded-full'
 }
-type Marca = { nome: string; logo: string | null; logoGrande: string | null; cor: string | null; modoPadrao: 'light' | 'dark'; loginLayout: LoginLayout }
+/** Moldura do quadro da logo conforme o estilo configurado. */
+function frameLogo(estilo?: string): string {
+  if (estilo === 'quadrado') return 'rounded-none'
+  if (estilo === 'borda') return 'rounded-lg border'
+  return 'rounded-xl'
+}
+/** Filtro CSS que força a logo a branco/preto (gama), igual à sidebar. */
+function filtroLogo(f?: string): string | undefined {
+  if (f === 'branco') return 'brightness(0) invert(1)'
+  if (f === 'preto') return 'brightness(0)'
+  return undefined
+}
+type Marca = { nome: string; logo: string | null; logoGrande: string | null; cor: string | null; modoPadrao: 'light' | 'dark'; loginLayout: LoginLayout; logoBg: string; logoEstilo: string; logoFiltro: string }
 type Modo = 'select' | 'aluno' | 'admin'
 
 const KEYFRAMES = `
@@ -36,7 +48,7 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
 
   const brand: Marca = modo === 'admin'
     ? marca
-    : { nome: sel?.nome ?? marca.nome, logo: sel?.logo ?? marca.logo, logoGrande: sel?.logoGrande ?? marca.logoGrande, cor: sel?.cor ?? marca.cor, modoPadrao: sel?.modoPadrao ?? marca.modoPadrao, loginLayout: sel?.loginLayout ?? marca.loginLayout }
+    : { nome: sel?.nome ?? marca.nome, logo: sel?.logo ?? marca.logo, logoGrande: sel?.logoGrande ?? marca.logoGrande, cor: sel?.cor ?? marca.cor, modoPadrao: sel?.modoPadrao ?? marca.modoPadrao, loginLayout: sel?.loginLayout ?? marca.loginLayout, logoBg: sel?.logoBg ?? marca.logoBg, logoEstilo: sel?.logoEstilo ?? marca.logoEstilo, logoFiltro: sel?.logoFiltro ?? marca.logoFiltro }
   const cor = brand.cor ?? '#6d28d9'
   const layout: LoginLayout = brand.loginLayout ?? 'painel'
   const logoLogin = brand.logoGrande ?? brand.logo // grande no painel da esquerda
@@ -140,7 +152,7 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
     <form onSubmit={entrarAluno} className="space-y-4">
       <Campo icon={Mail} type="email" placeholder="Endereço de e-mail" value={email} onChange={setEmail} autoComplete="email" />
       <Submit loading={loading} disabled={!email}>Continuar</Submit>
-      <p className="text-center text-xs text-muted-foreground">Estudantes entram apenas com o e-mail cadastrado.</p>
+      <p className="text-center text-xs text-muted-foreground">Use o mesmo e-mail que você usa na <strong className="font-semibold text-foreground">{brand.nome}</strong>. Como aluno, você entra só com o e-mail.</p>
     </form>
   ) : (
     <form onSubmit={entrarAdmin} className="space-y-4">
@@ -160,10 +172,11 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
         </div>
         <div className="relative w-full max-w-sm rounded-2xl border bg-card p-8 shadow-2xl" style={{ animation: 'loginPop .4s ease' }}>
           <div className="mb-6 flex flex-col items-center gap-3 text-center">
-            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
+            <div className={cn('flex h-20 w-20 items-center justify-center overflow-hidden ring-1 ring-border', frameLogo(brand.logoEstilo), (!brand.logoBg || brand.logoBg === 'transparent') && 'bg-muted')}
+              style={brand.logoBg && brand.logoBg !== 'transparent' ? { background: brand.logoBg } : undefined}>
               {(brand.logo ?? brand.logoGrande) ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={(brand.logo ?? brand.logoGrande)!} alt={brand.nome} className="h-full w-full object-contain" />
+                <img src={(brand.logo ?? brand.logoGrande)!} alt={brand.nome} className="h-full w-full object-contain" style={{ filter: filtroLogo(brand.logoFiltro) }} />
               ) : <GraduationCap className="h-10 w-10" style={{ color: cor }} />}
             </div>
             <p className="text-lg font-semibold">{brand.nome}</p>
