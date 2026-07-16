@@ -170,10 +170,17 @@ export async function removeQuestaoFromSimulado(simuladoQuestaoId: string, simul
   return { ok: true }
 }
 
+/** Gera um embed_token se o simulado ainda não tiver — sem ele o aluno não consegue abrir a prova. */
+async function patchComToken(supabase: any, id: string, base: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { data } = await supabase.from('simulado_simulados').select('embed_token').eq('id', id).maybeSingle()
+  return data?.embed_token ? base : { ...base, embed_token: crypto.randomUUID() }
+}
+
 export async function publishSimuladoAction(id: string) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const supabase = await createClient()
-  await supabase.from('simulado_simulados').update({ status: 'publicado' }).eq('id', id)
+  const patch = await patchComToken(supabase, id, { status: 'publicado' })
+  await supabase.from('simulado_simulados').update(patch).eq('id', id)
   await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'publicado' } })
   revalidatePath(`/admin/simulados/${id}`)
   revalidatePath('/admin/simulados')
@@ -191,7 +198,8 @@ export async function encerrarSimuladoAction(id: string) {
 export async function reabrirSimuladoAction(id: string) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const supabase = await createClient()
-  await supabase.from('simulado_simulados').update({ status: 'publicado' }).eq('id', id)
+  const patch = await patchComToken(supabase, id, { status: 'publicado' })
+  await supabase.from('simulado_simulados').update(patch).eq('id', id)
   await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'publicado', reaberto: true } })
   revalidatePath(`/admin/simulados/${id}`)
   revalidatePath('/admin/simulados')

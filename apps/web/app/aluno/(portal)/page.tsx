@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { BookOpen, Star, ClipboardList, NotebookPen, ArrowRight, Sparkles, Trophy, Target, Play, ListChecks } from 'lucide-react'
+import { BookOpen, Star, NotebookPen, ArrowRight, Sparkles, Trophy, Play, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
+import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
+import { iconeBanco } from '@/lib/banco-visual'
 
 const notaTone = (n: number) => (n >= 7 ? 'text-emerald-600 dark:text-emerald-400' : n >= 5 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
 
@@ -48,6 +50,9 @@ export default async function AlunoHome() {
   const melhorNota = notas.length ? Math.max(...notas) : null
   const nota = (n: number | null) => (n == null ? '—' : n.toFixed(1).replace('.', ','))
 
+  // Capa/cor/ícone (do banco de origem) para os cards de "Simulados para fazer".
+  const visual = await resolverVisualSimulados(svc, pendentes.map((s: any) => ({ id: s.id, regras: s.regras })))
+
   const atalhos = [
     { href: '/aluno/recomendado', icon: Sparkles, titulo: 'Recomendado', desc: 'Questões focadas nos seus pontos fracos' },
     { href: '/aluno/questoes', icon: BookOpen, titulo: 'Banco de questões', desc: 'Pratique questões avulsas com filtros' },
@@ -85,30 +90,6 @@ export default async function AlunoHome() {
         </div>
       </div>
 
-      {/* Simulados para fazer */}
-      {pendentes.length > 0 && (
-        <div className="overflow-hidden rounded-2xl border bg-card">
-          <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
-            <h2 className="flex items-center gap-2 text-sm font-semibold"><Play className="h-4 w-4 text-primary" /> Simulados para fazer</h2>
-            <Link href="/aluno/simulados" className="text-xs font-medium text-primary hover:underline">Ver todos</Link>
-          </div>
-          <div className="grid gap-2 p-3 sm:grid-cols-2">
-            {pendentes.slice(0, 4).map((s) => (
-              <div key={s.id} className="flex items-center gap-3 rounded-xl border p-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><ClipboardList className="h-4 w-4" /></span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{s.titulo}</span>
-                  <span className="block text-xs text-muted-foreground">{s.emAndamento ? 'Em andamento' : 'Não iniciado'}</span>
-                </span>
-                {s.podeFazer && (
-                  <Link href={`/simulado/${s.embed_token}`} className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:opacity-90">{s.emAndamento ? 'Continuar' : 'Fazer'}</Link>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Atalhos */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {atalhos.map((a) => (
@@ -126,6 +107,43 @@ export default async function AlunoHome() {
           </Link>
         ))}
       </div>
+
+      {/* Simulados para fazer — abaixo dos atalhos, com capa e clique direto p/ a prova */}
+      {pendentes.length > 0 && (
+        <div className="overflow-hidden rounded-2xl border bg-card">
+          <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+            <h2 className="flex items-center gap-2 text-sm font-semibold"><Play className="h-4 w-4 text-primary" /> Simulados para fazer</h2>
+            <Link href="/aluno/simulado" className="text-xs font-medium text-primary hover:underline">Ver todos</Link>
+          </div>
+          <div className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-3">
+            {pendentes.slice(0, 6).map((s) => {
+              const vis = visual.get(s.id)
+              const cor = vis?.cor ?? '#6d28d9'
+              const Icon = iconeBanco(vis?.icone)
+              const capa = vis?.capa
+              return (
+                <div key={s.id} className="group relative h-32 overflow-hidden rounded-xl border shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+                  {capa
+                    ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+                  {!capa && <Icon className="absolute -right-4 -top-4 h-24 w-24 text-white/10" />}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10" />
+                  {/* Clique no card inteiro → direto para a prova */}
+                  {s.podeFazer && <Link href={`/simulado/${s.embed_token}`} className="absolute inset-0 z-10" aria-label={s.titulo} />}
+                  <span className="pointer-events-none absolute left-2.5 top-2.5 z-20 flex h-8 w-8 items-center justify-center rounded-lg text-white ring-1 ring-white/20" style={{ background: cor }}><Icon className="h-4 w-4" /></span>
+                  <span className="pointer-events-none absolute right-2.5 top-2.5 z-20 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur">{s.emAndamento ? 'Em andamento' : 'Não iniciado'}</span>
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-3">
+                    <h3 className="line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm">{s.titulo}</h3>
+                    {s.podeFazer && (
+                      <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-white">{s.emAndamento ? 'Continuar' : 'Fazer agora'} <ArrowRight className="h-3 w-3" /></span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
