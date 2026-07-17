@@ -70,7 +70,7 @@ export const BLOCKS: BlockMeta[] = [
   { type: 'condicao', title: 'Condição (texto modulado)', icon: GitBranch, category: 'conteudo', container: true,
     defaults: { variavel: 'percentual', operador: 'entre', valor: '0', valor2: '50' } },
   { type: 'diag-disciplina', title: 'Diagnóstico — Disciplina', icon: ListChecks, category: 'avaliacao', dynamic: true, supportsVars: true,
-    defaults: { chave: '', nome: '', assunto: 'Assunto Principal', soSeErrou: true, corLinha: '#c9a227', linhaAltura: 2, corRow: '#e9eef7', corTitulo: '#1a3a6b', corAcerto: '#8a8a8a', corPct: '#e8850c' } },
+    defaults: { chave: '', nome: '', assunto: 'Assunto Principal', soSeErrou: true, corLinha: '#c9a227', linhaAltura: 2, corRow: '#e9eef7', corTitulo: '#1a3a6b', corAcerto: '#8a8a8a', corPct: '#e8850c', fonte: '' } },
   { type: 'diag-grupo', title: 'Diagnóstico — Grupo/Disciplinas', icon: Rows3, category: 'avaliacao', dynamic: true, supportsVars: true, oculto: true,
     defaults: {
       grupo: 'Grupo I', disciplinas: [{ chave: 'direito_administrativo', nome: 'Direito Administrativo', assunto: '' }],
@@ -443,7 +443,7 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
       const escondido = a.soSeErrou !== false && (tt === 0 || ac >= tt)
       if (escondido && !editor) return null
       return (
-        <div style={{ borderTop: `${a.linhaAltura ?? 2}px solid ${a.corLinha || '#c9a227'}`, background: a.corRow || '#e9eef7', padding: '7px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, fontFamily: theme.tipografia.familia }}>
+        <div style={{ borderTop: `${a.linhaAltura ?? 2}px solid ${a.corLinha || '#c9a227'}`, background: a.corRow || '#e9eef7', padding: '7px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 12, color: a.corTitulo || '#1a3a6b' }}>{applyVars(a.nome || '', data.vars)}</div>
             {a.assunto && <div style={{ fontSize: 10, color: '#555', fontStyle: 'italic' }}>- Categoria: {applyVars(a.assunto, data.vars)}</div>}

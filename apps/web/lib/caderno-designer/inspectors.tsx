@@ -425,6 +425,7 @@ export function BlockInspector({ block, onChange, varsExtra }: { block: Block; o
           </Row>
           <Row label="Nome exibido"><input value={a.nome ?? ''} onChange={(e) => set('nome', e.target.value)} className={inputCls} placeholder="Direito Constitucional" /></Row>
           <Row label="Assunto principal"><input value={a.assunto ?? ''} onChange={(e) => set('assunto', e.target.value)} className={inputCls} placeholder="Assunto Principal (vazio = não mostra)" /></Row>
+          <FonteSelect value={a.fonte} onChange={(v) => set('fonte', v)} />
           <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.soSeErrou !== false} onChange={(e) => set('soSeErrou', e.target.checked)} className="h-4 w-4 rounded border" /> Só aparece se errou alguma questão</label>
           <div className="border-t pt-2" />
           <Cor label="Cor da linha (de cima)" value={a.corLinha} onChange={(v) => set('corLinha', v)} />
