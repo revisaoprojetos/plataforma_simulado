@@ -419,6 +419,21 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, simuladosSistema }:
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">Diga o que cada <strong>produto</strong> comprado concede: a <strong>classificação</strong> (ex.: passaporte), e opcionalmente um <strong>grupo</strong> e/ou um <strong>simulado</strong> (matrícula automática).</p>
 
+      {/* Passo a passo */}
+      <ol className="space-y-2 rounded-lg border bg-muted/20 p-4 text-sm">
+        {[
+          <>Gere o <b>User Token</b> na Guru (perfil → aba <b>API</b>) e salve na aba <b>Credenciais</b>. O token só aparece uma vez.</>,
+          <>Clique em <b>Carregar produtos/grupos</b> abaixo — a Guru lista seus produtos. (Sem token, dá pra digitar o <b>ID do produto</b> na mão.)</>,
+          <>Para cada produto, defina o destino: <b>classificação</b> (passaporte), e opcional <b>grupo</b>/<b>simulado</b>. Salve.</>,
+          <>Pronto: o <b>webhook</b> aplica isso <b>automaticamente</b> a cada nova compra (cria o aluno + concede). Na aba <b>Assinaturas</b> você confere/adiciona manualmente quem já comprou.</>,
+        ].map((txt, i) => (
+          <li key={i} className="flex gap-2.5">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">{i + 1}</span>
+            <span className="text-muted-foreground [&_b]:text-foreground">{txt}</span>
+          </li>
+        ))}
+      </ol>
+
       {/* Lista atual */}
       <div className="divide-y rounded-lg border">
         {mapeamentos.length === 0 ? (
