@@ -180,7 +180,7 @@ function LarguraBloco({ a, set }: { a: any; set: (k: string, v: any) => void }) 
   )
 }
 
-export function BlockInspector({ block, onChange }: { block: Block; onChange: (patch: Record<string, unknown>) => void }) {
+export function BlockInspector({ block, onChange, varsExtra }: { block: Block; onChange: (patch: Record<string, unknown>) => void; varsExtra?: { grupo: string; itens: { token: string; label: string }[] }[] }) {
   const a = block.attributes as any
   const set = (k: string, v: unknown) => onChange({ [k]: v })
   const fieldRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null)
@@ -202,6 +202,11 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
       <Grupo label="Variáveis (mala direta)">
         <div className="flex flex-wrap gap-1">{VARIAVEIS.map((v) => <Chip key={v.token} {...v} />)}</div>
       </Grupo>
+      {(varsExtra ?? []).map((g) => (
+        <Grupo key={g.grupo} label={g.grupo}>
+          <div className="flex flex-wrap gap-1">{g.itens.map((v) => <Chip key={v.token} {...v} />)}</div>
+        </Grupo>
+      ))}
       <Grupo label="Variáveis da questão (no repetidor)">
         <div className="flex flex-wrap gap-1">{QVARIAVEIS.map((v) => <Chip key={v.token} {...v} />)}</div>
       </Grupo>

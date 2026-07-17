@@ -339,6 +339,22 @@ export function CadernoEditorV2({
   const [pending, start] = useTransition()
 
   const theme = useMemo(() => resolveTheme(cores), [cores])
+  // Variáveis dinâmicas deste simulado (disciplinas + pilares) para o painel de variáveis.
+  const varsExtra = useMemo(() => {
+    const vars = (registros[0]?.vars ?? previewData.vars ?? {}) as Record<string, string>
+    const keys = Object.keys(vars)
+    const human = (s: string) => s.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
+    const discSlugs = [...new Set(keys.filter((k) => k.startsWith('pct_') && !k.startsWith('pct_pilar_')).map((k) => k.slice(4)))].sort()
+    const pilarSlugs = [...new Set(keys.filter((k) => k.startsWith('pct_pilar_')).map((k) => k.slice('pct_pilar_'.length)))].sort()
+    const grupos: { grupo: string; itens: { token: string; label: string }[] }[] = []
+    if (pilarSlugs.length) grupos.push({ grupo: 'Pilares (deste simulado)', itens: pilarSlugs.flatMap((s) => [
+      { token: `{pct_pilar_${s}}`, label: `${human(s)} · %` }, { token: `{acerto_pilar_${s}}`, label: `${human(s)} · acertos` }, { token: `{total_pilar_${s}}`, label: `${human(s)} · total` },
+    ]) })
+    if (discSlugs.length) grupos.push({ grupo: 'Disciplinas (deste simulado)', itens: discSlugs.flatMap((s) => [
+      { token: `{pct_${s}}`, label: `${human(s)} · %` }, { token: `{acerto_${s}}`, label: `${human(s)} · acertos` }, { token: `{total_${s}}`, label: `${human(s)} · total` },
+    ]) })
+    return grupos
+  }, [registros, previewData])
   const regAtual = registros[regIndex] ?? null
   const dataAtual = useMemo(() => regAtual ? { ...previewData, vars: { ...previewData.vars, ...regAtual.vars }, respostas: regAtual.respostas } : previewData, [regAtual, previewData])
   const doc = docs[modAtiva] ?? novoDoc()
@@ -776,7 +792,7 @@ export function CadernoEditorV2({
             {aba === 'bloco' && (blocoSel ? (
               <div className="space-y-3">
                 <p className="flex items-center gap-1.5 text-sm font-semibold">{getBlockMeta(blocoSel.type)?.title}</p>
-                <BlockInspector block={blocoSel} onChange={(patch) => patchBlock(blocoSel.id, patch)} />
+                <BlockInspector block={blocoSel} onChange={(patch) => patchBlock(blocoSel.id, patch)} varsExtra={varsExtra} />
               </div>
             ) : <p className="text-sm text-muted-foreground">Selecione um bloco no canvas para editar suas opções.</p>)}
 
