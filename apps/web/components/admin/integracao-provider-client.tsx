@@ -37,30 +37,34 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
   const campos = CAMPOS_PROVIDER[provider]
   // Área (só para provedores push, ex.: Guru): separa COLETA (API/User Token) de RECEBIMENTO (Webhook/Account Token).
   const [area, setArea] = useState<'api' | 'webhook'>('api')
-  const [aba, setAba] = useState<Aba>('credenciais')
+  const [aba, setAba] = useState<Aba | null>(null)
 
+  // Ordem: as VISÕES primeiro, a CONFIGURAÇÃO por último (não abrir direto nas configs).
   const abas: { id: Aba; label: string; Icon: any }[] = meta.push
     ? (area === 'api'
         ? [
-            { id: 'credenciais', label: 'Credenciais', Icon: KeyRound },
-            { id: 'mapeamentos', label: 'Mapeamentos', Icon: GitBranch },
             { id: 'assinaturas', label: 'Assinaturas', Icon: Users },
+            { id: 'mapeamentos', label: 'Mapeamentos', Icon: GitBranch },
+            { id: 'credenciais', label: 'Credenciais', Icon: KeyRound },
           ]
         : [
-            { id: 'credenciais', label: 'Configuração', Icon: KeyRound },
-            { id: 'mapa', label: 'Mapa JSON', Icon: Braces },
             { id: 'recebidos', label: 'Recebidos', Icon: Inbox },
             { id: 'eventos', label: 'Eventos', Icon: Radio },
+            { id: 'mapa', label: 'Mapa JSON', Icon: Braces },
+            { id: 'credenciais', label: 'Configuração', Icon: KeyRound },
           ])
     : [
-        { id: 'credenciais', label: 'Credenciais', Icon: KeyRound },
-        { id: 'mapeamentos', label: 'Mapeamentos', Icon: GitBranch },
-        { id: 'importar', label: 'Importar', Icon: DownloadCloud },
         { id: 'recebidos', label: 'Recebidos', Icon: Inbox },
+        { id: 'importar', label: 'Importar', Icon: DownloadCloud },
+        { id: 'mapeamentos', label: 'Mapeamentos', Icon: GitBranch },
+        { id: 'credenciais', label: 'Credenciais', Icon: KeyRound },
       ]
 
-  // Ao trocar de área, garante que a aba selecionada existe na nova área.
-  const trocarArea = (a: 'api' | 'webhook') => { setArea(a); setAba('credenciais') }
+  // Aba ativa: a escolhida (se existe na área atual) OU a primeira (uma visão, nunca a config).
+  const abaAtiva: Aba = aba && abas.some((a) => a.id === aba) ? aba : abas[0].id
+
+  // Ao trocar de área, volta para a 1ª aba (visão) da nova área.
+  const trocarArea = (a: 'api' | 'webhook') => { setArea(a); setAba(null) }
 
   return (
     <div className="space-y-4">
@@ -88,19 +92,19 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
       <div className="flex gap-1 border-b">
         {abas.map(({ id, label, Icon }) => (
           <button key={id} type="button" onClick={() => setAba(id)}
-            className={cn('inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors', aba === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+            className={cn('inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors', abaAtiva === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>
             <Icon className="h-4 w-4" /> {label}
           </button>
         ))}
       </div>
 
-      {aba === 'credenciais' && <Credenciais provider={provider} appUrl={appUrl} config={config} meta={meta} campos={campos} area={meta.push ? area : undefined} />}
-      {aba === 'mapeamentos' && <Mapeamentos provider={provider} mapeamentos={mapeamentos} gruposSistema={gruposSistema} simuladosSistema={simuladosSistema} />}
-      {aba === 'assinaturas' && meta.push && <Assinaturas provider={provider} />}
-      {aba === 'importar' && !meta.push && <Importar provider={provider} />}
-      {aba === 'eventos' && meta.push && <Eventos provider={provider} />}
-      {aba === 'recebidos' && (meta.push || provider === 'curseduca') && <Recebidos provider={provider} appUrl={appUrl} token={config.webhookToken} />}
-      {aba === 'mapa' && meta.push && <MapaJson provider={provider} />}
+      {abaAtiva === 'credenciais' && <Credenciais provider={provider} appUrl={appUrl} config={config} meta={meta} campos={campos} area={meta.push ? area : undefined} />}
+      {abaAtiva === 'mapeamentos' && <Mapeamentos provider={provider} mapeamentos={mapeamentos} gruposSistema={gruposSistema} simuladosSistema={simuladosSistema} />}
+      {abaAtiva === 'assinaturas' && meta.push && <Assinaturas provider={provider} />}
+      {abaAtiva === 'importar' && !meta.push && <Importar provider={provider} />}
+      {abaAtiva === 'eventos' && meta.push && <Eventos provider={provider} />}
+      {abaAtiva === 'recebidos' && (meta.push || provider === 'curseduca') && <Recebidos provider={provider} appUrl={appUrl} token={config.webhookToken} />}
+      {abaAtiva === 'mapa' && meta.push && <MapaJson provider={provider} />}
     </div>
   )
 }
