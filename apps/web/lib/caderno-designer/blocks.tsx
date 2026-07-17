@@ -68,6 +68,11 @@ export const BLOCKS: BlockMeta[] = [
     defaults: { quantidade: 6, rotulo: 'Resposta:', altura: 28, cor: '' } },
   { type: 'condicao', title: 'Condição (texto modulado)', icon: GitBranch, category: 'conteudo', container: true,
     defaults: { variavel: 'percentual', operador: 'entre', valor: '0', valor2: '50' } },
+  { type: 'diag-grupo', title: 'Diagnóstico — Grupo/Disciplinas', icon: Rows3, category: 'avaliacao', dynamic: true, supportsVars: true,
+    defaults: {
+      grupo: 'Grupo I', disciplinas: [{ chave: 'direito_administrativo', nome: 'Direito Administrativo', assunto: '' }],
+      corHeader: '#f6c445', corHeaderTexto: '#3b3260', corFita: '#f6c445', corRow: '#eef3fb', corTitulo: '#243b7a', corPct: '#c0392b',
+    } },
   { type: 'diag-pilares', title: 'Diagnóstico — Pilares', icon: LayoutGrid, category: 'avaliacao', dynamic: true, supportsVars: true,
     defaults: {
       pilares: [
@@ -423,6 +428,33 @@ export function BlockRender({ block, theme, data, full }: { block: Block; theme:
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} full />)}
+        </div>
+      )
+    }
+    case 'diag-grupo': {
+      const disc: any[] = Array.isArray(a.disciplinas) ? a.disciplinas : []
+      const val = (tok: string, def: string) => { const r = applyVars(tok, data.vars); return /\{/.test(r) ? def : r }
+      const numDe = (tok: string) => parseInt(val(tok, '0').replace(/[^0-9-]/g, ''), 10) || 0
+      const somaAc = disc.reduce((s, d) => s + numDe(`{acerto_${d.chave}}`), 0)
+      const somaTot = disc.reduce((s, d) => s + numDe(`{total_${d.chave}}`), 0)
+      return (
+        <div style={{ fontFamily: theme.tipografia.familia }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: a.corHeader || '#f6c445', color: a.corHeaderTexto || '#3b3260', fontWeight: 700, padding: '6px 12px', fontSize: 13 }}>
+            <span>{applyVars(a.grupo || 'Grupo', data.vars)}</span>
+            <span>Acertos&nbsp;&nbsp;{somaAc}/{somaTot}</span>
+          </div>
+          {disc.map((d, i) => (
+            <div key={i} style={{ borderTop: `3px solid ${a.corFita || '#f6c445'}`, background: a.corRow || '#eef3fb', padding: '8px 12px', marginTop: i === 0 ? 0 : 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 12, color: a.corTitulo || '#243b7a' }}>{applyVars(d.nome || '', data.vars)}</div>
+                {d.assunto && <div style={{ fontSize: 10, color: '#555', fontStyle: 'italic' }}>- Categoria: {applyVars(d.assunto, data.vars)}</div>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 11, color: '#888' }}>{val(`{acerto_${d.chave}}`, '0')}/{val(`{total_${d.chave}}`, '0')}</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: a.corPct || '#c0392b' }}>{val(`{pct_${d.chave}}`, '0%')}</span>
+              </div>
+            </div>
+          ))}
         </div>
       )
     }

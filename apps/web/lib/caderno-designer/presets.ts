@@ -20,6 +20,12 @@ function doc(pages: Page[], running?: Partial<RunningConfig>): CadernoDoc {
 
 export type CadernoPreset = { id: string; nome: string; descricao: string; build: () => CadernoDoc }
 
+/** Disciplina do bloco de grupo. `chave` = slug do nome (ajuste na aba do bloco se não bater). */
+function d(nome: string, chave: string, assunto = 'Assunto Principal') { return { chave, nome, assunto } }
+function grpDiag(grupo: string, disciplinas: any[]): Block {
+  return blk('diag-grupo', { grupo, disciplinas, corHeader: '#f6c445', corHeaderTexto: '#3b3260', corFita: '#f6c445', corRow: '#eef3fb', corTitulo: '#243b7a', corPct: '#c0392b' })
+}
+
 export const PRESETS_CADERNO: CadernoPreset[] = [
   {
     id: 'diagnostico',
@@ -56,10 +62,33 @@ export const PRESETS_CADERNO: CadernoPreset[] = [
         ], corFundo: '#fef3d6', fitaCor: '#3b5bdb', fitaAltura: 4, divisoriaCor: '#cbb26b', corTitulo: '#243b7a' }),
         blk('espacador', { altura: 12 }),
         blk('titulo-secao', { texto: 'DESEMPENHO POR DISCIPLINA', nivel: 2, corFundo: '#2b2a4a', cor: '#ffffff', fundoRaio: 4, align: 'left', mostrarLinha: false }),
-        blk('espacador', { altura: 8 }),
-        blk('card', { corFundo: '#eef3fb', bordaLargura: 0, bordaRaio: 4, padding: 10, largura: 100, fitaCor: '#f6c445', fitaAltura: 4 }, [
-          blk('texto-livre', { texto: 'Direito Administrativo — {pct_direito_administrativo} ({acerto_direito_administrativo} de {total_direito_administrativo})', size: 12, align: 'left', bold: true }),
-          blk('texto-livre', { texto: 'Troque pelo nome real das suas disciplinas. As variáveis pct_/acerto_/total_ existem por disciplina do banco.', size: 10, align: 'left', color: '#888888', italico: true }),
+        blk('espacador', { altura: 6 }),
+        blk('texto-livre', { texto: 'A análise a seguir tem foco nos seus pontos de erros. Para cada disciplina, você encontra o desempenho por categoria (lei seca, jurisprudência e doutrina) e uma leitura personalizada do que os erros revelam sobre as lacunas a priorizar.', size: 11, align: 'justify', lineHeight: 1.5 }),
+        blk('espacador', { altura: 10 }),
+        grpDiag('Grupo I', [
+          d('Direito Administrativo', 'direito_administrativo', ''),
+          d('Direito Constitucional', 'direito_constitucional'),
+          d('Direito Tributário', 'direito_tributario'),
+          d('Direito Ambiental', 'direito_ambiental'),
+          d('Legislação da Advocacia-Geral da União, Gestão de Conflito e Governança', 'legislacao_da_agu'),
+          d('Direito Financeiro', 'direito_financeiro'),
+        ]),
+        blk('espacador', { altura: 12 }),
+        grpDiag('Grupo II', [
+          d('Direito Processual Civil', 'direito_processual_civil'),
+          d('Direito Civil', 'direito_civil'),
+          d('Direito Internacional Público e Privado', 'direito_internacional_publico_e_privado'),
+          d('Legislação sobre Educação, Ciência, Tecnologia e Inovação', 'legislacao_sobre_educacao_ciencia_tecnologia_e_inovacao'),
+          d('Direito Empresarial', 'direito_empresarial'),
+        ]),
+        blk('espacador', { altura: 12 }),
+        grpDiag('Grupo III', [
+          d('Direito Eleitoral', 'direito_eleitoral'),
+          d('Direito Previdenciário', 'direito_previdenciario'),
+          d('Direito do Trabalho', 'direito_do_trabalho'),
+          d('Direito Processual do Trabalho', 'direito_processual_do_trabalho'),
+          d('Direito Penal', 'direito_penal'),
+          d('Direito Processual Penal', 'direito_processual_penal'),
         ]),
       ]),
     ]),

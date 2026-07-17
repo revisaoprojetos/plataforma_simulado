@@ -409,6 +409,45 @@ export function BlockInspector({ block, onChange, varsExtra }: { block: Block; o
           <Faixa label="Altura da fita (px) — 0 = sem fita" min={0} max={12} value={a.fitaAltura ?? 0} onChange={(v) => set('fitaAltura', v)} />
         </div>
       )
+    case 'diag-grupo': {
+      const disc: any[] = Array.isArray(a.disciplinas) ? a.disciplinas : []
+      const setD = (i: number, k: string, v: string) => set('disciplinas', disc.map((d, idx) => idx === i ? { ...d, [k]: v } : d))
+      const addD = () => set('disciplinas', [...disc, { chave: '', nome: 'Nova disciplina', assunto: '' }])
+      const rmD = (i: number) => set('disciplinas', disc.filter((_, idx) => idx !== i))
+      const mvD = (i: number, dir: -1 | 1) => { const j = i + dir; if (j < 0 || j >= disc.length) return; const arr = [...disc]; [arr[i], arr[j]] = [arr[j], arr[i]]; set('disciplinas', arr) }
+      return (
+        <div className="space-y-3">
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Um bloco por grupo. As disciplinas listadas mostram acertos/total/% reais do aluno. A <b>chave</b> é o slug da disciplina (ex.: <code>direito_administrativo</code>) — veja no painel “Disciplinas (deste simulado)”. “Acertos x/N” do topo é somado automaticamente.</p>
+          <Row label="Nome do grupo"><input value={a.grupo ?? ''} onChange={(e) => set('grupo', e.target.value)} className={inputCls} placeholder="Grupo I" /></Row>
+          {(varsExtra ?? []).filter((g) => /Disciplina/i.test(g.grupo)).map((g) => (
+            <Grupo key={g.grupo} label={`${g.grupo} — clique para adicionar`}>
+              <div className="flex flex-wrap gap-1">{[...new Set(g.itens.map((v) => v.token.match(/\{pct_(.+)\}/)?.[1]).filter(Boolean))].map((slugK) => (
+                <button key={slugK} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => set('disciplinas', [...disc, { chave: slugK, nome: String(slugK).replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()), assunto: 'Assunto Principal' }])} className="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:border-primary hover:bg-primary/5 hover:text-primary">+ {String(slugK).replace(/_/g, ' ')}</button>
+              ))}</div>
+            </Grupo>
+          ))}
+          {disc.map((d, i) => (
+            <div key={i} className="space-y-1.5 rounded-lg border p-2">
+              <div className="flex items-center gap-1">
+                <input value={d.nome ?? ''} onChange={(e) => setD(i, 'nome', e.target.value)} className={inputCls} placeholder="Nome exibido" />
+                <button type="button" onClick={() => mvD(i, -1)} className="rounded p-1 text-muted-foreground hover:text-foreground">↑</button>
+                <button type="button" onClick={() => mvD(i, 1)} className="rounded p-1 text-muted-foreground hover:text-foreground">↓</button>
+                <button type="button" onClick={() => rmD(i)} className="rounded p-1 text-muted-foreground hover:text-destructive">✕</button>
+              </div>
+              <input value={d.chave ?? ''} onChange={(e) => setD(i, 'chave', e.target.value.trim())} className={inputCls} placeholder="chave (direito_administrativo)" />
+              <input value={d.assunto ?? ''} onChange={(e) => setD(i, 'assunto', e.target.value)} className={inputCls} placeholder="Assunto principal (opcional)" />
+            </div>
+          ))}
+          <button type="button" onClick={addD} className="w-full rounded-md border border-dashed py-1.5 text-xs text-muted-foreground hover:border-primary hover:text-primary">+ Adicionar disciplina (em branco)</button>
+          <div className="border-t pt-2" />
+          <Cor label="Cor do cabeçalho" value={a.corHeader} onChange={(v) => set('corHeader', v)} />
+          <Cor label="Texto do cabeçalho" value={a.corHeaderTexto} onChange={(v) => set('corHeaderTexto', v)} />
+          <Cor label="Fita das linhas" value={a.corFita} onChange={(v) => set('corFita', v)} />
+          <Cor label="Fundo das linhas" value={a.corRow} onChange={(v) => set('corRow', v)} />
+          <Cor label="Cor do %" value={a.corPct} onChange={(v) => set('corPct', v)} />
+        </div>
+      )
+    }
     case 'diag-pilares': {
       const pilares: any[] = Array.isArray(a.pilares) ? a.pilares : []
       const setP = (i: number, k: string, v: string) => set('pilares', pilares.map((p, idx) => idx === i ? { ...p, [k]: v } : p))
