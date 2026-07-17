@@ -1,5 +1,5 @@
 import type { ComponentType, CSSProperties, ReactNode } from 'react'
-import { Heading1, Type, AlignLeft, ListChecks, Grid3x3, IdCard, Image as ImageIcon, Minus, MoveVertical, Square, Columns2, Wallpaper, Repeat, Rows3, ClipboardCheck, PenLine, Scissors, Signature, LayoutGrid } from 'lucide-react'
+import { Heading1, Type, AlignLeft, ListChecks, Grid3x3, IdCard, Image as ImageIcon, Minus, MoveVertical, Square, Columns2, Wallpaper, Repeat, Rows3, ClipboardCheck, PenLine, Scissors, Signature, LayoutGrid, GitBranch } from 'lucide-react'
 import { cssDaFonte, type CadernoTheme } from './theme'
 import { type Block, type BlockCategory, type CadernoData, type QuestaoData, genId } from './types'
 
@@ -18,7 +18,7 @@ export type BlockMeta = {
   defaults: Record<string, unknown>
 }
 
-export const CONTAINERS = new Set(['card', 'colunas', 'coluna', 'repeticao'])
+export const CONTAINERS = new Set(['card', 'colunas', 'coluna', 'repeticao', 'condicao'])
 export function isContainer(type: string) { return CONTAINERS.has(type) }
 
 export const BLOCKS: BlockMeta[] = [
@@ -66,6 +66,8 @@ export const BLOCKS: BlockMeta[] = [
     defaults: {} },
   { type: 'linhas-resposta', title: 'Linhas p/ resposta', icon: PenLine, category: 'conteudo', supportsVars: true,
     defaults: { quantidade: 6, rotulo: 'Resposta:', altura: 28, cor: '' } },
+  { type: 'condicao', title: 'Condição (texto modulado)', icon: GitBranch, category: 'conteudo', container: true,
+    defaults: { variavel: 'percentual', operador: 'entre', valor: '0', valor2: '50' } },
 ]
 
 export function getBlockMeta(type: string): BlockMeta | undefined {
@@ -77,8 +79,29 @@ export function createBlock(type: string): Block {
   const meta = getBlockMeta(type)
   const b: Block = { id: genId(type), type, attributes: { ...(meta?.defaults ?? {}) } }
   if (type === 'colunas') b.innerBlocks = [criarColuna(), criarColuna()]
-  else if (type === 'card' || type === 'repeticao') b.innerBlocks = []
+  else if (type === 'card' || type === 'repeticao' || type === 'condicao') b.innerBlocks = []
   return b
+}
+
+/** Avalia a condição de um bloco `condicao` contra as variáveis atuais. */
+export function avaliarCondicao(a: any, vars: Record<string, string>): boolean {
+  const bruto = applyVars(`{${a.variavel ?? ''}}`, vars)
+  const num = parseFloat(String(bruto).replace(/[^0-9.,-]/g, '').replace(',', '.'))
+  const v1 = parseFloat(String(a.valor ?? '').replace(',', '.'))
+  const v2 = parseFloat(String(a.valor2 ?? '').replace(',', '.'))
+  const txt = String(bruto).trim().toLowerCase()
+  const alvo = String(a.valor ?? '').trim().toLowerCase()
+  switch (a.operador) {
+    case 'entre': return !isNaN(num) && !isNaN(v1) && !isNaN(v2) && num >= Math.min(v1, v2) && num <= Math.max(v1, v2)
+    case '>=': return !isNaN(num) && num >= v1
+    case '<=': return !isNaN(num) && num <= v1
+    case '>': return !isNaN(num) && num > v1
+    case '<': return !isNaN(num) && num < v1
+    case 'igual': return txt === alvo || (!isNaN(num) && num === v1)
+    case 'diferente': return txt !== alvo
+    case 'contem': return !!alvo && txt.includes(alvo)
+    default: return true
+  }
 }
 
 /** Contexto de uma questão para o repetidor: injeta {q_num},{q_enunciado}… nas vars. */
@@ -385,6 +408,15 @@ export function BlockRender({ block, theme, data, full }: { block: Block; theme:
           {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} full />)}
         </div>
       )
+    case 'condicao': {
+      // Texto modulado: só renderiza os blocos internos se a condição bater.
+      if (!avaliarCondicao(a, data.vars)) return null
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} full />)}
+        </div>
+      )
+    }
     case 'repeticao': {
       const qs = a.quantidade ? data.questoes.slice(0, a.quantidade) : data.questoes
       if (!qs.length) return <div style={{ border: '1px dashed #cbd5e1', borderRadius: 6, padding: 16, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>Vincule um banco — o template repete por questão.</div>

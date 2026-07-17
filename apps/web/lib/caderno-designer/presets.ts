@@ -20,17 +20,20 @@ function doc(pages: Page[], running?: Partial<RunningConfig>): CadernoDoc {
 
 export type CadernoPreset = { id: string; nome: string; descricao: string; build: () => CadernoDoc }
 
-/** Coluna de pilar do diagnóstico: card com fita + % + questões + texto modulado. */
-function colPilarDiag(titulo: string): Block {
+/** Coluna de pilar do diagnóstico (SEM card próprio — o fundo é do card que envolve as colunas).
+ *  `pilarVar` = slug do pilar (ex.: 'lei_seca') para o texto modulado por faixa. */
+function colPilarDiag(titulo: string, pilarVar: string): Block {
+  const v = `pct_pilar_${pilarVar}`
   return blk('coluna', { largura: 0 }, [
-    blk('card', { corFundo: '#fef3d6', bordaLargura: 0, bordaRaio: 4, padding: 8, largura: 100, alinhamento: 'center', fitaCor: '#3b5bdb', fitaAltura: 4 }, [
-      blk('titulo-secao', { texto: titulo, nivel: 3, cor: '#243b7a', align: 'left', mostrarLinha: false, corFundo: '' }),
-      blk('texto-livre', { texto: 'X%', bold: true, size: 22, color: '#243b7a', align: 'left', lineHeight: 1.1 }),
-      blk('texto-livre', { texto: 'X de N questões', size: 11, color: '#c0392b', align: 'left' }),
-      blk('espacador', { altura: 4 }),
-      blk('texto-livre', { texto: 'TEXTO MODULADO', bold: true, size: 10, align: 'left', color: '#555555' }),
-      blk('texto-livre', { texto: 'Escreva aqui a leitura personalizada deste pilar conforme a faixa de desempenho (0–50 / 51–80 / 81–100).', size: 11, align: 'justify', lineHeight: 1.5 }),
-    ]),
+    blk('titulo-secao', { texto: titulo, nivel: 3, cor: '#243b7a', align: 'left', mostrarLinha: false, corFundo: '' }),
+    blk('texto-livre', { texto: `{${v}}`, bold: true, size: 22, color: '#243b7a', align: 'left', lineHeight: 1.1 }),
+    blk('texto-livre', { texto: `{acerto_pilar_${pilarVar}} de {total_pilar_${pilarVar}} questões`, size: 11, color: '#c0392b', align: 'left' }),
+    blk('espacador', { altura: 4 }),
+    blk('texto-livre', { texto: 'TEXTO MODULADO', bold: true, size: 10, align: 'left', color: '#555555' }),
+    // Texto por faixa (só a condição verdadeira aparece).
+    blk('condicao', { variavel: v, operador: 'entre', valor: '0', valor2: '50' }, [blk('texto-livre', { texto: 'Desempenho abaixo de 50% — ponto crítico. Escreva aqui a leitura personalizada.', size: 11, align: 'justify', lineHeight: 1.5 })]),
+    blk('condicao', { variavel: v, operador: 'entre', valor: '51', valor2: '80' }, [blk('texto-livre', { texto: 'Desempenho intermediário (51–80%). Escreva aqui a leitura personalizada.', size: 11, align: 'justify', lineHeight: 1.5 })]),
+    blk('condicao', { variavel: v, operador: 'entre', valor: '81', valor2: '100' }, [blk('texto-livre', { texto: 'Bom desempenho (81–100%). Escreva aqui a leitura personalizada.', size: 11, align: 'justify', lineHeight: 1.5 })]),
   ])
 }
 
@@ -53,10 +56,13 @@ export const PRESETS_CADERNO: CadernoPreset[] = [
         blk('espacador', { altura: 12 }),
         blk('titulo-secao', { texto: 'DESEMPENHO POR PILAR', nivel: 2, corFundo: '#2b2a4a', cor: '#ffffff', fundoRaio: 4, align: 'left', mostrarLinha: false }),
         blk('espacador', { altura: 8 }),
-        blk('colunas', { gap: 14, divisoria: true, divisoriaCor: '#cbb26b', divisoriaEspessura: 1 }, [
-          colPilarDiag('LEI SECA'),
-          colPilarDiag('JURISPRUDÊNCIA'),
-          colPilarDiag('DOUTRINA'),
+        // Cards COLADOS: um único card (fundo + fita) envolvendo as 3 colunas com gap 0 + divisória.
+        blk('card', { corFundo: '#fef3d6', bordaLargura: 0, bordaRaio: 4, padding: 10, largura: 100, alinhamento: 'center', fitaCor: '#3b5bdb', fitaAltura: 4 }, [
+          blk('colunas', { gap: 16, divisoria: true, divisoriaCor: '#cbb26b', divisoriaEspessura: 1 }, [
+            colPilarDiag('LEI SECA', 'lei_seca'),
+            colPilarDiag('JURISPRUDÊNCIA', 'jurisprudencia'),
+            colPilarDiag('DOUTRINA', 'doutrina'),
+          ]),
         ]),
         blk('espacador', { altura: 12 }),
         blk('titulo-secao', { texto: 'DESEMPENHO POR DISCIPLINA', nivel: 2, corFundo: '#2b2a4a', cor: '#ffffff', fundoRaio: 4, align: 'left', mostrarLinha: false }),

@@ -409,6 +409,28 @@ export function BlockInspector({ block, onChange, varsExtra }: { block: Block; o
           <Faixa label="Altura da fita (px) — 0 = sem fita" min={0} max={12} value={a.fitaAltura ?? 0} onChange={(v) => set('fitaAltura', v)} />
         </div>
       )
+    case 'condicao':
+      return (
+        <div className="space-y-3">
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Mostra os blocos DENTRO só quando a condição é verdadeira. Empilhe várias condições para o <b>texto modulado</b> (ex.: 0–50, 51–80, 81–100).</p>
+          <Row label="Variável"><input value={a.variavel ?? ''} onChange={(e) => set('variavel', e.target.value.replace(/[{}]/g, ''))} className={inputCls} placeholder="ex.: pct_pilar_lei_seca" /></Row>
+          {(varsExtra ?? []).map((g) => (
+            <Grupo key={g.grupo} label={g.grupo}>
+              <div className="flex flex-wrap gap-1">{g.itens.filter((v) => v.token.startsWith('{pct')).map((v) => (
+                <button key={v.token} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => set('variavel', v.token.replace(/[{}]/g, ''))} className="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:border-primary hover:bg-primary/5 hover:text-primary">{v.label.replace(' · %', '')}</button>
+              ))}</div>
+            </Grupo>
+          ))}
+          <Row label="Condição"><select value={a.operador ?? 'entre'} onChange={(e) => set('operador', e.target.value)} className={inputCls}>
+            <option value="entre">está entre</option><option value=">=">maior ou igual</option><option value="<=">menor ou igual</option>
+            <option value=">">maior que</option><option value="<">menor que</option><option value="igual">igual a</option>
+            <option value="diferente">diferente de</option><option value="contem">contém o texto</option>
+          </select></Row>
+          <Row label={a.operador === 'entre' ? 'De' : 'Valor'}><input value={a.valor ?? ''} onChange={(e) => set('valor', e.target.value)} className={inputCls} placeholder="ex.: 0" /></Row>
+          {a.operador === 'entre' && <Row label="Até"><input value={a.valor2 ?? ''} onChange={(e) => set('valor2', e.target.value)} className={inputCls} placeholder="ex.: 50" /></Row>}
+          <p className="text-[11px] text-muted-foreground">Dica: números com “%” funcionam (ex.: “45%” conta como 45).</p>
+        </div>
+      )
     case 'colunas':
       return (
         <div className="space-y-3">

@@ -6,7 +6,7 @@ import { Loader2, Save, Printer, Plus, Trash2, ArrowUp, ArrowDown, FileText, Pal
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { BLOCKS, blocksByCategory, createBlock, getBlockMeta, BlockRender, cardStyle, dataComQuestao, larguraDaColuna } from '@/lib/caderno-designer/blocks'
+import { BLOCKS, blocksByCategory, createBlock, getBlockMeta, BlockRender, cardStyle, dataComQuestao, larguraDaColuna, avaliarCondicao } from '@/lib/caderno-designer/blocks'
 import { BlockInspector } from '@/lib/caderno-designer/inspectors'
 import { resolveTheme, type CadernoTheme } from '@/lib/caderno-designer/theme'
 import * as tree from '@/lib/caderno-designer/block-tree'
@@ -14,7 +14,7 @@ import { SHEET_W, SHEET_H, PAD_H, PAD_V, PAGE_KINDS, RUNNING_PADRAO, HUD_CORES_P
 import { HudSimuladoEditor } from '@/components/admin/hud-simulado-editor'
 import { HexColorField } from '@/components/admin/hex-color-field'
 import { GerarPdfServidor } from '@/components/admin/gerar-pdf-servidor'
-import { MonitorPlay } from 'lucide-react'
+import { MonitorPlay, GitBranch } from 'lucide-react'
 import { salvarCadernoDesignerV2 } from '@/app/admin/cadernos/actions'
 import { PRESETS_CADERNO, type CadernoPreset } from '@/lib/caderno-designer/presets'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
@@ -205,7 +205,7 @@ function EditorNode({ block, ctx, emColuna, divStyle }: { block: Block; ctx: Nod
   }
 
   const isCard = block.type === 'card'
-  const ehContainer = block.type === 'card' || block.type === 'repeticao' // detecta meio (dentro)
+  const ehContainer = block.type === 'card' || block.type === 'repeticao' || block.type === 'condicao' // detecta meio (dentro)
   const guiaLado = over && (ctx.overPos === 'left' || ctx.overPos === 'right') ? ctx.overPos : null
   const overIn = over && ctx.overPos === 'in'
   // posição do cursor: laterais (esquerda/direita) → ao lado; senão topo/base; containers têm meio (dentro)
@@ -256,6 +256,21 @@ function EditorNode({ block, ctx, emColuna, divStyle }: { block: Block; ctx: Nod
         </div>
         {filhos.length > 0
           ? <AutoAnim ativo={!ctx.arrastando} className="flex flex-col"><ListaBlocos blocks={filhos} ctx={ctxQ} /></AutoAnim>
+          : <DropZoneVazia onClick={() => ctx.addInto(block.id)} />}
+      </div>
+    )
+  } else if (block.type === 'condicao') {
+    const filhos = block.innerBlocks ?? []
+    const opLbl: Record<string, string> = { entre: 'entre', '>=': '≥', '<=': '≤', '>': '>', '<': '<', igual: '=', diferente: '≠', contem: 'contém' }
+    const cond = `{${a.variavel || '—'}} ${opLbl[a.operador] ?? a.operador} ${a.valor ?? ''}${a.operador === 'entre' ? `–${a.valor2 ?? ''}` : ''}`
+    const bate = avaliarCondicao(a, ctx.data.vars)
+    inner = (
+      <div style={{ border: `1.5px dashed ${ctx.theme.cores.secundaria}`, borderRadius: 8, padding: 8, background: 'color-mix(in oklab, var(--primary) 4%, transparent)', opacity: bate ? 1 : 0.55 }}>
+        <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold" style={{ color: ctx.theme.cores.secundaria }}>
+          <GitBranch className="h-3.5 w-3.5" /> SE {cond} <span className={cn('rounded px-1 text-[10px]', bate ? 'bg-emerald-500/15 text-emerald-600' : 'bg-muted text-muted-foreground')}>{bate ? 'aparece agora' : 'oculto no preview'}</span>
+        </div>
+        {filhos.length > 0
+          ? <AutoAnim ativo={!ctx.arrastando} className="flex flex-col"><ListaBlocos blocks={filhos} ctx={ctx} /></AutoAnim>
           : <DropZoneVazia onClick={() => ctx.addInto(block.id)} />}
       </div>
     )
@@ -460,7 +475,7 @@ export function CadernoEditorV2({
     }
     // alvo: container selecionado > região ativa
     const sel = blocoSel
-    if (sel && (sel.type === 'card' || sel.type === 'coluna' || sel.type === 'repeticao')) { mutarTudo((bs) => tree.insertInto(bs, sel.id, novo)); setSelBlock(novo.id); return }
+    if (sel && (sel.type === 'card' || sel.type === 'coluna' || sel.type === 'repeticao' || sel.type === 'condicao')) { mutarTudo((bs) => tree.insertInto(bs, sel.id, novo)); setSelBlock(novo.id); return }
     if (sel && sel.type === 'colunas') { const col0 = sel.innerBlocks?.[0]; if (col0) { mutarTudo((bs) => tree.insertInto(bs, col0.id, novo)); setSelBlock(novo.id); return } }
     if (regiao === 'cabecalho') { setDoc((d) => ({ ...d, cabecalho: [...(d.cabecalho ?? []), novo] })); setSelBlock(novo.id); return }
     if (regiao === 'rodape') { setDoc((d) => ({ ...d, rodape: [...(d.rodape ?? []), novo] })); setSelBlock(novo.id); return }
