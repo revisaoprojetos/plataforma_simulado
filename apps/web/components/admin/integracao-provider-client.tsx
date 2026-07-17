@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Loader2, Plug, Check, AlertTriangle, Trash2, RefreshCw, Copy, DownloadCloud, KeyRound, GitBranch, Radio, RotateCw, Eye, Users, UserPlus, Search, Inbox } from 'lucide-react'
+import { Loader2, Plug, Check, AlertTriangle, Trash2, RefreshCw, Copy, DownloadCloud, KeyRound, GitBranch, Radio, RotateCw, Eye, Users, UserPlus, Search, Inbox, Braces } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { CAMPOS_PROVIDER, PROVIDER_META } from '@/app/admin/integracoes/campos'
@@ -14,15 +14,18 @@ import {
   listarEventos, reprocessarEvento, getEventoDetalhe, regenerarWebhookToken, testarWebhookInbound, type EventoDTO, type EventoDetalhe,
   listarAssinaturasSalvas, sincronizarAssinaturas, aplicarAssinaturasGuru, type AssinaturaGuruDTO,
   listarWebhookInbox, getWebhookInboxDetalhe, type InboxDTO, type InboxDetalhe,
+  getMapaConfig, salvarMapaConfig,
 } from '@/app/admin/integracoes/actions'
 import type { Provider } from '@/lib/integracoes/tipos'
+import { CAMPOS_MAPA } from '@/lib/integracoes/mapa-campos'
+import { getStr, flattenPaths } from '@/lib/integracoes/jsonpath'
 
 interface Config { ativo: boolean; baseUrl: string; camposPreenchidos: string[]; webhookToken: string | null; cripto: boolean }
 interface Mapeamento { id: string; fonteRef: string; fonteNome: string | null; classificacao: string | null; grupoId: string | null; simuladoId: string | null; ativo: boolean }
 interface Grupo { id: string; nome: string }
 interface Fonte { ref: string; nome: string; total?: number }
 
-type Aba = 'credenciais' | 'mapeamentos' | 'importar' | 'eventos' | 'assinaturas' | 'recebidos'
+type Aba = 'credenciais' | 'mapeamentos' | 'importar' | 'eventos' | 'assinaturas' | 'recebidos' | 'mapa'
 const SEM = '__sem__'
 
 export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos, gruposSistema, simuladosSistema }: {
@@ -43,6 +46,7 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
           ]
         : [
             { id: 'credenciais', label: 'Configuração', Icon: KeyRound },
+            { id: 'mapa', label: 'Mapa JSON', Icon: Braces },
             { id: 'recebidos', label: 'Recebidos', Icon: Inbox },
             { id: 'eventos', label: 'Eventos', Icon: Radio },
           ])
@@ -93,6 +97,7 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
       {aba === 'importar' && !meta.push && <Importar provider={provider} />}
       {aba === 'eventos' && meta.push && <Eventos provider={provider} />}
       {aba === 'recebidos' && meta.push && <Recebidos provider={provider} appUrl={appUrl} token={config.webhookToken} />}
+      {aba === 'mapa' && meta.push && <MapaJson provider={provider} />}
     </div>
   )
 }
@@ -232,6 +237,72 @@ function Assinaturas({ provider }: { provider: Provider }) {
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Mapa JSON (mapeamento dinâmico das chaves do webhook) ─────────────────────
+function MapaJson({ provider }: { provider: Provider }) {
+  const [mapa, setMapa] = useState<Record<string, string>>({})
+  const [payload, setPayload] = useState<unknown | null>(null)
+  const [carregando, start] = useTransition()
+  const [salvando, startSalvar] = useTransition()
+
+  const carregar = () => start(async () => {
+    const r = await getMapaConfig(provider)
+    if (!r.ok) { toast.error(r.error ?? 'Erro'); return }
+    setMapa(r.dados?.mapa ?? {}); setPayload(r.dados?.ultimoPayload ?? null)
+  })
+  useEffect(() => { carregar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const paths = payload ? flattenPaths(payload) : []
+  const set = (k: string, v: string) => setMapa((m) => ({ ...m, [k]: v }))
+  const salvar = () => startSalvar(async () => {
+    const r = await salvarMapaConfig(provider, mapa)
+    if (r.ok) toast.success('Mapa salvo — os próximos webhooks usam este mapeamento'); else toast.error(r.error ?? 'Erro ao salvar')
+  })
+  const resolver = (k: string) => {
+    const campo = CAMPOS_MAPA.find((c) => c.key === k)
+    const caminho = (mapa[k]?.trim()) || campo?.padrao
+    return payload ? getStr(payload, caminho) : null
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm text-muted-foreground">Aponte cada campo do sistema para a chave (dot-path) do JSON que a {PROVIDER_META[provider].nome} envia. Vazio = usa o caminho padrão. O <b>ID do pedido</b> é a chave única (principal).</p>
+        <Button variant="outline" size="sm" onClick={carregar} disabled={carregando}>{carregando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />} Recarregar</Button>
+      </div>
+
+      {!payload && (
+        <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">Nenhum payload recebido ainda para pré-visualizar. Envie um evento (Postman ou compra real) e clique em <b>Recarregar</b> — as chaves reais viram sugestão nos campos e o valor resolvido aparece à direita.</div>
+      )}
+
+      <datalist id={`paths-${provider}`}>
+        {paths.map((p) => <option key={p.path} value={p.path}>{p.sample ? `${p.path} — ${p.sample}` : p.path}</option>)}
+      </datalist>
+
+      <div className="space-y-2">
+        {CAMPOS_MAPA.map((c) => {
+          const resolvido = resolver(c.key)
+          return (
+            <div key={c.key} className="grid items-center gap-2 rounded-lg border p-2.5 sm:grid-cols-[210px_1fr_170px]">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-sm font-medium">{c.label}{c.obrigatorio && <span className="rounded bg-primary/10 px-1 text-[10px] font-semibold text-primary">principal</span>}</div>
+                <p className="truncate text-[11px] text-muted-foreground" title={c.descricao}>{c.descricao}</p>
+              </div>
+              <Input list={`paths-${provider}`} value={mapa[c.key] ?? ''} onChange={(e) => set(c.key, e.target.value)} placeholder={`padrão: ${c.padrao}`} className="font-mono text-xs" />
+              <div className="truncate text-[11px]" title={resolvido ?? ''}>
+                {payload ? (resolvido != null ? <span className="text-emerald-600 dark:text-emerald-400">→ {resolvido}</span> : <span className="text-amber-600 dark:text-amber-400">→ (vazio)</span>) : <span className="text-muted-foreground">—</span>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="flex justify-end">
+        <Button onClick={salvar} disabled={salvando}>{salvando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />} Salvar mapa</Button>
+      </div>
     </div>
   )
 }

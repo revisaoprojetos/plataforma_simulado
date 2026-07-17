@@ -1,5 +1,7 @@
 import 'server-only'
 import { aguardarVaga, idCredencial } from '@/lib/integracoes/ratelimit'
+import { getStr } from '@/lib/integracoes/jsonpath'
+import { CAMPOS_MAPA } from '@/lib/integracoes/mapa-campos'
 import type { ProviderAdapter, ProviderCfg, FonteImport, PessoaEntitlement, EventoNormalizado, StatusEntitlement } from '@/lib/integracoes/tipos'
 
 /**
@@ -158,47 +160,57 @@ export const guruAdapter: ProviderAdapter = {
     return false
   },
 
-  /** Normaliza o payload da Guru em evento (comprador + direito de acesso). */
-  async parseWebhook(payload): Promise<EventoNormalizado | null> {
+  /**
+   * Normaliza o payload da Guru em evento (comprador + direito de acesso).
+   * Usa o MAPA DINÂMICO (cfg.mapa) quando configurado: cada campo tenta o caminho do mapa,
+   * depois o padrão e os fallbacks conhecidos. O `pedido_id` é a CHAVE ÚNICA (principal).
+   */
+  async parseWebhook(payload, _headers, cfg): Promise<EventoNormalizado | null> {
     const p = payload as any
     if (!p || typeof p !== 'object') return null
+    const mapa = (cfg as ProviderCfg | undefined)?.mapa ?? {}
 
-    const contact = p.contact ?? p.buyer ?? p.customer ?? {}
-    const product = p.product ?? p.items?.[0] ?? {}
-    const subscription = p.subscription ?? {}
+    // Resolve um campo pelo mapa → padrão → fallbacks (1º caminho que devolver valor).
+    const val = (key: string): string | null => {
+      const campo = CAMPOS_MAPA.find((c) => c.key === key)
+      const caminhos = [mapa[key], campo?.padrao, ...(campo?.padroesAlt ?? [])].filter(Boolean) as string[]
+      for (const c of caminhos) { const v = getStr(p, c); if (v) return v }
+      return null
+    }
 
-    const email = firstStr(contact.email, contact.mail)
-    const cpf = firstStr(contact.doc, contact.document, contact.cpf)
-    const externalPessoa = firstStr(contact.id, email, cpf)
-    if (!externalPessoa) return null
-
-    // status: assinatura (last_status) tem prioridade; senão o status da transação.
-    const statusBruto = firstStr(subscription.last_status, subscription.status, p.last_status, p.status)
+    const pedidoId = val('pedido_id')          // CHAVE ÚNICA (principal)
+    const statusBruto = val('status')
     const status = mapStatus(statusBruto)
-    if (!status) return null // evento sem efeito no acesso (ex.: aguardando pagamento)
+    if (!status) return null                   // evento sem efeito no acesso (ex.: aguardando pagamento)
 
-    const produtoRef = firstStr(product.marketplace_id, product.internal_id, product.id, p.product_id)
+    const produtoRef = val('produto_ref')
     if (!produtoRef) return null
 
-    const entExternalId = firstStr(subscription.id, subscription.internal_id, p.id, p.transaction_id) ?? `${produtoRef}:${externalPessoa}`
-    // event_id: id do evento/transação + status → dedupe por transição de estado.
-    const eventId = firstStr(p.id, p.transaction_id, subscription.id) ? `${firstStr(p.id, p.transaction_id, subscription.id)}:${statusBruto}` : `${entExternalId}:${statusBruto}`
+    const email = val('email')
+    const cpf = val('cpf')
+    const nome = val('nome')
+    const ddd = val('ddd'); const tel = val('telefone')
+    const telefoneCompleto = tel ? `${ddd ?? ''}${tel}` : null
+
+    const externalPessoa = firstStr(email, cpf, pedidoId)
+    if (!externalPessoa) return null
+
+    const entExternalId = pedidoId ?? `${produtoRef}:${externalPessoa}`
+    // event_id: id do pedido + status → dedupe por transição de estado (idempotência).
+    const eventId = `${pedidoId ?? entExternalId}:${statusBruto}`
 
     return {
       eventId,
       tipo: firstStr(p.webhook_type, p.event, p.type) ?? statusBruto ?? 'guru',
-      ocorridoEm: firstStr(p.dates?.confirmed_at, p.dates?.created_at, p.created_at),
-      pessoa: {
-        nome: firstStr(contact.name, contact.full_name) ?? email ?? 'Aluno',
-        email, cpf, telefone: telefone(contact), externalId: externalPessoa,
-      },
+      ocorridoEm: firstStr(getStr(p, 'dates.confirmed_at'), getStr(p, 'dates.created_at'), getStr(p, 'created_at')),
+      pessoa: { nome: nome ?? email ?? 'Aluno', email, cpf, telefone: telefoneCompleto, externalId: externalPessoa },
       entitlement: {
         externalId: entExternalId,
         produtoRef,
-        produtoNome: firstStr(product.name, product.title),
+        produtoNome: val('produto_nome'),
         status,
-        inicioEm: firstStr(subscription.started_at, p.dates?.confirmed_at, p.dates?.created_at),
-        expiraEm: firstStr(subscription.next_cycle_at, subscription.expires_at, subscription.ended_at),
+        inicioEm: firstStr(getStr(p, 'subscription.started_at'), getStr(p, 'dates.confirmed_at'), getStr(p, 'created_at')),
+        expiraEm: firstStr(getStr(p, 'subscription.next_cycle_at'), getStr(p, 'subscription.expires_at'), getStr(p, 'subscription.ended_at')),
       },
     }
   },

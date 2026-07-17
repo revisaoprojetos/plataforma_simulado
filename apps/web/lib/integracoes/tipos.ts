@@ -13,6 +13,8 @@ export interface ProviderCfg {
   provider: Provider
   baseUrl: string
   credenciais: Record<string, string> // ex.: { api_key, usuario, senha } | { api_token }
+  /** Mapa dinâmico do JSON recebido (campo normalizado → dot-path no payload). */
+  mapa?: Record<string, string>
 }
 
 /** Pessoa normalizada vinda de um provedor (comprador/membro). */

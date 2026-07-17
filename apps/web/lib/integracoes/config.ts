@@ -41,17 +41,21 @@ export function cfgDoEnv(provider: Provider, tenantId: string): ProviderCfg | nu
 export async function resolverProviderCfg(tenantId: string, provider: Provider, opts?: { ignorarAtivo?: boolean }): Promise<ProviderCfg | null> {
   try {
     const svc = createAdminClient()
-    const { data } = await svc
-      .from('simulado_integracao_config')
-      .select('base_url, credenciais, ativo')
-      .eq('tenant_id', tenantId).eq('provider', provider).maybeSingle()
+    // mapa_json pode não existir ainda (migration pendente) → busca tolerante.
+    let data: any
+    const r = await svc.from('simulado_integracao_config').select('base_url, credenciais, ativo, mapa_json').eq('tenant_id', tenantId).eq('provider', provider).maybeSingle()
+    if (r.error && /mapa_json|column/i.test(r.error.message)) {
+      const r2 = await svc.from('simulado_integracao_config').select('base_url, credenciais, ativo').eq('tenant_id', tenantId).eq('provider', provider).maybeSingle()
+      data = r2.data
+    } else data = r.data
     const d = data as any
     // ignorarAtivo: permite TESTAR a conexão com a credencial salva antes de ativar a integração.
     if (d && (opts?.ignorarAtivo || d.ativo) && d.credenciais && typeof d.credenciais === 'object') {
       const cred: Record<string, string> = {}
       for (const [k, v] of Object.entries(d.credenciais as Record<string, string>)) cred[k] = descriptografar(v) ?? ''
+      const mapa = (d.mapa_json && typeof d.mapa_json === 'object') ? (d.mapa_json as Record<string, string>) : undefined
       // considera configurado só se tiver ao menos uma credencial não vazia
-      if (Object.values(cred).some((v) => v)) return { provider, baseUrl: d.base_url || BASE_PADRAO[provider], credenciais: cred }
+      if (Object.values(cred).some((v) => v)) return { provider, baseUrl: d.base_url || BASE_PADRAO[provider], credenciais: cred, mapa }
     }
   } catch { /* tabela pode não existir ainda → tenta env */ }
   return cfgDoEnv(provider, tenantId)

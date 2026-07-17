@@ -244,6 +244,48 @@ export async function getEventoDetalhe(provider: string, id: string): Promise<{ 
   }
 }
 
+// ── Mapa dinâmico do JSON (webhook) ────────────────────────────────────────────
+export interface MapaConfigDTO {
+  mapa: Record<string, string>
+  ultimoPayload: unknown | null   // último corpo recebido (para pré-visualizar/preencher)
+}
+
+export async function getMapaConfig(provider: string): Promise<{ ok: boolean; error?: string; dados?: MapaConfigDTO }> {
+  if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
+  if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+
+  let mapa: Record<string, string> = {}
+  const rc = await svc.from('simulado_integracao_config').select('mapa_json').eq('tenant_id', g.tenantId).eq('provider', provider).maybeSingle()
+  if (!rc.error && (rc.data as any)?.mapa_json && typeof (rc.data as any).mapa_json === 'object') mapa = (rc.data as any).mapa_json
+
+  // Último payload JSON recebido (para o admin ver as chaves reais e mapear).
+  let ultimoPayload: unknown | null = null
+  const rp = await svc.from('simulado_webhook_inbox').select('body_json').eq('tenant_id', g.tenantId).eq('provider', provider).not('body_json', 'is', null).order('recebido_em', { ascending: false }).limit(1).maybeSingle()
+  if (!rp.error && (rp.data as any)?.body_json) ultimoPayload = (rp.data as any).body_json
+
+  return { ok: true, dados: { mapa, ultimoPayload } }
+}
+
+export async function salvarMapaConfig(provider: string, mapa: Record<string, string>): Promise<{ ok: boolean; error?: string }> {
+  if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  // Só grava caminhos não vazios (limpa strings em branco).
+  const limpo: Record<string, string> = {}
+  for (const [k, v] of Object.entries(mapa || {})) { const s = (v ?? '').trim(); if (s) limpo[k] = s }
+  const { error } = await svc.from('simulado_integracao_config').update({ mapa_json: limpo, atualizado_em: new Date().toISOString() }).eq('tenant_id', g.tenantId).eq('provider', provider)
+  if (error) {
+    if (/mapa_json|column|schema cache/i.test(error.message)) return { ok: false, error: 'Aplique a migration 20260717000004_integracao_mapa_json.' }
+    return { ok: false, error: error.message }
+  }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_integracao_config', entidadeId: g.tenantId, tenantId: g.tenantId, depois: { provider, mapa_json: limpo } }).catch(() => {})
+  revalidatePath(`/admin/integracoes/${provider}`)
+  return { ok: true }
+}
+
 // ── Inbox CRU do webhook (toda requisição que bate na URL) ─────────────────────
 export interface InboxDTO {
   id: string; metodo: string; statusResp: number | null; resultado: string | null
