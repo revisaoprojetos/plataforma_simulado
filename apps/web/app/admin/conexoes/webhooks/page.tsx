@@ -1,4 +1,6 @@
+import { headers } from 'next/headers'
 import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { ConexoesTabs } from '@/components/admin/conexoes-tabs'
 import { EVENTOS_WEBHOOK } from '@/lib/webhooks/dispatch'
@@ -8,6 +10,15 @@ export const dynamic = 'force-dynamic'
 export default async function WebhooksPage() {
   const svc = await createServiceClient()
   const tenantId = await getCurrentTenantId()
+
+  // Token de entrada (multi-fonte): reaproveita qualquer webhook_token do tenant.
+  const admin = createAdminClient()
+  const { data: cfgTok } = await admin.from('simulado_integracao_config').select('webhook_token').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').not('webhook_token', 'is', null).limit(1).maybeSingle()
+  const inboundToken = (cfgTok as any)?.webhook_token ?? null
+  const h = await headers()
+  const host = h.get('x-forwarded-host') || h.get('host') || 'localhost:3000'
+  const proto = h.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https')
+  const appUrl = `${proto}://${host}`
 
   let webhooks: any[] = []
   let precisaMigrar = false
@@ -53,6 +64,8 @@ export default async function WebhooksPage() {
         eventos={EVENTOS_WEBHOOK.map((e) => ({ chave: e.chave, label: e.label }))}
         simulados={(sims ?? []).map((s: any) => ({ id: s.id, titulo: s.titulo ?? 'Simulado' }))}
         precisaMigrar={precisaMigrar}
+        appUrl={appUrl}
+        inboundToken={inboundToken}
       />
     </div>
   )

@@ -270,6 +270,59 @@ export async function listarWebhookInbox(provider: string, limite = 100): Promis
   return { ok: true, itens }
 }
 
+// Inbox UNIFICADO (multi-fonte): todas as requisições do tenant, de qualquer fonte.
+export interface RecebidoDTO {
+  id: string; provider: string; fonte: string | null; metodo: string
+  statusResp: number | null; resultado: string | null
+  comprador: string | null; produto: string | null; ip: string | null; recebidoEm: string
+}
+
+export async function listarRecebidos(filtroFonte?: string, limite = 200): Promise<{ ok: boolean; error?: string; itens?: RecebidoDTO[]; fontes?: string[]; semTabela?: boolean }> {
+  if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const cols = 'id, provider, fonte, metodo, status_resp, resultado, body_json, ip, recebido_em'
+  let res = await svc.from('simulado_webhook_inbox').select(cols).eq('tenant_id', g.tenantId).order('recebido_em', { ascending: false }).limit(limite)
+  // Coluna `fonte` pode não existir ainda → tenta sem ela.
+  if (res.error && /fonte|column/i.test(res.error.message)) {
+    res = await svc.from('simulado_webhook_inbox').select('id, provider, metodo, status_resp, resultado, body_json, ip, recebido_em').eq('tenant_id', g.tenantId).order('recebido_em', { ascending: false }).limit(limite) as any
+  }
+  if (res.error) {
+    if ((res.error as any).code === '42P01' || /does not exist|schema cache/i.test(res.error.message)) return { ok: true, itens: [], fontes: [], semTabela: true }
+    return { ok: false, error: res.error.message }
+  }
+  const linhas = (res.data ?? []) as any[]
+  const fontes = [...new Set(linhas.map((e) => e.fonte ?? e.provider).filter(Boolean))].sort()
+  const filtradas = filtroFonte ? linhas.filter((e) => (e.fonte ?? e.provider) === filtroFonte) : linhas
+  const itens: RecebidoDTO[] = filtradas.map((e) => {
+    const r = resumoEvento(e.body_json)
+    return { id: e.id, provider: e.provider, fonte: e.fonte ?? e.provider, metodo: e.metodo, statusResp: e.status_resp, resultado: e.resultado, comprador: r.comprador, produto: r.produto, ip: e.ip, recebidoEm: e.recebido_em }
+  })
+  return { ok: true, itens, fontes }
+}
+
+export async function getRecebidoDetalhe(id: string): Promise<{ ok: boolean; error?: string; detalhe?: InboxDetalhe & { fonte: string | null; provider: string } }> {
+  if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  let res = await svc.from('simulado_webhook_inbox').select('provider, fonte, metodo, status_resp, resultado, ip, recebido_em, token, headers, query, body_json, body_raw').eq('id', id).eq('tenant_id', g.tenantId).maybeSingle()
+  if (res.error && /fonte|column/i.test(res.error.message)) {
+    res = await svc.from('simulado_webhook_inbox').select('provider, metodo, status_resp, resultado, ip, recebido_em, token, headers, query, body_json, body_raw').eq('id', id).eq('tenant_id', g.tenantId).maybeSingle() as any
+  }
+  const d = res.data as any
+  if (!d) return { ok: false, error: 'Requisição não encontrada.' }
+  const tok: string | null = d.token ?? null
+  return {
+    ok: true,
+    detalhe: {
+      provider: d.provider, fonte: d.fonte ?? d.provider,
+      metodo: d.metodo, statusResp: d.status_resp, resultado: d.resultado, ip: d.ip, recebidoEm: d.recebido_em,
+      tokenMasc: tok ? `${tok.slice(0, 6)}…${tok.slice(-4)}` : null,
+      headers: d.headers ?? null, query: d.query ?? null, body: d.body_json ?? null, bodyRaw: d.body_raw ?? null,
+    },
+  }
+}
+
 export interface InboxDetalhe {
   metodo: string; statusResp: number | null; resultado: string | null
   ip: string | null; recebidoEm: string; tokenMasc: string | null

@@ -1,0 +1,106 @@
+{
+  "info": {
+    "name": "Plataforma Simulado — Webhooks",
+    "description": "Testes dos webhooks de entrada da plataforma.\n\nAntes de usar, ajuste as variáveis da coleção:\n- baseUrl: http://localhost:3000 (dev) ou https://simulado.revisaopge.com.br (produção)\n- token: o webhook_token do tenant (Integrações → Guru → URL do webhook)\n- fonte: rótulo da origem para o receptor genérico (ex.: hotmart, kiwify, n8n)\n\nApós enviar, confira em Conexões → Webhooks & n8n → aba Recebidos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "token", "value": "180a61528296e5e7f716001bcb27f7d6422511237a43941a" },
+    { "key": "fonte", "value": "hotmart" }
+  ],
+  "item": [
+    {
+      "name": "Guru — Ping (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/webhooks/guru/{{token}}", "host": ["{{baseUrl}}"], "path": ["api", "webhooks", "guru", "{{token}}"] },
+        "description": "Confere se a URL está viva e o token reconhece o tenant. Aparece como GET na aba Recebidos."
+      }
+    },
+    {
+      "name": "Guru — Ping de teste (POST __test)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"__test\": true\n}" },
+        "url": { "raw": "{{baseUrl}}/api/webhooks/guru/{{token}}", "host": ["{{baseUrl}}"], "path": ["api", "webhooks", "guru", "{{token}}"] },
+        "description": "Ping sem efeito colateral — confirma URL + token."
+      }
+    },
+    {
+      "name": "Guru — Compra aprovada (POST)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"webhook_type\": \"transaction\",\n  \"id\": \"txn_teste_0001\",\n  \"status\": \"approved\",\n  \"contact\": {\n    \"id\": \"ct_teste_0001\",\n    \"name\": \"Aluno Teste Postman\",\n    \"email\": \"aluno.teste@example.com\",\n    \"doc\": \"12345678900\",\n    \"phone_local_code\": \"11\",\n    \"phone_number\": \"988887777\"\n  },\n  \"product\": {\n    \"marketplace_id\": \"PROD-123\",\n    \"name\": \"Assinatura Revisao PGE\"\n  },\n  \"subscription\": {\n    \"id\": \"sub_teste_0001\",\n    \"last_status\": \"active\"\n  },\n  \"dates\": {\n    \"confirmed_at\": \"2026-07-17T12:00:00Z\"\n  }\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/webhooks/guru/{{token}}", "host": ["{{baseUrl}}"], "path": ["api", "webhooks", "guru", "{{token}}"] },
+        "description": "Simula uma compra aprovada. Se a integração estiver ATIVA e o produto (PROD-123) mapeado, cria/concede o aluno. Registra o evento e a requisição crua."
+      }
+    },
+    {
+      "name": "Guru — Assinatura cancelada (POST)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"webhook_type\": \"subscription\",\n  \"id\": \"txn_teste_0002\",\n  \"contact\": {\n    \"id\": \"ct_teste_0001\",\n    \"name\": \"Aluno Teste Postman\",\n    \"email\": \"aluno.teste@example.com\",\n    \"doc\": \"12345678900\"\n  },\n  \"product\": {\n    \"marketplace_id\": \"PROD-123\",\n    \"name\": \"Assinatura Revisao PGE\"\n  },\n  \"subscription\": {\n    \"id\": \"sub_teste_0001\",\n    \"last_status\": \"canceled\"\n  }\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/webhooks/guru/{{token}}", "host": ["{{baseUrl}}"], "path": ["api", "webhooks", "guru", "{{token}}"] },
+        "description": "Simula cancelamento — revoga o acesso do aluno (se ativo + mapeado)."
+      }
+    },
+    {
+      "name": "Genérico (multi-fonte) — Ping (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/webhooks/in/{{token}}?fonte={{fonte}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "webhooks", "in", "{{token}}"],
+          "query": [{ "key": "fonte", "value": "{{fonte}}" }]
+        },
+        "description": "Receptor genérico: aceita qualquer fonte. A ?fonte rotula a origem na aba Recebidos."
+      }
+    },
+    {
+      "name": "Genérico (multi-fonte) — Evento (POST)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"evento\": \"compra.aprovada\",\n  \"comprador\": {\n    \"nome\": \"Fulano da Silva\",\n    \"email\": \"fulano@example.com\",\n    \"cpf\": \"98765432100\"\n  },\n  \"produto\": {\n    \"id\": \"OFERTA-XYZ\",\n    \"nome\": \"Curso Avancado\"\n  },\n  \"valor\": 497.00\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/webhooks/in/{{token}}?fonte={{fonte}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "webhooks", "in", "{{token}}"],
+          "query": [{ "key": "fonte", "value": "{{fonte}}" }]
+        },
+        "description": "Envia um payload de qualquer formato de qualquer fonte. É registrado cru na aba Recebidos (receptor puro; não processa acesso)."
+      }
+    },
+    {
+      "name": "Genérico — Token inválido (POST, deve dar 404)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"teste\": \"token errado\"\n}" },
+        "url": {
+          "raw": "{{baseUrl}}/api/webhooks/in/token_invalido_123?fonte=teste",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "webhooks", "in", "token_invalido_123"],
+          "query": [{ "key": "fonte", "value": "teste" }]
+        },
+        "description": "Valida o caminho de erro: token que não existe → 404 (mas ainda registra a tentativa)."
+      }
+    }
+  ]
+}

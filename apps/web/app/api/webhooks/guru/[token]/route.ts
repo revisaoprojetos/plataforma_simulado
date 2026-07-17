@@ -29,7 +29,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
   const svc = createAdminClient()
   const { data: cfgRow } = await svc.from('simulado_integracao_config').select('tenant_id').eq('provider', 'guru').eq('webhook_token', token).maybeSingle()
   const tenantId = (cfgRow as any)?.tenant_id ?? null
-  await registrarInbox({ provider: 'guru', metodo: 'GET', token, tenantId, ip, headers, query, status: 200, resultado: tenantId ? 'ping (GET)' : 'ping — token inválido' })
+  await registrarInbox({ provider: 'guru', fonte: 'guru', metodo: 'GET', token, tenantId, ip, headers, query, status: 200, resultado: tenantId ? 'ping (GET)' : 'ping — token inválido' })
   return NextResponse.json({ ok: true, endpoint: 'guru-webhook', reconhecido: !!tenantId, dica: 'Cadastre esta URL na Guru e envie um evento POST de compra/assinatura.' })
 }
 
@@ -45,7 +45,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   // Loga a requisição CRUA + responde. Usado em todos os pontos de saída.
   const finish = async (status: number, body: any, resultado: string) => {
-    await registrarInbox({ provider: 'guru', metodo: 'POST', token, tenantId, ip, headers, query, raw, status, resultado })
+    await registrarInbox({ provider: 'guru', fonte: 'guru', metodo: 'POST', token, tenantId, ip, headers, query, raw, status, resultado })
     return NextResponse.json(body, { status })
   }
 
