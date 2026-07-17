@@ -4,10 +4,12 @@ import { useState, useTransition, useEffect, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Loader2, Plug, Check, AlertTriangle, Trash2, RefreshCw, Copy, DownloadCloud, KeyRound, GitBranch, Radio, RotateCw, Eye, Users, UserPlus, Search, Inbox, Braces } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog'
+import { Loader2, Plug, Check, AlertTriangle, Trash2, RefreshCw, Copy, DownloadCloud, KeyRound, GitBranch, Radio, RotateCw, Eye, Users, UserPlus, Search, Inbox, Braces, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { JsonViewer } from '@/components/admin/json-viewer'
+import { ModalRequisicao } from '@/components/admin/modal-requisicao'
 import { CAMPOS_PROVIDER, PROVIDER_META } from '@/app/admin/integracoes/campos'
 import {
   salvarIntegracaoConfig, testarIntegracao, listarFontes, salvarMapeamento, excluirMapeamento, rodarImportIntegracao,
@@ -382,44 +384,6 @@ function MapaJson({ provider, inicial }: { provider: Provider; inicial?: { mapa:
   )
 }
 
-/** Visualizador de JSON aninhado (chaves azuis, valores coloridos, copiar/clicar por folha). */
-function JsonViewer({ data, onPick }: { data: unknown; onPick: (path: string) => void }) {
-  const ind = (d: number) => ({ paddingLeft: 4 + d * 14 })
-  const corVal = (v: unknown) =>
-    typeof v === 'string' ? 'text-amber-600 dark:text-amber-400'
-      : typeof v === 'number' ? 'text-violet-600 dark:text-violet-400'
-      : typeof v === 'boolean' ? 'text-rose-600 dark:text-rose-400'
-      : 'text-muted-foreground'
-  const linhas: ReactNode[] = []
-
-  const walk = (val: any, path: string, key: string | null, depth: number, ultimo: boolean) => {
-    const virg = ultimo ? '' : ','
-    const rotulo = key != null ? <span className="text-sky-600 dark:text-sky-400">{key}: </span> : null
-    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
-      const ents = Object.entries(val)
-      linhas.push(<div style={ind(depth)}>{rotulo}{'{'}</div>)
-      ents.forEach(([k, v], i) => walk(v, path ? `${path}.${k}` : k, k, depth + 1, i === ents.length - 1))
-      linhas.push(<div style={ind(depth)}>{'}'}{virg}</div>)
-      return
-    }
-    if (Array.isArray(val)) {
-      linhas.push(<div style={ind(depth)}>{rotulo}{'['}</div>)
-      val.forEach((v, i) => walk(v, `${path}[${i}]`, null, depth + 1, i === val.length - 1))
-      linhas.push(<div style={ind(depth)}>{']'}{virg}</div>)
-      return
-    }
-    linhas.push(
-      <div style={ind(depth)} className="group flex cursor-pointer items-center gap-1.5 rounded hover:bg-primary/10" onClick={() => onPick(path)} title={`Usar: ${path}`}>
-        {key != null && <span className="shrink-0 text-sky-600 dark:text-sky-400">{key}:</span>}
-        <Copy className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-primary" />
-        <span className={cn('truncate', corVal(val))}>{typeof val === 'string' ? `"${val}"` : String(val)}{virg}</span>
-      </div>,
-    )
-  }
-  walk(data, '', null, 0, true)
-  return <div className="font-mono text-[11px] leading-relaxed">{linhas.map((l, i) => <div key={i}>{l}</div>)}</div>
-}
-
 // ── Recebidos (inbox CRU: toda requisição que bate na URL do webhook) ─────────
 function Recebidos({ provider, appUrl, token }: { provider: Provider; appUrl: string; token: string | null }) {
   const [itens, setItens] = useState<InboxDTO[] | null>(null)
@@ -534,40 +498,12 @@ function Recebidos({ provider, appUrl, token }: { provider: Provider; appUrl: st
       </div>
 
       <Dialog open={!!detalhe} onOpenChange={(o) => { if (!o) setDetalhe(null) }}>
-        <DialogContent className="max-h-[85vh] overflow-auto sm:max-w-2xl">
-          <DialogHeader><DialogTitle>Requisição recebida</DialogTitle></DialogHeader>
-          {detalhe && (
-            <div className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2">
-                <Campo k="Método" v={detalhe.metodo} />
-                <Campo k="Status devolvido" v={String(detalhe.statusResp ?? '—')} />
-                <Campo k="Resultado" v={detalhe.resultado ?? '—'} />
-                <Campo k="IP" v={detalhe.ip ?? '—'} />
-                <Campo k="Token (URL)" v={detalhe.tokenMasc ?? '—'} />
-                <Campo k="Recebido em" v={new Date(detalhe.recebidoEm).toLocaleString('pt-BR')} />
-              </div>
-              <Secao titulo="Corpo (JSON)"><Bloco>{detalhe.body ? JSON.stringify(detalhe.body, null, 2) : (detalhe.bodyRaw || '(vazio)')}</Bloco></Secao>
-              <Secao titulo="Headers"><Bloco>{detalhe.headers ? JSON.stringify(detalhe.headers, null, 2) : '(nenhum)'}</Bloco></Secao>
-              {detalhe.query != null && Object.keys(detalhe.query as any).length > 0 && (
-                <Secao titulo="Query"><Bloco>{JSON.stringify(detalhe.query, null, 2)}</Bloco></Secao>
-              )}
-            </div>
-          )}
-        </DialogContent>
+        <ModalRequisicao detalhe={detalhe} />
       </Dialog>
     </div>
   )
 }
 
-function Campo({ k, v }: { k: string; v: string }) {
-  return <div className="rounded-md border bg-muted/20 px-2.5 py-1.5"><span className="block text-[10px] uppercase tracking-wide text-muted-foreground">{k}</span><span className="break-all font-medium">{v}</span></div>
-}
-function Secao({ titulo, children }: { titulo: string; children: ReactNode }) {
-  return <div><p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</p>{children}</div>
-}
-function Bloco({ children }: { children: ReactNode }) {
-  return <pre className="max-h-64 overflow-auto rounded-md border bg-muted/30 p-2.5 text-[11px] leading-relaxed">{children}</pre>
-}
 
 // ── Eventos (monitor dos webhooks recebidos) ──────────────────────────────────
 function Eventos({ provider }: { provider: Provider }) {

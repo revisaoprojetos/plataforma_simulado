@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState, useTransition, type ReactNode } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog } from '@/components/ui/dialog'
 import { Loader2, RefreshCw, Eye, Copy, Check, Inbox } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { ModalRequisicao } from '@/components/admin/modal-requisicao'
 import { listarRecebidos, getRecebidoDetalhe, type RecebidoDTO } from '@/app/admin/integracoes/actions'
 
 type Detalhe = Awaited<ReturnType<typeof getRecebidoDetalhe>>['detalhe']
@@ -105,34 +106,8 @@ export function RecebidosInbox({ appUrl, token }: { appUrl: string; token: strin
       </div>
 
       <Dialog open={!!detalhe} onOpenChange={(o) => { if (!o) setDetalhe(null) }}>
-        <DialogContent className="max-h-[85vh] overflow-auto sm:max-w-2xl">
-          <DialogHeader><DialogTitle>Requisição recebida{detalhe ? ` · ${detalhe.fonte}` : ''}</DialogTitle></DialogHeader>
-          {detalhe && (
-            <div className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2">
-                <Campo k="Fonte" v={detalhe.fonte ?? detalhe.provider} />
-                <Campo k="Método" v={detalhe.metodo} />
-                <Campo k="Status devolvido" v={String(detalhe.statusResp ?? '—')} />
-                <Campo k="Resultado" v={detalhe.resultado ?? '—'} />
-                <Campo k="IP" v={detalhe.ip ?? '—'} />
-                <Campo k="Recebido em" v={new Date(detalhe.recebidoEm).toLocaleString('pt-BR')} />
-              </div>
-              <Secao titulo="Corpo (JSON)"><Bloco>{detalhe.body ? JSON.stringify(detalhe.body, null, 2) : (detalhe.bodyRaw || '(vazio)')}</Bloco></Secao>
-              <Secao titulo="Headers"><Bloco>{detalhe.headers ? JSON.stringify(detalhe.headers, null, 2) : '(nenhum)'}</Bloco></Secao>
-            </div>
-          )}
-        </DialogContent>
+        <ModalRequisicao detalhe={detalhe ?? null} />
       </Dialog>
     </div>
   )
-}
-
-function Campo({ k, v }: { k: string; v: string }) {
-  return <div className="rounded-md border bg-muted/20 px-2.5 py-1.5"><span className="block text-[10px] uppercase tracking-wide text-muted-foreground">{k}</span><span className="break-all font-medium">{v}</span></div>
-}
-function Secao({ titulo, children }: { titulo: string; children: ReactNode }) {
-  return <div><p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</p>{children}</div>
-}
-function Bloco({ children }: { children: ReactNode }) {
-  return <pre className="max-h-64 overflow-auto rounded-md border bg-muted/30 p-2.5 text-[11px] leading-relaxed">{children}</pre>
 }
