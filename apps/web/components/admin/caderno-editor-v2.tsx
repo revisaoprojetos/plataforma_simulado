@@ -183,7 +183,7 @@ function ListaBlocos({ blocks, ctx, emColuna }: { blocks: Block[]; ctx: NodeCtx;
   )
 }
 
-function EditorNode({ block, ctx, emColuna }: { block: Block; ctx: NodeCtx; emColuna?: boolean }) {
+function EditorNode({ block, ctx, emColuna, divStyle }: { block: Block; ctx: NodeCtx; emColuna?: boolean; divStyle?: React.CSSProperties }) {
   const a = block.attributes as any
   const selected = ctx.selId === block.id
 
@@ -197,7 +197,7 @@ function EditorNode({ block, ctx, emColuna }: { block: Block; ctx: NodeCtx; emCo
       <div data-flip-key={block.id} onClick={(e) => { e.stopPropagation(); ctx.select(block) }}
         onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); ctx.setOver(block.id) }}
         onDrop={(e) => ctx.drop(e, { kind: 'into', containerId: block.id })}
-        style={{ flex: colLarg ? `0 0 ${colLarg}%` : '1 1 0%', ...(over ? { outline: `2px solid ${REALCE}`, outlineOffset: -2, borderRadius: 6 } : {}) }}
+        style={{ flex: colLarg ? `0 0 ${colLarg}%` : '1 1 0%', ...divStyle, ...(over ? { outline: `2px solid ${REALCE}`, outlineOffset: -2, borderRadius: 6 } : {}) }}
         className={cn('min-w-0 rounded transition-colors', over && 'bg-primary/10')}>
         {vazia ? <DropZoneVazia onClick={() => ctx.addInto(block.id)} /> : <AutoAnim ativo={!ctx.arrastando} className="flex flex-col"><ListaBlocos blocks={filhos} ctx={ctx} emColuna /></AutoAnim>}
       </div>
@@ -234,9 +234,14 @@ function EditorNode({ block, ctx, emColuna }: { block: Block; ctx: NodeCtx; emCo
       </div>
     )
   } else if (block.type === 'colunas') {
+    const estilosDiv = { solido: 'solid', tracejado: 'dashed', pontilhado: 'dotted' } as Record<string, string>
+    const temDiv = !!a.divisoria
+    const bordaDiv = temDiv ? `${a.divisoriaEspessura ?? 1}px ${estilosDiv[a.divisoriaEstilo] ?? 'solid'} ${a.divisoriaCor || '#cbd5e1'}` : ''
     inner = (
-      <AutoAnim ativo={!ctx.arrastando} style={{ display: 'flex', gap: a.gap ?? 16, alignItems: 'flex-start' }}>
-        {(block.innerBlocks ?? []).map((col) => <EditorNode key={col.id} block={col} ctx={ctx} />)}
+      <AutoAnim ativo={!ctx.arrastando} style={{ display: 'flex', gap: a.gap ?? 16, alignItems: temDiv ? 'stretch' : 'flex-start' }}>
+        {(block.innerBlocks ?? []).map((col, i) => (
+          <EditorNode key={col.id} block={col} ctx={ctx} divStyle={(temDiv && i > 0) ? { borderLeft: bordaDiv, paddingLeft: (a.gap ?? 16) / 2 } : undefined} />
+        ))}
       </AutoAnim>
     )
   } else if (block.type === 'repeticao') {

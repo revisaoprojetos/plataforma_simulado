@@ -344,8 +344,10 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
     case 'separador':
       return (
         <div className="space-y-3">
+          <Row label="Orientação"><select value={a.orientacao ?? 'horizontal'} onChange={(e) => set('orientacao', e.target.value)} className={inputCls}><option value="horizontal">Horizontal (entre blocos)</option><option value="vertical">Vertical (entre colunas)</option></select></Row>
           <Row label="Espessura"><select value={a.espessura} onChange={(e) => set('espessura', Number(e.target.value))} className={inputCls}><option value={1}>Fina</option><option value={2}>Média</option><option value={4}>Grossa</option></select></Row>
           <Row label="Estilo"><select value={a.estilo} onChange={(e) => set('estilo', e.target.value)} className={inputCls}><option value="solido">Sólido</option><option value="tracejado">Tracejado</option><option value="pontilhado">Pontilhado</option></select></Row>
+          {a.orientacao === 'vertical' && <Faixa label="Altura mínima (px)" min={0} max={600} value={a.altura ?? 0} onChange={(v) => set('altura', v)} />}
           <Cor label="Cor" value={a.cor} onChange={(v) => set('cor', v)} />
         </div>
       )
@@ -401,6 +403,14 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
         <div className="space-y-3">
           <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Use “+ coluna / − coluna” no bloco (canvas) e adicione blocos dentro de cada coluna. Clique numa coluna para ajustar a largura dela.</p>
           <Faixa label="Espaço entre colunas (px)" min={0} max={48} value={a.gap} onChange={(v) => set('gap', v)} />
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={!!a.divisoria} onChange={(e) => set('divisoria', e.target.checked)} className="h-4 w-4 rounded border" /> Linha divisória entre as colunas</label>
+          {a.divisoria && (
+            <>
+              <Row label="Espessura"><select value={a.divisoriaEspessura ?? 1} onChange={(e) => set('divisoriaEspessura', Number(e.target.value))} className={inputCls}><option value={1}>Fina</option><option value={2}>Média</option><option value={4}>Grossa</option></select></Row>
+              <Row label="Estilo"><select value={a.divisoriaEstilo ?? 'solido'} onChange={(e) => set('divisoriaEstilo', e.target.value)} className={inputCls}><option value="solido">Sólido</option><option value="tracejado">Tracejado</option><option value="pontilhado">Pontilhado</option></select></Row>
+              <Cor label="Cor da divisória" value={a.divisoriaCor} onChange={(v) => set('divisoriaCor', v)} />
+            </>
+          )}
         </div>
       )
     case 'coluna':

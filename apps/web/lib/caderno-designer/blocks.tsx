@@ -53,13 +53,13 @@ export const BLOCKS: BlockMeta[] = [
   { type: 'card', title: 'Card', icon: Square, category: 'estrutura', container: true, supportsVars: true,
     defaults: { corFundo: '#f8fafc', bordaCor: '', bordaLargura: 1, bordaRaio: 8, padding: 8, largura: 100, alinhamento: 'center' } },
   { type: 'colunas', title: 'Colunas (lado a lado)', icon: Columns2, category: 'estrutura', container: true,
-    defaults: { gap: 16 } },
+    defaults: { gap: 16, divisoria: false, divisoriaEspessura: 1, divisoriaEstilo: 'solido', divisoriaCor: '' } },
   { type: 'imagem', title: 'Imagem', icon: ImageIcon, category: 'estrutura',
     defaults: { url: '', largura: 60, align: 'center' } },
   { type: 'plano-fundo', title: 'Imagem de fundo', icon: Wallpaper, category: 'estrutura', unicoPorPagina: true, fullBleed: true,
     defaults: { url: '', opacidade: 100 } },
   { type: 'separador', title: 'Separador', icon: Minus, category: 'estrutura',
-    defaults: { espessura: 1, estilo: 'solido', cor: '' } },
+    defaults: { espessura: 1, estilo: 'solido', cor: '', orientacao: 'horizontal', altura: 0 } },
   { type: 'espacador', title: 'Espaçador', icon: MoveVertical, category: 'estrutura',
     defaults: { altura: 24 } },
   { type: 'quebra-pagina', title: 'Quebra de página', icon: Scissors, category: 'estrutura',
@@ -324,7 +324,12 @@ export function BlockRender({ block, theme, data, full }: { block: Block; theme:
       )
     case 'separador': {
       const estilos = { solido: 'solid', tracejado: 'dashed', pontilhado: 'dotted' } as Record<string, string>
-      return <div style={{ borderTop: `${a.espessura ?? 1}px ${estilos[a.estilo] ?? 'solid'} ${a.cor || c.secundaria}`, margin: '4px 0' }} />
+      const linha = `${a.espessura ?? 1}px ${estilos[a.estilo] ?? 'solid'} ${a.cor || c.secundaria}`
+      // Vertical: divide colunas (ocupa a altura). Horizontal (padrão): linha entre blocos.
+      if (a.orientacao === 'vertical') {
+        return <div style={{ alignSelf: 'stretch', borderLeft: linha, minHeight: a.altura ? a.altura : 24, margin: '0 8px' }} />
+      }
+      return <div style={{ borderTop: linha, margin: '4px 0' }} />
     }
     case 'espacador':
       return <div style={{ height: a.altura ?? 24 }} />
@@ -353,15 +358,20 @@ export function BlockRender({ block, theme, data, full }: { block: Block; theme:
         </div>
       )
     }
-    case 'colunas':
+    case 'colunas': {
+      const estilosDiv = { solido: 'solid', tracejado: 'dashed', pontilhado: 'dotted' } as Record<string, string>
+      const temDiv = !!a.divisoria
+      const bordaDiv = temDiv ? `${a.divisoriaEspessura ?? 1}px ${estilosDiv[a.divisoriaEstilo] ?? 'solid'} ${a.divisoriaCor || c.secundaria}` : ''
       return (
-        <div style={{ display: 'flex', gap: a.gap ?? 16, alignItems: 'flex-start' }}>
-          {(block.innerBlocks ?? []).map((col) => {
+        <div style={{ display: 'flex', gap: a.gap ?? 16, alignItems: temDiv ? 'stretch' : 'flex-start' }}>
+          {(block.innerBlocks ?? []).map((col, i) => {
             const cl = larguraDaColuna(col)
-            return <div key={col.id} style={{ flex: cl ? `0 0 ${cl}%` : '1 1 0%', minWidth: 0 }}><BlockRender block={col} theme={theme} data={data} /></div>
+            const div = (temDiv && i > 0) ? { borderLeft: bordaDiv, paddingLeft: (a.gap ?? 16) / 2 } : {}
+            return <div key={col.id} style={{ flex: cl ? `0 0 ${cl}%` : '1 1 0%', minWidth: 0, ...div }}><BlockRender block={col} theme={theme} data={data} /></div>
           })}
         </div>
       )
+    }
     case 'coluna':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
