@@ -244,6 +244,59 @@ export async function getEventoDetalhe(provider: string, id: string): Promise<{ 
   }
 }
 
+// ── Inbox CRU do webhook (toda requisição que bate na URL) ─────────────────────
+export interface InboxDTO {
+  id: string; metodo: string; statusResp: number | null; resultado: string | null
+  comprador: string | null; produto: string | null; ip: string | null; recebidoEm: string
+}
+
+export async function listarWebhookInbox(provider: string, limite = 100): Promise<{ ok: boolean; error?: string; itens?: InboxDTO[]; semTabela?: boolean }> {
+  if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
+  if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data, error } = await svc.from('simulado_webhook_inbox')
+    .select('id, metodo, status_resp, resultado, body_json, ip, recebido_em')
+    .eq('tenant_id', g.tenantId).eq('provider', provider)
+    .order('recebido_em', { ascending: false }).limit(limite)
+  if (error) {
+    if ((error as any).code === '42P01' || /does not exist|schema cache/i.test(error.message)) return { ok: true, itens: [], semTabela: true }
+    return { ok: false, error: error.message }
+  }
+  const itens: InboxDTO[] = (data ?? []).map((e: any) => {
+    const r = resumoEvento(e.body_json)
+    return { id: e.id, metodo: e.metodo, statusResp: e.status_resp, resultado: e.resultado, comprador: r.comprador, produto: r.produto, ip: e.ip, recebidoEm: e.recebido_em }
+  })
+  return { ok: true, itens }
+}
+
+export interface InboxDetalhe {
+  metodo: string; statusResp: number | null; resultado: string | null
+  ip: string | null; recebidoEm: string; tokenMasc: string | null
+  headers: unknown; query: unknown; body: unknown; bodyRaw: string | null
+}
+
+export async function getWebhookInboxDetalhe(provider: string, id: string): Promise<{ ok: boolean; error?: string; detalhe?: InboxDetalhe }> {
+  if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
+  if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data } = await svc.from('simulado_webhook_inbox')
+    .select('metodo, status_resp, resultado, ip, recebido_em, token, headers, query, body_json, body_raw')
+    .eq('id', id).eq('tenant_id', g.tenantId).eq('provider', provider).maybeSingle()
+  if (!data) return { ok: false, error: 'Requisição não encontrada.' }
+  const d = data as any
+  const tok: string | null = d.token ?? null
+  return {
+    ok: true,
+    detalhe: {
+      metodo: d.metodo, statusResp: d.status_resp, resultado: d.resultado, ip: d.ip, recebidoEm: d.recebido_em,
+      tokenMasc: tok ? `${tok.slice(0, 6)}…${tok.slice(-4)}` : null,
+      headers: d.headers ?? null, query: d.query ?? null, body: d.body_json ?? null, bodyRaw: d.body_raw ?? null,
+    },
+  }
+}
+
 export async function reprocessarEvento(provider: string, id: string): Promise<{ ok: boolean; error?: string }> {
   if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
   if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Loader2, Plug, Check, AlertTriangle, Trash2, RefreshCw, Copy, DownloadCloud, KeyRound, GitBranch, Radio, RotateCw, Eye, Users, UserPlus, Search } from 'lucide-react'
+import { Loader2, Plug, Check, AlertTriangle, Trash2, RefreshCw, Copy, DownloadCloud, KeyRound, GitBranch, Radio, RotateCw, Eye, Users, UserPlus, Search, Inbox } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { CAMPOS_PROVIDER, PROVIDER_META } from '@/app/admin/integracoes/campos'
@@ -13,6 +13,7 @@ import {
   salvarIntegracaoConfig, testarIntegracao, listarFontes, salvarMapeamento, excluirMapeamento, rodarImportIntegracao,
   listarEventos, reprocessarEvento, getEventoDetalhe, regenerarWebhookToken, testarWebhookInbound, type EventoDTO, type EventoDetalhe,
   listarAssinaturasSalvas, sincronizarAssinaturas, aplicarAssinaturasGuru, type AssinaturaGuruDTO,
+  listarWebhookInbox, getWebhookInboxDetalhe, type InboxDTO, type InboxDetalhe,
 } from '@/app/admin/integracoes/actions'
 import type { Provider } from '@/lib/integracoes/tipos'
 
@@ -21,7 +22,7 @@ interface Mapeamento { id: string; fonteRef: string; fonteNome: string | null; c
 interface Grupo { id: string; nome: string }
 interface Fonte { ref: string; nome: string; total?: number }
 
-type Aba = 'credenciais' | 'mapeamentos' | 'importar' | 'eventos' | 'assinaturas'
+type Aba = 'credenciais' | 'mapeamentos' | 'importar' | 'eventos' | 'assinaturas' | 'recebidos'
 const SEM = '__sem__'
 
 export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos, gruposSistema, simuladosSistema }: {
@@ -37,6 +38,7 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
     ...(meta.push ? [{ id: 'assinaturas' as Aba, label: 'Assinaturas', Icon: Users }] : []),
     ...(!meta.push ? [{ id: 'importar' as Aba, label: 'Importar', Icon: DownloadCloud }] : []),
     ...(meta.push ? [{ id: 'eventos' as Aba, label: 'Eventos', Icon: Radio }] : []),
+    ...(meta.push ? [{ id: 'recebidos' as Aba, label: 'Recebidos', Icon: Inbox }] : []),
   ]
 
   return (
@@ -55,6 +57,7 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
       {aba === 'assinaturas' && meta.push && <Assinaturas provider={provider} />}
       {aba === 'importar' && !meta.push && <Importar provider={provider} />}
       {aba === 'eventos' && meta.push && <Eventos provider={provider} />}
+      {aba === 'recebidos' && meta.push && <Recebidos provider={provider} />}
     </div>
   )
 }
@@ -196,6 +199,109 @@ function Assinaturas({ provider }: { provider: Provider }) {
       )}
     </div>
   )
+}
+
+// ── Recebidos (inbox CRU: toda requisição que bate na URL do webhook) ─────────
+function Recebidos({ provider }: { provider: Provider }) {
+  const [itens, setItens] = useState<InboxDTO[] | null>(null)
+  const [semTabela, setSemTabela] = useState(false)
+  const [carregando, start] = useTransition()
+  const [detalhe, setDetalhe] = useState<InboxDetalhe | null>(null)
+  const [abrindo, setAbrindo] = useState<string | null>(null)
+
+  const carregar = () => start(async () => {
+    const r = await listarWebhookInbox(provider)
+    if (!r.ok) { toast.error(r.error ?? 'Falha ao carregar'); setItens([]); return }
+    setItens(r.itens ?? []); setSemTabela(!!r.semTabela)
+  })
+  useEffect(() => { carregar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const abrir = (id: string) => { setAbrindo(id); (async () => { const r = await getWebhookInboxDetalhe(provider, id); setAbrindo(null); if (r.ok && r.detalhe) setDetalhe(r.detalhe); else toast.error(r.error ?? 'Erro') })() }
+  const fmt = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const corStatus = (s: number | null) => s == null ? 'bg-muted text-muted-foreground' : s < 300 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : s < 500 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">Toda requisição que chega na URL do webhook (últimas 100), <b>inclusive as que falham</b> — para conferir o que a {PROVIDER_META[provider].nome} envia.</p>
+        <Button variant="outline" size="sm" onClick={carregar} disabled={carregando}>{carregando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />} Atualizar</Button>
+      </div>
+
+      {semTabela && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+          A tabela do inbox ainda não foi criada. Aplique a migration <b>20260717000002_webhook_inbox</b> para começar a registrar as requisições.
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-lg border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/60 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+            <tr className="border-b">
+              <th className="px-3 py-2 font-medium">Recebido</th>
+              <th className="px-3 py-2 font-medium">Método</th>
+              <th className="px-3 py-2 font-medium">Status</th>
+              <th className="px-3 py-2 font-medium">Resultado</th>
+              <th className="px-3 py-2 font-medium">Comprador</th>
+              <th className="px-3 py-2 text-right font-medium">Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {itens === null ? (
+              <tr><td colSpan={6} className="py-8 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
+            ) : itens.length === 0 ? (
+              <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma requisição recebida ainda. Cadastre a URL na {PROVIDER_META[provider].nome} e faça uma compra de teste (ou abra a URL no navegador para um ping GET).</td></tr>
+            ) : itens.map((e) => (
+              <tr key={e.id} className="border-b last:border-0 align-top hover:bg-muted/30">
+                <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{fmt(e.recebidoEm)}</td>
+                <td className="px-3 py-2 text-xs font-medium">{e.metodo}</td>
+                <td className="px-3 py-2"><span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', corStatus(e.statusResp))}>{e.statusResp ?? '—'}</span></td>
+                <td className="max-w-[240px] px-3 py-2 text-xs">{e.resultado ?? '—'}</td>
+                <td className="px-3 py-2 text-xs">{e.comprador ?? '—'}</td>
+                <td className="px-3 py-2 text-right">
+                  <button type="button" onClick={() => abrir(e.id)} disabled={abrindo === e.id} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted disabled:opacity-60">
+                    {abrindo === e.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />} Ver
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Dialog open={!!detalhe} onOpenChange={(o) => { if (!o) setDetalhe(null) }}>
+        <DialogContent className="max-h-[85vh] overflow-auto sm:max-w-2xl">
+          <DialogHeader><DialogTitle>Requisição recebida</DialogTitle></DialogHeader>
+          {detalhe && (
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-2">
+                <Campo k="Método" v={detalhe.metodo} />
+                <Campo k="Status devolvido" v={String(detalhe.statusResp ?? '—')} />
+                <Campo k="Resultado" v={detalhe.resultado ?? '—'} />
+                <Campo k="IP" v={detalhe.ip ?? '—'} />
+                <Campo k="Token (URL)" v={detalhe.tokenMasc ?? '—'} />
+                <Campo k="Recebido em" v={new Date(detalhe.recebidoEm).toLocaleString('pt-BR')} />
+              </div>
+              <Secao titulo="Corpo (JSON)"><Bloco>{detalhe.body ? JSON.stringify(detalhe.body, null, 2) : (detalhe.bodyRaw || '(vazio)')}</Bloco></Secao>
+              <Secao titulo="Headers"><Bloco>{detalhe.headers ? JSON.stringify(detalhe.headers, null, 2) : '(nenhum)'}</Bloco></Secao>
+              {detalhe.query != null && Object.keys(detalhe.query as any).length > 0 && (
+                <Secao titulo="Query"><Bloco>{JSON.stringify(detalhe.query, null, 2)}</Bloco></Secao>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function Campo({ k, v }: { k: string; v: string }) {
+  return <div className="rounded-md border bg-muted/20 px-2.5 py-1.5"><span className="block text-[10px] uppercase tracking-wide text-muted-foreground">{k}</span><span className="break-all font-medium">{v}</span></div>
+}
+function Secao({ titulo, children }: { titulo: string; children: ReactNode }) {
+  return <div><p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</p>{children}</div>
+}
+function Bloco({ children }: { children: ReactNode }) {
+  return <pre className="max-h-64 overflow-auto rounded-md border bg-muted/30 p-2.5 text-[11px] leading-relaxed">{children}</pre>
 }
 
 // ── Eventos (monitor dos webhooks recebidos) ──────────────────────────────────
