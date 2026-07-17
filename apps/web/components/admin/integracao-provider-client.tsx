@@ -12,7 +12,7 @@ import { CAMPOS_PROVIDER, PROVIDER_META } from '@/app/admin/integracoes/campos'
 import {
   salvarIntegracaoConfig, testarIntegracao, listarFontes, salvarMapeamento, excluirMapeamento, rodarImportIntegracao,
   listarEventos, reprocessarEvento, getEventoDetalhe, regenerarWebhookToken, testarWebhookInbound, type EventoDTO, type EventoDetalhe,
-  listarAssinaturasGuru, aplicarAssinaturasGuru, type AssinaturaGuruDTO,
+  listarAssinaturasSalvas, sincronizarAssinaturas, aplicarAssinaturasGuru, type AssinaturaGuruDTO,
 } from '@/app/admin/integracoes/actions'
 import type { Provider } from '@/lib/integracoes/tipos'
 
@@ -64,19 +64,39 @@ function Assinaturas({ provider }: { provider: Provider }) {
   const [itens, setItens] = useState<AssinaturaGuruDTO[] | null>(null)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [busca, setBusca] = useState('')
+  const [syncEm, setSyncEm] = useState<string | null>(null)
+  const [nuncaSync, setNuncaSync] = useState(false)
   const [carregando, start] = useTransition()
+  const [sincronizando, startSync] = useTransition()
   const [aplicando, startAplicar] = useTransition()
+  const nomeProv = PROVIDER_META[provider].nome
 
-  const carregar = (forcar = false) => start(async () => {
-    const r = await listarAssinaturasGuru(provider, forcar)
-    if (!r.ok) { toast.error(r.error ?? 'Erro ao buscar'); setItens([]); return }
+  // Lê da BASE local (rápido, sem tocar a API).
+  const carregar = () => start(async () => {
+    const r = await listarAssinaturasSalvas(provider)
+    if (!r.ok) { toast.error(r.error ?? 'Erro ao ler a base'); setItens([]); return }
     setItens(r.itens ?? [])
+    setSyncEm(r.sincronizadoEm ?? null)
+    setNuncaSync(!!r.nuncaSync)
     setSel(new Set())
-    if (forcar) toast.success('Atualizado da Guru')
-    else if (r.deCache) toast.message('Exibindo do cache (não bateu na Guru)')
   })
 
-  useEffect(() => { carregar(false) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Toca a API do provedor e grava na base; depois relê a base.
+  const sincronizar = () => startSync(async () => {
+    const r = await sincronizarAssinaturas(provider)
+    if (!r.ok) { toast.error(r.error ?? 'Falha ao sincronizar'); return }
+    toast.success(`Sincronizado: ${r.total ?? 0} assinatura(s) da ${nomeProv}`)
+    carregar()
+  })
+
+  useEffect(() => { carregar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fmtSync = (iso: string | null) => {
+    if (!iso) return 'nunca sincronizado'
+    const d = new Date(iso), min = Math.round((Date.now() - d.getTime()) / 60000)
+    const quando = min < 1 ? 'agora há pouco' : min < 60 ? `há ${min} min` : min < 1440 ? `há ${Math.round(min / 60)} h` : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    return `última sincronização ${quando}`
+  }
 
   const filtrados = (itens ?? []).filter((a) => {
     const q = busca.trim().toLowerCase()
@@ -96,7 +116,7 @@ function Assinaturas({ provider }: { provider: Provider }) {
       if (!r.ok) { toast.error(r.error ?? 'Erro ao adicionar'); return }
       const s = r.resumo!
       toast.success(`${s.concedidos} com acesso · ${s.criados} aluno(s) · ${s.semMapeamento} sem mapeamento${s.erros ? ` · ${s.erros} erro(s)` : ''}`)
-      carregar(false)
+      carregar()
     })
   }
 
@@ -114,22 +134,31 @@ function Assinaturas({ provider }: { provider: Provider }) {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, e-mail, CPF, produto…" className="pl-8" />
         </div>
-        <Button variant="outline" onClick={() => carregar(true)} disabled={carregando}>
-          {carregando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />} Atualizar da Guru
+        <Button variant="outline" onClick={sincronizar} disabled={sincronizando || carregando}>
+          {sincronizando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DownloadCloud className="mr-2 h-4 w-4" />} Sincronizar da {nomeProv}
         </Button>
         <Button onClick={aplicar} disabled={aplicando || sel.size === 0}>
           {aplicando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Confirmar e adicionar ({sel.size})
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        A lista vem da API da Guru (comprador + produto + status), com cache curto para não estourar o limite. Marque e clique em <b>Confirmar e adicionar</b> — cria o aluno e, se o produto estiver mapeado, já concede o acesso/grupo. O <b>webhook</b> faz isso automaticamente em novas compras.
+        A lista vem da <b>base salva no sistema</b> (rápida e sem sobrecarregar a API). Clique em <b>Sincronizar da {nomeProv}</b> para atualizar a base com o que há na plataforma — a API só é consultada nesse momento. Depois, marque e clique em <b>Confirmar e adicionar</b>: cria o aluno e, se o produto estiver mapeado, já concede o acesso/grupo. O <b>webhook</b> mantém a base em dia automaticamente a cada nova compra.
       </p>
+      {itens !== null && (
+        <p className="text-[11px] text-muted-foreground">
+          {(itens?.length ?? 0)} na base · {fmtSync(syncEm)}
+        </p>
+      )}
 
       {itens === null ? (
-        <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando assinaturas…</div>
+        <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Lendo a base…</div>
       ) : filtrados.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          Nenhuma assinatura encontrada. Verifique as credenciais (User Token) em Credenciais e clique em <b>Atualizar da Guru</b>.
+          {nuncaSync
+            ? <>A base ainda está vazia. Clique em <b>Sincronizar da {nomeProv}</b> para trazer as assinaturas (verifique antes o User Token em Credenciais).</>
+            : busca.trim()
+              ? <>Nenhum resultado para “{busca}”.</>
+              : <>Nenhuma assinatura na base. Clique em <b>Sincronizar da {nomeProv}</b> para atualizar.</>}
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border">

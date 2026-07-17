@@ -10,8 +10,8 @@ import { resolverProviderCfg } from '@/lib/integracoes/config'
 import { getAdapter } from '@/lib/integracoes/registry'
 import { importarViaProvider, listarFontesProvider, processarEvento } from '@/lib/integracoes/orquestrador'
 import { aplicarEntitlement } from '@/lib/integracoes/engine'
-import { comCache, coalescer, invalidarCache } from '@/lib/integracoes/ratelimit'
-import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { coalescer } from '@/lib/integracoes/ratelimit'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { Provider, PessoaNormalizada, Entitlement } from '@/lib/integracoes/tipos'
 
 const PROVIDERS: Provider[] = ['curseduca', 'guru']
@@ -278,57 +278,125 @@ export interface AssinaturaGuruDTO {
 
 const chaveDigitos = (s?: string | null) => (s ? s.replace(/\D/g, '') : '')
 
+interface BaseRow {
+  pessoa_external_id: string | null; ent_external_id: string
+  nome: string | null; email: string | null; cpf: string | null; telefone: string | null
+  produto_ref: string | null; produto_nome: string | null; status: string | null
+}
+
+export interface AssinaturasResult {
+  ok: boolean; error?: string
+  itens?: AssinaturaGuruDTO[]
+  sincronizadoEm?: string | null   // ISO da última sincronização (base_sync_em)
+  total?: number
+  nuncaSync?: boolean              // base vazia e nunca sincronizada → sugerir "Sincronizar"
+}
+
 /**
- * Lista as assinaturas da Guru (comprador + produto + status) para a tela de análise.
- * A chamada à API é CACHEADA (comCache 3 min) + coalescida (single-flight) — abrir a tela
- * várias vezes ou vários admins juntos NÃO batem repetido na Guru (§7.4). "Atualizar" força
- * um novo pull. Enriquece com "já está no sistema?" e "produto mapeado?".
+ * Lê as assinaturas JÁ SALVAS na base local (simulado_integracao_base) — rápido e SEM tocar
+ * a API do provedor. A API só é chamada por `sincronizarAssinaturas()` (botão "Sincronizar").
+ * Assim o uso do dia a dia (abrir a tela, comparar, adicionar) NÃO sobrecarrega a chave/rate
+ * limit. Enriquece com "já está no sistema?" e "produto mapeado?".
  */
-export async function listarAssinaturasGuru(provider: string, forcar = false): Promise<{ ok: boolean; error?: string; itens?: AssinaturaGuruDTO[]; deCache?: boolean }> {
+export async function listarAssinaturasSalvas(provider: string): Promise<AssinaturasResult> {
   if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
   const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
-  // ignorarAtivo: a análise de assinaturas é leitura + confirmação manual, funciona com o token salvo (sem precisar ativar).
-  const cfg = await resolverProviderCfg(g.tenantId, provider, { ignorarAtivo: true })
-  if (!cfg) return { ok: false, error: 'Salve o API Token da Guru primeiro.' }
-  const adapter = getAdapter(provider)
-  if (!adapter) return { ok: false, error: 'Provedor não suportado.' }
-
-  const chaveCache = `${provider}:assinaturas:${g.tenantId}`
-  if (forcar) await invalidarCache(chaveCache)
-  let deCache = true
-  const pares = await comCache(chaveCache, 180, () => coalescer(chaveCache, async () => {
-    deCache = false
-    return adapter.listarPessoas(cfg, [])
-  }))
-  if (!pares.length) return { ok: true, itens: [], deCache }
-
   const svc = createAdminClient()
+
+  const { data: cfgRow } = await svc.from('simulado_integracao_config').select('base_sync_em').eq('tenant_id', g.tenantId).eq('provider', provider).maybeSingle()
+  const sincronizadoEm = (cfgRow as any)?.base_sync_em ?? null
+
+  // Lê a base salva (paginada; sem teto de 1000). Se a tabela ainda não existe → orienta a migration.
+  let linhas: BaseRow[]
+  try {
+    linhas = await fetchAll<BaseRow>(() =>
+      svc.from('simulado_integracao_base')
+        .select('pessoa_external_id, ent_external_id, nome, email, cpf, telefone, produto_ref, produto_nome, status')
+        .eq('tenant_id', g.tenantId).eq('provider', provider)
+        .order('status', { ascending: true }).order('nome', { ascending: true }))
+  } catch (e) {
+    if ((e as any)?.code === '42P01') return { ok: false, error: 'A base ainda não foi criada. Aplique a migration 20260717000001_integracao_base.' }
+    return { ok: false, error: (e as Error).message ?? 'Falha ao ler a base.' }
+  }
+  if (!linhas.length) return { ok: true, itens: [], sincronizadoEm, total: 0, nuncaSync: !sincronizadoEm }
+
   // Mapeamentos ativos (para marcar "produto mapeado?").
   const { data: maps } = await svc.from('simulado_integracao_mapeamentos').select('fonte_ref').eq('tenant_id', g.tenantId).eq('provider', provider).eq('ativo', true)
   const mapeados = new Set((maps ?? []).map((m: any) => m.fonte_ref))
 
   // "Já no sistema?" em lote: casa por email e por cpf (uma consulta chunk'd cada).
-  const emails = [...new Set(pares.map((p) => (p.pessoa.email ?? '').trim().toLowerCase()).filter(Boolean))]
-  const cpfs = [...new Set(pares.map((p) => chaveDigitos(p.pessoa.cpf)).filter(Boolean))]
+  const emails = [...new Set(linhas.map((r) => (r.email ?? '').trim().toLowerCase()).filter(Boolean))]
+  const cpfs = [...new Set(linhas.map((r) => chaveDigitos(r.cpf)).filter(Boolean))]
   const porEmail = emails.length ? await fetchAllByIn<{ email: string }>(emails, (c) => svc.from('simulado_estudantes').select('email').eq('tenant_id', g.tenantId).eq('deletado', false).in('email', c)) : []
   const porCpf = cpfs.length ? await fetchAllByIn<{ cpf: string }>(cpfs, (c) => svc.from('simulado_estudantes').select('cpf').eq('tenant_id', g.tenantId).eq('deletado', false).in('cpf', c)) : []
   const emailSet = new Set(porEmail.map((e) => (e.email ?? '').trim().toLowerCase()))
   const cpfSet = new Set(porCpf.map((e) => chaveDigitos(e.cpf)))
 
-  const itens: AssinaturaGuruDTO[] = pares.map((p) => {
-    const email = (p.pessoa.email ?? '').trim().toLowerCase() || null
-    const cpf = chaveDigitos(p.pessoa.cpf) || null
+  const itens: AssinaturaGuruDTO[] = linhas.map((r) => {
+    const email = (r.email ?? '').trim().toLowerCase() || null
+    const cpf = chaveDigitos(r.cpf) || null
     return {
-      pessoaExternalId: p.pessoa.externalId,
-      entExternalId: p.entitlement.externalId,
-      nome: p.pessoa.nome, email: p.pessoa.email, cpf: p.pessoa.cpf ?? null, telefone: p.pessoa.telefone ?? null,
-      produtoRef: p.entitlement.produtoRef, produtoNome: p.entitlement.produtoNome ?? null, status: p.entitlement.status,
+      pessoaExternalId: r.pessoa_external_id ?? r.ent_external_id,
+      entExternalId: r.ent_external_id,
+      nome: r.nome ?? email ?? 'Aluno', email: r.email, cpf: r.cpf, telefone: r.telefone,
+      produtoRef: r.produto_ref ?? '', produtoNome: r.produto_nome, status: r.status ?? 'ativo',
       jaNoSistema: (!!email && emailSet.has(email)) || (!!cpf && cpfSet.has(cpf)),
-      temMapeamento: mapeados.has(p.entitlement.produtoRef),
+      temMapeamento: !!r.produto_ref && mapeados.has(r.produto_ref),
     }
   })
-  return { ok: true, itens, deCache }
+  return { ok: true, itens, sincronizadoEm, total: itens.length, nuncaSync: !sincronizadoEm }
+}
+
+/**
+ * SINCRONIZA da API do provedor → base local (upsert idempotente por tenant+provider+external_id).
+ * Esta é a ÚNICA função que toca a API. Coalescida (single-flight) p/ dois admins clicando junto
+ * não puxarem em dobro; o rate limit interno do adapter respeita o limite da API. Grava
+ * base_sync_em/total em simulado_integracao_config p/ exibir "última sincronização".
+ */
+export async function sincronizarAssinaturas(provider: string): Promise<{ ok: boolean; error?: string; total?: number; sincronizadoEm?: string }> {
+  if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const cfg = await resolverProviderCfg(g.tenantId, provider, { ignorarAtivo: true })
+  if (!cfg) return { ok: false, error: 'Salve o API Token primeiro.' }
+  const adapter = getAdapter(provider)
+  if (!adapter) return { ok: false, error: 'Provedor não suportado.' }
+  const svc = createAdminClient()
+
+  try {
+    const pares = await coalescer(`${provider}:sync:${g.tenantId}`, () => adapter.listarPessoas(cfg, []))
+    const agora = new Date().toISOString()
+    const rows = pares.map((p) => ({
+      tenant_id: g.tenantId, provider,
+      ent_external_id: p.entitlement.externalId,
+      pessoa_external_id: p.pessoa.externalId,
+      nome: p.pessoa.nome,
+      email: (p.pessoa.email ?? '').trim().toLowerCase() || null,
+      cpf: chaveDigitos(p.pessoa.cpf) || null,
+      telefone: p.pessoa.telefone ?? null,
+      produto_ref: p.entitlement.produtoRef,
+      produto_nome: p.entitlement.produtoNome ?? null,
+      status: p.entitlement.status,
+      inicio_em: p.entitlement.inicioEm ?? null,
+      expira_em: p.entitlement.expiraEm ?? null,
+      bruto: p as any,
+      sincronizado_em: agora,
+    }))
+    for (let i = 0; i < rows.length; i += 500) {
+      const { error } = await svc.from('simulado_integracao_base').upsert(rows.slice(i, i + 500), { onConflict: 'tenant_id,provider,ent_external_id' })
+      if (error) {
+        if ((error as any).code === '42P01') return { ok: false, error: 'A base ainda não foi criada. Aplique a migration 20260717000001_integracao_base.' }
+        return { ok: false, error: (error as any).message ?? 'Falha ao gravar na base.' }
+      }
+    }
+    await svc.from('simulado_integracao_config').update({ base_sync_em: agora, base_sync_total: rows.length }).eq('tenant_id', g.tenantId).eq('provider', provider)
+    await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_integracao_base', entidadeId: g.tenantId, tenantId: g.tenantId, depois: { provider, total: rows.length } }).catch(() => {})
+    revalidatePath(`/admin/integracoes/${provider}`)
+    return { ok: true, total: rows.length, sincronizadoEm: agora }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message ?? 'Falha ao sincronizar.' }
+  }
 }
 
 /**
@@ -354,7 +422,6 @@ export async function aplicarAssinaturasGuru(provider: string, itens: Assinatura
       if (r.acao === 'ignorado' && r.motivo?.includes('mapeamento')) semMapeamento++
     } catch { erros++ }
   }
-  await invalidarCache(`${provider}:assinaturas:${g.tenantId}`)
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_assinaturas', entidadeId: g.tenantId, tenantId: g.tenantId, depois: { provider, selecionadas: itens.length, concedidos, semMapeamento, erros } }).catch(() => {})
   revalidatePath('/admin/estudantes')
   return { ok: true, resumo: { total: itens.length, concedidos, criados: estudantes.size, semMapeamento, erros } }
