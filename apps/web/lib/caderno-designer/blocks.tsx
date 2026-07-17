@@ -69,6 +69,8 @@ export const BLOCKS: BlockMeta[] = [
     defaults: { quantidade: 6, rotulo: 'Resposta:', altura: 28, cor: '' } },
   { type: 'condicao', title: 'Condição (texto modulado)', icon: GitBranch, category: 'conteudo', container: true,
     defaults: { variavel: 'percentual', operador: 'entre', valor: '0', valor2: '50' } },
+  { type: 'diag-grupo-header', title: 'Diagnóstico — Cabeçalho de Grupo', icon: Grid3x3, category: 'avaliacao', dynamic: true, supportsVars: true,
+    defaults: { grupo: 'Grupo I', chaves: [], corHeader: '#f6c445', corTexto: '#243b7a', fonte: '' } },
   { type: 'diag-disciplina', title: 'Diagnóstico — Disciplina', icon: ListChecks, category: 'avaliacao', dynamic: true, supportsVars: true,
     defaults: { chave: '', nome: '', assunto: 'Assunto Principal', soSeErrou: true, corLinha: '#c9a227', linhaAltura: 2, corRow: '#e9eef7', corTitulo: '#1a3a6b', corAcerto: '#8a8a8a', corPct: '#e8850c', fonte: '' } },
   { type: 'diag-grupo', title: 'Diagnóstico — Grupo/Disciplinas', icon: Rows3, category: 'avaliacao', dynamic: true, supportsVars: true, oculto: true,
@@ -432,6 +434,19 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} full />)}
+        </div>
+      )
+    }
+    case 'diag-grupo-header': {
+      const chaves: string[] = Array.isArray(a.chaves) ? a.chaves : []
+      const val = (tok: string, def: string) => { const r = applyVars(tok, data.vars); return /\{/.test(r) ? def : r }
+      const numDe = (tok: string) => parseInt(val(tok, '0').replace(/[^0-9-]/g, ''), 10) || 0
+      const somaAc = chaves.reduce((s, k) => s + numDe(`{acerto_${k}}`), 0)
+      const somaTot = chaves.reduce((s, k) => s + numDe(`{total_${k}}`), 0)
+      return (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: a.corHeader || '#f6c445', color: a.corTexto || '#243b7a', fontWeight: 700, padding: '8px 14px', fontSize: 13, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
+          <span>{applyVars(a.grupo || 'Grupo', data.vars)}</span>
+          <span>Acertos&nbsp;&nbsp;{somaAc}/{somaTot}</span>
         </div>
       )
     }

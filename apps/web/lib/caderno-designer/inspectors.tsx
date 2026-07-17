@@ -409,6 +409,32 @@ export function BlockInspector({ block, onChange, varsExtra }: { block: Block; o
           <Faixa label="Altura da fita (px) — 0 = sem fita" min={0} max={12} value={a.fitaAltura ?? 0} onChange={(v) => set('fitaAltura', v)} />
         </div>
       )
+    case 'diag-grupo-header': {
+      const chaves: string[] = Array.isArray(a.chaves) ? a.chaves : []
+      const opts = [...new Set((varsExtra ?? []).filter((g) => /Disciplina/i.test(g.grupo)).flatMap((g) => g.itens.map((v) => v.token.match(/\{pct_(.+)\}/)?.[1]).filter(Boolean)))] as string[]
+      const humano = (s: string) => s.replace(/_/g, ' ').replace(/^./, (ch) => ch.toUpperCase())
+      const toggle = (s: string) => set('chaves', chaves.includes(s) ? chaves.filter((k) => k !== s) : [...chaves, s])
+      return (
+        <div className="space-y-3">
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Marque as <b>disciplinas do grupo</b> — o “Acertos X/N” do cabeçalho é somado automaticamente delas.</p>
+          <Row label="Nome do grupo"><input value={a.grupo ?? ''} onChange={(e) => set('grupo', e.target.value)} className={inputCls} placeholder="Grupo I" /></Row>
+          <Grupo label={`Disciplinas do grupo (${chaves.length})`}>
+            <div className="max-h-52 space-y-0.5 overflow-y-auto rounded-md border p-1">
+              {opts.length === 0 && <p className="px-1 py-1 text-[11px] text-muted-foreground">Vincule um banco e recarregue — as disciplinas do simulado aparecem aqui.</p>}
+              {opts.map((s) => (
+                <label key={s} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted">
+                  <input type="checkbox" checked={chaves.includes(s)} onChange={() => toggle(s)} className="h-4 w-4 rounded border" />
+                  <span className="flex-1 truncate">{humano(s)}</span>
+                </label>
+              ))}
+            </div>
+          </Grupo>
+          <FonteSelect value={a.fonte} onChange={(v) => set('fonte', v)} />
+          <Cor label="Cor de fundo" value={a.corHeader} onChange={(v) => set('corHeader', v)} />
+          <Cor label="Cor do texto" value={a.corTexto} onChange={(v) => set('corTexto', v)} />
+        </div>
+      )
+    }
     case 'diag-disciplina': {
       // Lista de disciplinas do simulado (slug -> nome) a partir das variáveis disponíveis.
       const discOpts = [...new Set((varsExtra ?? []).filter((g) => /Disciplina/i.test(g.grupo)).flatMap((g) => g.itens.map((v) => v.token.match(/\{pct_(.+)\}/)?.[1]).filter(Boolean)))] as string[]
