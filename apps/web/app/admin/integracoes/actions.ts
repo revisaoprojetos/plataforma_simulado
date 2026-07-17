@@ -258,6 +258,65 @@ export async function reprocessarLiberacoes(provider: string, soProduto?: string
   }
 }
 
+// ── Reconciliação automática (Curseduca) — agendada pelo cron curseduca-sync ───
+export interface ReconciliacaoDTO {
+  ativo: boolean; intervaloMin: number; grupos: number[]; sincronizar: boolean
+  ultimaExecucao: string | null; ultimoResultado: any | null
+}
+
+export async function getReconciliacao(): Promise<{ ok: boolean; error?: string; dados?: ReconciliacaoDTO }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data } = await svc.from('simulado_curseduca_sync').select('ativo, intervalo_min, grupos, sincronizar, ultima_execucao, ultimo_resultado').eq('tenant_id', g.tenantId).order('criado_em', { ascending: false }).limit(1).maybeSingle()
+  const d = data as any
+  return {
+    ok: true,
+    dados: d
+      ? { ativo: !!d.ativo, intervaloMin: d.intervalo_min ?? 360, grupos: (d.grupos ?? []).map(Number), sincronizar: !!d.sincronizar, ultimaExecucao: d.ultima_execucao ?? null, ultimoResultado: d.ultimo_resultado ?? null }
+      : { ativo: false, intervaloMin: 360, grupos: [], sincronizar: true, ultimaExecucao: null, ultimoResultado: null },
+  }
+}
+
+export async function salvarReconciliacao(cfg: { ativo: boolean; intervaloMin: number; grupos: number[]; sincronizar: boolean }): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const grupos = (cfg.grupos ?? []).map(Number).filter((n) => Number.isFinite(n))
+  const intervaloMin = Math.max(15, Math.round(cfg.intervaloMin || 360)) // mínimo 15 min
+  if (cfg.ativo && !grupos.length) return { ok: false, error: 'Selecione ao menos um grupo para reconciliar.' }
+  const svc = createAdminClient()
+  const { data: existente } = await svc.from('simulado_curseduca_sync').select('id').eq('tenant_id', g.tenantId).order('criado_em', { ascending: false }).limit(1).maybeSingle()
+  const linha = { grupos, destino: { tipo: 'nenhum' }, sincronizar: !!cfg.sincronizar, intervalo_min: intervaloMin, ativo: !!cfg.ativo, atualizado_em: new Date().toISOString() }
+  const r = (existente as any)?.id
+    ? await svc.from('simulado_curseduca_sync').update(linha).eq('id', (existente as any).id)
+    : await svc.from('simulado_curseduca_sync').insert({ tenant_id: g.tenantId, tipo: 'import', criado_por: g.userId ?? null, ...linha })
+  if (r.error) return { ok: false, error: r.error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_curseduca_sync', entidadeId: g.tenantId, tenantId: g.tenantId, depois: { ativo: cfg.ativo, intervaloMin, grupos: grupos.length, sincronizar: cfg.sincronizar } }).catch(() => {})
+  revalidatePath('/admin/integracoes/curseduca')
+  return { ok: true }
+}
+
+export async function rodarReconciliacaoAgora(): Promise<{ ok: boolean; error?: string; resultado?: any }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data } = await svc.from('simulado_curseduca_sync').select('id, grupos, sincronizar').eq('tenant_id', g.tenantId).order('criado_em', { ascending: false }).limit(1).maybeSingle()
+  const d = data as any
+  const grupos = (d?.grupos ?? []).map(Number).filter((n: number) => Number.isFinite(n))
+  if (!grupos.length) return { ok: false, error: 'Configure e salve os grupos primeiro.' }
+  const { resolverCfg, executarImport } = await import('@/lib/curseduca/import-core')
+  const curCfg = await resolverCfg(g.tenantId)
+  if (!curCfg) return { ok: false, error: 'Credenciais Curseduca não configuradas/ativas.' }
+  try {
+    const resultado = await executarImport({ tenantId: g.tenantId, cfg: curCfg }, grupos, { tipo: 'nenhum' }, !!d?.sincronizar, Number.MAX_SAFE_INTEGER)
+    if (d?.id) await svc.from('simulado_curseduca_sync').update({ ultima_execucao: new Date().toISOString(), ultimo_resultado: resultado }).eq('id', d.id)
+    revalidatePath('/admin/estudantes')
+    return { ok: true, resultado }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message ?? 'Falha na reconciliação.' }
+  }
+}
+
 // ── Mapa dinâmico do JSON (webhook) ────────────────────────────────────────────
 export interface MapaConfigDTO {
   mapa: Record<string, string>

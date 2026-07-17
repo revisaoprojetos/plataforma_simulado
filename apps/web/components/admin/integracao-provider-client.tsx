@@ -16,6 +16,7 @@ import {
   listarWebhookInbox, getWebhookInboxDetalhe, type InboxDTO, type InboxDetalhe,
   getMapaConfig, salvarMapaConfig, reprocessarLiberacoes,
   processarRecebido, processarRecebidosTodos,
+  getReconciliacao, salvarReconciliacao, rodarReconciliacaoAgora,
 } from '@/app/admin/integracoes/actions'
 import type { Provider } from '@/lib/integracoes/tipos'
 import { CAMPOS_MAPA } from '@/lib/integracoes/mapa-campos'
@@ -945,6 +946,8 @@ function Importar({ provider }: { provider: Provider }) {
 
   return (
     <div className="space-y-4">
+      {provider === 'curseduca' && <ReconciliacaoCurseduca provider={provider} />}
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">Importa alunos das fontes selecionadas e aplica os mapeamentos (concede acesso). É uma ação manual.</p>
         <Button variant="outline" size="sm" onClick={carregar} disabled={carregando}>{carregando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />} Carregar fontes</Button>
@@ -973,6 +976,95 @@ function Importar({ provider }: { provider: Provider }) {
           <Kpi rotulo="Erros" valor={resumo.erros} tom={resumo.erros ? 'rose' : undefined} />
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Reconciliação automática (Curseduca): agenda + liga/desliga ───────────────
+function ReconciliacaoCurseduca({ provider }: { provider: Provider }) {
+  const [fontes, setFontes] = useState<Fonte[]>([])
+  const [ativo, setAtivo] = useState(false)
+  const [horas, setHoras] = useState(6)
+  const [grupos, setGrupos] = useState<Set<number>>(new Set())
+  const [sincronizar, setSincronizar] = useState(true)
+  const [ultima, setUltima] = useState<string | null>(null)
+  const [ultimoResultado, setUltimoResultado] = useState<any | null>(null)
+  const [carregando, start] = useTransition()
+  const [salvando, startSalvar] = useTransition()
+  const [rodando, startRodar] = useTransition()
+
+  const carregar = () => start(async () => {
+    const [r, rf] = await Promise.all([getReconciliacao(), listarFontes(provider)])
+    if (r.ok && r.dados) { setAtivo(r.dados.ativo); setHoras(Math.max(1, Math.round(r.dados.intervaloMin / 60))); setGrupos(new Set(r.dados.grupos)); setSincronizar(r.dados.sincronizar); setUltima(r.dados.ultimaExecucao); setUltimoResultado(r.dados.ultimoResultado) }
+    if (rf.ok) setFontes(rf.fontes ?? [])
+  })
+  useEffect(() => { carregar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const salvar = () => startSalvar(async () => {
+    const r = await salvarReconciliacao({ ativo, intervaloMin: horas * 60, grupos: [...grupos], sincronizar })
+    if (r.ok) toast.success(ativo ? 'Reconciliação automática ativada' : 'Configuração salva'); else toast.error(r.error ?? 'Erro ao salvar')
+  })
+  const rodar = () => startRodar(async () => {
+    const r = await rodarReconciliacaoAgora()
+    if (!r.ok) { toast.error(r.error ?? 'Erro'); return }
+    const s = r.resultado ?? {}
+    toast.success(`Reconciliação executada — ${s.novos ?? 0} novo(s), ${s.removidos ?? 0} removido(s)`)
+    carregar()
+  })
+  const toggleG = (id: number) => setGrupos((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'nunca'
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold"><RotateCw className="h-4 w-4 text-primary" /> Reconciliação automática</h3>
+          <p className="text-[11px] text-muted-foreground">Sincroniza os grupos periodicamente (importa novos e, se marcado, remove quem saiu). Última execução: {fmt(ultima)}.</p>
+        </div>
+        <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="h-4 w-4 rounded border" />
+          {ativo ? <span className="text-emerald-600 dark:text-emerald-400">Ativada</span> : <span className="text-muted-foreground">Desativada</span>}
+        </label>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <label className="flex items-center gap-1.5">A cada
+          <Input type="number" min={1} max={168} value={horas} onChange={(e) => setHoras(Math.max(1, Number(e.target.value) || 1))} className="h-8 w-16 text-center" /> hora(s)
+        </label>
+        <label className="flex items-center gap-1.5 text-xs">
+          <input type="checkbox" checked={sincronizar} onChange={(e) => setSincronizar(e.target.checked)} className="h-4 w-4 rounded border" />
+          Remover do sistema quem saiu do grupo (reconciliação)
+        </label>
+      </div>
+
+      <div>
+        <div className="mb-1 flex items-center justify-between">
+          <p className="text-xs font-medium">Grupos a reconciliar ({grupos.size})</p>
+          <Button variant="outline" size="sm" onClick={carregar} disabled={carregando}>{carregando ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1.5 h-3 w-3" />} Carregar grupos</Button>
+        </div>
+        {fontes.length === 0 ? (
+          <p className="rounded-lg border border-dashed p-3 text-[11px] text-muted-foreground">Clique em <b>Carregar grupos</b> para listar os grupos da Curseduca (exige credenciais salvas).</p>
+        ) : (
+          <div className="max-h-52 space-y-0.5 overflow-y-auto rounded-lg border bg-background p-2">
+            {fontes.map((f) => {
+              const id = Number(f.ref)
+              return (
+                <label key={f.ref} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted">
+                  <input type="checkbox" checked={grupos.has(id)} onChange={() => toggleG(id)} className="h-4 w-4 rounded border" />
+                  <span className="flex-1 truncate">{f.nome}</span>
+                  <span className="text-[10px] text-muted-foreground">#{f.ref}</span>
+                </label>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" onClick={salvar} disabled={salvando}>{salvando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-2 h-3.5 w-3.5" />} Salvar</Button>
+        <Button variant="outline" size="sm" onClick={rodar} disabled={rodando || grupos.size === 0}>{rodando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RotateCw className="mr-2 h-3.5 w-3.5" />} Rodar agora</Button>
+        {ultimoResultado && <span className="self-center text-[11px] text-muted-foreground">último: {ultimoResultado.ok === false ? `erro — ${ultimoResultado.error}` : `${ultimoResultado.novos ?? 0} novos · ${ultimoResultado.removidos ?? 0} removidos`}</span>}
+      </div>
     </div>
   )
 }

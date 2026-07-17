@@ -28,8 +28,22 @@ export function envAplicaAoTenant(tenantId: string): boolean {
  * `CURSEDUCA_ENV_TENANT_ID`. Sem isso, cada empresa DEVE ter sua config no banco.
  */
 export async function resolverCfg(tenantId: string): Promise<CurseducaCfg | null> {
+  const svc = createAdminClient()
+  // 1) NOVO sistema de Integrações (simulado_integracao_config) — todas as credenciais criptografadas.
   try {
-    const svc = createAdminClient()
+    const { data } = await svc
+      .from('simulado_integracao_config')
+      .select('base_url, credenciais, ativo')
+      .eq('tenant_id', tenantId).eq('provider', 'curseduca')
+      .maybeSingle()
+    const d = data as any
+    const c = d?.credenciais
+    if (d?.ativo && c?.api_key && c?.usuario && c?.senha) {
+      return { base: d.base_url || 'https://prof.curseduca.pro', apiKey: descriptografar(c.api_key) ?? '', user: descriptografar(c.usuario) ?? '', pass: descriptografar(c.senha) ?? '' }
+    }
+  } catch { /* tabela pode não existir ainda → tenta legado/env */ }
+  // 2) LEGADO (simulado_curseduca_config).
+  try {
     const { data } = await svc
       .from('simulado_curseduca_config')
       .select('base_url, api_key, usuario, senha, ativo')
@@ -37,10 +51,10 @@ export async function resolverCfg(tenantId: string): Promise<CurseducaCfg | null
       .maybeSingle()
     const d = data as any
     if (d && d.ativo && d.api_key && d.usuario && d.senha) {
-      // api_key/senha ficam criptografados em repouso — descriptografa para usar.
       return { base: d.base_url || 'https://prof.curseduca.pro', apiKey: descriptografar(d.api_key) ?? '', user: d.usuario, pass: descriptografar(d.senha) ?? '' }
     }
   } catch { /* tabela pode não existir ainda → tenta o env designado */ }
+  // 3) .env (só o tenant designado).
   return envAplicaAoTenant(tenantId) ? configDoEnv() : null
 }
 
