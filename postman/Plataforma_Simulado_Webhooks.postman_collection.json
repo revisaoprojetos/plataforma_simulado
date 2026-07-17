@@ -7,7 +7,9 @@
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:3000" },
     { "key": "token", "value": "180a61528296e5e7f716001bcb27f7d6422511237a43941a" },
-    { "key": "fonte", "value": "hotmart" }
+    { "key": "fonte", "value": "hotmart" },
+    { "key": "curseducaToken", "value": "COLE_O_TOKEN_DA_CURSEDUCA" },
+    { "key": "grupoCurseduca", "value": "123" }
   ],
   "item": [
     {
@@ -85,6 +87,44 @@
           "query": [{ "key": "fonte", "value": "{{fonte}}" }]
         },
         "description": "Envia um payload de qualquer formato de qualquer fonte. É registrado cru na aba Recebidos (receptor puro; não processa acesso)."
+      }
+    },
+    {
+      "name": "Curseduca — Ping sync (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/webhooks/curseduca/{{curseducaToken}}", "host": ["{{baseUrl}}"], "path": ["api", "webhooks", "curseduca", "{{curseducaToken}}"] },
+        "description": "Confere se a URL de sincronização da Curseduca está viva e o token reconhece o tenant. Aparece em Integrações → Curseduca → Recebidos.\n\nPegue o {{curseducaToken}} em Integrações → Curseduca → Credenciais (bloco 'URL de sincronização') após salvar as credenciais."
+      }
+    },
+    {
+      "name": "Curseduca — Sincronizar grupo (POST)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"grupos\": [{{grupoCurseduca}}],\n  \"sincronizar\": false\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/webhooks/curseduca/{{curseducaToken}}", "host": ["{{baseUrl}}"], "path": ["api", "webhooks", "curseduca", "{{curseducaToken}}"] },
+        "description": "Dispara a importação/sincronização dos membros do(s) grupo(s) Curseduca informado(s). `sincronizar:true` remove do sistema quem saiu do grupo (reconciliação). Requer credenciais Curseduca salvas + Integração ativa."
+      }
+    },
+    {
+      "name": "Curseduca — Webhook LEGADO (secret por header)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-webhook-secret", "value": "{{curseducaSecret}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tenantId\": \"02195fa6-3db8-49d0-8c07-d21328a26a13\",\n  \"grupos\": [{{grupoCurseduca}}],\n  \"sincronizar\": false\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/webhooks/curseduca", "host": ["{{baseUrl}}"], "path": ["api", "webhooks", "curseduca"] },
+        "description": "Rota LEGADA (sem token na URL): exige CURSEDUCA_WEBHOOK_SECRET no ambiente e o header x-webhook-secret. Corpo com tenantId + grupos. Prefira a rota por token acima."
       }
     },
     {

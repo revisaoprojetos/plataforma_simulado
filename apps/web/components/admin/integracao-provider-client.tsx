@@ -56,6 +56,7 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
         { id: 'credenciais', label: 'Credenciais', Icon: KeyRound },
         { id: 'mapeamentos', label: 'Mapeamentos', Icon: GitBranch },
         { id: 'importar', label: 'Importar', Icon: DownloadCloud },
+        { id: 'recebidos', label: 'Recebidos', Icon: Inbox },
       ]
 
   // Ao trocar de área, garante que a aba selecionada existe na nova área.
@@ -98,7 +99,7 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
       {aba === 'assinaturas' && meta.push && <Assinaturas provider={provider} />}
       {aba === 'importar' && !meta.push && <Importar provider={provider} />}
       {aba === 'eventos' && meta.push && <Eventos provider={provider} />}
-      {aba === 'recebidos' && meta.push && <Recebidos provider={provider} appUrl={appUrl} token={config.webhookToken} />}
+      {aba === 'recebidos' && (meta.push || provider === 'curseduca') && <Recebidos provider={provider} appUrl={appUrl} token={config.webhookToken} />}
       {aba === 'mapa' && meta.push && <MapaJson provider={provider} />}
     </div>
   )
@@ -687,7 +688,7 @@ function Credenciais({ provider, appUrl, config, meta, campos, area }: { provide
     : campos
   const mostrarBaseUrl = area !== 'webhook'
   const mostrarTestarConexao = area !== 'webhook'
-  const mostrarWebhook = meta.push && area !== 'api'
+  const mostrarWebhook = area !== 'api' && (meta.push || provider === 'curseduca') // Curseduca: URL de sincronização
   const [vals, setVals] = useState<Record<string, string>>({})
   const [baseUrl, setBaseUrl] = useState(config.baseUrl || meta.baseUrlPadrao)
   const [ativo, setAtivo] = useState(config.ativo)
@@ -762,14 +763,15 @@ function Credenciais({ provider, appUrl, config, meta, campos, area }: { provide
 
       {mostrarWebhook && webhookUrl && (
         <div className="space-y-2 rounded-2xl border bg-card p-3 shadow-sm">
-          <p className="text-xs font-semibold">URL do webhook</p>
+          <p className="text-xs font-semibold">{meta.push ? 'URL do webhook' : 'URL de sincronização (webhook)'}</p>
           <div className="flex items-center gap-2">
             <code className="min-w-0 flex-1 truncate rounded bg-background px-2 py-1 text-xs">{webhookUrl}</code>
             <Button variant="outline" size="sm" onClick={() => { navigator.clipboard?.writeText(webhookUrl); toast.success('Copiado') }} title="Copiar"><Copy className="h-3.5 w-3.5" /></Button>
           </div>
           <ol className="list-decimal space-y-0.5 pl-4 text-[11px] text-muted-foreground">
-            <li>Copie esta URL e cadastre em <strong>{meta.nome} → Webhooks</strong> (eventos de compra/assinatura).</li>
-            <li>Salve com a <strong>Integração ativa</strong> marcada.</li>
+            {meta.push
+              ? <><li>Copie esta URL e cadastre em <strong>{meta.nome} → Webhooks</strong> (eventos de compra/assinatura).</li><li>Salve com a <strong>Integração ativa</strong> marcada.</li></>
+              : <><li>Faça <strong>POST</strong> nesta URL (n8n/Curseduca) com <code>{'{ grupos:[ids], sincronizar? }'}</code> para importar/sincronizar em tempo real.</li><li>Salve com a <strong>Integração ativa</strong> marcada. Cada chamada aparece na aba <strong>Recebidos</strong>.</li></>}
             <li>Clique em <strong>Testar webhook</strong> abaixo para confirmar que a URL responde.</li>
           </ol>
           <div className="flex flex-wrap gap-2 pt-1">
