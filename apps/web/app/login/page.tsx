@@ -27,6 +27,7 @@ export default async function LoginPage() {
     logoBg: (t.tema?.logo_png_bg as string) ?? '#ffffff',
     logoEstilo: (t.tema?.logo_estilo as string) ?? 'arredondado',
     logoFiltro: (t.tema?.logo_filtro as string) ?? 'none',
+    selecao: t.tema?.login_selecao !== false,
     cor: t.tema?.cor_primaria ?? null,
     modoPadrao: t.tema?.modo_padrao === 'dark' ? 'dark' : 'light',
   }))
@@ -41,6 +42,8 @@ export default async function LoginPage() {
     logoBg: plataformas[0]?.logoBg ?? '#ffffff',
     logoEstilo: plataformas[0]?.logoEstilo ?? 'arredondado',
     logoFiltro: plataformas[0]?.logoFiltro ?? 'none',
+    // Só faz sentido pular a seleção com uma plataforma; com várias, mantém a escolha.
+    mostrarSelecao: plataformas.length > 1 ? true : (plataformas[0]?.selecao ?? true),
   }
 
   return (

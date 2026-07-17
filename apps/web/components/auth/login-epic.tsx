@@ -8,7 +8,7 @@ import { Loader2, ArrowLeft, ShieldCheck, GraduationCap, Mail, Lock } from 'luci
 import { cn } from '@/lib/utils'
 
 export type LoginLayout = 'painel' | 'centralizado'
-export type Plataforma = { id: string; nome: string; dominio: string | null; logo: string | null; logoGrande: string | null; logoSelecao: string | null; selecaoEstilo: 'quadrada' | 'redonda' | 'borda'; loginLayout: LoginLayout; logoBg: string; logoEstilo: string; logoFiltro: string; cor: string | null; modoPadrao: 'light' | 'dark' }
+export type Plataforma = { id: string; nome: string; dominio: string | null; logo: string | null; logoGrande: string | null; logoSelecao: string | null; selecaoEstilo: 'quadrada' | 'redonda' | 'borda'; loginLayout: LoginLayout; logoBg: string; logoEstilo: string; logoFiltro: string; selecao: boolean; cor: string | null; modoPadrao: 'light' | 'dark' }
 
 function frameSelecao(estilo?: string): string {
   if (estilo === 'quadrada') return 'rounded-xl'
@@ -27,7 +27,7 @@ function filtroLogo(f?: string): string | undefined {
   if (f === 'preto') return 'brightness(0)'
   return undefined
 }
-type Marca = { nome: string; logo: string | null; logoGrande: string | null; cor: string | null; modoPadrao: 'light' | 'dark'; loginLayout: LoginLayout; logoBg: string; logoEstilo: string; logoFiltro: string }
+type Marca = { nome: string; logo: string | null; logoGrande: string | null; cor: string | null; modoPadrao: 'light' | 'dark'; loginLayout: LoginLayout; logoBg: string; logoEstilo: string; logoFiltro: string; mostrarSelecao: boolean }
 type Modo = 'select' | 'aluno' | 'admin'
 
 const KEYFRAMES = `
@@ -39,7 +39,9 @@ const KEYFRAMES = `
 export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; marca: Marca }) {
   const router = useRouter()
   const search = useSearchParams()
-  const [modo, setModo] = useState<Modo>('select')
+  // Seleção desativada (uma plataforma) → já entra direto no login do aluno.
+  const pularSelecao = !marca.mostrarSelecao && plataformas.length > 0
+  const [modo, setModo] = useState<Modo>(pularSelecao ? 'aluno' : 'select')
   const [sel, setSel] = useState<Plataforma | null>(plataformas[0] ?? null)
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
@@ -48,7 +50,7 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
 
   const brand: Marca = modo === 'admin'
     ? marca
-    : { nome: sel?.nome ?? marca.nome, logo: sel?.logo ?? marca.logo, logoGrande: sel?.logoGrande ?? marca.logoGrande, cor: sel?.cor ?? marca.cor, modoPadrao: sel?.modoPadrao ?? marca.modoPadrao, loginLayout: sel?.loginLayout ?? marca.loginLayout, logoBg: sel?.logoBg ?? marca.logoBg, logoEstilo: sel?.logoEstilo ?? marca.logoEstilo, logoFiltro: sel?.logoFiltro ?? marca.logoFiltro }
+    : { nome: sel?.nome ?? marca.nome, logo: sel?.logo ?? marca.logo, logoGrande: sel?.logoGrande ?? marca.logoGrande, cor: sel?.cor ?? marca.cor, modoPadrao: sel?.modoPadrao ?? marca.modoPadrao, loginLayout: sel?.loginLayout ?? marca.loginLayout, logoBg: sel?.logoBg ?? marca.logoBg, logoEstilo: sel?.logoEstilo ?? marca.logoEstilo, logoFiltro: sel?.logoFiltro ?? marca.logoFiltro, mostrarSelecao: marca.mostrarSelecao }
   const cor = brand.cor ?? '#6d28d9'
   const layout: LoginLayout = brand.loginLayout ?? 'painel'
   const logoLogin = brand.logoGrande ?? brand.logo // grande no painel da esquerda
@@ -186,9 +188,11 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
             })()}
             <p className="text-lg font-semibold">{brand.nome}</p>
           </div>
-          <button type="button" onClick={() => { setModo('select'); setErro(null); setSenha('') }} className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Trocar plataforma
-          </button>
+          {!pularSelecao && (
+            <button type="button" onClick={() => { setModo('select'); setErro(null); setSenha('') }} className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" /> Trocar plataforma
+            </button>
+          )}
           <h1 className="mb-5 text-xl font-bold tracking-tight">{titulo}</h1>
           {erro && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{erro}</div>}
           {formLogin}
@@ -235,9 +239,11 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
             <p className="text-lg font-semibold">{brand.nome}</p>
           </div>
 
-          <button type="button" onClick={() => { setModo('select'); setErro(null); setSenha('') }} className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Trocar plataforma
-          </button>
+          {!pularSelecao && (
+            <button type="button" onClick={() => { setModo('select'); setErro(null); setSenha('') }} className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" /> Trocar plataforma
+            </button>
+          )}
           <h1 className="mb-6 text-2xl font-bold tracking-tight">{titulo}</h1>
 
           {erro && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{erro}</div>}
