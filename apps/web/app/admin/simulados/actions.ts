@@ -48,6 +48,8 @@ export async function createSimuladoAction(data: SimuladoData) {
       embed_ativo: data.embed_ativo ?? false,
       regras: data.bancoBaseId ? { ...(data.regras ?? {}), banco_base_id: data.bancoBaseId } : (data.regras ?? {}),
       status: 'rascunho',
+      // A coluna created_at não tem default no banco migrado — seta explícito (senão vem null → "1969").
+      created_at: new Date().toISOString(),
     })
     .select()
     .single()

@@ -151,7 +151,7 @@ export default async function AdminDashboard() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{s.titulo}</p>
                       <p className="text-xs text-muted-foreground">
-                        {modeLabels[s.modo_aplicacao] ?? '—'} · criado em {new Date(s.created_at).toLocaleDateString('pt-BR')}
+                        {modeLabels[s.modo_aplicacao] ?? '—'}{s.created_at ? ` · criado em ${new Date(s.created_at).toLocaleDateString('pt-BR')}` : ''}
                       </p>
                     </div>
                     <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${st.class}`}>{st.label}</span>
