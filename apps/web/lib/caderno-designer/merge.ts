@@ -31,8 +31,13 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
       const d = (q as any).disciplinas?.nome ?? 'Geral'
       discDaQuestao.set(q.id, d)
       discTotais.set(d, (discTotais.get(d) ?? 0) + 1)
-      const ps = [(q as any).categoria, (q as any).pilar_1, (q as any).pilar_2].map((x) => (x ?? '').toString().trim()).filter(Boolean)
-      const unicos = [...new Set(ps)]
+      // Normaliza a `categoria` (bagunçada/combinada) nos 3 pilares canônicos. "Legislação" = Lei seca.
+      // Uma questão combinada (ex.: "Legislação e Jurisprudência") conta nos dois pilares.
+      const catTxt = [(q as any).categoria, (q as any).pilar_1, (q as any).pilar_2].map((x) => (x ?? '').toString()).join(' ').toLowerCase()
+      const unicos: string[] = []
+      if (catTxt.includes('lei seca') || catTxt.includes('legisla')) unicos.push('Lei seca')
+      if (catTxt.includes('jurisprud')) unicos.push('Jurisprudência')
+      if (catTxt.includes('doutrina')) unicos.push('Doutrina')
       pilaresDaQuestao.set(q.id, unicos)
       for (const p of unicos) pilarTotais.set(p, (pilarTotais.get(p) ?? 0) + 1)
     }
