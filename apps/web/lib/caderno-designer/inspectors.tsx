@@ -234,9 +234,12 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
             </div>
           </Grupo>
           <Align value={a.align} onChange={(v) => set('align', v)} comJustificar />
-          <Cor label="Cor" value={a.cor} onChange={(v) => set('cor', v)} />
+          <Row label="Subtítulo (opcional)"><input value={a.subtitulo ?? ''} onChange={(e) => set('subtitulo', e.target.value)} className={inputCls} placeholder="linha menor abaixo do título" /></Row>
+          <Cor label="Cor do texto" value={a.cor} onChange={(v) => set('cor', v)} />
+          <Cor label="Cor de fundo (barra de seção)" value={a.corFundo} onChange={(v) => set('corFundo', v)} />
+          {a.corFundo && <Faixa label="Cantos da barra (px)" min={0} max={16} value={a.fundoRaio ?? 6} onChange={(v) => set('fundoRaio', v)} />}
           <Faixa label="Espaçamento entre letras (px)" min={0} max={8} value={a.espacamento ?? 0} onChange={(v) => set('espacamento', v)} />
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarLinha} onChange={(e) => set('mostrarLinha', e.target.checked)} /> Linha sob o título</label>
+          {!a.corFundo && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarLinha} onChange={(e) => set('mostrarLinha', e.target.checked)} /> Linha sob o título</label>}
         </div>
       )
     case 'texto-livre':
@@ -396,6 +399,9 @@ export function BlockInspector({ block, onChange }: { block: Block; onChange: (p
           <Faixa label="Espaçamento interno (px)" min={0} max={40} value={a.padding} onChange={(v) => set('padding', v)} />
           <Faixa label="Largura (%)" min={5} max={100} value={a.largura} onChange={(v) => set('largura', v)} />
           <Align value={a.alinhamento} onChange={(v) => set('alinhamento', v)} />
+          <div className="border-t pt-2" />
+          <Cor label="Fita no topo (cor)" value={a.fitaCor} onChange={(v) => set('fitaCor', v)} />
+          <Faixa label="Altura da fita (px) — 0 = sem fita" min={0} max={12} value={a.fitaAltura ?? 0} onChange={(v) => set('fitaAltura', v)} />
         </div>
       )
     case 'colunas':

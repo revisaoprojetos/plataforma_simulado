@@ -20,7 +20,54 @@ function doc(pages: Page[], running?: Partial<RunningConfig>): CadernoDoc {
 
 export type CadernoPreset = { id: string; nome: string; descricao: string; build: () => CadernoDoc }
 
+/** Coluna de pilar do diagnóstico: card com fita + % + questões + texto modulado. */
+function colPilarDiag(titulo: string): Block {
+  return blk('coluna', { largura: 0 }, [
+    blk('card', { corFundo: '#fef3d6', bordaLargura: 0, bordaRaio: 4, padding: 8, largura: 100, alinhamento: 'center', fitaCor: '#3b5bdb', fitaAltura: 4 }, [
+      blk('titulo-secao', { texto: titulo, nivel: 3, cor: '#243b7a', align: 'left', mostrarLinha: false, corFundo: '' }),
+      blk('texto-livre', { texto: 'X%', bold: true, size: 22, color: '#243b7a', align: 'left', lineHeight: 1.1 }),
+      blk('texto-livre', { texto: 'X de N questões', size: 11, color: '#c0392b', align: 'left' }),
+      blk('espacador', { altura: 4 }),
+      blk('texto-livre', { texto: 'TEXTO MODULADO', bold: true, size: 10, align: 'left', color: '#555555' }),
+      blk('texto-livre', { texto: 'Escreva aqui a leitura personalizada deste pilar conforme a faixa de desempenho (0–50 / 51–80 / 81–100).', size: 11, align: 'justify', lineHeight: 1.5 }),
+    ]),
+  ])
+}
+
 export const PRESETS_CADERNO: CadernoPreset[] = [
+  {
+    id: 'diagnostico',
+    nome: 'Diagnóstico de Desempenho',
+    descricao: 'Barras de seção, cartão de nota, 3 pilares com divisória e cards com fita. Ajuste os textos e vincule as variáveis ({nome}, {acertos}, {total_questoes}, {percentual}, pct_<disciplina>).',
+    build: () => doc([
+      page('conteudo', 'Diagnóstico', [
+        blk('plano-fundo', { url: '', opacidade: 100 }),
+        blk('espacador', { altura: 24 }),
+        blk('titulo-secao', { texto: 'Diagnóstico de Desempenho', subtitulo: '{simulado}', nivel: 1, corFundo: '#2c5ea5', cor: '#ffffff', fundoRaio: 6, align: 'left', mostrarLinha: false }),
+        blk('espacador', { altura: 8 }),
+        blk('titulo-secao', { texto: 'NOME:   {nome}', nivel: 2, corFundo: '#3b5bdb', cor: '#ffffff', fundoRaio: 6, align: 'left', mostrarLinha: false }),
+        blk('espacador', { altura: 8 }),
+        blk('card', { corFundo: '#f6c445', bordaLargura: 0, bordaRaio: 6, padding: 12, largura: 100, alinhamento: 'center' }, [
+          blk('texto-livre', { texto: '{acertos} / {total_questoes}      —      {percentual} de aproveitamento', bold: true, size: 18, align: 'left', color: '#3b3260' }),
+        ]),
+        blk('espacador', { altura: 12 }),
+        blk('titulo-secao', { texto: 'DESEMPENHO POR PILAR', nivel: 2, corFundo: '#2b2a4a', cor: '#ffffff', fundoRaio: 4, align: 'left', mostrarLinha: false }),
+        blk('espacador', { altura: 8 }),
+        blk('colunas', { gap: 14, divisoria: true, divisoriaCor: '#cbb26b', divisoriaEspessura: 1 }, [
+          colPilarDiag('LEI SECA'),
+          colPilarDiag('JURISPRUDÊNCIA'),
+          colPilarDiag('DOUTRINA'),
+        ]),
+        blk('espacador', { altura: 12 }),
+        blk('titulo-secao', { texto: 'DESEMPENHO POR DISCIPLINA', nivel: 2, corFundo: '#2b2a4a', cor: '#ffffff', fundoRaio: 4, align: 'left', mostrarLinha: false }),
+        blk('espacador', { altura: 8 }),
+        blk('card', { corFundo: '#eef3fb', bordaLargura: 0, bordaRaio: 4, padding: 10, largura: 100, fitaCor: '#f6c445', fitaAltura: 4 }, [
+          blk('texto-livre', { texto: 'Direito Administrativo — {pct_direito_administrativo} ({acerto_direito_administrativo} de {total_direito_administrativo})', size: 12, align: 'left', bold: true }),
+          blk('texto-livre', { texto: 'Troque pelo nome real das suas disciplinas. As variáveis pct_/acerto_/total_ existem por disciplina do banco.', size: 10, align: 'left', color: '#888888', italico: true }),
+        ]),
+      ]),
+    ]),
+  },
   {
     id: 'caderno-objetivo',
     nome: 'Folha de respostas',

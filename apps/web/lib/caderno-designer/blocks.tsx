@@ -24,7 +24,7 @@ export function isContainer(type: string) { return CONTAINERS.has(type) }
 export const BLOCKS: BlockMeta[] = [
   // Conteúdo
   { type: 'titulo-secao', title: 'Título de seção', icon: Heading1, category: 'conteudo', supportsVars: true,
-    defaults: { texto: 'Título da Seção', nivel: 1, align: 'left', cor: '', mostrarLinha: true, fonte: '', italico: false, sublinhado: false, espacamento: 0, alturaMin: 0, valignV: 'top', largura: 100, alinhamentoBloco: 'left' } },
+    defaults: { texto: 'Título da Seção', nivel: 1, align: 'left', cor: '', mostrarLinha: true, fonte: '', italico: false, sublinhado: false, espacamento: 0, alturaMin: 0, valignV: 'top', largura: 100, alinhamentoBloco: 'left', corFundo: '', fundoPad: 10, fundoRaio: 6, subtitulo: '' } },
   { type: 'texto-livre', title: 'Texto livre', icon: Type, category: 'conteudo', supportsVars: true,
     defaults: { texto: 'Digite o texto aqui…', align: 'left', size: 12, bold: false, italico: false, sublinhado: false, color: '', fonte: '', lineHeight: 1.5, espacamento: 0, alturaMin: 0, valignV: 'top', largura: 100, alinhamentoBloco: 'left' } },
   { type: 'instrucoes', title: 'Instruções', icon: AlignLeft, category: 'conteudo', supportsVars: true,
@@ -51,7 +51,7 @@ export const BLOCKS: BlockMeta[] = [
     defaults: { assinaturas: ['Assinatura do candidato'], align: 'left', larguraLinha: 220 } },
   // Estrutura
   { type: 'card', title: 'Card', icon: Square, category: 'estrutura', container: true, supportsVars: true,
-    defaults: { corFundo: '#f8fafc', bordaCor: '', bordaLargura: 1, bordaRaio: 8, padding: 8, largura: 100, alinhamento: 'center' } },
+    defaults: { corFundo: '#f8fafc', bordaCor: '', bordaLargura: 1, bordaRaio: 8, padding: 8, largura: 100, alinhamento: 'center', fitaCor: '', fitaAltura: 0 } },
   { type: 'colunas', title: 'Colunas (lado a lado)', icon: Columns2, category: 'estrutura', container: true,
     defaults: { gap: 16, divisoria: false, divisoriaEspessura: 1, divisoriaEstilo: 'solido', divisoriaCor: '' } },
   { type: 'imagem', title: 'Imagem', icon: ImageIcon, category: 'estrutura',
@@ -107,12 +107,15 @@ export function dataComQuestao(data: CadernoData, q: QuestaoData): CadernoData {
 
 /** Estilo do container Card — compartilhado entre editor e impressão. */
 export function cardStyle(a: any, theme: CadernoTheme): CSSProperties {
+  // Fita: barra colorida no TOPO do card (ex.: cabeçalho de grupo do diagnóstico).
+  const fita = a.fitaAltura ? { borderTop: `${a.fitaAltura}px solid ${a.fitaCor || theme.cores.primaria}` } : {}
   return {
     background: a.corFundo || 'transparent',
     border: a.bordaLargura ? `${a.bordaLargura}px solid ${a.bordaCor || theme.cores.secundaria}` : 'none',
     borderRadius: a.bordaRaio ?? 0,
     padding: a.padding ?? 12,
     width: `${a.largura ?? 100}%`,
+    ...fita,
   }
 }
 export function blocksByCategory(): Record<BlockCategory, BlockMeta[]> {
@@ -157,13 +160,17 @@ export function BlockRender({ block, theme, data, full }: { block: Block; theme:
   switch (block.type) {
     case 'titulo-secao': {
       const sizes = { 1: 22, 2: 17, 3: 14 } as Record<number, number>
+      const temFundo = !!a.corFundo
+      // Com fundo, vira uma BARRA de seção (texto claro sobre a cor); o subtítulo aparece abaixo.
+      const corTexto = temFundo ? (a.cor || '#ffffff') : (a.cor || c.primaria)
       return comLargura(full ? undefined : a.largura, a.alinhamentoBloco, (
         <div style={{ minHeight: a.alturaMin || undefined, display: a.alturaMin ? 'flex' : undefined, flexDirection: 'column', justifyContent: a.valignV === 'center' ? 'center' : a.valignV === 'bottom' ? 'flex-end' : 'flex-start' }}>
-          <div style={{ textAlign: ALIN[a.align as keyof typeof ALIN] ?? 'left' }}>
-            <span style={{ fontSize: sizes[a.nivel] ?? 22, fontWeight: 700, color: a.cor || c.primaria, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia, fontStyle: a.italico ? 'italic' : 'normal', textDecoration: a.sublinhado ? 'underline' : 'none', letterSpacing: a.espacamento ? `${a.espacamento}px` : undefined }}>
+          <div style={{ textAlign: ALIN[a.align as keyof typeof ALIN] ?? 'left', ...(temFundo ? { background: a.corFundo, padding: `${a.fundoPad ?? 10}px ${(a.fundoPad ?? 10) + 4}px`, borderRadius: a.fundoRaio ?? 6 } : {}) }}>
+            <span style={{ fontSize: sizes[a.nivel] ?? 22, fontWeight: 700, color: corTexto, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia, fontStyle: a.italico ? 'italic' : 'normal', textDecoration: a.sublinhado ? 'underline' : 'none', letterSpacing: a.espacamento ? `${a.espacamento}px` : undefined }}>
               {applyVars(a.texto ?? '', data.vars)}
             </span>
-            {a.mostrarLinha && <div style={{ height: 2, background: a.cor || c.acento, marginTop: 4, borderRadius: 2 }} />}
+            {a.subtitulo && <div style={{ fontSize: 11, fontWeight: 600, color: corTexto, opacity: temFundo ? 0.85 : 0.7, marginTop: 2 }}>{applyVars(a.subtitulo, data.vars)}</div>}
+            {!temFundo && a.mostrarLinha && <div style={{ height: 2, background: a.cor || c.acento, marginTop: 4, borderRadius: 2 }} />}
           </div>
         </div>
       ))
