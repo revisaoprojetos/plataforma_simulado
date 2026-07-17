@@ -448,6 +448,8 @@ export function BlockInspector({ block, onChange, varsExtra }: { block: Block; o
           <Cor label="Texto do cabeçalho" value={a.corHeaderTexto} onChange={(v) => set('corHeaderTexto', v)} />
           <Cor label="Fita das linhas" value={a.corFita} onChange={(v) => set('corFita', v)} />
           <Cor label="Fundo das linhas" value={a.corRow} onChange={(v) => set('corRow', v)} />
+          <Cor label="Cor do título (disciplina)" value={a.corTitulo} onChange={(v) => set('corTitulo', v)} />
+          <Cor label="Cor do acerto (X/N)" value={a.corAcerto} onChange={(v) => set('corAcerto', v)} />
           <Cor label="Cor do %" value={a.corPct} onChange={(v) => set('corPct', v)} />
         </div>
       )

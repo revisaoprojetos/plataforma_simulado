@@ -23,7 +23,7 @@ export type CadernoPreset = { id: string; nome: string; descricao: string; build
 /** Disciplina do bloco de grupo. `chave` = slug do nome (ajuste na aba do bloco se não bater). */
 function d(nome: string, chave: string, assunto = 'Assunto Principal') { return { chave, nome, assunto } }
 function grpDiag(grupo: string, disciplinas: any[]): Block {
-  return blk('diag-grupo', { grupo, disciplinas, corHeader: '#f6c445', corHeaderTexto: '#3b3260', corFita: '#f6c445', corRow: '#eef3fb', corTitulo: '#243b7a', corPct: '#c0392b' })
+  return blk('diag-grupo', { grupo, disciplinas, corHeader: '#f6c445', corHeaderTexto: '#3b3260', corFita: '#c9a227', corRow: '#e9eef7', corTitulo: '#1a3a6b', corPct: '#e8850c', corAcerto: '#8a8a8a', fitaPosicao: 'base', fitaAltura: 2 })
 }
 
 export const PRESETS_CADERNO: CadernoPreset[] = [

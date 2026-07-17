@@ -71,8 +71,8 @@ export const BLOCKS: BlockMeta[] = [
   { type: 'diag-grupo', title: 'Diagnóstico — Grupo/Disciplinas', icon: Rows3, category: 'avaliacao', dynamic: true, supportsVars: true,
     defaults: {
       grupo: 'Grupo I', disciplinas: [{ chave: 'direito_administrativo', nome: 'Direito Administrativo', assunto: '' }],
-      corHeader: '#f6c445', corHeaderTexto: '#3b3260', corFita: '#f6c445', corRow: '#eef3fb', corTitulo: '#243b7a', corPct: '#c0392b',
-      fitaPosicao: 'base', fitaAltura: 3, alturaLinha: 0, gapLinha: 6,
+      corHeader: '#f6c445', corHeaderTexto: '#3b3260', corFita: '#c9a227', corRow: '#e9eef7', corTitulo: '#1a3a6b', corPct: '#e8850c', corAcerto: '#8a8a8a',
+      fitaPosicao: 'base', fitaAltura: 2, alturaLinha: 0, gapLinha: 6,
     } },
   { type: 'diag-pilares', title: 'Diagnóstico — Pilares', icon: LayoutGrid, category: 'avaliacao', dynamic: true, supportsVars: true,
     defaults: {
@@ -453,9 +453,9 @@ export function BlockRender({ block, theme, data, full }: { block: Block; theme:
                   <div style={{ fontWeight: 700, fontSize: 12, color: a.corTitulo || '#243b7a' }}>{applyVars(d.nome || '', data.vars)}</div>
                   {d.assunto && <div style={{ fontSize: 10, color: '#555', fontStyle: 'italic' }}>- Categoria: {applyVars(d.assunto, data.vars)}</div>}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, whiteSpace: 'nowrap' }}>
-                  <span style={{ fontSize: 11, color: '#888' }}>{val(`{acerto_${d.chave}}`, '0')}/{val(`{total_${d.chave}}`, '0')}</span>
-                  <span style={{ fontWeight: 700, fontSize: 13, color: a.corPct || '#c0392b' }}>{val(`{pct_${d.chave}}`, '0%')}</span>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 11, color: a.corAcerto || '#8a8a8a' }}>{val(`{acerto_${d.chave}}`, 'X')}/{val(`{total_${d.chave}}`, '0')}</span>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: a.corPct || '#e8850c' }}>{val(`{pct_${d.chave}}`, '0%')}</span>
                 </div>
               </div>
             )
