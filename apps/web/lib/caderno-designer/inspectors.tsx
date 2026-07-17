@@ -440,6 +440,10 @@ export function BlockInspector({ block, onChange, varsExtra }: { block: Block; o
           ))}
           <button type="button" onClick={addD} className="w-full rounded-md border border-dashed py-1.5 text-xs text-muted-foreground hover:border-primary hover:text-primary">+ Adicionar disciplina (em branco)</button>
           <div className="border-t pt-2" />
+          <Row label="Fita (linha colorida)"><select value={a.fitaPosicao ?? 'base'} onChange={(e) => set('fitaPosicao', e.target.value)} className={inputCls}><option value="base">Embaixo</option><option value="topo">Em cima</option></select></Row>
+          <Faixa label="Espessura da fita (px)" min={0} max={8} value={a.fitaAltura ?? 3} onChange={(v) => set('fitaAltura', v)} />
+          <Faixa label="Altura mínima da linha (px) — 0 = automática" min={0} max={120} value={a.alturaLinha ?? 0} onChange={(v) => set('alturaLinha', v)} />
+          <Faixa label="Espaço entre linhas (px)" min={0} max={20} value={a.gapLinha ?? 6} onChange={(v) => set('gapLinha', v)} />
           <Cor label="Cor do cabeçalho" value={a.corHeader} onChange={(v) => set('corHeader', v)} />
           <Cor label="Texto do cabeçalho" value={a.corHeaderTexto} onChange={(v) => set('corHeaderTexto', v)} />
           <Cor label="Fita das linhas" value={a.corFita} onChange={(v) => set('corFita', v)} />
