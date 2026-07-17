@@ -26,7 +26,7 @@ function fmtData(iso: string | null) {
 }
 function notaTom(n: number | null) {
   if (n == null) return 'text-muted-foreground'
-  return n >= 7 ? 'text-emerald-600 dark:text-emerald-400' : n >= 5 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
+  return n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
 }
 
 export function EstudantesLista({ estudantes }: { estudantes: EstudanteRow[] }) {

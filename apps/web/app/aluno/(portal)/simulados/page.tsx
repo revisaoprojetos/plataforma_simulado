@@ -7,7 +7,7 @@ import { iconeBanco } from '@/lib/banco-visual'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 
-const notaTone = (n: number) => (n >= 7 ? 'text-emerald-600 dark:text-emerald-400' : n >= 5 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
+const notaTone = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
 const modoLabel = (m: string) => (m === 'janela_fixa' ? 'Agendado' : m === 'prazo_relativo' ? 'Prazo' : 'Aberto')
 
 export default async function MeusSimuladosPage() {

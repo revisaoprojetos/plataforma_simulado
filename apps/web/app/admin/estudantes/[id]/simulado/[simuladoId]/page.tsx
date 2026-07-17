@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic'
 
 const fmt = (d: string | null) => (d ? format(new Date(d), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '—')
 const fmtDur = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h > 0 ? `${h}h ${m}m` : `${m}m ${s % 60}s` }
-const notaTom = (n: number | null) => (n == null ? 'text-muted-foreground' : n >= 7 ? 'text-emerald-600 dark:text-emerald-400' : n >= 5 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
+const notaTom = (n: number | null) => (n == null ? 'text-muted-foreground' : n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
 const pctTom = (p: number) => (p >= 70 ? 'text-emerald-600 dark:text-emerald-400' : p >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
 
 export default async function EstudanteSimuladoPage({ params }: { params: Promise<{ id: string; simuladoId: string }> }) {

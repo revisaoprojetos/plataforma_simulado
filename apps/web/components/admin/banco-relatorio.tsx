@@ -116,7 +116,7 @@ export async function BancoRelatorio({ bancoId, cor = '#6d28d9' }: { bancoId: st
   }
 
   const mediaGeral = linhas.length ? linhas.reduce((s, l) => s + l.nota, 0) / linhas.length : 0
-  const tone = (n: number) => (n >= 7 ? 'text-emerald-600 dark:text-emerald-400' : n >= 5 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
+  const tone = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
   const pill = 'inline-flex min-w-7 justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold'
 
   return (

@@ -1,6 +1,6 @@
 // Cálculo CANÔNICO da nota de uma sessão — fonte única de verdade, usada por
 // finalizar, anular, trocar e remover correção (antes a regra estava triplicada
-// e divergente). Escala 0–10.
+// e divergente). Escala 0–100 (percentual de acerto; ex.: 13 de 100 → 13).
 //
 // Regras de anulação (por questão, conforme o registro de re-correção):
 //  - pontua_todos: a questão continua no total e TODOS ganham o ponto.
@@ -47,7 +47,8 @@ export function calcularNota(respostas: { questao_id: string; correta: boolean |
   const corretasValidas = respostas.filter((r) => r.correta && !ctx.anuladas.has(r.questao_id)).length
   const acertos = corretasValidas + nPontuaTodos // pontua_todos credita a todos
 
-  return denom > 0 ? Math.round((acertos / denom) * 10 * 100) / 100 : 0
+  // Escala 0–100 (percentual de acerto). Ex.: 13/100 acertos → 13,00; tudo certo → 100.
+  return denom > 0 ? Math.round((acertos / denom) * 100 * 100) / 100 : 0
 }
 
 /** Conveniência: recalcula e devolve a nota de UMA sessão (1 read de respostas). */

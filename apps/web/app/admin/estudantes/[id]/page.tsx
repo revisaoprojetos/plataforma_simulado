@@ -222,7 +222,7 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
   })
 
   const iniciais = (est.nome ?? '?').split(' ').filter(Boolean).slice(0, 2).map((n: string) => n[0]?.toUpperCase()).join('')
-  const notaTone = (n: number) => n >= 7 ? 'text-emerald-600 dark:text-emerald-400' : n >= 5 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
+  const notaTone = (n: number) => n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
 
   const Info = ({ icon: Icon, label, value }: { icon: any; label: string; value: string }) => (
     <div className="flex items-start gap-2.5">

@@ -11,7 +11,7 @@ import type { Comparativo } from '@/lib/simulado/comparativo'
 import type { TentativaResumo, QuestaoAgregada } from '@/lib/simulado/resultado-aluno'
 import type { DesempenhoSimulado } from '@/lib/simulado/desempenho-aluno'
 
-const notaTone = (n: number) => (n >= 7 ? 'text-emerald-600 dark:text-emerald-400' : n >= 5 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
+const notaTone = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
 const pctBar = (p: number) => (p >= 70 ? 'bg-emerald-500' : p >= 50 ? 'bg-amber-500' : 'bg-rose-500')
 const fmtDur = (ms: number) => { const m = Math.floor(ms / 60000), s = Math.round((ms % 60000) / 1000); return m > 0 ? `${m}min ${String(s).padStart(2, '0')}s` : `${s}s` }
 const fmtData = (d?: string | null) => (d ? new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—')
@@ -192,7 +192,7 @@ export function MeuSimuladoView({
                           <div key={d.nome}>
                             <div className="mb-1 flex items-baseline justify-between gap-2">
                               <span className="text-sm font-medium">{d.nome}</span>
-                              <span className="text-xs tabular-nums text-muted-foreground">{d.ac}/{d.tt} · <b className={notaTone(d.pct / 10)}>{d.pct}%</b></span>
+                              <span className="text-xs tabular-nums text-muted-foreground">{d.ac}/{d.tt} · <b className={notaTone(d.pct)}>{d.pct}%</b></span>
                             </div>
                             <div className="h-2 overflow-hidden rounded-full bg-muted"><div className={cn('h-full rounded-full', pctBar(d.pct))} style={{ width: `${d.pct}%` }} /></div>
                           </div>

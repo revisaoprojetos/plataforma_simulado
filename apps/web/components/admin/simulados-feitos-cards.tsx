@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 
 type Visual = { cor: string | null; icone: string | null; capa: string | null; bancoId: string | null }
 const notaTom = (n: number | null) =>
-  n == null ? 'text-white/70' : n >= 7 ? 'text-emerald-300' : n >= 5 ? 'text-amber-300' : 'text-rose-300'
+  n == null ? 'text-white/70' : n >= 70 ? 'text-emerald-300' : n >= 50 ? 'text-amber-300' : 'text-rose-300'
 
 type Grupo = { simuladoId: string; titulo: string; tipo: SessaoRow['tipo']; nTent: number; melhor: number | null; media: number | null; ultima: SessaoRow }
 
