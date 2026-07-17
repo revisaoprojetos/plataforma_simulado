@@ -56,13 +56,16 @@ export default async function IntegracaoProviderPage({ params }: { params: Promi
   // Demais provedores (Guru): sistema unificado novo (credenciais + mapeamentos).
   const tid = access.tenantId ?? '00000000-0000-0000-0000-000000000000'
   const svc = createAdminClient()
-  const [{ data: cfg }, { data: maps }, { data: grupos }, { data: simulados }] = await Promise.all([
-    svc.from('simulado_integracao_config').select('base_url, credenciais, ativo, webhook_token').eq('tenant_id', tid).eq('provider', prov).maybeSingle(),
+  const [{ data: cfg }, { data: maps }, { data: grupos }, { data: simulados }, ultimoInbox] = await Promise.all([
+    svc.from('simulado_integracao_config').select('base_url, credenciais, ativo, webhook_token, mapa_json').eq('tenant_id', tid).eq('provider', prov).maybeSingle(),
     svc.from('simulado_integracao_mapeamentos').select('id, fonte_ref, fonte_nome, classificacao, grupo_id, simulado_id, ativo').eq('tenant_id', tid).eq('provider', prov).order('fonte_nome'),
     svc.from('simulado_grupos').select('id, nome').eq('tenant_id', tid).eq('deletado', false).order('nome'),
     svc.from('simulado_simulados').select('id, titulo').eq('tenant_id', tid).eq('deletado', false).order('titulo'),
+    // Pré-carrega o último payload recebido → a aba Mapa JSON abre INSTANTÂNEA (sem round-trip).
+    (async () => { try { return await svc.from('simulado_webhook_inbox').select('body_json').eq('tenant_id', tid).eq('provider', prov).not('body_json', 'is', null).order('recebido_em', { ascending: false }).limit(1).maybeSingle() } catch { return { data: null } } })(),
   ])
   const cred = ((cfg as any)?.credenciais ?? {}) as Record<string, string>
+  const mapaInicial = { mapa: ((cfg as any)?.mapa_json && typeof (cfg as any).mapa_json === 'object') ? (cfg as any).mapa_json as Record<string, string> : {}, ultimoPayload: (ultimoInbox as any)?.data?.body_json ?? null }
 
   return (
     <div className="animate-page space-y-6">
@@ -80,6 +83,7 @@ export default async function IntegracaoProviderPage({ params }: { params: Promi
         mapeamentos={(maps ?? []).map((m: any) => ({ id: m.id, fonteRef: m.fonte_ref, fonteNome: m.fonte_nome, classificacao: m.classificacao, grupoId: m.grupo_id, simuladoId: m.simulado_id, ativo: m.ativo }))}
         gruposSistema={(grupos ?? []).map((g: any) => ({ id: g.id, nome: g.nome }))}
         simuladosSistema={(simulados ?? []).map((s: any) => ({ id: s.id, nome: s.titulo }))}
+        mapaInicial={mapaInicial}
       />
     </div>
   )

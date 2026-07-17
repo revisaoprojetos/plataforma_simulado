@@ -31,8 +31,9 @@ interface Fonte { ref: string; nome: string; total?: number }
 type Aba = 'credenciais' | 'mapeamentos' | 'importar' | 'eventos' | 'assinaturas' | 'recebidos' | 'mapa'
 const SEM = '__sem__'
 
-export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos, gruposSistema, simuladosSistema }: {
+export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos, gruposSistema, simuladosSistema, mapaInicial }: {
   provider: Provider; appUrl: string; config: Config; mapeamentos: Mapeamento[]; gruposSistema: Grupo[]; simuladosSistema: Grupo[]
+  mapaInicial?: { mapa: Record<string, string>; ultimoPayload: unknown | null }
 }) {
   const meta = PROVIDER_META[provider]
   const campos = CAMPOS_PROVIDER[provider]
@@ -105,7 +106,7 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
       {abaAtiva === 'importar' && !meta.push && <Importar provider={provider} />}
       {abaAtiva === 'eventos' && meta.push && <Eventos provider={provider} />}
       {abaAtiva === 'recebidos' && (meta.push || provider === 'curseduca') && <Recebidos provider={provider} appUrl={appUrl} token={config.webhookToken} />}
-      {abaAtiva === 'mapa' && meta.push && <MapaJson provider={provider} />}
+      {abaAtiva === 'mapa' && meta.push && <MapaJson provider={provider} inicial={mapaInicial} />}
     </div>
   )
 }
@@ -250,10 +251,12 @@ function Assinaturas({ provider }: { provider: Provider }) {
 }
 
 // ── Mapa JSON (mapeamento AUTOMÁTICO + ajuste manual das chaves do webhook) ────
-function MapaJson({ provider }: { provider: Provider }) {
-  const [mapa, setMapa] = useState<Record<string, string>>({})
-  const [auto, setAuto] = useState<Record<string, AutoMatch>>({})   // confiança por campo (última auto-detecção)
-  const [payload, setPayload] = useState<unknown | null>(null)
+function MapaJson({ provider, inicial }: { provider: Provider; inicial?: { mapa: Record<string, string>; ultimoPayload: unknown | null } }) {
+  // Estado inicial vindo do SERVIDOR (instantâneo, sem esperar round-trip).
+  const detInicial = (inicial?.ultimoPayload && Object.keys(inicial.mapa ?? {}).length === 0) ? autoMapear(inicial.ultimoPayload) : null
+  const [mapa, setMapa] = useState<Record<string, string>>(detInicial ? Object.fromEntries(Object.entries(detInicial).map(([k, v]) => [k, v.path])) : (inicial?.mapa ?? {}))
+  const [auto, setAuto] = useState<Record<string, AutoMatch>>(detInicial ?? {})
+  const [payload, setPayload] = useState<unknown | null>(inicial?.ultimoPayload ?? null)
   const [ativo, setAtivo] = useState<string | null>(null)          // campo em foco (recebe o clique no JSON)
   const [carregando, start] = useTransition()
   const [salvando, startSalvar] = useTransition()
@@ -274,7 +277,8 @@ function MapaJson({ provider }: { provider: Provider }) {
       setMapa(salvo); setAuto({})
     }
   })
-  useEffect(() => { carregar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Só busca do servidor se NÃO veio nada pré-carregado (refina em background, não bloqueia a tela).
+  useEffect(() => { if (!inicial) carregar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const detectar = () => {
     if (!payload) { toast.error('Sem payload recebido para detectar. Envie um evento e clique em Recarregar.'); return }
