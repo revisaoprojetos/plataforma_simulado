@@ -42,8 +42,18 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Non-embed pages cannot be framed
-  supabaseResponse.headers.set('X-Frame-Options', 'SAMEORIGIN')
+  // Rotas do aluno/login PODEM ser embedadas em plataformas externas (ex.: Curseduca).
+  // O painel /admin continua protegido contra clickjacking (SAMEORIGIN).
+  // ⚠️ frame-ancestors * = qualquer site pode embedar. Para restringir, troque por
+  //    "frame-ancestors 'self' https://revisaopge.curseduca.pro https://*.curseduca.pro".
+  const framavel = ['/login', '/aluno', '/simulado', '/auth'].some(p => pathname === p || pathname.startsWith(p + '/'))
+  if (framavel) {
+    supabaseResponse.headers.delete('X-Frame-Options')
+    supabaseResponse.headers.set('Content-Security-Policy', 'frame-ancestors *')
+  } else {
+    supabaseResponse.headers.set('X-Frame-Options', 'SAMEORIGIN')
+    supabaseResponse.headers.set('Content-Security-Policy', "frame-ancestors 'self'")
+  }
 
   if (isAdminPath && !user) {
     const loginUrl = new URL('/login', request.url)
