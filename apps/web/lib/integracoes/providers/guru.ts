@@ -73,13 +73,19 @@ export const guruAdapter: ProviderAdapter = {
   async testarCredenciais(cfg) {
     const token = cfg.credenciais.api_token
     if (!token) return { ok: false, error: 'Informe o API Token da Guru.' }
-    try {
-      // ⚠️ VERIFICAR endpoint real da API Guru (v2). Best-effort para validar o token.
-      const r = await fetch(`${cfg.baseUrl}/api/v2/accounts/me`, { headers: { accept: 'application/json', Authorization: `Bearer ${token}` }, cache: 'no-store' })
-      if (r.ok) return { ok: true }
-      if (r.status === 401 || r.status === 403) return { ok: false, error: 'Token inválido (401/403).' }
-      return { ok: false, error: `Guru respondeu ${r.status}. Verifique o endpoint/credenciais.` }
-    } catch (e) { return { ok: false, error: (e as Error).message } }
+    const base = (cfg.baseUrl || 'https://digitalmanager.guru').replace(/\/+$/, '')
+    // Tenta alguns endpoints conhecidos; OK se QUALQUER um responder 200. 401/403 = token inválido.
+    const rotas = ['/api/v2/accounts/me', '/api/v2/subscriptions?per_page=1', '/api/v2/transactions?per_page=1', '/api/v2/products?per_page=1']
+    let ultimo = 0
+    for (const path of rotas) {
+      try {
+        const r = await fetch(`${base}${path}`, { headers: { accept: 'application/json', Authorization: `Bearer ${token}` }, cache: 'no-store' })
+        if (r.ok) return { ok: true }
+        if (r.status === 401 || r.status === 403) return { ok: false, error: `Token inválido (${r.status}). Confira o User Token na Guru.` }
+        ultimo = r.status // 404/400 → endpoint pode diferir; tenta o próximo
+      } catch (e) { return { ok: false, error: `Falha de rede: ${(e as Error).message}` } }
+    }
+    return { ok: false, error: `Não foi possível validar (último status ${ultimo}). Confira o Base URL e o token.` }
   },
 
   async listarFontes(cfg): Promise<FonteImport[]> {

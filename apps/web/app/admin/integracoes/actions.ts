@@ -83,8 +83,8 @@ export async function testarIntegracao(provider: string): Promise<{ ok: boolean;
   if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
   const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
-  const cfg = await resolverProviderCfg(g.tenantId, provider)
-  if (!cfg) return { ok: false, error: 'Configure as credenciais primeiro.' }
+  const cfg = await resolverProviderCfg(g.tenantId, provider, { ignorarAtivo: true })
+  if (!cfg) return { ok: false, error: 'Salve o API Token primeiro.' }
   const adapter = getAdapter(provider)
   if (!adapter) return { ok: false, error: `Provedor "${provider}" ainda não implementado.` }
   return adapter.testarCredenciais(cfg)

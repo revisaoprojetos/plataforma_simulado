@@ -38,7 +38,7 @@ export function cfgDoEnv(provider: Provider, tenantId: string): ProviderCfg | nu
 }
 
 /** Config do tenant (descriptografada) ou fallback .env. Null se não configurado/ativo. */
-export async function resolverProviderCfg(tenantId: string, provider: Provider): Promise<ProviderCfg | null> {
+export async function resolverProviderCfg(tenantId: string, provider: Provider, opts?: { ignorarAtivo?: boolean }): Promise<ProviderCfg | null> {
   try {
     const svc = createAdminClient()
     const { data } = await svc
@@ -46,7 +46,8 @@ export async function resolverProviderCfg(tenantId: string, provider: Provider):
       .select('base_url, credenciais, ativo')
       .eq('tenant_id', tenantId).eq('provider', provider).maybeSingle()
     const d = data as any
-    if (d && d.ativo && d.credenciais && typeof d.credenciais === 'object') {
+    // ignorarAtivo: permite TESTAR a conexão com a credencial salva antes de ativar a integração.
+    if (d && (opts?.ignorarAtivo || d.ativo) && d.credenciais && typeof d.credenciais === 'object') {
       const cred: Record<string, string> = {}
       for (const [k, v] of Object.entries(d.credenciais as Record<string, string>)) cred[k] = descriptografar(v) ?? ''
       // considera configurado só se tiver ao menos uma credencial não vazia
