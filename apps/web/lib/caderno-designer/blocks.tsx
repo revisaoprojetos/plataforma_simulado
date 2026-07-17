@@ -68,6 +68,15 @@ export const BLOCKS: BlockMeta[] = [
     defaults: { quantidade: 6, rotulo: 'Resposta:', altura: 28, cor: '' } },
   { type: 'condicao', title: 'Condição (texto modulado)', icon: GitBranch, category: 'conteudo', container: true,
     defaults: { variavel: 'percentual', operador: 'entre', valor: '0', valor2: '50' } },
+  { type: 'diag-pilares', title: 'Diagnóstico — Pilares', icon: LayoutGrid, category: 'avaliacao', dynamic: true, supportsVars: true,
+    defaults: {
+      pilares: [
+        { chave: 'lei_seca', nome: 'LEI SECA', f1: '', f2: '', f3: '' },
+        { chave: 'jurisprudencia', nome: 'JURISPRUDÊNCIA', f1: '', f2: '', f3: '' },
+        { chave: 'doutrina', nome: 'DOUTRINA', f1: '', f2: '', f3: '' },
+      ],
+      corFundo: '#fef3d6', fitaCor: '#3b5bdb', fitaAltura: 4, bordaRaio: 4, padding: 10, gap: 16, divisoria: true, divisoriaCor: '#cbb26b', corTitulo: '#243b7a', corQuestoes: '#c0392b',
+    } },
 ]
 
 export function getBlockMeta(type: string): BlockMeta | undefined {
@@ -414,6 +423,27 @@ export function BlockRender({ block, theme, data, full }: { block: Block; theme:
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} full />)}
+        </div>
+      )
+    }
+    case 'diag-pilares': {
+      const pilares: any[] = Array.isArray(a.pilares) ? a.pilares : []
+      const bordaDiv = `${a.divisoriaEspessura ?? 1}px solid ${a.divisoriaCor || '#cbb26b'}`
+      const numPct = (chave: string) => { const n = parseFloat(String(applyVars(`{pct_pilar_${chave}}`, data.vars)).replace(/[^0-9.,-]/g, '').replace(',', '.')); return isNaN(n) ? null : n }
+      const faixaDe = (p: any) => { const n = numPct(p.chave); if (n == null) return p.f1 || ''; return n <= 50 ? (p.f1 || '') : n <= 80 ? (p.f2 || '') : (p.f3 || '') }
+      return (
+        <div style={{ background: a.corFundo || '#fef3d6', borderRadius: a.bordaRaio ?? 4, borderTop: a.fitaAltura ? `${a.fitaAltura}px solid ${a.fitaCor || c.primaria}` : undefined, padding: a.padding ?? 10, fontFamily: theme.tipografia.familia }}>
+          <div style={{ display: 'flex', gap: a.gap ?? 16, alignItems: 'stretch' }}>
+            {pilares.map((p, i) => (
+              <div key={i} style={{ flex: '1 1 0%', minWidth: 0, ...(i > 0 && a.divisoria !== false ? { borderLeft: bordaDiv, paddingLeft: (a.gap ?? 16) / 2 } : {}) }}>
+                <div style={{ fontWeight: 700, color: a.corTitulo || '#243b7a', fontSize: 13 }}>{p.nome}</div>
+                <div style={{ fontWeight: 700, color: a.corTitulo || '#243b7a', fontSize: 22, lineHeight: 1.1 }}>{applyVars(`{pct_pilar_${p.chave}}`, data.vars)}</div>
+                <div style={{ color: a.corQuestoes || '#c0392b', fontSize: 11 }}>{applyVars(`{acerto_pilar_${p.chave}} de {total_pilar_${p.chave}} questões`, data.vars)}</div>
+                <div style={{ fontWeight: 700, fontSize: 10, color: '#555', margin: '6px 0 2px' }}>TEXTO MODULADO</div>
+                <div style={{ fontSize: 11, lineHeight: 1.5, textAlign: 'justify', whiteSpace: 'pre-wrap', color: c.texto }}>{applyVars(faixaDe(p), data.vars)}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )
     }

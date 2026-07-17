@@ -20,23 +20,6 @@ function doc(pages: Page[], running?: Partial<RunningConfig>): CadernoDoc {
 
 export type CadernoPreset = { id: string; nome: string; descricao: string; build: () => CadernoDoc }
 
-/** Coluna de pilar do diagnóstico (SEM card próprio — o fundo é do card que envolve as colunas).
- *  `pilarVar` = slug do pilar (ex.: 'lei_seca') para o texto modulado por faixa. */
-function colPilarDiag(titulo: string, pilarVar: string): Block {
-  const v = `pct_pilar_${pilarVar}`
-  return blk('coluna', { largura: 0 }, [
-    blk('titulo-secao', { texto: titulo, nivel: 3, cor: '#243b7a', align: 'left', mostrarLinha: false, corFundo: '' }),
-    blk('texto-livre', { texto: `{${v}}`, bold: true, size: 22, color: '#243b7a', align: 'left', lineHeight: 1.1 }),
-    blk('texto-livre', { texto: `{acerto_pilar_${pilarVar}} de {total_pilar_${pilarVar}} questões`, size: 11, color: '#c0392b', align: 'left' }),
-    blk('espacador', { altura: 4 }),
-    blk('texto-livre', { texto: 'TEXTO MODULADO', bold: true, size: 10, align: 'left', color: '#555555' }),
-    // Texto por faixa (só a condição verdadeira aparece).
-    blk('condicao', { variavel: v, operador: 'entre', valor: '0', valor2: '50' }, [blk('texto-livre', { texto: 'Desempenho abaixo de 50% — ponto crítico. Escreva aqui a leitura personalizada.', size: 11, align: 'justify', lineHeight: 1.5 })]),
-    blk('condicao', { variavel: v, operador: 'entre', valor: '51', valor2: '80' }, [blk('texto-livre', { texto: 'Desempenho intermediário (51–80%). Escreva aqui a leitura personalizada.', size: 11, align: 'justify', lineHeight: 1.5 })]),
-    blk('condicao', { variavel: v, operador: 'entre', valor: '81', valor2: '100' }, [blk('texto-livre', { texto: 'Bom desempenho (81–100%). Escreva aqui a leitura personalizada.', size: 11, align: 'justify', lineHeight: 1.5 })]),
-  ])
-}
-
 export const PRESETS_CADERNO: CadernoPreset[] = [
   {
     id: 'diagnostico',
@@ -56,14 +39,21 @@ export const PRESETS_CADERNO: CadernoPreset[] = [
         blk('espacador', { altura: 12 }),
         blk('titulo-secao', { texto: 'DESEMPENHO POR PILAR', nivel: 2, corFundo: '#2b2a4a', cor: '#ffffff', fundoRaio: 4, align: 'left', mostrarLinha: false }),
         blk('espacador', { altura: 8 }),
-        // Cards COLADOS: um único card (fundo + fita) envolvendo as 3 colunas com gap 0 + divisória.
-        blk('card', { corFundo: '#fef3d6', bordaLargura: 0, bordaRaio: 4, padding: 10, largura: 100, alinhamento: 'center', fitaCor: '#3b5bdb', fitaAltura: 4 }, [
-          blk('colunas', { gap: 16, divisoria: true, divisoriaCor: '#cbb26b', divisoriaEspessura: 1 }, [
-            colPilarDiag('LEI SECA', 'lei_seca'),
-            colPilarDiag('JURISPRUDÊNCIA', 'jurisprudencia'),
-            colPilarDiag('DOUTRINA', 'doutrina'),
-          ]),
-        ]),
+        // Bloco dinâmico: 3 pilares colados, % real + faixa automática (0–50 / 51–80 / 81–100).
+        blk('diag-pilares', { pilares: [
+          { chave: 'lei_seca', nome: 'LEI SECA',
+            f1: 'O seu desempenho em lei seca ficou abaixo de 50%, um resultado que pode ser considerado ruim. A CEBRASPE cobra texto literal de lei em muitas questões, sendo um dos principais fatores de reprovação entre nossos alunos.',
+            f2: 'O seu desempenho em lei seca foi intermediário. Você tem base, mas ainda está deixando pontos na mesa. A banca cobra o dispositivo exato — foque nos diplomas de maior incidência, com atenção aos detalhes.',
+            f3: 'O seu desempenho em lei seca foi excelente! Esse pode ser o diferencial para sua aprovação. Mantenha-se firme, com revisões periódicas, e estude os conteúdos específicos da AGU com foco na lei seca.' },
+          { chave: 'jurisprudencia', nome: 'JURISPRUDÊNCIA',
+            f1: 'O seu desempenho em jurisprudência ficou abaixo de 50%, e isso é muito ruim. A CEBRASPE não abre mão de cobrar informativos. Reforce o estudo pelo DOD, JurisClub ou informativos do STF e STJ.',
+            f2: 'O seu desempenho em jurisprudência foi médio — há espaço relevante para crescimento. As questões de jurisprudência diferenciam os primeiros colocados. Reforce pelo DoD ou pelo JurisClub do Revisão.',
+            f3: 'O seu desempenho em jurisprudência foi maravilhoso! Você acompanha os informativos e aplica os entendimentos com segurança. Mantenha o hábito, com atenção à jurisprudência mais recente e às teses consolidadas.' },
+          { chave: 'doutrina', nome: 'DOUTRINA',
+            f1: 'O desempenho em doutrina ficou abaixo de 50%. Doutrina é a base do raciocínio jurídico — quem não domina classificações, distinções e princípios erra também em lei e jurisprudência. O investimento tem retorno duplo.',
+            f2: 'O desempenho em doutrina foi intermediário. Você acerta nas questões diretas, mas perde nas distinções mais finas. Dominar doutrina ajuda a ganhar pontos também em questões de lei e jurisprudência.',
+            f3: 'O desempenho em doutrina foi excelente. Você domina classificações, distinções conceituais e fundamentos teóricos — o que se reflete também em questões de lei e jurisprudência. Mantenha a solidez.' },
+        ], corFundo: '#fef3d6', fitaCor: '#3b5bdb', fitaAltura: 4, divisoriaCor: '#cbb26b', corTitulo: '#243b7a' }),
         blk('espacador', { altura: 12 }),
         blk('titulo-secao', { texto: 'DESEMPENHO POR DISCIPLINA', nivel: 2, corFundo: '#2b2a4a', cor: '#ffffff', fundoRaio: 4, align: 'left', mostrarLinha: false }),
         blk('espacador', { altura: 8 }),

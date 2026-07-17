@@ -409,6 +409,35 @@ export function BlockInspector({ block, onChange, varsExtra }: { block: Block; o
           <Faixa label="Altura da fita (px) — 0 = sem fita" min={0} max={12} value={a.fitaAltura ?? 0} onChange={(v) => set('fitaAltura', v)} />
         </div>
       )
+    case 'diag-pilares': {
+      const pilares: any[] = Array.isArray(a.pilares) ? a.pilares : []
+      const setP = (i: number, k: string, v: string) => set('pilares', pilares.map((p, idx) => idx === i ? { ...p, [k]: v } : p))
+      const addP = () => set('pilares', [...pilares, { chave: '', nome: 'NOVO PILAR', f1: '', f2: '', f3: '' }])
+      const rmP = (i: number) => set('pilares', pilares.filter((_, idx) => idx !== i))
+      return (
+        <div className="space-y-3">
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Os 3 pilares aparecem colados com % real do aluno. O <b>texto de faixa</b> é escolhido automaticamente pelo desempenho (0–50 / 51–80 / 81–100). A <b>chave</b> deve casar com o pilar da importação (ex.: <code>lei_seca</code>).</p>
+          {pilares.map((p, i) => (
+            <div key={i} className="space-y-1.5 rounded-lg border p-2">
+              <div className="flex items-center gap-1.5">
+                <input value={p.nome ?? ''} onChange={(e) => setP(i, 'nome', e.target.value)} className={inputCls} placeholder="Nome exibido (LEI SECA)" />
+                <button type="button" onClick={() => rmP(i)} className="rounded p-1 text-muted-foreground hover:text-destructive">✕</button>
+              </div>
+              <input value={p.chave ?? ''} onChange={(e) => setP(i, 'chave', e.target.value.trim())} className={inputCls} placeholder="chave do pilar (lei_seca)" />
+              <textarea value={p.f1 ?? ''} onChange={(e) => setP(i, 'f1', e.target.value)} rows={2} className={inputCls} placeholder="Texto faixa 0–50" />
+              <textarea value={p.f2 ?? ''} onChange={(e) => setP(i, 'f2', e.target.value)} rows={2} className={inputCls} placeholder="Texto faixa 51–80" />
+              <textarea value={p.f3 ?? ''} onChange={(e) => setP(i, 'f3', e.target.value)} rows={2} className={inputCls} placeholder="Texto faixa 81–100" />
+            </div>
+          ))}
+          <button type="button" onClick={addP} className="w-full rounded-md border border-dashed py-1.5 text-xs text-muted-foreground hover:border-primary hover:text-primary">+ Adicionar pilar</button>
+          <div className="border-t pt-2" />
+          <Cor label="Cor de fundo" value={a.corFundo} onChange={(v) => set('corFundo', v)} />
+          <Cor label="Cor da fita (topo)" value={a.fitaCor} onChange={(v) => set('fitaCor', v)} />
+          <Cor label="Cor da divisória" value={a.divisoriaCor} onChange={(v) => set('divisoriaCor', v)} />
+          <Cor label="Cor do título/número" value={a.corTitulo} onChange={(v) => set('corTitulo', v)} />
+        </div>
+      )
+    }
     case 'condicao':
       return (
         <div className="space-y-3">
