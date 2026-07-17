@@ -69,6 +69,8 @@ export const BLOCKS: BlockMeta[] = [
     defaults: { quantidade: 6, rotulo: 'Resposta:', altura: 28, cor: '' } },
   { type: 'condicao', title: 'Condição (texto modulado)', icon: GitBranch, category: 'conteudo', container: true,
     defaults: { variavel: 'percentual', operador: 'entre', valor: '0', valor2: '50' } },
+  { type: 'diag-disciplina', title: 'Diagnóstico — Disciplina', icon: ListChecks, category: 'avaliacao', dynamic: true, supportsVars: true,
+    defaults: { chave: '', nome: '', assunto: 'Assunto Principal', soSeErrou: true, corLinha: '#c9a227', linhaAltura: 2, corRow: '#e9eef7', corTitulo: '#1a3a6b', corAcerto: '#8a8a8a', corPct: '#e8850c' } },
   { type: 'diag-grupo', title: 'Diagnóstico — Grupo/Disciplinas', icon: Rows3, category: 'avaliacao', dynamic: true, supportsVars: true, oculto: true,
     defaults: {
       grupo: 'Grupo I', disciplinas: [{ chave: 'direito_administrativo', nome: 'Direito Administrativo', assunto: '' }],
@@ -192,7 +194,7 @@ export function larguraDaColuna(col: Block): number | undefined {
 }
 
 /** Renderer único (sem hooks): usado no canvas do editor E na impressão/PDF. */
-export function BlockRender({ block, theme, data, full }: { block: Block; theme: CadernoTheme; data: CadernoData; full?: boolean }) {
+export function BlockRender({ block, theme, data, full, editor }: { block: Block; theme: CadernoTheme; data: CadernoData; full?: boolean; editor?: boolean }) {
   const a = block.attributes as any
   const c = theme.cores
 
@@ -430,6 +432,26 @@ export function BlockRender({ block, theme, data, full }: { block: Block; theme:
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} full />)}
+        </div>
+      )
+    }
+    case 'diag-disciplina': {
+      const val = (tok: string, def: string) => { const r = applyVars(tok, data.vars); return /\{/.test(r) ? def : r }
+      const numDe = (tok: string) => parseInt(val(tok, '0').replace(/[^0-9-]/g, ''), 10) || 0
+      const ac = numDe(`{acerto_${a.chave}}`), tt = numDe(`{total_${a.chave}}`)
+      // "Só se errou": acertou tudo (ou sem questões) → não aparece (no editor sempre mostra p/ editar).
+      const escondido = a.soSeErrou !== false && (tt === 0 || ac >= tt)
+      if (escondido && !editor) return null
+      return (
+        <div style={{ borderTop: `${a.linhaAltura ?? 2}px solid ${a.corLinha || '#c9a227'}`, background: a.corRow || '#e9eef7', padding: '7px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, fontFamily: theme.tipografia.familia }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 12, color: a.corTitulo || '#1a3a6b' }}>{applyVars(a.nome || '', data.vars)}</div>
+            {a.assunto && <div style={{ fontSize: 10, color: '#555', fontStyle: 'italic' }}>- Categoria: {applyVars(a.assunto, data.vars)}</div>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 11, color: a.corAcerto || '#8a8a8a' }}>{val(`{acerto_${a.chave}}`, 'X')}/{val(`{total_${a.chave}}`, '0')}</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: a.corPct || '#e8850c' }}>{val(`{pct_${a.chave}}`, '0%')}</span>
+          </div>
         </div>
       )
     }

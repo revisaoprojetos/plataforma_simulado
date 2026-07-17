@@ -409,6 +409,33 @@ export function BlockInspector({ block, onChange, varsExtra }: { block: Block; o
           <Faixa label="Altura da fita (px) — 0 = sem fita" min={0} max={12} value={a.fitaAltura ?? 0} onChange={(v) => set('fitaAltura', v)} />
         </div>
       )
+    case 'diag-disciplina': {
+      // Lista de disciplinas do simulado (slug -> nome) a partir das variáveis disponíveis.
+      const discOpts = [...new Set((varsExtra ?? []).filter((g) => /Disciplina/i.test(g.grupo)).flatMap((g) => g.itens.map((v) => v.token.match(/\{pct_(.+)\}/)?.[1]).filter(Boolean)))] as string[]
+      const humano = (s: string) => s.replace(/_/g, ' ').replace(/^./, (ch) => ch.toUpperCase())
+      return (
+        <div className="space-y-3">
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Escolha a <b>disciplina do simulado</b> — o bloco preenche nome, acertos/total e % automaticamente. Só aparece se o aluno <b>errou</b> ao menos uma questão dela.</p>
+          <Row label="Disciplina">
+            <select value={a.chave ?? ''} onChange={(e) => { const s = e.target.value; onChange({ chave: s, nome: a.nome && a.chave !== s ? a.nome : humano(s) }) }} className={inputCls}>
+              <option value="">— escolher —</option>
+              {discOpts.map((s) => <option key={s} value={s}>{humano(s)}</option>)}
+              {a.chave && !discOpts.includes(a.chave) && <option value={a.chave}>{humano(a.chave)} (atual)</option>}
+            </select>
+          </Row>
+          <Row label="Nome exibido"><input value={a.nome ?? ''} onChange={(e) => set('nome', e.target.value)} className={inputCls} placeholder="Direito Constitucional" /></Row>
+          <Row label="Assunto principal"><input value={a.assunto ?? ''} onChange={(e) => set('assunto', e.target.value)} className={inputCls} placeholder="Assunto Principal (vazio = não mostra)" /></Row>
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.soSeErrou !== false} onChange={(e) => set('soSeErrou', e.target.checked)} className="h-4 w-4 rounded border" /> Só aparece se errou alguma questão</label>
+          <div className="border-t pt-2" />
+          <Cor label="Cor da linha (de cima)" value={a.corLinha} onChange={(v) => set('corLinha', v)} />
+          <Faixa label="Espessura da linha (px)" min={0} max={8} value={a.linhaAltura ?? 2} onChange={(v) => set('linhaAltura', v)} />
+          <Cor label="Fundo" value={a.corRow} onChange={(v) => set('corRow', v)} />
+          <Cor label="Cor do título" value={a.corTitulo} onChange={(v) => set('corTitulo', v)} />
+          <Cor label="Cor do acerto (X/N)" value={a.corAcerto} onChange={(v) => set('corAcerto', v)} />
+          <Cor label="Cor do %" value={a.corPct} onChange={(v) => set('corPct', v)} />
+        </div>
+      )
+    }
     case 'diag-grupo': {
       const disc: any[] = Array.isArray(a.disciplinas) ? a.disciplinas : []
       const setD = (i: number, k: string, v: string) => set('disciplinas', disc.map((d, idx) => idx === i ? { ...d, [k]: v } : d))

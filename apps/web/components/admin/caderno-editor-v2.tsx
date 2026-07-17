@@ -275,7 +275,7 @@ function EditorNode({ block, ctx, emColuna, divStyle }: { block: Block; ctx: Nod
       </div>
     )
   } else {
-    inner = <BlockRender block={block} theme={ctx.theme} data={ctx.data} full={emColuna} />
+    inner = <BlockRender block={block} theme={ctx.theme} data={ctx.data} full={emColuna} editor />
   }
 
   return (
