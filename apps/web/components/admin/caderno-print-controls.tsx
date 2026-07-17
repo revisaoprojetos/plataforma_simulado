@@ -7,18 +7,15 @@ import { toast } from 'sonner'
 export function CadernoPrintControls() {
   const [baixando, setBaixando] = useState(false)
 
-  // Baixa o PDF DIRETO (attachment), sem abrir o diálogo de impressão do navegador.
-  // A rota /api/aluno/caderno-pdf renderiza esta mesma página no servidor (Edge headless)
-  // e devolve o arquivo. Fallback: se a geração falhar (ex.: sem navegador no host), abre
-  // o diálogo de impressão para o usuário salvar manualmente.
+  // Baixa o PDF DIRETO (attachment) via servidor (Chromium headless), COM fundo e cards certos.
+  // Sem fallback de impressão: se falhar, mostra erro (não abre o diálogo de imprimir).
   async function baixar() {
     if (baixando) return
     const params = new URLSearchParams(window.location.search)
     const m = window.location.pathname.match(/\/imprimir\/caderno\/([^/?#]+)/)
     const cadernoId = m?.[1]
     const sessao = params.get('sessao')
-    // Sem credencial de sessão (ex.: preview do admin) → cai no "Salvar como PDF" do navegador.
-    if (!cadernoId || !sessao) { try { window.focus(); window.print() } catch { /* noop */ } return }
+    if (!cadernoId || !sessao) { toast.error('Não foi possível identificar o caderno para gerar o PDF.'); return }
 
     const mod = params.get('mod') || 'caderno_completo'
     const aluno = params.get('aluno') || ''
@@ -44,14 +41,13 @@ export function CadernoPrintControls() {
       setTimeout(() => URL.revokeObjectURL(url), 10_000)
       toast.success('Download concluído', { id: 'cadpdf' })
     } catch {
-      toast.error('Não foi possível gerar o PDF. Abrindo impressão para salvar…', { id: 'cadpdf' })
-      try { window.focus(); window.print() } catch { /* noop */ }
+      toast.error('Não foi possível gerar o PDF agora. Tente novamente em instantes.', { id: 'cadpdf' })
     } finally {
       setBaixando(false)
     }
   }
 
-  // Legado: quando aberto com ?print=1, dispara o download automaticamente.
+  // Legado: quando aberto com ?print=1, baixa o PDF automaticamente (sem imprimir).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('print') !== '1') return
@@ -70,9 +66,9 @@ export function CadernoPrintControls() {
         disabled={baixando}
         className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
       >
-        {baixando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {baixando ? 'Gerando PDF…' : 'Salvar PDF'}
+        {baixando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {baixando ? 'Gerando PDF…' : 'Baixar PDF'}
       </button>
-      <span className="ml-auto text-xs text-muted-foreground">O PDF é baixado direto, sem passar pela impressão.</span>
+      <span className="ml-auto text-xs text-muted-foreground">O PDF é baixado direto (com o fundo e os cards), sem impressão.</span>
     </div>
   )
 }

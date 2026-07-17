@@ -195,7 +195,8 @@ export function ProvaHud(p: ProvaHudProps) {
               <CardContent className="px-4 pb-0 pt-0">
                 <p className="text-center text-sm font-semibold">Navegador de questões</p>
                 <div className="mt-2 mb-3 border-t" />
-                <div className="grid grid-cols-5 gap-1.5">
+                {/* Rolável: com muitas questões (ex.: 100) o navegador não estica a página. */}
+                <div className="grid max-h-[46vh] grid-cols-5 gap-1.5 overflow-y-auto pr-1 [scrollbar-width:thin]">
                   {p.respondidas.map((respondida, i) => {
                     const atual = i === p.questaoIndex
                     const marcada = !!p.marcadas?.[i]

@@ -105,8 +105,7 @@ export function MeuSimuladoView({
       setTimeout(() => URL.revokeObjectURL(url), 10_000)
       toast.success('Download concluído', { id: 'cadpdf', description: nome })
     } catch {
-      toast.error('Não foi possível gerar o PDF. Abrindo para salvar…', { id: 'cadpdf' })
-      abrir(`${cadUrl(sessaoId, mod, gab)}&print=1`)
+      toast.error('Não foi possível gerar o PDF agora. Tente novamente em instantes.', { id: 'cadpdf' })
     } finally {
       setBaixando(null)
     }

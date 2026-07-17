@@ -26,6 +26,12 @@ RUN pnpm --filter web build
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+
+# Chromium para gerar o PDF dos cadernos/relatórios (puppeteer-core). Sem ele, o download
+# de PDF falha e a UI cairia no "imprimir". Fontes p/ acentuação/emoji corretos no PDF.
+RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont font-noto
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser PUPPETEER_SKIP_DOWNLOAD=1
+
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
 # Saída "standalone" do Next em monorepo: o server fica em apps/web/server.js
