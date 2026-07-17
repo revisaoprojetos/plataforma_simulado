@@ -72,11 +72,11 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
       {meta.push && (
         <div className="inline-flex rounded-xl border bg-muted/40 p-1">
           <button type="button" onClick={() => trocarArea('api')}
-            className={cn('inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors', area === 'api' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+            className={cn('inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors', area === 'api' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
             <DownloadCloud className="h-4 w-4" /> Coleta via API
           </button>
           <button type="button" onClick={() => trocarArea('webhook')}
-            className={cn('inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors', area === 'webhook' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+            className={cn('inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors', area === 'webhook' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
             <Radio className="h-4 w-4" /> Recebimento via Webhook
           </button>
         </div>

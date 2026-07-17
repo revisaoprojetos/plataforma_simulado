@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, ShieldAlert } from 'lucide-react'
+import { ChevronLeft, ShieldAlert, CreditCard, DownloadCloud } from 'lucide-react'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { createAdminClient } from '@/lib/supabase/server'
 import { criptografiaAtiva } from '@/lib/crypto'
@@ -29,11 +29,12 @@ export default async function IntegracaoProviderPage({ params }: { params: Promi
   }
 
   const meta = PROVIDER_META[prov]
+  const IconeProvider = prov === 'guru' ? CreditCard : DownloadCloud
   const header = (
     <div>
       <Link href="/admin/integracoes" className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /> Integrações</Link>
       <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: meta.cor }} />
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: meta.cor }}><IconeProvider className="h-5 w-5" /></span>
         <h1 className="text-2xl font-bold tracking-tight">{meta.nome}</h1>
       </div>
     </div>
