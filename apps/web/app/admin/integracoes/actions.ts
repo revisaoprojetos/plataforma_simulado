@@ -300,6 +300,52 @@ export async function salvarMapaConfig(provider: string, mapa: Record<string, st
   return { ok: true }
 }
 
+// ── Processar recebidos (aplica os dados do inbox no sistema via mapa + engine) ─
+async function aplicarPayloadNoSistema(tenantId: string, provider: Provider, payload: unknown): Promise<{ ok: boolean; acao?: string; motivo?: string; error?: string; comprador?: string | null }> {
+  const { normalizarPorMapa } = await import('@/lib/integracoes/normalizar-mapa')
+  const cfg = await resolverProviderCfg(tenantId, provider, { ignorarAtivo: true })
+  const norm = normalizarPorMapa(payload, cfg?.mapa, true) // manual: status desconhecido = concede
+  if (!norm) return { ok: false, error: 'Payload sem pessoa/produto reconhecíveis — ajuste o Mapa JSON.' }
+  const r = await aplicarEntitlement({ tenantId, provider, pessoa: norm.pessoa, entitlement: norm.entitlement })
+  return { ok: r.ok, acao: r.acao, motivo: r.motivo, error: r.error, comprador: norm.pessoa.email ?? norm.pessoa.nome }
+}
+
+export async function processarRecebido(provider: string, inboxId: string): Promise<{ ok: boolean; error?: string; acao?: string; motivo?: string }> {
+  if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data } = await svc.from('simulado_webhook_inbox').select('body_json').eq('id', inboxId).eq('tenant_id', g.tenantId).eq('provider', provider).maybeSingle()
+  if (!data || (data as any).body_json == null) return { ok: false, error: 'Requisição sem corpo JSON para processar.' }
+  const r = await aplicarPayloadNoSistema(g.tenantId, provider, (data as any).body_json)
+  if (!r.ok) return { ok: false, error: r.error ?? 'Falha ao aplicar.' }
+  await svc.from('simulado_webhook_inbox').update({ resultado: `processado manual: ${r.acao}${r.motivo ? ` (${r.motivo})` : ''}` }).eq('id', inboxId)
+  revalidatePath('/admin/estudantes')
+  return { ok: true, acao: r.acao, motivo: r.motivo }
+}
+
+export async function processarRecebidosTodos(provider: string, limite = 300): Promise<{ ok: boolean; error?: string; resumo?: { total: number; concedidos: number; ignorados: number; erros: number } }> {
+  if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data } = await svc.from('simulado_webhook_inbox').select('id, body_json').eq('tenant_id', g.tenantId).eq('provider', provider).eq('metodo', 'POST').not('body_json', 'is', null).order('recebido_em', { ascending: false }).limit(limite)
+  const linhas = (data ?? []) as any[]
+  let concedidos = 0, ignorados = 0, erros = 0
+  const vistos = new Set<string>()
+  for (const l of linhas) {
+    try {
+      const chave = JSON.stringify(l.body_json)
+      if (vistos.has(chave)) continue; vistos.add(chave) // dedupe payloads idênticos
+      const r = await aplicarPayloadNoSistema(g.tenantId, provider, l.body_json)
+      if (!r.ok) { erros++; continue }
+      if (r.acao === 'concedido') concedidos++; else ignorados++
+    } catch { erros++ }
+  }
+  revalidatePath('/admin/estudantes')
+  return { ok: true, resumo: { total: linhas.length, concedidos, ignorados, erros } }
+}
+
 // ── Inbox CRU do webhook (toda requisição que bate na URL) ─────────────────────
 export interface InboxDTO {
   id: string; metodo: string; statusResp: number | null; resultado: string | null

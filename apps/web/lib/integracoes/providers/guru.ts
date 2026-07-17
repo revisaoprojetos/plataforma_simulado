@@ -1,7 +1,7 @@
 import 'server-only'
 import { aguardarVaga, idCredencial } from '@/lib/integracoes/ratelimit'
 import { getStr } from '@/lib/integracoes/jsonpath'
-import { CAMPOS_MAPA } from '@/lib/integracoes/mapa-campos'
+import { normalizarPorMapa } from '@/lib/integracoes/normalizar-mapa'
 import type { ProviderAdapter, ProviderCfg, FonteImport, PessoaEntitlement, EventoNormalizado, StatusEntitlement } from '@/lib/integracoes/tipos'
 
 /**
@@ -168,50 +168,20 @@ export const guruAdapter: ProviderAdapter = {
   async parseWebhook(payload, _headers, cfg): Promise<EventoNormalizado | null> {
     const p = payload as any
     if (!p || typeof p !== 'object') return null
-    const mapa = (cfg as ProviderCfg | undefined)?.mapa ?? {}
+    const mapa = (cfg as ProviderCfg | undefined)?.mapa
 
-    // Resolve um campo pelo mapa → padrão → fallbacks (1º caminho que devolver valor).
-    const val = (key: string): string | null => {
-      const campo = CAMPOS_MAPA.find((c) => c.key === key)
-      const caminhos = [mapa[key], campo?.padrao, ...(campo?.padroesAlt ?? [])].filter(Boolean) as string[]
-      for (const c of caminhos) { const v = getStr(p, c); if (v) return v }
-      return null
-    }
+    // Normalização compartilhada (mapa dinâmico → padrões). No webhook, status desconhecido = ignora.
+    const norm = normalizarPorMapa(p, mapa, false)
+    if (!norm) return null   // sem pessoa/produto/status válido → evento sem efeito no acesso
 
-    const pedidoId = val('pedido_id')          // CHAVE ÚNICA (principal)
-    const statusBruto = val('status')
-    const status = mapStatus(statusBruto)
-    if (!status) return null                   // evento sem efeito no acesso (ex.: aguardando pagamento)
-
-    const produtoRef = val('produto_ref')
-    if (!produtoRef) return null
-
-    const email = val('email')
-    const cpf = val('cpf')
-    const nome = val('nome')
-    const ddd = val('ddd'); const tel = val('telefone')
-    const telefoneCompleto = tel ? `${ddd ?? ''}${tel}` : null
-
-    const externalPessoa = firstStr(email, cpf, pedidoId)
-    if (!externalPessoa) return null
-
-    const entExternalId = pedidoId ?? `${produtoRef}:${externalPessoa}`
     // event_id: id do pedido + status → dedupe por transição de estado (idempotência).
-    const eventId = `${pedidoId ?? entExternalId}:${statusBruto}`
-
+    const eventId = `${norm.pedidoId ?? norm.entitlement.externalId}:${norm.statusBruto}`
     return {
       eventId,
-      tipo: firstStr(p.webhook_type, p.event, p.type) ?? statusBruto ?? 'guru',
+      tipo: firstStr(p.webhook_type, p.event, p.type) ?? norm.statusBruto ?? 'guru',
       ocorridoEm: firstStr(getStr(p, 'dates.confirmed_at'), getStr(p, 'dates.created_at'), getStr(p, 'created_at')),
-      pessoa: { nome: nome ?? email ?? 'Aluno', email, cpf, telefone: telefoneCompleto, externalId: externalPessoa },
-      entitlement: {
-        externalId: entExternalId,
-        produtoRef,
-        produtoNome: val('produto_nome'),
-        status,
-        inicioEm: firstStr(getStr(p, 'subscription.started_at'), getStr(p, 'dates.confirmed_at'), getStr(p, 'created_at')),
-        expiraEm: firstStr(getStr(p, 'subscription.next_cycle_at'), getStr(p, 'subscription.expires_at'), getStr(p, 'subscription.ended_at')),
-      },
+      pessoa: norm.pessoa,
+      entitlement: norm.entitlement,
     }
   },
 }

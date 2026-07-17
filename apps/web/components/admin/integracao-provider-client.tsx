@@ -15,6 +15,7 @@ import {
   listarAssinaturasSalvas, sincronizarAssinaturas, aplicarAssinaturasGuru, type AssinaturaGuruDTO,
   listarWebhookInbox, getWebhookInboxDetalhe, type InboxDTO, type InboxDetalhe,
   getMapaConfig, salvarMapaConfig, reprocessarLiberacoes,
+  processarRecebido, processarRecebidosTodos,
 } from '@/app/admin/integracoes/actions'
 import type { Provider } from '@/lib/integracoes/tipos'
 import { CAMPOS_MAPA } from '@/lib/integracoes/mapa-campos'
@@ -417,6 +418,8 @@ function Recebidos({ provider, appUrl, token }: { provider: Provider; appUrl: st
   const [detalhe, setDetalhe] = useState<InboxDetalhe | null>(null)
   const [abrindo, setAbrindo] = useState<string | null>(null)
   const [copiado, setCopiado] = useState(false)
+  const [processandoId, setProcessandoId] = useState<string | null>(null)
+  const [processandoTodos, startTodos] = useTransition()
 
   const carregar = () => start(async () => {
     const r = await listarWebhookInbox(provider)
@@ -426,6 +429,19 @@ function Recebidos({ provider, appUrl, token }: { provider: Provider; appUrl: st
   useEffect(() => { carregar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const abrir = (id: string) => { setAbrindo(id); (async () => { const r = await getWebhookInboxDetalhe(provider, id); setAbrindo(null); if (r.ok && r.detalhe) setDetalhe(r.detalhe); else toast.error(r.error ?? 'Erro') })() }
+  const processar = (id: string) => { setProcessandoId(id); (async () => {
+    const r = await processarRecebido(provider, id); setProcessandoId(null)
+    if (!r.ok) { toast.error(r.error ?? 'Falha ao processar'); return }
+    toast.success(r.acao === 'concedido' ? 'Aluno criado/liberado ✓' : `Processado: ${r.acao}${r.motivo ? ` — ${r.motivo}` : ''}`)
+    carregar()
+  })() }
+  const processarTodos = () => startTodos(async () => {
+    const r = await processarRecebidosTodos(provider)
+    if (!r.ok) { toast.error(r.error ?? 'Falha'); return }
+    const s = r.resumo!
+    toast.success(`${s.concedidos} liberado(s) · ${s.ignorados} sem efeito · ${s.erros} erro(s) (de ${s.total})`)
+    carregar()
+  })
   const fmt = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
   const corStatus = (s: number | null) => s == null ? 'bg-muted text-muted-foreground' : s < 300 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : s < 500 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
 
@@ -451,9 +467,12 @@ function Recebidos({ provider, appUrl, token }: { provider: Provider; appUrl: st
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">Toda requisição que chega na URL do webhook (últimas 100), <b>inclusive as que falham</b> — para conferir o que a {PROVIDER_META[provider].nome} envia.</p>
-        <Button variant="outline" size="sm" onClick={carregar} disabled={carregando}>{carregando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />} Atualizar</Button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="max-w-md text-sm text-muted-foreground">Toda requisição que chega na URL do webhook (últimas 100), <b>inclusive as que falham</b>. <b>Processar</b> aplica o dado no sistema (cria/concede o aluno) usando o Mapa JSON.</p>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={carregar} disabled={carregando}>{carregando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />} Atualizar</Button>
+          <Button size="sm" onClick={processarTodos} disabled={processandoTodos}>{processandoTodos ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RotateCw className="mr-2 h-3.5 w-3.5" />} Processar todos</Button>
+        </div>
       </div>
 
       {semTabela && (
@@ -487,9 +506,16 @@ function Recebidos({ provider, appUrl, token }: { provider: Provider; appUrl: st
                 <td className="max-w-[240px] px-3 py-2 text-xs">{e.resultado ?? '—'}</td>
                 <td className="px-3 py-2 text-xs">{e.comprador ?? '—'}</td>
                 <td className="px-3 py-2 text-right">
-                  <button type="button" onClick={() => abrir(e.id)} disabled={abrindo === e.id} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted disabled:opacity-60">
-                    {abrindo === e.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />} Ver
-                  </button>
+                  <div className="flex items-center justify-end gap-1">
+                    <button type="button" onClick={() => abrir(e.id)} disabled={abrindo === e.id} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted disabled:opacity-60">
+                      {abrindo === e.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />} Ver
+                    </button>
+                    {e.metodo === 'POST' && (
+                      <button type="button" onClick={() => processar(e.id)} disabled={processandoId === e.id} title="Aplicar este dado no sistema (cria/concede o aluno)" className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/5 px-2 py-1 text-xs text-primary hover:bg-primary/10 disabled:opacity-60">
+                        {processandoId === e.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />} Processar
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
