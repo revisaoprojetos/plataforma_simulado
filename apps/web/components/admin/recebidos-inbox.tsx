@@ -36,7 +36,7 @@ export function RecebidosInbox({ appUrl, token }: { appUrl: string; token: strin
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 rounded-xl border bg-muted/20 p-4">
+      <div className="flex items-start gap-3 rounded-2xl border bg-card p-4 shadow-sm">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Inbox className="h-4 w-4" /></span>
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold">URL de recebimento (multi-fonte)</h3>
@@ -67,7 +67,7 @@ export function RecebidosInbox({ appUrl, token }: { appUrl: string; token: strin
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border">
+      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         <table className="w-full text-sm">
           <thead className="bg-muted/60 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
             <tr className="border-b">

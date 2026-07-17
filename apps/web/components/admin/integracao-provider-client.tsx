@@ -205,7 +205,7 @@ function Assinaturas({ provider }: { provider: Provider }) {
               : <>Nenhuma assinatura na base. Clique em <b>Sincronizar da {nomeProv}</b> para atualizar.</>}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border">
+        <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
               <tr>
@@ -316,7 +316,7 @@ function MapaJson({ provider }: { provider: Provider }) {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Mapeamento de campos (esquerda) */}
-        <div className="rounded-xl border">
+        <div className="rounded-2xl border bg-card shadow-sm">
           <div className="border-b bg-muted/30 px-3 py-2">
             <p className="text-xs font-semibold">Mapeamento de campos</p>
             <p className="text-[11px] text-muted-foreground">Campo do sistema → chave do JSON. Clique no campo e depois na chave à direita.</p>
@@ -347,7 +347,7 @@ function MapaJson({ provider }: { provider: Provider }) {
         </div>
 
         {/* Dados recebidos (direita) — JSON real, clicável (estilo Datacrazy) */}
-        <div className="rounded-xl border bg-muted/10">
+        <div className="rounded-2xl border bg-card shadow-sm">
           <div className="flex items-center gap-1.5 border-b px-3 py-2">
             <Braces className="h-3.5 w-3.5 text-muted-foreground" />
             <p className="text-xs font-semibold">Dados recebidos</p>
@@ -735,7 +735,7 @@ function Credenciais({ provider, appUrl, config, meta, campos, area }: { provide
       </div>
 
       {mostrarWebhook && webhookUrl && (
-        <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+        <div className="space-y-2 rounded-2xl border bg-card p-3 shadow-sm">
           <p className="text-xs font-semibold">URL do webhook</p>
           <div className="flex items-center gap-2">
             <code className="min-w-0 flex-1 truncate rounded bg-background px-2 py-1 text-xs">{webhookUrl}</code>
@@ -813,7 +813,7 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, simuladosSistema }:
       </div>
 
       {/* Passo a passo */}
-      <ol className="space-y-2 rounded-lg border bg-muted/20 p-4 text-sm">
+      <ol className="space-y-2 rounded-2xl border bg-card p-4 text-sm shadow-sm">
         {[
           <>Gere o <b>User Token</b> na Guru (perfil → aba <b>API</b>) e salve na aba <b>Credenciais</b>. O token só aparece uma vez.</>,
           <>Clique em <b>Carregar produtos/grupos</b> abaixo — a Guru lista seus produtos. (Sem token, dá pra digitar o <b>ID do produto</b> na mão.)</>,
@@ -828,7 +828,7 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, simuladosSistema }:
       </ol>
 
       {/* Lista atual */}
-      <div className="divide-y rounded-lg border">
+      <div className="divide-y rounded-2xl border bg-card shadow-sm">
         {mapeamentos.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-muted-foreground">Nenhum mapeamento ainda.</p>
         ) : mapeamentos.map((m) => (
@@ -844,7 +844,7 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, simuladosSistema }:
       </div>
 
       {/* Novo mapeamento */}
-      <div className="space-y-3 rounded-lg border p-4">
+      <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold">Novo mapeamento</p>
           <Button variant="outline" size="sm" onClick={carregarFontes} disabled={carregandoFontes}>
