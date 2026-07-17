@@ -421,11 +421,18 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
   const svc = createAdminClient()
 
   const idsParaVincular: string[] = []
+  // Ordem final desejada (coluna "Número" do CSV; empate desfeito pela ordem de leitura).
+  const ordenados: { n: number; seq: number; id: string }[] = []
   let criadas = 0, jaExistiam = 0
+  let seq = 0
+  const registrarOrdem = (id: string, numero?: string | null) => {
+    const n = numero != null && numero !== '' && !Number.isNaN(Number(numero)) ? Number(numero) : Number.MAX_SAFE_INTEGER
+    ordenados.push({ n, seq: seq++, id })
+  }
 
   for (const q of questoes) {
     if (q.erro) continue
-    if (q.jaExiste && q.questaoIdExistente) { idsParaVincular.push(q.questaoIdExistente); jaExistiam++; continue }
+    if (q.jaExiste && q.questaoIdExistente) { idsParaVincular.push(q.questaoIdExistente); registrarOrdem(q.questaoIdExistente, q.numero); jaExistiam++; continue }
 
     const banca_id = await resolveNome(svc, 'simulado_bancas', g.tenantId, q.banca)
     const orgao_id = await resolveNome(svc, 'simulado_orgaos', g.tenantId, q.orgao)
@@ -468,7 +475,7 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
         break
       }
     }
-    idsParaVincular.push(novaId); criadas++
+    idsParaVincular.push(novaId); registrarOrdem(novaId, q.numero); criadas++
   }
 
   // Vincula ao banco (ignora as já vinculadas) — só quando há banco de destino.
@@ -481,6 +488,20 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
       const { error } = await svc.from('simulado_questao_pasta').insert(novos.map((questao_id) => ({ tenant_id: g.tenantId, pasta_id: bancoId, questao_id })))
       if (!error) vinculadas = novos.length
     }
+  }
+
+  // Ordena o banco pela coluna "Número" do CSV (preservando questões que já estavam antes deste
+  // import). Sem isso, o banco (e o simulado que herda dele) exibia as questões embaralhadas.
+  if (bancoId && ordenados.length) {
+    try {
+      const importadosEmOrdem = [...ordenados].sort((a, b) => a.n - b.n || a.seq - b.seq).map((o) => o.id)
+      const jaSet = new Set(importadosEmOrdem)
+      const { data: pasta } = await svc.from('simulado_pastas').select('ordem_questoes').eq('id', bancoId).eq('tenant_id', g.tenantId).maybeSingle()
+      const anterior = (Array.isArray((pasta as any)?.ordem_questoes) ? (pasta as any).ordem_questoes : []) as string[]
+      const preservados = anterior.filter((id) => !jaSet.has(id)) // ordens antigas de questões não reimportadas
+      const novaOrdem = [...preservados, ...importadosEmOrdem]
+      await svc.from('simulado_pastas').update({ ordem_questoes: novaOrdem }).eq('id', bancoId).eq('tenant_id', g.tenantId)
+    } catch { /* coluna ordem_questoes pode não existir ainda — ignora */ }
   }
 
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_questoes', entidadeId: bancoId ?? 'sistema', depois: { importadas: criadas, jaExistiam, vinculadas } })
