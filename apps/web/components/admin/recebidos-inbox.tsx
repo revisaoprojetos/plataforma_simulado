@@ -31,44 +31,26 @@ export function RecebidosInbox({ appUrl, token }: { appUrl: string; token: strin
   const fmt = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
   const corStatus = (s: number | null) => s == null ? 'bg-muted text-muted-foreground' : s < 300 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : s < 500 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
 
-  const urlGuru = token ? `${appUrl}/api/webhooks/guru/${token}` : null
   const urlGenerica = token ? `${appUrl}/api/webhooks/in/${token}?fonte=minha_fonte` : null
-  const copiar = (url: string, qual: string) => { navigator.clipboard.writeText(url).then(() => { setCopiado(qual); setTimeout(() => setCopiado(null), 1500) }) }
+  const copiar = (url: string) => { navigator.clipboard.writeText(url).then(() => { setCopiado('gen'); setTimeout(() => setCopiado(null), 1500) }) }
 
   return (
     <div className="space-y-4">
-      {!token ? (
-        <div className="rounded-xl border bg-muted/20 p-4 text-xs text-amber-600 dark:text-amber-400">
-          Nenhum token de webhook configurado ainda. Configure uma integração (ex.: Guru) em <b>Integrações</b> para gerar o token do tenant e liberar as URLs de recebimento.
-        </div>
-      ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {/* URL dedicada da Guru */}
-          <div className="flex items-start gap-3 rounded-xl border border-primary/25 bg-primary/[0.04] p-4">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Inbox className="h-4 w-4" /></span>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-semibold">URL da Guru (dedicada)</h3>
-              <p className="mb-2 text-xs text-muted-foreground">Cadastre esta URL na <b>Guru</b> (Webhooks de compra/assinatura). Ela <b>processa</b> a compra (cria/concede o aluno) e aparece aqui com fonte <b>guru</b>.</p>
-              <div className="flex items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded-md border bg-background px-2.5 py-1.5 text-xs">{urlGuru}</code>
-                <Button variant="outline" size="sm" onClick={() => copiar(urlGuru!, 'guru')}>{copiado === 'guru' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</Button>
-              </div>
+      <div className="flex items-start gap-3 rounded-xl border bg-muted/20 p-4">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Inbox className="h-4 w-4" /></span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold">URL de recebimento (multi-fonte)</h3>
+          <p className="mb-2 text-xs text-muted-foreground">Aponte outras fontes (Hotmart, Kiwify, Eduzz, n8n, Zapier…) para esta URL. Troque <code>minha_fonte</code> pelo nome da origem — ela aparece na coluna <b>Fonte</b>. A URL <b>dedicada da Guru</b> fica em <b>Integrações → Guru</b>.</p>
+          {urlGenerica ? (
+            <div className="flex items-center gap-2">
+              <code className="min-w-0 flex-1 truncate rounded-md border bg-background px-2.5 py-1.5 text-xs">{urlGenerica}</code>
+              <Button variant="outline" size="sm" onClick={() => copiar(urlGenerica)}>{copiado === 'gen' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</Button>
             </div>
-          </div>
-          {/* URL genérica multi-fonte */}
-          <div className="flex items-start gap-3 rounded-xl border bg-muted/20 p-4">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"><Inbox className="h-4 w-4" /></span>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-semibold">URL genérica (multi-fonte)</h3>
-              <p className="mb-2 text-xs text-muted-foreground">Qualquer outra origem (Hotmart, Kiwify, Eduzz, n8n…). Troque <code>minha_fonte</code> pelo nome — só <b>registra</b> (não processa acesso).</p>
-              <div className="flex items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded-md border bg-background px-2.5 py-1.5 text-xs">{urlGenerica}</code>
-                <Button variant="outline" size="sm" onClick={() => copiar(urlGenerica!, 'gen')}>{copiado === 'gen' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</Button>
-              </div>
-            </div>
-          </div>
+          ) : (
+            <p className="text-xs text-amber-600 dark:text-amber-400">Nenhum token de webhook configurado ainda. Configure uma integração (ex.: Guru) para gerar o token do tenant.</p>
+          )}
         </div>
-      )}
+      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted-foreground">Fonte:</span>

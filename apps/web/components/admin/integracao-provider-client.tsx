@@ -57,7 +57,7 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
       {aba === 'assinaturas' && meta.push && <Assinaturas provider={provider} />}
       {aba === 'importar' && !meta.push && <Importar provider={provider} />}
       {aba === 'eventos' && meta.push && <Eventos provider={provider} />}
-      {aba === 'recebidos' && meta.push && <Recebidos provider={provider} />}
+      {aba === 'recebidos' && meta.push && <Recebidos provider={provider} appUrl={appUrl} token={config.webhookToken} />}
     </div>
   )
 }
@@ -202,12 +202,13 @@ function Assinaturas({ provider }: { provider: Provider }) {
 }
 
 // ── Recebidos (inbox CRU: toda requisição que bate na URL do webhook) ─────────
-function Recebidos({ provider }: { provider: Provider }) {
+function Recebidos({ provider, appUrl, token }: { provider: Provider; appUrl: string; token: string | null }) {
   const [itens, setItens] = useState<InboxDTO[] | null>(null)
   const [semTabela, setSemTabela] = useState(false)
   const [carregando, start] = useTransition()
   const [detalhe, setDetalhe] = useState<InboxDetalhe | null>(null)
   const [abrindo, setAbrindo] = useState<string | null>(null)
+  const [copiado, setCopiado] = useState(false)
 
   const carregar = () => start(async () => {
     const r = await listarWebhookInbox(provider)
@@ -220,8 +221,28 @@ function Recebidos({ provider }: { provider: Provider }) {
   const fmt = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
   const corStatus = (s: number | null) => s == null ? 'bg-muted text-muted-foreground' : s < 300 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : s < 500 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
 
+  const urlDedicada = token ? `${appUrl}/api/webhooks/${provider}/${token}` : null
+  const copiar = () => { if (!urlDedicada) return; navigator.clipboard.writeText(urlDedicada).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 1500) }) }
+
   return (
     <div className="space-y-3">
+      {/* URL dedicada deste provedor — recebe E processa a compra/assinatura */}
+      <div className="flex items-start gap-3 rounded-xl border border-primary/25 bg-primary/[0.04] p-4">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Inbox className="h-4 w-4" /></span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold">URL dedicada da {PROVIDER_META[provider].nome}</h3>
+          <p className="mb-2 text-xs text-muted-foreground">Cadastre esta URL na {PROVIDER_META[provider].nome} (Webhooks de compra/assinatura). Ela <b>recebe e processa</b> o evento (cria/concede o aluno) e cada chamada aparece na lista abaixo.</p>
+          {urlDedicada ? (
+            <div className="flex items-center gap-2">
+              <code className="min-w-0 flex-1 truncate rounded-md border bg-background px-2.5 py-1.5 text-xs">{urlDedicada}</code>
+              <Button variant="outline" size="sm" onClick={copiar}>{copiado ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</Button>
+            </div>
+          ) : (
+            <p className="text-xs text-amber-600 dark:text-amber-400">Salve as credenciais primeiro para gerar o token do webhook.</p>
+          )}
+        </div>
+      </div>
+
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">Toda requisição que chega na URL do webhook (últimas 100), <b>inclusive as que falham</b> — para conferir o que a {PROVIDER_META[provider].nome} envia.</p>
         <Button variant="outline" size="sm" onClick={carregar} disabled={carregando}>{carregando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />} Atualizar</Button>
