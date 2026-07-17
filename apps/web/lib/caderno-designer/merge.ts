@@ -122,7 +122,7 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
   return (alunos ?? []).map((a: any) => {
     const m = respPorAluno.get(a.id) ?? new Map<string, boolean>()
     const acertos = [...m.values()].filter(Boolean).length
-    const nota = totalQ ? Math.round((acertos / totalQ) * 10 * 10) / 10 : 0
+    const nota = totalQ ? Math.round((acertos / totalQ) * 100 * 10) / 10 : 0 // escala 0–100 (percentual)
     const porDisc = new Map<string, number>()
     for (const [qid, ok] of m) if (ok) { const d = discDaQuestao.get(qid) ?? 'Geral'; porDisc.set(d, (porDisc.get(d) ?? 0) + 1) }
 
