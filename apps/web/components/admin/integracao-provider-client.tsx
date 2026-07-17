@@ -30,19 +30,54 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
 }) {
   const meta = PROVIDER_META[provider]
   const campos = CAMPOS_PROVIDER[provider]
+  // Área (só para provedores push, ex.: Guru): separa COLETA (API/User Token) de RECEBIMENTO (Webhook/Account Token).
+  const [area, setArea] = useState<'api' | 'webhook'>('api')
   const [aba, setAba] = useState<Aba>('credenciais')
 
-  const abas: { id: Aba; label: string; Icon: any }[] = [
-    { id: 'credenciais', label: 'Credenciais', Icon: KeyRound },
-    { id: 'mapeamentos', label: 'Mapeamentos', Icon: GitBranch },
-    ...(meta.push ? [{ id: 'assinaturas' as Aba, label: 'Assinaturas', Icon: Users }] : []),
-    ...(!meta.push ? [{ id: 'importar' as Aba, label: 'Importar', Icon: DownloadCloud }] : []),
-    ...(meta.push ? [{ id: 'eventos' as Aba, label: 'Eventos', Icon: Radio }] : []),
-    ...(meta.push ? [{ id: 'recebidos' as Aba, label: 'Recebidos', Icon: Inbox }] : []),
-  ]
+  const abas: { id: Aba; label: string; Icon: any }[] = meta.push
+    ? (area === 'api'
+        ? [
+            { id: 'credenciais', label: 'Credenciais', Icon: KeyRound },
+            { id: 'mapeamentos', label: 'Mapeamentos', Icon: GitBranch },
+            { id: 'assinaturas', label: 'Assinaturas', Icon: Users },
+          ]
+        : [
+            { id: 'credenciais', label: 'Configuração', Icon: KeyRound },
+            { id: 'recebidos', label: 'Recebidos', Icon: Inbox },
+            { id: 'eventos', label: 'Eventos', Icon: Radio },
+          ])
+    : [
+        { id: 'credenciais', label: 'Credenciais', Icon: KeyRound },
+        { id: 'mapeamentos', label: 'Mapeamentos', Icon: GitBranch },
+        { id: 'importar', label: 'Importar', Icon: DownloadCloud },
+      ]
+
+  // Ao trocar de área, garante que a aba selecionada existe na nova área.
+  const trocarArea = (a: 'api' | 'webhook') => { setArea(a); setAba('credenciais') }
 
   return (
     <div className="space-y-4">
+      {meta.push && (
+        <div className="inline-flex rounded-xl border bg-muted/40 p-1">
+          <button type="button" onClick={() => trocarArea('api')}
+            className={cn('inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors', area === 'api' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+            <DownloadCloud className="h-4 w-4" /> Coleta via API
+          </button>
+          <button type="button" onClick={() => trocarArea('webhook')}
+            className={cn('inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors', area === 'webhook' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+            <Radio className="h-4 w-4" /> Recebimento via Webhook
+          </button>
+        </div>
+      )}
+
+      {meta.push && (
+        <p className="text-xs text-muted-foreground">
+          {area === 'api'
+            ? 'Puxa dados da Guru pela API (User Token) — sincroniza assinaturas e adiciona alunos manualmente.'
+            : 'Recebe eventos em tempo real por webhook (Account Token) — a Guru envia cada compra/assinatura.'}
+        </p>
+      )}
+
       <div className="flex gap-1 border-b">
         {abas.map(({ id, label, Icon }) => (
           <button key={id} type="button" onClick={() => setAba(id)}
@@ -52,7 +87,7 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
         ))}
       </div>
 
-      {aba === 'credenciais' && <Credenciais provider={provider} appUrl={appUrl} config={config} meta={meta} campos={campos} />}
+      {aba === 'credenciais' && <Credenciais provider={provider} appUrl={appUrl} config={config} meta={meta} campos={campos} area={meta.push ? area : undefined} />}
       {aba === 'mapeamentos' && <Mapeamentos provider={provider} mapeamentos={mapeamentos} gruposSistema={gruposSistema} simuladosSistema={simuladosSistema} />}
       {aba === 'assinaturas' && meta.push && <Assinaturas provider={provider} />}
       {aba === 'importar' && !meta.push && <Importar provider={provider} />}
@@ -446,7 +481,14 @@ function JsonBloco({ titulo, valor }: { titulo: string; valor: unknown }) {
 }
 
 // ── Credenciais ──────────────────────────────────────────────────────────────
-function Credenciais({ provider, appUrl, config, meta, campos }: { provider: Provider; appUrl: string; config: Config; meta: typeof PROVIDER_META[Provider]; campos: typeof CAMPOS_PROVIDER[Provider] }) {
+function Credenciais({ provider, appUrl, config, meta, campos, area }: { provider: Provider; appUrl: string; config: Config; meta: typeof PROVIDER_META[Provider]; campos: typeof CAMPOS_PROVIDER[Provider]; area?: 'api' | 'webhook' }) {
+  // Filtra os campos por área: API mostra o User Token; Webhook mostra o Account Token.
+  const camposArea = area === 'api' ? campos.filter((c) => c.key !== 'webhook_secret')
+    : area === 'webhook' ? campos.filter((c) => c.key === 'webhook_secret')
+    : campos
+  const mostrarBaseUrl = area !== 'webhook'
+  const mostrarTestarConexao = area !== 'webhook'
+  const mostrarWebhook = meta.push && area !== 'api'
   const [vals, setVals] = useState<Record<string, string>>({})
   const [baseUrl, setBaseUrl] = useState(config.baseUrl || meta.baseUrlPadrao)
   const [ativo, setAtivo] = useState(config.ativo)
@@ -491,12 +533,14 @@ function Credenciais({ provider, appUrl, config, meta, campos }: { provider: Pro
         </div>
       )}
 
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Base URL</label>
-        <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder={meta.baseUrlPadrao} />
-      </div>
+      {mostrarBaseUrl && (
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Base URL</label>
+          <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder={meta.baseUrlPadrao} />
+        </div>
+      )}
 
-      {campos.map((c) => {
+      {camposArea.map((c) => {
         const preenchido = config.camposPreenchidos.includes(c.key)
         return (
           <div key={c.key} className="space-y-1.5">
@@ -509,15 +553,15 @@ function Credenciais({ provider, appUrl, config, meta, campos }: { provider: Pro
 
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="h-4 w-4 rounded border" />
-        Integração ativa
+        Integração ativa {area === 'webhook' && <span className="text-xs text-muted-foreground">(necessária para o webhook processar)</span>}
       </label>
 
       <div className="flex gap-2">
         <Button onClick={salvar} disabled={salvando}>{salvando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />} Salvar</Button>
-        <Button variant="outline" onClick={testar} disabled={testando}>{testando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plug className="mr-2 h-4 w-4" />} Testar conexão</Button>
+        {mostrarTestarConexao && <Button variant="outline" onClick={testar} disabled={testando}>{testando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plug className="mr-2 h-4 w-4" />} Testar conexão</Button>}
       </div>
 
-      {meta.push && webhookUrl && (
+      {mostrarWebhook && webhookUrl && (
         <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
           <p className="text-xs font-semibold">URL do webhook</p>
           <div className="flex items-center gap-2">

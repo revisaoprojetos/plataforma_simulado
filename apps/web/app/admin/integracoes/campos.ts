@@ -14,6 +14,7 @@ export const CAMPOS_PROVIDER: Record<Provider, { key: string; label: string; sec
     { key: 'senha', label: 'Senha', secret: true },
   ],
   guru: [
-    { key: 'api_token', label: 'API Token', secret: true },
+    { key: 'api_token', label: 'User Token (API)', secret: true },
+    { key: 'webhook_secret', label: 'Account Token (validação do webhook) — opcional', secret: true },
   ],
 }

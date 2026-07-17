@@ -74,10 +74,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   const cfg = await resolverProviderCfg(tenantId, 'guru', { ignorarAtivo: true })
 
-  // 2) Valida: a Guru manda o api_token da conta no corpo → confere com o configurado.
-  const segredo = cfg?.credenciais?.api_token || cfg?.credenciais?.webhook_secret || process.env.GURU_WEBHOOK_SECRET || ''
+  // 2) Valida a assinatura SÓ se o Account Token do webhook estiver configurado (webhook_secret).
+  //    ATENÇÃO: o `api_token` que a Guru envia no CORPO é o ACCOUNT TOKEN (token da conta),
+  //    DIFERENTE do User Token da API. Por isso NÃO validamos contra o User Token (daria 401
+  //    sempre). Sem Account Token configurado, a segurança fica no token único da URL.
+  const segredo = cfg?.credenciais?.webhook_secret || process.env.GURU_WEBHOOK_SECRET || ''
   if (segredo && adapter.validarWebhook && !adapter.validarWebhook(raw, headers, segredo)) {
-    return finish(401, { error: 'assinatura inválida (api_token)' }, 'assinatura inválida (api_token do corpo não confere)')
+    return finish(401, { error: 'assinatura inválida (api_token)' }, 'assinatura inválida (Account Token do corpo não confere)')
   }
 
   // 3) Normaliza o evento.
