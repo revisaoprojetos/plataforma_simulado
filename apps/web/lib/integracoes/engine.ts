@@ -145,6 +145,40 @@ async function revogar(svc: any, tenantId: string, estudanteId: string, excetoEx
 }
 
 /**
+ * Auto-provisiona 1 GRUPO por PRODUTO: se o produto ainda não tem mapeamento, cria (ou reusa,
+ * por nome) um grupo com o nome do produto e registra o mapeamento produto→grupo. Assim todo
+ * comprador daquele produto já cai no mesmo grupo — o admin depois liga o grupo aos simulados.
+ * Idempotente: reusa grupo pelo nome e o mapeamento tem UNIQUE(tenant,provider,fonte_ref).
+ */
+async function garantirMapeamentoAuto(svc: any, tenantId: string, provider: Provider, produtoRef: string, produtoNome: string | null): Promise<Mapeamento | null> {
+  const existente = await resolverMapeamento(svc, tenantId, provider, produtoRef)
+  if (existente) return existente
+
+  const nomeGrupo = (produtoNome?.trim() || `Produto ${produtoRef}`).slice(0, 120)
+  let grupoId: string | null = null
+  try {
+    // reusa grupo com o mesmo nome (evita duplicar em recompras/concorrência)
+    const { data: gExist } = await svc.from('simulado_grupos').select('id').eq('tenant_id', tenantId).eq('nome', nomeGrupo).eq('deletado', false).maybeSingle()
+    grupoId = gExist?.id ?? null
+    if (!grupoId) {
+      const { data: gNovo } = await svc.from('simulado_grupos').insert({ tenant_id: tenantId, nome: nomeGrupo }).select('id').single()
+      grupoId = gNovo?.id ?? null
+    }
+  } catch { /* falha ao criar/achar grupo */ }
+  if (!grupoId) return null
+
+  try {
+    await svc.from('simulado_integracao_mapeamentos').upsert(
+      { tenant_id: tenantId, provider, fonte_ref: produtoRef, fonte_nome: produtoNome ?? produtoRef, grupo_id: grupoId, ativo: true },
+      { onConflict: 'tenant_id,provider,fonte_ref' },
+    )
+  } catch { /* ignora — segue com o grupo resolvido */ }
+
+  const final = await resolverMapeamento(svc, tenantId, provider, produtoRef)
+  return final ?? { fonteRef: produtoRef, classificacao: null, grupoId, simuladoId: null }
+}
+
+/**
  * Aplica UM entitlement no domínio local. Idempotente. Retorna o que foi feito.
  * `ativo` → concede; `cancelado/reembolsado/expirado` → revoga (escopado ao mapeamento).
  */
@@ -159,9 +193,13 @@ export async function aplicarEntitlement(params: {
 
   await upsertAssinatura(svc, tenantId, estudanteId, provider, entitlement)
 
-  const m = await resolverMapeamento(svc, tenantId, provider, entitlement.produtoRef)
+  let m = await resolverMapeamento(svc, tenantId, provider, entitlement.produtoRef)
+  if (!m && entitlement.status === 'ativo') {
+    // Sem mapeamento + compra ativa → auto-cria grupo por produto e aloca (nada fica sem grupo).
+    m = await garantirMapeamentoAuto(svc, tenantId, provider, entitlement.produtoRef, entitlement.produtoNome ?? null)
+  }
   if (!m) {
-    // Produto sem mapeamento: cadastro feito, mas sem conceder acesso (sinalizar no admin).
+    // Produto sem mapeamento (ex.: cancelamento de produto nunca comprado) → só cadastro.
     return { ok: true, estudanteId, acao: 'ignorado', motivo: 'produto/grupo sem mapeamento' }
   }
 
