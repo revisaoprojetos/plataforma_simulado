@@ -314,52 +314,50 @@ function MapaJson({ provider }: { provider: Provider }) {
         {paths.map((p) => <option key={p.path} value={p.path}>{p.sample ? `${p.path} — ${p.sample}` : p.path}</option>)}
       </datalist>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-        {/* Campos do sistema */}
-        <div className="space-y-2">
-          {CAMPOS_MAPA.map((c) => {
-            const resolvido = resolver(c.key)
-            const conf = auto[c.key]?.confianca
-            const emFoco = ativo === c.key
-            return (
-              <div key={c.key} className={cn('grid items-center gap-2 rounded-lg border p-2.5 sm:grid-cols-[180px_1fr_150px]', emFoco && 'ring-2 ring-primary/40')}>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
-                    {c.label}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Mapeamento de campos (esquerda) */}
+        <div className="rounded-xl border">
+          <div className="border-b bg-muted/30 px-3 py-2">
+            <p className="text-xs font-semibold">Mapeamento de campos</p>
+            <p className="text-[11px] text-muted-foreground">Campo do sistema → chave do JSON. Clique no campo e depois na chave à direita.</p>
+          </div>
+          <div className="divide-y">
+            {CAMPOS_MAPA.map((c) => {
+              const resolvido = resolver(c.key)
+              const conf = auto[c.key]?.confianca
+              const emFoco = ativo === c.key
+              return (
+                <div key={c.key} className={cn('px-3 py-2 transition-colors', emFoco && 'bg-primary/[0.06]')}>
+                  <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                    <span className="text-sm font-medium">{c.label}</span>
                     {c.obrigatorio && <span className="rounded bg-primary/10 px-1 text-[10px] font-semibold text-primary">principal</span>}
                     {conf != null && <span className={cn('rounded px-1 text-[10px] font-semibold', corConf(conf))} title="Detectado automaticamente">auto {conf}%</span>}
+                    {payload != null && (resolvido != null
+                      ? <span className="ml-auto truncate text-[11px] text-emerald-600 dark:text-emerald-400" title={resolvido}>= {resolvido}</span>
+                      : <span className="ml-auto text-[11px] text-amber-600 dark:text-amber-400">= (vazio)</span>)}
                   </div>
-                  <p className="truncate text-[11px] text-muted-foreground" title={c.descricao}>{c.descricao}</p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sky-600 dark:text-sky-400">→</span>
+                    <Input list={`paths-${provider}`} value={mapa[c.key] ?? ''} onFocus={() => setAtivo(c.key)} onChange={(e) => set(c.key, e.target.value)} placeholder={c.padrao} className="h-8 font-mono text-xs" />
+                  </div>
                 </div>
-                <Input list={`paths-${provider}`} value={mapa[c.key] ?? ''} onFocus={() => setAtivo(c.key)} onChange={(e) => set(c.key, e.target.value)} placeholder={`padrão: ${c.padrao}`} className="font-mono text-xs" />
-                <div className="truncate text-[11px]" title={resolvido ?? ''}>
-                  {payload ? (resolvido != null ? <span className="text-emerald-600 dark:text-emerald-400">→ {resolvido}</span> : <span className="text-amber-600 dark:text-amber-400">→ (vazio)</span>) : <span className="text-muted-foreground">—</span>}
-                </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
 
-        {/* Dados recebidos — clique numa chave para atribuir ao campo em foco (estilo Datacrazy) */}
-        <div className="rounded-lg border bg-muted/20">
-          <div className="border-b px-3 py-2">
+        {/* Dados recebidos (direita) — JSON real, clicável (estilo Datacrazy) */}
+        <div className="rounded-xl border bg-muted/10">
+          <div className="flex items-center gap-1.5 border-b px-3 py-2">
+            <Braces className="h-3.5 w-3.5 text-muted-foreground" />
             <p className="text-xs font-semibold">Dados recebidos</p>
-            <p className="text-[11px] text-muted-foreground">{labelAtivo ? <>Clique numa chave para atribuir a <b>{labelAtivo}</b>.</> : 'Clique num campo à esquerda e depois numa chave aqui.'}</p>
+            <span className="ml-auto text-[11px] text-muted-foreground">{labelAtivo ? <>→ atribui a <b className="text-foreground">{labelAtivo}</b></> : 'clique numa chave'}</span>
           </div>
           {!payload ? (
-            <p className="p-3 text-[11px] text-muted-foreground">Sem payload recebido ainda.</p>
+            <p className="p-4 text-[11px] text-muted-foreground">Sem payload recebido ainda. Envie um evento na URL do webhook e clique em <b>Recarregar</b>.</p>
           ) : (
-            <div className="max-h-[380px] overflow-auto p-2">
-              {paths.map((p) => (
-                <button key={p.path} type="button" onClick={() => clicarPath(p.path)}
-                  className="group flex w-full items-start gap-2 rounded-md px-2 py-1 text-left hover:bg-primary/10">
-                  <Copy className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground group-hover:text-primary" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-mono text-[11px] text-foreground">{p.path}</span>
-                    {p.sample && <span className="block truncate text-[10px] text-muted-foreground">{p.sample}</span>}
-                  </span>
-                </button>
-              ))}
+            <div className="max-h-[440px] overflow-auto p-3">
+              <JsonViewer data={payload} onPick={clicarPath} />
             </div>
           )}
         </div>
@@ -371,6 +369,44 @@ function MapaJson({ provider }: { provider: Provider }) {
       </div>
     </div>
   )
+}
+
+/** Visualizador de JSON aninhado (chaves azuis, valores coloridos, copiar/clicar por folha). */
+function JsonViewer({ data, onPick }: { data: unknown; onPick: (path: string) => void }) {
+  const ind = (d: number) => ({ paddingLeft: 4 + d * 14 })
+  const corVal = (v: unknown) =>
+    typeof v === 'string' ? 'text-amber-600 dark:text-amber-400'
+      : typeof v === 'number' ? 'text-violet-600 dark:text-violet-400'
+      : typeof v === 'boolean' ? 'text-rose-600 dark:text-rose-400'
+      : 'text-muted-foreground'
+  const linhas: ReactNode[] = []
+
+  const walk = (val: any, path: string, key: string | null, depth: number, ultimo: boolean) => {
+    const virg = ultimo ? '' : ','
+    const rotulo = key != null ? <span className="text-sky-600 dark:text-sky-400">{key}: </span> : null
+    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      const ents = Object.entries(val)
+      linhas.push(<div style={ind(depth)}>{rotulo}{'{'}</div>)
+      ents.forEach(([k, v], i) => walk(v, path ? `${path}.${k}` : k, k, depth + 1, i === ents.length - 1))
+      linhas.push(<div style={ind(depth)}>{'}'}{virg}</div>)
+      return
+    }
+    if (Array.isArray(val)) {
+      linhas.push(<div style={ind(depth)}>{rotulo}{'['}</div>)
+      val.forEach((v, i) => walk(v, `${path}[${i}]`, null, depth + 1, i === val.length - 1))
+      linhas.push(<div style={ind(depth)}>{']'}{virg}</div>)
+      return
+    }
+    linhas.push(
+      <div style={ind(depth)} className="group flex cursor-pointer items-center gap-1.5 rounded hover:bg-primary/10" onClick={() => onPick(path)} title={`Usar: ${path}`}>
+        {key != null && <span className="shrink-0 text-sky-600 dark:text-sky-400">{key}:</span>}
+        <Copy className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-primary" />
+        <span className={cn('truncate', corVal(val))}>{typeof val === 'string' ? `"${val}"` : String(val)}{virg}</span>
+      </div>,
+    )
+  }
+  walk(data, '', null, 0, true)
+  return <div className="font-mono text-[11px] leading-relaxed">{linhas.map((l, i) => <div key={i}>{l}</div>)}</div>
 }
 
 // ── Recebidos (inbox CRU: toda requisição que bate na URL do webhook) ─────────
