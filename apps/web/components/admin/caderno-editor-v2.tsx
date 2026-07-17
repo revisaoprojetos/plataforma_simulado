@@ -1,8 +1,8 @@
 'use client'
 
-import { Fragment, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { Fragment, useLayoutEffect, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, Printer, Plus, Trash2, ArrowUp, ArrowDown, FileText, Palette, LayoutTemplate, ChevronLeft, ChevronRight, Columns2, PanelTop, PanelBottom, Minus, Wallpaper, Database, Users, Repeat, Copy, GripVertical } from 'lucide-react'
+import { Loader2, Save, Printer, Plus, Trash2, ArrowUp, ArrowDown, FileText, Palette, LayoutTemplate, ChevronLeft, ChevronRight, Columns2, PanelTop, PanelBottom, Minus, Wallpaper, Database, Users, Repeat, Copy, GripVertical, Undo2, Redo2 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -345,9 +345,66 @@ export function CadernoEditorV2({
   const cats = blocksByCategory()
   const running = doc.running ?? RUNNING_PADRAO
 
+  // ── Histórico (desfazer/refazer) do documento da modalidade ativa ──────────────
+  const [undoStack, setUndoStack] = useState<CadernoDoc[]>([])
+  const [redoStack, setRedoStack] = useState<CadernoDoc[]>([])
+  const docsRef = useRef(docs); useEffect(() => { docsRef.current = docs }, [docs])
+  const ultimaMudanca = useRef(0)
+  // Ao trocar de modalidade, o histórico não vale mais (docs diferentes).
+  useEffect(() => { setUndoStack([]); setRedoStack([]) }, [modAtiva])
+
   function setDoc(updater: (d: CadernoDoc) => CadernoDoc) {
-    setDocs((prev) => ({ ...prev, [modAtiva]: updater(prev[modAtiva] ?? novoDoc()) }))
+    const atual = docsRef.current[modAtiva] ?? novoDoc()
+    const novo = updater(atual)
+    if (novo === atual) return
+    // Coalesce mudanças rápidas (digitação) num único passo de desfazer.
+    const agora = Date.now()
+    if (agora - ultimaMudanca.current > 350) { setUndoStack((s) => [...s.slice(-59), atual]); setRedoStack([]) }
+    ultimaMudanca.current = agora
+    docsRef.current = { ...docsRef.current, [modAtiva]: novo }
+    setDocs((prev) => ({ ...prev, [modAtiva]: novo }))
   }
+
+  function desfazer() {
+    setUndoStack((s) => {
+      if (!s.length) return s
+      const anterior = s[s.length - 1]
+      const cur = docsRef.current[modAtiva] ?? novoDoc()
+      setRedoStack((r) => [...r, cur])
+      docsRef.current = { ...docsRef.current, [modAtiva]: anterior }
+      setDocs((d) => ({ ...d, [modAtiva]: anterior }))
+      ultimaMudanca.current = 0
+      return s.slice(0, -1)
+    })
+  }
+  function refazer() {
+    setRedoStack((r) => {
+      if (!r.length) return r
+      const proximo = r[r.length - 1]
+      const cur = docsRef.current[modAtiva] ?? novoDoc()
+      setUndoStack((u) => [...u, cur])
+      docsRef.current = { ...docsRef.current, [modAtiva]: proximo }
+      setDocs((d) => ({ ...d, [modAtiva]: proximo }))
+      ultimaMudanca.current = 0
+      return r.slice(0, -1)
+    })
+  }
+
+  // Atalhos: Ctrl/Cmd+Z = desfazer, Ctrl/Cmd+Shift+Z ou Ctrl+Y = refazer.
+  // (Ignora quando o foco está num campo de texto — lá o Ctrl+Z é o desfazer nativo do texto.)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      const el = e.target as HTMLElement
+      const digitando = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+      if (digitando) return
+      const k = e.key.toLowerCase()
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); desfazer() }
+      else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); refazer() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   // aplica uma transformação de árvore a TODAS as regiões (páginas + cabeçalho + rodapé)
   function mutarTudo(fn: (blocks: Block[]) => Block[]) {
     setDoc((d) => ({ ...d, pages: d.pages.map((p) => ({ ...p, blocks: fn(p.blocks) })), cabecalho: fn(d.cabecalho ?? []), rodape: fn(d.rodape ?? []) }))
@@ -574,6 +631,10 @@ export function CadernoEditorV2({
               <button onClick={() => setRegIndex((i) => Math.min(registros.length - 1, i + 1))} disabled={regIndex >= registros.length - 1} className="rounded p-0.5 hover:bg-muted disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
             </div>
           )}
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={desfazer} disabled={undoStack.length === 0} title="Desfazer (Ctrl+Z)"><Undo2 className="h-4 w-4" /></Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={refazer} disabled={redoStack.length === 0} title="Refazer (Ctrl+Shift+Z)"><Redo2 className="h-4 w-4" /></Button>
+          </div>
           <a href={`/imprimir/caderno/${cadernoId}?mod=${modAtiva}${regAtual ? `&aluno=${regAtual.id}` : ''}`} target="_blank" rel="noreferrer">
             <Button variant="outline" size="sm"><Printer className="mr-1.5 h-4 w-4" /> Imprimir/PDF</Button>
           </a>
