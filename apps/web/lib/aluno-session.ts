@@ -27,11 +27,15 @@ export async function criarSessaoAluno(s: AlunoSession): Promise<void> {
     .setExpirationTime('7d')
     .sign(secret())
 
+  // Embed (iframe cross-site, ex.: Curseduca): o navegador só ARMAZENA e ENVIA o cookie
+  // de sessão num contexto de terceiro se for SameSite=None + Secure. Em produção (HTTPS)
+  // usamos None; em dev (HTTP) mantemos Lax porque None exige Secure (que não vale em http).
+  const emProducao = process.env.NODE_ENV === 'production'
   const jar = await cookies()
   jar.set(COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: emProducao,
+    sameSite: emProducao ? 'none' : 'lax',
     path: '/',
     maxAge: MAX_AGE,
   })
