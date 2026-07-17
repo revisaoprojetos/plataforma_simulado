@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Loader2, Plug, Check, AlertTriangle, Trash2, RefreshCw, Copy, DownloadCloud, KeyRound, GitBranch, Radio, RotateCw, Eye } from 'lucide-react'
+import { Loader2, Plug, Check, AlertTriangle, Trash2, RefreshCw, Copy, DownloadCloud, KeyRound, GitBranch, Radio, RotateCw, Eye, Users, UserPlus, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { CAMPOS_PROVIDER, PROVIDER_META } from '@/app/admin/integracoes/campos'
 import {
   salvarIntegracaoConfig, testarIntegracao, listarFontes, salvarMapeamento, excluirMapeamento, rodarImportIntegracao,
   listarEventos, reprocessarEvento, getEventoDetalhe, regenerarWebhookToken, testarWebhookInbound, type EventoDTO, type EventoDetalhe,
+  listarAssinaturasGuru, aplicarAssinaturasGuru, type AssinaturaGuruDTO,
 } from '@/app/admin/integracoes/actions'
 import type { Provider } from '@/lib/integracoes/tipos'
 
@@ -20,7 +21,7 @@ interface Mapeamento { id: string; fonteRef: string; fonteNome: string | null; c
 interface Grupo { id: string; nome: string }
 interface Fonte { ref: string; nome: string; total?: number }
 
-type Aba = 'credenciais' | 'mapeamentos' | 'importar' | 'eventos'
+type Aba = 'credenciais' | 'mapeamentos' | 'importar' | 'eventos' | 'assinaturas'
 const SEM = '__sem__'
 
 export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos, gruposSistema, simuladosSistema }: {
@@ -33,6 +34,7 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
   const abas: { id: Aba; label: string; Icon: any }[] = [
     { id: 'credenciais', label: 'Credenciais', Icon: KeyRound },
     { id: 'mapeamentos', label: 'Mapeamentos', Icon: GitBranch },
+    ...(meta.push ? [{ id: 'assinaturas' as Aba, label: 'Assinaturas', Icon: Users }] : []),
     ...(!meta.push ? [{ id: 'importar' as Aba, label: 'Importar', Icon: DownloadCloud }] : []),
     ...(meta.push ? [{ id: 'eventos' as Aba, label: 'Eventos', Icon: Radio }] : []),
   ]
@@ -50,8 +52,119 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
 
       {aba === 'credenciais' && <Credenciais provider={provider} appUrl={appUrl} config={config} meta={meta} campos={campos} />}
       {aba === 'mapeamentos' && <Mapeamentos provider={provider} mapeamentos={mapeamentos} gruposSistema={gruposSistema} simuladosSistema={simuladosSistema} />}
+      {aba === 'assinaturas' && meta.push && <Assinaturas provider={provider} />}
       {aba === 'importar' && !meta.push && <Importar provider={provider} />}
       {aba === 'eventos' && meta.push && <Eventos provider={provider} />}
+    </div>
+  )
+}
+
+// ── Assinaturas (Guru): analisa quem comprou e adiciona ao sistema ────────────
+function Assinaturas({ provider }: { provider: Provider }) {
+  const [itens, setItens] = useState<AssinaturaGuruDTO[] | null>(null)
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  const [busca, setBusca] = useState('')
+  const [carregando, start] = useTransition()
+  const [aplicando, startAplicar] = useTransition()
+
+  const carregar = (forcar = false) => start(async () => {
+    const r = await listarAssinaturasGuru(provider, forcar)
+    if (!r.ok) { toast.error(r.error ?? 'Erro ao buscar'); setItens([]); return }
+    setItens(r.itens ?? [])
+    setSel(new Set())
+    if (forcar) toast.success('Atualizado da Guru')
+    else if (r.deCache) toast.message('Exibindo do cache (não bateu na Guru)')
+  })
+
+  useEffect(() => { carregar(false) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtrados = (itens ?? []).filter((a) => {
+    const q = busca.trim().toLowerCase()
+    return !q || `${a.nome} ${a.email ?? ''} ${a.cpf ?? ''} ${a.produtoNome ?? ''}`.toLowerCase().includes(q)
+  })
+  const key = (a: AssinaturaGuruDTO) => `${a.pessoaExternalId}::${a.entExternalId}`
+  const toggle = (a: AssinaturaGuruDTO) => setSel((p) => { const n = new Set(p); const k = key(a); n.has(k) ? n.delete(k) : n.add(k); return n })
+  const selecionaveis = filtrados // permite reaplicar mesmo os já no sistema (idempotente)
+  const todosMarcados = selecionaveis.length > 0 && selecionaveis.every((a) => sel.has(key(a)))
+  const marcarTodos = () => setSel(todosMarcados ? new Set() : new Set(selecionaveis.map(key)))
+
+  const aplicar = () => {
+    const escolhidos = (itens ?? []).filter((a) => sel.has(key(a)))
+    if (!escolhidos.length) { toast.error('Selecione ao menos uma assinatura.'); return }
+    startAplicar(async () => {
+      const r = await aplicarAssinaturasGuru(provider, escolhidos)
+      if (!r.ok) { toast.error(r.error ?? 'Erro ao adicionar'); return }
+      const s = r.resumo!
+      toast.success(`${s.concedidos} com acesso · ${s.criados} aluno(s) · ${s.semMapeamento} sem mapeamento${s.erros ? ` · ${s.erros} erro(s)` : ''}`)
+      carregar(false)
+    })
+  }
+
+  const badge = (a: AssinaturaGuruDTO) => {
+    const cor = a.status === 'ativo' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+      : a.status === 'cancelado' || a.status === 'reembolsado' ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+      : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+    return <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', cor)}>{a.status}</span>
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-48 flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, e-mail, CPF, produto…" className="pl-8" />
+        </div>
+        <Button variant="outline" onClick={() => carregar(true)} disabled={carregando}>
+          {carregando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />} Atualizar da Guru
+        </Button>
+        <Button onClick={aplicar} disabled={aplicando || sel.size === 0}>
+          {aplicando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Confirmar e adicionar ({sel.size})
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        A lista vem da API da Guru (comprador + produto + status), com cache curto para não estourar o limite. Marque e clique em <b>Confirmar e adicionar</b> — cria o aluno e, se o produto estiver mapeado, já concede o acesso/grupo. O <b>webhook</b> faz isso automaticamente em novas compras.
+      </p>
+
+      {itens === null ? (
+        <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando assinaturas…</div>
+      ) : filtrados.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+          Nenhuma assinatura encontrada. Verifique as credenciais (User Token) em Credenciais e clique em <b>Atualizar da Guru</b>.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="w-10 px-3 py-2"><input type="checkbox" checked={todosMarcados} onChange={marcarTodos} /></th>
+                <th className="px-3 py-2">Comprador</th>
+                <th className="px-3 py-2">Produto</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">No sistema</th>
+                <th className="px-3 py-2">Mapeado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {filtrados.map((a) => {
+                const on = sel.has(key(a))
+                return (
+                  <tr key={key(a)} className={cn('cursor-pointer transition-colors hover:bg-muted/30', on && 'bg-primary/5')} onClick={() => toggle(a)}>
+                    <td className="px-3 py-2"><input type="checkbox" checked={on} onChange={() => toggle(a)} onClick={(e) => e.stopPropagation()} /></td>
+                    <td className="px-3 py-2">
+                      <div className="font-medium">{a.nome}</div>
+                      <div className="text-[11px] text-muted-foreground">{a.email ?? '—'}{a.cpf ? ` · ${a.cpf}` : ''}</div>
+                    </td>
+                    <td className="px-3 py-2">{a.produtoNome ?? a.produtoRef}</td>
+                    <td className="px-3 py-2">{badge(a)}</td>
+                    <td className="px-3 py-2">{a.jaNoSistema ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><Check className="h-3.5 w-3.5" /> sim</span> : <span className="text-muted-foreground">não</span>}</td>
+                    <td className="px-3 py-2">{a.temMapeamento ? <span className="text-emerald-600 dark:text-emerald-400">sim</span> : <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400"><AlertTriangle className="h-3.5 w-3.5" /> não</span>}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

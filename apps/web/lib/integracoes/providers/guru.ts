@@ -37,6 +37,36 @@ function telefone(contact: any): string | null {
   )
 }
 
+/** Normaliza um item de assinatura da API Guru em pessoa+entitlement. ⚠️ VERIFICAR campos. */
+function normalizarAssinatura(s: any): PessoaEntitlement | null {
+  if (!s || typeof s !== 'object') return null
+  const contact = s.subscriber ?? s.contact ?? s.customer ?? s.buyer ?? {}
+  const product = s.product ?? s.items?.[0] ?? {}
+  const email = firstStr(contact.email, contact.mail)
+  const cpf = firstStr(contact.doc, contact.document, contact.cpf)
+  const externalPessoa = firstStr(contact.id, email, cpf)
+  if (!externalPessoa) return null
+  const produtoRef = firstStr(product.marketplace_id, product.internal_id, product.id, s.product_id)
+  if (!produtoRef) return null
+  // Na listagem, mantém o status real; se não mapear, assume 'ativo' (está na lista de assinaturas).
+  const status = mapStatus(firstStr(s.last_status, s.status, s.subscription?.last_status)) ?? 'ativo'
+  const entExternalId = firstStr(s.id, s.internal_id, s.subscription_code, s.code) ?? `${produtoRef}:${externalPessoa}`
+  return {
+    pessoa: {
+      nome: firstStr(contact.name, contact.full_name) ?? email ?? 'Aluno',
+      email, cpf, telefone: telefone(contact), externalId: externalPessoa,
+    },
+    entitlement: {
+      externalId: entExternalId,
+      produtoRef,
+      produtoNome: firstStr(product.name, product.title),
+      status,
+      inicioEm: firstStr(s.started_at, s.dates?.started_at, s.created_at),
+      expiraEm: firstStr(s.next_cycle_at, s.dates?.next_cycle_at, s.expires_at, s.ended_at),
+    },
+  }
+}
+
 export const guruAdapter: ProviderAdapter = {
   provider: 'guru',
 
@@ -67,8 +97,43 @@ export const guruAdapter: ProviderAdapter = {
     } catch { return [] }
   },
 
-  // Guru é push: sem pull de pessoas por produto no MVP (reconciliação vem depois).
-  async listarPessoas(): Promise<PessoaEntitlement[]> { return [] },
+  /**
+   * Pull de assinaturas da API Guru (para a tela de análise "Assinaturas" e reconciliação).
+   * ⚠️ VERIFICAR com a doc/token real: endpoint `/api/v2/subscriptions`, paginação por cursor
+   * e caminhos de `subscriber`/`product`/`last_status`. Robusto a variações de envelope.
+   * `refs` opcional filtra por produto (produtoRef); vazio = todas.
+   */
+  async listarPessoas(cfg, refs): Promise<PessoaEntitlement[]> {
+    const token = cfg.credenciais.api_token
+    if (!token) return []
+    const key = idCredencial('guru', token)
+    const refSet = new Set((refs ?? []).filter(Boolean))
+    const out: PessoaEntitlement[] = []
+    let cursor: string | null = null
+    for (let pag = 0; pag < 50; pag++) { // teto de segurança (50 páginas)
+      await aguardarVaga('guru', key, RATE)
+      const url = new URL(`${cfg.baseUrl}/api/v2/subscriptions`)
+      if (cursor) url.searchParams.set('cursor', cursor)
+      let j: any
+      try {
+        const r = await fetch(url.toString(), { headers: { accept: 'application/json', Authorization: `Bearer ${token}` }, cache: 'no-store' })
+        if (!r.ok) break
+        j = await r.json()
+      } catch { break }
+      const arr: any[] = Array.isArray(j) ? j : (j.data ?? j.subscriptions ?? j.items ?? [])
+      if (!arr.length) break
+      for (const s of arr) {
+        const pe = normalizarAssinatura(s)
+        if (!pe) continue
+        if (refSet.size && !refSet.has(pe.entitlement.produtoRef)) continue
+        out.push(pe)
+      }
+      cursor = firstStr(j?.next_cursor, j?.meta?.next_cursor, j?.links?.next)
+      const temMais = j?.has_more_pages ?? j?.has_more ?? !!cursor
+      if (!temMais || !cursor) break
+    }
+    return out
+  },
 
   /**
    * Validação: a Guru envia o `api_token` da conta NO CORPO do webhook (confirmado em

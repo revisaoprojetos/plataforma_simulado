@@ -9,7 +9,10 @@ import { criptografar, criptografiaAtiva } from '@/lib/crypto'
 import { resolverProviderCfg } from '@/lib/integracoes/config'
 import { getAdapter } from '@/lib/integracoes/registry'
 import { importarViaProvider, listarFontesProvider, processarEvento } from '@/lib/integracoes/orquestrador'
-import type { Provider } from '@/lib/integracoes/tipos'
+import { aplicarEntitlement } from '@/lib/integracoes/engine'
+import { comCache, coalescer, invalidarCache } from '@/lib/integracoes/ratelimit'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import type { Provider, PessoaNormalizada, Entitlement } from '@/lib/integracoes/tipos'
 
 const PROVIDERS: Provider[] = ['curseduca', 'guru']
 
@@ -258,6 +261,104 @@ export async function reprocessarEvento(provider: string, id: string): Promise<{
 }
 
 // ── Import (ação explícita do admin) ───────────────────────────────────────────
+// ── Assinaturas (Guru): análise + confirmar/adicionar ─────────────────────────
+export interface AssinaturaGuruDTO {
+  pessoaExternalId: string
+  entExternalId: string
+  nome: string
+  email: string | null
+  cpf: string | null
+  telefone: string | null
+  produtoRef: string
+  produtoNome: string | null
+  status: string
+  jaNoSistema: boolean
+  temMapeamento: boolean
+}
+
+const chaveDigitos = (s?: string | null) => (s ? s.replace(/\D/g, '') : '')
+
+/**
+ * Lista as assinaturas da Guru (comprador + produto + status) para a tela de análise.
+ * A chamada à API é CACHEADA (comCache 3 min) + coalescida (single-flight) — abrir a tela
+ * várias vezes ou vários admins juntos NÃO batem repetido na Guru (§7.4). "Atualizar" força
+ * um novo pull. Enriquece com "já está no sistema?" e "produto mapeado?".
+ */
+export async function listarAssinaturasGuru(provider: string, forcar = false): Promise<{ ok: boolean; error?: string; itens?: AssinaturaGuruDTO[]; deCache?: boolean }> {
+  if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
+  if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const cfg = await resolverProviderCfg(g.tenantId, provider)
+  if (!cfg) return { ok: false, error: 'Configure e ative as credenciais primeiro.' }
+  const adapter = getAdapter(provider)
+  if (!adapter) return { ok: false, error: 'Provedor não suportado.' }
+
+  const chaveCache = `${provider}:assinaturas:${g.tenantId}`
+  if (forcar) await invalidarCache(chaveCache)
+  let deCache = true
+  const pares = await comCache(chaveCache, 180, () => coalescer(chaveCache, async () => {
+    deCache = false
+    return adapter.listarPessoas(cfg, [])
+  }))
+  if (!pares.length) return { ok: true, itens: [], deCache }
+
+  const svc = createAdminClient()
+  // Mapeamentos ativos (para marcar "produto mapeado?").
+  const { data: maps } = await svc.from('simulado_integracao_mapeamentos').select('fonte_ref').eq('tenant_id', g.tenantId).eq('provider', provider).eq('ativo', true)
+  const mapeados = new Set((maps ?? []).map((m: any) => m.fonte_ref))
+
+  // "Já no sistema?" em lote: casa por email e por cpf (uma consulta chunk'd cada).
+  const emails = [...new Set(pares.map((p) => (p.pessoa.email ?? '').trim().toLowerCase()).filter(Boolean))]
+  const cpfs = [...new Set(pares.map((p) => chaveDigitos(p.pessoa.cpf)).filter(Boolean))]
+  const porEmail = emails.length ? await fetchAllByIn<{ email: string }>(emails, (c) => svc.from('simulado_estudantes').select('email').eq('tenant_id', g.tenantId).eq('deletado', false).in('email', c)) : []
+  const porCpf = cpfs.length ? await fetchAllByIn<{ cpf: string }>(cpfs, (c) => svc.from('simulado_estudantes').select('cpf').eq('tenant_id', g.tenantId).eq('deletado', false).in('cpf', c)) : []
+  const emailSet = new Set(porEmail.map((e) => (e.email ?? '').trim().toLowerCase()))
+  const cpfSet = new Set(porCpf.map((e) => chaveDigitos(e.cpf)))
+
+  const itens: AssinaturaGuruDTO[] = pares.map((p) => {
+    const email = (p.pessoa.email ?? '').trim().toLowerCase() || null
+    const cpf = chaveDigitos(p.pessoa.cpf) || null
+    return {
+      pessoaExternalId: p.pessoa.externalId,
+      entExternalId: p.entitlement.externalId,
+      nome: p.pessoa.nome, email: p.pessoa.email, cpf: p.pessoa.cpf ?? null, telefone: p.pessoa.telefone ?? null,
+      produtoRef: p.entitlement.produtoRef, produtoNome: p.entitlement.produtoNome ?? null, status: p.entitlement.status,
+      jaNoSistema: (!!email && emailSet.has(email)) || (!!cpf && cpfSet.has(cpf)),
+      temMapeamento: mapeados.has(p.entitlement.produtoRef),
+    }
+  })
+  return { ok: true, itens, deCache }
+}
+
+/**
+ * Confirma e adiciona ao sistema as assinaturas selecionadas (cria/atualiza o estudante,
+ * registra a assinatura e concede acesso pelo mapeamento do produto). Idempotente.
+ */
+export async function aplicarAssinaturasGuru(provider: string, itens: AssinaturaGuruDTO[]): Promise<{ ok: boolean; error?: string; resumo?: { total: number; concedidos: number; criados: number; semMapeamento: number; erros: number } }> {
+  if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  if (!itens?.length) return { ok: false, error: 'Nada selecionado.' }
+
+  let concedidos = 0, semMapeamento = 0, erros = 0
+  const estudantes = new Set<string>()
+  for (const it of itens) {
+    const pessoa: PessoaNormalizada = { nome: it.nome, email: it.email, cpf: it.cpf, telefone: it.telefone, externalId: it.pessoaExternalId }
+    const entitlement: Entitlement = { externalId: it.entExternalId, produtoRef: it.produtoRef, produtoNome: it.produtoNome, status: (it.status as any) ?? 'ativo' }
+    try {
+      const r = await aplicarEntitlement({ tenantId: g.tenantId, provider, pessoa, entitlement })
+      if (!r.ok) { erros++; continue }
+      if (r.estudanteId) estudantes.add(r.estudanteId)
+      if (r.acao === 'concedido') concedidos++
+      if (r.acao === 'ignorado' && r.motivo?.includes('mapeamento')) semMapeamento++
+    } catch { erros++ }
+  }
+  await invalidarCache(`${provider}:assinaturas:${g.tenantId}`)
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_assinaturas', entidadeId: g.tenantId, tenantId: g.tenantId, depois: { provider, selecionadas: itens.length, concedidos, semMapeamento, erros } }).catch(() => {})
+  revalidatePath('/admin/estudantes')
+  return { ok: true, resumo: { total: itens.length, concedidos, criados: estudantes.size, semMapeamento, erros } }
+}
+
 export async function rodarImportIntegracao(provider: string, refs: string[]): Promise<{ ok: boolean; error?: string; resumo?: { total: number; concedidos: number; revogados: number; ignorados: number; erros: number } }> {
   if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
   if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
