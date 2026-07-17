@@ -19,6 +19,7 @@ import {
 import type { Provider } from '@/lib/integracoes/tipos'
 import { CAMPOS_MAPA } from '@/lib/integracoes/mapa-campos'
 import { getStr, flattenPaths } from '@/lib/integracoes/jsonpath'
+import { autoMapear, type AutoMatch } from '@/lib/integracoes/automap'
 
 interface Config { ativo: boolean; baseUrl: string; camposPreenchidos: string[]; webhookToken: string | null; cripto: boolean }
 interface Mapeamento { id: string; fonteRef: string; fonteNome: string | null; classificacao: string | null; grupoId: string | null; simuladoId: string | null; ativo: boolean }
@@ -241,22 +242,49 @@ function Assinaturas({ provider }: { provider: Provider }) {
   )
 }
 
-// ── Mapa JSON (mapeamento dinâmico das chaves do webhook) ─────────────────────
+// ── Mapa JSON (mapeamento AUTOMÁTICO + ajuste manual das chaves do webhook) ────
 function MapaJson({ provider }: { provider: Provider }) {
   const [mapa, setMapa] = useState<Record<string, string>>({})
+  const [auto, setAuto] = useState<Record<string, AutoMatch>>({})   // confiança por campo (última auto-detecção)
   const [payload, setPayload] = useState<unknown | null>(null)
+  const [ativo, setAtivo] = useState<string | null>(null)          // campo em foco (recebe o clique no JSON)
   const [carregando, start] = useTransition()
   const [salvando, startSalvar] = useTransition()
+  const nomeProv = PROVIDER_META[provider].nome
 
   const carregar = () => start(async () => {
     const r = await getMapaConfig(provider)
     if (!r.ok) { toast.error(r.error ?? 'Erro'); return }
-    setMapa(r.dados?.mapa ?? {}); setPayload(r.dados?.ultimoPayload ?? null)
+    const salvo = r.dados?.mapa ?? {}
+    const pl = r.dados?.ultimoPayload ?? null
+    setPayload(pl)
+    // Se ainda não há mapa salvo e temos um payload → já detecta automaticamente.
+    if (pl && Object.keys(salvo).length === 0) {
+      const det = autoMapear(pl)
+      setAuto(det)
+      setMapa(Object.fromEntries(Object.entries(det).map(([k, v]) => [k, v.path])))
+    } else {
+      setMapa(salvo); setAuto({})
+    }
   })
   useEffect(() => { carregar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const detectar = () => {
+    if (!payload) { toast.error('Sem payload recebido para detectar. Envie um evento e clique em Recarregar.'); return }
+    const det = autoMapear(payload)
+    setAuto(det)
+    setMapa((m) => ({ ...m, ...Object.fromEntries(Object.entries(det).map(([k, v]) => [k, v.path])) }))
+    const n = Object.keys(det).length
+    toast.success(n ? `${n} campo(s) detectado(s) automaticamente — revise e salve` : 'Não consegui detectar campos neste payload')
+  }
+
   const paths = payload ? flattenPaths(payload) : []
-  const set = (k: string, v: string) => setMapa((m) => ({ ...m, [k]: v }))
+  const set = (k: string, v: string) => { setMapa((m) => ({ ...m, [k]: v })); setAuto((a) => { const n = { ...a }; delete n[k]; return n }) }
+  const labelAtivo = ativo ? (CAMPOS_MAPA.find((c) => c.key === ativo)?.label ?? ativo) : null
+  const clicarPath = (path: string) => {
+    if (ativo) { set(ativo, path); toast.success(`“${path}” → ${labelAtivo}`) }
+    else { navigator.clipboard?.writeText(path); toast.message(`Copiado: ${path}`, { description: 'Clique num campo primeiro para atribuir direto.' }) }
+  }
   const salvar = () => startSalvar(async () => {
     const r = await salvarMapaConfig(provider, mapa)
     if (r.ok) toast.success('Mapa salvo — os próximos webhooks usam este mapeamento'); else toast.error(r.error ?? 'Erro ao salvar')
@@ -266,41 +294,79 @@ function MapaJson({ provider }: { provider: Provider }) {
     const caminho = (mapa[k]?.trim()) || campo?.padrao
     return payload ? getStr(payload, caminho) : null
   }
+  const corConf = (c: number) => c >= 80 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : c >= 55 ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm text-muted-foreground">Aponte cada campo do sistema para a chave (dot-path) do JSON que a {PROVIDER_META[provider].nome} envia. Vazio = usa o caminho padrão. O <b>ID do pedido</b> é a chave única (principal).</p>
-        <Button variant="outline" size="sm" onClick={carregar} disabled={carregando}>{carregando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />} Recarregar</Button>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <p className="max-w-xl text-sm text-muted-foreground">O sistema <b>detecta automaticamente</b> as chaves do JSON que a {nomeProv} envia (pelo nome e pelo valor). Revise, ajuste se precisar e salve. O <b>ID do pedido</b> é a chave única (principal).</p>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={carregar} disabled={carregando}>{carregando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />} Recarregar</Button>
+          <Button size="sm" onClick={detectar} disabled={!payload}><RotateCw className="mr-2 h-3.5 w-3.5" /> Detectar automaticamente</Button>
+        </div>
       </div>
 
       {!payload && (
-        <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">Nenhum payload recebido ainda para pré-visualizar. Envie um evento (Postman ou compra real) e clique em <b>Recarregar</b> — as chaves reais viram sugestão nos campos e o valor resolvido aparece à direita.</div>
+        <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">Nenhum payload recebido ainda para detectar. Envie um evento (Postman ou compra real) na URL do webhook e clique em <b>Recarregar</b> — a detecção automática roda em cima do JSON real.</div>
       )}
 
       <datalist id={`paths-${provider}`}>
         {paths.map((p) => <option key={p.path} value={p.path}>{p.sample ? `${p.path} — ${p.sample}` : p.path}</option>)}
       </datalist>
 
-      <div className="space-y-2">
-        {CAMPOS_MAPA.map((c) => {
-          const resolvido = resolver(c.key)
-          return (
-            <div key={c.key} className="grid items-center gap-2 rounded-lg border p-2.5 sm:grid-cols-[210px_1fr_170px]">
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-sm font-medium">{c.label}{c.obrigatorio && <span className="rounded bg-primary/10 px-1 text-[10px] font-semibold text-primary">principal</span>}</div>
-                <p className="truncate text-[11px] text-muted-foreground" title={c.descricao}>{c.descricao}</p>
+      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+        {/* Campos do sistema */}
+        <div className="space-y-2">
+          {CAMPOS_MAPA.map((c) => {
+            const resolvido = resolver(c.key)
+            const conf = auto[c.key]?.confianca
+            const emFoco = ativo === c.key
+            return (
+              <div key={c.key} className={cn('grid items-center gap-2 rounded-lg border p-2.5 sm:grid-cols-[180px_1fr_150px]', emFoco && 'ring-2 ring-primary/40')}>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
+                    {c.label}
+                    {c.obrigatorio && <span className="rounded bg-primary/10 px-1 text-[10px] font-semibold text-primary">principal</span>}
+                    {conf != null && <span className={cn('rounded px-1 text-[10px] font-semibold', corConf(conf))} title="Detectado automaticamente">auto {conf}%</span>}
+                  </div>
+                  <p className="truncate text-[11px] text-muted-foreground" title={c.descricao}>{c.descricao}</p>
+                </div>
+                <Input list={`paths-${provider}`} value={mapa[c.key] ?? ''} onFocus={() => setAtivo(c.key)} onChange={(e) => set(c.key, e.target.value)} placeholder={`padrão: ${c.padrao}`} className="font-mono text-xs" />
+                <div className="truncate text-[11px]" title={resolvido ?? ''}>
+                  {payload ? (resolvido != null ? <span className="text-emerald-600 dark:text-emerald-400">→ {resolvido}</span> : <span className="text-amber-600 dark:text-amber-400">→ (vazio)</span>) : <span className="text-muted-foreground">—</span>}
+                </div>
               </div>
-              <Input list={`paths-${provider}`} value={mapa[c.key] ?? ''} onChange={(e) => set(c.key, e.target.value)} placeholder={`padrão: ${c.padrao}`} className="font-mono text-xs" />
-              <div className="truncate text-[11px]" title={resolvido ?? ''}>
-                {payload ? (resolvido != null ? <span className="text-emerald-600 dark:text-emerald-400">→ {resolvido}</span> : <span className="text-amber-600 dark:text-amber-400">→ (vazio)</span>) : <span className="text-muted-foreground">—</span>}
-              </div>
+            )
+          })}
+        </div>
+
+        {/* Dados recebidos — clique numa chave para atribuir ao campo em foco (estilo Datacrazy) */}
+        <div className="rounded-lg border bg-muted/20">
+          <div className="border-b px-3 py-2">
+            <p className="text-xs font-semibold">Dados recebidos</p>
+            <p className="text-[11px] text-muted-foreground">{labelAtivo ? <>Clique numa chave para atribuir a <b>{labelAtivo}</b>.</> : 'Clique num campo à esquerda e depois numa chave aqui.'}</p>
+          </div>
+          {!payload ? (
+            <p className="p-3 text-[11px] text-muted-foreground">Sem payload recebido ainda.</p>
+          ) : (
+            <div className="max-h-[380px] overflow-auto p-2">
+              {paths.map((p) => (
+                <button key={p.path} type="button" onClick={() => clicarPath(p.path)}
+                  className="group flex w-full items-start gap-2 rounded-md px-2 py-1 text-left hover:bg-primary/10">
+                  <Copy className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground group-hover:text-primary" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-mono text-[11px] text-foreground">{p.path}</span>
+                    {p.sample && <span className="block truncate text-[10px] text-muted-foreground">{p.sample}</span>}
+                  </span>
+                </button>
+              ))}
             </div>
-          )
-        })}
+          )}
+        </div>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] text-muted-foreground">Dica: <b>Detectar automaticamente</b> preenche tudo; ou clique num campo e depois na chave em <b>Dados recebidos</b>.</span>
         <Button onClick={salvar} disabled={salvando}>{salvando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />} Salvar mapa</Button>
       </div>
     </div>
