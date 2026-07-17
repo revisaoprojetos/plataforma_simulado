@@ -152,7 +152,7 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
     <form onSubmit={entrarAluno} className="space-y-4">
       <Campo icon={Mail} type="email" placeholder="Endereço de e-mail" value={email} onChange={setEmail} autoComplete="email" />
       <Submit loading={loading} disabled={!email}>Continuar</Submit>
-      <p className="text-center text-xs text-muted-foreground">Use o mesmo e-mail de aluno utilizado na plataforma <a href="https://revisaopge.curseduca.pro/login" target="_blank" rel="noopener noreferrer" className="font-semibold text-foreground underline underline-offset-2 hover:text-primary">revisaopge.curseduca.pro</a>. Como aluno, você entra só com o e-mail.</p>
+      <p className="text-center text-xs text-muted-foreground">Use o mesmo e-mail de aluno utilizado na plataforma <a href="https://revisaopge.curseduca.pro/login" target="_blank" rel="noopener noreferrer" className="font-semibold text-foreground underline underline-offset-2 hover:text-primary">revisaopge.curseduca.pro</a>. Como aluno, você só precisa do e-mail para acessar.</p>
     </form>
   ) : (
     <form onSubmit={entrarAdmin} className="space-y-4">
