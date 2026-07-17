@@ -21,12 +21,17 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
 
   const discDaQuestao = new Map<string, string>()
   const discTotais = new Map<string, number>()
+  const pilaresDaQuestao = new Map<string, string[]>() // questao_id -> [pilar_1, pilar_2] (não vazios)
+  const pilarTotais = new Map<string, number>()        // pilar -> nº de questões
   if (qids.length) {
-    const { data: qs } = await svc.from('simulado_questoes').select('id, disciplinas:simulado_disciplinas(nome)').in('id', qids)
+    const { data: qs } = await svc.from('simulado_questoes').select('id, pilar_1, pilar_2, disciplinas:simulado_disciplinas(nome)').in('id', qids)
     for (const q of qs ?? []) {
       const d = (q as any).disciplinas?.nome ?? 'Geral'
       discDaQuestao.set(q.id, d)
       discTotais.set(d, (discTotais.get(d) ?? 0) + 1)
+      const ps = [(q as any).pilar_1, (q as any).pilar_2].map((x) => (x ?? '').toString().trim()).filter(Boolean)
+      pilaresDaQuestao.set(q.id, ps)
+      for (const p of ps) pilarTotais.set(p, (pilarTotais.get(p) ?? 0) + 1)
     }
   }
 
@@ -124,7 +129,11 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
     const acertos = [...m.values()].filter(Boolean).length
     const nota = totalQ ? Math.round((acertos / totalQ) * 100 * 10) / 10 : 0 // escala 0–100 (percentual)
     const porDisc = new Map<string, number>()
-    for (const [qid, ok] of m) if (ok) { const d = discDaQuestao.get(qid) ?? 'Geral'; porDisc.set(d, (porDisc.get(d) ?? 0) + 1) }
+    const porPilar = new Map<string, number>() // acertos por pilar
+    for (const [qid, ok] of m) if (ok) {
+      const d = discDaQuestao.get(qid) ?? 'Geral'; porDisc.set(d, (porDisc.get(d) ?? 0) + 1)
+      for (const p of pilaresDaQuestao.get(qid) ?? []) porPilar.set(p, (porPilar.get(p) ?? 0) + 1)
+    }
 
     const vars: Record<string, string> = {
       nome: a.nome ?? '', email: a.email ?? '', telefone: a.telefone ?? '', cpf: a.cpf ?? '', classificacao: a.classificacao ?? '',
@@ -137,6 +146,13 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
       vars[`acerto_${s}`] = String(porDisc.get(d) ?? 0)
       vars[`total_${s}`] = String(tot)
       vars[`pct_${s}`] = tot ? `${Math.round(((porDisc.get(d) ?? 0) / tot) * 100)}%` : '0%'
+    }
+    // Variáveis por PILAR (vêm de pilar_1/pilar_2 da importação das questões).
+    for (const [p, tot] of pilarTotais) {
+      const s = slug(p)
+      vars[`acerto_pilar_${s}`] = String(porPilar.get(p) ?? 0)
+      vars[`total_pilar_${s}`] = String(tot)
+      vars[`pct_pilar_${s}`] = tot ? `${Math.round(((porPilar.get(p) ?? 0) / tot) * 100)}%` : '0%'
     }
     return { id: a.id, nome: a.nome ?? a.email ?? 'Aluno', vars, respostas: Object.fromEntries(marcadaPorAluno.get(a.id) ?? []) }
   })
