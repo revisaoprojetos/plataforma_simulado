@@ -288,8 +288,9 @@ export async function listarAssinaturasGuru(provider: string, forcar = false): P
   if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
   const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
-  const cfg = await resolverProviderCfg(g.tenantId, provider)
-  if (!cfg) return { ok: false, error: 'Configure e ative as credenciais primeiro.' }
+  // ignorarAtivo: a análise de assinaturas é leitura + confirmação manual, funciona com o token salvo (sem precisar ativar).
+  const cfg = await resolverProviderCfg(g.tenantId, provider, { ignorarAtivo: true })
+  if (!cfg) return { ok: false, error: 'Salve o API Token da Guru primeiro.' }
   const adapter = getAdapter(provider)
   if (!adapter) return { ok: false, error: 'Provedor não suportado.' }
 
