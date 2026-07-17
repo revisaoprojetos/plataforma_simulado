@@ -21,17 +21,20 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
 
   const discDaQuestao = new Map<string, string>()
   const discTotais = new Map<string, number>()
-  const pilaresDaQuestao = new Map<string, string[]>() // questao_id -> [pilar_1, pilar_2] (não vazios)
+  const pilaresDaQuestao = new Map<string, string[]>() // questao_id -> pilar (categoria: Lei seca/Jurisprudência/Doutrina)
   const pilarTotais = new Map<string, number>()        // pilar -> nº de questões
   if (qids.length) {
-    const { data: qs } = await svc.from('simulado_questoes').select('id, pilar_1, pilar_2, disciplinas:simulado_disciplinas(nome)').in('id', qids)
+    // O PILAR vem da coluna `categoria` da questão (Lei seca / Jurisprudência / Doutrina).
+    // `pilar_1/pilar_2` é opcional (fallback) para bases que usem esse formato.
+    const { data: qs } = await svc.from('simulado_questoes').select('id, categoria, pilar_1, pilar_2, disciplinas:simulado_disciplinas(nome)').in('id', qids)
     for (const q of qs ?? []) {
       const d = (q as any).disciplinas?.nome ?? 'Geral'
       discDaQuestao.set(q.id, d)
       discTotais.set(d, (discTotais.get(d) ?? 0) + 1)
-      const ps = [(q as any).pilar_1, (q as any).pilar_2].map((x) => (x ?? '').toString().trim()).filter(Boolean)
-      pilaresDaQuestao.set(q.id, ps)
-      for (const p of ps) pilarTotais.set(p, (pilarTotais.get(p) ?? 0) + 1)
+      const ps = [(q as any).categoria, (q as any).pilar_1, (q as any).pilar_2].map((x) => (x ?? '').toString().trim()).filter(Boolean)
+      const unicos = [...new Set(ps)]
+      pilaresDaQuestao.set(q.id, unicos)
+      for (const p of unicos) pilarTotais.set(p, (pilarTotais.get(p) ?? 0) + 1)
     }
   }
 
