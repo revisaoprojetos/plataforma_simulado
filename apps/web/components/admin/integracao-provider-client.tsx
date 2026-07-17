@@ -14,7 +14,7 @@ import {
   listarEventos, reprocessarEvento, getEventoDetalhe, regenerarWebhookToken, testarWebhookInbound, type EventoDTO, type EventoDetalhe,
   listarAssinaturasSalvas, sincronizarAssinaturas, aplicarAssinaturasGuru, type AssinaturaGuruDTO,
   listarWebhookInbox, getWebhookInboxDetalhe, type InboxDTO, type InboxDetalhe,
-  getMapaConfig, salvarMapaConfig,
+  getMapaConfig, salvarMapaConfig, reprocessarLiberacoes,
 } from '@/app/admin/integracoes/actions'
 import type { Provider } from '@/lib/integracoes/tipos'
 import { CAMPOS_MAPA } from '@/lib/integracoes/mapa-campos'
@@ -751,10 +751,30 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, simuladosSistema }:
   }
   const nomeGrupo = (id: string | null) => gruposSistema.find((g) => g.id === id)?.nome ?? '—'
   const nomeSimulado = (id: string | null) => simuladosSistema.find((s) => s.id === id)?.nome ?? '—'
+  const [reprocessando, startReproc] = useTransition()
+  const reprocessar = () => startReproc(async () => {
+    const r = await reprocessarLiberacoes(provider)
+    if (!r.ok) { toast.error(r.error ?? 'Falha ao reprocessar'); return }
+    const s = r.resumo!
+    toast.success(`${s.concedidos} liberação(ões) aplicadas · ${s.total} assinaturas ativas`, {
+      description: `${s.semMapeamento} sem mapeamento${s.erros ? ` · ${s.erros} erro(s)` : ''}${s.produtosSemMapa.length ? ` · produtos sem mapa: ${s.produtosSemMapa.slice(0, 5).join(', ')}` : ''}`,
+    })
+  })
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">Diga o que cada <strong>produto</strong> comprado concede: a <strong>classificação</strong> (ex.: passaporte), e opcionalmente um <strong>grupo</strong> e/ou um <strong>simulado</strong> (matrícula automática).</p>
+
+      {/* Reprocessar liberações (recuperação de erro) */}
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/25 bg-primary/[0.04] p-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">Reprocessar liberações</p>
+          <p className="text-[11px] text-muted-foreground">Re-aplica o acesso de <b>todas as assinaturas ativas</b> (idempotente) — corrige quem comprou mas não ficou alocado no grupo/simulado (produto mapeado depois, erro no webhook…). Não revoga nada.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={reprocessar} disabled={reprocessando}>
+          {reprocessando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RotateCw className="mr-2 h-3.5 w-3.5" />} Reprocessar
+        </Button>
+      </div>
 
       {/* Passo a passo */}
       <ol className="space-y-2 rounded-lg border bg-muted/20 p-4 text-sm">

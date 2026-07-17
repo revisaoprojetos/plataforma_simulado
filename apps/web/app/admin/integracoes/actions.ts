@@ -9,7 +9,7 @@ import { criptografar, criptografiaAtiva } from '@/lib/crypto'
 import { resolverProviderCfg } from '@/lib/integracoes/config'
 import { getAdapter } from '@/lib/integracoes/registry'
 import { importarViaProvider, listarFontesProvider, processarEvento } from '@/lib/integracoes/orquestrador'
-import { aplicarEntitlement } from '@/lib/integracoes/engine'
+import { aplicarEntitlement, reaplicarLiberacoes } from '@/lib/integracoes/engine'
 import { coalescer } from '@/lib/integracoes/ratelimit'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { Provider, PessoaNormalizada, Entitlement } from '@/lib/integracoes/tipos'
@@ -241,6 +241,20 @@ export async function getEventoDetalhe(provider: string, id: string): Promise<{ 
       recebidoEm: data.recebido_em, processadoEm: data.processado_em,
       headers: h.headers ?? null, query: h.query ?? null, body: data.payload,
     },
+  }
+}
+
+// ── Reprocessar liberações (recuperação de erro) ──────────────────────────────
+export async function reprocessarLiberacoes(provider: string, soProduto?: string): Promise<{ ok: boolean; error?: string; resumo?: Awaited<ReturnType<typeof reaplicarLiberacoes>> }> {
+  if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  try {
+    const resumo = await reaplicarLiberacoes(g.tenantId, provider, soProduto || undefined)
+    revalidatePath('/admin/estudantes')
+    return { ok: true, resumo }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message ?? 'Falha ao reprocessar.' }
   }
 }
 

@@ -1,6 +1,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { registrarAudit } from '@/lib/audit'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import type { Provider, PessoaNormalizada, Entitlement, Mapeamento, ResultadoEntitlement } from '@/lib/integracoes/tipos'
 
 /**
@@ -173,4 +174,38 @@ export async function aplicarEntitlement(params: {
     await registrarAudit({ operacao: 'BLOQUEAR', entidade: 'simulado_assinaturas', entidadeId: estudanteId, tenantId, depois: { acao: 'revogar', provider, produto: entitlement.produtoRef, status: entitlement.status } }).catch(() => {})
     return { ok: true, estudanteId, acao: 'revogado' }
   }
+}
+
+export interface ResumoReprocesso { total: number; concedidos: number; semMapeamento: number; semEstudante: number; erros: number; produtosSemMapa: string[] }
+
+/**
+ * REPROCESSA as liberações a partir do histórico de assinaturas ATIVAS (recuperação de erro):
+ * re-aplica o `conceder` para cada assinatura ativa cujo produto está mapeado — idempotente
+ * (quem já está no grupo/simulado não muda). Corrige quem comprou mas não ficou alocado
+ * (ex.: produto mapeado depois, falha no webhook). Não revoga nada.
+ * `soProduto` opcional limita a um produto (fonte_ref).
+ */
+export async function reaplicarLiberacoes(tenantId: string, provider: Provider, soProduto?: string): Promise<ResumoReprocesso> {
+  const svc = createAdminClient()
+  const ativas = await fetchAll<{ estudante_id: string; produto_ref: string }>(() => {
+    let q = svc.from('simulado_assinaturas').select('estudante_id, produto_ref').eq('tenant_id', tenantId).eq('provider', provider).eq('status', 'ativo')
+    if (soProduto) q = q.eq('produto_ref', soProduto)
+    return q.order('estudante_id', { ascending: true })
+  })
+
+  const cacheMapa = new Map<string, Mapeamento | null>()
+  const produtosSemMapa = new Set<string>()
+  let concedidos = 0, semMapeamento = 0, semEstudante = 0, erros = 0
+  for (const a of ativas) {
+    if (!a.estudante_id) { semEstudante++; continue }
+    try {
+      if (!cacheMapa.has(a.produto_ref)) cacheMapa.set(a.produto_ref, await resolverMapeamento(svc, tenantId, provider, a.produto_ref))
+      const m = cacheMapa.get(a.produto_ref) ?? null
+      if (!m) { semMapeamento++; produtosSemMapa.add(a.produto_ref); continue }
+      await conceder(svc, tenantId, a.estudante_id, m)
+      concedidos++
+    } catch { erros++ }
+  }
+  await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_assinaturas', entidadeId: tenantId, tenantId, depois: { acao: 'reprocessar', provider, soProduto: soProduto ?? null, total: ativas.length, concedidos, semMapeamento, erros } }).catch(() => {})
+  return { total: ativas.length, concedidos, semMapeamento, semEstudante, erros, produtosSemMapa: [...produtosSemMapa] }
 }
