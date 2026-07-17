@@ -1,8 +1,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, ClipboardCheck, Users, BarChart3, Target, Clock, Crown, BookOpen, Lock, Check, MessageSquare, ListChecks, FileText, ScrollText, Award, TrendingUp, MoreVertical, Download } from 'lucide-react'
+import { LayoutDashboard, ClipboardCheck, Users, BarChart3, Target, Clock, Crown, BookOpen, Lock, Check, MessageSquare, ListChecks, FileText, ScrollText, Award, TrendingUp, MoreVertical, Download, Loader2 } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { ComparativoTurma } from '@/components/simulado/comparativo-turma'
@@ -77,6 +78,39 @@ export function MeuSimuladoView({
 
   // Modal de download de cadernos (por tentativa).
   const [modalTent, setModalTent] = useState<TentativaResumo | null>(null)
+  const [baixando, setBaixando] = useState<string | null>(null)
+
+  // Baixa o caderno como ARQUIVO PDF (attachment) — 1 clique → salvar arquivo. O servidor
+  // renderiza a página de impressão (Edge headless) COM os fundos/cards e devolve o PDF.
+  // Fallback: se a geração falhar (ex.: sem navegador no host), abre a página com print=1.
+  async function baixarCaderno(sessaoId: string, mod: string, nome: string, gab = false) {
+    if (!cadernoId) { abrir(cadUrl(sessaoId, mod, gab)); return }
+    const chave = `${sessaoId}:${mod}:${gab ? 'g' : 's'}`
+    if (baixando) return
+    const limpar = (s?: string) => (s ?? '').trim().replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_')
+    const arquivo = [simuladoTitulo, nome, `tentativa-${modalTent?.n ?? ''}`].map(limpar).filter(Boolean).join('_') || 'caderno'
+    const qs = new URLSearchParams({ caderno: cadernoId, sessao: sessaoId, mod, nome: arquivo })
+    if (estId) qs.set('aluno', estId)
+    if (gab) qs.set('gabarito', '1')
+    setBaixando(chave)
+    toast.loading('Gerando PDF com o fundo e os cards…', { id: 'cadpdf' })
+    try {
+      const res = await fetch(`/api/aluno/caderno-pdf?${qs.toString()}`)
+      if (!res.ok) throw new Error('falha')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `${arquivo}.pdf`
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      toast.success('Download concluído', { id: 'cadpdf', description: nome })
+    } catch {
+      toast.error('Não foi possível gerar o PDF. Abrindo para salvar…', { id: 'cadpdf' })
+      abrir(`${cadUrl(sessaoId, mod, gab)}&print=1`)
+    } finally {
+      setBaixando(null)
+    }
+  }
 
   return (
     <>
@@ -261,7 +295,7 @@ export function MeuSimuladoView({
               </div>
               <div className="space-y-1.5">
                 {modalidades.length > 0
-                  ? modalidades.map((m) => <BtnCaderno key={m.id} nome={m.nome} onClick={() => abrir(cadUrl(modalTent.id, m.id))} />)
+                  ? modalidades.map((m) => <BtnCaderno key={m.id} nome={m.nome} loading={baixando === `${modalTent.id}:${m.id}:s`} onClick={() => baixarCaderno(modalTent.id, m.id, m.nome)} />)
                   : <BtnCaderno nome="Prova que você fez" onClick={() => abrir(`${gabaritoUrl(modalTent.id)}?sem=1`)} />}
               </div>
             </section>
@@ -279,7 +313,7 @@ export function MeuSimuladoView({
                 <p className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground"><Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Disponível quando o professor liberar o gabarito.</p>
               ) : modalidades.length > 0 ? (
                 <div className="space-y-1.5">
-                  {modalidades.filter((m) => m.temGabarito).map((m) => <BtnCaderno key={m.id} nome={m.nome} gab onClick={() => abrir(cadUrl(modalTent.id, m.id, true))} />)}
+                  {modalidades.filter((m) => m.temGabarito).map((m) => <BtnCaderno key={m.id} nome={m.nome} gab loading={baixando === `${modalTent.id}:${m.id}:g`} onClick={() => baixarCaderno(modalTent.id, m.id, m.nome, true)} />)}
                 </div>
               ) : (
                 <div className="space-y-1.5">
@@ -295,13 +329,15 @@ export function MeuSimuladoView({
   )
 }
 
-function BtnCaderno({ nome, onClick, gab }: { nome: string; onClick: () => void; gab?: boolean }) {
+function BtnCaderno({ nome, onClick, gab, loading }: { nome: string; onClick: () => void; gab?: boolean; loading?: boolean }) {
   return (
-    <button type="button" onClick={onClick}
-      className={cn('group flex w-full items-center gap-2.5 rounded-xl border bg-card p-2.5 text-left text-sm shadow-sm transition-all hover:shadow-md', gab ? 'border-primary/20 hover:border-primary/50' : 'hover:border-foreground/20')}>
+    <button type="button" onClick={onClick} disabled={loading}
+      className={cn('group flex w-full items-center gap-2.5 rounded-xl border bg-card p-2.5 text-left text-sm shadow-sm transition-all hover:shadow-md disabled:opacity-70', gab ? 'border-primary/20 hover:border-primary/50' : 'hover:border-foreground/20')}>
       <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', gab ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}><FileText className="h-4 w-4" /></span>
-      <span className="min-w-0 flex-1 truncate font-medium">{nome}</span>
-      <Download className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-y-0.5 group-hover:text-foreground" />
+      <span className="min-w-0 flex-1 truncate font-medium">{loading ? 'Gerando PDF…' : nome}</span>
+      {loading
+        ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
+        : <Download className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-y-0.5 group-hover:text-foreground" />}
     </button>
   )
 }
