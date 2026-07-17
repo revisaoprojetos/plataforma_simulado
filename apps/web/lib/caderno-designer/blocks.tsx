@@ -15,6 +15,7 @@ export type BlockMeta = {
   supportsVars?: boolean
   container?: boolean // aceita blocos filhos (card/colunas/coluna)
   fullBleed?: boolean // camada de fundo da página inteira
+  oculto?: boolean // não aparece na paleta (mas continua renderizando se já usado)
   defaults: Record<string, unknown>
 }
 
@@ -68,7 +69,7 @@ export const BLOCKS: BlockMeta[] = [
     defaults: { quantidade: 6, rotulo: 'Resposta:', altura: 28, cor: '' } },
   { type: 'condicao', title: 'Condição (texto modulado)', icon: GitBranch, category: 'conteudo', container: true,
     defaults: { variavel: 'percentual', operador: 'entre', valor: '0', valor2: '50' } },
-  { type: 'diag-grupo', title: 'Diagnóstico — Grupo/Disciplinas', icon: Rows3, category: 'avaliacao', dynamic: true, supportsVars: true,
+  { type: 'diag-grupo', title: 'Diagnóstico — Grupo/Disciplinas', icon: Rows3, category: 'avaliacao', dynamic: true, supportsVars: true, oculto: true,
     defaults: {
       grupo: 'Grupo I', disciplinas: [{ chave: 'direito_administrativo', nome: 'Direito Administrativo', assunto: '' }],
       corHeader: '#f6c445', corHeaderTexto: '#3b3260', corFita: '#c9a227', corRow: '#e9eef7', corTitulo: '#1a3a6b', corPct: '#e8850c', corAcerto: '#8a8a8a',
@@ -445,10 +446,11 @@ export function BlockRender({ block, theme, data, full }: { block: Block; theme:
             <span>Acertos&nbsp;&nbsp;{somaAc}/{somaTot}</span>
           </div>
           {disc.map((d, i) => {
-            const fita = a.fitaAltura ?? 3
+            // Fita só se explicitamente pedida (a.mostrarFita). Por padrão, sem linha divisória.
+            const fita = a.mostrarFita ? (a.fitaAltura ?? 2) : 0
             const posBase = (a.fitaPosicao ?? 'base') !== 'topo'
             return (
-              <div key={i} style={{ [posBase ? 'borderBottom' : 'borderTop']: `${fita}px solid ${a.corFita || '#f6c445'}`, background: a.corRow || '#eef3fb', padding: '7px 12px', marginTop: i === 0 ? 0 : (a.gapLinha ?? 6), minHeight: a.alturaLinha || undefined, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 } as any}>
+              <div key={i} style={{ ...(fita ? { [posBase ? 'borderBottom' : 'borderTop']: `${fita}px solid ${a.corFita || '#c9a227'}` } : {}), background: a.corRow || '#e9eef7', padding: '7px 12px', marginTop: i === 0 ? 0 : (a.gapLinha ?? 6), minHeight: a.alturaLinha || undefined, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 } as any}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 12, color: a.corTitulo || '#243b7a' }}>{applyVars(d.nome || '', data.vars)}</div>
                   {d.assunto && <div style={{ fontSize: 10, color: '#555', fontStyle: 'italic' }}>- Categoria: {applyVars(d.assunto, data.vars)}</div>}

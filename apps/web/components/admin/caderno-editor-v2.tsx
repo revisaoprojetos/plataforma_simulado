@@ -720,7 +720,7 @@ export function CadernoEditorV2({
                 <div key={cat}>
                   <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">{CAT_NOMES[cat]}</p>
                   <div className="flex flex-col gap-1.5">
-                    {cats[cat].map((b) => {
+                    {cats[cat].filter((b) => !b.oculto).map((b) => {
                       const Icon = b.icon
                       const dis = (b.unico && tiposUsados.has(b.type)) || (b.unicoPorPagina && doc.pages.length > 0 && doc.pages.every((p) => p.blocks.some((x) => x.type === b.type)))
                       return (
