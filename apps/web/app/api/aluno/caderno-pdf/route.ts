@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
   const sessao = searchParams.get('sessao')
   const mod = searchParams.get('mod') || 'caderno_completo'
   const aluno = searchParams.get('aluno') || ''
+  const comGabarito = searchParams.get('gabarito') === '1' // versão "com correção"
   const nomeArquivo = (searchParams.get('nome') || 'caderno').replace(/[\\/:*?"<>|]+/g, '').slice(0, 120)
   if (!cadernoId || !sessao) return NextResponse.json({ message: 'Parâmetros ausentes.' }, { status: 400 })
 
@@ -49,8 +50,8 @@ export async function GET(request: NextRequest) {
   if (!exec) return NextResponse.json({ message: 'Nenhum navegador (Edge/Chrome) encontrado para gerar o PDF.' }, { status: 503 })
 
   // URL interna da página de impressão (acesso pelo ?sessao, sem cookie). Sem print=1
-  // (quem imprime é o Puppeteer). semgab=1 = sem gabarito.
-  const qs = new URLSearchParams({ mod, sessao, semgab: '1', rawimg: '1' })
+  // (quem "imprime" é o Puppeteer). gabarito=1 → versão com correção; senão semgab=1 (como você fez).
+  const qs = new URLSearchParams(comGabarito ? { mod, sessao, gabarito: '1', rawimg: '1' } : { mod, sessao, semgab: '1', rawimg: '1' })
   if (aluno) qs.set('aluno', aluno)
   const url = `${WEB_INTERNAL}/imprimir/caderno/${cadernoId}?${qs.toString()}`
 
