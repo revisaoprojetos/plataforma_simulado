@@ -160,7 +160,8 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
     setRes(r)
     setSel(new Set()) // limpa a seleção pós-import (evita reimportar os mesmos p/ outro grupo sem querer)
     recarregarSistema()
-    toast.success(`${r.novos ?? 0} novo(s) · ${r.jaExistiam ?? 0} já existia(m)${r.vinculados ? ` · ${r.vinculados} vinculado(s)` : ''}${r.removidos ? ` · ${r.removidos} removido(s)` : ''}`)
+    const notaGrupo = destino === 'nenhum' ? ' · sem grupo (só cadastro no sistema)' : ''
+    toast.success(`${r.novos ?? 0} novo(s) · ${r.jaExistiam ?? 0} já existia(m)${r.vinculados ? ` · ${r.vinculados} vinculado(s)` : ''}${r.removidos ? ` · ${r.removidos} removido(s)` : ''}${notaGrupo}`)
   }
 
   const temFiltro = !!q || soSelecionados || ocultarDesatualizados
@@ -275,6 +276,20 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
             <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary"><Pencil className="h-3.5 w-3.5" /> Alterar</span>
           </button>
 
+          {/* Aviso + atalho quando o destino é "Sem grupo" (evita importar sem vincular sem querer). */}
+          {destino === 'nenhum' && (
+            <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 text-xs">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <div className="min-w-0 space-y-1.5">
+                <p>Os alunos só serão <b>cadastrados no sistema</b> — <b>não</b> entrarão em nenhum grupo.</p>
+                <button type="button" onClick={() => { setDestino('por_canal'); setCanalPaiId(null) }}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 font-medium text-primary-foreground transition hover:opacity-90">
+                  <Layers className="h-3 w-3" /> Criar 1 grupo por canal (mesmo nome)
+                </button>
+              </div>
+            </div>
+          )}
+
           {destino === 'existente' && (
             <label className="mt-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs">
               <input type="checkbox" checked={sincronizar} onChange={(e) => setSincronizar(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border" />
@@ -286,16 +301,19 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
           )}
         </div>
 
-        <label className="flex items-center gap-2 px-1 text-xs">
-          <input type="checkbox" checked={segundoPlano} onChange={(e) => setSegundoPlano(e.target.checked)} className="h-4 w-4 rounded border" />
-          <span><b>Importar em segundo plano</b> — para grupos grandes (roda no servidor).</span>
-        </label>
+        {/* Segundo plano não se aplica ao modo "um grupo por canal" (roda em foreground). */}
+        {destino !== 'por_canal' && (
+          <label className="flex items-center gap-2 px-1 text-xs">
+            <input type="checkbox" checked={segundoPlano} onChange={(e) => setSegundoPlano(e.target.checked)} className="h-4 w-4 rounded border" />
+            <span><b>Importar em segundo plano</b> — para grupos grandes (roda no servidor).</span>
+          </label>
+        )}
 
         <button type="button" onClick={importar} disabled={sel.size === 0 || importando}
           className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-violet-600 px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:shadow-primary/40 disabled:opacity-60 disabled:shadow-none">
           {importando
             ? <><Loader2 className="h-4 w-4 animate-spin" /> {jobStatus ? `Em segundo plano (${jobStatus})…` : 'Importando…'}</>
-            : <><DownloadCloud className="h-4 w-4 transition-transform group-hover:translate-y-0.5" /> Importar membros</>}
+            : <><DownloadCloud className="h-4 w-4 transition-transform group-hover:translate-y-0.5" /> {destino === 'nenhum' ? 'Importar (sem grupo)' : destino === 'por_canal' ? 'Importar · 1 grupo por canal' : 'Importar no grupo'}</>}
         </button>
 
         <p className="px-1 text-[11px] leading-snug text-muted-foreground">Traz nome, e-mail, CPF, telefone e classificação. Data de nascimento não vem da Curseduca.</p>
