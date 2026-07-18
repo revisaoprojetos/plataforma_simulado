@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog'
-import { Loader2, Plug, Check, AlertTriangle, Trash2, RefreshCw, Copy, DownloadCloud, KeyRound, GitBranch, Radio, RotateCw, Eye, Users, UserPlus, Search, Inbox, Braces, X } from 'lucide-react'
+import { Loader2, Plug, Check, AlertTriangle, Trash2, RefreshCw, Copy, DownloadCloud, KeyRound, GitBranch, Radio, RotateCw, Eye, Users, UserPlus, Search, Inbox, Braces, X, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { JsonViewer } from '@/components/admin/json-viewer'
@@ -24,6 +24,7 @@ import type { Provider } from '@/lib/integracoes/tipos'
 import { CAMPOS_MAPA } from '@/lib/integracoes/mapa-campos'
 import { getStr, flattenPaths } from '@/lib/integracoes/jsonpath'
 import { autoMapear, type AutoMatch } from '@/lib/integracoes/automap'
+import { ehProdutoPassaporte, mapStatusMapa } from '@/lib/integracoes/normalizar-mapa'
 
 interface Config { ativo: boolean; baseUrl: string; camposPreenchidos: string[]; webhookToken: string | null; cripto: boolean }
 interface Mapeamento { id: string; fonteRef: string; fonteNome: string | null; classificacao: string | null; grupoId: string | null; pastaId: string | null; simuladoId: string | null; ativo: boolean }
@@ -310,6 +311,12 @@ function MapaJson({ provider, inicial }: { provider: Provider; inicial?: { mapa:
   const corConf = (c: number) => c >= 80 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : c >= 55 ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
   const resolvidos = payload ? CAMPOS_MAPA.filter((c) => resolver(c.key) != null).length : Object.values(mapa).filter((v) => (v ?? '').trim()).length
   const pct = Math.round((resolvidos / CAMPOS_MAPA.length) * 100)
+  // Identificação (mesma regra do motor) para o payload atual: passaporte por nome + status.
+  const produtoNome = resolver('produto_nome') as string | null
+  const ehPass = ehProdutoPassaporte(produtoNome)
+  const statusBruto = resolver('status') as string | null
+  const statusMap = mapStatusMapa(statusBruto)
+  const statusLabel = statusMap === 'ativo' ? 'libera acesso' : statusMap ? 'cancela acesso' : '—'
 
   return (
     <div className="space-y-4">
@@ -333,6 +340,17 @@ function MapaJson({ provider, inicial }: { provider: Provider; inicial?: { mapa:
       </div>
       {/* Barra de progresso */}
       <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-gradient-to-r from-primary to-violet-500 transition-all" style={{ width: `${pct}%` }} /></div>
+
+      {/* Identificação do payload atual (mesma regra do motor) */}
+      {payload != null && (
+        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+          <span className="text-muted-foreground">Este produto seria:</span>
+          {ehPass
+            ? <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-2 py-0.5 font-semibold text-violet-600 dark:text-violet-400"><Sparkles className="h-3 w-3" /> PASSAPORTE (acesso a todos os simulados)</span>
+            : <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground">Normal (usa o mapeamento)</span>}
+          {statusBruto && <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium">status: <b className="font-semibold">{statusBruto}</b> → {statusLabel}</span>}
+        </div>
+      )}
 
       {!payload && (
         <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-center text-xs text-muted-foreground">
