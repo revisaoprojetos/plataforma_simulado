@@ -4,6 +4,7 @@
 import { createBlock } from './blocks'
 import { genId, RUNNING_PADRAO, type CadernoDoc, type Block, type Page, type PageKind, type RunningConfig } from './types'
 import { DIAGNOSTICO_DOC } from './preset-diagnostico-doc'
+import { CADERNO_COMPLETO_DOC, CADERNO_PERGUNTAS_DOC, FOLHA_RESPOSTAS_DOC } from './preset-cadernos-doc'
 
 /** Cria um bloco com os defaults do tipo + um patch de atributos (e filhos opcionais). */
 function blk(type: string, patch: Record<string, unknown> = {}, inner?: Block[]): Block {
@@ -48,29 +49,8 @@ export const PRESETS_CADERNO: CadernoPreset[] = [
   {
     id: 'caderno-objetivo',
     nome: 'Folha de respostas',
-    descricao: 'Capa + cabeçalho + dados do estudante + grade de respostas (reenvie as imagens de fundo).',
-    build: () => doc([
-      page('capa', 'Capa', [
-        blk('plano-fundo', { url: '', opacidade: 100 }),
-        blk('espacador', { altura: 749 }),
-        blk('texto-livre', { bold: true, size: 48, align: 'center', color: '#ffffff', fonte: 'montserrat', texto: 'CADERNO DE \nQUESTÕES OBJETIVAS', italico: false, valignV: 'center', alturaMin: 171, lineHeight: 1, sublinhado: false, espacamento: 0 }),
-      ]),
-      page('conteudo', 'Conteúdo', [
-        blk('plano-fundo', { url: '', opacidade: 100 }),
-        blk('espacador', { altura: 36 }),
-        blk('card', { largura: 100, padding: 14, bordaCor: '', corFundo: '#2c5ea5', bordaRaio: 0, alinhamento: 'center', bordaLargura: 1 }, [
-          blk('texto-livre', { bold: true, size: 24, align: 'left', color: '#ffffff', fonte: 'sans', texto: 'CADERNO DE QUESTÕES OBJETIVAS\n', italico: false, lineHeight: 1.8, sublinhado: false, espacamento: 0 }),
-          blk('texto-livre', { bold: false, size: 20, align: 'left', color: '#ffffff', fonte: 'montserrat', texto: 'Concurso Simulado AGU \n', italico: false, valignV: 'top', alturaMin: 0, lineHeight: 1.5, sublinhado: false, espacamento: 0 }),
-        ]),
-        blk('espacador', { altura: 4 }),
-        blk('identificacao', {
-          fonte: 'montserrat', titulo: 'DADOS DO ESTUDANTE', bordaRaio: 0, corHeader: '#2c5ea5', corHeaderTexto: '#ffffff',
-          destaque: [{ rotulo: 'Nome', valor: '{{nome}}' }, { rotulo: 'E-mail', valor: '{{email}}' }],
-          campos: [{ rotulo: 'Data', valor: '{{data}}' }, { rotulo: 'Início', valor: '{{inicio}}' }, { rotulo: 'Término', valor: '{{termino}}' }, { rotulo: 'Tempo total', valor: '{{tempo_total}}' }, { rotulo: 'Respondidas', valor: '{{respondidas}}' }, { rotulo: 'Em branco', valor: '{{em_branco}}' }],
-        }),
-        blk('gabarito-grid', { fonte: 'montserrat', origem: 'marcado', titulo: 'GABARITO DE ALTERNATIVA', corHeader: '#2c5ea5', corHeaderTexto: '#ffffff', fundoImpar: '#ffbd35', textoImpar: '#ffffff', fundoPar: '#3b3260', textoPar: '#ffffff', corMarcadas: '#000000', porLinha: 10, bordaRaio: 0, numQuestoes: null, numAlternativas: 5 }),
-      ]),
-    ]),
+    descricao: 'Modelo pronto (Simulado AGU): capa + dados do estudante + respostas por questão. Reenvie as imagens de fundo.',
+    build: () => docCapturado(FOLHA_RESPOSTAS_DOC),
   },
   {
     id: 'caderno-discursivo',
@@ -101,59 +81,14 @@ export const PRESETS_CADERNO: CadernoPreset[] = [
   {
     id: 'caderno-completo',
     nome: 'Caderno completo',
-    descricao: 'Capa + dados do estudante + questões (enunciado, alternativas e resposta marcada) com cabeçalho/rodapé. Reenvie as imagens de fundo.',
-    build: () => doc([
-      page('capa', 'Capa', [
-        blk('plano-fundo', { url: '', opacidade: 100 }),
-        blk('espacador', { altura: 749 }),
-        blk('texto-livre', { bold: true, size: 48, align: 'center', color: '#ffffff', fonte: 'montserrat', texto: 'CADERNO DE \nPROVA COMPLETO', italico: false, valignV: 'center', alturaMin: 171, lineHeight: 1, sublinhado: false, espacamento: 0 }),
-      ]),
-      page('conteudo', 'Conteúdo', [
-        blk('plano-fundo', { url: '', opacidade: 100 }),
-        blk('card', { largura: 100, padding: 14, bordaCor: '', corFundo: '#2c5ea5', bordaRaio: 0, alinhamento: 'center', bordaLargura: 1 }, [
-          blk('texto-livre', { bold: true, size: 24, align: 'left', color: '#ffffff', fonte: 'sans', texto: 'CADERNO DE QUESTÕES OBJETIVAS\n', italico: false, valignV: 'top', alturaMin: 0, lineHeight: 1.8, sublinhado: false, espacamento: 0 }),
-          blk('texto-livre', { bold: false, size: 20, align: 'left', color: '#ffffff', fonte: 'montserrat', texto: 'Concurso Simulado AGU \n', italico: false, valignV: 'top', alturaMin: 0, lineHeight: 1.5, sublinhado: false, espacamento: 0 }),
-        ]),
-        blk('espacador', { altura: 4 }),
-        blk('identificacao', {
-          fonte: 'montserrat', titulo: 'DADOS DO ESTUDANTE', bordaRaio: 0, corHeader: '#2c5ea5', corHeaderTexto: '#ffffff',
-          destaque: [{ rotulo: 'Nome', valor: '{{nome}}' }, { rotulo: 'E-mail', valor: '{{email}}' }],
-          campos: [{ rotulo: 'Data', valor: '{{data}}' }, { rotulo: 'Início', valor: '{{inicio}}' }, { rotulo: 'Término', valor: '{{termino}}' }, { rotulo: 'Tempo total', valor: '{{tempo_total}}' }, { rotulo: 'Respondidas', valor: '{{respondidas}}' }, { rotulo: 'Em branco', valor: '{{em_branco}}' }],
-        }),
-        blk('repeticao', { gap: 16, quantidade: null }, [
-          blk('card', { largura: 20, padding: 1, bordaCor: '', corFundo: '#2c5ea5', bordaRaio: 8, alinhamento: 'left', bordaLargura: 1 }, [
-            blk('texto-livre', { bold: true, size: 14, align: 'center', color: '#ffffff', fonte: 'montserrat', texto: 'QUESTÃO {q_num}', italico: false, valignV: 'top', alturaMin: 0, lineHeight: 1.5, sublinhado: false, espacamento: 0 }),
-          ]),
-          blk('texto-livre', { bold: false, size: 12, align: 'justify', color: '', fonte: '', texto: '{q_enunciado}', italico: false, valignV: 'top', alturaMin: 0, lineHeight: 1.5, sublinhado: false, espacamento: 0 }),
-          blk('texto-livre', { bold: false, size: 12, align: 'left', color: '', fonte: '', texto: '{q_alt_a}\n{q_alt_b}\n{q_alt_c}\n{q_alt_d}\n{q_alt_e}', italico: false, valignV: 'top', alturaMin: 0, lineHeight: 1.5, sublinhado: false, espacamento: 0 }),
-          blk('colunas', { gap: 16 }, [
-            blk('coluna', {}, [
-              blk('texto-livre', { bold: false, size: 12, align: 'center', color: '', fonte: '', texto: 'RESPOSTA MARCADA: ', italico: false, largura: 20, valignV: 'center', alturaMin: 0, lineHeight: 3, sublinhado: false, espacamento: 0 }),
-            ]),
-            blk('coluna', {}, [
-              blk('card', { largura: 6, padding: 3, bordaCor: '#ffffff', corFundo: '#2c5ea5', bordaRaio: 10, alinhamento: 'center', bordaLargura: 0 }, [
-                blk('texto-livre', { bold: false, size: 12, align: 'center', color: '#ffffff', fonte: '', texto: '{q_resposta_letra}', italico: false, largura: 65, valignV: 'top', alturaMin: 0, lineHeight: 1.7, sublinhado: false, espacamento: 0, alinhamentoBloco: 'center' }),
-              ]),
-            ]),
-          ]),
-        ]),
-      ]),
-    ], { cabecalhoAtivo: true, cabecalhoAltura: 75, cabecalhoPaginas: 'exceto_capa', rodapeAtivo: true, rodapeAltura: 40, rodapePaginas: 'exceto_capa', mostrarNumeroPagina: true }),
+    descricao: 'Modelo pronto (Simulado AGU): capa + dados do estudante + questões (enunciado, alternativas e resposta marcada) com cabeçalho/rodapé. Reenvie as imagens de fundo.',
+    build: () => docCapturado(CADERNO_COMPLETO_DOC),
   },
   {
     id: 'caderno-perguntas',
     nome: 'Caderno de perguntas',
-    descricao: 'Só as perguntas e as alternativas de cada questão (sem dados do aluno, sem gabarito).',
-    build: () => doc([
-      page('conteudo', 'Perguntas', [
-        blk('titulo-secao', { texto: '{simulado}', nivel: 1, align: 'left', mostrarLinha: true, espacamento: 6 }),
-        blk('repeticao', { gap: 18, quantidade: null }, [
-          blk('titulo-secao', { texto: 'Questão {q_num}', nivel: 2, align: 'left', mostrarLinha: false }),
-          blk('texto-livre', { texto: '{q_enunciado}', size: 12, align: 'justify', lineHeight: 1.5, espacamento: 4 }),
-          blk('alternativas', { mostrarGabarito: false }),
-        ]),
-      ]),
-    ]),
+    descricao: 'Modelo pronto (Simulado AGU): capa + dados do estudante + perguntas e alternativas de cada questão. Reenvie as imagens de fundo.',
+    build: () => docCapturado(CADERNO_PERGUNTAS_DOC),
   },
   {
     id: 'prova-completa',
