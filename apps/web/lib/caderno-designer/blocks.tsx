@@ -560,12 +560,12 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
       const pad = a.padding ?? 12
       const meia = (a.gap ?? 16) / 2
       return (
-        <div style={{ background: a.corFundo || '#fef3d6', borderRadius: a.bordaRaio ?? 4, padding: `0 ${pad}px`, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
-          <div style={{ display: 'flex', gap: a.gap ?? 16, alignItems: 'stretch' }}>
+        <div style={{ background: a.corFundo || '#fef3d6', borderRadius: a.bordaRaio ?? 4, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia, boxSizing: 'border-box' }}>
+          <div style={{ display: 'flex', alignItems: 'stretch' }}>
             {pilares.map((p, i) => {
               const f = faixaInfo(p)
               return (
-                <div key={i} style={{ flex: '1 1 0%', minWidth: 0, padding: `${pad}px 0`, ...(i > 0 && a.divisoria !== false ? { borderLeft: bordaDiv, paddingLeft: meia } : {}) }}>
+                <div key={i} style={{ flex: '1 1 0%', minWidth: 0, boxSizing: 'border-box', padding: `${pad}px ${pad + meia}px`, ...(i > 0 && a.divisoria !== false ? { borderLeft: bordaDiv } : {}) }}>
                   <div style={{ fontWeight: 700, color: a.corTitulo || '#243b7a', fontSize: a.tamTitulo ?? 12 }}>{applyVars(p.nome || '', data.vars)}</div>
                   <div style={{ fontWeight: 800, color: a.corPct || a.corTitulo || '#243b7a', fontSize: a.tamPct ?? 22, lineHeight: 1.1 }}>{val(`{pct_pilar_${p.chave}}`, '0%')}</div>
                   <div style={{ color: a.corQuestoes || '#c0392b', fontSize: 11 }}>{val(`{acerto_pilar_${p.chave}}`, 'X')} de {val(`{total_pilar_${p.chave}}`, '0')} questões</div>
