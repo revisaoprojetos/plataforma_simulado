@@ -51,7 +51,8 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
       .limit(60)).data
   }
 
-  const amostraIds = (questoes ?? []).slice(0, 6).map((q: any) => q.id)
+  // Alternativas de TODAS as questões do preview (para navegar por elas no repetidor).
+  const amostraIds = (questoes ?? []).map((q: any) => q.id)
   const { data: alts } = amostraIds.length
     ? await svc.from('simulado_alternativas').select('questao_id, texto, ordem, correta').in('questao_id', amostraIds)
     : { data: [] as any[] }
@@ -61,7 +62,7 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
   const previewData: CadernoData = {
     numQuestoes: (questoes ?? []).length || 20,
     numAlternativas: 5,
-    questoes: (questoes ?? []).slice(0, 6).map((q: any, i: number) => ({
+    questoes: (questoes ?? []).map((q: any, i: number) => ({
       id: q.id, numero: i + 1, enunciado: q.enunciado ?? '', tipo: q.tipo, comentario: q.comentario_professor ?? '',
       alternativas: (altMap.get(q.id) ?? []).sort((x, y) => x.ordem - y.ordem).map((a, j) => ({ letra: LETRAS[j] ?? '?', texto: a.texto ?? '', correta: !!a.correta })),
     })),

@@ -271,4 +271,6 @@ export type CadernoData = {
   respostas?: Record<string, string>
   /** Gabarito liberado? Controla a exibição da correção (marcada × correta). */
   gabaritoLiberado?: boolean
+  /** Editor: índice da questão exibida no preview do repetidor (para navegar pelas questões). */
+  previewIndex?: number
 }

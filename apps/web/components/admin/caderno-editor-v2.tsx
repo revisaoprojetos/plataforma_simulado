@@ -198,8 +198,8 @@ function FolhasPaginadas({ blocks, theme, data, cabH, rodH, renderSheet }: {
 }) {
   const [grupos, setGrupos] = useState<Block[][] | null>(null)
   const medRef = useRef<HTMLDivElement>(null)
-  // Repetição aparece compacta no editor (template com 1 questão) — mede igual.
-  const dataMed = useMemo(() => ({ ...data, questoes: (data?.questoes ?? []).slice(0, 1) }), [data])
+  // Repetição aparece compacta no editor (template com a questão em preview) — mede igual.
+  const dataMed = useMemo(() => { const qs = data?.questoes ?? []; const q = qs[data?.previewIndex ?? 0] ?? qs[0]; return { ...data, previewIndex: 0, questoes: q ? [q] : [] } }, [data])
   const chave = useMemo(() => JSON.stringify(blocks.map((b) => [b.id, b.type, b.attributes, b.innerBlocks])), [blocks])
   // Assinatura das variáveis (troca de aluno muda o conteúdo e a altura dos blocos). String →
   // comparação por valor: só re-mede quando o VALOR muda, mesmo que `data` mude de identidade.
@@ -220,7 +220,7 @@ function FolhasPaginadas({ blocks, theme, data, cabH, rodH, renderSheet }: {
     }
     if (atual.length) gi.push(atual)
     setGrupos(gi.length ? gi.map((g) => g.map((i) => blocks[i])) : [[]])
-  }, [chave, chaveVars, cabH, rodH])
+  }, [chave, chaveVars, cabH, rodH, data?.previewIndex])
   const paginas = grupos ?? (blocks.length ? [blocks] : [[]])
   return (
     <>
@@ -297,12 +297,13 @@ function EditorNode({ block, ctx, emColuna, divStyle }: { block: Block; ctx: Nod
   } else if (block.type === 'repeticao') {
     const filhos = block.innerBlocks ?? []
     // preview do template com a 1ª questão do banco (no print repete por todas)
-    const ctxQ: NodeCtx = ctx.data.questoes[0] ? { ...ctx, data: dataComQuestao(ctx.data, ctx.data.questoes[0]) } : ctx
+    const qPrev = ctx.data.questoes[ctx.data.previewIndex ?? 0] ?? ctx.data.questoes[0]
+    const ctxQ: NodeCtx = qPrev ? { ...ctx, data: dataComQuestao(ctx.data, qPrev) } : ctx
     const n = ctx.data.questoes.length || ctx.data.numQuestoes
     inner = (
       <div style={{ border: `1.5px dashed ${ctx.theme.cores.secundaria}`, borderRadius: 8, padding: 8, background: 'color-mix(in oklab, var(--primary) 4%, transparent)' }}>
         <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: ctx.theme.cores.secundaria }}>
-          <Repeat className="h-3.5 w-3.5" /> Repete por questão — {n} no banco
+          <Repeat className="h-3.5 w-3.5" /> Repete por questão — {n} no banco {qPrev ? <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary">preview: questão {(ctx.data.previewIndex ?? 0) + 1}</span> : null}
         </div>
         {filhos.length > 0
           ? <AutoAnim ativo={!ctx.arrastando} className="flex flex-col"><ListaBlocos blocks={filhos} ctx={ctxQ} /></AutoAnim>
@@ -396,6 +397,7 @@ export function CadernoEditorV2({
   useEffect(() => { let vivo = true; if (bancoId) getAssuntosBanco(bancoId).then((r) => { if (vivo && r.ok) setAssuntosBanco(r.porDisciplina ?? {}) }); else setAssuntosBanco({}); return () => { vivo = false } }, [bancoId])
 
   const [regIndex, setRegIndex] = useState(0)
+  const [previewQ, setPreviewQ] = useState(0) // índice da questão exibida no preview do repetidor
   const [modAtiva, setModAtiva] = useState<string>((mods0Vis[0] ?? mods0[0]).id)
   const [selPage, setSelPage] = useState<string | null>(null)
   const [pageDrag, setPageDrag] = useState<number | null>(null)
@@ -427,7 +429,9 @@ export function CadernoEditorV2({
     return grupos
   }, [registros, previewData])
   const regAtual = registros[regIndex] ?? null
-  const dataAtual = useMemo(() => regAtual ? { ...previewData, vars: { ...previewData.vars, ...regAtual.vars }, respostas: regAtual.respostas } : previewData, [regAtual, previewData])
+  const totalQPreview = previewData.questoes.length
+  const qIdx = totalQPreview ? Math.min(previewQ, totalQPreview - 1) : 0
+  const dataAtual = useMemo(() => ({ ...(regAtual ? { ...previewData, vars: { ...previewData.vars, ...regAtual.vars }, respostas: regAtual.respostas } : previewData), previewIndex: qIdx }), [regAtual, previewData, qIdx])
   const doc = docs[modAtiva] ?? novoDoc()
   const cats = blocksByCategory()
   const running = doc.running ?? RUNNING_PADRAO
@@ -716,6 +720,15 @@ export function CadernoEditorV2({
               <span className="min-w-[110px] truncate text-center font-medium" title={regAtual?.nome}>{regAtual?.nome}</span>
               <span className="text-muted-foreground">{regIndex + 1}/{registros.length}</span>
               <button onClick={() => setRegIndex((i) => Math.min(registros.length - 1, i + 1))} disabled={regIndex >= registros.length - 1} className="rounded p-0.5 hover:bg-muted disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
+            </div>
+          )}
+          {totalQPreview > 1 && (
+            <div className="flex items-center gap-1 rounded-lg border bg-muted/40 px-1.5 py-1 text-xs" title="Navegar pelas questões do repetidor (preview)">
+              <Repeat className="ml-0.5 h-3.5 w-3.5 text-primary" />
+              <button onClick={() => setPreviewQ((i) => Math.max(0, Math.min(totalQPreview - 1, i) - 1))} disabled={qIdx === 0} className="rounded p-0.5 hover:bg-muted disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
+              <span className="min-w-[62px] text-center font-medium">Questão {qIdx + 1}</span>
+              <span className="text-muted-foreground">/{totalQPreview}</span>
+              <button onClick={() => setPreviewQ((i) => Math.min(totalQPreview - 1, i + 1))} disabled={qIdx >= totalQPreview - 1} className="rounded p-0.5 hover:bg-muted disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
             </div>
           )}
           <div className="flex items-center gap-1">
