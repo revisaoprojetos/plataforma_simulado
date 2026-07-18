@@ -96,7 +96,9 @@ export const BLOCKS: BlockMeta[] = [
         { chave: 'jurisprudencia', nome: 'JURISPRUDÊNCIA', f1: '', f2: '', f3: '' },
         { chave: 'doutrina', nome: 'DOUTRINA', f1: '', f2: '', f3: '' },
       ],
-      corFundo: '#fef3d6', fitaCor: '#3b5bdb', fitaAltura: 4, bordaRaio: 4, padding: 10, gap: 16, divisoria: true, divisoriaCor: '#cbb26b', corTitulo: '#243b7a', corQuestoes: '#c0392b',
+      corFundo: '#fef3d6', fitaCor: '#3b5bdb', fitaAltura: 4, bordaRaio: 4, padding: 12, gap: 16, divisoria: true, divisoriaCor: '#cbb26b',
+      corTitulo: '#243b7a', corPct: '#243b7a', corQuestoes: '#c0392b', corLabel: '#777777', corFaixa: '#999999', corTexto: '#222222', corLinhaInterna: '#d9c9a0',
+      tamTitulo: 12, tamPct: 22, mostrarFaixa: true, mostrarLinhaInterna: true, fonte: '',
     } },
 ]
 
@@ -552,22 +554,26 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
     case 'diag-pilares': {
       const pilares: any[] = Array.isArray(a.pilares) ? a.pilares : []
       const bordaDiv = `${a.divisoriaEspessura ?? 1}px solid ${a.divisoriaCor || '#cbb26b'}`
-      // Resolve uma variável; se não existir (pilar com 0 questões), usa o padrão.
       const val = (tok: string, def: string) => { const r = applyVars(tok, data.vars); return /\{/.test(r) ? def : r }
       const numPct = (chave: string) => { const n = parseFloat(val(`{pct_pilar_${chave}}`, '0').replace(/[^0-9.,-]/g, '').replace(',', '.')); return isNaN(n) ? 0 : n }
-      const faixaDe = (p: any) => { const n = numPct(p.chave); return n <= 50 ? (p.f1 || '') : n <= 80 ? (p.f2 || '') : (p.f3 || '') }
+      const faixaInfo = (p: any) => { const n = numPct(p.chave); if (n <= 50) return { label: '0-50', texto: p.f1 || '' }; if (n <= 80) return { label: '51-80', texto: p.f2 || '' }; return { label: '81-100', texto: p.f3 || '' } }
       return (
-        <div style={{ background: a.corFundo || '#fef3d6', borderRadius: a.bordaRaio ?? 4, borderTop: a.fitaAltura ? `${a.fitaAltura}px solid ${a.fitaCor || c.primaria}` : undefined, padding: a.padding ?? 10, fontFamily: theme.tipografia.familia }}>
+        <div style={{ background: a.corFundo || '#fef3d6', borderRadius: a.bordaRaio ?? 4, borderTop: a.fitaAltura ? `${a.fitaAltura}px solid ${a.fitaCor || c.primaria}` : undefined, padding: a.padding ?? 12, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
           <div style={{ display: 'flex', gap: a.gap ?? 16, alignItems: 'stretch' }}>
-            {pilares.map((p, i) => (
-              <div key={i} style={{ flex: '1 1 0%', minWidth: 0, ...(i > 0 && a.divisoria !== false ? { borderLeft: bordaDiv, paddingLeft: (a.gap ?? 16) / 2 } : {}) }}>
-                <div style={{ fontWeight: 700, color: a.corTitulo || '#243b7a', fontSize: 13 }}>{p.nome}</div>
-                <div style={{ fontWeight: 700, color: a.corTitulo || '#243b7a', fontSize: 22, lineHeight: 1.1 }}>{val(`{pct_pilar_${p.chave}}`, '0%')}</div>
-                <div style={{ color: a.corQuestoes || '#c0392b', fontSize: 11 }}>{val(`{acerto_pilar_${p.chave}}`, '0')} de {val(`{total_pilar_${p.chave}}`, '0')} questões</div>
-                <div style={{ fontWeight: 700, fontSize: 10, color: '#555', margin: '6px 0 2px' }}>TEXTO MODULADO</div>
-                <div style={{ fontSize: 11, lineHeight: 1.5, textAlign: 'justify', whiteSpace: 'pre-wrap', color: c.texto }}>{applyVars(faixaDe(p), data.vars)}</div>
-              </div>
-            ))}
+            {pilares.map((p, i) => {
+              const f = faixaInfo(p)
+              return (
+                <div key={i} style={{ flex: '1 1 0%', minWidth: 0, ...(i > 0 && a.divisoria !== false ? { borderLeft: bordaDiv, paddingLeft: (a.gap ?? 16) / 2 } : {}) }}>
+                  <div style={{ fontWeight: 700, color: a.corTitulo || '#243b7a', fontSize: a.tamTitulo ?? 12 }}>{applyVars(p.nome || '', data.vars)}</div>
+                  <div style={{ fontWeight: 800, color: a.corPct || a.corTitulo || '#243b7a', fontSize: a.tamPct ?? 22, lineHeight: 1.1 }}>{val(`{pct_pilar_${p.chave}}`, '0%')}</div>
+                  <div style={{ color: a.corQuestoes || '#c0392b', fontSize: 11 }}>{val(`{acerto_pilar_${p.chave}}`, 'X')} de {val(`{total_pilar_${p.chave}}`, '0')} questões</div>
+                  {a.mostrarLinhaInterna !== false && <div style={{ borderTop: `1px solid ${a.corLinhaInterna || '#d9c9a0'}`, margin: '5px 0' }} />}
+                  <div style={{ fontWeight: 700, fontSize: 10, color: a.corLabel || '#777', letterSpacing: 0.3 }}>TEXTO MODULADO</div>
+                  {a.mostrarFaixa !== false && <div style={{ fontSize: 10, color: a.corFaixa || '#999', marginBottom: 2 }}>{f.label}</div>}
+                  <div style={{ fontSize: 11, lineHeight: 1.5, textAlign: 'justify', whiteSpace: 'pre-wrap', color: a.corTexto || c.texto }}>{applyVars(f.texto, data.vars)}</div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )
