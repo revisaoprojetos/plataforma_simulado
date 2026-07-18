@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { registrarAudit } from '@/lib/audit'
+import { ehProdutoPassaporte } from '@/lib/integracoes/normalizar-mapa'
 import { configDoEnv, listarMembrosDoGrupo, detalheMembro, type CurseducaCfg, type MembroCurseduca, type DetalheMembro } from '@/lib/curseduca/client'
 import type { DestinoImport, ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
 import { descriptografar } from '@/lib/crypto'
@@ -96,7 +97,8 @@ export async function executarImport(
       porExt.get(String(m.id)) || (m.email ? porEmail.get(m.email) : null) || (m.cpf ? porCpf.get(m.cpf) : null) || null
 
     // Classificação: se o aluno está em algum grupo de "Passaporte/Passe" → passaporte; senão normal (assinatura).
-    const classificar = (nomes: string[]): string => (/passaporte|passe/i.test(nomes.join(' ')) ? 'passaporte' : 'normal')
+    // Passaporte se estiver em ALGUM grupo passaporte real (exclui amostra/grátis) — mesma regra da Guru.
+    const classificar = (nomes: string[]): string => (nomes.some((n) => ehProdutoPassaporte(n)) ? 'passaporte' : 'normal')
 
     // 3) Separa novos × existentes. Já existentes SEM CPF/telefone entram no backfill.
     const idsResolvidos: string[] = []
@@ -222,6 +224,26 @@ export async function executarImport(
           const lote = paraRemover.slice(i, i + 200)
           const { error } = await svc.from('simulado_grupo_membros').delete().eq('grupo_id', grupoDestinoId).eq('tenant_id', g.tenantId).in('estudante_id', lote)
           if (!error) removidos += lote.length
+        }
+      }
+    }
+
+    // 6) Passaporte também entra no grupo "Passaporte" (consistência com a Guru).
+    if (idsResolvidos.length) {
+      const { data: gp } = await svc.from('simulado_grupos').select('id').eq('tenant_id', g.tenantId).eq('deletado', false).eq('is_mestre', false).ilike('nome', 'passaporte').limit(1).maybeSingle()
+      const gpId = (gp as any)?.id
+      if (gpId) {
+        const unicos = [...new Set(idsResolvidos)]
+        const passas = await fetchAllByIn<{ id: string }>(unicos, (chunk) =>
+          svc.from('simulado_estudantes').select('id').in('id', chunk).eq('tenant_id', g.tenantId).eq('classificacao', 'passaporte').order('id', { ascending: true }))
+        const passIds = passas.map((p) => p.id)
+        if (passIds.length) {
+          const jaGp = new Set((await fetchAll<{ estudante_id: string }>(() =>
+            svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', gpId).order('estudante_id', { ascending: true }))).map((r) => r.estudante_id))
+          const novosGp = passIds.filter((id) => !jaGp.has(id))
+          for (let i = 0; i < novosGp.length; i += 200) {
+            await svc.from('simulado_grupo_membros').insert(novosGp.slice(i, i + 200).map((estudante_id) => ({ tenant_id: g.tenantId, grupo_id: gpId, estudante_id })))
+          }
         }
       }
     }
