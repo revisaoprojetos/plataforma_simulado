@@ -367,7 +367,7 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
               <div className="px-4">
                 <p className="text-center text-sm font-semibold">Navegador de questões</p>
                 <div className="mt-2 mb-3 border-t" />
-                <div className="grid grid-cols-5 gap-1.5">
+                <div className="grid grid-cols-5 gap-1.5 px-1.5 py-1">
                   {nav.map((q) => {
                     let st: React.CSSProperties | undefined
                     let cls = 'bg-muted text-muted-foreground'
@@ -377,7 +377,7 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
                     else if (liberado && q.tipo === 'errou') { cls = 'text-white'; st = { background: COR_ERRO } }
                     else if (q.respondida) { cls = 'text-white'; st = { background: COR_MARCADA } }
                     return (
-                      <span key={q.n} className={cn('flex h-9 items-center justify-center rounded-md text-xs font-bold', cls)} style={st}>{q.n}</span>
+                      <span key={q.n} className={cn('flex aspect-square items-center justify-center rounded-md text-xs font-bold', cls)} style={st}>{q.n}</span>
                     )
                   })}
                 </div>

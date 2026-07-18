@@ -196,7 +196,7 @@ export function ProvaHud(p: ProvaHudProps) {
                 <p className="text-center text-sm font-semibold">Navegador de questões</p>
                 <div className="mt-2 mb-3 border-t" />
                 {/* Rolável: com muitas questões (ex.: 100) o navegador não estica a página. */}
-                <div className="grid max-h-[46vh] grid-cols-5 gap-1.5 overflow-y-auto pr-1 [scrollbar-width:thin]">
+                <div className="grid max-h-[46vh] grid-cols-5 gap-1.5 overflow-y-auto px-1.5 py-1 [scrollbar-width:thin]">
                   {p.respondidas.map((respondida, i) => {
                     const atual = i === p.questaoIndex
                     const marcada = !!p.marcadas?.[i]
@@ -208,7 +208,7 @@ export function ProvaHud(p: ProvaHudProps) {
                     if (atual) { cls = 'bg-primary text-primary-foreground'; st = { boxShadow: '0 0 0 2px var(--background), 0 0 0 4px var(--foreground)' } }
                     return (
                       <button key={i} onClick={() => p.onGoto(i)} title={`Questão ${i + 1}${marcada ? ' • marcada p/ revisar' : ''}`}
-                        className={cn('relative flex h-9 items-center justify-center rounded-md text-xs font-bold transition-colors', cls)}
+                        className={cn('relative flex aspect-square items-center justify-center rounded-md text-xs font-bold transition-colors', cls)}
                         style={st}>
                         {i + 1}
                         {marcada && <Flag className="absolute -right-1 -top-1 h-3 w-3 rounded-full p-0.5 text-white" style={{ background: REVISAR }} />}
