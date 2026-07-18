@@ -67,16 +67,42 @@ export default async function CadernoImprimirPage({
   if (bancoId) {
     const { data: vinc } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId)
     const ids = (vinc ?? []).map((v: any) => v.questao_id)
-    questoes = ids.length ? (await svc.from('simulado_questoes').select('id, enunciado, tipo, comentario_professor').in('id', ids).limit(200)).data : []
+    questoes = ids.length ? (await svc.from('simulado_questoes').select('id, enunciado, tipo, comentario_professor, numero').in('id', ids).limit(200)).data : []
   } else {
     questoes = (await svc
       .from('simulado_questoes')
-      .select('id, enunciado, tipo, comentario_professor')
+      .select('id, enunciado, tipo, comentario_professor, numero')
       .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
       .eq('status', 'publicada')
       .order('created_at', { ascending: false })
       .limit(120)).data
   }
+
+  // Ordena as questões na MESMA ordem em que o ALUNO as viu na prova — senão as marcações
+  // (mapeadas por questao_id) caem em posições trocadas no caderno. Prioridade:
+  // ordem embaralhada da sessão → ordem da prova (prova_questoes) → nº da questão (fallback).
+  {
+    let ordemMap: Map<string, number> | null = null
+    if (sessao) {
+      const { data: sess2 } = await svc.from('simulado_sessoes_prova').select('simulado_id').eq('id', sessao).maybeSingle()
+      const simId = (sess2 as any)?.simulado_id
+      if (simId) {
+        const { data: sqo } = await svc.from('simulado_sessao_questao_ordem').select('questao_id, ordem_exibida').eq('sessao_id', sessao)
+        if (sqo?.length) ordemMap = new Map((sqo as any[]).map((r) => [r.questao_id, Number(r.ordem_exibida)]))
+        else {
+          const { data: pq2 } = await svc.from('simulado_prova_questoes').select('questao_id, ordem').eq('simulado_id', simId)
+          if (pq2?.length) ordemMap = new Map((pq2 as any[]).map((r) => [r.questao_id, Number(r.ordem)]))
+        }
+      }
+    }
+    const numDe = (q: any) => { const n = Number(q?.numero); return Number.isFinite(n) ? n : 1e9 }
+    questoes = [...(questoes ?? [])].sort((a: any, b: any) => {
+      const oa = ordemMap?.get(a.id), ob = ordemMap?.get(b.id)
+      if (oa != null || ob != null) return (oa ?? 1e9) - (ob ?? 1e9)
+      return numDe(a) - numDe(b)
+    })
+  }
+
   const qIds = (questoes ?? []).map((q: any) => q.id)
   const { data: alts } = qIds.length
     ? await svc.from('simulado_alternativas').select('questao_id, texto, ordem, correta, comentario, lei').in('questao_id', qIds)
