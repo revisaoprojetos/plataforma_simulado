@@ -162,7 +162,9 @@ function InsertSlot({ ctx, blockId, pos, active }: { ctx: NodeCtx; blockId: stri
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); ctx.setOver(blockId, pos) }}
       onDrop={(e) => ctx.drop(e, pos === 'top' ? { kind: 'before', blockId } : { kind: 'after', blockId })}
       className={cn('flex shrink-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-md border-dashed text-[10px] font-medium text-primary transition-all duration-200 ease-out',
-        active ? 'my-0.5 h-9 border-2 border-primary bg-primary/10 opacity-100' : 'h-[3px] border-0 opacity-0')}>
+        // Inativo = altura ZERO: no editor os blocos ficam colados (gap 0), idêntico ao PDF.
+        // Só ocupa espaço quando ativo (durante o arraste), abrindo a zona de "soltar aqui".
+        active ? 'my-0.5 h-9 border-2 border-primary bg-primary/10 opacity-100' : 'h-0 border-0 opacity-0')}>
       soltar aqui
     </div>
   )
