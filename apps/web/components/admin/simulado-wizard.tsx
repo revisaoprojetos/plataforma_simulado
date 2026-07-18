@@ -224,24 +224,31 @@ export function SimuladoWizard({
                   const discursiva = b.tipo === 'discursiva'
                   return (
                     <button key={b.id} type="button" onClick={() => { setModo('banco'); setBancoBase(b.id); setTipo(discursiva ? 'discursivo' : 'objetivo') }}
-                      className={cn('group relative flex flex-col overflow-hidden rounded-xl border bg-card text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md',
+                      className={cn('group relative aspect-[4/5] overflow-hidden rounded-2xl border text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg',
                         on ? 'border-primary ring-2 ring-primary' : 'border-border')}>
-                      {/* Cabeçalho: faixa com a cor do banco (ou capa) + ícone */}
-                      <div className="relative h-16 w-full overflow-hidden" style={b.capa ? undefined : { background: `linear-gradient(135deg, ${c} 0%, color-mix(in oklab, ${c} 55%, #0f172a) 130%)` }}>
-                        {b.capa && <img src={b.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />}
-                        {!b.capa && <Icon className="absolute -right-3 -top-3 h-20 w-20 text-white/10" />}
-                        <span className="absolute left-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white ring-1 ring-white/25 backdrop-blur"><Icon className="h-4 w-4" /></span>
-                        {on && <span className="absolute right-2.5 top-2.5 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow"><Check className="h-3.5 w-3.5" /></span>}
-                      </div>
-                      {/* Corpo: nome + chips */}
-                      <div className="flex flex-1 flex-col gap-2 p-3">
-                        <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-foreground">{b.nome}</h3>
-                        <div className="mt-auto flex flex-wrap items-center gap-1.5">
-                          <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium', discursiva ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-primary/10 text-primary')}>
+                      {/* Fundo: capa preenchendo o card (ou degradê da cor) */}
+                      {b.capa ? (
+                        <img src={b.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      ) : (
+                        <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
+                      )}
+                      {!b.capa && <Icon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
+                      {/* Degradê para legibilidade do texto */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+
+                      {/* Chip do ícone (topo esquerdo) */}
+                      <span className="absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: c }}><Icon className="h-4 w-4" /></span>
+                      {on && <span className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow"><Check className="h-4 w-4" /></span>}
+
+                      {/* Título + chips (rodapé) */}
+                      <div className="absolute inset-x-0 bottom-0 z-10 p-3">
+                        <h3 className="line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm">{b.nome}</h3>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">
                             {discursiva ? <PenLine className="h-3 w-3" /> : <ListChecks className="h-3 w-3" />}{discursiva ? 'Discursiva' : 'Objetiva'}
                           </span>
-                          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground" title={`${b.nQuestoes ?? 0} questão(ões)`}><FileText className="h-3 w-3" />{b.nQuestoes ?? 0}</span>
-                          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground" title={`${b.nEstudantes ?? 0} estudante(s)`}><Users className="h-3 w-3" />{b.nEstudantes ?? 0}</span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur" title={`${b.nQuestoes ?? 0} questão(ões)`}><FileText className="h-3 w-3" />{b.nQuestoes ?? 0}</span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur" title={`${b.nEstudantes ?? 0} estudante(s)`}><Users className="h-3 w-3" />{b.nEstudantes ?? 0}</span>
                         </div>
                       </div>
                     </button>
