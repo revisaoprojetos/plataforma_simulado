@@ -414,7 +414,7 @@ export function RevisaoFinal({
               return semg.length > 0 ? (
                 <div className="space-y-1.5">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Como você fez</p>
-                  <div className={cn('grid gap-2', semg.length > 1 && 'sm:grid-cols-2')}>
+                  <div className={cn('grid gap-2', semg.length >= 3 ? 'sm:grid-cols-3' : semg.length === 2 && 'sm:grid-cols-2')}>
                     {semg.map((m) => (
                       <button key={m.id} type="button" onClick={() => baixarComoFez(m.id, m.nome)} disabled={gerandoPdf.has(`pdf:${m.id}:s`)}
                         className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}>
@@ -434,7 +434,7 @@ export function RevisaoFinal({
             {liberado && modalidades.some((m) => m.comGab) && (
               <div className="space-y-1.5 rounded-xl border border-primary/25 bg-primary/[0.04] p-2.5">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-primary">Com gabarito</p>
-                <div className={cn('grid gap-2', modalidades.filter((m) => m.comGab).length > 1 && 'sm:grid-cols-2')}>
+                <div className={cn('grid gap-2', modalidades.filter((m) => m.comGab).length >= 3 ? 'sm:grid-cols-3' : modalidades.filter((m) => m.comGab).length === 2 && 'sm:grid-cols-2')}>
                   {modalidades.filter((m) => m.comGab).map((m) => (
                     <button key={m.id} type="button" onClick={() => baixarComoFez(m.id, m.nome, true)} disabled={gerandoPdf.has(`pdf:${m.id}:g`)}
                       className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}>
