@@ -35,6 +35,7 @@ import {
   Webhook,
   Share2,
   Plug,
+  Zap,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -126,6 +127,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Acessos', href: '/admin/auditoria?tipo=acessos', icon: LogIn, perm: 'auditoria:view' },
       { label: 'Modificações', href: '/admin/auditoria?tipo=modificacoes', icon: FilePen, perm: 'auditoria:view' },
+      { label: 'Automações', href: '/admin/auditoria?tipo=automacoes', icon: Zap, perm: 'auditoria:view' },
     ],
   },
   {
