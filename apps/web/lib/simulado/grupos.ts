@@ -12,6 +12,7 @@ export type GrupoRow = {
   cor: string | null
   pai_id: string | null
   is_mestre: boolean
+  codigo_externo?: string | null
   criado_em?: string | null
 }
 
@@ -31,6 +32,7 @@ export async function selecionarGrupos(
   const data = opts?.comData ? ',criado_em' : ''
   // Tentativas em cascata: da mais rica para a mais pobre.
   const tentativas = [
+    `id,nome,cor,pai_id,is_mestre,codigo_externo${data}`,
     `id,nome,cor,pai_id,is_mestre${data}`,
     `id,nome,cor${data}`,
     `id,nome${data}`,
@@ -56,6 +58,7 @@ export async function selecionarGrupos(
     cor: g.cor ?? null,
     pai_id: g.pai_id ?? null,
     is_mestre: g.is_mestre === true,
+    codigo_externo: g.codigo_externo ?? null,
     criado_em: g.criado_em ?? null,
   }))
 }

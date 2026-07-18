@@ -211,13 +211,20 @@ export async function importarGruposCurseduca(ids: number[], destino: DestinoImp
   return executarImport({ tenantId: g.tenantId, cfg: g.cfg }, ids, destino, sincronizar, 400)
 }
 
-/** Cria um grupo (tolerante a pai_id ausente). Retorna o id ou null. */
-async function inserirGrupo(svc: ReturnType<typeof createAdminClient>, tenantId: string, nome: string, paiId: string | null): Promise<string | null> {
-  const payload: any = { tenant_id: tenantId, nome }
-  if (paiId) payload.pai_id = paiId
-  let r = await svc.from('simulado_grupos').insert(payload).select('id').single()
-  if (r.error && /pai_id/i.test(r.error.message)) { delete payload.pai_id; r = await svc.from('simulado_grupos').insert(payload).select('id').single() }
-  return r.error ? null : (r.data as any).id
+/** Cria um grupo (tolerante a pai_id/codigo_externo ausentes). Retorna o id ou null. */
+async function inserirGrupo(svc: ReturnType<typeof createAdminClient>, tenantId: string, nome: string, paiId: string | null, codigo?: string | null): Promise<string | null> {
+  const attempt: any = { tenant_id: tenantId, nome }
+  if (paiId) attempt.pai_id = paiId
+  if (codigo != null) attempt.codigo_externo = codigo
+  for (let i = 0; i < 3; i++) {
+    const r = await svc.from('simulado_grupos').insert(attempt).select('id').single()
+    if (!r.error) return (r.data as any).id
+    const m = r.error.message
+    if (/codigo_externo/i.test(m)) delete attempt.codigo_externo
+    else if (/pai_id/i.test(m)) delete attempt.pai_id
+    else return null
+  }
+  return null
 }
 
 export type ResultadoPorCanal = ResultadoImportCurseduca & { canais?: number; gruposCriados?: number; gruposReusados?: number }
@@ -251,11 +258,14 @@ export async function importarCurseducaPorCanal(ids: number[], paiId: string | n
   for (const id of ids) {
     const nome = (nomePorId.get(id) ?? `Curseduca ${id}`).trim()
     const key = nome.toLowerCase()
+    const codigo = String(id)
     let grupoId = idPorNome.get(key)
     if (grupoId) {
       agg.gruposReusados = (agg.gruposReusados ?? 0) + 1
+      // Grava o código do canal se o grupo ainda não tiver (tolerante se a coluna não existe).
+      await svc.from('simulado_grupos').update({ codigo_externo: codigo }).eq('id', grupoId).is('codigo_externo', null)
     } else {
-      grupoId = (await inserirGrupo(svc, g.tenantId, nome, paiId)) ?? undefined
+      grupoId = (await inserirGrupo(svc, g.tenantId, nome, paiId, codigo)) ?? undefined
       if (!grupoId) continue
       idPorNome.set(key, grupoId)
       agg.gruposCriados = (agg.gruposCriados ?? 0) + 1

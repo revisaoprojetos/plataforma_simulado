@@ -11,14 +11,25 @@ import { criarGrupo, criarGrupoMestre, excluirGrupo, moverGrupo } from '@/app/ad
 import { pedirTexto, confirmar } from '@/components/ui/confirm-dialog'
 import { EditarGrupoDialog } from '@/components/admin/editar-grupo-dialog'
 import { SecaoHeader } from '@/components/admin/secao-header'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import {
   Plus, Users, Pencil, Trash2, Loader2, UsersRound, ChevronRight, ChevronDown,
   Folder, FolderOpen, FolderPlus, FolderInput, X, Check, GripVertical, FolderMinus,
+  Search, ArrowUpDown, ListFilter, Hash,
 } from 'lucide-react'
 
-type Grupo = { id: string; nome: string; membros: number; cor: string | null; is_mestre: boolean; pai_id: string | null }
+type Grupo = { id: string; nome: string; membros: number; cor: string | null; is_mestre: boolean; pai_id: string | null; codigo?: string | null }
 type Destino = { id: string; nome: string; cor: string | null; depth: number }
+type Ordem = 'nome' | 'nome_desc' | 'membros' | 'membros_asc' | 'codigo'
+type Filtro = 'todos' | 'grupos' | 'pastas' | 'importados'
+const ORDENS: { v: Ordem; label: string }[] = [
+  { v: 'nome', label: 'Nome (A → Z)' },
+  { v: 'nome_desc', label: 'Nome (Z → A)' },
+  { v: 'membros', label: 'Mais membros' },
+  { v: 'membros_asc', label: 'Menos membros' },
+  { v: 'codigo', label: 'Código' },
+]
 
 export function GruposClient({ grupos }: { grupos: Grupo[] }) {
   const router = useRouter()
@@ -28,21 +39,61 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
   const [expandido, setExpandido] = useState<Set<string>>(() => new Set(grupos.filter((g) => g.is_mestre).map((g) => g.id)))
   const [arrastando, setArrastando] = useState<Grupo | null>(null)
   const [alvo, setAlvo] = useState<string | null>(null) // pasta.id ou '__solto__'
+  const [busca, setBusca] = useState('')
+  const [ordem, setOrdem] = useState<Ordem>('nome')
+  const [filtro, setFiltro] = useState<Filtro>('todos')
 
   const byId = useMemo(() => new Map(grupos.map((g) => [g.id, g])), [grupos])
   // Árvore: filhos por pasta-mãe (existente) + nós de topo (pai nulo ou órfão).
-  const { children, top } = useMemo(() => {
+  const { children, top, baseCmp, memOf } = useMemo(() => {
     const m = new Map<string, Grupo[]>()
     const t: Grupo[] = []
     for (const g of grupos) {
       const pai = g.pai_id && byId.has(g.pai_id) ? g.pai_id : null
       if (pai) { const a = m.get(pai) ?? []; a.push(g); m.set(pai, a) } else t.push(g)
     }
-    const ordena = (arr: Grupo[]) => arr.sort((a, b) => Number(b.is_mestre) - Number(a.is_mestre) || a.nome.localeCompare(b.nome))
-    for (const a of m.values()) ordena(a)
-    ordena(t)
-    return { children: m, top: t }
-  }, [grupos, byId])
+    // Membros efetivos: grupo = próprios; pasta = soma dos grupos descendentes.
+    const memOf = (g: Grupo): number => {
+      if (!g.is_mestre) return g.membros
+      let s = 0; const st = [...(m.get(g.id) ?? [])]
+      while (st.length) { const n = st.pop()!; if (n.is_mestre) { const c = m.get(n.id); if (c) st.push(...c) } else s += n.membros }
+      return s
+    }
+    const codeNum = (g: Grupo) => (g.codigo != null && g.codigo !== '' ? Number(g.codigo) : NaN)
+    const baseCmp = (a: Grupo, b: Grupo): number => {
+      switch (ordem) {
+        case 'nome_desc': return b.nome.localeCompare(a.nome, 'pt-BR')
+        case 'membros': return memOf(b) - memOf(a) || a.nome.localeCompare(b.nome, 'pt-BR')
+        case 'membros_asc': return memOf(a) - memOf(b) || a.nome.localeCompare(b.nome, 'pt-BR')
+        case 'codigo': {
+          const ca = codeNum(a), cb = codeNum(b)
+          if (!isNaN(ca) && !isNaN(cb)) return ca - cb
+          if (!isNaN(ca)) return -1
+          if (!isNaN(cb)) return 1
+          return a.nome.localeCompare(b.nome, 'pt-BR')
+        }
+        default: return a.nome.localeCompare(b.nome, 'pt-BR')
+      }
+    }
+    // Na árvore: pastas primeiro, depois a ordem escolhida.
+    const treeCmp = (a: Grupo, b: Grupo) => Number(b.is_mestre) - Number(a.is_mestre) || baseCmp(a, b)
+    for (const a of m.values()) a.sort(treeCmp)
+    t.sort(treeCmp)
+    return { children: m, top: t, baseCmp, memOf }
+  }, [grupos, byId, ordem])
+
+  // Lista plana (quando há busca ou filtro): grupos/pastas filtrados e ordenados.
+  const flat = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    return grupos.filter((g) => {
+      if (filtro === 'grupos' && g.is_mestre) return false
+      if (filtro === 'pastas' && !g.is_mestre) return false
+      if (filtro === 'importados' && !g.codigo) return false
+      if (q && !(g.nome.toLowerCase().includes(q) || String(g.codigo ?? '').toLowerCase().includes(q))) return false
+      return true
+    }).sort(baseCmp)
+  }, [grupos, busca, filtro, baseCmp])
+  const flatAtivo = busca.trim() !== '' || filtro !== 'todos'
 
   const descendentesDe = (id: string): Set<string> => {
     const out = new Set<string>()
@@ -184,20 +235,63 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
               <button type="button" onClick={novo} className="text-sm font-medium text-primary hover:underline">Criar o primeiro</button>
             </div>
           ) : (
-            <div className="divide-y">
-              {top.map((g) => renderNo(g, 0))}
-              {/* Zona para tirar da pasta (aparece ao arrastar algo que está dentro de uma pasta). */}
-              {arrastando && arrastando.pai_id && (
-                <div
-                  onDragOver={(e) => { if ((arrastando.pai_id ?? null) !== null) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setAlvo('__solto__') } }}
-                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setAlvo((a) => (a === '__solto__' ? null : a)) }}
-                  onDrop={(e) => { if (arrastando) { e.preventDefault(); doMover(arrastando, null) } }}
-                  className={cn('m-3 flex items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-3 text-sm transition-colors',
-                    alvo === '__solto__' ? 'border-primary bg-primary/10 font-medium text-primary' : 'border-muted-foreground/30 text-muted-foreground')}>
-                  <FolderMinus className="h-4 w-4" /> Solte aqui para tirar da pasta
+            <>
+              {/* Toolbar: busca + ordenar + filtro */}
+              <div className="flex flex-wrap items-center gap-2 border-b p-3">
+                <div className="relative min-w-[180px] flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou código…"
+                    className="w-full rounded-lg border bg-transparent py-2 pl-9 pr-8 text-sm outline-none focus:ring-2 focus:ring-ring" />
+                  {busca && <button type="button" onClick={() => setBusca('')} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
+                </div>
+                <Select value={ordem} onValueChange={(v) => v && setOrdem(v as Ordem)}>
+                  <SelectTrigger className="h-10 gap-2"><ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" /><SelectValue>{(v: string) => ORDENS.find((o) => o.v === v)?.label}</SelectValue></SelectTrigger>
+                  <SelectContent>{ORDENS.map((o) => <SelectItem key={o.v} value={o.v}>{o.label}</SelectItem>)}</SelectContent>
+                </Select>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><ListFilter className="h-3.5 w-3.5" /></span>
+                  {([['todos', 'Todos'], ['grupos', 'Grupos'], ['pastas', 'Pastas'], ['importados', 'Importados']] as [Filtro, string][]).map(([v, label]) => (
+                    <button key={v} type="button" onClick={() => setFiltro(v)}
+                      className={cn('rounded-full border px-2.5 py-1 text-xs font-medium transition', filtro === v ? 'border-primary bg-primary text-primary-foreground' : 'text-muted-foreground hover:border-primary/40 hover:text-foreground')}>{label}</button>
+                  ))}
+                </div>
+              </div>
+
+              {flatAtivo ? (
+                <div className="divide-y">
+                  {flat.length === 0 ? (
+                    <p className="py-10 text-center text-sm text-muted-foreground">Nenhum grupo/pasta encontrado.</p>
+                  ) : flat.map((g) => g.is_mestre ? (
+                    <div key={g.id} className="group flex items-center gap-1.5 py-2.5 pl-3 pr-4 transition-colors hover:bg-muted/40">
+                      <Folder className="h-4 w-4 shrink-0" style={{ color: g.cor ?? 'var(--muted-foreground)' }} />
+                      <span className="min-w-0 flex-1 truncate font-semibold">{g.nome}</span>
+                      <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{comunsDentro(g.id)} grupo(s) · {membrosDe(g.id)} membro(s)</span>
+                      <div className="flex shrink-0 gap-1">
+                        <button type="button" onClick={() => setEditando(g)} title="Renomear pasta" className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Pencil className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => excluir(g)} title="Excluir pasta" className="rounded-md p-1.5 text-destructive transition-colors hover:bg-destructive/10"><Trash2 className="h-4 w-4" /></button>
+                      </div>
+                    </div>
+                  ) : (
+                    <GrupoRow key={g.id} g={g} padLeft={12} onEdit={() => setEditando(g)} onMove={() => setMovendo(g)} onDelete={() => excluir(g)} />
+                  ))}
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {top.map((g) => renderNo(g, 0))}
+                  {/* Zona para tirar da pasta (aparece ao arrastar algo que está dentro de uma pasta). */}
+                  {arrastando && arrastando.pai_id && (
+                    <div
+                      onDragOver={(e) => { if ((arrastando.pai_id ?? null) !== null) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setAlvo('__solto__') } }}
+                      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setAlvo((a) => (a === '__solto__' ? null : a)) }}
+                      onDrop={(e) => { if (arrastando) { e.preventDefault(); doMover(arrastando, null) } }}
+                      className={cn('m-3 flex items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-3 text-sm transition-colors',
+                        alvo === '__solto__' ? 'border-primary bg-primary/10 font-medium text-primary' : 'border-muted-foreground/30 text-muted-foreground')}>
+                      <FolderMinus className="h-4 w-4" /> Solte aqui para tirar da pasta
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -214,20 +308,32 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
   )
 }
 
+function CodigoBadge({ codigo }: { codigo?: string | null }) {
+  if (!codigo) return null
+  return (
+    <span title="Código do canal importado" className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+      <Hash className="h-3 w-3" />{codigo}
+    </span>
+  )
+}
+
 function GrupoRow({ g, padLeft, dragging, dragProps, onEdit, onMove, onDelete }: {
   g: Grupo; padLeft: number; dragging?: boolean
-  dragProps: React.HTMLAttributes<HTMLDivElement> & { draggable: boolean }
+  dragProps?: React.HTMLAttributes<HTMLDivElement> & { draggable: boolean }
   onEdit: () => void; onMove: () => void; onDelete: () => void
 }) {
   return (
-    <div {...dragProps} style={{ paddingLeft: padLeft }}
+    <div {...(dragProps ?? {})} style={{ paddingLeft: padLeft }}
       className={cn('group flex items-center gap-1.5 py-2.5 pr-4 transition-colors hover:bg-muted/40', dragging && 'opacity-40')}>
-      <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/30 transition-colors group-hover:text-muted-foreground active:cursor-grabbing" />
+      {dragProps
+        ? <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/30 transition-colors group-hover:text-muted-foreground active:cursor-grabbing" />
+        : <span className="w-4 shrink-0" />}
       <Link href={`/admin/grupos/${g.id}`} draggable={false} className="flex min-w-0 flex-1 items-center gap-2 font-medium hover:text-primary">
         <span className="h-3 w-3 shrink-0 rounded-full ring-1 ring-black/10" style={{ background: g.cor ?? 'var(--muted-foreground)' }} />
         <span className="truncate">{g.nome}</span>
         <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
       </Link>
+      <CodigoBadge codigo={g.codigo} />
       <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground"><Users className="h-3.5 w-3.5" /> {g.membros}</span>
       <div className="flex shrink-0 gap-1">
         <button type="button" onClick={onMove} title="Mover para uma pasta" className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><FolderInput className="h-4 w-4" /></button>
