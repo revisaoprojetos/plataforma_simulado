@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -56,11 +57,12 @@ export type SimuladoFormData = z.infer<typeof simuladoSchema>
 
 interface SimuladoFormProps {
   initialData?: Partial<SimuladoFormData>
-  onSubmit: (data: SimuladoFormData) => Promise<{ error?: string } | void>
+  onSubmit: (data: SimuladoFormData) => Promise<{ error?: string; ok?: boolean } | void>
 }
 
 export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
 
   const {
     register,
@@ -99,6 +101,10 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
       const result = await onSubmit(data)
       if (result?.error) {
         toast.error(result.error)
+      } else {
+        // Edição bem-sucedida (a criação faz redirect e não chega aqui): confirma e recarrega.
+        toast.success('Simulado salvo com sucesso')
+        router.refresh()
       }
     } catch (e) {
       // redirect() em server action lança NEXT_REDIRECT — deixar o Next navegar.
@@ -111,8 +117,13 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
     }
   }
 
+  // Bloqueou por validação → o usuário precisa saber (senão "clica em salvar e nada acontece").
+  function onInvalid() {
+    toast.error('Verifique os campos destacados antes de salvar.')
+  }
+
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(handleFormSubmit, onInvalid)} className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Informações Gerais</CardTitle>

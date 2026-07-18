@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
@@ -95,30 +95,40 @@ export async function createSimuladoAction(data: SimuladoData) {
 
 export async function updateSimuladoAction(id: string, data: SimuladoData) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Você não tem permissão para editar simulados.' }
-  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+  // Admin client (service role) + escopo por tenant manual: evita o UPDATE ser NEGADO
+  // silenciosamente pela RLS (0 linhas, sem erro) e permite validar/auditar de verdade.
+  const svc = createAdminClient()
 
-  const { error } = await supabase
-    .from('simulado_simulados')
-    .update({
-      titulo: data.titulo,
-      descricao: data.descricao || null,
-      modo_aplicacao: data.modo_aplicacao,
-      data_inicio: data.data_inicio || null,
-      data_fim: data.data_fim || null,
-      tempo_limite_min: data.tempo_limite_min || null,
-      metodo_identificacao: data.metodo_identificacao || null,
-      embed_ativo: data.embed_ativo ?? false,
-      regras: data.regras ?? {},
-    })
-    .eq('id', id)
+  const { data: antes } = await svc.from('simulado_simulados').select('*').eq('id', id).maybeSingle()
+  if (!antes) return { error: 'Simulado não encontrado.' }
+  if (tenantId && (antes as any).tenant_id && (antes as any).tenant_id !== tenantId) return { error: 'Você não tem acesso a este simulado.' }
 
-  if (error) {
-    return { error: error.message }
+  // MERGE das regras: o form envia só as chaves do schema; preserva as demais já salvas
+  // (banco_base_id, caderno_id, liberações manuais de nota/gabarito/caderno etc.).
+  const regrasMescladas = { ...((antes as any).regras ?? {}), ...(data.regras ?? {}) }
+
+  const patch = {
+    titulo: data.titulo,
+    descricao: data.descricao || null,
+    modo_aplicacao: data.modo_aplicacao,
+    data_inicio: data.data_inicio || null,
+    data_fim: data.data_fim || null,
+    tempo_limite_min: data.tempo_limite_min || null,
+    metodo_identificacao: data.metodo_identificacao || null,
+    embed_ativo: data.embed_ativo ?? false,
+    regras: regrasMescladas,
   }
+
+  const { data: upd, error } = await svc.from('simulado_simulados').update(patch).eq('id', id).select('id')
+  if (error) return { error: error.message }
+  if (!upd?.length) return { error: 'Nada foi salvo — verifique seu acesso a este simulado.' }
+
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_simulados', entidadeId: id, antes, depois: { ...antes, ...patch } })
 
   revalidatePath('/admin/simulados')
   revalidatePath(`/admin/simulados/${id}`)
-  redirect(`/admin/simulados/${id}`)
+  return { ok: true }
 }
 
 /** Vincula (ou desvincula) explicitamente um caderno de design ao simulado — define o tema/HUD aplicado. */
