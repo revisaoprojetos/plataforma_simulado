@@ -10,6 +10,9 @@ import { contarMembrosGrupos, contarTodosGrupos, importarGruposCurseduca, agenda
 import { criarGrupo, criarGrupoMestre } from '@/app/admin/grupos/actions'
 import type { ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
 
+// Linha-guia de árvore (estilo explorador de arquivos) para itens dentro de uma pasta.
+const TICK = "relative before:absolute before:content-[''] before:top-1/2 before:-translate-y-1/2 before:left-[-14px] before:h-px before:w-[14px] before:bg-border"
+
 type Destino = 'nenhum' | 'existente'
 type Ordem = 'nome' | 'nome_desc' | 'id' | 'id_desc' | 'recentes'
 
@@ -369,11 +372,11 @@ function GrupoDestinoDialog({ aberto, onClose, sistema, onSistemaChange, valor, 
 
   const q = busca.trim().toLowerCase()
 
-  function grupoRow(g: GrupoSistema, depth: number) {
+  function grupoRow(g: GrupoSistema, dentro: boolean) {
     const on = escolha === g.id
     return (
-      <button key={g.id} type="button" onClick={() => setEscolha(g.id)} style={{ paddingLeft: 12 + depth * 18 }}
-        className={cn('flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', on ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
+      <button key={g.id} type="button" onClick={() => setEscolha(g.id)}
+        className={cn('flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', dentro && TICK, on ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
         <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
           {on && <Check className="h-3 w-3" />}
         </span>
@@ -384,13 +387,13 @@ function GrupoDestinoDialog({ aberto, onClose, sistema, onSistemaChange, valor, 
     )
   }
 
-  function renderNo(g: GrupoSistema, depth: number): React.ReactElement {
-    if (!g.is_mestre) return grupoRow(g, depth)
+  function renderNo(g: GrupoSistema, dentro: boolean): React.ReactElement {
+    if (!g.is_mestre) return grupoRow(g, dentro)
     const filhos = children.get(g.id) ?? []
     const aberto2 = expandido.has(g.id)
     return (
       <div key={g.id} className="space-y-1.5">
-        <div style={{ paddingLeft: 8 + depth * 18 }} className="flex items-center gap-2 rounded-lg bg-muted/50 px-2 py-2">
+        <div className={cn('flex items-center gap-2 rounded-lg bg-muted/50 px-2 py-2', dentro && TICK)}>
           <button type="button" onClick={() => toggle(g.id)} className="rounded p-0.5 text-muted-foreground hover:text-foreground">
             {aberto2 ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </button>
@@ -399,9 +402,13 @@ function GrupoDestinoDialog({ aberto, onClose, sistema, onSistemaChange, valor, 
           <button type="button" onClick={() => { setModo('grupo'); setPaiNovo(g.id) }} title="Criar grupo nesta pasta"
             className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"><Plus className="h-3.5 w-3.5" /></button>
         </div>
-        {aberto2 && (filhos.length === 0
-          ? <p style={{ paddingLeft: depth * 18 + 26 }} className="py-1 text-xs text-muted-foreground">Pasta vazia.</p>
-          : filhos.map((c) => renderNo(c, depth + 1)))}
+        {aberto2 && (
+          <div className="ml-[18px] space-y-1.5 border-l border-border pl-[14px]">
+            {filhos.length === 0
+              ? <p className={cn('py-1 text-xs text-muted-foreground', TICK)}>Pasta vazia.</p>
+              : filhos.map((c) => renderNo(c, true))}
+          </div>
+        )}
       </div>
     )
   }
@@ -435,11 +442,11 @@ function GrupoDestinoDialog({ aberto, onClose, sistema, onSistemaChange, valor, 
                 const res = sistema.filter((g) => !g.is_mestre && g.nome.toLowerCase().includes(q))
                 return res.length === 0
                   ? <p className="py-6 text-center text-sm text-muted-foreground">Nenhum grupo encontrado.</p>
-                  : res.map((g) => grupoRow(g, 0))
+                  : res.map((g) => grupoRow(g, false))
               })()
             : sistema.length === 0
               ? <p className="py-6 text-center text-sm text-muted-foreground">Nenhum grupo criado ainda. Crie um abaixo.</p>
-              : top.map((g) => renderNo(g, 0))}
+              : top.map((g) => renderNo(g, false))}
         </div>
 
         {/* Criar grupo / pasta */}
