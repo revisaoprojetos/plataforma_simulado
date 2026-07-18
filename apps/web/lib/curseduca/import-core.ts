@@ -73,7 +73,10 @@ export async function executarImport(
     // 1) Coleta os membros de todos os grupos (dedupe entre grupos pelo id da Curseduca).
     const porId = new Map<number, MembroCurseduca>()
     for (const gid of ids) for (const m of await listarMembrosDoGrupo(g.cfg, gid)) if (!porId.has(m.id)) porId.set(m.id, m)
-    const membros = [...porId.values()]
+    // Ignora contas de SISTEMA da Curseduca (ex.: apps@/contato@curseduca.com) que são membros
+    // de vários canais e apareciam em "todos os grupos". Real aluno nunca usa o domínio da Curseduca.
+    const ehContaSistema = (m: MembroCurseduca) => /@curseduca\.com$/i.test((m.email ?? '').trim().toLowerCase())
+    const membros = [...porId.values()].filter((m) => !ehContaSistema(m))
     const total = membros.length
 
     // 2) Quem já existe no sistema (por matrícula Curseduca, e-mail ou CPF).
