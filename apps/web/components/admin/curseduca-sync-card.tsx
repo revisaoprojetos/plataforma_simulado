@@ -69,7 +69,7 @@ export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialI
   }
 
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="space-y-4">
       <div>
         <h3 className="flex items-center gap-2 text-base font-semibold"><RefreshCw className="h-4 w-4 text-primary" /> Sincronização Curseduca</h3>
         <p className="text-sm text-muted-foreground">Mantém os grupos do sistema atualizados com os canais de acesso da Curseduca de <b>mesmo nome</b>. Só adiciona alunos novos — <b>nunca</b> remove nem sincroniza a conta inteira.</p>
@@ -81,8 +81,8 @@ export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialI
           <span>Nenhum canal da Curseduca corresponde a um grupo do sistema. Crie um grupo no sistema com o <b>mesmo nome</b> do canal da Curseduca — só grupos <b>vinculados</b> podem ser sincronizados (trava de segurança).</span>
         </div>
       ) : (
-        <>
-          {/* Grupos de acesso vinculados */}
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+          {/* Grupos de acesso vinculados (esquerda, mais largo) */}
           <div className="rounded-2xl border bg-card p-3 shadow-sm">
             <div className="mb-2 flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5 text-sm font-medium"><Link2 className="h-4 w-4 text-primary" /> Grupos de acesso vinculados <span className="text-muted-foreground">({sel.size}/{vinculados.length})</span></span>
@@ -110,6 +110,8 @@ export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialI
             </div>
           </div>
 
+          {/* Coluna direita: as 2 opções de sincronização */}
+          <div className="space-y-4">
           {/* Opção 1: sincronização imediata */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3 shadow-sm">
             <div className="min-w-0">
@@ -143,7 +145,8 @@ export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialI
           <p className="flex items-start gap-1.5 text-[11px] leading-snug text-muted-foreground">
             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" /> Segurança: a sincronização cobre <b>só os grupos vinculados</b> (canal com grupo de mesmo nome) — é impossível arrastar a conta inteira. Nunca remove alunos.
           </p>
-        </>
+          </div>
+        </div>
       )}
     </div>
   )
