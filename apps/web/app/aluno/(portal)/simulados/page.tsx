@@ -16,11 +16,22 @@ export default async function MeusSimuladosPage() {
   const estId = sessao!.estudanteId
 
   // Simulados atribuídos: matrícula (liberada) + acesso avulso.
-  const [{ data: mats }, { data: acs }] = await Promise.all([
+  // Passaporte enxerga TODOS os simulados publicados automaticamente (não precisa de matrícula).
+  const [{ data: mats }, { data: acs }, { data: estRow }] = await Promise.all([
     svc.from('simulado_matriculas').select('simulado_id, liberado').eq('estudante_id', estId),
     svc.from('simulado_acessos').select('simulado_id').eq('estudante_id', estId),
+    svc.from('simulado_estudantes').select('classificacao').eq('id', estId).maybeSingle(),
   ])
-  const ids = [...new Set([...(mats ?? []).filter((m: any) => m.liberado !== false).map((m: any) => m.simulado_id), ...(acs ?? []).map((a: any) => a.simulado_id)].filter(Boolean))]
+  let idsPassaporte: string[] = []
+  if ((estRow as any)?.classificacao === 'passaporte') {
+    const { data: pubs } = await svc.from('simulado_simulados').select('id').eq('status', 'publicado').eq('deletado', false)
+    idsPassaporte = (pubs ?? []).map((s: any) => s.id)
+  }
+  const ids = [...new Set([
+    ...(mats ?? []).filter((m: any) => m.liberado !== false).map((m: any) => m.simulado_id),
+    ...(acs ?? []).map((a: any) => a.simulado_id),
+    ...idsPassaporte,
+  ].filter(Boolean))]
 
   let simulados: any[] = []
   const sessoesPorSim = new Map<string, any[]>()

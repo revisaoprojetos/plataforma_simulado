@@ -163,14 +163,19 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .maybeSingle()
     if (!acesso) {
-      return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
+      // Passaporte acessa TODOS os simulados (inclui prazo relativo) — sem acesso avulso vira acesso livre.
+      if (estudante.classificacao !== 'passaporte') {
+        return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
+      }
+    } else {
+      if (acesso.expira_em && new Date(acesso.expira_em) < new Date()) {
+        return bloqueio(tenantId, 'bloqueio_prazo_expirado', { nome: estudante.nome ?? '', simulado: tituloSimulado })
+      }
+      acessoAvulso = acesso
     }
-    if (acesso.expira_em && new Date(acesso.expira_em) < new Date()) {
-      return bloqueio(tenantId, 'bloqueio_prazo_expirado', { nome: estudante.nome ?? '', simulado: tituloSimulado })
-    }
-    acessoAvulso = acesso
   } else {
-    const temAcesso = await verificarAcesso(supabase, estudante.id, simulado.id)
+    // Passaporte tem acesso a todos os simulados; senão exige matrícula liberada.
+    const temAcesso = estudante.classificacao === 'passaporte' || await verificarAcesso(supabase, estudante.id, simulado.id)
     if (!temAcesso) {
       return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
     }
