@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useLayoutEffect, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { Fragment, useCallback, useLayoutEffect, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Save, Printer, Plus, Trash2, ArrowUp, ArrowDown, FileText, Palette, LayoutTemplate, ChevronLeft, ChevronRight, Columns2, PanelTop, PanelBottom, Minus, Wallpaper, Database, Users, Repeat, Copy, GripVertical, Undo2, Redo2 } from 'lucide-react'
 import Link from 'next/link'
@@ -31,7 +31,7 @@ function FundoPagina({ bloco, selecionado, corPrimaria, onSelect }: { bloco: Blo
   const placeholder = !temImagem
   return (
     <div onClick={placeholder ? (e) => { e.stopPropagation(); onSelect() } : undefined}
-      style={{ position: 'absolute', inset: 0, zIndex: placeholder ? 4 : 0, pointerEvents: placeholder ? 'auto' : 'none',
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, height: SHEET_H, zIndex: placeholder ? 4 : 0, pointerEvents: placeholder ? 'auto' : 'none',
         cursor: placeholder ? 'pointer' : 'default', outline: selecionado ? `3px solid ${corPrimaria}` : 'none' }}>
       {a.url && (
         <img src={a.url} alt="" onError={() => setErro(true)} onLoad={() => setErro(false)}
@@ -346,6 +346,19 @@ export function CadernoEditorV2({
   useEffect(() => { let vivo = true; if (bancoId) getGruposBanco(bancoId).then((r) => { if (vivo && r.ok) setGruposBanco(r.grupos ?? []) }); else setGruposBanco([]); return () => { vivo = false } }, [bancoId])
   const [assuntosBanco, setAssuntosBanco] = useState<Record<string, string[]>>({})
   useEffect(() => { let vivo = true; if (bancoId) getAssuntosBanco(bancoId).then((r) => { if (vivo && r.ok) setAssuntosBanco(r.porDisciplina ?? {}) }); else setAssuntosBanco({}); return () => { vivo = false } }, [bancoId])
+
+  // Altura real de cada folha do canvas (cresce com o conteúdo) — para NÃO cortar blocos que
+  // passam do limite da página, igual ao PDF. Um ResizeObserver por página mede o conteúdo.
+  const [pagAlturas, setPagAlturas] = useState<Record<string, number>>({})
+  const pagObs = useRef<Map<string, ResizeObserver>>(new Map())
+  const medirPagina = useCallback((pageId: string) => (el: HTMLDivElement | null) => {
+    const m = pagObs.current
+    const prev = m.get(pageId); if (prev) { prev.disconnect(); m.delete(pageId) }
+    if (!el) return
+    const medir = () => setPagAlturas((s) => (Math.abs((s[pageId] ?? 0) - el.scrollHeight) < 1 ? s : { ...s, [pageId]: el.scrollHeight }))
+    const ro = new ResizeObserver(medir); ro.observe(el); m.set(pageId, ro); medir()
+  }, [])
+  useEffect(() => () => { pagObs.current.forEach((o) => o.disconnect()); pagObs.current.clear() }, [])
   const [regIndex, setRegIndex] = useState(0)
   const [modAtiva, setModAtiva] = useState<string>((mods0Vis[0] ?? mods0[0]).id)
   const [selPage, setSelPage] = useState<string | null>(null)
@@ -760,23 +773,30 @@ export function CadernoEditorV2({
                     <span className="font-medium">{page.titulo} · {PAGE_KINDS.find((k) => k.id === page.kind)?.nome}{running.mostrarNumeroPagina ? ` · pág. ${pi + 1}` : ''}</span>
                     <button onClick={() => removePage(page.id)} className="opacity-0 transition-opacity hover:text-destructive group-hover/p:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
-                  <div style={{ width: SHEET_W * ZOOM, height: SHEET_H * ZOOM }} className="relative">
-                    <div onClick={() => { setSelPage(page.id); setSelBlock(null); setRegiao('pagina') }}
+                  <div style={{ width: SHEET_W * ZOOM, height: (pagAlturas[page.id] ?? SHEET_H) * ZOOM }} className="relative">
+                    <div ref={medirPagina(page.id)} onClick={() => { setSelPage(page.id); setSelBlock(null); setRegiao('pagina') }}
                       onDragOver={(e) => { e.preventDefault(); setOver(page.id) }}
                       onDrop={(e) => ctx.drop(e, { kind: 'page', pageId: page.id })}
-                      style={{ width: SHEET_W, height: SHEET_H, transform: `scale(${ZOOM})`, transformOrigin: 'top left', background: theme.cores.fundo, boxShadow: '0 2px 16px rgba(0,0,0,.13)',
+                      style={{ width: SHEET_W, minHeight: SHEET_H, transform: `scale(${ZOOM})`, transformOrigin: 'top left', background: theme.cores.fundo, boxShadow: '0 2px 16px rgba(0,0,0,.13)',
                         ...(overId === page.id ? { outline: `2.5px solid ${REALCE}`, outlineOffset: -2 } : arrastando ? { outline: `1.5px solid ${REALCE}`, outlineOffset: -2 } : {}) }}
-                      className={cn('relative overflow-hidden', !arrastando && selPage === page.id && regiao === 'pagina' && 'ring-2 ring-primary/40')}>
+                      className={cn('relative', !arrastando && selPage === page.id && regiao === 'pagina' && 'ring-2 ring-primary/40')}>
+                      {/* Marcadores de quebra de página A4: quando o conteúdo passa de uma folha, o
+                          PDF continua na próxima — aqui nada é cortado (a folha cresce). */}
+                      {Array.from({ length: Math.max(0, Math.floor((((pagAlturas[page.id] ?? SHEET_H)) - 2) / SHEET_H)) }).map((_, k) => (
+                        <div key={`brk${k}`} style={{ position: 'absolute', left: 0, right: 0, top: (k + 1) * SHEET_H, zIndex: 15, pointerEvents: 'none', borderTop: '2px dashed #ef4444' }}>
+                          <span style={{ position: 'absolute', right: 6, top: 3, fontSize: 12, fontWeight: 600, color: '#fff', background: '#ef4444', padding: '1px 7px', borderRadius: 5 }}>quebra de página (folha {k + 2})</span>
+                        </div>
+                      ))}
                       {/* camada de fundo full-bleed (placeholder quando sem imagem ou url quebrada) */}
                       {bg && (
                         <FundoPagina key={(bg.attributes as any).url || 'sem'} bloco={bg} selecionado={selBlock === bg.id}
                           corPrimaria={theme.cores.primaria} onSelect={() => { setSelBlock(bg.id); setAba('bloco') }} />
                       )}
                       {/* Coluna da folha: faixas usam a LARGURA TODA (borda a borda); só o conteúdo do meio tem margem lateral/vertical. */}
-                      <div className="relative flex h-full flex-col">
+                      <div className="relative flex flex-col" style={{ minHeight: SHEET_H }}>
                         {mostraCab && <ZonaFaixa reg="cabecalho" blocks={doc.cabecalho ?? []} altura={running.cabecalhoAltura} />}
                         {/* Conteúdo do meio: preso entre cabeçalho e rodapé; overflow recortado para não invadir as áreas. */}
-                        <AutoAnim ativo={!arrastando} style={{ paddingTop: mostraCab ? 0 : PAD_V, paddingBottom: mostraRod ? 0 : PAD_V, paddingLeft: PAD_H, paddingRight: PAD_H }} className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden', page.valign === 'center' && 'justify-center', page.valign === 'bottom' && 'justify-end')}>
+                        <AutoAnim ativo={!arrastando} style={{ paddingTop: mostraCab ? 0 : PAD_V, paddingBottom: mostraRod ? 0 : PAD_V, paddingLeft: PAD_H, paddingRight: PAD_H }} className={cn('relative flex min-h-0 flex-1 flex-col', page.valign === 'center' && 'justify-center', page.valign === 'bottom' && 'justify-end')}>
                           {conteudo.length === 0 && !bg && (
                             <div className={cn('flex h-[200px] items-center justify-center rounded-lg border-2 border-dashed text-sm transition-colors', arrastando ? 'border-primary/50 bg-primary/5 text-primary' : 'border-border text-muted-foreground')}>{arrastando ? 'Solte o bloco aqui' : 'Arraste um bloco ou clique para começar'}</div>
                           )}
