@@ -102,6 +102,11 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
     return () => clearTimeout(t)
   }, [sel])
 
+  // Grupos grandes: liga o segundo plano automaticamente. O import interativo tem teto de
+  // detalhe (400) e pediria "reimportar"; o segundo plano NÃO tem limite → traz tudo de uma vez.
+  const grande = total !== null && total > 500
+  useEffect(() => { if (grande && destino !== 'por_canal') setSegundoPlano(true) }, [grande, destino])
+
   const toggle = (id: number) => { setRes(null); setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n }) }
   const selecionarFiltrados = () => { setRes(null); setSel((s) => { const n = new Set(s); filtrados.forEach((g) => n.add(g.id)); return n }) }
   const limpar = () => { setRes(null); setSel(new Set()) }
@@ -305,8 +310,13 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
         {destino !== 'por_canal' && (
           <label className="flex items-center gap-2 px-1 text-xs">
             <input type="checkbox" checked={segundoPlano} onChange={(e) => setSegundoPlano(e.target.checked)} className="h-4 w-4 rounded border" />
-            <span><b>Importar em segundo plano</b> — para grupos grandes (roda no servidor).</span>
+            <span><b>Importar em segundo plano</b> — para grupos grandes (roda no servidor, sem limite).</span>
           </label>
+        )}
+        {grande && destino !== 'por_canal' && (
+          <p className="flex items-start gap-1.5 px-1 text-[11px] text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> Seleção grande ({total}). Ligamos o <b>segundo plano</b> para trazer <b>todos os dados de uma vez</b> — sem precisar reimportar.
+          </p>
         )}
 
         <button type="button" onClick={importar} disabled={sel.size === 0 || importando}
