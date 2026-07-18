@@ -282,6 +282,29 @@ export async function importarCurseducaPorCanal(ids: number[], paiId: string | n
   return agg
 }
 
+/**
+ * Sincronização IMEDIATA dos grupos vinculados: cada canal → o grupo do sistema JÁ escolhido
+ * (por par canal→grupo). Só adiciona alunos (sincronizar=false, nunca remove). TRAVA anti-17k:
+ * nº de canais nunca pode exceder o nº de grupos do sistema (impossível sincronizar a conta toda).
+ */
+export async function sincronizarCurseducaAgora(pares: { canal: number; grupo: string }[]): Promise<{ ok: boolean; error?: string; canais?: number; vinculados?: number; novos?: number }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const lista = (pares ?? []).filter((p) => p && p.canal && p.grupo)
+  if (!lista.length) return { ok: false, error: 'Selecione ao menos um grupo vinculado.' }
+  const svc = createAdminClient()
+  const { count } = await svc.from('simulado_grupos').select('id', { count: 'exact', head: true }).eq('tenant_id', g.tenantId).eq('deletado', false)
+  if (lista.length > Math.max(1, count ?? 0)) return { ok: false, error: 'Seleção inválida (mais canais que grupos do sistema).' }
+  let canais = 0, vinculados = 0, novos = 0
+  for (const p of lista) {
+    const r = await executarImport({ tenantId: g.tenantId, cfg: g.cfg }, [p.canal], { tipo: 'existente', grupoId: p.grupo }, false, 400)
+    canais++
+    if (r.ok) { vinculados += r.vinculados ?? 0; novos += r.novos ?? 0 }
+  }
+  revalidatePath('/admin/estudantes')
+  return { ok: true, canais, vinculados, novos }
+}
+
 // ── Import em segundo plano (job) ────────────────────────────────────────────
 /** Agenda uma importação para rodar em segundo plano (worker → /api/cron/curseduca-jobs). */
 export async function agendarImportacaoCurseduca(ids: number[], destino: DestinoImport, sincronizar = false): Promise<{ ok: boolean; jobId?: string; error?: string }> {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { KeyRound, DownloadCloud, AlertTriangle, Loader2 } from 'lucide-react'
+import { KeyRound, DownloadCloud, AlertTriangle, Loader2, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CurseducaConfig } from '@/components/admin/curseduca-config'
 import { CurseducaImport } from '@/components/admin/curseduca-import'
@@ -14,7 +14,7 @@ import { listarGruposCurseduca } from '@/app/admin/curseduca/actions'
  * (não bloqueiam esperando a API da Curseduca listar/contar centenas de grupos).
  * A aba "Sincronização" completa está oculta; o intervalo fica no card do Importar.
  */
-type Aba = 'importar' | 'credenciais'
+type Aba = 'importar' | 'sincronizacao' | 'credenciais'
 
 export function IntegracaoCurseducaTabs({ configurado, inativo = false, regras }: { configurado: boolean; inativo?: boolean; regras: any[] }) {
   const [aba, setAba] = useState<Aba>(configurado ? 'importar' : 'credenciais')
@@ -23,9 +23,9 @@ export function IntegracaoCurseducaTabs({ configurado, inativo = false, regras }
   const [carregando, setCarregando] = useState(false)
   const [erroGrupos, setErroGrupos] = useState<string | null>(null)
 
-  // Carrega os grupos uma vez, quando a aba Importar é aberta.
+  // Carrega os grupos uma vez, quando a aba Importar OU Sincronização é aberta.
   useEffect(() => {
-    if (aba !== 'importar' || !configurado || grupos !== null || carregando) return
+    if ((aba !== 'importar' && aba !== 'sincronizacao') || !configurado || grupos !== null || carregando) return
     setCarregando(true)
     listarGruposCurseduca()
       .then((r) => { if (r.ok) { setGrupos(r.grupos ?? []); setSistema(r.sistema ?? []) } else setErroGrupos(r.error ?? 'Falha ao carregar grupos') })
@@ -35,6 +35,7 @@ export function IntegracaoCurseducaTabs({ configurado, inativo = false, regras }
   const regra0 = regras?.[0]
   const abas: { id: Aba; label: string; Icon: any }[] = [
     { id: 'importar', label: 'Importar', Icon: DownloadCloud },
+    { id: 'sincronizacao', label: 'Sincronização', Icon: RefreshCw },
     { id: 'credenciais', label: 'Credenciais', Icon: KeyRound },
   ]
 
@@ -70,8 +71,16 @@ export function IntegracaoCurseducaTabs({ configurado, inativo = false, regras }
               <Loader2 className="h-6 w-6 animate-spin" /> Carregando grupos da Curseduca…
             </div>
           ) : erroGrupos ? aviso('Não foi possível carregar os grupos', erroGrupos)
-            : <CurseducaImport grupos={grupos} sistema={sistema}
-                extra={<CurseducaSyncCard grupos={grupos} sistema={sistema} inicialAtivo={!!regra0?.ativo} inicialIntervalo={regra0?.intervalo_min ?? 30} inicialGrupos={regra0?.grupos ?? []} />} />
+            : <CurseducaImport grupos={grupos} sistema={sistema} />
+      )}
+      {aba === 'sincronizacao' && (
+        !configurado ? aviso('Integração não configurada', 'Configure as credenciais na aba Credenciais.')
+          : carregando || grupos === null ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" /> Carregando grupos da Curseduca…
+            </div>
+          ) : erroGrupos ? aviso('Não foi possível carregar os grupos', erroGrupos)
+            : <CurseducaSyncCard grupos={grupos} sistema={sistema} inicialAtivo={!!regra0?.ativo} inicialIntervalo={regra0?.intervalo_min ?? 30} inicialGrupos={regra0?.grupos ?? []} />
       )}
       {aba === 'credenciais' && <div className="max-w-3xl"><CurseducaConfig inicialAberto semColapso /></div>}
     </div>
