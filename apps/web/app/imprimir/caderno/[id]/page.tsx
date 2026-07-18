@@ -244,18 +244,32 @@ export default async function CadernoImprimirPage({
                   const qtd = block.attributes?.quantidade as number | null | undefined
                   const gapQ = (block.attributes?.gap as number | undefined) ?? 16 // espaço ENTRE questões (igual ao editor)
                   const qs = qtd ? c.data.questoes.slice(0, qtd) : c.data.questoes
-                  return qs.map((q: any) => ({
-                    key: `${ci}-${page.id}-${q.id}`,
-                    gapTop: gapQ,
-                    node: (
-                      // gap: 6 DENTRO da questão (título/enunciado/alternativas), igual ao editor.
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, breakInside: 'avoid' }}>
-                        {(block.innerBlocks ?? []).map((ib: any) => (
-                          <BlockRender key={ib.id} block={ib} theme={theme} data={dataComQuestao(c.data, q)} />
-                        ))}
-                      </div>
-                    ),
-                  }))
+                  const inner = (block.innerBlocks ?? []) as any[]
+                  // "Cabeça" da questão = do início até o 1º texto (número + enunciado juntos, nunca
+                  // órfãos). Os demais blocos (alternativas, resposta, correção, comentário) viram
+                  // itens SOLTOS → o paginador continua a questão na próxima folha e ENCHE as folhas.
+                  let corte = inner.findIndex((ib) => ib.type === 'texto-livre')
+                  if (corte < 0) corte = 0
+                  const head = inner.slice(0, corte + 1)
+                  const resto = inner.slice(corte + 1)
+                  return qs.flatMap((q: any) => {
+                    const dq = dataComQuestao(c.data, q)
+                    const itens: { key: string; gapTop: number; node: any }[] = [{
+                      key: `${ci}-${page.id}-${q.id}-head`,
+                      gapTop: gapQ,
+                      node: (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, breakInside: 'avoid' }}>
+                          {head.map((ib: any) => <BlockRender key={ib.id} block={ib} theme={theme} data={dq} />)}
+                        </div>
+                      ),
+                    }]
+                    for (const ib of resto) itens.push({
+                      key: `${ci}-${page.id}-${q.id}-${ib.id}`,
+                      gapTop: 6,
+                      node: <div style={{ breakInside: 'avoid' }}><BlockRender block={ib} theme={theme} data={dq} /></div>,
+                    })
+                    return itens
+                  })
                 }
                 return [{ key: `${ci}-${page.id}-${block.id}`, gapTop: 0, node: <BlockRender block={block} theme={theme} data={c.data} /> }]
               })

@@ -624,8 +624,9 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
     case 'gabarito-correcao': {
       const q = data.questaoAtual
       if (!q) return <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Use dentro do repetidor — mostra a correção da questão.</div>
-      // Gating: a correção só aparece quando o gabarito está liberado.
-      if (!data.gabaritoLiberado) return <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', fontFamily: theme.tipografia.familia }}>Gabarito ainda não liberado.</div>
+      // Gating: a correção só aparece quando o gabarito está liberado. Na versão SEM gabarito
+      // o bloco some por completo (no editor mostra um aviso discreto para você posicioná-lo).
+      if (!data.gabaritoLiberado) return editor ? <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', fontFamily: theme.tipografia.familia }}>Correção (aparece só na versão com gabarito).</div> : null
       const marcadaLetra = data.respostas?.[q.id]
       const marcada = q.alternativas.find((al) => al.letra === marcadaLetra)
       const correta = q.alternativas.find((al) => al.correta)
