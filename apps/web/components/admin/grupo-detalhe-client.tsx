@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -10,6 +10,7 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { EditarGrupoDialog } from '@/components/admin/editar-grupo-dialog'
 import { ImportarMembrosDialog } from '@/components/admin/importar-membros-dialog'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
+import { useOrdenacao, Th } from '@/components/admin/th-ordenavel'
 import { ArrowLeft, Pencil, Users, UserPlus, UserMinus, Search, Upload } from 'lucide-react'
 
 type Est = { id: string; nome: string; email: string | null; classificacao: string | null }
@@ -26,6 +27,13 @@ export function GrupoDetalheClient({ grupo, membros, naoMembros }: { grupo: { id
   const disponiveis = q ? naoMembros.filter((e) => `${e.nome} ${e.email ?? ''}`.toLowerCase().includes(q)) : naoMembros
   const qm = buscaMembros.trim().toLowerCase()
   const membrosFiltrados = qm ? membros.filter((e) => `${e.nome} ${e.email ?? ''}`.toLowerCase().includes(qm)) : membros
+  const { sort, ordenarPor } = useOrdenacao<'nome' | 'classificacao'>()
+  const membrosOrdenados = useMemo(() => {
+    if (!sort) return membrosFiltrados
+    const dir = sort.dir === 'asc' ? 1 : -1
+    return [...membrosFiltrados].sort((a, b) =>
+      (sort.key === 'classificacao' ? (a.classificacao || '').localeCompare(b.classificacao || '', 'pt-BR') : (a.nome || '').localeCompare(b.nome || '', 'pt-BR')) * dir)
+  }, [membrosFiltrados, sort])
   const iniciais = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join('')
   const cor = grupo.cor ?? '#6d28d9'
 
@@ -72,23 +80,41 @@ export function GrupoDetalheClient({ grupo, membros, naoMembros }: { grupo: { id
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input value={buscaMembros} onChange={(e) => setBuscaMembros(e.target.value)} placeholder="Buscar participante…" className="w-full rounded-lg border bg-[var(--input-bg,transparent)] py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
                 </div>
-                <ul className="scroll-claro max-h-[360px] divide-y overflow-auto rounded-lg border">
-                  {membrosFiltrados.length === 0 ? (
-                    <li className="px-4 py-6 text-center text-sm text-muted-foreground">Nenhum participante encontrado.</li>
-                  ) : membrosFiltrados.map((e) => (
-                    <li key={e.id} className="flex items-center gap-3 px-4 py-2.5">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{iniciais(e.nome)}</span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <Link href={`/admin/estudantes/${e.id}`} className="truncate font-medium hover:text-primary">{e.nome}</Link>
-                          <ClassificacaoBadge classificacao={e.classificacao} />
-                        </div>
-                        {e.email && <p className="truncate text-xs text-muted-foreground">{e.email}</p>}
-                      </div>
-                      <button type="button" onClick={() => remover(e)} disabled={pending} title="Remover do grupo" className="shrink-0 rounded-md p-1.5 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"><UserMinus className="h-4 w-4" /></button>
-                    </li>
-                  ))}
-                </ul>
+                <div className="scroll-claro max-h-[360px] overflow-auto rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 z-10 bg-muted/60 text-left text-[11px] uppercase tracking-wide text-muted-foreground backdrop-blur">
+                      <tr className="border-b">
+                        <Th label="Estudante" k="nome" sort={sort} onSort={ordenarPor} />
+                        <Th label="Plano" k="classificacao" sort={sort} onSort={ordenarPor} className="hidden sm:table-cell" />
+                        <th className="px-3 py-2.5 text-right font-medium">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {membrosOrdenados.length === 0 ? (
+                        <tr><td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">Nenhum participante encontrado.</td></tr>
+                      ) : membrosOrdenados.map((e) => (
+                        <tr key={e.id} className="transition-colors hover:bg-muted/40">
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2.5">
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{iniciais(e.nome)}</span>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <Link href={`/admin/estudantes/${e.id}`} className="truncate font-medium hover:text-primary">{e.nome}</Link>
+                                  <span className="sm:hidden"><ClassificacaoBadge classificacao={e.classificacao} /></span>
+                                </div>
+                                {e.email && <p className="truncate text-xs text-muted-foreground">{e.email}</p>}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="hidden px-3 py-2 sm:table-cell"><ClassificacaoBadge classificacao={e.classificacao} /></td>
+                          <td className="px-3 py-2 text-right">
+                            <button type="button" onClick={() => remover(e)} disabled={pending} title="Remover do grupo" className="rounded-md p-1.5 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"><UserMinus className="h-4 w-4" /></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </>
             )}
           </CardContent>

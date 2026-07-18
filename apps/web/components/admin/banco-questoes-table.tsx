@@ -13,6 +13,10 @@ import { toast } from 'sonner'
 import { removerQuestoes, reordenarQuestoesBanco } from '@/app/admin/banco-questoes/actions'
 import { CopiarCodigo } from '@/components/admin/copiar-codigo'
 import { codigoQuestao } from '@/lib/codigo-questao'
+import { useOrdenacao, SortButton } from '@/components/admin/th-ordenavel'
+
+const difRank: Record<string, number> = { facil: 0, medio: 1, dificil: 2 }
+const stRank: Record<string, number> = { publicada: 0, rascunho: 1, arquivada: 2 }
 
 interface Q { id: string; enunciado: string; tipo?: string | null; nivel_dificuldade?: string | null; status?: string | null; disciplina?: string | null; assunto?: string | null }
 
@@ -47,7 +51,10 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
   const statusItems = { all: 'Status', publicada: 'Ativa', rascunho: 'Rascunho', arquivada: 'Arquivada' }
   const difItems = { all: 'Dific.', facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' }
 
-  const filtroAtivo = busca.trim() !== '' || disc !== 'all' || status !== 'all' || dif !== 'all'
+  const { sort, ordenarPor } = useOrdenacao<'enunciado' | 'disciplina' | 'assunto' | 'dif' | 'status'>()
+  // Reordenar (arrastar/setas) só quando NÃO há filtro NEM ordenação por coluna.
+  const travado = busca.trim() !== '' || disc !== 'all' || status !== 'all' || dif !== 'all' || sort !== null
+  const filtroAtivo = travado
 
   const filtradas = useMemo(() => {
     const q = busca.toLowerCase().trim()
@@ -60,11 +67,27 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
     })
   }, [ordered, busca, disc, status, dif])
 
+  const visiveis = useMemo(() => {
+    if (!sort) return filtradas
+    const dir = sort.dir === 'asc' ? 1 : -1
+    const txt = (s?: string | null) => s || ''
+    return [...filtradas].sort((a, b) => {
+      switch (sort.key) {
+        case 'enunciado': return txt(a.enunciado).localeCompare(txt(b.enunciado), 'pt-BR') * dir
+        case 'disciplina': return txt(a.disciplina).localeCompare(txt(b.disciplina), 'pt-BR') * dir
+        case 'assunto': return txt(a.assunto).localeCompare(txt(b.assunto), 'pt-BR') * dir
+        case 'dif': return ((difRank[a.nivel_dificuldade ?? ''] ?? 99) - (difRank[b.nivel_dificuldade ?? ''] ?? 99)) * dir
+        case 'status': return ((stRank[a.status ?? ''] ?? 99) - (stRank[b.status ?? ''] ?? 99)) * dir
+        default: return 0
+      }
+    })
+  }, [filtradas, sort])
+
   function toggle(id: string) {
     setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
   function toggleAll() {
-    setSel((p) => p.size === filtradas.length ? new Set() : new Set(filtradas.map((q) => q.id)))
+    setSel((p) => p.size === visiveis.length ? new Set() : new Set(visiveis.map((q) => q.id)))
   }
   function remover() {
     if (sel.size === 0) return
@@ -145,7 +168,7 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
             <SelectItem value="dificil">Difícil</SelectItem>
           </SelectContent>
         </Select>
-        {filtroAtivo && <span className="text-xs text-muted-foreground">Limpe os filtros para reordenar as questões.</span>}
+        {travado && <span className="text-xs text-muted-foreground">Limpe filtros e ordenação para reordenar as questões.</span>}
       </div>
 
       <CardContent className="p-0">
@@ -155,24 +178,24 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
               <TableRow>
                 <TableHead className="w-10">
                   <button type="button" onClick={toggleAll} className={cn('flex h-4 w-4 items-center justify-center rounded border',
-                    filtradas.length > 0 && sel.size === filtradas.length ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
-                    {filtradas.length > 0 && sel.size === filtradas.length && <Check className="h-3 w-3" />}
+                    visiveis.length > 0 && sel.size === visiveis.length ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
+                    {visiveis.length > 0 && sel.size === visiveis.length && <Check className="h-3 w-3" />}
                   </button>
                 </TableHead>
                 <TableHead className="w-14 text-center">Ordem</TableHead>
                 <TableHead className="w-10">#</TableHead>
-                <TableHead>Enunciado</TableHead>
-                <TableHead className="w-44">Disciplina</TableHead>
-                <TableHead className="w-48">Assunto</TableHead>
-                <TableHead className="w-12 text-center">Dif.</TableHead>
-                <TableHead className="w-20">Status</TableHead>
+                <TableHead><SortButton label="Enunciado" k="enunciado" sort={sort} onSort={ordenarPor} /></TableHead>
+                <TableHead className="w-44"><SortButton label="Disciplina" k="disciplina" sort={sort} onSort={ordenarPor} /></TableHead>
+                <TableHead className="w-48"><SortButton label="Assunto" k="assunto" sort={sort} onSort={ordenarPor} /></TableHead>
+                <TableHead className="w-12 text-center"><SortButton label="Dif." k="dif" sort={sort} onSort={ordenarPor} className="mx-auto" /></TableHead>
+                <TableHead className="w-20"><SortButton label="Status" k="status" sort={sort} onSort={ordenarPor} /></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtradas.length === 0 ? (
+              {visiveis.length === 0 ? (
                 <TableRow><TableCell colSpan={8} className="py-10 text-center text-muted-foreground">Nenhuma questão.</TableCell></TableRow>
               ) : (
-                filtradas.map((q, i) => {
+                visiveis.map((q, i) => {
                   const on = sel.has(q.id)
                   const d = difCfg[q.nivel_dificuldade ?? '']
                   const st = statusCfg[q.status ?? ''] ?? { label: q.status ?? '—', cls: 'bg-muted text-muted-foreground' }
@@ -201,7 +224,7 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
                             <span className="cursor-grab text-muted-foreground active:cursor-grabbing" title="Arraste para reordenar"><GripVertical className="h-4 w-4" /></span>
                             <div className="flex flex-col">
                               <button type="button" onClick={() => mover(i, i - 1)} disabled={i === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Subir"><ChevronUp className="h-3.5 w-3.5" /></button>
-                              <button type="button" onClick={() => mover(i, i + 1)} disabled={i === filtradas.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Descer"><ChevronDown className="h-3.5 w-3.5" /></button>
+                              <button type="button" onClick={() => mover(i, i + 1)} disabled={i === visiveis.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Descer"><ChevronDown className="h-3.5 w-3.5" /></button>
                             </div>
                           </div>
                         )}
