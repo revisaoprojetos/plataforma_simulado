@@ -13,7 +13,8 @@ function firstStr(...vs: (string | null | undefined)[]): string | null { for (co
 export function mapStatusMapa(bruto: string | null): StatusEntitlement | null {
   const s = (bruto ?? '').toLowerCase()
   if (['approved', 'paid', 'active', 'completed', 'trialing', 'trial'].includes(s)) return 'ativo'
-  if (['canceled', 'cancelled', 'inactive'].includes(s)) return 'cancelado'
+  // Compra negada/recusada/cancelada → cancela o acesso (revoga).
+  if (['canceled', 'cancelled', 'inactive', 'refused', 'denied', 'declined', 'rejected', 'abandoned'].includes(s)) return 'cancelado'
   if (['refunded', 'refund', 'chargeback', 'dispute'].includes(s)) return 'reembolsado'
   if (['expired', 'past_due', 'unpaid', 'ended'].includes(s)) return 'expirado'
   return null

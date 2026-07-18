@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient, createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
@@ -66,24 +67,30 @@ export async function createSimuladoAction(data: SimuladoData) {
     )
   }
 
-  // Matricula os estudantes: herdados do banco base (pré-preparatório) + escolhidos manualmente.
+  // Matricula os estudantes: herdados do banco base + escolhidos manualmente + TODOS os passaportes.
   let herdados = 0
-  const aMatricular = new Set<string>((data.estudanteIds ?? []).filter(Boolean))
-  if (data.bancoBaseId || aMatricular.size) {
+  {
     const svc = await createServiceClient()
+    const aMatricular = new Set<string>((data.estudanteIds ?? []).filter(Boolean))
     if (data.bancoBaseId) {
       const { data: alunos } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', data.bancoBaseId).eq('tenant_id', tenantId)
       for (const a of (alunos ?? []) as any[]) if (a.estudante_id) aMatricular.add(a.estudante_id)
     }
+    // Passaporte entra em TODO simulado criado (aparece em relatórios/ranking; a regra de acesso vale por cima).
+    const passaportes = await fetchAll<{ id: string }>(() =>
+      svc.from('simulado_estudantes').select('id').eq('tenant_id', tenantId).eq('classificacao', 'passaporte').eq('deletado', false).order('id', { ascending: true }))
+    for (const p of passaportes) aMatricular.add(p.id)
+
     const estIds = [...aMatricular]
     if (estIds.length) {
       const { data: ja } = await svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simulado.id).in('estudante_id', estIds)
       const jaSet = new Set((ja ?? []).map((m: any) => m.estudante_id))
       const novos = estIds.filter((e) => !jaSet.has(e))
-      if (novos.length) {
-        await svc.from('simulado_matriculas').insert(novos.map((estudante_id) => ({ tenant_id: tenantId, estudante_id, simulado_id: simulado.id, liberado: true })))
-        herdados = novos.length
+      for (let i = 0; i < novos.length; i += 500) {
+        const lote = novos.slice(i, i + 500)
+        await svc.from('simulado_matriculas').insert(lote.map((estudante_id) => ({ tenant_id: tenantId, estudante_id, simulado_id: simulado.id, liberado: true })))
       }
+      herdados = novos.length
     }
   }
 

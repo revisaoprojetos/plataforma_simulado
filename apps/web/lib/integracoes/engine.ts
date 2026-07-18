@@ -29,6 +29,14 @@ async function resolverMapeamento(svc: any, tenantId: string, provider: Provider
   return null
 }
 
+/** Grupo comum "Passaporte" do tenant — destino EXTRA de todo aluno passaporte (além do grupo do produto). */
+async function grupoPassaporte(svc: any, tenantId: string): Promise<string | null> {
+  try {
+    const { data } = await svc.from('simulado_grupos').select('id').eq('tenant_id', tenantId).eq('deletado', false).eq('is_mestre', false).ilike('nome', 'passaporte').limit(1).maybeSingle()
+    return (data as any)?.id ?? null
+  } catch { return null }
+}
+
 /** Simulados de uma pasta (banco base) que AINDA valem — exclui os encerrados (evita arquivo morto). */
 async function simuladosVivosDaPasta(svc: any, tenantId: string, pastaId: string): Promise<string[]> {
   try {
@@ -130,9 +138,22 @@ async function matricular(svc: any, tenantId: string, estudanteId: string, simul
   } catch { /* ignora */ }
 }
 
+/** Adiciona o estudante a um grupo, idempotente. */
+async function entrarGrupo(svc: any, tenantId: string, grupoId: string, estudanteId: string) {
+  try {
+    const { data } = await svc.from('simulado_grupo_membros').select('id').eq('grupo_id', grupoId).eq('estudante_id', estudanteId).maybeSingle()
+    if (!data) await svc.from('simulado_grupo_membros').insert({ tenant_id: tenantId, grupo_id: grupoId, estudante_id: estudanteId })
+  } catch { /* ignora */ }
+}
+
 async function conceder(svc: any, tenantId: string, estudanteId: string, m: Mapeamento) {
   if (m.classificacao) {
     try { await svc.from('simulado_estudantes').update({ classificacao: m.classificacao }).eq('id', estudanteId).eq('tenant_id', tenantId) } catch { /* ignora */ }
+  }
+  // Passaporte entra TAMBÉM no grupo "Passaporte" (além do grupo do produto).
+  if (m.classificacao === 'passaporte') {
+    const gp = await grupoPassaporte(svc, tenantId)
+    if (gp) await entrarGrupo(svc, tenantId, gp, estudanteId)
   }
   if (m.grupoId) {
     try {
@@ -169,9 +190,11 @@ async function revogar(svc: any, tenantId: string, estudanteId: string, excetoEx
   if (m.simuladoId && !(await outraAtivaConcede(svc, tenantId, estudanteId, excetoExternalId, { simuladoId: m.simuladoId }))) {
     try { await svc.from('simulado_matriculas').delete().eq('tenant_id', tenantId).eq('simulado_id', m.simuladoId).eq('estudante_id', estudanteId) } catch { /* ignora */ }
   }
-  // Rebaixa classificação só se nenhuma outra assinatura ativa concede passaporte.
+  // Rebaixa classificação e sai do grupo "Passaporte" só se nenhuma outra assinatura ativa concede passaporte.
   if (m.classificacao === 'passaporte' && !(await outraAtivaConcede(svc, tenantId, estudanteId, excetoExternalId, { passaporte: true }))) {
     try { await svc.from('simulado_estudantes').update({ classificacao: 'normal' }).eq('id', estudanteId).eq('tenant_id', tenantId) } catch { /* ignora */ }
+    const gp = await grupoPassaporte(svc, tenantId)
+    if (gp) { try { await svc.from('simulado_grupo_membros').delete().eq('tenant_id', tenantId).eq('grupo_id', gp).eq('estudante_id', estudanteId) } catch { /* ignora */ } }
   }
 }
 

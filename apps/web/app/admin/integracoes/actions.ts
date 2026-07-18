@@ -161,6 +161,20 @@ export async function salvarMapeamento(provider: string, m: { id?: string; fonte
   const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
   if (!m.fonteRef) return { ok: false, error: 'Selecione o produto/grupo de origem.' }
   const svc = createAdminClient()
+  // Validação de direcionamento: grupo/banco/simulado precisam existir e ser do MESMO tenant.
+  if (m.grupoId) {
+    const { data } = await svc.from('simulado_grupos').select('id, is_mestre').eq('id', m.grupoId).eq('tenant_id', g.tenantId).eq('deletado', false).maybeSingle()
+    if (!data) return { ok: false, error: 'Grupo inválido ou de outra plataforma.' }
+    if ((data as any).is_mestre) return { ok: false, error: 'O destino de "Grupo" deve ser um grupo (não uma pasta).' }
+  }
+  if (m.pastaId) {
+    const { data } = await svc.from('simulado_pastas').select('id').eq('id', m.pastaId).eq('tenant_id', g.tenantId).maybeSingle()
+    if (!data) return { ok: false, error: 'Banco inválido ou de outra plataforma.' }
+  }
+  if (m.simuladoId) {
+    const { data } = await svc.from('simulado_simulados').select('id').eq('id', m.simuladoId).eq('tenant_id', g.tenantId).eq('deletado', false).maybeSingle()
+    if (!data) return { ok: false, error: 'Simulado inválido ou de outra plataforma.' }
+  }
   const row: any = {
     tenant_id: g.tenantId, provider, fonte_ref: m.fonteRef, fonte_nome: m.fonteNome ?? null,
     classificacao: m.classificacao ?? null, grupo_id: m.grupoId ?? null, pasta_id: m.pastaId ?? null, simulado_id: m.simuladoId ?? null,
