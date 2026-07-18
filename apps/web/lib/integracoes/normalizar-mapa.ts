@@ -20,6 +20,18 @@ export function mapStatusMapa(bruto: string | null): StatusEntitlement | null {
   return null
 }
 
+/**
+ * Identifica produto "passaporte" pelo NOME (regra automática): contém "passaporte" (ou "passe"),
+ * EXCLUINDO amostras/grátis/trial — que não dão passaporte completo. Usado quando o mapeamento
+ * não define uma classificação explícita.
+ */
+export function ehProdutoPassaporte(nome?: string | null): boolean {
+  const s = (nome ?? '').toLowerCase()
+  if (!/passaporte|\bpasse\b/.test(s)) return false
+  if (/amostra|gr[aá]tis|gratuit|trial|degusta|\bfree\b/.test(s)) return false
+  return true
+}
+
 export interface Normalizado {
   pessoa: PessoaNormalizada
   entitlement: Entitlement

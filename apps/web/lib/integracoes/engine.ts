@@ -2,6 +2,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
+import { ehProdutoPassaporte } from '@/lib/integracoes/normalizar-mapa'
 import type { Provider, PessoaNormalizada, Entitlement, Mapeamento, ResultadoEntitlement } from '@/lib/integracoes/tipos'
 
 /**
@@ -255,6 +256,13 @@ export async function aplicarEntitlement(params: {
   if (!m) {
     // Produto sem mapeamento (ex.: cancelamento de produto nunca comprado) → só cadastro.
     return { ok: true, estudanteId, acao: 'ignorado', motivo: 'produto/grupo sem mapeamento' }
+  }
+
+  // Regra automática: produto "passaporte" pelo NOME (exceto amostra) força a classificação
+  // passaporte quando o mapeamento ainda não define uma explícita. Persiste p/ ficar visível.
+  if (!m.classificacao && ehProdutoPassaporte(entitlement.produtoNome)) {
+    m = { ...m, classificacao: 'passaporte' }
+    try { await svc.from('simulado_integracao_mapeamentos').update({ classificacao: 'passaporte' }).eq('tenant_id', tenantId).eq('provider', provider).eq('fonte_ref', entitlement.produtoRef) } catch { /* ignora */ }
   }
 
   if (entitlement.status === 'ativo') {

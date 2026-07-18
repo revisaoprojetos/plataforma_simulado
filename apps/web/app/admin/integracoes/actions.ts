@@ -12,7 +12,7 @@ import { importarViaProvider, listarFontesProvider, processarEvento } from '@/li
 import { aplicarEntitlement, reaplicarLiberacoes } from '@/lib/integracoes/engine'
 import { coalescer } from '@/lib/integracoes/ratelimit'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
-import { normalizarPorMapa } from '@/lib/integracoes/normalizar-mapa'
+import { normalizarPorMapa, ehProdutoPassaporte } from '@/lib/integracoes/normalizar-mapa'
 import type { Provider, PessoaNormalizada, Entitlement } from '@/lib/integracoes/tipos'
 
 const PROVIDERS: Provider[] = ['curseduca', 'guru']
@@ -520,6 +520,7 @@ async function montarResumoRecebido(svc: ReturnType<typeof createAdminClient>, t
     const out: string[] = []
     out.push(`Comprador: ${pessoa.nome}${pessoa.email ? ` · ${pessoa.email}` : ''}${pessoa.cpf ? ` · CPF ${dig(pessoa.cpf)}` : ''}`)
     out.push(`Produto: ${entitlement.produtoNome ?? entitlement.produtoRef} · status "${statusBruto ?? '—'}" → ${entitlement.status === 'ativo' ? 'LIBERA acesso' : 'CANCELA acesso'}`)
+    if (ehProdutoPassaporte(entitlement.produtoNome)) out.push('Produto identificado como PASSAPORTE (pelo nome) → acesso a todos os simulados + grupo "Passaporte".')
 
     let est: any = null
     for (const [col, val] of [['matricula_externa', pessoa.externalId], ['email', pessoa.email?.trim().toLowerCase()], ['cpf', dig(pessoa.cpf)]] as [string, string | undefined][]) {
