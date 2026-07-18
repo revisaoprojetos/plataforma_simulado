@@ -796,7 +796,7 @@ export function CadernoEditorV2({
                       <div className="relative flex flex-col" style={{ minHeight: SHEET_H }}>
                         {mostraCab && <ZonaFaixa reg="cabecalho" blocks={doc.cabecalho ?? []} altura={running.cabecalhoAltura} />}
                         {/* Conteúdo do meio: preso entre cabeçalho e rodapé; overflow recortado para não invadir as áreas. */}
-                        <AutoAnim ativo={!arrastando} style={{ paddingTop: mostraCab ? 0 : PAD_V, paddingBottom: mostraRod ? 0 : PAD_V, paddingLeft: PAD_H, paddingRight: PAD_H }} className={cn('relative flex min-h-0 flex-1 flex-col', page.valign === 'center' && 'justify-center', page.valign === 'bottom' && 'justify-end')}>
+                        <AutoAnim ativo={!arrastando} style={{ flex: '1 0 auto', paddingTop: mostraCab ? 0 : PAD_V, paddingBottom: mostraRod ? 0 : PAD_V, paddingLeft: PAD_H, paddingRight: PAD_H }} className={cn('relative flex flex-col', page.valign === 'center' && 'justify-center', page.valign === 'bottom' && 'justify-end')}>
                           {conteudo.length === 0 && !bg && (
                             <div className={cn('flex h-[200px] items-center justify-center rounded-lg border-2 border-dashed text-sm transition-colors', arrastando ? 'border-primary/50 bg-primary/5 text-primary' : 'border-border text-muted-foreground')}>{arrastando ? 'Solte o bloco aqui' : 'Arraste um bloco ou clique para começar'}</div>
                           )}
