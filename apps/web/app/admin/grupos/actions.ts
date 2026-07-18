@@ -50,14 +50,15 @@ export async function criarGrupo(
   return { ok: false, error: 'Falha ao criar grupo.' }
 }
 
-/** Cria uma pasta (grupo mestre) que agrupa sub-grupos. */
-export async function criarGrupoMestre(nome: string, cor?: string): Promise<{ ok: boolean; id?: string; error?: string }> {
-  return criarGrupo(nome, cor, { isMestre: true })
+/** Cria uma pasta (grupo mestre). `paiId` cria a pasta já dentro de outra pasta (sub-pasta). */
+export async function criarGrupoMestre(nome: string, cor?: string, paiId?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
+  return criarGrupo(nome, cor, { isMestre: true, paiId: paiId ?? null })
 }
 
 /**
- * Move um grupo para dentro de uma pasta (mestre) ou o solta (paiId = null).
- * Valida: o grupo não pode ser mestre; o destino, se houver, precisa ser um mestre do tenant.
+ * Move um grupo (comum OU pasta) para dentro de uma pasta (mestre) ou o solta (paiId = null).
+ * Pastas podem aninhar em vários níveis; a única trava é anti-ciclo: uma pasta não pode ir
+ * para dentro de si mesma nem de uma descendente sua.
  */
 export async function moverGrupo(grupoId: string, paiId: string | null): Promise<{ ok: boolean; error?: string }> {
   const g = await guard(); if (!g.ok) return g
@@ -66,13 +67,28 @@ export async function moverGrupo(grupoId: string, paiId: string | null): Promise
   const grp = await svc.from('simulado_grupos').select('id, is_mestre').eq('id', grupoId).eq('tenant_id', g.tenantId).eq('deletado', false).maybeSingle()
   if (grp.error && /is_mestre/i.test(grp.error.message)) return { ok: false, error: 'Grupo mestre indisponível no banco. Aplique a migração de grupo mestre.' }
   if (!grp.data) return { ok: false, error: 'Grupo não encontrado.' }
-  if ((grp.data as any).is_mestre === true) return { ok: false, error: 'Uma pasta (grupo mestre) não pode entrar em outra pasta.' }
 
   if (paiId) {
+    if (paiId === grupoId) return { ok: false, error: 'Uma pasta não pode entrar em si mesma.' }
     const pai = await svc.from('simulado_grupos').select('id, is_mestre').eq('id', paiId).eq('tenant_id', g.tenantId).eq('deletado', false).maybeSingle()
     if (pai.error) return { ok: false, error: pai.error.message }
     if (!pai.data) return { ok: false, error: 'Pasta destino não encontrada.' }
     if ((pai.data as any).is_mestre !== true) return { ok: false, error: 'O destino precisa ser um grupo mestre (pasta).' }
+
+    // Anti-ciclo: sobe dos ancestrais do destino; se cruzar o próprio grupo, é um ciclo.
+    if ((grp.data as any).is_mestre === true) {
+      const todos = await fetchAll<{ id: string; pai_id: string | null }>(() =>
+        svc.from('simulado_grupos').select('id, pai_id').eq('tenant_id', g.tenantId).eq('deletado', false).order('id', { ascending: true }))
+      const paiDe = new Map(todos.map((t) => [t.id, t.pai_id ?? null]))
+      let cur: string | null | undefined = paiId
+      const visto = new Set<string>()
+      while (cur) {
+        if (cur === grupoId) return { ok: false, error: 'Não dá para mover uma pasta para dentro dela mesma.' }
+        if (visto.has(cur)) break
+        visto.add(cur)
+        cur = paiDe.get(cur) ?? null
+      }
+    }
   }
 
   const { error } = await svc.from('simulado_grupos').update({ pai_id: paiId }).eq('id', grupoId).eq('tenant_id', g.tenantId)

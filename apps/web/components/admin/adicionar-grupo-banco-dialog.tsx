@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
+import type React from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
@@ -33,29 +34,33 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
     return () => document.removeEventListener('keydown', onKey)
   }, [open])
 
-  // Só grupos comuns são vinculáveis; pastas (mestre) viram cabeçalhos que agrupam os filhos.
-  const q = busca.trim().toLowerCase()
-  const match = (g: GrupoOpc) => !q || g.nome.toLowerCase().includes(q)
-  const pastas = useMemo(() => grupos.filter((g) => g.is_mestre).sort((a, b) => a.nome.localeCompare(b.nome)), [grupos])
-  const filhosPorPai = useMemo(() => {
+  const byId = useMemo(() => new Map(grupos.map((g) => [g.id, g])), [grupos])
+  const { children, top } = useMemo(() => {
     const m = new Map<string, GrupoOpc[]>()
+    const t: GrupoOpc[] = []
     for (const g of grupos) {
-      if (g.is_mestre) continue
-      if (g.pai_id && pastas.some((p) => p.id === g.pai_id)) { const a = m.get(g.pai_id) ?? []; a.push(g); m.set(g.pai_id, a) }
+      const pai = g.pai_id && byId.has(g.pai_id) ? g.pai_id : null
+      if (pai) { const a = m.get(pai) ?? []; a.push(g); m.set(pai, a) } else t.push(g)
     }
-    for (const a of m.values()) a.sort((x, y) => x.nome.localeCompare(y.nome))
-    return m
-  }, [grupos, pastas])
-  const soltos = useMemo(
-    () => grupos.filter((g) => !g.is_mestre && (!g.pai_id || !pastas.some((p) => p.id === g.pai_id))).sort((a, b) => a.nome.localeCompare(b.nome)),
-    [grupos, pastas],
-  )
+    const ordena = (arr: GrupoOpc[]) => arr.sort((a, b) => Number(!!b.is_mestre) - Number(!!a.is_mestre) || a.nome.localeCompare(b.nome))
+    for (const a of m.values()) ordena(a)
+    ordena(t)
+    return { children: m, top: t }
+  }, [grupos, byId])
 
-  function toggle(id: string) {
-    setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+  // Grupos comuns (folhas) dentro de uma pasta, em qualquer nível.
+  const folhasDe = (id: string): GrupoOpc[] => {
+    const out: GrupoOpc[] = []
+    const stack = [...(children.get(id) ?? [])]
+    while (stack.length) { const n = stack.pop()!; if (n.is_mestre) { const c = children.get(n.id); if (c) stack.push(...c) } else out.push(n) }
+    return out
   }
-  function togglePasta(filhos: GrupoOpc[]) {
-    const ids = filhos.map((f) => f.id)
+
+  const q = busca.trim().toLowerCase()
+
+  function toggle(id: string) { setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }) }
+  function togglePasta(pastaId: string) {
+    const ids = folhasDe(pastaId).map((f) => f.id)
     const todos = ids.length > 0 && ids.every((id) => sel.has(id))
     setSel((p) => { const n = new Set(p); ids.forEach((id) => (todos ? n.delete(id) : n.add(id))); return n })
   }
@@ -64,11 +69,9 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
     start(async () => {
       const r = await desvincularGrupoDoBanco(bancoId, id)
       if (!r.ok) { toast.error(r.error ?? 'Erro ao desvincular'); return }
-      toast.success(`Grupo "${nome}" desvinculado`)
-      router.refresh()
+      toast.success(`Grupo "${nome}" desvinculado`); router.refresh()
     })
   }
-
   function vincular() {
     if (sel.size === 0) return
     start(async () => {
@@ -79,17 +82,16 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
         total += r.vinculados ?? 0
       }
       toast.success(`${sel.size} grupo(s) vinculado(s) · ${total} estudante(s) ligado(s) ao banco`)
-      setOpen(false)
-      setSel(new Set())
-      router.refresh()
+      setOpen(false); setSel(new Set()); router.refresh()
     })
   }
 
-  const linha = (g: GrupoOpc, indent?: boolean) => {
+  // Linha de grupo comum (folha).
+  function linhaGrupo(g: GrupoOpc, depth: number) {
     const on = sel.has(g.id)
     return (
-      <div key={g.id} role="button" tabIndex={0} onClick={() => toggle(g.id)}
-        className={cn('flex w-full cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', indent && 'ml-5', on ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
+      <div key={g.id} role="button" tabIndex={0} onClick={() => toggle(g.id)} style={{ marginLeft: depth * 18 }}
+        className={cn('flex w-full cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', on ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
         <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
           {on && <Check className="h-3 w-3" />}
         </span>
@@ -104,6 +106,32 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
         ) : (
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-muted-foreground"><Link2 className="h-3 w-3" /> vincular</span>
         )}
+      </div>
+    )
+  }
+
+  // Nó da árvore (pasta ou grupo).
+  function renderNo(g: GrupoOpc, depth: number): React.ReactElement | null {
+    if (!g.is_mestre) return linhaGrupo(g, depth)
+    const folhas = folhasDe(g.id)
+    const ids = folhas.map((f) => f.id)
+    const marcados = ids.filter((id) => sel.has(id)).length
+    const totalMembros = folhas.reduce((s, f) => s + f.membros, 0)
+    const filhos = children.get(g.id) ?? []
+    return (
+      <div key={g.id} className="space-y-1.5" style={{ marginLeft: depth * 18 }}>
+        <div role="button" tabIndex={0} onClick={() => togglePasta(g.id)}
+          className="flex w-full cursor-pointer items-center gap-3 rounded-lg bg-muted/50 px-3 py-2 text-left transition-colors hover:bg-muted">
+          <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', marcados === 0 ? 'border-muted-foreground/40' : 'border-primary bg-primary text-primary-foreground')}>
+            {marcados > 0 && (marcados === ids.length ? <Check className="h-3 w-3" /> : <Minus className="h-3 w-3" />)}
+          </span>
+          <Folder className="h-4 w-4 shrink-0" style={{ color: g.cor ?? 'var(--muted-foreground)' }} />
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">{g.nome}</span>
+          <span className="shrink-0 text-[11px] text-muted-foreground">{ids.length} grupo(s) · {totalMembros} membro(s)</span>
+        </div>
+        {filhos.length === 0
+          ? <p className="px-3 py-1 text-xs text-muted-foreground" style={{ marginLeft: 18 }}>Pasta vazia.</p>
+          : filhos.map((c) => renderNo(c, depth + 1))}
       </div>
     )
   }
@@ -124,7 +152,7 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
             </div>
 
             <div className="px-5 pt-4">
-              <p className="mb-3 text-xs text-muted-foreground">Marque uma <strong>pasta</strong> para selecionar todos os grupos dela de uma vez — e desmarque os que não devem entrar. Os estudantes de cada grupo são ligados ao banco (novos membros entram <strong>automaticamente</strong>).</p>
+              <p className="mb-3 text-xs text-muted-foreground">Marque uma <strong>pasta</strong> para selecionar todos os grupos dentro dela (em qualquer nível) — e desmarque os que não devem entrar. Novos membros de cada grupo entram no banco <strong>automaticamente</strong>.</p>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar grupo…" className="w-full rounded-lg border bg-[var(--input-bg,transparent)] py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
@@ -134,35 +162,16 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
             <div className="scroll-claro mt-3 min-h-0 flex-1 space-y-2 overflow-auto px-5 pb-2">
               {grupos.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">Nenhum grupo cadastrado.</p>
+              ) : q ? (
+                // Busca: lista plana só de grupos comuns que casam.
+                (() => {
+                  const res = grupos.filter((g) => !g.is_mestre && g.nome.toLowerCase().includes(q))
+                  return res.length === 0
+                    ? <p className="py-8 text-center text-sm text-muted-foreground">Nenhum grupo encontrado.</p>
+                    : res.map((g) => linhaGrupo(g, 0))
+                })()
               ) : (
-                <>
-                  {pastas.map((p) => {
-                    const filhos = (filhosPorPai.get(p.id) ?? []).filter(match)
-                    // Esconde a pasta se a busca não casa nem no nome dela nem em nenhum filho.
-                    if (q && !p.nome.toLowerCase().includes(q) && filhos.length === 0) return null
-                    const todosFilhos = filhosPorPai.get(p.id) ?? []
-                    const ids = todosFilhos.map((f) => f.id)
-                    const marcados = ids.filter((id) => sel.has(id)).length
-                    const totalMembros = todosFilhos.reduce((s, f) => s + f.membros, 0)
-                    return (
-                      <div key={p.id} className="space-y-1.5">
-                        <div role="button" tabIndex={0} onClick={() => togglePasta(todosFilhos)}
-                          className="flex w-full cursor-pointer items-center gap-3 rounded-lg bg-muted/50 px-3 py-2 text-left transition-colors hover:bg-muted">
-                          <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', marcados === 0 ? 'border-muted-foreground/40' : 'border-primary bg-primary text-primary-foreground')}>
-                            {marcados > 0 && (marcados === ids.length ? <Check className="h-3 w-3" /> : <Minus className="h-3 w-3" />)}
-                          </span>
-                          <Folder className="h-4 w-4 shrink-0" style={{ color: p.cor ?? 'var(--muted-foreground)' }} />
-                          <span className="min-w-0 flex-1 truncate text-sm font-semibold">{p.nome}</span>
-                          <span className="shrink-0 text-[11px] text-muted-foreground">{todosFilhos.length} grupo(s) · {totalMembros} membro(s)</span>
-                        </div>
-                        {filhos.length === 0
-                          ? <p className="ml-5 px-3 py-1 text-xs text-muted-foreground">Pasta vazia.</p>
-                          : filhos.map((g) => linha(g, true))}
-                      </div>
-                    )
-                  })}
-                  {soltos.filter(match).map((g) => linha(g))}
-                </>
+                top.map((g) => renderNo(g, 0))
               )}
             </div>
 
