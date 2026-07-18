@@ -47,9 +47,10 @@ export const BLOCKS: BlockMeta[] = [
   // Identificação
   { type: 'identificacao', title: 'Identificação', icon: IdCard, category: 'identificacao', dynamic: true, supportsVars: true,
     defaults: { titulo: 'Dados do Candidato', bordaRaio: 8, fonte: '', corBorda: '', corHeader: '', corHeaderTexto: '', corRotulo: '', corValor: '', corDestaque: '', corAcento: '', mostrarDesempenho: true,
+      corAcertos: '#16a34a', corErros: '#dc2626', mediaLim1: 33, mediaLim2: 66, corMediaBaixa: '#dc2626', corMediaMedia: '#f59e0b', corMediaAlta: '#16a34a', corMediaMax: '',
       destaque: [{ rotulo: 'Nome', valor: '{{nome}}' }, { rotulo: 'E-mail', valor: '{{email}}' }],
       campos: [{ rotulo: 'Data', valor: '{{data}}' }, { rotulo: 'Início', valor: '{{inicio}}' }, { rotulo: 'Término', valor: '{{termino}}' }, { rotulo: 'Tempo total', valor: '{{tempo_total}}' }, { rotulo: 'Respondidas', valor: '{{respondidas}}' }, { rotulo: 'Em branco', valor: '{{em_branco}}' }],
-      desempenho: [{ rotulo: 'Acertos', valor: '{{acertos}}' }, { rotulo: 'Erros', valor: '{{erros}}' }, { rotulo: 'Média', valor: '{{nota}}' }] } },
+      desempenho: [{ rotulo: 'Acertos', valor: '{{acertos}}' }, { rotulo: 'Erros', valor: '{{erros}}' }, { rotulo: 'Média', valor: '{{percentual}}' }] } },
   { type: 'cabecalho-prova', title: 'Cabeçalho de prova', icon: LayoutGrid, category: 'identificacao', supportsVars: true,
     defaults: { campos: [{ rotulo: 'Banca', valor: '' }, { rotulo: 'Órgão', valor: '' }, { rotulo: 'Cargo', valor: '' }, { rotulo: 'Ano', valor: '' }], colunas: 2 } },
   { type: 'assinatura', title: 'Assinatura', icon: Signature, category: 'identificacao', supportsVars: true,
@@ -364,6 +365,19 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
       // Linha de desempenho (Acertos/Erros/Média) — só quando o gabarito está liberado.
       const mostraDesemp = a.mostrarDesempenho !== false && (data.gabaritoLiberado || editor)
       const desempenho = mostraDesemp ? norm(a.desempenho) : []
+      // Cores da linha de desempenho. Média muda por faixa de % de acerto (limites configuráveis).
+      const corAcertos = a.corAcertos || '#16a34a'
+      const corErros = a.corErros || '#dc2626'
+      const lim1 = Number(a.mediaLim1 ?? 33), lim2 = Number(a.mediaLim2 ?? 66)
+      const cMedBaixa = a.corMediaBaixa || '#dc2626', cMedMedia = a.corMediaMedia || '#f59e0b', cMedAlta = a.corMediaAlta || '#16a34a', cMedMax = a.corMediaMax || c.primaria
+      const pctNum = parseFloat(String(applyVars('{{percentual}}', data.vars)).replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0
+      const corMedia = pctNum >= 100 ? cMedMax : pctNum >= lim2 ? cMedAlta : pctNum >= lim1 ? cMedMedia : cMedBaixa
+      const corCelDesemp = (valor: string) => {
+        if (/\{\{?\s*erros/i.test(valor)) return corErros
+        if (/\{\{?\s*acertos/i.test(valor)) return corAcertos
+        if (/\{\{?\s*(nota|percentual|media|média)/i.test(valor)) return corMedia
+        return a.corValor || c.texto
+      }
       const titulo = a.titulo || 'Dados do Candidato'
       const raio = a.bordaRaio ?? 8
       const fontFamily = cssDaFonte(a.fonte) || theme.tipografia.familia
@@ -396,7 +410,12 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
           )}
           {desempenho.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${desempenho.length}, 1fr)`, borderTop: (destaque.length || campos.length) ? `1px solid ${borda}` : 'none', background: corDestaque }}>
-              {desempenho.map((f, i) => celula(f, i, desempenho.length, false))}
+              {desempenho.map((f, i) => (
+                <div key={i} style={{ padding: '7px 10px', minWidth: 0, borderLeft: i % desempenho.length !== 0 ? `1px solid ${borda}` : 'none', textAlign: 'center' }}>
+                  <div style={{ fontSize: 8.5, color: corRotulo, marginBottom: 2, letterSpacing: 0.4, textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.rotulo}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: corCelDesemp(f.valor), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{val(f.valor) || '—'}</div>
+                </div>
+              ))}
             </div>
           )}
           <div style={{ height: 3, background: corAcento }} />

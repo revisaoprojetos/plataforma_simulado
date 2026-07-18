@@ -343,7 +343,19 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco, assunt
           <div className="border-t pt-2" />
           <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarDesempenho !== false} onChange={(e) => set('mostrarDesempenho', e.target.checked)} className="h-4 w-4 rounded border" /> Linha de desempenho (só no caderno com gabarito liberado)</label>
           {a.mostrarDesempenho !== false && (
-            <GrupoCampos label="Desempenho (aparece só com gabarito liberado)" items={normCampos(a.desempenho)} onChange={(v) => set('desempenho', v)} exemplos="{{acertos}} {{erros}} {{nota}} {{percentual}} {{total_questoes}}" />
+            <>
+              <GrupoCampos label="Desempenho (centralizado, aparece só com gabarito liberado)" items={normCampos(a.desempenho)} onChange={(v) => set('desempenho', v)} exemplos="{{acertos}} {{erros}} {{percentual}} {{nota}} {{total_questoes}}" />
+              <p className="text-[11px] text-muted-foreground">Cores por tipo: o campo com <code>{'{{acertos}}'}</code> usa a cor de acerto, <code>{'{{erros}}'}</code> a de erro, e <code>{'{{percentual}}'}</code>/<code>{'{{nota}}'}</code> muda pela faixa de % abaixo.</p>
+              <Cor label="Cor de Acertos" value={a.corAcertos} onChange={(v) => set('corAcertos', v)} />
+              <Cor label="Cor de Erros" value={a.corErros} onChange={(v) => set('corErros', v)} />
+              <p className="pt-1 text-xs font-semibold text-muted-foreground">Média — cor por faixa de %</p>
+              <Row label="Abaixo de (%) → cor baixa"><input type="number" min={0} max={100} value={a.mediaLim1 ?? 33} onChange={(e) => set('mediaLim1', Number(e.target.value))} className={inputCls} /></Row>
+              <Row label="Até (%) → cor média"><input type="number" min={0} max={100} value={a.mediaLim2 ?? 66} onChange={(e) => set('mediaLim2', Number(e.target.value))} className={inputCls} /></Row>
+              <Cor label={`Baixa (< ${a.mediaLim1 ?? 33}%)`} value={a.corMediaBaixa} onChange={(v) => set('corMediaBaixa', v)} />
+              <Cor label={`Média (${a.mediaLim1 ?? 33}–${a.mediaLim2 ?? 66}%)`} value={a.corMediaMedia} onChange={(v) => set('corMediaMedia', v)} />
+              <Cor label={`Alta (${a.mediaLim2 ?? 66}–99%)`} value={a.corMediaAlta} onChange={(v) => set('corMediaAlta', v)} />
+              <Cor label="100% (padrão = roxo do sistema)" value={a.corMediaMax} onChange={(v) => set('corMediaMax', v)} />
+            </>
           )}
         </div>
       )
