@@ -42,7 +42,7 @@ export const BLOCKS: BlockMeta[] = [
   { type: 'gabarito-correcao', title: 'Correção (marcada × correta)', icon: ClipboardCheck, category: 'avaliacao', dynamic: true,
     defaults: { rotulo: 'Sua resposta:', mostrarCorreta: true } },
   { type: 'q-comentario', title: 'Comentário da questão', icon: MessageSquare, category: 'avaliacao', dynamic: true, supportsVars: true,
-    defaults: { titulo: 'Comentário', modo: 'correta', mostrarGabarito: true, mostrarLei: true, respeitaGabarito: true, soSeTiver: true,
+    defaults: { titulo: 'Comentário do professor', modo: 'correta', mostrarGabarito: false, mostrarLei: true, respeitaGabarito: true, soSeTiver: true,
       corFundo: '#eef4ff', corBorda: '#c7d7f5', corTitulo: '#1a3a6b', corTexto: '#243b53', corLei: '#6b7280', bordaRaio: 8, padding: 10, fonte: '' } },
   // Identificação
   { type: 'identificacao', title: 'Identificação', icon: IdCard, category: 'identificacao', dynamic: true, supportsVars: true,
