@@ -180,7 +180,7 @@ function LarguraBloco({ a, set }: { a: any; set: (k: string, v: any) => void }) 
   )
 }
 
-export function BlockInspector({ block, onChange, varsExtra, gruposBanco }: { block: Block; onChange: (patch: Record<string, unknown>) => void; varsExtra?: { grupo: string; itens: { token: string; label: string }[] }[]; gruposBanco?: { id: string; nome: string; disciplinas: string[] }[] }) {
+export function BlockInspector({ block, onChange, varsExtra, gruposBanco, assuntosBanco }: { block: Block; onChange: (patch: Record<string, unknown>) => void; varsExtra?: { grupo: string; itens: { token: string; label: string }[] }[]; gruposBanco?: { id: string; nome: string; disciplinas: string[] }[]; assuntosBanco?: Record<string, string[]> }) {
   const a = block.attributes as any
   const set = (k: string, v: unknown) => onChange({ [k]: v })
   const fieldRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null)
@@ -510,7 +510,23 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco }: { bl
             )}
           </Row>
           <Row label="Nome exibido"><input value={a.nome ?? ''} onChange={(e) => set('nome', e.target.value)} className={inputCls} placeholder="Direito Constitucional" /></Row>
-          <Row label="Assunto principal"><input value={a.assunto ?? ''} onChange={(e) => set('assunto', e.target.value)} className={inputCls} placeholder="Assunto Principal (vazio = não mostra)" /></Row>
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.assuntoAuto !== false} onChange={(e) => set('assuntoAuto', e.target.checked)} className="h-4 w-4 rounded border" /> Assuntos automáticos (das questões erradas)</label>
+          {a.assuntoAuto !== false ? (
+            (() => {
+              const lista = (assuntosBanco ?? {})[a.chave] ?? []
+              return (
+                <div className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">
+                  {a.chave
+                    ? (lista.length
+                        ? <><b>Assuntos desta disciplina ({lista.length}):</b><div className="mt-1 max-h-40 space-y-0.5 overflow-y-auto">{lista.map((s) => <div key={s} className="truncate">• {s}</div>)}</div><p className="mt-1.5 text-[11px]">No relatório, cada aluno vê só os assuntos das questões que <b>errou</b> (uma por linha); se acertou tudo, o bloco não aparece.</p></>
+                        : <>Nenhum assunto principal armazenado para esta disciplina nas questões do banco. Importe a coluna <b>“Assunto Principal”</b> ou preencha manualmente (desmarque a opção acima).</>)
+                    : 'Selecione uma disciplina para ver os assuntos que serão listados.'}
+                </div>
+              )
+            })()
+          ) : (
+            <Row label="Assunto principal (manual)"><input value={a.assunto ?? ''} onChange={(e) => set('assunto', e.target.value)} className={inputCls} placeholder="Assunto Principal (vazio = não mostra)" /></Row>
+          )}
           <FonteSelect value={a.fonte} onChange={(v) => set('fonte', v)} />
           <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.soSeErrou !== false} onChange={(e) => set('soSeErrou', e.target.checked)} className="h-4 w-4 rounded border" /> Só aparece se errou alguma questão</label>
           <div className="border-t pt-2" />
@@ -518,6 +534,7 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco }: { bl
           <Faixa label="Espessura da linha (px)" min={0} max={8} value={a.linhaAltura ?? 2} onChange={(v) => set('linhaAltura', v)} />
           <Cor label="Fundo" value={a.corRow} onChange={(v) => set('corRow', v)} />
           <Cor label="Cor do título" value={a.corTitulo} onChange={(v) => set('corTitulo', v)} />
+          <Cor label="Cor dos assuntos" value={a.corAssunto} onChange={(v) => set('corAssunto', v)} />
           <Cor label="Cor do acerto (X/N)" value={a.corAcerto} onChange={(v) => set('corAcerto', v)} />
           <Cor label="Cor do %" value={a.corPct} onChange={(v) => set('corPct', v)} />
         </div>

@@ -82,7 +82,7 @@ export const BLOCKS: BlockMeta[] = [
   { type: 'diag-grupo-header', title: 'Diagnóstico — Cabeçalho de Grupo', icon: Grid3x3, category: 'avaliacao', dynamic: true, supportsVars: true,
     defaults: { grupo: 'Grupo I', chaves: [], corHeader: '#f6c445', corTexto: '#243b7a', fonte: '' } },
   { type: 'diag-disciplina', title: 'Diagnóstico — Disciplina', icon: ListChecks, category: 'avaliacao', dynamic: true, supportsVars: true,
-    defaults: { chave: '', nome: '', assunto: 'Assunto Principal', soSeErrou: true, corLinha: '#c9a227', linhaAltura: 2, corRow: '#e9eef7', corTitulo: '#1a3a6b', corAcerto: '#8a8a8a', corPct: '#e8850c', fonte: '' } },
+    defaults: { chave: '', nome: '', assunto: 'Assunto Principal', assuntoAuto: true, soSeErrou: true, corLinha: '#c9a227', linhaAltura: 2, corRow: '#e9eef7', corTitulo: '#1a3a6b', corAssunto: '#555555', corAcerto: '#8a8a8a', corPct: '#e8850c', fonte: '' } },
   { type: 'diag-grupo', title: 'Diagnóstico — Grupo/Disciplinas', icon: Rows3, category: 'avaliacao', dynamic: true, supportsVars: true, oculto: true,
     defaults: {
       grupo: 'Grupo I', disciplinas: [{ chave: 'direito_administrativo', nome: 'Direito Administrativo', assunto: '' }],
@@ -510,7 +510,16 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
         <div style={{ borderTop: `${a.linhaAltura ?? 2}px solid ${a.corLinha || '#c9a227'}`, background: a.corRow || '#e9eef7', padding: '7px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 12, color: a.corTitulo || '#1a3a6b' }}>{applyVars(a.nome || '', data.vars)}</div>
-            {a.assunto && <div style={{ fontSize: 10, color: '#555', fontStyle: 'italic' }}>- Categoria: {applyVars(a.assunto, data.vars)}</div>}
+            {a.assuntoAuto !== false ? (
+              // Assuntos das questões erradas (um por linha). Vazio quando acertou tudo.
+              (() => {
+                const raw = applyVars(`{assuntos_${a.chave}}`, data.vars)
+                const linhas = /\{/.test(raw) ? [] : raw.split('\n').map((x: string) => x.trim()).filter(Boolean)
+                return linhas.map((as: string, i: number) => <div key={i} style={{ fontSize: 10, color: a.corAssunto || '#555', fontStyle: 'italic' }}>- {as}</div>)
+              })()
+            ) : (
+              a.assunto ? <div style={{ fontSize: 10, color: a.corAssunto || '#555', fontStyle: 'italic' }}>- Categoria: {applyVars(a.assunto, data.vars)}</div> : null
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, whiteSpace: 'nowrap' }}>
             <span style={{ fontSize: 11, color: a.corAcerto || '#8a8a8a' }}>{val(`{acerto_${a.chave}}`, 'X')}/{val(`{total_${a.chave}}`, '0')}</span>

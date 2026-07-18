@@ -15,7 +15,7 @@ import { HudSimuladoEditor } from '@/components/admin/hud-simulado-editor'
 import { HexColorField } from '@/components/admin/hex-color-field'
 import { GerarPdfServidor } from '@/components/admin/gerar-pdf-servidor'
 import { MonitorPlay, GitBranch } from 'lucide-react'
-import { salvarCadernoDesignerV2, getGruposBanco } from '@/app/admin/cadernos/actions'
+import { salvarCadernoDesignerV2, getGruposBanco, getAssuntosBanco } from '@/app/admin/cadernos/actions'
 import { PRESETS_CADERNO, type CadernoPreset } from '@/lib/caderno-designer/presets'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
@@ -344,6 +344,8 @@ export function CadernoEditorV2({
   // Grupos de disciplinas definidos no banco (para o bloco Cabeçalho de Grupo).
   const [gruposBanco, setGruposBanco] = useState<{ id: string; nome: string; disciplinas: string[] }[]>([])
   useEffect(() => { let vivo = true; if (bancoId) getGruposBanco(bancoId).then((r) => { if (vivo && r.ok) setGruposBanco(r.grupos ?? []) }); else setGruposBanco([]); return () => { vivo = false } }, [bancoId])
+  const [assuntosBanco, setAssuntosBanco] = useState<Record<string, string[]>>({})
+  useEffect(() => { let vivo = true; if (bancoId) getAssuntosBanco(bancoId).then((r) => { if (vivo && r.ok) setAssuntosBanco(r.porDisciplina ?? {}) }); else setAssuntosBanco({}); return () => { vivo = false } }, [bancoId])
   const [regIndex, setRegIndex] = useState(0)
   const [modAtiva, setModAtiva] = useState<string>((mods0Vis[0] ?? mods0[0]).id)
   const [selPage, setSelPage] = useState<string | null>(null)
@@ -812,7 +814,7 @@ export function CadernoEditorV2({
             {aba === 'bloco' && (blocoSel ? (
               <div className="space-y-3">
                 <p className="flex items-center gap-1.5 text-sm font-semibold">{getBlockMeta(blocoSel.type)?.title}</p>
-                <BlockInspector block={blocoSel} onChange={(patch) => patchBlock(blocoSel.id, patch)} varsExtra={varsExtra} gruposBanco={gruposBanco} />
+                <BlockInspector block={blocoSel} onChange={(patch) => patchBlock(blocoSel.id, patch)} varsExtra={varsExtra} gruposBanco={gruposBanco} assuntosBanco={assuntosBanco} />
               </div>
             ) : <p className="text-sm text-muted-foreground">Selecione um bloco no canvas para editar suas opções.</p>)}
 

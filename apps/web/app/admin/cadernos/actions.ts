@@ -119,3 +119,29 @@ export async function getGruposBanco(bancoId: string): Promise<{ ok: boolean; gr
   const grupos = Array.isArray((data as any)?.grupos) ? (data as any).grupos : []
   return { ok: true, grupos: grupos.map((g: any) => ({ id: String(g.id ?? g.nome), nome: String(g.nome ?? ''), disciplinas: Array.isArray(g.disciplinas) ? g.disciplinas.map(String) : [] })) }
 }
+
+/** Assuntos principais das questões do banco, agrupados por disciplina (slug → nomes). */
+export async function getAssuntosBanco(bancoId: string): Promise<{ ok: boolean; porDisciplina?: Record<string, string[]> }> {
+  if (!bancoId) return { ok: true, porDisciplina: {} }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false }
+  const svc = createAdminClient()
+  const { data: vinc } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', access.tenantId)
+  const ids = [...new Set((vinc ?? []).map((v: any) => v.questao_id).filter(Boolean))]
+  if (!ids.length) return { ok: true, porDisciplina: {} }
+  const slug = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+  const porDisc: Record<string, Set<string>> = {}
+  const CHUNK = 500
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const { data: qs } = await svc.from('simulado_questoes').select('disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)').in('id', ids.slice(i, i + CHUNK)).eq('deletado', false)
+    for (const q of qs ?? []) {
+      const d = (q as any).disciplinas?.nome as string | undefined
+      const a = (q as any).assuntos?.nome as string | undefined
+      if (!d || !a) continue
+      const k = slug(d); (porDisc[k] ??= new Set<string>()).add(a)
+    }
+  }
+  const out: Record<string, string[]> = {}
+  for (const k of Object.keys(porDisc)) out[k] = [...porDisc[k]].sort()
+  return { ok: true, porDisciplina: out }
+}

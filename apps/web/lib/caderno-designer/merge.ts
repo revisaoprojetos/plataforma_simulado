@@ -21,16 +21,24 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
 
   const discDaQuestao = new Map<string, string>()
   const discTotais = new Map<string, number>()
+  const assuntoDaQuestao = new Map<string, string>()       // questao_id -> assunto principal (simulado_assuntos.nome)
+  const assuntosTodosPorDisc = new Map<string, Set<string>>() // disciplina -> todos os assuntos das suas questões
   const pilaresDaQuestao = new Map<string, string[]>() // questao_id -> pilar (categoria: Lei seca/Jurisprudência/Doutrina)
   const pilarTotais = new Map<string, number>()        // pilar -> nº de questões
   if (qids.length) {
     // O PILAR vem da coluna `categoria` da questão (Lei seca / Jurisprudência / Doutrina).
     // `pilar_1/pilar_2` é opcional (fallback) para bases que usem esse formato.
-    const { data: qs } = await svc.from('simulado_questoes').select('id, categoria, pilar_1, pilar_2, disciplinas:simulado_disciplinas(nome)').in('id', qids)
+    const { data: qs } = await svc.from('simulado_questoes').select('id, categoria, pilar_1, pilar_2, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)').in('id', qids)
     for (const q of qs ?? []) {
       const d = (q as any).disciplinas?.nome ?? 'Geral'
       discDaQuestao.set(q.id, d)
       discTotais.set(d, (discTotais.get(d) ?? 0) + 1)
+      // Assunto principal (da importação) — usado no bloco "Diagnóstico — Disciplina".
+      const as = (q as any).assuntos?.nome as string | undefined
+      if (as) {
+        assuntoDaQuestao.set(q.id, as)
+        const set = assuntosTodosPorDisc.get(d) ?? new Set<string>(); set.add(as); assuntosTodosPorDisc.set(d, set)
+      }
       // Normaliza a `categoria` (bagunçada/combinada) em UM pilar canônico. "Legislação" = Lei seca.
       // PRIORIDADE (cada questão conta em um só pilar → soma = total do simulado): Lei seca > Jurisprudência > Doutrina.
       const catTxt = [(q as any).categoria, (q as any).pilar_1, (q as any).pilar_2].map((x) => (x ?? '').toString()).join(' ').toLowerCase()
@@ -143,6 +151,14 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
       const d = discDaQuestao.get(qid) ?? 'Geral'; porDisc.set(d, (porDisc.get(d) ?? 0) + 1)
       for (const p of pilaresDaQuestao.get(qid) ?? []) porPilar.set(p, (porPilar.get(p) ?? 0) + 1)
     }
+    // Assuntos das questões que o aluno NÃO acertou (errou ou deixou em branco), por disciplina.
+    // Percorre TODAS as questões da disciplina; entra quem não tem acerto (m.get !== true).
+    const assuntosErrPorDisc = new Map<string, Set<string>>()
+    for (const [qid, d] of discDaQuestao) {
+      if (m.get(qid) === true) continue
+      const as = assuntoDaQuestao.get(qid); if (!as) continue
+      const set = assuntosErrPorDisc.get(d) ?? new Set<string>(); set.add(as); assuntosErrPorDisc.set(d, set)
+    }
 
     const vars: Record<string, string> = {
       nome: a.nome ?? '', email: a.email ?? '', telefone: a.telefone ?? '', cpf: a.cpf ?? '', classificacao: a.classificacao ?? '',
@@ -155,6 +171,9 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
       vars[`acerto_${s}`] = String(porDisc.get(d) ?? 0)
       vars[`total_${s}`] = String(tot)
       vars[`pct_${s}`] = tot ? `${Math.round(((porDisc.get(d) ?? 0) / tot) * 100)}%` : '0%'
+      // Assuntos principais: das erradas (por linha) e todos os da disciplina.
+      vars[`assuntos_${s}`] = [...(assuntosErrPorDisc.get(d) ?? [])].join('\n')
+      vars[`assuntos_todos_${s}`] = [...(assuntosTodosPorDisc.get(d) ?? [])].join('\n')
     }
     // Variáveis por PILAR (vêm de pilar_1/pilar_2 da importação das questões).
     for (const [p, tot] of pilarTotais) {
