@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import type React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
@@ -13,7 +14,7 @@ import { SecaoHeader } from '@/components/admin/secao-header'
 import { cn } from '@/lib/utils'
 import {
   Plus, Users, Pencil, Trash2, Loader2, UsersRound, ChevronRight, ChevronDown,
-  Folder, FolderOpen, FolderPlus, FolderInput, X, Check,
+  Folder, FolderOpen, FolderPlus, FolderInput, X, Check, GripVertical, FolderMinus,
 } from 'lucide-react'
 
 type Grupo = { id: string; nome: string; membros: number; cor: string | null; is_mestre: boolean; pai_id: string | null }
@@ -24,6 +25,8 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
   const [editando, setEditando] = useState<Grupo | null>(null)
   const [movendo, setMovendo] = useState<Grupo | null>(null)
   const [expandido, setExpandido] = useState<Set<string>>(() => new Set(grupos.filter((g) => g.is_mestre).map((g) => g.id)))
+  const [arrastando, setArrastando] = useState<Grupo | null>(null)
+  const [alvo, setAlvo] = useState<string | null>(null) // pasta.id ou '__solto__'
 
   const pastas = useMemo(() => grupos.filter((g) => g.is_mestre).sort((a, b) => a.nome.localeCompare(b.nome)), [grupos])
   const porPai = useMemo(() => {
@@ -64,6 +67,26 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
   function toggle(id: string) {
     setExpandido((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
+  function expandir(id: string) {
+    setExpandido((p) => (p.has(id) ? p : new Set(p).add(id)))
+  }
+
+  // ── Drag & drop ──────────────────────────────────────────────────────────
+  function doMover(g: Grupo, paiId: string | null) {
+    setArrastando(null); setAlvo(null)
+    if ((g.pai_id ?? null) === paiId) return
+    start(async () => {
+      const r = await moverGrupo(g.id, paiId)
+      if (r.ok) { toast.success(paiId ? 'Grupo movido para a pasta' : 'Grupo solto da pasta'); router.refresh() }
+      else toast.error(r.error ?? 'Erro ao mover')
+    })
+  }
+  const dragProps = (g: Grupo): React.HTMLAttributes<HTMLDivElement> & { draggable: boolean } => ({
+    draggable: true,
+    onDragStart: (e) => { setArrastando(g); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', g.id) } catch {} },
+    onDragEnd: () => { setArrastando(null); setAlvo(null) },
+  })
+  const podeSoltarNa = (paiId: string | null) => !!arrastando && (arrastando.pai_id ?? null) !== paiId
 
   const nada = grupos.length === 0
 
@@ -72,7 +95,7 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Grupos</h1>
-          <p className="text-muted-foreground">Organize grupos de estudantes em pastas (grupos mestre) para atribuir em lote.</p>
+          <p className="text-muted-foreground">Organize grupos de estudantes em pastas (grupos mestre) — arraste um grupo para dentro de uma pasta.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={novaPasta} disabled={pending}
@@ -101,8 +124,13 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
                 const filhos = porPai.get(p.id) ?? []
                 const totalMembros = filhos.reduce((s, f) => s + f.membros, 0)
                 const aberto = expandido.has(p.id)
+                const ativo = alvo === p.id
                 return (
-                  <div key={p.id}>
+                  <div key={p.id}
+                    onDragOver={(e) => { if (podeSoltarNa(p.id)) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setAlvo(p.id); expandir(p.id) } }}
+                    onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setAlvo((a) => (a === p.id ? null : a)) }}
+                    onDrop={(e) => { if (arrastando && podeSoltarNa(p.id)) { e.preventDefault(); doMover(arrastando, p.id) } }}
+                    className={cn('transition-colors', ativo && 'bg-primary/10 ring-2 ring-inset ring-primary')}>
                     <div className="group flex items-center gap-2 px-4 py-2.5 transition-colors hover:bg-muted/40">
                       <button type="button" onClick={() => toggle(p.id)} className="rounded p-0.5 text-muted-foreground hover:text-foreground" title={aberto ? 'Recolher' : 'Expandir'}>
                         {aberto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -120,17 +148,32 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
                     {aberto && (
                       <div className="bg-muted/20">
                         {filhos.length === 0 ? (
-                          <p className="py-2.5 pl-12 pr-4 text-xs text-muted-foreground">Pasta vazia — mova grupos para cá pelo botão <FolderInput className="mb-0.5 inline h-3 w-3" />.</p>
+                          <p className={cn('py-2.5 pl-12 pr-4 text-xs', ativo ? 'font-medium text-primary' : 'text-muted-foreground')}>
+                            {ativo ? 'Solte para mover para esta pasta' : <>Pasta vazia — arraste grupos para cá ou use o botão <FolderInput className="mb-0.5 inline h-3 w-3" />.</>}
+                          </p>
                         ) : filhos.map((g) => (
-                          <GrupoRow key={g.id} g={g} indent onEdit={() => setEditando(g)} onMove={() => setMovendo(g)} onDelete={() => excluir(g)} />
+                          <GrupoRow key={g.id} g={g} indent dragging={arrastando?.id === g.id} dragProps={dragProps(g)} onEdit={() => setEditando(g)} onMove={() => setMovendo(g)} onDelete={() => excluir(g)} />
                         ))}
                       </div>
                     )}
                   </div>
                 )
               })}
+
+              {/* Zona para tirar da pasta (só aparece ao arrastar um grupo que está em alguma pasta). */}
+              {arrastando && arrastando.pai_id && (
+                <div
+                  onDragOver={(e) => { if (podeSoltarNa(null)) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setAlvo('__solto__') } }}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setAlvo((a) => (a === '__solto__' ? null : a)) }}
+                  onDrop={(e) => { if (arrastando) { e.preventDefault(); doMover(arrastando, null) } }}
+                  className={cn('m-3 flex items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-3 text-sm transition-colors',
+                    alvo === '__solto__' ? 'border-primary bg-primary/10 font-medium text-primary' : 'border-muted-foreground/30 text-muted-foreground')}>
+                  <FolderMinus className="h-4 w-4" /> Solte aqui para tirar da pasta
+                </div>
+              )}
+
               {soltos.map((g) => (
-                <GrupoRow key={g.id} g={g} onEdit={() => setEditando(g)} onMove={() => setMovendo(g)} onDelete={() => excluir(g)} />
+                <GrupoRow key={g.id} g={g} dragging={arrastando?.id === g.id} dragProps={dragProps(g)} onEdit={() => setEditando(g)} onMove={() => setMovendo(g)} onDelete={() => excluir(g)} />
               ))}
             </div>
           )}
@@ -143,10 +186,16 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
   )
 }
 
-function GrupoRow({ g, indent, onEdit, onMove, onDelete }: { g: Grupo; indent?: boolean; onEdit: () => void; onMove: () => void; onDelete: () => void }) {
+function GrupoRow({ g, indent, dragging, dragProps, onEdit, onMove, onDelete }: {
+  g: Grupo; indent?: boolean; dragging?: boolean
+  dragProps: React.HTMLAttributes<HTMLDivElement> & { draggable: boolean }
+  onEdit: () => void; onMove: () => void; onDelete: () => void
+}) {
   return (
-    <div className={cn('group flex items-center gap-2 px-4 py-2.5 transition-colors hover:bg-muted/40', indent && 'pl-12')}>
-      <Link href={`/admin/grupos/${g.id}`} className="flex min-w-0 flex-1 items-center gap-2 font-medium hover:text-primary">
+    <div {...dragProps}
+      className={cn('group flex items-center gap-1.5 px-4 py-2.5 transition-colors hover:bg-muted/40', indent && 'pl-8', dragging && 'opacity-40')}>
+      <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/40 transition-colors group-hover:text-muted-foreground active:cursor-grabbing" />
+      <Link href={`/admin/grupos/${g.id}`} draggable={false} className="flex min-w-0 flex-1 items-center gap-2 font-medium hover:text-primary">
         <span className="h-3 w-3 shrink-0 rounded-full ring-1 ring-black/10" style={{ background: g.cor ?? 'var(--muted-foreground)' }} />
         <span className="truncate">{g.nome}</span>
         <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
