@@ -12,6 +12,7 @@ import { importarViaProvider, listarFontesProvider, processarEvento } from '@/li
 import { aplicarEntitlement, reaplicarLiberacoes } from '@/lib/integracoes/engine'
 import { coalescer } from '@/lib/integracoes/ratelimit'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { normalizarPorMapa } from '@/lib/integracoes/normalizar-mapa'
 import type { Provider, PessoaNormalizada, Entitlement } from '@/lib/integracoes/tipos'
 
 const PROVIDERS: Provider[] = ['curseduca', 'guru']
@@ -505,6 +506,53 @@ export interface InboxDetalhe {
   metodo: string; statusResp: number | null; resultado: string | null
   ip: string | null; recebidoEm: string; tokenMasc: string | null
   headers: unknown; query: unknown; body: unknown; bodyRaw: string | null
+  resumo?: string[]
+}
+
+/** Resumo humano do que a requisição faz/fez (read-only): comprador, produto, aluno, grupos, mapeamento. */
+async function montarResumoRecebido(svc: ReturnType<typeof createAdminClient>, tenantId: string, provider: Provider, payload: unknown): Promise<string[]> {
+  try {
+    const cfg = await resolverProviderCfg(tenantId, provider)
+    const norm = normalizarPorMapa(payload, cfg?.mapa, true)
+    if (!norm) return ['Não deu para identificar comprador/produto neste payload — revise o Mapa JSON.']
+    const { pessoa, entitlement, statusBruto } = norm
+    const dig = (s?: string | null) => (s ? s.replace(/\D/g, '') : '')
+    const out: string[] = []
+    out.push(`Comprador: ${pessoa.nome}${pessoa.email ? ` · ${pessoa.email}` : ''}${pessoa.cpf ? ` · CPF ${dig(pessoa.cpf)}` : ''}`)
+    out.push(`Produto: ${entitlement.produtoNome ?? entitlement.produtoRef} · status "${statusBruto ?? '—'}" → ${entitlement.status === 'ativo' ? 'LIBERA acesso' : 'CANCELA acesso'}`)
+
+    let est: any = null
+    for (const [col, val] of [['matricula_externa', pessoa.externalId], ['email', pessoa.email?.trim().toLowerCase()], ['cpf', dig(pessoa.cpf)]] as [string, string | undefined][]) {
+      if (est || !val) continue
+      const { data } = await svc.from('simulado_estudantes').select('id, classificacao').eq('tenant_id', tenantId).eq(col, val).eq('deletado', false).maybeSingle()
+      if (data) est = data
+    }
+    if (est) {
+      out.push(`Aluno já cadastrado${est.classificacao ? ` · classificação: ${est.classificacao}` : ''}.`)
+      const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', est.id)
+      const gids = (gm ?? []).map((x: any) => x.grupo_id)
+      if (gids.length) { const { data: gs } = await svc.from('simulado_grupos').select('nome').in('id', gids); out.push(`Está nos grupos: ${(gs ?? []).map((x: any) => x.nome).join(', ')}.`) }
+      const { count } = await svc.from('simulado_matriculas').select('id', { count: 'exact', head: true }).eq('estudante_id', est.id)
+      out.push(`Matriculado em ${count ?? 0} simulado(s).`)
+      if (est.classificacao === 'passaporte') out.push('É PASSAPORTE → acessa TODOS os simulados automaticamente.')
+    } else {
+      out.push('Aluno ainda não existe — será cadastrado ao processar.')
+    }
+
+    const { data: mp } = await svc.from('simulado_integracao_mapeamentos').select('classificacao, grupo_id, pasta_id, simulado_id, ativo').eq('tenant_id', tenantId).eq('provider', provider).eq('fonte_ref', entitlement.produtoRef).maybeSingle()
+    if (mp && (mp as any).ativo) {
+      const m = mp as any
+      const partes: string[] = []
+      if (m.classificacao) partes.push(`classificação ${m.classificacao}`)
+      if (m.grupo_id) { const { data } = await svc.from('simulado_grupos').select('nome').eq('id', m.grupo_id).maybeSingle(); partes.push(`grupo "${(data as any)?.nome ?? '?'}"`) }
+      if (m.pasta_id) { const { data } = await svc.from('simulado_pastas').select('nome').eq('id', m.pasta_id).maybeSingle(); partes.push(`banco "${(data as any)?.nome ?? '?'}" (libera os simulados dele)`) }
+      if (m.simulado_id) { const { data } = await svc.from('simulado_simulados').select('titulo').eq('id', m.simulado_id).maybeSingle(); partes.push(`simulado "${(data as any)?.titulo ?? '?'}"`) }
+      out.push(`Mapeamento concede: ${partes.length ? partes.join(' · ') : '(nada configurado)'}.`)
+    } else {
+      out.push('Produto SEM mapeamento → ao processar cai num grupo automático (configure em Mapeamentos).')
+    }
+    return out
+  } catch (e: any) { return ['Não foi possível montar o resumo: ' + (e?.message ?? String(e))] }
 }
 
 export async function getWebhookInboxDetalhe(provider: string, id: string): Promise<{ ok: boolean; error?: string; detalhe?: InboxDetalhe }> {
@@ -518,12 +566,14 @@ export async function getWebhookInboxDetalhe(provider: string, id: string): Prom
   if (!data) return { ok: false, error: 'Requisição não encontrada.' }
   const d = data as any
   const tok: string | null = d.token ?? null
+  const resumo = d.body_json ? await montarResumoRecebido(svc, g.tenantId, provider as Provider, d.body_json) : undefined
   return {
     ok: true,
     detalhe: {
       metodo: d.metodo, statusResp: d.status_resp, resultado: d.resultado, ip: d.ip, recebidoEm: d.recebido_em,
       tokenMasc: tok ? `${tok.slice(0, 6)}…${tok.slice(-4)}` : null,
       headers: d.headers ?? null, query: d.query ?? null, body: d.body_json ?? null, bodyRaw: d.body_raw ?? null,
+      resumo,
     },
   }
 }

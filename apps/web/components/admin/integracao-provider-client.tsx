@@ -308,77 +308,93 @@ function MapaJson({ provider, inicial }: { provider: Provider; inicial?: { mapa:
     return payload ? getStr(payload, caminho) : null
   }
   const corConf = (c: number) => c >= 80 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : c >= 55 ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+  const resolvidos = payload ? CAMPOS_MAPA.filter((c) => resolver(c.key) != null).length : Object.values(mapa).filter((v) => (v ?? '').trim()).length
+  const pct = Math.round((resolvidos / CAMPOS_MAPA.length) * 100)
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="max-w-xl text-sm text-muted-foreground">O sistema <b>detecta automaticamente</b> as chaves do JSON que a {nomeProv} envia (pelo nome e pelo valor). Revise, ajuste se precisar e salve. O <b>ID do pedido</b> é a chave única (principal).</p>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={carregar} disabled={carregando}>{carregando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />} Recarregar</Button>
-          <Button size="sm" onClick={detectar} disabled={!payload}><RotateCw className="mr-2 h-3.5 w-3.5" /> Detectar automaticamente</Button>
+      {/* Cabeçalho: descrição + progresso + ações */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-gradient-to-br from-primary/[0.07] to-transparent p-4">
+        <div className="min-w-0 max-w-xl">
+          <h3 className="flex items-center gap-2 text-sm font-semibold"><Braces className="h-4 w-4 text-primary" /> Mapa do JSON</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">Ligue cada campo do sistema à chave que a {nomeProv} envia. Clique num campo, depois na chave em <b>Dados recebidos</b> — ou use <b>Detectar</b>.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-right leading-none">
+            <p className="text-2xl font-bold tabular-nums">{resolvidos}<span className="text-sm font-medium text-muted-foreground">/{CAMPOS_MAPA.length}</span></p>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">campos ok</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={carregar} disabled={carregando}>{carregando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />} Recarregar</Button>
+            <Button size="sm" onClick={detectar} disabled={!payload}><RotateCw className="mr-2 h-3.5 w-3.5" /> Detectar</Button>
+          </div>
         </div>
       </div>
+      {/* Barra de progresso */}
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-gradient-to-r from-primary to-violet-500 transition-all" style={{ width: `${pct}%` }} /></div>
 
       {!payload && (
-        <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">Nenhum payload recebido ainda para detectar. Envie um evento (Postman ou compra real) na URL do webhook e clique em <b>Recarregar</b> — a detecção automática roda em cima do JSON real.</div>
+        <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-center text-xs text-muted-foreground">
+          <Inbox className="mx-auto mb-1.5 h-6 w-6 opacity-40" />
+          Nenhum payload recebido ainda. Envie um evento (compra real ou Postman) na URL do webhook e clique em <b>Recarregar</b> — a detecção roda no JSON real.
+        </div>
       )}
 
       <datalist id={`paths-${provider}`}>
         {paths.map((p) => <option key={p.path} value={p.path}>{p.sample ? `${p.path} — ${p.sample}` : p.path}</option>)}
       </datalist>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Mapeamento de campos (esquerda) */}
-        <div className="rounded-2xl border bg-card shadow-sm">
-          <div className="border-b bg-muted/30 px-3 py-2">
-            <p className="text-xs font-semibold">Mapeamento de campos</p>
-            <p className="text-[11px] text-muted-foreground">Campo do sistema → chave do JSON. Clique no campo e depois na chave à direita.</p>
-          </div>
-          <div className="divide-y">
-            {CAMPOS_MAPA.map((c) => {
-              const resolvido = resolver(c.key)
-              const conf = auto[c.key]?.confianca
-              const emFoco = ativo === c.key
-              return (
-                <div key={c.key} className={cn('px-3 py-2 transition-colors', emFoco && 'bg-primary/[0.06]')}>
-                  <div className="mb-1 flex flex-wrap items-center gap-1.5">
-                    <span className="text-sm font-medium">{c.label}</span>
-                    {c.obrigatorio && <span className="rounded bg-primary/10 px-1 text-[10px] font-semibold text-primary">principal</span>}
-                    {conf != null && <span className={cn('rounded px-1 text-[10px] font-semibold', corConf(conf))} title="Detectado automaticamente">auto {conf}%</span>}
-                    {payload != null && (resolvido != null
-                      ? <span className="ml-auto truncate text-[11px] text-emerald-600 dark:text-emerald-400" title={resolvido}>= {resolvido}</span>
-                      : <span className="ml-auto text-[11px] text-amber-600 dark:text-amber-400">= (vazio)</span>)}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sky-600 dark:text-sky-400">→</span>
-                    <Input list={`paths-${provider}`} value={mapa[c.key] ?? ''} onFocus={() => setAtivo(c.key)} onChange={(e) => set(c.key, e.target.value)} placeholder={c.padrao} className="h-8 font-mono text-xs" />
-                  </div>
+      {/* Grid: campos (esquerda, flexível) + JSON (direita, largura fixa, sticky, sem cortar) */}
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
+        {/* Campos do sistema */}
+        <div className="space-y-2">
+          {CAMPOS_MAPA.map((c) => {
+            const resolvido = resolver(c.key)
+            const conf = auto[c.key]?.confianca
+            const emFoco = ativo === c.key
+            return (
+              <div key={c.key} onClick={() => setAtivo(c.key)}
+                className={cn('cursor-pointer rounded-xl border bg-card p-3 shadow-sm transition-all', emFoco ? 'border-primary ring-2 ring-primary/20' : 'hover:border-primary/40')}>
+                <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                  <span className="text-sm font-semibold">{c.label}</span>
+                  {c.obrigatorio && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">principal</span>}
+                  {conf != null && <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold', corConf(conf))} title="Detectado automaticamente">auto {conf}%</span>}
+                  <span className="ml-auto min-w-0 max-w-[55%] truncate text-right text-[11px] font-medium">
+                    {payload == null ? <span className="text-muted-foreground">—</span>
+                      : resolvido != null ? <span className="text-emerald-600 dark:text-emerald-400" title={resolvido}>= {resolvido}</span>
+                      : <span className="text-amber-600 dark:text-amber-400">= (vazio)</span>}
+                  </span>
                 </div>
-              )
-            })}
-          </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="shrink-0 text-sky-600 dark:text-sky-400">→</span>
+                  <Input list={`paths-${provider}`} value={mapa[c.key] ?? ''} onFocus={() => setAtivo(c.key)} onChange={(e) => set(c.key, e.target.value)} placeholder={c.padrao} className="h-8 font-mono text-xs" />
+                </div>
+              </div>
+            )
+          })}
         </div>
 
-        {/* Dados recebidos (direita) — JSON real, clicável (estilo Datacrazy) */}
-        <div className="rounded-2xl border bg-card shadow-sm">
-          <div className="flex items-center gap-1.5 border-b px-3 py-2">
+        {/* Dados recebidos — JSON real clicável */}
+        <div className="overflow-hidden rounded-2xl border bg-card shadow-sm lg:sticky lg:top-2">
+          <div className="flex items-center gap-1.5 border-b bg-muted/30 px-3 py-2">
             <Braces className="h-3.5 w-3.5 text-muted-foreground" />
             <p className="text-xs font-semibold">Dados recebidos</p>
-            <span className="ml-auto text-[11px] text-muted-foreground">{labelAtivo ? <>→ atribui a <b className="text-foreground">{labelAtivo}</b></> : 'clique numa chave'}</span>
+            <span className="ml-auto truncate text-[11px] text-muted-foreground">{labelAtivo ? <>→ <b className="text-foreground">{labelAtivo}</b></> : 'clique numa chave'}</span>
           </div>
           {!payload ? (
-            <p className="p-4 text-[11px] text-muted-foreground">Sem payload recebido ainda. Envie um evento na URL do webhook e clique em <b>Recarregar</b>.</p>
+            <p className="p-4 text-[11px] text-muted-foreground">Sem payload recebido. Envie um evento na URL do webhook e clique em <b>Recarregar</b>.</p>
           ) : (
-            <div className="max-h-[440px] overflow-auto p-3">
+            <div className="max-h-[62vh] overflow-auto p-3">
               <JsonViewer data={payload} onPick={clicarPath} />
             </div>
           )}
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">Dica: <b>Detectar automaticamente</b> preenche tudo; ou clique num campo e depois na chave em <b>Dados recebidos</b>.</span>
-        <Button onClick={salvar} disabled={salvando}>{salvando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />} Salvar mapa</Button>
+      {/* Rodapé: salvar (fixo no fim, sempre visível) */}
+      <div className="sticky bottom-0 -mx-1 flex items-center justify-between gap-3 rounded-xl border bg-card/80 px-3 py-2.5 shadow-sm backdrop-blur">
+        <span className="hidden text-[11px] text-muted-foreground sm:block">Dica: <b>Detectar</b> preenche tudo; ou clique num campo e depois na chave.</span>
+        <Button onClick={salvar} disabled={salvando} className="ml-auto">{salvando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />} Salvar mapa</Button>
       </div>
     </div>
   )

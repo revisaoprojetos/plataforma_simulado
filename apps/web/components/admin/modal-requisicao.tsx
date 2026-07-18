@@ -2,7 +2,7 @@
 
 import { DialogContent, DialogClose } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Inbox, X } from 'lucide-react'
+import { Inbox, X, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { JsonViewer } from '@/components/admin/json-viewer'
 
@@ -19,6 +19,7 @@ export interface DetalheRequisicao {
   bodyRaw: string | null
   fonte?: string | null
   provider?: string
+  resumo?: string[]
 }
 
 /** Modal "Requisição recebida" — mesmo design do pop-up de webhook (header colorido + JSON viewer). */
@@ -40,6 +41,16 @@ export function ModalRequisicao({ detalhe }: { detalhe: DetalheRequisicao | null
       </div>
 
       <div className="max-h-[75vh] space-y-4 overflow-y-auto p-5">
+        {detalhe.resumo && detalhe.resumo.length > 0 && (
+          <div className="rounded-xl border border-primary/25 bg-primary/[0.04] p-3">
+            <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-primary"><Sparkles className="h-3.5 w-3.5" /> O que foi/será feito</p>
+            <ul className="space-y-1 text-sm">
+              {detalhe.resumo.map((r, i) => (
+                <li key={i} className="flex gap-2"><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary/60" /><span className="text-muted-foreground [&_b]:text-foreground">{r}</span></li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <Campo k="Método" v={detalhe.metodo} />
           <Campo k="Status devolvido" v={String(detalhe.statusResp ?? '—')} />
