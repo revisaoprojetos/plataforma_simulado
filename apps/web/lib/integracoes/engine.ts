@@ -16,16 +16,27 @@ import type { Provider, PessoaNormalizada, Entitlement, Mapeamento, ResultadoEnt
 
 const soDigitos = (s?: string | null) => (s ? s.replace(/\D/g, '') : '')
 
-/** Mapeamento produto/grupo → destino (classificação/grupo/simulado). */
+/** Mapeamento produto/grupo → destino (classificação/grupo/pasta/simulado). Tolerante a `pasta_id` ausente. */
 async function resolverMapeamento(svc: any, tenantId: string, provider: Provider, fonteRef: string): Promise<Mapeamento | null> {
+  const ler = async (cols: string) => svc.from('simulado_integracao_mapeamentos').select(cols)
+    .eq('tenant_id', tenantId).eq('provider', provider).eq('fonte_ref', fonteRef).maybeSingle()
   try {
-    const { data } = await svc
-      .from('simulado_integracao_mapeamentos')
-      .select('fonte_ref, classificacao, grupo_id, simulado_id, ativo')
-      .eq('tenant_id', tenantId).eq('provider', provider).eq('fonte_ref', fonteRef).maybeSingle()
-    if (data && data.ativo) return { fonteRef: data.fonte_ref, classificacao: data.classificacao ?? null, grupoId: data.grupo_id ?? null, simuladoId: data.simulado_id ?? null }
+    let r = await ler('fonte_ref, classificacao, grupo_id, pasta_id, simulado_id, ativo')
+    if (r.error && /pasta_id/i.test(r.error.message)) r = await ler('fonte_ref, classificacao, grupo_id, simulado_id, ativo')
+    const data = r.data
+    if (data && data.ativo) return { fonteRef: data.fonte_ref, classificacao: data.classificacao ?? null, grupoId: data.grupo_id ?? null, pastaId: data.pasta_id ?? null, simuladoId: data.simulado_id ?? null }
   } catch { /* tabela pode não existir ainda */ }
   return null
+}
+
+/** Simulados de uma pasta (banco base) que AINDA valem — exclui os encerrados (evita arquivo morto). */
+async function simuladosVivosDaPasta(svc: any, tenantId: string, pastaId: string): Promise<string[]> {
+  try {
+    const { data } = await svc.from('simulado_simulados')
+      .select('id, status').eq('tenant_id', tenantId).eq('deletado', false)
+      .eq('regras->>banco_base_id', pastaId).neq('status', 'encerrado')
+    return (data ?? []).map((s: any) => s.id)
+  } catch { return [] }
 }
 
 /**
@@ -94,7 +105,7 @@ async function upsertAssinatura(svc: any, tenantId: string, estudanteId: string,
 }
 
 /** True se o estudante tem OUTRA assinatura ativa que concede este grupo/simulado/passaporte. */
-async function outraAtivaConcede(svc: any, tenantId: string, estudanteId: string, excetoExternalId: string, alvo: { grupoId?: string | null; simuladoId?: string | null; passaporte?: boolean }): Promise<boolean> {
+async function outraAtivaConcede(svc: any, tenantId: string, estudanteId: string, excetoExternalId: string, alvo: { grupoId?: string | null; pastaId?: string | null; simuladoId?: string | null; passaporte?: boolean }): Promise<boolean> {
   try {
     const { data: ass } = await svc.from('simulado_assinaturas').select('provider, produto_ref, external_id')
       .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('status', 'ativo')
@@ -103,11 +114,20 @@ async function outraAtivaConcede(svc: any, tenantId: string, estudanteId: string
       const m = await resolverMapeamento(svc, tenantId, a.provider, a.produto_ref)
       if (!m) continue
       if (alvo.grupoId && m.grupoId === alvo.grupoId) return true
+      if (alvo.pastaId && m.pastaId === alvo.pastaId) return true
       if (alvo.simuladoId && m.simuladoId === alvo.simuladoId) return true
       if (alvo.passaporte && m.classificacao === 'passaporte') return true
     }
   } catch { /* ignora */ }
   return false
+}
+
+/** Matricula (libera) o estudante num simulado, idempotente. */
+async function matricular(svc: any, tenantId: string, estudanteId: string, simuladoId: string) {
+  try {
+    const { data } = await svc.from('simulado_matriculas').select('id').eq('simulado_id', simuladoId).eq('estudante_id', estudanteId).maybeSingle()
+    if (!data) await svc.from('simulado_matriculas').insert({ tenant_id: tenantId, estudante_id: estudanteId, simulado_id: simuladoId, liberado: true })
+  } catch { /* ignora */ }
 }
 
 async function conceder(svc: any, tenantId: string, estudanteId: string, m: Mapeamento) {
@@ -120,12 +140,17 @@ async function conceder(svc: any, tenantId: string, estudanteId: string, m: Mape
       if (!data) await svc.from('simulado_grupo_membros').insert({ tenant_id: tenantId, grupo_id: m.grupoId, estudante_id: estudanteId })
     } catch { /* ignora */ }
   }
-  if (m.simuladoId) {
+  // Pasta (banco): entra na pasta + libera os simulados VIVOS dela (encerrados ficam de fora).
+  // Como fica na pasta, também herda automaticamente os simulados FUTUROS criados a partir dela.
+  if (m.pastaId) {
     try {
-      const { data } = await svc.from('simulado_matriculas').select('id').eq('simulado_id', m.simuladoId).eq('estudante_id', estudanteId).maybeSingle()
-      if (!data) await svc.from('simulado_matriculas').insert({ tenant_id: tenantId, estudante_id: estudanteId, simulado_id: m.simuladoId, liberado: true })
+      const { data } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', m.pastaId).eq('estudante_id', estudanteId).maybeSingle()
+      if (!data) await svc.from('simulado_pasta_estudantes').insert({ tenant_id: tenantId, pasta_id: m.pastaId, estudante_id: estudanteId })
     } catch { /* ignora */ }
+    for (const sid of await simuladosVivosDaPasta(svc, tenantId, m.pastaId)) await matricular(svc, tenantId, estudanteId, sid)
   }
+  // Simulado direto = "vale": libera mesmo se já encerrou (foi comprado explicitamente).
+  if (m.simuladoId) await matricular(svc, tenantId, estudanteId, m.simuladoId)
 }
 
 async function revogar(svc: any, tenantId: string, estudanteId: string, excetoExternalId: string, m: Mapeamento) {
@@ -134,6 +159,12 @@ async function revogar(svc: any, tenantId: string, estudanteId: string, excetoEx
   //  refinar depois com coluna `origem` em grupo_membros/matriculas.)
   if (m.grupoId && !(await outraAtivaConcede(svc, tenantId, estudanteId, excetoExternalId, { grupoId: m.grupoId }))) {
     try { await svc.from('simulado_grupo_membros').delete().eq('tenant_id', tenantId).eq('grupo_id', m.grupoId).eq('estudante_id', estudanteId) } catch { /* ignora */ }
+  }
+  if (m.pastaId && !(await outraAtivaConcede(svc, tenantId, estudanteId, excetoExternalId, { pastaId: m.pastaId }))) {
+    try { await svc.from('simulado_pasta_estudantes').delete().eq('tenant_id', tenantId).eq('pasta_id', m.pastaId).eq('estudante_id', estudanteId) } catch { /* ignora */ }
+    for (const sid of await simuladosVivosDaPasta(svc, tenantId, m.pastaId)) {
+      try { await svc.from('simulado_matriculas').delete().eq('tenant_id', tenantId).eq('simulado_id', sid).eq('estudante_id', estudanteId) } catch { /* ignora */ }
+    }
   }
   if (m.simuladoId && !(await outraAtivaConcede(svc, tenantId, estudanteId, excetoExternalId, { simuladoId: m.simuladoId }))) {
     try { await svc.from('simulado_matriculas').delete().eq('tenant_id', tenantId).eq('simulado_id', m.simuladoId).eq('estudante_id', estudanteId) } catch { /* ignora */ }
@@ -175,7 +206,7 @@ async function garantirMapeamentoAuto(svc: any, tenantId: string, provider: Prov
   } catch { /* ignora — segue com o grupo resolvido */ }
 
   const final = await resolverMapeamento(svc, tenantId, provider, produtoRef)
-  return final ?? { fonteRef: produtoRef, classificacao: null, grupoId, simuladoId: null }
+  return final ?? { fonteRef: produtoRef, classificacao: null, grupoId, pastaId: null, simuladoId: null }
 }
 
 /**

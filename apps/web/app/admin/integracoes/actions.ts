@@ -142,29 +142,32 @@ export async function listarGruposSistema(): Promise<{ ok: boolean; grupos?: { i
 }
 
 // ── Mapeamentos (produto/grupo → classificação/grupo/simulado) ─────────────────
-export interface MapeamentoDTO { id: string; fonteRef: string; fonteNome: string | null; classificacao: string | null; grupoId: string | null; simuladoId: string | null; ativo: boolean }
+export interface MapeamentoDTO { id: string; fonteRef: string; fonteNome: string | null; classificacao: string | null; grupoId: string | null; pastaId: string | null; simuladoId: string | null; ativo: boolean }
 
 export async function listarMapeamentos(provider: string): Promise<{ ok: boolean; error?: string; mapeamentos?: MapeamentoDTO[] }> {
   if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
   const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { data } = await svc.from('simulado_integracao_mapeamentos').select('id, fonte_ref, fonte_nome, classificacao, grupo_id, simulado_id, ativo').eq('tenant_id', g.tenantId).eq('provider', provider).order('fonte_nome')
-  return { ok: true, mapeamentos: (data ?? []).map((m: any) => ({ id: m.id, fonteRef: m.fonte_ref, fonteNome: m.fonte_nome, classificacao: m.classificacao, grupoId: m.grupo_id, simuladoId: m.simulado_id, ativo: m.ativo })) }
+  const ler = (cols: string) => svc.from('simulado_integracao_mapeamentos').select(cols).eq('tenant_id', g.tenantId).eq('provider', provider).order('fonte_nome')
+  let r = await ler('id, fonte_ref, fonte_nome, classificacao, grupo_id, pasta_id, simulado_id, ativo')
+  if (r.error && /pasta_id/i.test(r.error.message)) r = await ler('id, fonte_ref, fonte_nome, classificacao, grupo_id, simulado_id, ativo')
+  return { ok: true, mapeamentos: ((r.data as any[]) ?? []).map((m: any) => ({ id: m.id, fonteRef: m.fonte_ref, fonteNome: m.fonte_nome, classificacao: m.classificacao, grupoId: m.grupo_id, pastaId: m.pasta_id ?? null, simuladoId: m.simulado_id, ativo: m.ativo })) }
 }
 
-export async function salvarMapeamento(provider: string, m: { id?: string; fonteRef: string; fonteNome?: string; classificacao?: string | null; grupoId?: string | null; simuladoId?: string | null; ativo?: boolean }): Promise<{ ok: boolean; error?: string }> {
+export async function salvarMapeamento(provider: string, m: { id?: string; fonteRef: string; fonteNome?: string; classificacao?: string | null; grupoId?: string | null; pastaId?: string | null; simuladoId?: string | null; ativo?: boolean }): Promise<{ ok: boolean; error?: string }> {
   if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
   if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
   const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
   if (!m.fonteRef) return { ok: false, error: 'Selecione o produto/grupo de origem.' }
   const svc = createAdminClient()
-  const row = {
+  const row: any = {
     tenant_id: g.tenantId, provider, fonte_ref: m.fonteRef, fonte_nome: m.fonteNome ?? null,
-    classificacao: m.classificacao ?? null, grupo_id: m.grupoId ?? null, simulado_id: m.simuladoId ?? null,
+    classificacao: m.classificacao ?? null, grupo_id: m.grupoId ?? null, pasta_id: m.pastaId ?? null, simulado_id: m.simuladoId ?? null,
     ativo: m.ativo ?? true, atualizado_em: new Date().toISOString(),
   }
-  const { error } = await svc.from('simulado_integracao_mapeamentos').upsert(row, { onConflict: 'tenant_id,provider,fonte_ref' })
+  let { error } = await svc.from('simulado_integracao_mapeamentos').upsert(row, { onConflict: 'tenant_id,provider,fonte_ref' })
+  if (error && /pasta_id/i.test(error.message)) { delete row.pasta_id; ({ error } = await svc.from('simulado_integracao_mapeamentos').upsert(row, { onConflict: 'tenant_id,provider,fonte_ref' })) }
   if (error) return { ok: false, error: error.message }
   revalidatePath(`/admin/integracoes/${provider}`)
   return { ok: true }

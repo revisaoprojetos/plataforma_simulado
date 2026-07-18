@@ -26,15 +26,15 @@ import { getStr, flattenPaths } from '@/lib/integracoes/jsonpath'
 import { autoMapear, type AutoMatch } from '@/lib/integracoes/automap'
 
 interface Config { ativo: boolean; baseUrl: string; camposPreenchidos: string[]; webhookToken: string | null; cripto: boolean }
-interface Mapeamento { id: string; fonteRef: string; fonteNome: string | null; classificacao: string | null; grupoId: string | null; simuladoId: string | null; ativo: boolean }
+interface Mapeamento { id: string; fonteRef: string; fonteNome: string | null; classificacao: string | null; grupoId: string | null; pastaId: string | null; simuladoId: string | null; ativo: boolean }
 interface Grupo { id: string; nome: string }
 interface Fonte { ref: string; nome: string; total?: number }
 
 type Aba = 'credenciais' | 'mapeamentos' | 'importar' | 'eventos' | 'assinaturas' | 'recebidos' | 'mapa'
 const SEM = '__sem__'
 
-export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos, gruposSistema, simuladosSistema, mapaInicial }: {
-  provider: Provider; appUrl: string; config: Config; mapeamentos: Mapeamento[]; gruposSistema: Grupo[]; simuladosSistema: Grupo[]
+export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos, gruposSistema, pastasSistema = [], simuladosSistema, mapaInicial }: {
+  provider: Provider; appUrl: string; config: Config; mapeamentos: Mapeamento[]; gruposSistema: Grupo[]; pastasSistema?: Grupo[]; simuladosSistema: Grupo[]
   mapaInicial?: { mapa: Record<string, string>; ultimoPayload: unknown | null }
 }) {
   const meta = PROVIDER_META[provider]
@@ -103,7 +103,7 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
       </div>
 
       {abaAtiva === 'credenciais' && <Credenciais provider={provider} appUrl={appUrl} config={config} meta={meta} campos={campos} area={meta.push ? area : undefined} />}
-      {abaAtiva === 'mapeamentos' && <Mapeamentos provider={provider} mapeamentos={mapeamentos} gruposSistema={gruposSistema} simuladosSistema={simuladosSistema} />}
+      {abaAtiva === 'mapeamentos' && <Mapeamentos provider={provider} mapeamentos={mapeamentos} gruposSistema={gruposSistema} pastasSistema={pastasSistema} simuladosSistema={simuladosSistema} />}
       {abaAtiva === 'assinaturas' && meta.push && <Assinaturas provider={provider} />}
       {abaAtiva === 'importar' && !meta.push && <Importar provider={provider} />}
       {abaAtiva === 'eventos' && meta.push && <Eventos provider={provider} />}
@@ -731,7 +731,7 @@ function Credenciais({ provider, appUrl, config, meta, campos, area }: { provide
 }
 
 // ── Mapeamentos ──────────────────────────────────────────────────────────────
-function Mapeamentos({ provider, mapeamentos, gruposSistema, simuladosSistema }: { provider: Provider; mapeamentos: Mapeamento[]; gruposSistema: Grupo[]; simuladosSistema: Grupo[] }) {
+function Mapeamentos({ provider, mapeamentos, gruposSistema, pastasSistema, simuladosSistema }: { provider: Provider; mapeamentos: Mapeamento[]; gruposSistema: Grupo[]; pastasSistema: Grupo[]; simuladosSistema: Grupo[] }) {
   const [fontes, setFontes] = useState<Fonte[]>([])
   const [carregandoFontes, startFontes] = useTransition()
   const [salvando, startSalvar] = useTransition()
@@ -739,6 +739,7 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, simuladosSistema }:
   const [fonteRef, setFonteRef] = useState('')
   const [classificacao, setClassificacao] = useState('passaporte')
   const [grupoId, setGrupoId] = useState(SEM)
+  const [pastaId, setPastaId] = useState(SEM)
   const [simuladoId, setSimuladoId] = useState(SEM)
 
   function carregarFontes() {
@@ -751,7 +752,7 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, simuladosSistema }:
     if (!fonteRef) { toast.error('Selecione o produto/grupo de origem'); return }
     const nome = fontes.find((f) => f.ref === fonteRef)?.nome
     startSalvar(async () => {
-      const r = await salvarMapeamento(provider, { fonteRef, fonteNome: nome, classificacao, grupoId: grupoId === SEM ? null : grupoId, simuladoId: simuladoId === SEM ? null : simuladoId, ativo: true })
+      const r = await salvarMapeamento(provider, { fonteRef, fonteNome: nome, classificacao, grupoId: grupoId === SEM ? null : grupoId, pastaId: pastaId === SEM ? null : pastaId, simuladoId: simuladoId === SEM ? null : simuladoId, ativo: true })
       if (r.ok) { toast.success('Mapeamento salvo'); location.reload() } else toast.error(r.error ?? 'Erro')
     })
   }
@@ -759,6 +760,7 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, simuladosSistema }:
     startSalvar(async () => { const r = await excluirMapeamento(provider, id); if (r.ok) location.reload(); else toast.error(r.error ?? 'Erro') })
   }
   const nomeGrupo = (id: string | null) => gruposSistema.find((g) => g.id === id)?.nome ?? '—'
+  const nomePasta = (id: string | null) => pastasSistema.find((g) => g.id === id)?.nome ?? '—'
   const nomeSimulado = (id: string | null) => simuladosSistema.find((s) => s.id === id)?.nome ?? '—'
   const [reprocessando, startReproc] = useTransition()
   const reprocessar = () => startReproc(async () => {
@@ -810,6 +812,7 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, simuladosSistema }:
             <span className="text-muted-foreground">→</span>
             {m.classificacao && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{m.classificacao}</span>}
             {m.grupoId && <span className="rounded-full border px-2 py-0.5 text-xs">grupo: {nomeGrupo(m.grupoId)}</span>}
+            {m.pastaId && <span className="rounded-full border px-2 py-0.5 text-xs">pasta: {nomePasta(m.pastaId)}</span>}
             {m.simuladoId && <span className="rounded-full border px-2 py-0.5 text-xs">simulado: {nomeSimulado(m.simuladoId)}</span>}
             <button type="button" onClick={() => remover(m.id)} className="ml-auto text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
           </div>
@@ -824,7 +827,7 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, simuladosSistema }:
             {carregandoFontes ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />} Carregar produtos/grupos
           </Button>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Produto/Grupo</label>
             {fontes.length ? (
@@ -848,6 +851,13 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, simuladosSistema }:
             <Select value={grupoId} onValueChange={(v) => setGrupoId(v ?? SEM)} items={{ [SEM]: 'Nenhum', ...Object.fromEntries(gruposSistema.map((g) => [g.id, g.nome])) }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value={SEM}>Nenhum</SelectItem>{gruposSistema.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Pasta (libera os simulados dela)</label>
+            <Select value={pastaId} onValueChange={(v) => setPastaId(v ?? SEM)} items={{ [SEM]: 'Nenhuma', ...Object.fromEntries(pastasSistema.map((g) => [g.id, g.nome])) }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value={SEM}>Nenhuma</SelectItem>{pastasSistema.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-1">

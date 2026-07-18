@@ -58,8 +58,13 @@ export default async function IntegracaoProviderPage({ params }: { params: Promi
   const svc = createAdminClient()
   const [{ data: cfg }, { data: maps }, { data: grupos }, { data: simulados }, ultimoInbox] = await Promise.all([
     svc.from('simulado_integracao_config').select('base_url, credenciais, ativo, webhook_token, mapa_json').eq('tenant_id', tid).eq('provider', prov).maybeSingle(),
-    svc.from('simulado_integracao_mapeamentos').select('id, fonte_ref, fonte_nome, classificacao, grupo_id, simulado_id, ativo').eq('tenant_id', tid).eq('provider', prov).order('fonte_nome'),
-    svc.from('simulado_grupos').select('id, nome').eq('tenant_id', tid).eq('deletado', false).order('nome'),
+    (async () => {
+      const ler = (cols: string) => svc.from('simulado_integracao_mapeamentos').select(cols).eq('tenant_id', tid).eq('provider', prov).order('fonte_nome')
+      let r = await ler('id, fonte_ref, fonte_nome, classificacao, grupo_id, pasta_id, simulado_id, ativo')
+      if (r.error && /pasta_id/i.test(r.error.message)) r = await ler('id, fonte_ref, fonte_nome, classificacao, grupo_id, simulado_id, ativo')
+      return { data: r.data }
+    })(),
+    svc.from('simulado_grupos').select('id, nome, is_mestre').eq('tenant_id', tid).eq('deletado', false).order('nome'),
     svc.from('simulado_simulados').select('id, titulo').eq('tenant_id', tid).eq('deletado', false).order('titulo'),
     // Pré-carrega o último payload recebido → a aba Mapa JSON abre INSTANTÂNEA (sem round-trip).
     (async () => { try { return await svc.from('simulado_webhook_inbox').select('body_json').eq('tenant_id', tid).eq('provider', prov).not('body_json', 'is', null).order('recebido_em', { ascending: false }).limit(1).maybeSingle() } catch { return { data: null } } })(),
@@ -80,8 +85,9 @@ export default async function IntegracaoProviderPage({ params }: { params: Promi
           webhookToken: (cfg as any)?.webhook_token ?? null,
           cripto: criptografiaAtiva(),
         }}
-        mapeamentos={(maps ?? []).map((m: any) => ({ id: m.id, fonteRef: m.fonte_ref, fonteNome: m.fonte_nome, classificacao: m.classificacao, grupoId: m.grupo_id, simuladoId: m.simulado_id, ativo: m.ativo }))}
-        gruposSistema={(grupos ?? []).map((g: any) => ({ id: g.id, nome: g.nome }))}
+        mapeamentos={(maps ?? []).map((m: any) => ({ id: m.id, fonteRef: m.fonte_ref, fonteNome: m.fonte_nome, classificacao: m.classificacao, grupoId: m.grupo_id, pastaId: m.pasta_id ?? null, simuladoId: m.simulado_id, ativo: m.ativo }))}
+        gruposSistema={(grupos ?? []).filter((g: any) => !g.is_mestre).map((g: any) => ({ id: g.id, nome: g.nome }))}
+        pastasSistema={(grupos ?? []).filter((g: any) => g.is_mestre).map((g: any) => ({ id: g.id, nome: g.nome }))}
         simuladosSistema={(simulados ?? []).map((s: any) => ({ id: s.id, nome: s.titulo }))}
         mapaInicial={mapaInicial}
       />

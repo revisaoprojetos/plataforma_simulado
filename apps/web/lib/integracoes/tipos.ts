@@ -95,6 +95,7 @@ export interface Mapeamento {
   fonteRef: string
   classificacao: string | null
   grupoId: string | null
+  pastaId: string | null
   simuladoId: string | null
 }
 
