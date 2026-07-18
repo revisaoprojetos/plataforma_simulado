@@ -86,9 +86,11 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
     return lista
   }, [grupos, q, ordem, soSelecionados, ocultarDesatualizados, sel])
 
-  // Conta membros (com debounce) quando a seleção muda.
+  // Conta membros (com debounce) quando a seleção muda. NÃO zera o resultado aqui —
+  // senão limpar a seleção após importar apagaria o painel de resultado (o "limpar
+  // resultado" fica nas ações manuais de seleção abaixo).
   useEffect(() => {
-    setTotal(null); setRes(null)
+    setTotal(null)
     if (sel.size === 0) return
     const t = setTimeout(async () => {
       setContando(true)
@@ -99,9 +101,9 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
     return () => clearTimeout(t)
   }, [sel])
 
-  const toggle = (id: number) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const selecionarFiltrados = () => setSel((s) => { const n = new Set(s); filtrados.forEach((g) => n.add(g.id)); return n })
-  const limpar = () => setSel(new Set())
+  const toggle = (id: number) => { setRes(null); setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n }) }
+  const selecionarFiltrados = () => { setRes(null); setSel((s) => { const n = new Set(s); filtrados.forEach((g) => n.add(g.id)); return n }) }
+  const limpar = () => { setRes(null); setSel(new Set()) }
 
   const grupoSel = useMemo(() => sistemaLocal.find((s) => s.id === grupoId) ?? null, [sistemaLocal, grupoId])
   const pastaDoSel = useMemo(() => grupoSel?.pai_id ? sistemaLocal.find((s) => s.id === grupoSel.pai_id) ?? null : null, [grupoSel, sistemaLocal])
@@ -123,7 +125,7 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
         const s = await statusImportacaoCurseduca(jobId)
         if (!s.ok) { setJobStatus(null); setImportando(false); toast.error(s.error ?? 'Falha no acompanhamento.'); return }
         setJobStatus(s.status ?? null)
-        if (s.status === 'concluido') { setImportando(false); if (s.resultado) setRes(s.resultado); toast.success('Importação concluída.'); return }
+        if (s.status === 'concluido') { setImportando(false); if (s.resultado) setRes(s.resultado); setSel(new Set()); toast.success('Importação concluída.'); return }
         if (s.status === 'erro') { setImportando(false); toast.error(s.erro ?? 'Falha na importação.'); return }
         setTimeout(poll, 5000)
       }
@@ -135,6 +137,7 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
     setImportando(false)
     if (!r.ok) { toast.error(r.error ?? 'Falha na importação.'); return }
     setRes(r)
+    setSel(new Set()) // limpa a seleção pós-import (evita reimportar os mesmos p/ outro grupo sem querer)
     toast.success(`${r.novos ?? 0} novo(s) · ${r.jaExistiam ?? 0} já existia(m)${r.vinculados ? ` · ${r.vinculados} vinculado(s)` : ''}${r.removidos ? ` · ${r.removidos} removido(s)` : ''}`)
   }
 
