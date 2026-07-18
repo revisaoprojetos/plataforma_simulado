@@ -326,7 +326,8 @@ function MapaJson({ provider, inicial }: { provider: Provider; inicial?: { mapa:
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={carregar} disabled={carregando}>{carregando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />} Recarregar</Button>
-            <Button size="sm" onClick={detectar} disabled={!payload}><RotateCw className="mr-2 h-3.5 w-3.5" /> Detectar</Button>
+            <Button variant="outline" size="sm" onClick={detectar} disabled={!payload}><RotateCw className="mr-2 h-3.5 w-3.5" /> Detectar</Button>
+            <Button size="sm" onClick={salvar} disabled={salvando}>{salvando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-2 h-3.5 w-3.5" />} Salvar</Button>
           </div>
         </div>
       </div>
@@ -346,29 +347,35 @@ function MapaJson({ provider, inicial }: { provider: Provider; inicial?: { mapa:
 
       {/* Grid: campos (esquerda, flexível) + JSON (direita, largura fixa, sticky, sem cortar) */}
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
-        {/* Campos do sistema */}
-        <div className="space-y-2">
+        {/* Campos do sistema — UM card, linhas inline (label → input) */}
+        <div className="divide-y overflow-hidden rounded-2xl border bg-card shadow-sm">
           {CAMPOS_MAPA.map((c) => {
             const resolvido = resolver(c.key)
             const conf = auto[c.key]?.confianca
             const emFoco = ativo === c.key
+            const ok = payload != null && resolvido != null
             return (
               <div key={c.key} onClick={() => setAtivo(c.key)}
-                className={cn('cursor-pointer rounded-xl border bg-card p-3 shadow-sm transition-all', emFoco ? 'border-primary ring-2 ring-primary/20' : 'hover:border-primary/40')}>
-                <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                  <span className="text-sm font-semibold">{c.label}</span>
-                  {c.obrigatorio && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">principal</span>}
-                  {conf != null && <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold', corConf(conf))} title="Detectado automaticamente">auto {conf}%</span>}
-                  <span className="ml-auto min-w-0 max-w-[55%] truncate text-right text-[11px] font-medium">
-                    {payload == null ? <span className="text-muted-foreground">—</span>
-                      : resolvido != null ? <span className="text-emerald-600 dark:text-emerald-400" title={resolvido}>= {resolvido}</span>
-                      : <span className="text-amber-600 dark:text-amber-400">= (vazio)</span>}
+                className={cn('flex items-center gap-2.5 px-3 py-2 transition-colors', emFoco ? 'bg-primary/[0.06]' : 'hover:bg-muted/30')}>
+                {/* Verificação (animada) */}
+                <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all duration-300',
+                  payload == null ? 'bg-muted text-muted-foreground' : ok ? 'scale-100 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400')}
+                  title={payload == null ? 'sem payload' : ok ? `= ${resolvido}` : 'não resolve neste payload'}>
+                  {payload == null ? <span className="h-1.5 w-1.5 rounded-full bg-current" /> : ok ? <Check className="h-3 w-3 animate-in zoom-in" /> : <AlertTriangle className="h-3 w-3" />}
+                </span>
+                {/* Rótulo */}
+                <div className="w-32 shrink-0">
+                  <span className="flex items-center gap-1 truncate text-sm font-medium" title={c.label}>
+                    {c.label}{c.obrigatorio && <span className="text-primary" title="Campo principal">★</span>}
                   </span>
+                  {conf != null && <span className={cn('mt-0.5 inline-block rounded px-1 text-[9px] font-semibold', corConf(conf))} title="Detectado automaticamente">auto {conf}%</span>}
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="shrink-0 text-sky-600 dark:text-sky-400">→</span>
-                  <Input list={`paths-${provider}`} value={mapa[c.key] ?? ''} onFocus={() => setAtivo(c.key)} onChange={(e) => set(c.key, e.target.value)} placeholder={c.padrao} className="h-8 font-mono text-xs" />
-                </div>
+                <span className="shrink-0 text-sky-500">→</span>
+                <Input list={`paths-${provider}`} value={mapa[c.key] ?? ''} onClick={(e) => e.stopPropagation()} onFocus={() => setAtivo(c.key)} onChange={(e) => set(c.key, e.target.value)} placeholder={c.padrao} className="h-8 min-w-0 flex-1 font-mono text-xs" />
+                {/* Valor resolvido */}
+                <span className="hidden w-36 shrink-0 truncate text-right text-[11px] font-medium xl:block" title={resolvido ?? ''}>
+                  {payload == null ? '' : ok ? <span className="text-emerald-600 dark:text-emerald-400">= {resolvido}</span> : <span className="text-amber-600 dark:text-amber-400">vazio</span>}
+                </span>
               </div>
             )
           })}
@@ -391,11 +398,7 @@ function MapaJson({ provider, inicial }: { provider: Provider; inicial?: { mapa:
         </div>
       </div>
 
-      {/* Rodapé: salvar (fixo no fim, sempre visível) */}
-      <div className="sticky bottom-0 -mx-1 flex items-center justify-between gap-3 rounded-xl border bg-card/80 px-3 py-2.5 shadow-sm backdrop-blur">
-        <span className="hidden text-[11px] text-muted-foreground sm:block">Dica: <b>Detectar</b> preenche tudo; ou clique num campo e depois na chave.</span>
-        <Button onClick={salvar} disabled={salvando} className="ml-auto">{salvando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />} Salvar mapa</Button>
-      </div>
+      <p className="px-1 text-[11px] text-muted-foreground">Dica: <b>Detectar</b> preenche tudo automaticamente; ou clique num campo e depois na chave em <b>Dados recebidos</b>. Lembre de <b>Salvar</b>.</p>
     </div>
   )
 }
