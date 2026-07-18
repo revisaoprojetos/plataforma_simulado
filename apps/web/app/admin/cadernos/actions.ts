@@ -108,3 +108,14 @@ export async function excluirCaderno(id: string): Promise<{ ok: boolean; error?:
   revalidatePath('/admin/cadernos')
   return { ok: true }
 }
+
+/** Grupos de disciplinas definidos no banco (pasta): [{ id, nome, disciplinas:[nomes] }]. */
+export async function getGruposBanco(bancoId: string): Promise<{ ok: boolean; grupos?: { id: string; nome: string; disciplinas: string[] }[] }> {
+  if (!bancoId) return { ok: true, grupos: [] }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false }
+  const svc = createAdminClient()
+  const { data } = await svc.from('simulado_pastas').select('grupos').eq('id', bancoId).eq('tenant_id', access.tenantId).maybeSingle()
+  const grupos = Array.isArray((data as any)?.grupos) ? (data as any).grupos : []
+  return { ok: true, grupos: grupos.map((g: any) => ({ id: String(g.id ?? g.nome), nome: String(g.nome ?? ''), disciplinas: Array.isArray(g.disciplinas) ? g.disciplinas.map(String) : [] })) }
+}

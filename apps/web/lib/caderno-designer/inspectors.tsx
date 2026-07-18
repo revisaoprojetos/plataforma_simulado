@@ -180,7 +180,7 @@ function LarguraBloco({ a, set }: { a: any; set: (k: string, v: any) => void }) 
   )
 }
 
-export function BlockInspector({ block, onChange, varsExtra }: { block: Block; onChange: (patch: Record<string, unknown>) => void; varsExtra?: { grupo: string; itens: { token: string; label: string }[] }[] }) {
+export function BlockInspector({ block, onChange, varsExtra, gruposBanco }: { block: Block; onChange: (patch: Record<string, unknown>) => void; varsExtra?: { grupo: string; itens: { token: string; label: string }[] }[]; gruposBanco?: { id: string; nome: string; disciplinas: string[] }[] }) {
   const a = block.attributes as any
   const set = (k: string, v: unknown) => onChange({ [k]: v })
   const fieldRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null)
@@ -411,24 +411,32 @@ export function BlockInspector({ block, onChange, varsExtra }: { block: Block; o
       )
     case 'diag-grupo-header': {
       const chaves: string[] = Array.isArray(a.chaves) ? a.chaves : []
-      const opts = [...new Set((varsExtra ?? []).filter((g) => /Disciplina/i.test(g.grupo)).flatMap((g) => g.itens.map((v) => v.token.match(/\{pct_(.+)\}/)?.[1]).filter(Boolean)))] as string[]
+      const grupos = gruposBanco ?? []
+      const slugify = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
       const humano = (s: string) => s.replace(/_/g, ' ').replace(/^./, (ch) => ch.toUpperCase())
-      const toggle = (s: string) => set('chaves', chaves.includes(s) ? chaves.filter((k) => k !== s) : [...chaves, s])
+      const escolher = (nome: string) => {
+        const gr = grupos.find((x) => x.nome === nome)
+        if (!gr) { onChange({ grupo: nome }); return }
+        onChange({ grupo: gr.nome, chaves: gr.disciplinas.map(slugify) })
+      }
       return (
         <div className="space-y-3">
-          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Marque as <b>disciplinas do grupo</b> — o “Acertos X/N” do cabeçalho é somado automaticamente delas.</p>
-          <Row label="Nome do grupo"><input value={a.grupo ?? ''} onChange={(e) => set('grupo', e.target.value)} className={inputCls} placeholder="Grupo I" /></Row>
-          <Grupo label={`Disciplinas do grupo (${chaves.length})`}>
-            <div className="max-h-52 space-y-0.5 overflow-y-auto rounded-md border p-1">
-              {opts.length === 0 && <p className="px-1 py-1 text-[11px] text-muted-foreground">Vincule um banco e recarregue — as disciplinas do simulado aparecem aqui.</p>}
-              {opts.map((s) => (
-                <label key={s} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted">
-                  <input type="checkbox" checked={chaves.includes(s)} onChange={() => toggle(s)} className="h-4 w-4 rounded border" />
-                  <span className="flex-1 truncate">{humano(s)}</span>
-                </label>
-              ))}
-            </div>
-          </Grupo>
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Selecione um <b>grupo do simulado</b> — o nome e as disciplinas (e o “Acertos X/N” somado) vêm dele automaticamente.</p>
+          <Row label="Grupo do simulado">
+            <select value={a.grupo ?? ''} onChange={(e) => escolher(e.target.value)} className={inputCls}>
+              <option value="">— escolher grupo —</option>
+              {grupos.map((gr) => <option key={gr.id} value={gr.nome}>{gr.nome} ({gr.disciplinas.length} disc.)</option>)}
+              {a.grupo && !grupos.some((gr) => gr.nome === a.grupo) && <option value={a.grupo}>{a.grupo} (atual)</option>}
+            </select>
+          </Row>
+          {grupos.length === 0 && <p className="text-[11px] text-amber-600 dark:text-amber-400">Nenhum grupo definido no banco. Defina os grupos em Banco de Simulado → Grupos, e recarregue.</p>}
+          {chaves.length > 0 && (
+            <Grupo label={`Disciplinas do grupo (${chaves.length})`}>
+              <div className="max-h-40 space-y-0.5 overflow-y-auto rounded-md border bg-muted/20 p-1.5 text-xs">
+                {chaves.map((s) => <div key={s} className="truncate">• {humano(s)}</div>)}
+              </div>
+            </Grupo>
+          )}
           <FonteSelect value={a.fonte} onChange={(v) => set('fonte', v)} />
           <Cor label="Cor de fundo" value={a.corHeader} onChange={(v) => set('corHeader', v)} />
           <Cor label="Cor do texto" value={a.corTexto} onChange={(v) => set('corTexto', v)} />
