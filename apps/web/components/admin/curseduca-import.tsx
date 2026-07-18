@@ -400,9 +400,10 @@ function GrupoDestinoDialog({ aberto, onClose, sistema, onSistemaChange, valor, 
     if (!g.is_mestre) return grupoRow(g)
     const filhos = children.get(g.id) ?? []
     const aberto2 = expandido.has(g.id)
+    const alvoPasta = paiNovo === g.id
     return (
       <div key={g.id}>
-        <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-2 py-2">
+        <div className={cn('flex items-center gap-2 rounded-lg border px-2 py-2 transition-colors', alvoPasta ? 'border-primary bg-primary/5' : 'border-transparent bg-muted/50')}>
           <button type="button" onClick={() => toggle(g.id)} className="rounded p-0.5 text-muted-foreground hover:text-foreground">
             {aberto2 ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </button>
@@ -410,6 +411,11 @@ function GrupoDestinoDialog({ aberto, onClose, sistema, onSistemaChange, valor, 
           <span className="min-w-0 flex-1 truncate text-sm font-semibold">{g.nome}</span>
           <button type="button" onClick={() => { setModo('grupo'); setPaiNovo(g.id) }} title="Criar grupo nesta pasta"
             className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"><Plus className="h-3.5 w-3.5" /></button>
+          <button type="button" onClick={() => { setModo('grupo'); setPaiNovo(alvoPasta ? '' : g.id) }}
+            title={alvoPasta ? 'Pasta selecionada — novo grupo entra aqui' : 'Selecionar esta pasta para o novo grupo'}
+            className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors', alvoPasta ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40 hover:border-primary/60')}>
+            {alvoPasta && <Check className="h-3 w-3" />}
+          </button>
         </div>
         {aberto2 && (
           <div className="ml-[18px] mt-1.5">
