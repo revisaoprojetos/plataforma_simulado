@@ -90,7 +90,7 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
   function linhaGrupo(g: GrupoOpc, depth: number) {
     const on = sel.has(g.id)
     return (
-      <div key={g.id} role="button" tabIndex={0} onClick={() => toggle(g.id)} style={{ marginLeft: depth * 18 }}
+      <div key={g.id} role="button" tabIndex={0} onClick={() => toggle(g.id)} style={{ paddingLeft: 12 + depth * 18 }}
         className={cn('flex w-full cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', on ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
         <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
           {on && <Check className="h-3 w-3" />}
@@ -119,8 +119,8 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
     const totalMembros = folhas.reduce((s, f) => s + f.membros, 0)
     const filhos = children.get(g.id) ?? []
     return (
-      <div key={g.id} className="space-y-1.5" style={{ marginLeft: depth * 18 }}>
-        <div role="button" tabIndex={0} onClick={() => togglePasta(g.id)}
+      <div key={g.id} className="space-y-1.5">
+        <div role="button" tabIndex={0} onClick={() => togglePasta(g.id)} style={{ paddingLeft: 12 + depth * 18 }}
           className="flex w-full cursor-pointer items-center gap-3 rounded-lg bg-muted/50 px-3 py-2 text-left transition-colors hover:bg-muted">
           <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', marcados === 0 ? 'border-muted-foreground/40' : 'border-primary bg-primary text-primary-foreground')}>
             {marcados > 0 && (marcados === ids.length ? <Check className="h-3 w-3" /> : <Minus className="h-3 w-3" />)}
@@ -130,7 +130,7 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
           <span className="shrink-0 text-[11px] text-muted-foreground">{ids.length} grupo(s) · {totalMembros} membro(s)</span>
         </div>
         {filhos.length === 0
-          ? <p className="px-3 py-1 text-xs text-muted-foreground" style={{ marginLeft: 18 }}>Pasta vazia.</p>
+          ? <p className="py-1 text-xs text-muted-foreground" style={{ paddingLeft: 12 + (depth + 1) * 18 }}>Pasta vazia.</p>
           : filhos.map((c) => renderNo(c, depth + 1))}
       </div>
     )

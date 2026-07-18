@@ -372,7 +372,7 @@ function GrupoDestinoDialog({ aberto, onClose, sistema, onSistemaChange, valor, 
   function grupoRow(g: GrupoSistema, depth: number) {
     const on = escolha === g.id
     return (
-      <button key={g.id} type="button" onClick={() => setEscolha(g.id)} style={{ marginLeft: depth * 18 }}
+      <button key={g.id} type="button" onClick={() => setEscolha(g.id)} style={{ paddingLeft: 12 + depth * 18 }}
         className={cn('flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', on ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
         <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
           {on && <Check className="h-3 w-3" />}
@@ -390,7 +390,7 @@ function GrupoDestinoDialog({ aberto, onClose, sistema, onSistemaChange, valor, 
     const aberto2 = expandido.has(g.id)
     return (
       <div key={g.id} className="space-y-1.5">
-        <div style={{ marginLeft: depth * 18 }} className="flex items-center gap-2 rounded-lg bg-muted/50 px-2 py-2">
+        <div style={{ paddingLeft: 8 + depth * 18 }} className="flex items-center gap-2 rounded-lg bg-muted/50 px-2 py-2">
           <button type="button" onClick={() => toggle(g.id)} className="rounded p-0.5 text-muted-foreground hover:text-foreground">
             {aberto2 ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </button>
@@ -400,7 +400,7 @@ function GrupoDestinoDialog({ aberto, onClose, sistema, onSistemaChange, valor, 
             className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"><Plus className="h-3.5 w-3.5" /></button>
         </div>
         {aberto2 && (filhos.length === 0
-          ? <p style={{ marginLeft: depth * 18 + 26 }} className="py-1 text-xs text-muted-foreground">Pasta vazia.</p>
+          ? <p style={{ paddingLeft: depth * 18 + 26 }} className="py-1 text-xs text-muted-foreground">Pasta vazia.</p>
           : filhos.map((c) => renderNo(c, depth + 1)))}
       </div>
     )
