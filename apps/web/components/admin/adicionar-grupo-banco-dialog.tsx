@@ -10,9 +10,18 @@ import { UsersRound, X, Search, Check, Minus, Loader2, Link2, Unlink, Folder } f
 import { cn } from '@/lib/utils'
 import { vincularGrupoAoBanco, desvincularGrupoDoBanco } from '@/app/admin/banco-questoes/estudantes-actions'
 
-// Linha-guia de árvore (estilo explorador de arquivos): tick horizontal ligando o item à
-// linha vertical (border-l) do wrapper-pai. Aplicado nas linhas que estão DENTRO de uma pasta.
-const TICK = "relative before:absolute before:content-[''] before:top-1/2 before:-translate-y-1/2 before:left-[-14px] before:h-px before:w-[14px] before:bg-border"
+// Ramo da árvore (estilo explorador de arquivos): desenha o segmento vertical + o tick
+// horizontal de UM item. O segmento vai até embaixo (conecta ao próximo irmão), exceto no
+// ÚLTIMO filho, onde para no centro (forma o "L"). `children` é o nó (linha ou sub-árvore).
+function TreeBranch({ isLast, children }: { isLast: boolean; children: React.ReactNode }) {
+  return (
+    <div className={cn('relative pl-[14px]', !isLast && 'pb-1.5')}>
+      <span aria-hidden className="pointer-events-none absolute left-0 top-0 w-px bg-border" style={{ height: isLast ? 18 : '100%' }} />
+      <span aria-hidden className="pointer-events-none absolute left-0 top-[18px] h-px w-[14px] bg-border" />
+      {children}
+    </div>
+  )
+}
 
 export interface GrupoOpc {
   id: string
@@ -90,12 +99,12 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
     })
   }
 
-  // Linha de grupo comum (folha). `dentro` = está dentro de uma pasta → ganha a linha-guia.
-  function linhaGrupo(g: GrupoOpc, dentro: boolean) {
+  // Linha de grupo comum (folha).
+  function linhaGrupo(g: GrupoOpc) {
     const on = sel.has(g.id)
     return (
       <div key={g.id} role="button" tabIndex={0} onClick={() => toggle(g.id)}
-        className={cn('flex w-full cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', dentro && TICK, on ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
+        className={cn('flex w-full cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', on ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
         <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
           {on && <Check className="h-3 w-3" />}
         </span>
@@ -114,18 +123,18 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
     )
   }
 
-  // Nó da árvore (pasta ou grupo). `dentro` = filho de outra pasta → ganha a linha-guia.
-  function renderNo(g: GrupoOpc, dentro: boolean): React.ReactElement | null {
-    if (!g.is_mestre) return linhaGrupo(g, dentro)
+  // Nó da árvore (pasta ou grupo).
+  function renderNo(g: GrupoOpc): React.ReactElement | null {
+    if (!g.is_mestre) return linhaGrupo(g)
     const folhas = folhasDe(g.id)
     const ids = folhas.map((f) => f.id)
     const marcados = ids.filter((id) => sel.has(id)).length
     const totalMembros = folhas.reduce((s, f) => s + f.membros, 0)
     const filhos = children.get(g.id) ?? []
     return (
-      <div key={g.id} className="space-y-1.5">
+      <div key={g.id}>
         <div role="button" tabIndex={0} onClick={() => togglePasta(g.id)}
-          className={cn('flex w-full cursor-pointer items-center gap-3 rounded-lg bg-muted/50 px-3 py-2 text-left transition-colors hover:bg-muted', dentro && TICK)}>
+          className="flex w-full cursor-pointer items-center gap-3 rounded-lg bg-muted/50 px-3 py-2 text-left transition-colors hover:bg-muted">
           <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', marcados === 0 ? 'border-muted-foreground/40' : 'border-primary bg-primary text-primary-foreground')}>
             {marcados > 0 && (marcados === ids.length ? <Check className="h-3 w-3" /> : <Minus className="h-3 w-3" />)}
           </span>
@@ -133,11 +142,10 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
           <span className="min-w-0 flex-1 truncate text-sm font-semibold">{g.nome}</span>
           <span className="shrink-0 text-[11px] text-muted-foreground">{ids.length} grupo(s) · {totalMembros} membro(s)</span>
         </div>
-        {/* Linha vertical do nível (border-l) + itens filhos com tick horizontal. */}
-        <div className="ml-[18px] space-y-1.5 border-l border-border pl-[14px]">
+        <div className="ml-[18px] mt-1.5">
           {filhos.length === 0
-            ? <p className={cn('py-1 text-xs text-muted-foreground', TICK)}>Pasta vazia.</p>
-            : filhos.map((c) => renderNo(c, true))}
+            ? <TreeBranch isLast><p className="py-1 text-xs text-muted-foreground">Pasta vazia.</p></TreeBranch>
+            : filhos.map((c, i) => <TreeBranch key={c.id} isLast={i === filhos.length - 1}>{renderNo(c)}</TreeBranch>)}
         </div>
       </div>
     )
@@ -175,10 +183,10 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
                   const res = grupos.filter((g) => !g.is_mestre && g.nome.toLowerCase().includes(q))
                   return res.length === 0
                     ? <p className="py-8 text-center text-sm text-muted-foreground">Nenhum grupo encontrado.</p>
-                    : res.map((g) => linhaGrupo(g, false))
+                    : res.map((g) => linhaGrupo(g))
                 })()
               ) : (
-                top.map((g) => renderNo(g, false))
+                top.map((g) => renderNo(g))
               )}
             </div>
 
