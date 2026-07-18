@@ -213,7 +213,7 @@ export function SimuladoWizard({
               </div>
 
               {/* Cards pôster roláveis — o cabeçalho e a busca ficam fixos acima */}
-              <div className="scroll-claro max-h-[72vh] overflow-y-auto p-1.5">
+              <div className="scroll-claro max-h-[64vh] overflow-y-auto p-1.5">
                 <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {bancosFiltrados.length === 0 ? (
                   <p className="col-span-full rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">{bancos.length === 0 ? 'Nenhum banco criado ainda. Use "Criar do zero".' : 'Nenhum banco encontrado.'}</p>
