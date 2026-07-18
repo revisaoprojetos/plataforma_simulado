@@ -233,9 +233,9 @@ export default async function CadernoImprimirPage({
           <style>{estiloAluno}</style>
           {!embed && <CadernoPrintControls />}
           {copias.map((c, ci) => {
-            // Cada questão é um item próprio (a repetição é expandida) para o paginador
-            // poder distribuí-las por página; os demais blocos (banner, tabela) são itens únicos.
-            const itens = contPages.flatMap((page: any) =>
+            // Itens de UMA página de conteúdo. Cada questão é um item próprio (a repetição é
+            // expandida) para o paginador distribuir por página; os demais blocos são itens únicos.
+            const itensDaPagina = (page: any) =>
               page.blocks.filter((b: any) => b.type !== 'plano-fundo').flatMap((block: any) => {
                 if (block.type === 'repeticao') {
                   const qtd = block.attributes?.quantidade as number | null | undefined
@@ -255,8 +255,7 @@ export default async function CadernoImprimirPage({
                   }))
                 }
                 return [{ key: `${ci}-${page.id}-${block.id}`, gapTop: 0, node: <BlockRender block={block} theme={theme} data={c.data} /> }]
-              }),
-            )
+              })
             return (
               <div key={ci} className={ci > 0 ? 'aluno-quebra' : undefined}>
                 {capaPages.map((page: any) => {
@@ -271,7 +270,13 @@ export default async function CadernoImprimirPage({
                     </div>
                   )
                 })}
-                <PaginadorCaderno itens={itens} letterhead={letterhead} opac={opac} cabH={cabH} cabHCont={cabHCont} rodH={rodH} fundo={theme.cores.fundo} />
+                {/* Uma PÁGINA do editor = uma página no PDF (paginada individualmente). Respeita
+                    as quebras que o usuário montou; o overflow interno flui como rede de segurança.
+                    Antes, TODAS as páginas eram achatadas num só fluxo e reflluíam — o que quebrava
+                    o posicionamento/espaçamento em relação ao editor. */}
+                {contPages.map((page: any) => (
+                  <PaginadorCaderno key={`${ci}-${page.id}`} itens={itensDaPagina(page)} letterhead={letterhead} opac={opac} cabH={cabH} cabHCont={cabHCont} rodH={rodH} fundo={theme.cores.fundo} />
+                ))}
               </div>
             )
           })}
