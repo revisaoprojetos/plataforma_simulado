@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { selecionarGrupos } from '@/lib/simulado/grupos'
 import { BancoEstudantesClient } from '@/components/admin/banco-estudantes-client'
 import { AlertTriangle } from 'lucide-react'
 
@@ -56,15 +57,9 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
   const vinculados = lista.filter((a: any) => vincSet.has(a.id)).map((a: any) => ({ ...a, ultimo_acesso: ultimoPorAluno.get(a.id) ?? null }))
 
   // Grupos do tenant (para o botão "Adicionar grupo"), com contagem de membros e vínculo atual.
-  let gruposRaw: any[] | null = null
-  {
-    const r = await svc.from('simulado_grupos').select('id, nome, cor').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').eq('deletado', false).order('nome')
-    if (r.error && /cor/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_grupos').select('id, nome').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').eq('deletado', false).order('nome')
-      gruposRaw = r2.data
-    } else gruposRaw = r.data
-  }
-  const gids = (gruposRaw ?? []).map((x: any) => x.id)
+  // Tolerante a cor/pai_id/is_mestre ausentes; pastas (mestre) agrupam sub-grupos no diálogo.
+  const gruposRaw = await selecionarGrupos(svc, tenantId ?? '00000000-0000-0000-0000-000000000000')
+  const gids = gruposRaw.filter((x) => !x.is_mestre).map((x) => x.id)
   const contMembros = new Map<string, number>()
   if (gids.length) {
     // fetchAll: há >1000 vínculos no total → sem paginar, a contagem por grupo é cortada em 1000
@@ -78,7 +73,7 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
     const { data: links, error: linkErr } = await svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', bancoId)
     if (!linkErr) vinculadosSet = new Set((links ?? []).map((l: any) => l.grupo_id))
   }
-  const grupos = (gruposRaw ?? []).map((x: any) => ({ id: x.id, nome: x.nome, cor: x.cor ?? null, membros: contMembros.get(x.id) ?? 0, vinculado: vinculadosSet.has(x.id) }))
+  const grupos = gruposRaw.map((x) => ({ id: x.id, nome: x.nome, cor: x.cor, membros: contMembros.get(x.id) ?? 0, vinculado: vinculadosSet.has(x.id), pai_id: x.pai_id, is_mestre: x.is_mestre }))
 
   return <BancoEstudantesClient bancoId={bancoId} vinculados={vinculados as any} alunos={alunos as any} grupos={grupos} cor={cor} />
 }

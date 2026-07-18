@@ -16,18 +16,69 @@ function revalidar(id?: string) {
   if (id) revalidatePath(`/admin/grupos/${id}`)
 }
 
-/** Cria um grupo de estudantes. */
-export async function criarGrupo(nome: string, cor?: string): Promise<{ ok: boolean; id?: string; error?: string }> {
+/**
+ * Cria um grupo de estudantes.
+ * `opts.isMestre` cria uma pasta (grupo mestre); `opts.paiId` cria o grupo já dentro de uma pasta.
+ * Tolerante: se as colunas `cor`/`pai_id`/`is_mestre` não existem, degrada removendo a ausente —
+ * mas se o recurso de mestre foi pedido e a coluna falta, avisa para aplicar a migração.
+ */
+export async function criarGrupo(
+  nome: string,
+  cor?: string,
+  opts?: { paiId?: string | null; isMestre?: boolean },
+): Promise<{ ok: boolean; id?: string; error?: string }> {
   const g = await guard(); if (!g.ok) return g
   const titulo = nome.trim(); if (!titulo) return { ok: false, error: 'Informe um nome.' }
   const svc = createAdminClient()
-  const insere = async (comCor: boolean) =>
-    svc.from('simulado_grupos').insert(comCor ? { tenant_id: g.tenantId, nome: titulo, cor: cor || null } : { tenant_id: g.tenantId, nome: titulo }).select('id').single()
-  let { data, error } = await insere(true)
-  if (error && /cor/i.test(error.message)) ({ data, error } = await insere(false))
-  if (error) return { ok: false, error: error.message }
-  revalidar()
-  return { ok: true, id: data!.id }
+
+  const attempt: any = { tenant_id: g.tenantId, nome: titulo }
+  if (cor) attempt.cor = cor
+  if (opts?.isMestre) attempt.is_mestre = true
+  if (opts?.paiId != null) attempt.pai_id = opts.paiId
+  const querMestre = !!opts?.isMestre || opts?.paiId != null
+
+  for (let i = 0; i < 4; i++) {
+    const r = await svc.from('simulado_grupos').insert(attempt).select('id').single()
+    if (!r.error) { revalidar(); return { ok: true, id: r.data!.id } }
+    const m = r.error.message
+    const faltando = /pai_id/i.test(m) ? 'pai_id' : /is_mestre/i.test(m) ? 'is_mestre' : /\bcor\b/i.test(m) ? 'cor' : null
+    if (!faltando) return { ok: false, error: m }
+    if ((faltando === 'pai_id' || faltando === 'is_mestre') && querMestre)
+      return { ok: false, error: 'Grupo mestre indisponível no banco. Aplique a migração de grupo mestre e tente de novo.' }
+    delete attempt[faltando]
+  }
+  return { ok: false, error: 'Falha ao criar grupo.' }
+}
+
+/** Cria uma pasta (grupo mestre) que agrupa sub-grupos. */
+export async function criarGrupoMestre(nome: string, cor?: string): Promise<{ ok: boolean; id?: string; error?: string }> {
+  return criarGrupo(nome, cor, { isMestre: true })
+}
+
+/**
+ * Move um grupo para dentro de uma pasta (mestre) ou o solta (paiId = null).
+ * Valida: o grupo não pode ser mestre; o destino, se houver, precisa ser um mestre do tenant.
+ */
+export async function moverGrupo(grupoId: string, paiId: string | null): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard(); if (!g.ok) return g
+  const svc = createAdminClient()
+
+  const grp = await svc.from('simulado_grupos').select('id, is_mestre').eq('id', grupoId).eq('tenant_id', g.tenantId).eq('deletado', false).maybeSingle()
+  if (grp.error && /is_mestre/i.test(grp.error.message)) return { ok: false, error: 'Grupo mestre indisponível no banco. Aplique a migração de grupo mestre.' }
+  if (!grp.data) return { ok: false, error: 'Grupo não encontrado.' }
+  if ((grp.data as any).is_mestre === true) return { ok: false, error: 'Uma pasta (grupo mestre) não pode entrar em outra pasta.' }
+
+  if (paiId) {
+    const pai = await svc.from('simulado_grupos').select('id, is_mestre').eq('id', paiId).eq('tenant_id', g.tenantId).eq('deletado', false).maybeSingle()
+    if (pai.error) return { ok: false, error: pai.error.message }
+    if (!pai.data) return { ok: false, error: 'Pasta destino não encontrada.' }
+    if ((pai.data as any).is_mestre !== true) return { ok: false, error: 'O destino precisa ser um grupo mestre (pasta).' }
+  }
+
+  const { error } = await svc.from('simulado_grupos').update({ pai_id: paiId }).eq('id', grupoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: /pai_id/i.test(error.message) ? 'Grupo mestre indisponível no banco. Aplique a migração de grupo mestre.' : error.message }
+  revalidar(grupoId)
+  return { ok: true }
 }
 
 /** Edita nome e cor do grupo (cor é tolerante caso a coluna não exista). */
@@ -47,10 +98,13 @@ export async function editarGrupo(id: string, nome: string, cor: string | null):
   return { ok: true }
 }
 
-/** Exclui (soft delete) um grupo. */
+/** Exclui (soft delete) um grupo. Se for uma pasta (mestre), solta os filhos antes (não os apaga). */
 export async function excluirGrupo(id: string): Promise<{ ok: boolean; error?: string }> {
   const g = await guard(); if (!g.ok) return g
   const svc = createAdminClient()
+  // Solta os sub-grupos para que não sumam junto com a pasta (tolerante se pai_id não existe).
+  const solta = await svc.from('simulado_grupos').update({ pai_id: null }).eq('pai_id', id).eq('tenant_id', g.tenantId)
+  if (solta.error && !/pai_id/i.test(solta.error.message)) return { ok: false, error: solta.error.message }
   const { error } = await svc.from('simulado_grupos').update({ deletado: true }).eq('id', id).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
   revalidar()
