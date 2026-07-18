@@ -147,7 +147,7 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
   }
 
   // ---------- LOGIN (após escolher plataforma / admin) ----------
-  const titulo = modo === 'admin' ? 'Acesso administrativo' : `Entre na ${sel?.nome ?? 'plataforma'}`
+  const titulo = modo === 'admin' ? 'Acesso administrativo' : 'Login'
 
   // Formulário de credenciais — reutilizado nos dois layouts (painel e centralizado).
   const formLogin = modo === 'aluno' ? (
