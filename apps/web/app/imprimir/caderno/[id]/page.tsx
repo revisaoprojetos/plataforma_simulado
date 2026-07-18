@@ -91,7 +91,7 @@ export default async function CadernoImprimirPage({
       id: q.id, numero: i + 1, enunciado: q.enunciado ?? '', tipo: q.tipo, comentario: q.comentario_professor ?? '',
       alternativas: (altMap.get(q.id) ?? []).sort((x, y) => x.ordem - y.ordem).map((a, j) => ({ letra: LETRA[j] ?? '?', texto: a.texto ?? '', correta: !!a.correta, comentario: a.comentario ?? '', lei: a.lei ?? '' })),
     })),
-    vars: { nome: '', simulado: caderno.nome, acertos: '', total_questoes: String((questoes ?? []).length || 20), nota: '', percentual: '' },
+    vars: { nome: '', simulado: caderno.nome, acertos: '', erros: '', total_questoes: String((questoes ?? []).length || 20), nota: '', percentual: '' },
   }
   // Gating: o gabarito (correção) só aparece se algum simulado vinculado ao banco liberou.
   if (bancoId && !forcarSemGabarito) {

@@ -160,11 +160,14 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
       const set = assuntosErrPorDisc.get(d) ?? new Set<string>(); set.add(as); assuntosErrPorDisc.set(d, set)
     }
 
+    const info = infoPorAluno.get(a.id) ?? { data: '', inicio: '', termino: '', tempo_total: '', respondidas: '', em_branco: '' }
+    const respN = Number(info.respondidas || 0)
+    const erros = Math.max(0, respN - acertos) // respondidas incorretamente (em branco fica em em_branco)
     const vars: Record<string, string> = {
       nome: a.nome ?? '', email: a.email ?? '', telefone: a.telefone ?? '', cpf: a.cpf ?? '', classificacao: a.classificacao ?? '',
-      simulado: bancoNome, acertos: String(acertos), total_questoes: String(totalQ),
+      simulado: bancoNome, acertos: String(acertos), erros: String(erros), total_questoes: String(totalQ),
       nota: nota.toFixed(1).replace('.', ','), percentual: totalQ ? `${Math.round((acertos / totalQ) * 100)}%` : '0%',
-      ...(infoPorAluno.get(a.id) ?? { data: '', inicio: '', termino: '', tempo_total: '', respondidas: '', em_branco: '' }),
+      ...info,
     }
     for (const [d, tot] of discTotais) {
       const s = slug(d)

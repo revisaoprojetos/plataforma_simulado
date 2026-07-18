@@ -300,6 +300,7 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco, assunt
               <option value="oficial">Gabarito oficial</option>
             </select>
           </Row>
+          {(a.origem ?? 'marcado') === 'oficial' && <p className="rounded-md border border-amber-300/40 bg-amber-50 px-2 py-1.5 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">O <b>gabarito oficial</b> revela as respostas — aparece só na versão do caderno <b>com o gabarito liberado</b>.</p>}
           <Row label="Título (vazio = automático)"><input value={a.titulo ?? ''} onChange={(e) => set('titulo', e.target.value)} placeholder={(a.origem ?? 'marcado') === 'oficial' ? 'Gabarito Oficial' : 'Gabarito de Alternativas'} className={inputCls} /></Row>
           <Faixa label="Questões por linha" min={4} max={20} value={a.porLinha ?? 10} onChange={(v) => set('porLinha', v)} />
           <Faixa label="Arredondamento das bordas (0 = retas)" min={0} max={16} value={a.bordaRaio ?? 8} onChange={(v) => set('bordaRaio', v)} />
@@ -338,7 +339,12 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco, assunt
           <Cor label="Cor da borda" value={a.corBorda} onChange={(v) => set('corBorda', v)} />
           <Cor label="Linha inferior (destaque)" value={a.corAcento} onChange={(v) => set('corAcento', v)} />
           <GrupoCampos label="Destaque (linha de cima, maior)" items={normCampos(a.destaque)} onChange={(v) => set('destaque', v)} exemplos="{{nome}} {{email}} {{telefone}} {{simulado}} {{classificacao}}" />
-          <GrupoCampos label="Estatísticas (linha de baixo)" items={normCampos(a.campos)} onChange={(v) => set('campos', v)} exemplos="{{data}} {{inicio}} {{termino}} {{tempo_total}} {{respondidas}} {{em_branco}} {{nota}} {{percentual}}" />
+          <GrupoCampos label="Estatísticas (linha de baixo)" items={normCampos(a.campos)} onChange={(v) => set('campos', v)} exemplos="{{data}} {{inicio}} {{termino}} {{tempo_total}} {{respondidas}} {{em_branco}}" />
+          <div className="border-t pt-2" />
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarDesempenho !== false} onChange={(e) => set('mostrarDesempenho', e.target.checked)} className="h-4 w-4 rounded border" /> Linha de desempenho (só no caderno com gabarito liberado)</label>
+          {a.mostrarDesempenho !== false && (
+            <GrupoCampos label="Desempenho (aparece só com gabarito liberado)" items={normCampos(a.desempenho)} onChange={(v) => set('desempenho', v)} exemplos="{{acertos}} {{erros}} {{nota}} {{percentual}} {{total_questoes}}" />
+          )}
         </div>
       )
     case 'imagem':

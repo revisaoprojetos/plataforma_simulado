@@ -46,9 +46,10 @@ export const BLOCKS: BlockMeta[] = [
       corFundo: '#eef4ff', corBorda: '#c7d7f5', corTitulo: '#1a3a6b', corTexto: '#243b53', corLei: '#6b7280', bordaRaio: 8, padding: 10, fonte: '' } },
   // Identificação
   { type: 'identificacao', title: 'Identificação', icon: IdCard, category: 'identificacao', dynamic: true, supportsVars: true,
-    defaults: { titulo: 'Dados do Candidato', bordaRaio: 8, fonte: '', corBorda: '', corHeader: '', corHeaderTexto: '', corRotulo: '', corValor: '', corDestaque: '', corAcento: '',
+    defaults: { titulo: 'Dados do Candidato', bordaRaio: 8, fonte: '', corBorda: '', corHeader: '', corHeaderTexto: '', corRotulo: '', corValor: '', corDestaque: '', corAcento: '', mostrarDesempenho: true,
       destaque: [{ rotulo: 'Nome', valor: '{{nome}}' }, { rotulo: 'E-mail', valor: '{{email}}' }],
-      campos: [{ rotulo: 'Data', valor: '{{data}}' }, { rotulo: 'Início', valor: '{{inicio}}' }, { rotulo: 'Término', valor: '{{termino}}' }, { rotulo: 'Tempo total', valor: '{{tempo_total}}' }, { rotulo: 'Respondidas', valor: '{{respondidas}}' }, { rotulo: 'Em branco', valor: '{{em_branco}}' }] } },
+      campos: [{ rotulo: 'Data', valor: '{{data}}' }, { rotulo: 'Início', valor: '{{inicio}}' }, { rotulo: 'Término', valor: '{{termino}}' }, { rotulo: 'Tempo total', valor: '{{tempo_total}}' }, { rotulo: 'Respondidas', valor: '{{respondidas}}' }, { rotulo: 'Em branco', valor: '{{em_branco}}' }],
+      desempenho: [{ rotulo: 'Acertos', valor: '{{acertos}}' }, { rotulo: 'Erros', valor: '{{erros}}' }, { rotulo: 'Média', valor: '{{nota}}' }] } },
   { type: 'cabecalho-prova', title: 'Cabeçalho de prova', icon: LayoutGrid, category: 'identificacao', supportsVars: true,
     defaults: { campos: [{ rotulo: 'Banca', valor: '' }, { rotulo: 'Órgão', valor: '' }, { rotulo: 'Cargo', valor: '' }, { rotulo: 'Ano', valor: '' }], colunas: 2 } },
   { type: 'assinatura', title: 'Assinatura', icon: Signature, category: 'identificacao', supportsVars: true,
@@ -293,6 +294,8 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
       const nAlt = a.numAlternativas ?? data.numAlternativas ?? 5
       const letras = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, nAlt)
       const origem = a.origem ?? 'marcado' // 'marcado' = respostas do aluno | 'oficial' = gabarito correto
+      // Gabarito OFICIAL revela as respostas → só na versão com o gabarito liberado (no editor sempre mostra).
+      if (origem === 'oficial' && !data.gabaritoLiberado && !editor) return null
       const usarDados = data.questoes.length > 0
       const total = a.numQuestoes ?? (usarDados ? data.questoes.length : (data.numQuestoes ?? 100))
       const porLinha = Math.max(4, Math.min(20, a.porLinha ?? 10))
@@ -358,6 +361,9 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
         (arr ?? []).map((x) => (typeof x === 'string' ? { rotulo: x, valor: '' } : { rotulo: x?.rotulo ?? '', valor: x?.valor ?? '' }))
       const destaque = norm(a.destaque)
       const campos = norm(a.campos)
+      // Linha de desempenho (Acertos/Erros/Média) — só quando o gabarito está liberado.
+      const mostraDesemp = a.mostrarDesempenho !== false && (data.gabaritoLiberado || editor)
+      const desempenho = mostraDesemp ? norm(a.desempenho) : []
       const titulo = a.titulo || 'Dados do Candidato'
       const raio = a.bordaRaio ?? 8
       const fontFamily = cssDaFonte(a.fonte) || theme.tipografia.familia
@@ -386,6 +392,11 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
           {campos.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${campos.length}, 1fr)`, borderTop: destaque.length ? `1px solid ${borda}` : 'none' }}>
               {campos.map((f, i) => celula(f, i, campos.length, false))}
+            </div>
+          )}
+          {desempenho.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${desempenho.length}, 1fr)`, borderTop: (destaque.length || campos.length) ? `1px solid ${borda}` : 'none', background: corDestaque }}>
+              {desempenho.map((f, i) => celula(f, i, desempenho.length, false))}
             </div>
           )}
           <div style={{ height: 3, background: corAcento }} />
