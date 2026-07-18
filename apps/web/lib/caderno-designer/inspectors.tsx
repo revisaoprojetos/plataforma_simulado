@@ -444,18 +444,29 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco }: { bl
       )
     }
     case 'diag-disciplina': {
-      // Lista de disciplinas do simulado (slug -> nome) a partir das variáveis disponíveis.
-      const discOpts = [...new Set((varsExtra ?? []).filter((g) => /Disciplina/i.test(g.grupo)).flatMap((g) => g.itens.map((v) => v.token.match(/\{pct_(.+)\}/)?.[1]).filter(Boolean)))] as string[]
+      const slugify = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
       const humano = (s: string) => s.replace(/_/g, ' ').replace(/^./, (ch) => ch.toUpperCase())
+      // Nomes REAIS das disciplinas (do banco/grupos). Fallback: slugs das variáveis, humanizados.
+      const nomesReais = [...new Set((gruposBanco ?? []).flatMap((g) => g.disciplinas))].sort()
+      const slugsVar = [...new Set((varsExtra ?? []).filter((g) => /Disciplina/i.test(g.grupo)).flatMap((g) => g.itens.map((v) => v.token.match(/\{pct_(.+)\}/)?.[1]).filter(Boolean)))] as string[]
+      const usarReais = nomesReais.length > 0
       return (
         <div className="space-y-3">
-          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Escolha a <b>disciplina do simulado</b> — o bloco preenche nome, acertos/total e % automaticamente. Só aparece se o aluno <b>errou</b> ao menos uma questão dela.</p>
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Escolha a <b>disciplina do simulado</b> — o bloco usa o <b>nome real</b> dela e preenche acertos/total/% automaticamente. Só aparece se o aluno <b>errou</b> ao menos uma questão.</p>
           <Row label="Disciplina">
-            <select value={a.chave ?? ''} onChange={(e) => { const s = e.target.value; onChange({ chave: s, nome: a.nome && a.chave !== s ? a.nome : humano(s) }) }} className={inputCls}>
-              <option value="">— escolher —</option>
-              {discOpts.map((s) => <option key={s} value={s}>{humano(s)}</option>)}
-              {a.chave && !discOpts.includes(a.chave) && <option value={a.chave}>{humano(a.chave)} (atual)</option>}
-            </select>
+            {usarReais ? (
+              <select value={a.nome ?? ''} onChange={(e) => { const nome = e.target.value; onChange({ nome, chave: slugify(nome) }) }} className={inputCls}>
+                <option value="">— escolher —</option>
+                {nomesReais.map((n) => <option key={n} value={n}>{n}</option>)}
+                {a.nome && !nomesReais.includes(a.nome) && <option value={a.nome}>{a.nome} (atual)</option>}
+              </select>
+            ) : (
+              <select value={a.chave ?? ''} onChange={(e) => { const s = e.target.value; onChange({ chave: s, nome: humano(s) }) }} className={inputCls}>
+                <option value="">— escolher —</option>
+                {slugsVar.map((s) => <option key={s} value={s}>{humano(s)}</option>)}
+                {a.chave && !slugsVar.includes(a.chave) && <option value={a.chave}>{humano(a.chave)} (atual)</option>}
+              </select>
+            )}
           </Row>
           <Row label="Nome exibido"><input value={a.nome ?? ''} onChange={(e) => set('nome', e.target.value)} className={inputCls} placeholder="Direito Constitucional" /></Row>
           <Row label="Assunto principal"><input value={a.assunto ?? ''} onChange={(e) => set('assunto', e.target.value)} className={inputCls} placeholder="Assunto Principal (vazio = não mostra)" /></Row>
