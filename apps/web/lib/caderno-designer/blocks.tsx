@@ -42,7 +42,8 @@ export const BLOCKS: BlockMeta[] = [
   { type: 'gabarito-correcao', title: 'Correção (marcada × correta)', icon: ClipboardCheck, category: 'avaliacao', dynamic: true,
     defaults: { rotulo: 'Sua resposta:', mostrarCorreta: true } },
   { type: 'q-comentario', title: 'Comentário da questão', icon: MessageSquare, category: 'avaliacao', dynamic: true, supportsVars: true,
-    defaults: { titulo: 'Comentário do professor', soSeTiver: true, corFundo: '#eef4ff', corBorda: '#c7d7f5', corTitulo: '#1a3a6b', corTexto: '#243b53', bordaRaio: 8, padding: 10, fonte: '' } },
+    defaults: { titulo: 'Comentário', modo: 'correta', mostrarGabarito: true, mostrarLei: true, respeitaGabarito: true, soSeTiver: true,
+      corFundo: '#eef4ff', corBorda: '#c7d7f5', corTitulo: '#1a3a6b', corTexto: '#243b53', corLei: '#6b7280', bordaRaio: 8, padding: 10, fonte: '' } },
   // Identificação
   { type: 'identificacao', title: 'Identificação', icon: IdCard, category: 'identificacao', dynamic: true, supportsVars: true,
     defaults: { titulo: 'Dados do Candidato', bordaRaio: 8, fonte: '', corBorda: '', corHeader: '', corHeaderTexto: '', corRotulo: '', corValor: '', corDestaque: '', corAcento: '',
@@ -150,11 +151,24 @@ export function dataComQuestao(data: CadernoData, q: QuestaoData): CadernoData {
   // Uma variável por alternativa: {q_alt_a} → "A) texto", {q_alt_b} → "B) texto"…
   const porAlt: Record<string, string> = { q_alt_a: '', q_alt_b: '', q_alt_c: '', q_alt_d: '', q_alt_e: '', q_alt_f: '' }
   for (const al of q.alternativas) porAlt[`q_alt_${al.letra.toLowerCase()}`] = `${al.letra}) ${al.texto}`
+  // Comentários e leis — vêm POR ALTERNATIVA (a correta traz a explicação principal).
+  const corretaAl = q.alternativas.find((al) => al.correta)
+  for (const al of q.alternativas) {
+    porAlt[`q_comentario_${al.letra.toLowerCase()}`] = al.comentario ?? ''
+    porAlt[`q_lei_${al.letra.toLowerCase()}`] = al.lei ?? ''
+  }
+  const comentTodas = q.alternativas.filter((al) => (al.comentario ?? '').trim()).map((al) => `${al.letra}) ${al.comentario}`).join('\n\n')
+  const leiTodas = q.alternativas.filter((al) => (al.lei ?? '').trim()).map((al) => `${al.letra}) ${al.lei}`).join('\n')
+  // {q_comentario} = comentário da alternativa CORRETA (fallback: comentario_professor da questão).
+  const comentarioPrincipal = (corretaAl?.comentario ?? '').trim() || (q.comentario ?? '')
   return {
     ...data, questaoAtual: q,
     vars: {
       ...data.vars, q_num: String(q.numero), q_numero: String(q.numero), q_enunciado: q.enunciado,
-      q_tipo: q.tipo, q_disciplina: q.disciplina ?? '', q_comentario: q.comentario ?? '', q_alternativas: altsTexto, q_letras: letras,
+      q_tipo: q.tipo, q_disciplina: q.disciplina ?? '', q_gabarito: corretaAl?.letra ?? '',
+      q_comentario: comentarioPrincipal, q_comentario_correta: corretaAl?.comentario ?? '', q_comentario_todas: comentTodas,
+      q_lei: corretaAl?.lei ?? '', q_lei_todas: leiTodas,
+      q_alternativas: altsTexto, q_letras: letras,
       // {q_resposta} = alternativa completa marcada ("B) 4"); {q_resposta_letra} = só a letra.
       q_resposta: respostaTexto, q_resposta_letra: marcadaLetra, q_resposta_texto: respostaTexto,
       ...porAlt,
@@ -631,15 +645,26 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
       )
     }
     case 'q-comentario': {
-      // Comentário do professor da questão (só aparece quando a questão tem comentário).
-      const txt = applyVars('{q_comentario}', data.vars)
-      const vazio = !txt || /\{q_comentario\}/.test(txt)
+      // Comentário da questão (vem da alternativa CORRETA; opção de mostrar de todas + a lei).
+      // Revela o gabarito → por padrão só na versão "com correção" (respeitaGabarito).
+      if (a.respeitaGabarito !== false && !data.gabaritoLiberado && !editor) return null
+      const resolver = (tok: string) => { const r = applyVars(tok, data.vars); return /\{/.test(r) ? '' : r }
+      const txt = (a.modo === 'todas' ? resolver('{q_comentario_todas}') : resolver('{q_comentario}')).trim()
+      const lei = a.mostrarLei ? (a.modo === 'todas' ? resolver('{q_lei_todas}') : resolver('{q_lei}')).trim() : ''
+      const gab = a.mostrarGabarito ? resolver('{q_gabarito}').trim() : ''
+      const vazio = !txt && !lei
       if (vazio && a.soSeTiver !== false && !editor) return null
-      const conteudo = vazio ? (editor ? '(sem comentário nesta questão — aparece só nas que têm)' : '') : txt
       return (
         <div style={{ background: a.corFundo || '#eef4ff', border: `1px solid ${a.corBorda || '#c7d7f5'}`, borderRadius: a.bordaRaio ?? 8, padding: a.padding ?? 10, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
-          {a.titulo && <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 11, color: a.corTitulo || '#1a3a6b', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>{a.titulo}</div>}
-          <div style={{ fontSize: 12, lineHeight: 1.55, textAlign: 'justify', whiteSpace: 'pre-wrap', color: vazio ? '#94a3b8' : (a.corTexto || '#243b53'), fontStyle: vazio ? 'italic' : 'normal' }}>{conteudo}</div>
+          {(a.titulo || gab) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 11, color: a.corTitulo || '#1a3a6b', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>
+              {a.titulo}{gab ? <span style={{ fontWeight: 700 }}>{a.titulo ? ' — ' : ''}Gabarito: {gab}</span> : null}
+            </div>
+          )}
+          <div style={{ fontSize: 12, lineHeight: 1.55, textAlign: 'justify', whiteSpace: 'pre-wrap', color: txt ? (a.corTexto || '#243b53') : '#94a3b8', fontStyle: txt ? 'normal' : 'italic' }}>
+            {txt || (editor ? '(sem comentário nesta questão — aparece só nas que têm)' : '')}
+          </div>
+          {lei && <div style={{ marginTop: 6, fontSize: 11, lineHeight: 1.5, whiteSpace: 'pre-wrap', color: a.corLei || '#6b7280' }}>📖 {lei}</div>}
         </div>
       )
     }

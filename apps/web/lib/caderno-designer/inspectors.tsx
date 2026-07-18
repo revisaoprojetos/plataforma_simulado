@@ -396,8 +396,15 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco, assunt
     case 'q-comentario':
       return (
         <div className="space-y-3">
-          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Mostra o <b>comentário do professor</b> da questão (variável <code>{'{q_comentario}'}</code>). Use dentro do <strong>Repetir por questão</strong>. As questões sem comentário não exibem o bloco.</p>
-          <Row label="Título"><input value={a.titulo ?? ''} onChange={(e) => set('titulo', e.target.value)} className={inputCls} placeholder="Comentário do professor (vazio = sem título)" /></Row>
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Mostra o <b>comentário da questão</b> (vem da alternativa correta). Use dentro do <strong>Repetir por questão</strong>. Revela o gabarito, então por padrão só aparece na versão <b>com correção</b>. Questões sem comentário não exibem o bloco.</p>
+          <Row label="Título"><input value={a.titulo ?? ''} onChange={(e) => set('titulo', e.target.value)} className={inputCls} placeholder="Comentário (vazio = sem título)" /></Row>
+          <Row label="Conteúdo"><select value={a.modo ?? 'correta'} onChange={(e) => set('modo', e.target.value)} className={inputCls}>
+            <option value="correta">Comentário da alternativa correta</option>
+            <option value="todas">Comentário de todas as alternativas (A–E)</option>
+          </select></Row>
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarGabarito !== false} onChange={(e) => set('mostrarGabarito', e.target.checked)} className="h-4 w-4 rounded border" /> Mostrar “Gabarito: X” no título</label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarLei !== false} onChange={(e) => set('mostrarLei', e.target.checked)} className="h-4 w-4 rounded border" /> Mostrar a lei/base legal (quando houver)</label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.respeitaGabarito !== false} onChange={(e) => set('respeitaGabarito', e.target.checked)} className="h-4 w-4 rounded border" /> Só na versão com correção (respeita o gabarito)</label>
           <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.soSeTiver !== false} onChange={(e) => set('soSeTiver', e.target.checked)} className="h-4 w-4 rounded border" /> Só aparece se a questão tiver comentário</label>
           <FonteSelect value={a.fonte} onChange={(v) => set('fonte', v)} />
           <Faixa label="Espaçamento interno (px)" min={0} max={24} value={a.padding ?? 10} onChange={(v) => set('padding', v)} />
@@ -407,6 +414,7 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco, assunt
           <Cor label="Cor da borda" value={a.corBorda} onChange={(v) => set('corBorda', v)} />
           <Cor label="Cor do título" value={a.corTitulo} onChange={(v) => set('corTitulo', v)} />
           <Cor label="Cor do texto" value={a.corTexto} onChange={(v) => set('corTexto', v)} />
+          <Cor label="Cor da lei" value={a.corLei} onChange={(v) => set('corLei', v)} />
         </div>
       )
     case 'card':

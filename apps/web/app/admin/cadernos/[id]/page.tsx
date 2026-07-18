@@ -54,7 +54,7 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
   // Alternativas de TODAS as questões do preview (para navegar por elas no repetidor).
   const amostraIds = (questoes ?? []).map((q: any) => q.id)
   const { data: alts } = amostraIds.length
-    ? await svc.from('simulado_alternativas').select('questao_id, texto, ordem, correta').in('questao_id', amostraIds)
+    ? await svc.from('simulado_alternativas').select('questao_id, texto, ordem, correta, comentario, lei').in('questao_id', amostraIds)
     : { data: [] as any[] }
   const altMap = new Map<string, any[]>()
   for (const a of alts ?? []) { const arr = altMap.get(a.questao_id) ?? []; arr.push(a); altMap.set(a.questao_id, arr) }
@@ -64,7 +64,7 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
     numAlternativas: 5,
     questoes: (questoes ?? []).map((q: any, i: number) => ({
       id: q.id, numero: i + 1, enunciado: q.enunciado ?? '', tipo: q.tipo, comentario: q.comentario_professor ?? '',
-      alternativas: (altMap.get(q.id) ?? []).sort((x, y) => x.ordem - y.ordem).map((a, j) => ({ letra: LETRAS[j] ?? '?', texto: a.texto ?? '', correta: !!a.correta })),
+      alternativas: (altMap.get(q.id) ?? []).sort((x, y) => x.ordem - y.ordem).map((a, j) => ({ letra: LETRAS[j] ?? '?', texto: a.texto ?? '', correta: !!a.correta, comentario: a.comentario ?? '', lei: a.lei ?? '' })),
     })),
     vars: {
       nome: 'João da Silva', email: 'joao.silva@email.com', telefone: '(11) 90000-0000', classificacao: '',
