@@ -650,7 +650,7 @@ export function RevisaoFinal({
               <CardContent className="px-4 pb-0 pt-0">
                 <p className="text-center text-sm font-semibold">Navegador de questões</p>
                 <div className="mt-2 mb-3 border-t" />
-                <div className="grid grid-cols-5 gap-1.5">
+                <div className="grid max-h-[46vh] grid-cols-5 gap-1.5 overflow-y-auto px-1.5 py-1 [scrollbar-width:thin]">
                   {qs.map((q) => {
                     const respondida = q.resposta_aluno !== null
                     let st: React.CSSProperties | undefined
@@ -665,7 +665,7 @@ export function RevisaoFinal({
                         key={q.id}
                         onClick={() => document.getElementById(`q-${q.numero}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                         title={`Questão ${q.numero}${q.anulada ? ' (anulada)' : q.alt_trocada ? ' (alternativa trocada)' : ''}`}
-                        className={cn('flex h-9 items-center justify-center rounded-md text-xs font-bold transition-colors', cls)}
+                        className={cn('flex aspect-square items-center justify-center rounded-md text-xs font-bold transition-colors', cls)}
                         style={st}
                       >
                         {q.numero}
