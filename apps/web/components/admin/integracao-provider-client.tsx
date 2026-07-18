@@ -372,6 +372,10 @@ function MapaJson({ provider, inicial }: { provider: Provider; inicial?: { mapa:
                 </div>
                 <span className="shrink-0 text-sky-500">→</span>
                 <Input list={`paths-${provider}`} value={mapa[c.key] ?? ''} onClick={(e) => e.stopPropagation()} onFocus={() => setAtivo(c.key)} onChange={(e) => set(c.key, e.target.value)} placeholder={c.padrao} className="h-8 min-w-0 flex-1 font-mono text-xs" />
+                {/* Valor que essa chave resolve no payload recebido */}
+                <span className="hidden max-w-[38%] shrink-0 truncate text-right text-[11px] font-medium md:block" title={resolvido ?? ''}>
+                  {payload == null ? '' : ok ? <span className="text-emerald-600 dark:text-emerald-400">= {resolvido}</span> : <span className="text-amber-600 dark:text-amber-400">= vazio</span>}
+                </span>
               </div>
             )
           })}
