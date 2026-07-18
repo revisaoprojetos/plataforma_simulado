@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -114,6 +114,11 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
   const [erro, setErro] = useState<ErroBloqueio | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [sucesso, setSucesso] = useState(false)
+  // Espera pela janela: aluno já se identificou, mas o simulado ainda não começou.
+  const [aguardando, setAguardando] = useState<string | null>(null) // data_inicio (ISO)
+  const [restante, setRestante] = useState(0) // ms até o início
+  const ultimoLogin = useRef<FormData | null>(null)
+  const ultimaTentativa = useRef(0)
   const [dark, toggleDark] = useDarkMode(darkInicial)
   const router = useRouter()
   const coresLogin = efetivarHud(hud?.base, hud?.porPagina, 'login')
@@ -125,6 +130,7 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
   } = useForm<FormData>({ resolver: zodResolver(schema) })
 
   async function onSubmit(data: FormData) {
+    ultimoLogin.current = data
     setErro(null)
     setIsLoading(true)
 
@@ -156,8 +162,17 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
         return
       }
 
-      const { sessao_id } = await res.json()
+      const json = await res.json()
+      // Entrada antecipada: identidade OK, mas ainda antes do início → tela de espera.
+      if (json.aguardando && json.data_inicio) {
+        setAguardando(json.data_inicio as string)
+        setRestante(Math.max(0, new Date(json.data_inicio as string).getTime() - Date.now()))
+        setIsLoading(false)
+        return
+      }
+      const { sessao_id } = json
       // Entra na tela "Carregamento" do caderno antes de abrir o simulado.
+      setAguardando(null)
       setSucesso(true)
       toast.success('Login realizado! Entrando no simulado...')
       if (destino === 'simulado') {
@@ -171,6 +186,24 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
       setIsLoading(false)
     }
   }
+
+  // Contagem regressiva na espera; ao chegar a hora, refaz o identify sozinho (com trava
+  // anti-spam de 6s por causa do rate-limit e de possível diferença de relógio).
+  useEffect(() => {
+    if (!aguardando) return
+    const tick = () => {
+      const ms = Math.max(0, new Date(aguardando).getTime() - Date.now())
+      setRestante(ms)
+      if (ms <= 0 && !isLoading && Date.now() - ultimaTentativa.current > 6000 && ultimoLogin.current) {
+        ultimaTentativa.current = Date.now()
+        onSubmit(ultimoLogin.current)
+      }
+    }
+    tick()
+    const t = setInterval(tick, 1000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aguardando, isLoading])
 
   const plataforma = (branding?.nome ?? 'Revisão').replace(/^plataforma\s+/i, '')
   const statusLabel = calcStatus(prova)
@@ -189,6 +222,37 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
           logoBg={branding?.logoBg}
           logoEstilo={branding?.logoEstilo}
         />
+      </div>
+    )
+  }
+
+  // Espera: aluno já se identificou, mas o simulado ainda não começou (regra "entrada antecipada").
+  if (aguardando) {
+    const totalSeg = Math.ceil(restante / 1000)
+    const d = Math.floor(totalSeg / 86400), h = Math.floor((totalSeg % 86400) / 3600), m = Math.floor((totalSeg % 3600) / 60), s = totalSeg % 60
+    const p2 = (n: number) => String(n).padStart(2, '0')
+    const relogio = d > 0 ? `${d}d ${p2(h)}:${p2(m)}:${p2(s)}` : `${p2(h)}:${p2(m)}:${p2(s)}`
+    const chegou = restante <= 0
+    return (
+      <div className="relative flex min-h-screen items-center justify-center bg-background p-4" style={hudCssVars(coresLogin, dark) as React.CSSProperties}>
+        <div className="absolute right-3 top-3"><ThemeToggle dark={dark} onToggle={toggleDark} /></div>
+        <div className="w-full max-w-md animate-in fade-in space-y-5 rounded-2xl border bg-card/60 p-8 text-center shadow-sm">
+          {branding?.logoUrl && (
+            <div className={cn('mx-auto flex h-14 w-14 items-center justify-center overflow-hidden', frameLogo(branding.logoEstilo))} style={{ background: branding.logoBg ?? '#ffffff' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={branding.logoUrl} alt="" className="h-full w-full object-contain" />
+            </div>
+          )}
+          <span className="inline-block rounded-full px-3 py-1 text-xs font-semibold" style={statusStyle('Não iniciado')}>Aguardando início</span>
+          <h1 className="text-2xl font-extrabold uppercase leading-tight tracking-tight" style={{ color: 'var(--prova-titulo, var(--primary))' }}>{simuladoTitulo}</h1>
+          <p className="text-sm text-muted-foreground">Você já está identificado. Fique nesta tela — o simulado abre <b>automaticamente</b> quando começar.</p>
+          <div className="rounded-xl border bg-background/70 py-5">
+            <p className="mb-1 flex items-center justify-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"><Clock className="h-3.5 w-3.5" /> Começa em</p>
+            <p className="text-4xl font-bold tabular-nums" style={{ color: 'var(--prova-titulo, var(--primary))' }}>{chegou ? 'Iniciando…' : relogio}</p>
+          </div>
+          <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground"><Calendar className="h-3.5 w-3.5" /> Início: {fmtDT(aguardando)}</p>
+          {chegou && <p className="flex items-center justify-center gap-1.5 text-xs text-primary"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Entrando no simulado…</p>}
+        </div>
       </div>
     )
   }

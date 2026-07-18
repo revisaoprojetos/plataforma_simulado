@@ -100,9 +100,15 @@ export async function POST(request: NextRequest) {
     return bloqueio(tenantId, 'bloqueio_fora_janela', { simulado: tituloSimulado })
   }
 
-  // Verificar janela temporal se aplicável
+  // Regra: "entrada antecipada" permite o aluno LOGAR antes do início e ficar aguardando
+  // (sem gastar tempo de prova). Sem a regra, o comportamento antigo (bloqueio) permanece.
+  const regrasSim = (simulado.regras as Record<string, unknown>) ?? {}
+  const entradaAntecipada = !!regrasSim.entrada_antecipada
+
+  // Verificar janela temporal se aplicável.
   const agora = new Date()
-  if (simulado.data_inicio && new Date(simulado.data_inicio) > agora) {
+  const antesDoInicio = !!simulado.data_inicio && new Date(simulado.data_inicio) > agora
+  if (antesDoInicio && !entradaAntecipada) {
     return bloqueio(tenantId, 'bloqueio_fora_janela', { simulado: tituloSimulado })
   }
   if (simulado.data_fim && new Date(simulado.data_fim) < agora) {
@@ -168,6 +174,13 @@ export async function POST(request: NextRequest) {
     if (!temAcesso) {
       return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
     }
+  }
+
+  // Entrada antecipada + ainda antes do início: identidade e acesso já foram validados,
+  // mas NÃO criamos a sessão (para não iniciar/gastar o tempo de prova). O aluno fica na
+  // tela de espera com contagem regressiva; ao chegar a hora, o front refaz o identify.
+  if (entradaAntecipada && antesDoInicio) {
+    return NextResponse.json({ aguardando: true, data_inicio: simulado.data_inicio, estudante_nome: estudante.nome })
   }
 
   // 4. Abrir ou retomar sessao_prova

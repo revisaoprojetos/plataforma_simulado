@@ -48,6 +48,7 @@ const simuladoSchema = z.object({
       liberar_caderno: z.enum(['imediato', 'apos_janela', 'manual']).optional(),
       caderno_publico: z.enum(['todos', 'passaporte']).optional(),
       iniciar_atrasado: z.boolean().optional(),
+      entrada_antecipada: z.boolean().optional(),
       politica_anulacao: z.enum(['pontua_todos', 'desconsidera']).optional(),
     })
     .optional(),
@@ -86,6 +87,7 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
         liberar_caderno: 'apos_janela',
         caderno_publico: 'todos',
         iniciar_atrasado: false,
+        entrada_antecipada: false,
         politica_anulacao: 'pontua_todos',
       },
       ...initialData,
@@ -236,6 +238,23 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
         </CardHeader>
         <CardContent>
           <Accordion className="w-full" multiple>
+            <AccordionItem value="inicio">
+              <AccordionTrigger>Início e janela</AccordionTrigger>
+              <AccordionContent className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <Switch
+                    id="entrada_antecipada"
+                    defaultChecked={initialData?.regras?.entrada_antecipada ?? false}
+                    onCheckedChange={(v) => setValue('regras.entrada_antecipada', v)}
+                  />
+                  <div>
+                    <Label htmlFor="entrada_antecipada">Permitir entrada antecipada (aguardar o início)</Label>
+                    <p className="text-xs text-muted-foreground">O aluno pode fazer login antes do horário e fica numa tela de espera com contagem regressiva; o simulado abre sozinho ao chegar a hora — sem gastar tempo de prova. (Só faz efeito no modo Janela Fixa, com data/hora de início.)</p>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
             <AccordionItem value="embaralhamento">
               <AccordionTrigger>Embaralhamento</AccordionTrigger>
               <AccordionContent className="space-y-3">
