@@ -409,6 +409,23 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco }: { bl
           <Faixa label="Altura da fita (px) — 0 = sem fita" min={0} max={12} value={a.fitaAltura ?? 0} onChange={(v) => set('fitaAltura', v)} />
         </div>
       )
+    case 'diag-nota':
+      return (
+        <div className="space-y-3">
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Cartão de nota do aluno. À esquerda o <b>número/total</b>; à direita o texto (edite com as variáveis).</p>
+          <Row label="Número (esquerda)"><select value={a.varNumero ?? 'acertos'} onChange={(e) => set('varNumero', e.target.value)} className={inputCls}><option value="acertos">Acertos</option><option value="percentual">Percentual (média)</option><option value="nota">Nota</option></select></Row>
+          <Row label="Total (após a /)"><select value={a.varTotal ?? 'total_questoes'} onChange={(e) => set('varTotal', e.target.value)} className={inputCls}><option value="total_questoes">Total de questões</option><option value="__100">100 (fixo)</option></select></Row>
+          <Row label="Texto (direita)"><textarea value={a.texto ?? ''} onChange={(e) => set('texto', e.target.value)} rows={2} className={inputCls} placeholder="{acertos} acertos de {total_questoes} questões — {percentual} de aproveitamento" /></Row>
+          <Variaveis />
+          <FonteSelect value={a.fonte} onChange={(v) => set('fonte', v)} />
+          <Faixa label="Largura da caixa da nota (px)" min={80} max={280} value={a.larguraEsquerda ?? 150} onChange={(v) => set('larguraEsquerda', v)} />
+          <div className="border-t pt-2" />
+          <Cor label="Cor 1 (caixa da nota)" value={a.corEsquerda} onChange={(v) => set('corEsquerda', v)} />
+          <Cor label="Cor 2 (faixa do texto)" value={a.corDireita} onChange={(v) => set('corDireita', v)} />
+          <Cor label="Cor do número (X/100)" value={a.corNumero} onChange={(v) => set('corNumero', v)} />
+          <Cor label="Cor do texto" value={a.corTexto} onChange={(v) => set('corTexto', v)} />
+        </div>
+      )
     case 'diag-sugestoes':
       return (
         <div className="space-y-3">

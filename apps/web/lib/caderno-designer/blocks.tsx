@@ -69,6 +69,11 @@ export const BLOCKS: BlockMeta[] = [
     defaults: { quantidade: 6, rotulo: 'Resposta:', altura: 28, cor: '' } },
   { type: 'condicao', title: 'Condição (texto modulado)', icon: GitBranch, category: 'conteudo', container: true,
     defaults: { variavel: 'percentual', operador: 'entre', valor: '0', valor2: '50' } },
+  { type: 'diag-nota', title: 'Diagnóstico — Nota (X/100)', icon: IdCard, category: 'avaliacao', dynamic: true, supportsVars: true,
+    defaults: {
+      varNumero: 'acertos', varTotal: 'total_questoes', texto: '{acertos} acertos de {total_questoes} questões — {percentual} de aproveitamento',
+      corEsquerda: '#d4920a', corDireita: '#f6b420', corNumero: '#1a3a6b', corTexto: '#3b2f00', larguraEsquerda: 150, fonte: '',
+    } },
   { type: 'diag-sugestoes', title: 'Diagnóstico — Sugestões de estudo', icon: AlignLeft, category: 'avaliacao', supportsVars: true,
     defaults: {
       titulo: 'LEI SECA', prioridade: 'Prioridade Alta', mostrarPrioridade: true, intro: '', topicos: '',
@@ -439,6 +444,19 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} full />)}
+        </div>
+      )
+    }
+    case 'diag-nota': {
+      return (
+        <div style={{ display: 'flex', alignItems: 'stretch', fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
+          <div style={{ background: a.corEsquerda || '#d4920a', color: a.corNumero || '#1a3a6b', padding: '10px 20px', display: 'flex', alignItems: 'baseline', justifyContent: 'center', minWidth: a.larguraEsquerda ?? 150, boxSizing: 'border-box' }}>
+            <span style={{ fontSize: 34, fontWeight: 800, lineHeight: 1 }}>{applyVars(`{${a.varNumero || 'acertos'}}`, data.vars)}</span>
+            <span style={{ fontSize: 18, fontWeight: 700 }}>/{a.varTotal === '__100' ? '100' : applyVars(`{${a.varTotal || 'total_questoes'}}`, data.vars)}</span>
+          </div>
+          <div style={{ background: a.corDireita || '#f6b420', color: a.corTexto || '#3b2f00', padding: '10px 16px', flex: 1, display: 'flex', alignItems: 'center', fontSize: 13, fontWeight: 600 }}>
+            {applyVars(a.texto || '', data.vars)}
+          </div>
         </div>
       )
     }
