@@ -216,7 +216,10 @@ export default async function CadernoImprimirPage({
       const cabHCont = cabH
       const estiloAluno = `
         .impressao-wrap { padding: 24px 0; }
-        .folha { width: 210mm; min-height: 297mm; box-sizing: border-box; margin: 0 auto 8mm; background: #fff; overflow: hidden; }
+        /* SEM overflow:hidden — o paginador já distribui os blocos por página; cortar aqui
+           faria um bloco que passa do limite "sumir". Sem corte, no pior caso (bloco maior
+           que a página) ele transborda de forma visível em vez de desaparecer. */
+        .folha { width: 210mm; min-height: 297mm; box-sizing: border-box; margin: 0 auto 8mm; background: #fff; }
         @media screen { .folha { box-shadow: 0 1px 10px rgba(0,0,0,.15); } }
         @media print {
           .no-print { display: none !important; }

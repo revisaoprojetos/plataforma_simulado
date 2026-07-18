@@ -42,26 +42,31 @@ export function PaginadorCaderno({
     const cont = medRef.current
     if (!cont) return
     const filhos = Array.from(cont.children) as HTMLElement[]
-    const n = filhos.length
-    const contH = cont.getBoundingClientRect().height
-    // Altura ocupada por cada item via offsetTop — inclui as margens próprias dos blocos
-    // (mesmo espaçamento do editor), sem gap artificial.
-    const tops = filhos.map((f) => f.offsetTop)
-    const alturas = filhos.map((_, i) => (i < n - 1 ? tops[i + 1] : contH) - tops[i])
+    // Altura REAL de cada bloco (getBoundingClientRect = border-box; margem/gap fica de fora
+    // e é somada separadamente na hora de empacotar). Cada filho envolve exatamente um item.
+    const alturas = filhos.map((f) => f.getBoundingClientRect().height)
+    // Folga contra arredondamento sub-pixel (evita que um bloco "quase cabe" seja cortado).
+    const BUF = 4
     const grupos: number[][] = []
     let atual: number[] = []
     let h = 0
-    alturas.forEach((alt, i) => {
-      // Área segura da página atual: 1ª usa cabH; continuações usam cabCont.
-      const safe = PAGE_H - (grupos.length === 0 ? cabH : cabCont) - rodH
-      if (atual.length && h + alt > safe) {
+    for (let i = 0; i < alturas.length; i++) {
+      const safe = PAGE_H - (grupos.length === 0 ? cabH : cabCont) - rodH - BUF
+      const alt = alturas[i]
+      const gap = atual.length ? (itens[i].gapTop || 0) : 0 // 1º item da página não tem gap
+      // Não cabe no espaço restante desta página (e a página já tem conteúdo) →
+      // NÃO corta: fecha a página e move o bloco INTEIRO para o topo da próxima.
+      if (atual.length && h + gap + alt > safe) {
         grupos.push(atual)
         atual = []
         h = 0
       }
+      // Se um único bloco é maior que a página inteira, ele fica sozinho na própria página
+      // (não é cortado; com overflow liberado, transborda de forma visível em vez de sumir).
+      const gap2 = atual.length ? (itens[i].gapTop || 0) : 0
       atual.push(i)
-      h += alt
-    })
+      h += gap2 + alt
+    }
     if (atual.length) grupos.push(atual)
     setPaginas(grupos.length ? grupos : [[...itens.keys()]])
   }, [itens, cabH, cabCont, rodH])
