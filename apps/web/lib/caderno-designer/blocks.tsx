@@ -69,6 +69,11 @@ export const BLOCKS: BlockMeta[] = [
     defaults: { quantidade: 6, rotulo: 'Resposta:', altura: 28, cor: '' } },
   { type: 'condicao', title: 'Condição (texto modulado)', icon: GitBranch, category: 'conteudo', container: true,
     defaults: { variavel: 'percentual', operador: 'entre', valor: '0', valor2: '50' } },
+  { type: 'diag-sugestoes', title: 'Diagnóstico — Sugestões de estudo', icon: AlignLeft, category: 'avaliacao', supportsVars: true,
+    defaults: {
+      titulo: 'LEI SECA', prioridade: 'Prioridade Alta', mostrarPrioridade: true, intro: '', topicos: '',
+      corHeader: '#fdf3d0', corTitulo: '#d17a00', corPrioridade: '#d17a00', corRow: '#e9eef7', corSetaAlto: '#e8850c', corSetaMedio: '#3b5bdb', corTexto: '#1a1a1a', fonte: '',
+    } },
   { type: 'diag-grupo-header', title: 'Diagnóstico — Cabeçalho de Grupo', icon: Grid3x3, category: 'avaliacao', dynamic: true, supportsVars: true,
     defaults: { grupo: 'Grupo I', chaves: [], corHeader: '#f6c445', corTexto: '#243b7a', fonte: '' } },
   { type: 'diag-disciplina', title: 'Diagnóstico — Disciplina', icon: ListChecks, category: 'avaliacao', dynamic: true, supportsVars: true,
@@ -434,6 +439,30 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} full />)}
+        </div>
+      )
+    }
+    case 'diag-sugestoes': {
+      const linhas = String(a.topicos ?? '').split(/\r?\n/).map((l: string) => l.trim()).filter(Boolean)
+      return (
+        <div style={{ fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: a.corHeader || '#fdf3d0', padding: '6px 12px', gap: 10 }}>
+            <span style={{ fontWeight: 700, fontSize: 13, color: a.corTitulo || '#d17a00' }}>{applyVars(a.titulo || '', data.vars)}</span>
+            {a.mostrarPrioridade !== false && a.prioridade && <span style={{ fontWeight: 700, fontSize: 11, color: a.corPrioridade || '#d17a00', whiteSpace: 'nowrap' }}>[!] {applyVars(a.prioridade, data.vars)}</span>}
+          </div>
+          <div style={{ background: a.corRow || '#e9eef7', padding: '8px 12px' }}>
+            {a.intro && <p style={{ fontSize: 11, color: a.corTexto || '#1a1a1a', margin: '0 0 6px', lineHeight: 1.5, textAlign: 'justify' }}>{applyVars(a.intro, data.vars)}</p>}
+            {linhas.map((l: string, i: number) => {
+              const alto = l.startsWith('>>')
+              const texto = l.replace(/^>+\s*/, '')
+              return (
+                <div key={i} style={{ fontSize: 11, color: a.corTexto || '#1a1a1a', lineHeight: 1.5, marginBottom: 2, display: 'flex', gap: 5 }}>
+                  <span style={{ fontWeight: 700, color: alto ? (a.corSetaAlto || '#e8850c') : (a.corSetaMedio || '#3b5bdb'), flexShrink: 0 }}>{alto ? '>>' : '>'}</span>
+                  <span>{applyVars(texto, data.vars)}</span>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )
     }

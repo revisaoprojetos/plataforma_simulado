@@ -409,6 +409,27 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco }: { bl
           <Faixa label="Altura da fita (px) — 0 = sem fita" min={0} max={12} value={a.fitaAltura ?? 0} onChange={(v) => set('fitaAltura', v)} />
         </div>
       )
+    case 'diag-sugestoes':
+      return (
+        <div className="space-y-3">
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Cole os tópicos em <b>Tópicos</b>, um por linha. Comece com <code>&gt;&gt;</code> para <b>alto</b> (seta dupla) ou <code>&gt;</code> para <b>médio</b> (seta simples).</p>
+          <Row label="Título"><input value={a.titulo ?? ''} onChange={(e) => set('titulo', e.target.value)} className={inputCls} placeholder="LEI SECA" /></Row>
+          <Variaveis />
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarPrioridade !== false} onChange={(e) => set('mostrarPrioridade', e.target.checked)} className="h-4 w-4 rounded border" /> Mostrar prioridade (à direita)</label>
+          {a.mostrarPrioridade !== false && <Row label="Prioridade"><input value={a.prioridade ?? ''} onChange={(e) => set('prioridade', e.target.value)} className={inputCls} placeholder="Prioridade Alta" /></Row>}
+          <Row label="Texto de introdução"><textarea value={a.intro ?? ''} onChange={(e) => set('intro', e.target.value)} rows={3} className={inputCls} placeholder="Texto abaixo do título…" /></Row>
+          <Row label="Tópicos (>> alto | > médio)"><textarea value={a.topicos ?? ''} onChange={(e) => set('topicos', e.target.value)} rows={8} className={`${inputCls} font-mono text-[11px]`} placeholder={'>> CF/1988 — arts. 44-75 (Poder Legislativo)…\n> Lei 8.112/1990 (Estatuto do Servidor)…'} /></Row>
+          <FonteSelect value={a.fonte} onChange={(v) => set('fonte', v)} />
+          <div className="border-t pt-2" />
+          <Cor label="Fundo do cabeçalho" value={a.corHeader} onChange={(v) => set('corHeader', v)} />
+          <Cor label="Cor do título" value={a.corTitulo} onChange={(v) => set('corTitulo', v)} />
+          <Cor label="Cor da prioridade" value={a.corPrioridade} onChange={(v) => set('corPrioridade', v)} />
+          <Cor label="Fundo do corpo" value={a.corRow} onChange={(v) => set('corRow', v)} />
+          <Cor label="Seta alta (>>)" value={a.corSetaAlto} onChange={(v) => set('corSetaAlto', v)} />
+          <Cor label="Seta média (>)" value={a.corSetaMedio} onChange={(v) => set('corSetaMedio', v)} />
+          <Cor label="Cor do texto" value={a.corTexto} onChange={(v) => set('corTexto', v)} />
+        </div>
+      )
     case 'diag-grupo-header': {
       const chaves: string[] = Array.isArray(a.chaves) ? a.chaves : []
       const grupos = gruposBanco ?? []
