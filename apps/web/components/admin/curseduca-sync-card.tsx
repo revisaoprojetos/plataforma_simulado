@@ -33,11 +33,13 @@ function calcVinculados(grupos: { id: number; nome: string }[], sistema: { id: s
 export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialIntervalo, inicialGrupos = [] }: {
   grupos: GrupoCurseducaDTO[]; sistema?: GrupoSistema[]; inicialAtivo: boolean; inicialIntervalo: number; inicialGrupos?: number[]
 }) {
-  const vinculados = useMemo(() => calcVinculados(grupos, sistema), [grupos, sistema])
+  // Só grupos comuns podem casar com a Curseduca (pastas/mestre não são destino de sync).
+  const comuns = useMemo(() => sistema.filter((s) => !s.is_mestre), [sistema])
+  const vinculados = useMemo(() => calcVinculados(grupos, comuns), [grupos, comuns])
   const [ativo, setAtivo] = useState(inicialAtivo)
   const [intervalo, setIntervalo] = useState(String(inicialIntervalo || 30))
   const [sel, setSel] = useState<Set<number>>(() => {
-    const ids = calcVinculados(grupos, sistema).map((v) => v.id)
+    const ids = calcVinculados(grupos, comuns).map((v) => v.id)
     const pre = inicialGrupos.filter((id) => ids.includes(id))
     return new Set(pre.length ? pre : ids)
   })

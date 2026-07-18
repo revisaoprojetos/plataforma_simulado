@@ -2,14 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Search, Users, Loader2, DownloadCloud, Check, CheckCircle2, FolderPlus, Folder, Ban, ArrowUpDown, ListFilter, X, Layers, Eye, Mail, AlertTriangle } from 'lucide-react'
+import { Search, Users, Loader2, DownloadCloud, Check, CheckCircle2, FolderPlus, Folder, FolderOpen, Ban, ArrowUpDown, ListFilter, X, Layers, Eye, Mail, AlertTriangle, ChevronRight, ChevronDown, Plus, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { contarMembrosGrupos, contarTodosGrupos, importarGruposCurseduca, agendarImportacaoCurseduca, statusImportacaoCurseduca, previewMembrosGrupo, type GrupoCurseducaDTO, type GrupoSistema, type MembroPreview } from '@/app/admin/curseduca/actions'
+import { contarMembrosGrupos, contarTodosGrupos, importarGruposCurseduca, agendarImportacaoCurseduca, statusImportacaoCurseduca, previewMembrosGrupo, listarGruposSistema, type GrupoCurseducaDTO, type GrupoSistema, type MembroPreview } from '@/app/admin/curseduca/actions'
+import { criarGrupo, criarGrupoMestre } from '@/app/admin/grupos/actions'
 import type { ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
 
-type Destino = 'nenhum' | 'existente' | 'novo'
+type Destino = 'nenhum' | 'existente'
 type Ordem = 'nome' | 'nome_desc' | 'id' | 'id_desc' | 'recentes'
 
 const ORDENS: { valor: Ordem; label: string }[] = [
@@ -32,7 +33,6 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
   const [contando, setContando] = useState(false)
   const [destino, setDestino] = useState<Destino>('nenhum')
   const [grupoId, setGrupoId] = useState('')
-  const [nomeNovo, setNomeNovo] = useState('')
   const [sincronizar, setSincronizar] = useState(false)
   const [segundoPlano, setSegundoPlano] = useState(false)
   const [jobStatus, setJobStatus] = useState<string | null>(null)
@@ -41,6 +41,10 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
   const [verGrupo, setVerGrupo] = useState<GrupoCurseducaDTO | null>(null)
   const [contagens, setContagens] = useState<Record<number, number>>({})
   const [contandoTudo, setContandoTudo] = useState(true)
+  const [sistemaLocal, setSistemaLocal] = useState<GrupoSistema[]>(sistema)
+  const [pickerAberto, setPickerAberto] = useState(false)
+
+  useEffect(() => { setSistemaLocal(sistema) }, [sistema])
 
   // Carrega a contagem de membros de todos os grupos (uma vez, ao montar).
   useEffect(() => {
@@ -83,24 +87,18 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
     return () => clearTimeout(t)
   }, [sel])
 
-  // Sugere o nome do novo grupo a partir do grupo selecionado.
-  useEffect(() => {
-    if (destino === 'novo' && !nomeNovo && sel.size === 1) {
-      const g = grupos.find((x) => x.id === [...sel][0])
-      if (g) setNomeNovo(g.nome)
-    }
-  }, [destino, sel, grupos, nomeNovo])
-
   const toggle = (id: number) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const selecionarFiltrados = () => setSel((s) => { const n = new Set(s); filtrados.forEach((g) => n.add(g.id)); return n })
   const limpar = () => setSel(new Set())
 
+  const grupoSel = useMemo(() => sistemaLocal.find((s) => s.id === grupoId) ?? null, [sistemaLocal, grupoId])
+  const pastaDoSel = useMemo(() => grupoSel?.pai_id ? sistemaLocal.find((s) => s.id === grupoSel.pai_id) ?? null : null, [grupoSel, sistemaLocal])
+
   async function importar() {
     if (!sel.size) return
     if (destino === 'existente' && !grupoId) { toast.error('Escolha o grupo de destino.'); return }
-    if (destino === 'novo' && !nomeNovo.trim()) { toast.error('Informe o nome do novo grupo.'); return }
     setImportando(true); setRes(null); setJobStatus(null)
-    const dest = { tipo: destino, grupoId: grupoId || undefined, nomeNovo: nomeNovo || undefined }
+    const dest = { tipo: destino, grupoId: grupoId || undefined }
     const sync = destino === 'existente' && sincronizar
 
     if (segundoPlano) {
@@ -108,7 +106,6 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
       if (!ag.ok || !ag.jobId) { setImportando(false); toast.error(ag.error ?? 'Falha ao agendar.'); return }
       toast.success('Importação agendada — rodando em segundo plano.')
       setJobStatus('pendente')
-      // Poll do status até concluir/erro (o worker processa a cada ~60s).
       const jobId = ag.jobId
       const poll = async () => {
         const s = await statusImportacaoCurseduca(jobId)
@@ -135,7 +132,6 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
     <div className="grid gap-6 lg:h-[calc(100vh-16rem)] lg:grid-cols-[minmax(0,1fr)_420px]">
       {/* Lista de grupos da Curseduca */}
       <div className="animate-rise flex flex-col overflow-hidden rounded-2xl border bg-card">
-        {/* barra de busca + ordenação */}
         <div className="flex flex-wrap items-center gap-2 border-b p-3">
           <div className="relative min-w-[200px] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -154,7 +150,6 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
           </Select>
         </div>
 
-        {/* chips de filtro */}
         <div className="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-3 py-2">
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><ListFilter className="h-3.5 w-3.5" /> Filtros:</span>
           <Chip ativo={soSelecionados} onClick={() => setSoSelecionados((v) => !v)} icon={<Check className="h-3 w-3" />}>Só selecionados ({sel.size})</Chip>
@@ -162,7 +157,6 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
           {temFiltro && <button type="button" onClick={() => { setQ(''); setSoSelecionados(false); setOcultarDesatualizados(false) }} className="ml-auto text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">Limpar filtros</button>}
         </div>
 
-        {/* contador + selecionar/limpar */}
         <div className="flex items-center justify-between gap-2 px-3 py-2 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5"><Layers className="h-3.5 w-3.5" /> Exibindo <b className="tabular-nums text-foreground">{filtrados.length}</b> de {grupos.length}</span>
           <div className="flex items-center gap-1.5">
@@ -171,7 +165,6 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
           </div>
         </div>
 
-        {/* lista preenche a altura do card (grid com altura fixa) e rola internamente */}
         <div className="scroll-claro stagger min-h-0 flex-1 overflow-y-auto p-2 max-lg:max-h-[60vh]">
           {filtrados.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-14 text-center text-sm text-muted-foreground">
@@ -196,14 +189,11 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
                   <Users className="h-3 w-3" />
                   {g.id in contagens ? <span className="tabular-nums text-foreground">{contagens[g.id]}</span> : contandoTudo ? <Loader2 className="h-3 w-3 animate-spin" /> : '—'}
                 </span>
-                <span
-                  role="button"
-                  tabIndex={0}
+                <span role="button" tabIndex={0}
                   onClick={(e) => { e.stopPropagation(); setVerGrupo(g) }}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setVerGrupo(g) } }}
                   className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-muted-foreground opacity-0 transition hover:bg-primary/10 hover:text-primary focus:opacity-100 group-hover:opacity-100"
-                  title="Ver membros do grupo"
-                >
+                  title="Ver membros do grupo">
                   <Eye className="h-3.5 w-3.5" /> Ver
                 </span>
                 <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">#{g.id}</span>
@@ -226,37 +216,35 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
         </div>
 
         <div className="rounded-2xl border bg-card p-3">
-          <p className="mb-1.5 text-sm font-semibold">Destino dos alunos</p>
-          <div className="space-y-1.5">
-            <Opcao ativo={destino === 'nenhum'} onClick={() => setDestino('nenhum')} icon={<Ban className="h-4 w-4" />} titulo="Só adicionar ao sistema" desc="Cadastra os alunos (sem vincular a grupo)." />
-            <Opcao ativo={destino === 'existente'} onClick={() => setDestino('existente')} icon={<Folder className="h-4 w-4" />} titulo="Vincular a um grupo existente" desc={sistema.length ? undefined : 'Nenhum grupo criado ainda.'} />
-            {destino === 'existente' && (
-              <Select value={grupoId} onValueChange={(v) => setGrupoId(v ?? '')}>
-                <SelectTrigger className="ml-7 h-9 w-[calc(100%-1.75rem)]">
-                  <SelectValue placeholder="Escolha o grupo…">
-                    {(value: string) => (value ? sistema.find((s) => s.id === value)?.nome : null) ?? 'Escolha o grupo…'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {sistema.map((s) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
-            {destino === 'existente' && (
-              <label className="ml-7 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs">
-                <input type="checkbox" checked={sincronizar} onChange={(e) => setSincronizar(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border" />
-                <span>
-                  <b>Sincronizar</b> — remove do grupo quem veio da Curseduca e <b>saiu</b> dos grupos selecionados.
-                  <span className="block text-muted-foreground">Só desvincula do grupo (não apaga o aluno) e preserva quem foi adicionado manualmente.</span>
-                </span>
-              </label>
-            )}
-            <Opcao ativo={destino === 'novo'} onClick={() => setDestino('novo')} icon={<FolderPlus className="h-4 w-4" />} titulo="Criar um novo grupo" desc="Cria um grupo daqui e vincula todos." />
-            {destino === 'novo' && (
-              <input value={nomeNovo} onChange={(e) => setNomeNovo(e.target.value)} placeholder="Nome do novo grupo"
-                className="ml-7 w-[calc(100%-1.75rem)] rounded-lg border bg-transparent px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
-            )}
-          </div>
+          <p className="mb-2 text-sm font-semibold">Destino dos alunos</p>
+          {/* Resumo do destino (abre o pop-up com a área de grupos). */}
+          <button type="button" onClick={() => setPickerAberto(true)}
+            className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition hover:border-primary/40 hover:bg-muted">
+            <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', destino === 'nenhum' ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary')}>
+              {destino === 'nenhum' ? <Ban className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">
+                {destino === 'nenhum' ? 'Só adicionar ao sistema' : (grupoSel?.nome ?? 'Grupo removido — escolha outro')}
+              </span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {destino === 'nenhum'
+                  ? 'Cadastra os alunos sem vincular a grupo'
+                  : pastaDoSel ? `Pasta: ${pastaDoSel.nome}` : `${grupoSel?.membros ?? 0} membro(s) no grupo`}
+              </span>
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary"><Pencil className="h-3.5 w-3.5" /> Alterar</span>
+          </button>
+
+          {destino === 'existente' && (
+            <label className="mt-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs">
+              <input type="checkbox" checked={sincronizar} onChange={(e) => setSincronizar(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border" />
+              <span>
+                <b>Sincronizar</b> — remove do grupo quem veio da Curseduca e <b>saiu</b> dos grupos selecionados.
+                <span className="block text-muted-foreground">Só desvincula do grupo (não apaga o aluno) e preserva quem foi adicionado manualmente.</span>
+              </span>
+            </label>
+          )}
         </div>
 
         <label className="flex items-center gap-2 px-1 text-xs">
@@ -290,14 +278,207 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
           </div>
         )}
 
-        {/* Slot extra na mesma coluna do card de destino (ex.: card de sincronização). */}
         {extra}
       </div>
+
+      <GrupoDestinoDialog
+        aberto={pickerAberto}
+        onClose={() => setPickerAberto(false)}
+        sistema={sistemaLocal}
+        onSistemaChange={setSistemaLocal}
+        valor={{ destino, grupoId }}
+        onConfirmar={(d, id) => { setDestino(d); setGrupoId(id); if (d !== 'existente') setSincronizar(false); setPickerAberto(false) }}
+      />
 
       <MembrosDialog grupo={verGrupo} onClose={() => setVerGrupo(null)}
         selecionado={verGrupo ? sel.has(verGrupo.id) : false}
         onToggle={(id) => toggle(id)} />
     </div>
+  )
+}
+
+// ── Pop-up: área de grupos (escolher destino, criar grupo/pasta, organizar) ──
+function GrupoDestinoDialog({ aberto, onClose, sistema, onSistemaChange, valor, onConfirmar }: {
+  aberto: boolean
+  onClose: () => void
+  sistema: GrupoSistema[]
+  onSistemaChange: (s: GrupoSistema[]) => void
+  valor: { destino: Destino; grupoId: string }
+  onConfirmar: (destino: Destino, grupoId: string) => void
+}) {
+  const [escolha, setEscolha] = useState<string | null>(valor.destino === 'existente' ? valor.grupoId : null)
+  const [expandido, setExpandido] = useState<Set<string>>(new Set())
+  const [busca, setBusca] = useState('')
+  const [criando, setCriando] = useState(false)
+  const [modo, setModo] = useState<'grupo' | 'pasta'>('grupo')
+  const [nome, setNome] = useState('')
+  const [paiNovo, setPaiNovo] = useState<string>('')
+
+  const byId = useMemo(() => new Map(sistema.map((g) => [g.id, g])), [sistema])
+  const { children, top } = useMemo(() => {
+    const m = new Map<string, GrupoSistema[]>()
+    const t: GrupoSistema[] = []
+    for (const g of sistema) {
+      const pai = g.pai_id && byId.has(g.pai_id) ? g.pai_id : null
+      if (pai) { const a = m.get(pai) ?? []; a.push(g); m.set(pai, a) } else t.push(g)
+    }
+    const ord = (arr: GrupoSistema[]) => arr.sort((a, b) => Number(b.is_mestre) - Number(a.is_mestre) || a.nome.localeCompare(b.nome))
+    for (const a of m.values()) ord(a)
+    ord(t)
+    return { children: m, top: t }
+  }, [sistema, byId])
+
+  const pastas = useMemo(() => {
+    const out: { id: string; nome: string; depth: number }[] = []
+    const walk = (nodes: GrupoSistema[], d: number) => { for (const n of nodes) if (n.is_mestre) { out.push({ id: n.id, nome: n.nome, depth: d }); walk(children.get(n.id) ?? [], d + 1) } }
+    walk(top, 0)
+    return out
+  }, [children, top])
+
+  // Ao (re)abrir, sincroniza a escolha com o valor atual e expande as pastas.
+  useEffect(() => {
+    if (!aberto) return
+    setEscolha(valor.destino === 'existente' ? valor.grupoId : null)
+    setExpandido(new Set(sistema.filter((g) => g.is_mestre).map((g) => g.id)))
+    setBusca(''); setNome(''); setModo('grupo'); setPaiNovo('')
+  }, [aberto]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function toggle(id: string) { setExpandido((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }) }
+
+  async function refresh(): Promise<GrupoSistema[]> {
+    const r = await listarGruposSistema()
+    if (r.ok && r.sistema) { onSistemaChange(r.sistema); return r.sistema }
+    return sistema
+  }
+
+  async function criar() {
+    const t = nome.trim()
+    if (!t) { toast.error('Informe um nome.'); return }
+    setCriando(true)
+    const r = modo === 'pasta'
+      ? await criarGrupoMestre(t, undefined, paiNovo || null)
+      : await criarGrupo(t, undefined, { paiId: paiNovo || null })
+    setCriando(false)
+    if (!r.ok) { toast.error(r.error ?? 'Erro ao criar'); return }
+    toast.success(modo === 'pasta' ? 'Pasta criada' : 'Grupo criado')
+    setNome('')
+    await refresh()
+    if (modo === 'grupo' && r.id) setEscolha(r.id)
+    if (modo === 'pasta' && r.id) setExpandido((p) => new Set(p).add(r.id!))
+  }
+
+  const q = busca.trim().toLowerCase()
+
+  function grupoRow(g: GrupoSistema, depth: number) {
+    const on = escolha === g.id
+    return (
+      <button key={g.id} type="button" onClick={() => setEscolha(g.id)} style={{ marginLeft: depth * 18 }}
+        className={cn('flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', on ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
+        <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
+          {on && <Check className="h-3 w-3" />}
+        </span>
+        <span className="h-3 w-3 shrink-0 rounded-full ring-1 ring-black/10" style={{ background: g.cor ?? 'var(--muted-foreground)' }} />
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{g.nome}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">{g.membros} membro(s)</span>
+      </button>
+    )
+  }
+
+  function renderNo(g: GrupoSistema, depth: number): React.ReactElement {
+    if (!g.is_mestre) return grupoRow(g, depth)
+    const filhos = children.get(g.id) ?? []
+    const aberto2 = expandido.has(g.id)
+    return (
+      <div key={g.id} className="space-y-1.5">
+        <div style={{ marginLeft: depth * 18 }} className="flex items-center gap-2 rounded-lg bg-muted/50 px-2 py-2">
+          <button type="button" onClick={() => toggle(g.id)} className="rounded p-0.5 text-muted-foreground hover:text-foreground">
+            {aberto2 ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </button>
+          {aberto2 ? <FolderOpen className="h-4 w-4 shrink-0" style={{ color: g.cor ?? 'var(--muted-foreground)' }} /> : <Folder className="h-4 w-4 shrink-0" style={{ color: g.cor ?? 'var(--muted-foreground)' }} />}
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">{g.nome}</span>
+          <button type="button" onClick={() => { setModo('grupo'); setPaiNovo(g.id) }} title="Criar grupo nesta pasta"
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"><Plus className="h-3.5 w-3.5" /></button>
+        </div>
+        {aberto2 && (filhos.length === 0
+          ? <p style={{ marginLeft: depth * 18 + 26 }} className="py-1 text-xs text-muted-foreground">Pasta vazia.</p>
+          : filhos.map((c) => renderNo(c, depth + 1)))}
+      </div>
+    )
+  }
+
+  return (
+    <Dialog open={aberto} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 pr-8"><Folder className="h-5 w-5 text-primary" /> Destino dos alunos</DialogTitle>
+        </DialogHeader>
+
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar grupo…"
+            className="w-full rounded-lg border bg-transparent py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+        </div>
+
+        {/* Árvore de grupos/pastas */}
+        <div className="scroll-claro min-h-[14rem] flex-1 space-y-1.5 overflow-y-auto rounded-xl border p-2">
+          <button type="button" onClick={() => setEscolha(null)}
+            className={cn('flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', escolha === null ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
+            <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', escolha === null ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
+              {escolha === null && <Check className="h-3 w-3" />}
+            </span>
+            <Ban className="h-4 w-4 text-muted-foreground" />
+            <span className="min-w-0 flex-1 text-sm font-medium">Sem grupo — só cadastrar no sistema</span>
+          </button>
+
+          {q
+            ? (() => {
+                const res = sistema.filter((g) => !g.is_mestre && g.nome.toLowerCase().includes(q))
+                return res.length === 0
+                  ? <p className="py-6 text-center text-sm text-muted-foreground">Nenhum grupo encontrado.</p>
+                  : res.map((g) => grupoRow(g, 0))
+              })()
+            : sistema.length === 0
+              ? <p className="py-6 text-center text-sm text-muted-foreground">Nenhum grupo criado ainda. Crie um abaixo.</p>
+              : top.map((g) => renderNo(g, 0))}
+        </div>
+
+        {/* Criar grupo / pasta */}
+        <div className="rounded-xl border bg-muted/20 p-3">
+          <div className="mb-2 flex items-center gap-1.5">
+            <button type="button" onClick={() => setModo('grupo')} className={cn('inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition', modo === 'grupo' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}><FolderPlus className="h-3.5 w-3.5" /> Novo grupo</button>
+            <button type="button" onClick={() => setModo('pasta')} className={cn('inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition', modo === 'pasta' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}><Folder className="h-3.5 w-3.5" /> Nova pasta</button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <input value={nome} onChange={(e) => setNome(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); criar() } }}
+              placeholder={modo === 'pasta' ? 'Nome da nova pasta' : 'Nome do novo grupo'}
+              className="min-w-[160px] flex-1 rounded-lg border bg-transparent px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
+            <Select value={paiNovo} onValueChange={(v) => setPaiNovo(v === '__raiz__' ? '' : (v ?? ''))}>
+              <SelectTrigger className="h-9 w-[170px]">
+                <SelectValue placeholder="Na raiz">
+                  {(value: string) => (value && value !== '__raiz__' ? pastas.find((p) => p.id === value)?.nome : null) ?? 'Na raiz'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__raiz__">Na raiz (sem pasta)</SelectItem>
+                {pastas.map((p) => <SelectItem key={p.id} value={p.id}>{' '.repeat(p.depth * 2)}{p.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <button type="button" onClick={criar} disabled={criando || !nome.trim()}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
+              {criando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Criar
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t pt-3">
+          <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition hover:bg-muted">Cancelar</button>
+          <button type="button" onClick={() => onConfirmar(escolha ? 'existente' : 'nenhum', escolha ?? '')}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
+            <Check className="h-4 w-4" /> Usar este destino
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -315,7 +496,6 @@ function fmtHora(iso: string | null): string {
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-/** Expiração como texto simples (estilo Curseduca): "Vitalício" / "Até dd/mm/aaaa" / "Expirado…". */
 function ExpiracaoTexto({ m }: { m: MembroPreview }) {
   if (!m.temMatricula) return <span className="text-muted-foreground">—</span>
   if (!m.expiraEm) return <span className="text-foreground">Vitalício</span>
@@ -375,7 +555,6 @@ function MembrosDialog({ grupo, onClose, selecionado, onToggle }: { grupo: Grupo
           </DialogTitle>
         </DialogHeader>
 
-        {/* resumo + busca */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[200px] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -396,7 +575,6 @@ function MembrosDialog({ grupo, onClose, selecionado, onToggle }: { grupo: Grupo
           <span className="inline-flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> <b className="tabular-nums text-foreground">{comEmail}</b> com e-mail</span>
         </div>
 
-        {/* corpo */}
         <div className="scroll-claro max-h-[55vh] min-h-[16rem] overflow-y-auto rounded-xl border">
           {carregando ? (
             <div className="flex h-64 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -455,20 +633,6 @@ function Chip({ ativo, onClick, icon, children }: { ativo: boolean; onClick: () 
       className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition',
         ativo ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground')}>
       {icon}{children}
-    </button>
-  )
-}
-
-function Opcao({ ativo, onClick, icon, titulo, desc }: { ativo: boolean; onClick: () => void; icon: React.ReactNode; titulo: string; desc?: string }) {
-  return (
-    <button type="button" onClick={onClick} className={cn('flex w-full items-start gap-2.5 rounded-lg border p-2.5 text-left transition', ativo ? 'border-primary bg-primary/5' : 'hover:bg-muted')}>
-      <span className={cn('mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition', ativo ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40 text-muted-foreground')}>
-        {ativo ? <Check className="h-3 w-3" /> : icon}
-      </span>
-      <span className="min-w-0">
-        <span className="block text-sm font-medium leading-tight">{titulo}</span>
-        {desc && <span className="block text-xs text-muted-foreground">{desc}</span>}
-      </span>
     </button>
   )
 }

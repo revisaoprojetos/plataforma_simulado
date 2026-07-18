@@ -8,9 +8,34 @@ import { configDoEnv, testarCredenciais, listarTodosGrupos, contarMembros, lista
 import { resolverCfg, executarImport, envAplicaAoTenant } from '@/lib/curseduca/import-core'
 import type { DestinoImport, ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
 import { criptografar, descriptografar, estaCriptografado, criptografiaAtiva } from '@/lib/crypto'
+import { selecionarGrupos } from '@/lib/simulado/grupos'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 
 export type GrupoCurseducaDTO = { id: number; nome: string; criadoEm: string | null }
-export type GrupoSistema = { id: string; nome: string }
+export type GrupoSistema = { id: string; nome: string; cor: string | null; pai_id: string | null; is_mestre: boolean; membros: number }
+
+/** Árvore de grupos do sistema (pastas + grupos) com contagem de membros — para o seletor de destino. */
+async function carregarGruposSistema(tenantId: string): Promise<GrupoSistema[]> {
+  const svc = createAdminClient()
+  const grupos = await selecionarGrupos(svc, tenantId)
+  const ids = grupos.filter((x) => !x.is_mestre).map((x) => x.id)
+  const membros = new Map<string, number>()
+  if (ids.length) {
+    const gm = await fetchAll<{ grupo_id: string }>(() =>
+      svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', ids).order('id', { ascending: true }))
+    for (const m of gm) membros.set(m.grupo_id, (membros.get(m.grupo_id) ?? 0) + 1)
+  }
+  return grupos.map((x) => ({ id: x.id, nome: x.nome, cor: x.cor, pai_id: x.pai_id, is_mestre: x.is_mestre, membros: membros.get(x.id) ?? 0 }))
+}
+
+/** Recarrega só os grupos do sistema (sem tocar na API da Curseduca) — usado após criar grupo/pasta no seletor. */
+export async function listarGruposSistema(): Promise<{ ok: boolean; error?: string; sistema?: GrupoSistema[] }> {
+  if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  try { return { ok: true, sistema: await carregarGruposSistema(access.tenantId) } }
+  catch (e: any) { return { ok: false, error: e?.message ?? 'Falha ao carregar grupos.' } }
+}
 
 /** Contexto: tenant resolvido + credenciais Curseduca (do tenant ou do .env). */
 async function ctx() {
@@ -29,9 +54,8 @@ export async function listarGruposCurseduca(): Promise<{ ok: boolean; error?: st
     const grupos = (await listarTodosGrupos(g.cfg))
       .map((x) => ({ id: x.id, nome: x.nome, criadoEm: x.criadoEm }))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-    const svc = createAdminClient()
-    const { data: sis } = await svc.from('simulado_grupos').select('id, nome').eq('tenant_id', g.tenantId).eq('deletado', false).order('nome')
-    return { ok: true, grupos, sistema: (sis ?? []).map((s: any) => ({ id: s.id, nome: s.nome })) }
+    const sistema = await carregarGruposSistema(g.tenantId)
+    return { ok: true, grupos, sistema }
   } catch (e: any) {
     return { ok: false, error: e?.message ?? 'Falha ao consultar a Curseduca.' }
   }
