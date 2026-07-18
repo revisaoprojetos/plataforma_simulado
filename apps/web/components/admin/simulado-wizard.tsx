@@ -224,7 +224,7 @@ export function SimuladoWizard({
                   const discursiva = b.tipo === 'discursiva'
                   return (
                     <button key={b.id} type="button" onClick={() => { setModo('banco'); setBancoBase(b.id); setTipo(discursiva ? 'discursivo' : 'objetivo') }}
-                      className={cn('group relative aspect-[4/5] overflow-hidden rounded-2xl border text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg',
+                      className={cn('group relative aspect-square overflow-hidden rounded-2xl border text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg',
                         on ? 'border-primary ring-2 ring-primary' : 'border-border')}>
                       {/* Fundo: capa preenchendo o card (ou degradê da cor) */}
                       {b.capa ? (
