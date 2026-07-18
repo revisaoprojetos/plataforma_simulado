@@ -39,7 +39,7 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
     const { data: vinc } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId)
     const ids = (vinc ?? []).map((v: any) => v.questao_id)
     questoes = ids.length
-      ? (await svc.from('simulado_questoes').select('id, enunciado, tipo, comentario_professor').in('id', ids).limit(80)).data
+      ? (await svc.from('simulado_questoes').select('id, enunciado, tipo, comentario_professor').in('id', ids).limit(1000)).data
       : []
   } else {
     questoes = (await svc
@@ -48,7 +48,7 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
       .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
       .eq('status', 'publicada')
       .order('created_at', { ascending: false })
-      .limit(60)).data
+      .limit(300)).data
   }
 
   // Alternativas de TODAS as questões do preview (para navegar por elas no repetidor).
