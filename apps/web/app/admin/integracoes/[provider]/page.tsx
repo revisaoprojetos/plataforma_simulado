@@ -56,7 +56,7 @@ export default async function IntegracaoProviderPage({ params }: { params: Promi
   // Demais provedores (Guru): sistema unificado novo (credenciais + mapeamentos).
   const tid = access.tenantId ?? '00000000-0000-0000-0000-000000000000'
   const svc = createAdminClient()
-  const [{ data: cfg }, { data: maps }, { data: grupos }, { data: simulados }, ultimoInbox] = await Promise.all([
+  const [{ data: cfg }, { data: maps }, { data: grupos }, { data: simulados }, { data: bancos }, ultimoInbox] = await Promise.all([
     svc.from('simulado_integracao_config').select('base_url, credenciais, ativo, webhook_token, mapa_json').eq('tenant_id', tid).eq('provider', prov).maybeSingle(),
     (async () => {
       const ler = (cols: string) => svc.from('simulado_integracao_mapeamentos').select(cols).eq('tenant_id', tid).eq('provider', prov).order('fonte_nome')
@@ -66,6 +66,8 @@ export default async function IntegracaoProviderPage({ params }: { params: Promi
     })(),
     svc.from('simulado_grupos').select('id, nome, is_mestre').eq('tenant_id', tid).eq('deletado', false).order('nome'),
     svc.from('simulado_simulados').select('id, titulo').eq('tenant_id', tid).eq('deletado', false).order('titulo'),
+    // Bancos (simulado_pastas): a "pasta" que LIBERA os simulados dela (via banco_base_id).
+    (async () => { try { return await svc.from('simulado_pastas').select('id, nome').eq('tenant_id', tid).order('nome') } catch { return { data: [] } } })(),
     // Pré-carrega o último payload recebido → a aba Mapa JSON abre INSTANTÂNEA (sem round-trip).
     (async () => { try { return await svc.from('simulado_webhook_inbox').select('body_json').eq('tenant_id', tid).eq('provider', prov).not('body_json', 'is', null).order('recebido_em', { ascending: false }).limit(1).maybeSingle() } catch { return { data: null } } })(),
   ])
@@ -87,7 +89,7 @@ export default async function IntegracaoProviderPage({ params }: { params: Promi
         }}
         mapeamentos={(maps ?? []).map((m: any) => ({ id: m.id, fonteRef: m.fonte_ref, fonteNome: m.fonte_nome, classificacao: m.classificacao, grupoId: m.grupo_id, pastaId: m.pasta_id ?? null, simuladoId: m.simulado_id, ativo: m.ativo }))}
         gruposSistema={(grupos ?? []).filter((g: any) => !g.is_mestre).map((g: any) => ({ id: g.id, nome: g.nome }))}
-        pastasSistema={(grupos ?? []).filter((g: any) => g.is_mestre).map((g: any) => ({ id: g.id, nome: g.nome }))}
+        pastasSistema={(bancos ?? []).map((b: any) => ({ id: b.id, nome: b.nome }))}
         simuladosSistema={(simulados ?? []).map((s: any) => ({ id: s.id, nome: s.titulo }))}
         mapaInicial={mapaInicial}
       />

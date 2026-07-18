@@ -812,7 +812,7 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, pastasSistema, simu
             <span className="text-muted-foreground">→</span>
             {m.classificacao && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{m.classificacao}</span>}
             {m.grupoId && <span className="rounded-full border px-2 py-0.5 text-xs">grupo: {nomeGrupo(m.grupoId)}</span>}
-            {m.pastaId && <span className="rounded-full border px-2 py-0.5 text-xs">pasta: {nomePasta(m.pastaId)}</span>}
+            {m.pastaId && <span className="rounded-full border px-2 py-0.5 text-xs">banco: {nomePasta(m.pastaId)}</span>}
             {m.simuladoId && <span className="rounded-full border px-2 py-0.5 text-xs">simulado: {nomeSimulado(m.simuladoId)}</span>}
             <button type="button" onClick={() => remover(m.id)} className="ml-auto text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
           </div>
@@ -854,7 +854,7 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, pastasSistema, simu
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Pasta (libera os simulados dela)</label>
+            <label className="text-xs text-muted-foreground">Banco (libera os simulados dele)</label>
             <Select value={pastaId} onValueChange={(v) => setPastaId(v ?? SEM)} items={{ [SEM]: 'Nenhuma', ...Object.fromEntries(pastasSistema.map((g) => [g.id, g.nome])) }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value={SEM}>Nenhuma</SelectItem>{pastasSistema.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}</SelectContent>
