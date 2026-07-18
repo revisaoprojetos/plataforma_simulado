@@ -278,7 +278,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
         const total = sessao?.questoes.length ?? 0
         const acertos = Object.keys(respostas).length
         setResultado({
-          nota: total > 0 ? (acertos / total) * 10 : 0,
+          nota: total > 0 ? (acertos / total) * 100 : 0,
           acertos,
           total,
         })
@@ -288,7 +288,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
       // Mock
       const total = sessao?.questoes.length ?? 0
       const acertos = Math.floor(Object.keys(respostas).length * 0.7)
-      setResultado({ nota: total > 0 ? (acertos / total) * 10 : 0, acertos, total })
+      setResultado({ nota: total > 0 ? (acertos / total) * 100 : 0, acertos, total })
       setStatus('finalizada')
     } finally {
       setIsFinalizando(false)

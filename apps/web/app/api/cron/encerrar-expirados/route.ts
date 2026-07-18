@@ -41,7 +41,7 @@ async function finalizarSessao(svc: AnyClient, s: SessaoMin, cache: Map<string, 
   const total = await totalValidas(svc, s.simulado_id, cache)
   const { data: resp } = await svc.from('simulado_respostas_objetivas').select('correta').eq('sessao_id', s.id)
   const acertos = (resp ?? []).filter((r: any) => r.correta).length
-  const nota = total > 0 ? Math.round((acertos / total) * 10 * 100) / 100 : 0
+  const nota = total > 0 ? Math.round((acertos / total) * 100 * 100) / 100 : 0 // escala 0–100
   const { data: upd } = await svc
     .from('simulado_sessoes_prova')
     .update({ status: 'finalizada', finalizado_em: new Date().toISOString(), nota })

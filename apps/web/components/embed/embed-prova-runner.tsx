@@ -143,13 +143,13 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
       } else {
         const total = sessao?.questoes.length ?? 0
         const acertos = Object.keys(respostas).length
-        setResultado({ nota: total > 0 ? (acertos / total) * 10 : 0, acertos, total })
+        setResultado({ nota: total > 0 ? (acertos / total) * 100 : 0, acertos, total })
       }
       setStatus('finalizada')
     } catch {
       const total = sessao?.questoes.length ?? 0
       const acertos = Object.keys(respostas).length
-      setResultado({ nota: total > 0 ? (acertos / total) * 10 : 0, acertos, total })
+      setResultado({ nota: total > 0 ? (acertos / total) * 100 : 0, acertos, total })
       setStatus('finalizada')
     } finally {
       setIsFinalizando(false)

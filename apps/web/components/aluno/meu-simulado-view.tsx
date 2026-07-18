@@ -169,8 +169,8 @@ export function MeuSimuladoView({
                           return (
                             <div key={`${p.simId}-${p.n}-${i}`} className="flex min-w-[42px] flex-1 flex-col items-center justify-end gap-1" title={`${p.simulado} · Tentativa ${p.n}`}>
                               <span className={cn('text-xs font-bold tabular-nums', p.nota != null && notaTone(p.nota))}>{nota(p.nota)}</span>
-                              <div className="flex w-full max-w-[46px] flex-col justify-end overflow-hidden rounded-t-md bg-muted" style={{ height: `${Math.max(4, ((p.nota ?? 0) / 10) * 120)}px` }}>
-                                <div className={cn('w-full', p.nota != null ? pctBar((p.nota ?? 0) * 10) : 'bg-muted')} style={{ height: '100%' }} />
+                              <div className="flex w-full max-w-[46px] flex-col justify-end overflow-hidden rounded-t-md bg-muted" style={{ height: `${Math.max(4, ((p.nota ?? 0) / 100) * 120)}px` }}>
+                                <div className={cn('w-full', p.nota != null ? pctBar(p.nota ?? 0) : 'bg-muted')} style={{ height: '100%' }} />
                               </div>
                               <span className={cn('flex h-3 items-center text-[9px] font-semibold tabular-nums', subiu == null ? 'text-transparent' : subiu > 0 ? 'text-emerald-600 dark:text-emerald-400' : subiu < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-muted-foreground')}>
                                 {subiu != null && subiu !== 0 ? `${subiu > 0 ? '▲' : '▼'}${Math.abs(Math.round(subiu * 10) / 10)}` : '·'}

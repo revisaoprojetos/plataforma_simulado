@@ -50,7 +50,7 @@ export function RelatorioEstudanteView({ d, print }: { d: DadosRelatorioEstudant
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Painel titulo="Evolução da nota" sub="Nota em cada simulado, na ordem cronológica" tom="primary" icon={<TrendingUp className="h-4 w-4" />}>
-          <AreaSpark pontos={d.evolucao.map((x) => ({ rotulo: x.rotulo, valor: x.nota }))} tom="primary" min={0} max={10} formato={(n) => n.toFixed(1).replace('.', ',')} />
+          <AreaSpark pontos={d.evolucao.map((x) => ({ rotulo: x.rotulo, valor: x.nota }))} tom="primary" min={0} max={100} formato={(n) => n.toFixed(1).replace('.', ',')} />
         </Painel>
         <Painel titulo="Acerto por disciplina" sub="Comparação do estudante com a média da turma" tom="emerald" icon={<BookOpen className="h-4 w-4" />}>
           <BarrasDupla itens={d.porDisciplina.map((x) => ({ rotulo: x.nome, a: x.aluno, b: x.turma }))} aTom="primary" bTom="slate" aNome="Aluno" bNome="Turma" />

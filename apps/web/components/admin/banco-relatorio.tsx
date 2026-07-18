@@ -99,7 +99,7 @@ export async function BancoRelatorio({ bancoId, cor = '#6d28d9' }: { bancoId: st
     const acertos = [...m.values()].filter(Boolean).length
     const incorretas = respondidas - acertos
     const emBranco = totalQ - respondidas
-    const nota = totalQ > 0 ? Math.round((acertos / totalQ) * 10 * 10) / 10 : 0
+    const nota = totalQ > 0 ? Math.round((acertos / totalQ) * 100 * 10) / 10 : 0 // escala 0–100
     const finalizadoData = fmtData(finalizadoEm.get(a.id))
     // acertos por disciplina
     const porDisc = new Map<string, number>()

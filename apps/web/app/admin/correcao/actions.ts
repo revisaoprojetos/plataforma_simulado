@@ -132,7 +132,7 @@ async function recomputarNotaSessao(svc: ReturnType<typeof createAdminClient>, s
     if (maxP > 0) fracDisc += Math.min(1, Number(d.nota ?? 0) / maxP)
   }
 
-  const nota = Math.round(((acertosObj + fracDisc) / total) * 10 * 100) / 100
+  const nota = Math.round(((acertosObj + fracDisc) / total) * 100 * 100) / 100 // escala 0–100
   await svc.from('simulado_sessoes_prova').update({ nota }).eq('id', sessaoId)
 
   // Recalcula ranking (dedup por aluno conforme a política de nota).

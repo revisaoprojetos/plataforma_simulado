@@ -165,7 +165,7 @@ async function gradeSession(sessaoId: string, tenantId: string) {
 
   const total = respostas?.length ?? 0
   const corretas = respostas?.filter((r) => r.correta).length ?? 0
-  const nota = total > 0 ? parseFloat(((corretas / total) * 10).toFixed(2)) : 0
+  const nota = total > 0 ? parseFloat(((corretas / total) * 100).toFixed(2)) : 0 // escala 0–100
 
   await supabase.from('sessoes_prova').update({ nota }).eq('id', sessaoId)
   return nota
