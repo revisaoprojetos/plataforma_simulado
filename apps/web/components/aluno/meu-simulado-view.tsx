@@ -28,7 +28,7 @@ export function MeuSimuladoView({
   gabaritoLiberado: boolean
   cadernoLiberado: boolean
   cadernoId: string | null
-  modalidades: { id: string; nome: string; temGabarito: boolean }[]
+  modalidades: { id: string; nome: string; semGab: boolean; comGab: boolean }[]
   estId: string
   simuladoId: string
   simuladoTitulo: string
@@ -293,8 +293,8 @@ export function MeuSimuladoView({
                 </div>
               </div>
               <div className="space-y-1.5">
-                {modalidades.length > 0
-                  ? modalidades.map((m) => <BtnCaderno key={m.id} nome={m.nome} loading={baixando === `${modalTent.id}:${m.id}:s`} onClick={() => baixarCaderno(modalTent.id, m.id, m.nome)} />)
+                {modalidades.some((m) => m.semGab)
+                  ? modalidades.filter((m) => m.semGab).map((m) => <BtnCaderno key={m.id} nome={m.nome} loading={baixando === `${modalTent.id}:${m.id}:s`} onClick={() => baixarCaderno(modalTent.id, m.id, m.nome)} />)
                   : <BtnCaderno nome="Prova que você fez" onClick={() => abrir(`${gabaritoUrl(modalTent.id)}?sem=1`)} />}
               </div>
             </section>
@@ -310,9 +310,9 @@ export function MeuSimuladoView({
               </div>
               {!gabaritoLiberado ? (
                 <p className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground"><Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Disponível quando o professor liberar o gabarito.</p>
-              ) : modalidades.length > 0 ? (
+              ) : modalidades.some((m) => m.comGab) ? (
                 <div className="space-y-1.5">
-                  {modalidades.filter((m) => m.temGabarito).map((m) => <BtnCaderno key={m.id} nome={m.nome} gab loading={baixando === `${modalTent.id}:${m.id}:g`} onClick={() => baixarCaderno(modalTent.id, m.id, m.nome, true)} />)}
+                  {modalidades.filter((m) => m.comGab).map((m) => <BtnCaderno key={m.id} nome={m.nome} gab loading={baixando === `${modalTent.id}:${m.id}:g`} onClick={() => baixarCaderno(modalTent.id, m.id, m.nome, true)} />)}
                 </div>
               ) : (
                 <div className="space-y-1.5">

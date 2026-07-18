@@ -179,7 +179,7 @@ export async function GET(request: NextRequest) {
 
   // Caderno vinculado + suas modalidades (para o download "como você fez" por modalidade).
   let cadernoId: string | null = null
-  let modalidades: { id: string; nome: string }[] = []
+  let modalidades: { id: string; nome: string; semGab: boolean; comGab: boolean }[] = []
   try {
     const qids = questoes.map((q: any) => q.id).filter(Boolean)
     if (qids.length) {
@@ -198,7 +198,8 @@ export async function GET(request: NextRequest) {
           // (o motor de impressão usa a semente). As demais exigem conteúdo desenhado.
           modalidades = filtrarModsPorTipo(mesclarModalidades(cfg.modalidadesV2), tipo)
             .filter((m) => temConteudo(docs[m.id]) || m.id === 'caderno_perguntas')
-            .map((m) => ({ id: m.id, nome: m.nome }))
+            // semGab (como você fez): tudo menos Diagnóstico | comGab (com gabarito): tudo menos Caderno de Questões
+            .map((m) => ({ id: m.id, nome: m.nome, semGab: m.id !== 'diagnostico', comGab: m.id !== 'caderno_perguntas' }))
         }
       }
     }

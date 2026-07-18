@@ -84,16 +84,17 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
   // para não exibir botão de caderno em branco.
   const tipo = (await tiposDeSimulados(svc, [id])).get(id) ?? null
   const temConteudo = (d: any) => !!d && Array.isArray(d.pages) && d.pages.some((p: any) => (p.blocks ?? []).some((b: any) => b.type !== 'plano-fundo'))
-  let modalidades: { id: string; nome: string; temGabarito: boolean }[] = []
+  // Disponibilidade por etapa:
+  //  - semGab ("como você fez", logo após terminar): tudo, MENOS o Diagnóstico (que precisa do resultado).
+  //  - comGab ("com correção", quando o gabarito é liberado): tudo, MENOS o Caderno de Questões (só enunciado).
+  let modalidades: { id: string; nome: string; semGab: boolean; comGab: boolean }[] = []
   if (cadernoId) {
     const { data: cad } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoId).maybeSingle()
     const cfg = ((cad as any)?.config ?? {}) as any
     const docs = (cfg.docsV2 ?? {}) as Record<string, unknown>
-    // "Caderno de Perguntas" é entrega-padrão (aparece mesmo sem doc próprio, via semente)
-    // e nunca tem versão com gabarito — é só o enunciado + alternativas.
     modalidades = filtrarModsPorTipo(mesclarModalidades(cfg.modalidadesV2), tipo)
       .filter((m) => temConteudo(docs[m.id]) || m.id === 'caderno_perguntas')
-      .map((m) => ({ id: m.id, nome: m.nome, temGabarito: m.id !== 'diagnostico' && m.id !== 'caderno_perguntas' }))
+      .map((m) => ({ id: m.id, nome: m.nome, semGab: m.id !== 'diagnostico', comGab: m.id !== 'caderno_perguntas' }))
   }
 
   return (

@@ -69,7 +69,7 @@ interface Resultado {
   finalizado_em: string | null
   estudante_id: string | null
   caderno_id: string | null
-  modalidades?: { id: string; nome: string }[]
+  modalidades?: { id: string; nome: string; semGab?: boolean; comGab?: boolean }[]
   posicao: number | null
   total_participantes: number
   stats_por_disciplina: StatDisciplina[]
@@ -267,14 +267,15 @@ export function RevisaoFinal({
   // Baixa o caderno "como você fez" (sem gabarito) como ARQUIVO PDF: a rota gera o PDF
   // no servidor (Edge headless) e devolve como attachment → o navegador baixa direto.
   // Fallback: se a geração falhar, abre a página de impressão para salvar manualmente.
-  async function baixarComoFez(mod: string, nome: string) {
-    const key = `pdf:${mod}`
+  async function baixarComoFez(mod: string, nome: string, gab = false) {
+    const key = `pdf:${mod}:${gab ? 'g' : 's'}`
     if (gerandoPdf.has(key)) return
     if (!data?.caderno_id) { window.open(`${urlComoFezFallback}&print=1`, '_blank', 'noopener,noreferrer'); return }
     const limpar = (s?: string) => (s ?? '').trim().replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_')
     const arquivo = [data?.aluno_nome, data?.titulo, nome].map(limpar).filter(Boolean).join('_') || 'caderno'
     const qs = new URLSearchParams({ caderno: data.caderno_id, sessao: sessionToken, mod, nome: arquivo })
     if (data.estudante_id) qs.set('aluno', String(data.estudante_id))
+    if (gab) qs.set('gabarito', '1')
     marcarPdf(key, true)
     toast.loading('Download iniciado — gerando PDF…', { id: key })
     try {
@@ -292,7 +293,7 @@ export function RevisaoFinal({
       toast.success('Download concluído', { id: key, description: nome })
     } catch {
       toast.error('Não foi possível gerar o PDF. Abrindo para salvar…', { id: key })
-      window.open(`/imprimir/caderno/${data.caderno_id}?mod=${mod}&sessao=${sessionToken}${data.estudante_id ? `&aluno=${data.estudante_id}` : ''}&semgab=1&rawimg=1&print=1`, '_blank', 'noopener,noreferrer')
+      window.open(`/imprimir/caderno/${data.caderno_id}?mod=${mod}&sessao=${sessionToken}${data.estudante_id ? `&aluno=${data.estudante_id}` : ''}&${gab ? 'gabarito=1' : 'semgab=1'}&rawimg=1&print=1`, '_blank', 'noopener,noreferrer')
     } finally {
       marcarPdf(key, false)
     }
@@ -407,33 +408,41 @@ export function RevisaoFinal({
               </div>
             )}
 
-            {/* Dois downloads lado a lado — só quando o caderno está liberado para este aluno */}
-            {cadernoLiberado && (
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => baixarPdf('gabarito')} disabled={gerandoPdf.has('gabarito')} className={cn(BTN_CADERNO, 'disabled:opacity-60')} style={STYLE_CADERNO}>
-                  {gerandoPdf.has('gabarito') ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileText className="mr-1.5 h-4 w-4" />} Caderno de gabarito PDF
-                </button>
-                <button type="button" onClick={() => baixarPdf('completo')} disabled={gerandoPdf.has('completo')} className={cn(BTN_CADERNO, 'disabled:opacity-60')} style={STYLE_CADERNO}>
-                  {gerandoPdf.has('completo') ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileStack className="mr-1.5 h-4 w-4" />} Caderno completo PDF
-                </button>
-              </div>
-            )}
+            {/* Como você fez (sem gabarito) — as opções padrão do caderno, sempre após terminar. */}
+            {(() => {
+              const semg = modalidades.filter((m) => m.semGab)
+              return semg.length > 0 ? (
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Como você fez</p>
+                  <div className={cn('grid gap-2', semg.length > 1 && 'sm:grid-cols-2')}>
+                    {semg.map((m) => (
+                      <button key={m.id} type="button" onClick={() => baixarComoFez(m.id, m.nome)} disabled={gerandoPdf.has(`pdf:${m.id}:s`)}
+                        className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}>
+                        {gerandoPdf.has(`pdf:${m.id}:s`) ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileStack className="mr-1.5 h-4 w-4" />} {m.nome}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <a href={urlComoFezFallback} target="_blank" rel="noopener noreferrer" className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}>
+                  <FileStack className="mr-1.5 h-4 w-4" /> Baixar caderno (como você fez)
+                </a>
+              )
+            })()}
 
-            {/* Cadernos "como você fez" (sem gabarito) — um botão por modalidade, sempre
-                disponível. A navegação (voltar/meus simulados) fica na barra superior. */}
-            {modalidades.length > 0 ? (
-              <div className={cn('grid gap-2', modalidades.length > 1 && 'sm:grid-cols-2')}>
-                {modalidades.map((m) => (
-                  <button key={m.id} type="button" onClick={() => baixarComoFez(m.id, m.nome)} disabled={gerandoPdf.has(`pdf:${m.id}`)}
-                    className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}>
-                    {gerandoPdf.has(`pdf:${m.id}`) ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileStack className="mr-1.5 h-4 w-4" />} {m.nome}
-                  </button>
-                ))}
+            {/* Com gabarito — aparece embaixo quando o gabarito já está liberado ao terminar. */}
+            {liberado && modalidades.some((m) => m.comGab) && (
+              <div className="space-y-1.5 rounded-xl border border-primary/25 bg-primary/[0.04] p-2.5">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-primary">Com gabarito</p>
+                <div className={cn('grid gap-2', modalidades.filter((m) => m.comGab).length > 1 && 'sm:grid-cols-2')}>
+                  {modalidades.filter((m) => m.comGab).map((m) => (
+                    <button key={m.id} type="button" onClick={() => baixarComoFez(m.id, m.nome, true)} disabled={gerandoPdf.has(`pdf:${m.id}:g`)}
+                      className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}>
+                      {gerandoPdf.has(`pdf:${m.id}:g`) ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileText className="mr-1.5 h-4 w-4" />} {m.nome}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ) : (
-              <a href={urlComoFezFallback} target="_blank" rel="noopener noreferrer" className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}>
-                <FileStack className="mr-1.5 h-4 w-4" /> Baixar caderno (como você fez)
-              </a>
             )}
           </CardContent>
         </Card>
