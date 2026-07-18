@@ -570,7 +570,7 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
                   <div style={{ fontWeight: 800, color: a.corPct || a.corTitulo || '#243b7a', fontSize: a.tamPct ?? 22, lineHeight: 1.1 }}>{val(`{pct_pilar_${p.chave}}`, '0%')}</div>
                   <div style={{ color: a.corQuestoes || '#c0392b', fontSize: 11 }}>{val(`{acerto_pilar_${p.chave}}`, 'X')} de {val(`{total_pilar_${p.chave}}`, '0')} questões</div>
                   {a.mostrarLinhaInterna !== false && <div style={{ borderTop: `1px solid ${a.corLinhaInterna || '#d9c9a0'}`, margin: '5px 0' }} />}
-                  <div style={{ fontWeight: 700, fontSize: 10, color: a.corLabel || '#777', letterSpacing: 0.3 }}>TEXTO MODULADO</div>
+                  {a.mostrarLabel !== false && <div style={{ fontWeight: 700, fontSize: 10, color: a.corLabel || '#777', letterSpacing: 0.3 }}>{a.textoLabel || 'TEXTO MODULADO'}</div>}
                   {a.mostrarFaixa !== false && <div style={{ fontSize: 10, color: a.corFaixa || '#999', marginBottom: 2 }}>{f.label}</div>}
                   <div style={{ fontSize: 11, lineHeight: 1.5, textAlign: 'justify', whiteSpace: 'pre-wrap', color: a.corTexto || c.texto }}>{applyVars(f.texto, data.vars)}</div>
                 </div>

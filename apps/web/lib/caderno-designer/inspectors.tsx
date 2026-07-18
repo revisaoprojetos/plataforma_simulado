@@ -592,6 +592,8 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco }: { bl
           <div className="border-t pt-2" />
           <FonteSelect value={a.fonte ?? ''} onChange={(v) => set('fonte', v)} />
           <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarLinhaInterna !== false} onChange={(e) => set('mostrarLinhaInterna', e.target.checked)} className="h-4 w-4 rounded border" /> Linha interna (antes do texto)</label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarLabel !== false} onChange={(e) => set('mostrarLabel', e.target.checked)} className="h-4 w-4 rounded border" /> Mostrar rótulo “TEXTO MODULADO”</label>
+          {a.mostrarLabel !== false && <Row label="Texto do rótulo"><input value={a.textoLabel ?? ''} onChange={(e) => set('textoLabel', e.target.value)} className={inputCls} placeholder="TEXTO MODULADO" /></Row>}
           <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarFaixa !== false} onChange={(e) => set('mostrarFaixa', e.target.checked)} className="h-4 w-4 rounded border" /> Mostrar rótulo da faixa (0-50 / 51-80 / 81-100)</label>
           <Faixa label="Tamanho do título (px)" min={8} max={24} value={a.tamTitulo ?? 12} onChange={(v) => set('tamTitulo', v)} />
           <Faixa label="Tamanho do % (px)" min={12} max={40} value={a.tamPct ?? 22} onChange={(v) => set('tamPct', v)} />
