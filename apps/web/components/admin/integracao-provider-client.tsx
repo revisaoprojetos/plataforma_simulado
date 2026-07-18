@@ -312,7 +312,7 @@ function MapaJson({ provider, inicial }: { provider: Provider; inicial?: { mapa:
   const pct = Math.round((resolvidos / CAMPOS_MAPA.length) * 100)
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-5xl space-y-4">
       {/* Cabeçalho: descrição + progresso + ações */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-gradient-to-br from-primary/[0.07] to-transparent p-4">
         <div className="min-w-0 max-w-xl">
@@ -346,7 +346,7 @@ function MapaJson({ provider, inicial }: { provider: Provider; inicial?: { mapa:
       </datalist>
 
       {/* Grid: campos (esquerda, flexível) + JSON (direita, largura fixa, sticky, sem cortar) */}
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
         {/* Campos do sistema — UM card, linhas inline (label → input) */}
         <div className="divide-y overflow-hidden rounded-2xl border bg-card shadow-sm">
           {CAMPOS_MAPA.map((c) => {
@@ -372,10 +372,6 @@ function MapaJson({ provider, inicial }: { provider: Provider; inicial?: { mapa:
                 </div>
                 <span className="shrink-0 text-sky-500">→</span>
                 <Input list={`paths-${provider}`} value={mapa[c.key] ?? ''} onClick={(e) => e.stopPropagation()} onFocus={() => setAtivo(c.key)} onChange={(e) => set(c.key, e.target.value)} placeholder={c.padrao} className="h-8 min-w-0 flex-1 font-mono text-xs" />
-                {/* Valor resolvido */}
-                <span className="hidden w-36 shrink-0 truncate text-right text-[11px] font-medium xl:block" title={resolvido ?? ''}>
-                  {payload == null ? '' : ok ? <span className="text-emerald-600 dark:text-emerald-400">= {resolvido}</span> : <span className="text-amber-600 dark:text-amber-400">vazio</span>}
-                </span>
               </div>
             )
           })}
