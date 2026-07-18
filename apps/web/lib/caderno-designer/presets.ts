@@ -3,6 +3,7 @@
 
 import { createBlock } from './blocks'
 import { genId, RUNNING_PADRAO, type CadernoDoc, type Block, type Page, type PageKind, type RunningConfig } from './types'
+import { DIAGNOSTICO_DOC } from './preset-diagnostico-doc'
 
 /** Cria um bloco com os defaults do tipo + um patch de atributos (e filhos opcionais). */
 function blk(type: string, patch: Record<string, unknown> = {}, inner?: Block[]): Block {
@@ -20,78 +21,29 @@ function doc(pages: Page[], running?: Partial<RunningConfig>): CadernoDoc {
 
 export type CadernoPreset = { id: string; nome: string; descricao: string; build: () => CadernoDoc }
 
-/** Disciplina do bloco de grupo. `chave` = slug do nome (ajuste na aba do bloco se não bater). */
-function d(nome: string, chave: string, assunto = 'Assunto Principal') { return { chave, nome, assunto } }
-function grpDiag(grupo: string, disciplinas: any[]): Block {
-  return blk('diag-grupo', { grupo, disciplinas, corHeader: '#f6c445', corHeaderTexto: '#3b3260', corFita: '#c9a227', corRow: '#e9eef7', corTitulo: '#1a3a6b', corPct: '#e8850c', corAcerto: '#8a8a8a', fitaPosicao: 'base', fitaAltura: 2 })
+/** Reconstrói um doc capturado (JSON sem ids) em blocos reais, com IDs novos a cada aplicação. */
+function docCapturado(raw: any): CadernoDoc {
+  const cloneBlock = (b: any): Block => {
+    const nb = createBlock(b.type)
+    Object.assign(nb.attributes as Record<string, unknown>, b.attributes ?? {})
+    nb.innerBlocks = Array.isArray(b.innerBlocks) ? b.innerBlocks.map(cloneBlock) : (nb.innerBlocks ?? [])
+    return nb
+  }
+  return {
+    versao: raw.versao ?? 1,
+    running: { ...RUNNING_PADRAO, ...(raw.running ?? {}) },
+    cabecalho: (raw.cabecalho ?? []).map(cloneBlock),
+    rodape: (raw.rodape ?? []).map(cloneBlock),
+    pages: (raw.pages ?? []).map((p: any): Page => ({ id: genId('page'), kind: p.kind, titulo: p.titulo, valign: p.valign, blocks: (p.blocks ?? []).map(cloneBlock) })),
+  }
 }
 
 export const PRESETS_CADERNO: CadernoPreset[] = [
   {
     id: 'diagnostico',
     nome: 'Diagnóstico de Desempenho',
-    descricao: 'Barras de seção, cartão de nota, 3 pilares com divisória e cards com fita. Ajuste os textos e vincule as variáveis ({nome}, {acertos}, {total_questoes}, {percentual}, pct_<disciplina>).',
-    build: () => doc([
-      page('conteudo', 'Diagnóstico', [
-        blk('plano-fundo', { url: '', opacidade: 100 }),
-        blk('espacador', { altura: 24 }),
-        blk('titulo-secao', { texto: 'Diagnóstico de Desempenho', subtitulo: '{simulado}', nivel: 1, corFundo: '#2c5ea5', cor: '#ffffff', fundoRaio: 6, align: 'left', mostrarLinha: false }),
-        blk('espacador', { altura: 8 }),
-        blk('titulo-secao', { texto: 'NOME:   {nome}', nivel: 2, corFundo: '#3b5bdb', cor: '#ffffff', fundoRaio: 6, align: 'left', mostrarLinha: false }),
-        blk('espacador', { altura: 8 }),
-        blk('card', { corFundo: '#f6c445', bordaLargura: 0, bordaRaio: 6, padding: 12, largura: 100, alinhamento: 'center' }, [
-          blk('texto-livre', { texto: '{acertos} / {total_questoes}      —      {percentual} de aproveitamento', bold: true, size: 18, align: 'left', color: '#3b3260' }),
-        ]),
-        blk('espacador', { altura: 12 }),
-        blk('titulo-secao', { texto: 'DESEMPENHO POR PILAR', nivel: 2, corFundo: '#2b2a4a', cor: '#ffffff', fundoRaio: 4, align: 'left', mostrarLinha: false }),
-        blk('espacador', { altura: 8 }),
-        // Bloco dinâmico: 3 pilares colados, % real + faixa automática (0–50 / 51–80 / 81–100).
-        blk('diag-pilares', { pilares: [
-          { chave: 'lei_seca', nome: 'LEI SECA',
-            f1: 'O seu desempenho em lei seca ficou abaixo de 50%, um resultado que pode ser considerado ruim. A CEBRASPE cobra texto literal de lei em muitas questões, sendo um dos principais fatores de reprovação entre nossos alunos.',
-            f2: 'O seu desempenho em lei seca foi intermediário. Você tem base, mas ainda está deixando pontos na mesa. A banca cobra o dispositivo exato — foque nos diplomas de maior incidência, com atenção aos detalhes.',
-            f3: 'O seu desempenho em lei seca foi excelente! Esse pode ser o diferencial para sua aprovação. Mantenha-se firme, com revisões periódicas, e estude os conteúdos específicos da AGU com foco na lei seca.' },
-          { chave: 'jurisprudencia', nome: 'JURISPRUDÊNCIA',
-            f1: 'O seu desempenho em jurisprudência ficou abaixo de 50%, e isso é muito ruim. A CEBRASPE não abre mão de cobrar informativos. Reforce o estudo pelo DOD, JurisClub ou informativos do STF e STJ.',
-            f2: 'O seu desempenho em jurisprudência foi médio — há espaço relevante para crescimento. As questões de jurisprudência diferenciam os primeiros colocados. Reforce pelo DoD ou pelo JurisClub do Revisão.',
-            f3: 'O seu desempenho em jurisprudência foi maravilhoso! Você acompanha os informativos e aplica os entendimentos com segurança. Mantenha o hábito, com atenção à jurisprudência mais recente e às teses consolidadas.' },
-          { chave: 'doutrina', nome: 'DOUTRINA',
-            f1: 'O desempenho em doutrina ficou abaixo de 50%. Doutrina é a base do raciocínio jurídico — quem não domina classificações, distinções e princípios erra também em lei e jurisprudência. O investimento tem retorno duplo.',
-            f2: 'O desempenho em doutrina foi intermediário. Você acerta nas questões diretas, mas perde nas distinções mais finas. Dominar doutrina ajuda a ganhar pontos também em questões de lei e jurisprudência.',
-            f3: 'O desempenho em doutrina foi excelente. Você domina classificações, distinções conceituais e fundamentos teóricos — o que se reflete também em questões de lei e jurisprudência. Mantenha a solidez.' },
-        ], corFundo: '#fef3d6', fitaCor: '#3b5bdb', fitaAltura: 4, divisoriaCor: '#cbb26b', corTitulo: '#243b7a' }),
-        blk('espacador', { altura: 12 }),
-        blk('titulo-secao', { texto: 'DESEMPENHO POR DISCIPLINA', nivel: 2, corFundo: '#2b2a4a', cor: '#ffffff', fundoRaio: 4, align: 'left', mostrarLinha: false }),
-        blk('espacador', { altura: 6 }),
-        blk('texto-livre', { texto: 'A análise a seguir tem foco nos seus pontos de erros. Para cada disciplina, você encontra o desempenho por categoria (lei seca, jurisprudência e doutrina) e uma leitura personalizada do que os erros revelam sobre as lacunas a priorizar.', size: 11, align: 'justify', lineHeight: 1.5 }),
-        blk('espacador', { altura: 10 }),
-        grpDiag('Grupo I', [
-          d('Direito Administrativo', 'direito_administrativo', ''),
-          d('Direito Constitucional', 'direito_constitucional'),
-          d('Direito Tributário', 'direito_tributario'),
-          d('Direito Ambiental', 'direito_ambiental'),
-          d('Legislação da Advocacia-Geral da União, Gestão de Conflito e Governança', 'legislacao_da_agu'),
-          d('Direito Financeiro', 'direito_financeiro'),
-        ]),
-        blk('espacador', { altura: 12 }),
-        grpDiag('Grupo II', [
-          d('Direito Processual Civil', 'direito_processual_civil'),
-          d('Direito Civil', 'direito_civil'),
-          d('Direito Internacional Público e Privado', 'direito_internacional_publico_e_privado'),
-          d('Legislação sobre Educação, Ciência, Tecnologia e Inovação', 'legislacao_sobre_educacao_ciencia_tecnologia_e_inovacao'),
-          d('Direito Empresarial', 'direito_empresarial'),
-        ]),
-        blk('espacador', { altura: 12 }),
-        grpDiag('Grupo III', [
-          d('Direito Eleitoral', 'direito_eleitoral'),
-          d('Direito Previdenciário', 'direito_previdenciario'),
-          d('Direito do Trabalho', 'direito_do_trabalho'),
-          d('Direito Processual do Trabalho', 'direito_processual_do_trabalho'),
-          d('Direito Penal', 'direito_penal'),
-          d('Direito Processual Penal', 'direito_processual_penal'),
-        ]),
-      ]),
-    ]),
+    descricao: 'Modelo pronto (Simulado AGU): capa + nota, 3 pilares, desempenho por disciplina em grupos e sugestões de estudo. Reenvie as imagens de fundo e ajuste os textos/variáveis.',
+    build: () => docCapturado(DIAGNOSTICO_DOC),
   },
   {
     id: 'caderno-objetivo',
