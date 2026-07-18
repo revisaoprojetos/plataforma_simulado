@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { SimuladoWizard } from '@/components/admin/simulado-wizard'
 import { createSimuladoAction } from '../actions'
 import Link from 'next/link'
@@ -8,25 +9,28 @@ import { ChevronLeft } from 'lucide-react'
 export default async function NovoSimuladoPage() {
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
+  const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
 
-  const [{ data: questoesRaw }, { data: vinculos }, { data: pastaEst }, { data: estudantesRaw }] = await Promise.all([
-    svc.from('simulado_questoes')
+  // Todas as varreduras usam fetchAll — o PostgREST corta em 1000 linhas por resposta;
+  // sem paginar, as contagens de alunos/questões por banco e a lista do seletor ficam
+  // truncadas (era o motivo de o banco mostrar 436 em vez dos ~3 mil reais).
+  const [questoesRaw, vinculos, pastaEst, estudantesRaw] = await Promise.all([
+    fetchAll<any>(() => svc.from('simulado_questoes')
       .select('id, enunciado, tipo, nivel_dificuldade, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)')
-      .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+      .eq('tenant_id', tid)
       // Ordem de leitura (1ª questão importada primeiro) — casa com a listagem do banco.
-      .order('created_at', { ascending: true })
-      .limit(1000),
-    svc.from('simulado_questao_pasta').select('questao_id, pasta_id').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000'),
-    svc.from('simulado_pasta_estudantes').select('pasta_id, estudante_id').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000'),
-    svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome'),
+      .order('created_at', { ascending: true })),
+    fetchAll<any>(() => svc.from('simulado_questao_pasta').select('questao_id, pasta_id').eq('tenant_id', tid).order('questao_id')),
+    fetchAll<any>(() => svc.from('simulado_pasta_estudantes').select('pasta_id, estudante_id').eq('tenant_id', tid).order('estudante_id')),
+    fetchAll<any>(() => svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tid).order('nome')),
   ])
 
   // Bancos: tolerante à coluna `tipo` (migration pode não ter rodado).
   let bancos: any[] | null = null
   {
-    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, tipo').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome')
-    if (r.error && /tipo|column/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome')
+    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, capa_card_url, tipo').eq('deletado', false).eq('tenant_id', tid).order('nome')
+    if (r.error && /tipo|capa_card_url|column/i.test(r.error.message)) {
+      const r2 = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url').eq('deletado', false).eq('tenant_id', tid).order('nome')
       bancos = r2.data
     } else bancos = r.data
   }
@@ -48,7 +52,7 @@ export default async function NovoSimuladoPage() {
   }
 
   const bancosDetalhe = (bancos ?? []).map((b: any) => ({
-    id: b.id, nome: b.nome, cor: b.cor ?? null, icone: b.icone ?? null, capa: b.capa_url ?? null, tipo: b.tipo ?? 'objetiva',
+    id: b.id, nome: b.nome, cor: b.cor ?? null, icone: b.icone ?? null, capa: (b.capa_card_url ?? b.capa_url) ?? null, tipo: b.tipo ?? 'objetiva',
     nQuestoes: qCount.get(b.id) ?? 0, nEstudantes: eCount.get(b.id)?.size ?? 0,
   }))
 
@@ -56,7 +60,7 @@ export default async function NovoSimuladoPage() {
   // a mesma ordem exibida no banco. Tolerante: a coluna pode não existir até a migration.
   const ordemPorBanco: Record<string, string[]> = {}
   {
-    const { data: ord } = await svc.from('simulado_pastas').select('id, ordem_questoes').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+    const { data: ord } = await svc.from('simulado_pastas').select('id, ordem_questoes').eq('tenant_id', tid)
     for (const p of ord ?? []) {
       if (Array.isArray((p as any).ordem_questoes)) ordemPorBanco[(p as any).id] = (p as any).ordem_questoes
     }
