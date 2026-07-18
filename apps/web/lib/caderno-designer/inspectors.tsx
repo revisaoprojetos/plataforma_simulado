@@ -446,6 +446,9 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco }: { bl
     case 'diag-disciplina': {
       const slugify = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
       const humano = (s: string) => s.replace(/_/g, ' ').replace(/^./, (ch) => ch.toUpperCase())
+      // Se o nome vier TODO EM MAIÚSCULA, formata para Título (pt-br); se já tem minúsculas, mantém.
+      const MINUS = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o', 'em', 'na', 'no', 'para', 'por', 'com', 'sobre', 'ao', 'à'])
+      const formatar = (s: string) => /[a-zà-ÿ]/.test(s) ? s : s.toLowerCase().split(/\s+/).map((w, i) => (i > 0 && MINUS.has(w)) ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
       // Nomes REAIS das disciplinas (do banco/grupos). Fallback: slugs das variáveis, humanizados.
       const nomesReais = [...new Set((gruposBanco ?? []).flatMap((g) => g.disciplinas))].sort()
       const slugsVar = [...new Set((varsExtra ?? []).filter((g) => /Disciplina/i.test(g.grupo)).flatMap((g) => g.itens.map((v) => v.token.match(/\{pct_(.+)\}/)?.[1]).filter(Boolean)))] as string[]
@@ -455,10 +458,10 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco }: { bl
           <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Escolha a <b>disciplina do simulado</b> — o bloco usa o <b>nome real</b> dela e preenche acertos/total/% automaticamente. Só aparece se o aluno <b>errou</b> ao menos uma questão.</p>
           <Row label="Disciplina">
             {usarReais ? (
-              <select value={a.nome ?? ''} onChange={(e) => { const nome = e.target.value; onChange({ nome, chave: slugify(nome) }) }} className={inputCls}>
+              <select value={a.chave ?? ''} onChange={(e) => { const real = nomesReais.find((n) => slugify(n) === e.target.value); if (real) onChange({ nome: formatar(real), chave: slugify(real) }) }} className={inputCls}>
                 <option value="">— escolher —</option>
-                {nomesReais.map((n) => <option key={n} value={n}>{n}</option>)}
-                {a.nome && !nomesReais.includes(a.nome) && <option value={a.nome}>{a.nome} (atual)</option>}
+                {nomesReais.map((n) => <option key={n} value={slugify(n)}>{formatar(n)}</option>)}
+                {a.chave && !nomesReais.some((n) => slugify(n) === a.chave) && <option value={a.chave}>{a.nome || humano(a.chave)} (atual)</option>}
               </select>
             ) : (
               <select value={a.chave ?? ''} onChange={(e) => { const s = e.target.value; onChange({ chave: s, nome: humano(s) }) }} className={inputCls}>
