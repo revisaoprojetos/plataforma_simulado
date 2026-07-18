@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useCallback, useLayoutEffect, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { Fragment, useLayoutEffect, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Save, Printer, Plus, Trash2, ArrowUp, ArrowDown, FileText, Palette, LayoutTemplate, ChevronLeft, ChevronRight, Columns2, PanelTop, PanelBottom, Minus, Wallpaper, Database, Users, Repeat, Copy, GripVertical, Undo2, Redo2 } from 'lucide-react'
 import Link from 'next/link'
@@ -31,7 +31,7 @@ function FundoPagina({ bloco, selecionado, corPrimaria, onSelect }: { bloco: Blo
   const placeholder = !temImagem
   return (
     <div onClick={placeholder ? (e) => { e.stopPropagation(); onSelect() } : undefined}
-      style={{ position: 'absolute', top: 0, left: 0, right: 0, height: SHEET_H, zIndex: placeholder ? 4 : 0, pointerEvents: placeholder ? 'auto' : 'none',
+      style={{ position: 'absolute', inset: 0, zIndex: placeholder ? 4 : 0, pointerEvents: placeholder ? 'auto' : 'none',
         cursor: placeholder ? 'pointer' : 'default', outline: selecionado ? `3px solid ${corPrimaria}` : 'none' }}>
       {a.url && (
         <img src={a.url} alt="" onError={() => setErro(true)} onLoad={() => setErro(false)}
@@ -181,6 +181,54 @@ function ListaBlocos({ blocks, ctx, emColuna }: { blocks: Block[]; ctx: NodeCtx;
           <InsertSlot ctx={ctx} blockId={block.id} pos="bottom" active={ctx.overId === block.id && ctx.overPos === 'bottom'} />
         </Fragment>
       ))}
+    </>
+  )
+}
+
+/**
+ * Pagina o conteúdo de UMA página do editor em folhas A4 de verdade (estilo Word):
+ * mede a altura real de cada bloco (num passe escondido, com a MESMA largura útil da folha)
+ * e distribui em grupos que cabem na área segura (SHEET_H − cabeçalho − rodapé). Cada grupo
+ * é uma folha nova — o bloco que não cabe vai INTEIRO para a próxima (nunca é cortado).
+ * `renderSheet` desenha cada folha (com cabeçalho/rodapé/fundo e os blocos interativos).
+ */
+function FolhasPaginadas({ blocks, theme, data, cabH, rodH, renderSheet }: {
+  blocks: Block[]; theme: any; data: any; cabH: number; rodH: number
+  renderSheet: (grupo: Block[], sheetIndex: number, total: number) => React.ReactNode
+}) {
+  const [grupos, setGrupos] = useState<Block[][] | null>(null)
+  const medRef = useRef<HTMLDivElement>(null)
+  // Repetição aparece compacta no editor (template com 1 questão) — mede igual.
+  const dataMed = useMemo(() => ({ ...data, questoes: (data?.questoes ?? []).slice(0, 1) }), [data])
+  const chave = useMemo(() => JSON.stringify(blocks.map((b) => [b.id, b.type, b.attributes, b.innerBlocks])), [blocks])
+  // Assinatura das variáveis (troca de aluno muda o conteúdo e a altura dos blocos). String →
+  // comparação por valor: só re-mede quando o VALOR muda, mesmo que `data` mude de identidade.
+  const chaveVars = useMemo(() => JSON.stringify(data?.vars ?? {}), [data])
+  useLayoutEffect(() => {
+    const cont = medRef.current
+    if (!cont) return
+    const filhos = Array.from(cont.children) as HTMLElement[]
+    const alturas = filhos.map((f) => f.getBoundingClientRect().height)
+    const safe = SHEET_H - cabH - rodH - 4 // folga anti-arredondamento
+    const gi: number[][] = []
+    let atual: number[] = []
+    let h = 0
+    for (let i = 0; i < alturas.length; i++) {
+      const alt = alturas[i]
+      if (atual.length && h + alt > safe) { gi.push(atual); atual = []; h = 0 } // não cabe → próxima folha
+      atual.push(i); h += alt
+    }
+    if (atual.length) gi.push(atual)
+    setGrupos(gi.length ? gi.map((g) => g.map((i) => blocks[i])) : [[]])
+  }, [chave, chaveVars, cabH, rodH])
+  const paginas = grupos ?? (blocks.length ? [blocks] : [[]])
+  return (
+    <>
+      {/* Passe de medição (escondido, não interativo) — mesma largura útil da folha. */}
+      <div ref={medRef} aria-hidden className="pointer-events-none" style={{ position: 'absolute', left: -99999, top: 0, width: SHEET_W - 2 * PAD_H, display: 'flex', flexDirection: 'column' }}>
+        {blocks.map((b) => <div key={b.id}><BlockRender block={b} theme={theme} data={dataMed} editor /></div>)}
+      </div>
+      {paginas.map((grupo, si) => <Fragment key={si}>{renderSheet(grupo, si, paginas.length)}</Fragment>)}
     </>
   )
 }
@@ -347,18 +395,6 @@ export function CadernoEditorV2({
   const [assuntosBanco, setAssuntosBanco] = useState<Record<string, string[]>>({})
   useEffect(() => { let vivo = true; if (bancoId) getAssuntosBanco(bancoId).then((r) => { if (vivo && r.ok) setAssuntosBanco(r.porDisciplina ?? {}) }); else setAssuntosBanco({}); return () => { vivo = false } }, [bancoId])
 
-  // Altura real de cada folha do canvas (cresce com o conteúdo) — para NÃO cortar blocos que
-  // passam do limite da página, igual ao PDF. Um ResizeObserver por página mede o conteúdo.
-  const [pagAlturas, setPagAlturas] = useState<Record<string, number>>({})
-  const pagObs = useRef<Map<string, ResizeObserver>>(new Map())
-  const medirPagina = useCallback((pageId: string) => (el: HTMLDivElement | null) => {
-    const m = pagObs.current
-    const prev = m.get(pageId); if (prev) { prev.disconnect(); m.delete(pageId) }
-    if (!el) return
-    const medir = () => setPagAlturas((s) => (Math.abs((s[pageId] ?? 0) - el.scrollHeight) < 1 ? s : { ...s, [pageId]: el.scrollHeight }))
-    const ro = new ResizeObserver(medir); ro.observe(el); m.set(pageId, ro); medir()
-  }, [])
-  useEffect(() => () => { pagObs.current.forEach((o) => o.disconnect()); pagObs.current.clear() }, [])
   const [regIndex, setRegIndex] = useState(0)
   const [modAtiva, setModAtiva] = useState<string>((mods0Vis[0] ?? mods0[0]).id)
   const [selPage, setSelPage] = useState<string | null>(null)
@@ -767,46 +803,44 @@ export function CadernoEditorV2({
               const conteudo = page.blocks.filter((b) => b.type !== 'plano-fundo')
               const mostraCab = running.cabecalhoAtivo && faixaNaPagina(running.cabecalhoPaginas, pi, page.kind)
               const mostraRod = running.rodapeAtivo && faixaNaPagina(running.rodapePaginas, pi, page.kind)
+              // Reserva de cabeçalho/rodapé na área segura (o +24 cobre o padding/borda da faixa no editor).
+              const cabH = mostraCab ? (running.cabecalhoAltura || PAD_V) + 24 : PAD_V
+              const rodH = mostraRod ? (running.rodapeAltura || PAD_V) + 24 : PAD_V
+              // Uma folha A4 (fixa) com fundo + cabeçalho + blocos desta folha + rodapé.
+              const renderSheet = (grupo: Block[], si: number, total: number) => (
+                <div style={{ width: SHEET_W * ZOOM, height: SHEET_H * ZOOM }} className="relative">
+                  <div onClick={() => { setSelPage(page.id); setSelBlock(null); setRegiao('pagina') }}
+                    onDragOver={(e) => { e.preventDefault(); setOver(page.id) }}
+                    onDrop={(e) => ctx.drop(e, { kind: 'page', pageId: page.id })}
+                    style={{ width: SHEET_W, height: SHEET_H, transform: `scale(${ZOOM})`, transformOrigin: 'top left', background: theme.cores.fundo, boxShadow: '0 2px 16px rgba(0,0,0,.13)',
+                      ...(overId === page.id ? { outline: `2.5px solid ${REALCE}`, outlineOffset: -2 } : arrastando ? { outline: `1.5px solid ${REALCE}`, outlineOffset: -2 } : {}) }}
+                    className={cn('relative', !arrastando && selPage === page.id && regiao === 'pagina' && 'ring-2 ring-primary/40')}>
+                    {bg && (
+                      <FundoPagina key={(bg.attributes as any).url || 'sem'} bloco={bg} selecionado={selBlock === bg.id}
+                        corPrimaria={theme.cores.primaria} onSelect={() => { setSelBlock(bg.id); setAba('bloco') }} />
+                    )}
+                    <div className="relative flex h-full flex-col">
+                      {mostraCab && <ZonaFaixa reg="cabecalho" blocks={doc.cabecalho ?? []} altura={running.cabecalhoAltura} />}
+                      <AutoAnim ativo={!arrastando} style={{ paddingTop: mostraCab ? 0 : PAD_V, paddingBottom: mostraRod ? 0 : PAD_V, paddingLeft: PAD_H, paddingRight: PAD_H }} className={cn('relative flex min-h-0 flex-1 flex-col', page.valign === 'center' && 'justify-center', page.valign === 'bottom' && 'justify-end')}>
+                        {grupo.length === 0 && !bg && (
+                          <div className={cn('flex h-[200px] items-center justify-center rounded-lg border-2 border-dashed text-sm transition-colors', arrastando ? 'border-primary/50 bg-primary/5 text-primary' : 'border-border text-muted-foreground')}>{arrastando ? 'Solte o bloco aqui' : 'Arraste um bloco ou clique para começar'}</div>
+                        )}
+                        <ListaBlocos blocks={grupo} ctx={ctx} />
+                      </AutoAnim>
+                      {mostraRod && <ZonaFaixa reg="rodape" blocks={doc.rodape ?? []} altura={running.rodapeAltura} />}
+                    </div>
+                    {bg && si === 0 && <ChipFundo selecionado={selBlock === bg.id} corPrimaria={theme.cores.primaria} onSelect={() => { setSelBlock(bg.id); setAba('bloco') }} />}
+                    {total > 1 && <span style={{ position: 'absolute', right: 6, bottom: 6, zIndex: 16, fontSize: 11, fontWeight: 600, color: '#64748b', background: '#fff', padding: '1px 6px', borderRadius: 5, border: '1px solid #e2e8f0' }}>folha {si + 1}/{total}</span>}
+                  </div>
+                </div>
+              )
               return (
-                <div key={page.id} className="group/p relative">
+                <div key={page.id} className="group/p relative flex flex-col items-center gap-2">
                   <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground" style={{ width: SHEET_W * ZOOM }}>
                     <span className="font-medium">{page.titulo} · {PAGE_KINDS.find((k) => k.id === page.kind)?.nome}{running.mostrarNumeroPagina ? ` · pág. ${pi + 1}` : ''}</span>
                     <button onClick={() => removePage(page.id)} className="opacity-0 transition-opacity hover:text-destructive group-hover/p:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
-                  <div style={{ width: SHEET_W * ZOOM, height: (pagAlturas[page.id] ?? SHEET_H) * ZOOM }} className="relative">
-                    <div ref={medirPagina(page.id)} onClick={() => { setSelPage(page.id); setSelBlock(null); setRegiao('pagina') }}
-                      onDragOver={(e) => { e.preventDefault(); setOver(page.id) }}
-                      onDrop={(e) => ctx.drop(e, { kind: 'page', pageId: page.id })}
-                      style={{ width: SHEET_W, minHeight: SHEET_H, transform: `scale(${ZOOM})`, transformOrigin: 'top left', background: theme.cores.fundo, boxShadow: '0 2px 16px rgba(0,0,0,.13)',
-                        ...(overId === page.id ? { outline: `2.5px solid ${REALCE}`, outlineOffset: -2 } : arrastando ? { outline: `1.5px solid ${REALCE}`, outlineOffset: -2 } : {}) }}
-                      className={cn('relative', !arrastando && selPage === page.id && regiao === 'pagina' && 'ring-2 ring-primary/40')}>
-                      {/* Marcadores de quebra de página A4: quando o conteúdo passa de uma folha, o
-                          PDF continua na próxima — aqui nada é cortado (a folha cresce). */}
-                      {Array.from({ length: Math.max(0, Math.floor((((pagAlturas[page.id] ?? SHEET_H)) - 2) / SHEET_H)) }).map((_, k) => (
-                        <div key={`brk${k}`} style={{ position: 'absolute', left: 0, right: 0, top: (k + 1) * SHEET_H, zIndex: 15, pointerEvents: 'none', borderTop: '2px dashed #ef4444' }}>
-                          <span style={{ position: 'absolute', right: 6, top: 3, fontSize: 12, fontWeight: 600, color: '#fff', background: '#ef4444', padding: '1px 7px', borderRadius: 5 }}>quebra de página (folha {k + 2})</span>
-                        </div>
-                      ))}
-                      {/* camada de fundo full-bleed (placeholder quando sem imagem ou url quebrada) */}
-                      {bg && (
-                        <FundoPagina key={(bg.attributes as any).url || 'sem'} bloco={bg} selecionado={selBlock === bg.id}
-                          corPrimaria={theme.cores.primaria} onSelect={() => { setSelBlock(bg.id); setAba('bloco') }} />
-                      )}
-                      {/* Coluna da folha: faixas usam a LARGURA TODA (borda a borda); só o conteúdo do meio tem margem lateral/vertical. */}
-                      <div className="relative flex flex-col" style={{ minHeight: SHEET_H }}>
-                        {mostraCab && <ZonaFaixa reg="cabecalho" blocks={doc.cabecalho ?? []} altura={running.cabecalhoAltura} />}
-                        {/* Conteúdo do meio: preso entre cabeçalho e rodapé; overflow recortado para não invadir as áreas. */}
-                        <AutoAnim ativo={!arrastando} style={{ flex: '1 0 auto', paddingTop: mostraCab ? 0 : PAD_V, paddingBottom: mostraRod ? 0 : PAD_V, paddingLeft: PAD_H, paddingRight: PAD_H }} className={cn('relative flex flex-col', page.valign === 'center' && 'justify-center', page.valign === 'bottom' && 'justify-end')}>
-                          {conteudo.length === 0 && !bg && (
-                            <div className={cn('flex h-[200px] items-center justify-center rounded-lg border-2 border-dashed text-sm transition-colors', arrastando ? 'border-primary/50 bg-primary/5 text-primary' : 'border-border text-muted-foreground')}>{arrastando ? 'Solte o bloco aqui' : 'Arraste um bloco ou clique para começar'}</div>
-                          )}
-                          <ListaBlocos blocks={conteudo} ctx={ctx} />
-                        </AutoAnim>
-                        {mostraRod && <ZonaFaixa reg="rodape" blocks={doc.rodape ?? []} altura={running.rodapeAltura} />}
-                      </div>
-                      {bg && <ChipFundo selecionado={selBlock === bg.id} corPrimaria={theme.cores.primaria} onSelect={() => { setSelBlock(bg.id); setAba('bloco') }} />}
-                    </div>
-                  </div>
+                  <FolhasPaginadas blocks={conteudo} theme={theme} data={ctx.data} cabH={cabH} rodH={rodH} renderSheet={renderSheet} />
                 </div>
               )
             })}
