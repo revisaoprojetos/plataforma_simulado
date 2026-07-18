@@ -557,13 +557,15 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
       const val = (tok: string, def: string) => { const r = applyVars(tok, data.vars); return /\{/.test(r) ? def : r }
       const numPct = (chave: string) => { const n = parseFloat(val(`{pct_pilar_${chave}}`, '0').replace(/[^0-9.,-]/g, '').replace(',', '.')); return isNaN(n) ? 0 : n }
       const faixaInfo = (p: any) => { const n = numPct(p.chave); if (n <= 50) return { label: '0-50', texto: p.f1 || '' }; if (n <= 80) return { label: '51-80', texto: p.f2 || '' }; return { label: '81-100', texto: p.f3 || '' } }
+      const pad = a.padding ?? 12
+      const meia = (a.gap ?? 16) / 2
       return (
-        <div style={{ background: a.corFundo || '#fef3d6', borderRadius: a.bordaRaio ?? 4, borderTop: a.fitaAltura ? `${a.fitaAltura}px solid ${a.fitaCor || c.primaria}` : undefined, padding: a.padding ?? 12, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
+        <div style={{ background: a.corFundo || '#fef3d6', borderRadius: a.bordaRaio ?? 4, padding: `0 ${pad}px`, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
           <div style={{ display: 'flex', gap: a.gap ?? 16, alignItems: 'stretch' }}>
             {pilares.map((p, i) => {
               const f = faixaInfo(p)
               return (
-                <div key={i} style={{ flex: '1 1 0%', minWidth: 0, ...(i > 0 && a.divisoria !== false ? { borderLeft: bordaDiv, paddingLeft: (a.gap ?? 16) / 2 } : {}) }}>
+                <div key={i} style={{ flex: '1 1 0%', minWidth: 0, padding: `${pad}px 0`, ...(i > 0 && a.divisoria !== false ? { borderLeft: bordaDiv, paddingLeft: meia } : {}) }}>
                   <div style={{ fontWeight: 700, color: a.corTitulo || '#243b7a', fontSize: a.tamTitulo ?? 12 }}>{applyVars(p.nome || '', data.vars)}</div>
                   <div style={{ fontWeight: 800, color: a.corPct || a.corTitulo || '#243b7a', fontSize: a.tamPct ?? 22, lineHeight: 1.1 }}>{val(`{pct_pilar_${p.chave}}`, '0%')}</div>
                   <div style={{ color: a.corQuestoes || '#c0392b', fontSize: 11 }}>{val(`{acerto_pilar_${p.chave}}`, 'X')} de {val(`{total_pilar_${p.chave}}`, '0')} questões</div>

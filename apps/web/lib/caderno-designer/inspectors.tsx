@@ -597,7 +597,6 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco }: { bl
           <Faixa label="Tamanho do % (px)" min={12} max={40} value={a.tamPct ?? 22} onChange={(v) => set('tamPct', v)} />
           <div className="border-t pt-2" />
           <Cor label="Cor de fundo" value={a.corFundo} onChange={(v) => set('corFundo', v)} />
-          <Cor label="Cor da fita (topo)" value={a.fitaCor} onChange={(v) => set('fitaCor', v)} />
           <Cor label="Cor da divisória (entre colunas)" value={a.divisoriaCor} onChange={(v) => set('divisoriaCor', v)} />
           <Cor label="Cor do título" value={a.corTitulo} onChange={(v) => set('corTitulo', v)} />
           <Cor label="Cor do %" value={a.corPct} onChange={(v) => set('corPct', v)} />
