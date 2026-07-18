@@ -41,7 +41,7 @@ const simuladoSchema = z.object({
       embaralhar_questoes: z.boolean().optional(),
       embaralhar_alternativas: z.boolean().optional(),
       revisao_antes_enviar: z.boolean().optional(),
-      retentativas: z.number().optional(),
+      retentativas: z.coerce.number().optional(),
       politica_nota: z.enum(['ultima', 'melhor', 'media']).optional(),
       liberar_nota: z.enum(['imediato', 'apos_janela', 'manual']).optional(),
       liberar_gabarito: z.enum(['imediato', 'apos_janela', 'manual']).optional(),
