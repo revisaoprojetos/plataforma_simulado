@@ -257,7 +257,7 @@ export function docCadernoPerguntas(): CadernoDoc {
   }
 }
 
-export type QuestaoData = { id: string; numero: number; enunciado: string; tipo: string; disciplina?: string; alternativas: { letra: string; texto: string; correta: boolean }[] }
+export type QuestaoData = { id: string; numero: number; enunciado: string; tipo: string; disciplina?: string; comentario?: string; alternativas: { letra: string; texto: string; correta: boolean }[] }
 
 /** Dados reais (ou de exemplo) que os blocos `dynamic` consomem. */
 export type CadernoData = {

@@ -393,6 +393,22 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco, assunt
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarCorreta} onChange={(e) => set('mostrarCorreta', e.target.checked)} /> Mostrar a correta quando errar</label>
         </div>
       )
+    case 'q-comentario':
+      return (
+        <div className="space-y-3">
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Mostra o <b>comentário do professor</b> da questão (variável <code>{'{q_comentario}'}</code>). Use dentro do <strong>Repetir por questão</strong>. As questões sem comentário não exibem o bloco.</p>
+          <Row label="Título"><input value={a.titulo ?? ''} onChange={(e) => set('titulo', e.target.value)} className={inputCls} placeholder="Comentário do professor (vazio = sem título)" /></Row>
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.soSeTiver !== false} onChange={(e) => set('soSeTiver', e.target.checked)} className="h-4 w-4 rounded border" /> Só aparece se a questão tiver comentário</label>
+          <FonteSelect value={a.fonte} onChange={(v) => set('fonte', v)} />
+          <Faixa label="Espaçamento interno (px)" min={0} max={24} value={a.padding ?? 10} onChange={(v) => set('padding', v)} />
+          <Faixa label="Arredondamento (px)" min={0} max={20} value={a.bordaRaio ?? 8} onChange={(v) => set('bordaRaio', v)} />
+          <div className="border-t pt-2" />
+          <Cor label="Cor de fundo" value={a.corFundo} onChange={(v) => set('corFundo', v)} />
+          <Cor label="Cor da borda" value={a.corBorda} onChange={(v) => set('corBorda', v)} />
+          <Cor label="Cor do título" value={a.corTitulo} onChange={(v) => set('corTitulo', v)} />
+          <Cor label="Cor do texto" value={a.corTexto} onChange={(v) => set('corTexto', v)} />
+        </div>
+      )
     case 'card':
       return (
         <div className="space-y-3">

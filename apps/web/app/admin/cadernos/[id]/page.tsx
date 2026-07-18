@@ -39,12 +39,12 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
     const { data: vinc } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId)
     const ids = (vinc ?? []).map((v: any) => v.questao_id)
     questoes = ids.length
-      ? (await svc.from('simulado_questoes').select('id, enunciado, tipo').in('id', ids).limit(80)).data
+      ? (await svc.from('simulado_questoes').select('id, enunciado, tipo, comentario_professor').in('id', ids).limit(80)).data
       : []
   } else {
     questoes = (await svc
       .from('simulado_questoes')
-      .select('id, enunciado, tipo')
+      .select('id, enunciado, tipo, comentario_professor')
       .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
       .eq('status', 'publicada')
       .order('created_at', { ascending: false })
@@ -62,7 +62,7 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
     numQuestoes: (questoes ?? []).length || 20,
     numAlternativas: 5,
     questoes: (questoes ?? []).slice(0, 6).map((q: any, i: number) => ({
-      id: q.id, numero: i + 1, enunciado: q.enunciado ?? '', tipo: q.tipo,
+      id: q.id, numero: i + 1, enunciado: q.enunciado ?? '', tipo: q.tipo, comentario: q.comentario_professor ?? '',
       alternativas: (altMap.get(q.id) ?? []).sort((x, y) => x.ordem - y.ordem).map((a, j) => ({ letra: LETRAS[j] ?? '?', texto: a.texto ?? '', correta: !!a.correta })),
     })),
     vars: {

@@ -1,5 +1,5 @@
 import type { ComponentType, CSSProperties, ReactNode } from 'react'
-import { Heading1, Type, AlignLeft, ListChecks, Grid3x3, IdCard, Image as ImageIcon, Minus, MoveVertical, Square, Columns2, Wallpaper, Repeat, Rows3, ClipboardCheck, PenLine, Scissors, Signature, LayoutGrid, GitBranch } from 'lucide-react'
+import { Heading1, Type, AlignLeft, ListChecks, Grid3x3, IdCard, Image as ImageIcon, Minus, MoveVertical, Square, Columns2, Wallpaper, Repeat, Rows3, ClipboardCheck, PenLine, Scissors, Signature, LayoutGrid, GitBranch, MessageSquare } from 'lucide-react'
 import { cssDaFonte, type CadernoTheme } from './theme'
 import { type Block, type BlockCategory, type CadernoData, type QuestaoData, genId } from './types'
 
@@ -41,6 +41,8 @@ export const BLOCKS: BlockMeta[] = [
     defaults: { titulo: '', origem: 'marcado', numQuestoes: null, numAlternativas: 5, porLinha: 10, fonte: '', corHeader: '', corHeaderTexto: '', corMarcadas: '', fundoImpar: '', textoImpar: '', fundoPar: '', textoPar: '', bordaRaio: 8 } },
   { type: 'gabarito-correcao', title: 'Correção (marcada × correta)', icon: ClipboardCheck, category: 'avaliacao', dynamic: true,
     defaults: { rotulo: 'Sua resposta:', mostrarCorreta: true } },
+  { type: 'q-comentario', title: 'Comentário da questão', icon: MessageSquare, category: 'avaliacao', dynamic: true, supportsVars: true,
+    defaults: { titulo: 'Comentário do professor', soSeTiver: true, corFundo: '#eef4ff', corBorda: '#c7d7f5', corTitulo: '#1a3a6b', corTexto: '#243b53', bordaRaio: 8, padding: 10, fonte: '' } },
   // Identificação
   { type: 'identificacao', title: 'Identificação', icon: IdCard, category: 'identificacao', dynamic: true, supportsVars: true,
     defaults: { titulo: 'Dados do Candidato', bordaRaio: 8, fonte: '', corBorda: '', corHeader: '', corHeaderTexto: '', corRotulo: '', corValor: '', corDestaque: '', corAcento: '',
@@ -152,7 +154,7 @@ export function dataComQuestao(data: CadernoData, q: QuestaoData): CadernoData {
     ...data, questaoAtual: q,
     vars: {
       ...data.vars, q_num: String(q.numero), q_numero: String(q.numero), q_enunciado: q.enunciado,
-      q_tipo: q.tipo, q_disciplina: q.disciplina ?? '', q_alternativas: altsTexto, q_letras: letras,
+      q_tipo: q.tipo, q_disciplina: q.disciplina ?? '', q_comentario: q.comentario ?? '', q_alternativas: altsTexto, q_letras: letras,
       // {q_resposta} = alternativa completa marcada ("B) 4"); {q_resposta_letra} = só a letra.
       q_resposta: respostaTexto, q_resposta_letra: marcadaLetra, q_resposta_texto: respostaTexto,
       ...porAlt,
@@ -625,6 +627,19 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
           {a.mostrarCorreta && !acertou && correta && (
             <p style={{ margin: '2px 0 0', fontWeight: 600, color: VERDE }}>Correta: {correta.letra}) {correta.texto}</p>
           )}
+        </div>
+      )
+    }
+    case 'q-comentario': {
+      // Comentário do professor da questão (só aparece quando a questão tem comentário).
+      const txt = applyVars('{q_comentario}', data.vars)
+      const vazio = !txt || /\{q_comentario\}/.test(txt)
+      if (vazio && a.soSeTiver !== false && !editor) return null
+      const conteudo = vazio ? (editor ? '(sem comentário nesta questão — aparece só nas que têm)' : '') : txt
+      return (
+        <div style={{ background: a.corFundo || '#eef4ff', border: `1px solid ${a.corBorda || '#c7d7f5'}`, borderRadius: a.bordaRaio ?? 8, padding: a.padding ?? 10, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
+          {a.titulo && <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 11, color: a.corTitulo || '#1a3a6b', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>{a.titulo}</div>}
+          <div style={{ fontSize: 12, lineHeight: 1.55, textAlign: 'justify', whiteSpace: 'pre-wrap', color: vazio ? '#94a3b8' : (a.corTexto || '#243b53'), fontStyle: vazio ? 'italic' : 'normal' }}>{conteudo}</div>
         </div>
       )
     }

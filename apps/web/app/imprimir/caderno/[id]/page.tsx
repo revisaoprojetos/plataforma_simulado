@@ -67,11 +67,11 @@ export default async function CadernoImprimirPage({
   if (bancoId) {
     const { data: vinc } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId)
     const ids = (vinc ?? []).map((v: any) => v.questao_id)
-    questoes = ids.length ? (await svc.from('simulado_questoes').select('id, enunciado, tipo').in('id', ids).limit(200)).data : []
+    questoes = ids.length ? (await svc.from('simulado_questoes').select('id, enunciado, tipo, comentario_professor').in('id', ids).limit(200)).data : []
   } else {
     questoes = (await svc
       .from('simulado_questoes')
-      .select('id, enunciado, tipo')
+      .select('id, enunciado, tipo, comentario_professor')
       .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
       .eq('status', 'publicada')
       .order('created_at', { ascending: false })
@@ -88,7 +88,7 @@ export default async function CadernoImprimirPage({
     numQuestoes: (questoes ?? []).length || 20,
     numAlternativas: 5,
     questoes: (questoes ?? []).map((q: any, i: number) => ({
-      id: q.id, numero: i + 1, enunciado: q.enunciado ?? '', tipo: q.tipo,
+      id: q.id, numero: i + 1, enunciado: q.enunciado ?? '', tipo: q.tipo, comentario: q.comentario_professor ?? '',
       alternativas: (altMap.get(q.id) ?? []).sort((x, y) => x.ordem - y.ordem).map((a, j) => ({ letra: LETRA[j] ?? '?', texto: a.texto ?? '', correta: !!a.correta })),
     })),
     vars: { nome: '', simulado: caderno.nome, acertos: '', total_questoes: String((questoes ?? []).length || 20), nota: '', percentual: '' },
