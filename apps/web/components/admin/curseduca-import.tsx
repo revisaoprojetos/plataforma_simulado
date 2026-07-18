@@ -6,7 +6,7 @@ import { Search, Users, Loader2, DownloadCloud, Check, CheckCircle2, FolderPlus,
 import { cn } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { contarMembrosGrupos, contarTodosGrupos, importarGruposCurseduca, agendarImportacaoCurseduca, statusImportacaoCurseduca, previewMembrosGrupo, listarGruposSistema, type GrupoCurseducaDTO, type GrupoSistema, type MembroPreview } from '@/app/admin/curseduca/actions'
+import { contarMembrosGrupos, contarTodosGrupos, importarGruposCurseduca, importarCurseducaPorCanal, agendarImportacaoCurseduca, statusImportacaoCurseduca, previewMembrosGrupo, listarGruposSistema, type GrupoCurseducaDTO, type GrupoSistema, type MembroPreview } from '@/app/admin/curseduca/actions'
 import { criarGrupo, criarGrupoMestre } from '@/app/admin/grupos/actions'
 import type { ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
 
@@ -22,7 +22,7 @@ function TreeBranch({ isLast, children }: { isLast: boolean; children: React.Rea
   )
 }
 
-type Destino = 'nenhum' | 'existente'
+type Destino = 'nenhum' | 'existente' | 'por_canal'
 type Ordem = 'nome' | 'nome_desc' | 'id' | 'id_desc' | 'recentes'
 
 const ORDENS: { valor: Ordem; label: string }[] = [
@@ -45,6 +45,7 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
   const [contando, setContando] = useState(false)
   const [destino, setDestino] = useState<Destino>('nenhum')
   const [grupoId, setGrupoId] = useState('')
+  const [canalPaiId, setCanalPaiId] = useState<string | null>(null) // pasta destino do modo "um grupo por canal"
   const [sincronizar, setSincronizar] = useState(false)
   const [segundoPlano, setSegundoPlano] = useState(false)
   const [jobStatus, setJobStatus] = useState<string | null>(null)
@@ -107,12 +108,32 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
 
   const grupoSel = useMemo(() => sistemaLocal.find((s) => s.id === grupoId) ?? null, [sistemaLocal, grupoId])
   const pastaDoSel = useMemo(() => grupoSel?.pai_id ? sistemaLocal.find((s) => s.id === grupoSel.pai_id) ?? null : null, [grupoSel, sistemaLocal])
+  const canalPastaNome = useMemo(() => canalPaiId ? (sistemaLocal.find((s) => s.id === canalPaiId)?.nome ?? null) : null, [canalPaiId, sistemaLocal])
+
+  // Recarrega os grupos do sistema (contagens de membros mudam após importar) — sem isso
+  // o pop-up de destino mostrava contagens antigas até recarregar a página.
+  async function recarregarSistema() {
+    const r = await listarGruposSistema()
+    if (r.ok && r.sistema) setSistemaLocal(r.sistema)
+  }
 
   async function importar() {
     if (!sel.size) return
+
+    // Modo "um grupo por canal": cria/reaproveita um grupo por canal, dentro da pasta.
+    if (destino === 'por_canal') {
+      setImportando(true); setRes(null); setJobStatus(null)
+      const r = await importarCurseducaPorCanal([...sel], canalPaiId)
+      setImportando(false)
+      if (!r.ok) { toast.error(r.error ?? 'Falha na importação.'); return }
+      setRes(r); setSel(new Set()); recarregarSistema()
+      toast.success(`${r.canais ?? 0} canal(is) → ${r.gruposCriados ?? 0} grupo(s) novo(s) + ${r.gruposReusados ?? 0} reusado(s) · ${r.vinculados ?? 0} vinculado(s)`)
+      return
+    }
+
     if (destino === 'existente' && !grupoId) { toast.error('Escolha o grupo de destino.'); return }
     setImportando(true); setRes(null); setJobStatus(null)
-    const dest = { tipo: destino, grupoId: grupoId || undefined }
+    const dest = { tipo: destino as 'nenhum' | 'existente', grupoId: grupoId || undefined }
     const sync = destino === 'existente' && sincronizar
 
     if (segundoPlano) {
@@ -125,7 +146,7 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
         const s = await statusImportacaoCurseduca(jobId)
         if (!s.ok) { setJobStatus(null); setImportando(false); toast.error(s.error ?? 'Falha no acompanhamento.'); return }
         setJobStatus(s.status ?? null)
-        if (s.status === 'concluido') { setImportando(false); if (s.resultado) setRes(s.resultado); setSel(new Set()); toast.success('Importação concluída.'); return }
+        if (s.status === 'concluido') { setImportando(false); if (s.resultado) setRes(s.resultado); setSel(new Set()); recarregarSistema(); toast.success('Importação concluída.'); return }
         if (s.status === 'erro') { setImportando(false); toast.error(s.erro ?? 'Falha na importação.'); return }
         setTimeout(poll, 5000)
       }
@@ -138,6 +159,7 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
     if (!r.ok) { toast.error(r.error ?? 'Falha na importação.'); return }
     setRes(r)
     setSel(new Set()) // limpa a seleção pós-import (evita reimportar os mesmos p/ outro grupo sem querer)
+    recarregarSistema()
     toast.success(`${r.novos ?? 0} novo(s) · ${r.jaExistiam ?? 0} já existia(m)${r.vinculados ? ` · ${r.vinculados} vinculado(s)` : ''}${r.removidos ? ` · ${r.removidos} removido(s)` : ''}`)
   }
 
@@ -236,15 +258,17 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
           <button type="button" onClick={() => setPickerAberto(true)}
             className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition hover:border-primary/40 hover:bg-muted">
             <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', destino === 'nenhum' ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary')}>
-              {destino === 'nenhum' ? <Ban className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
+              {destino === 'nenhum' ? <Ban className="h-5 w-5" /> : destino === 'por_canal' ? <Layers className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-medium">
-                {destino === 'nenhum' ? 'Só adicionar ao sistema' : (grupoSel?.nome ?? 'Grupo removido — escolha outro')}
+                {destino === 'nenhum' ? 'Só adicionar ao sistema'
+                  : destino === 'por_canal' ? 'Um grupo por canal'
+                  : (grupoSel?.nome ?? 'Grupo removido — escolha outro')}
               </span>
               <span className="block truncate text-xs text-muted-foreground">
-                {destino === 'nenhum'
-                  ? 'Cadastra os alunos sem vincular a grupo'
+                {destino === 'nenhum' ? 'Cadastra os alunos sem vincular a grupo'
+                  : destino === 'por_canal' ? `Cada canal vira um grupo ${canalPastaNome ? `na pasta "${canalPastaNome}"` : 'na raiz'}`
                   : pastaDoSel ? `Pasta: ${pastaDoSel.nome}` : `${grupoSel?.membros ?? 0} membro(s) no grupo`}
               </span>
             </span>
@@ -301,8 +325,14 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
         onClose={() => setPickerAberto(false)}
         sistema={sistemaLocal}
         onSistemaChange={setSistemaLocal}
-        valor={{ destino, grupoId }}
-        onConfirmar={(d, id) => { setDestino(d); setGrupoId(id); if (d !== 'existente') setSincronizar(false); setPickerAberto(false) }}
+        valor={{ destino, grupoId, paiId: canalPaiId }}
+        onConfirmar={(r) => {
+          setDestino(r.tipo)
+          setGrupoId(r.tipo === 'existente' ? (r.grupoId ?? '') : '')
+          setCanalPaiId(r.tipo === 'por_canal' ? (r.paiId ?? null) : null)
+          if (r.tipo !== 'existente') setSincronizar(false)
+          setPickerAberto(false)
+        }}
       />
 
       <MembrosDialog grupo={verGrupo} onClose={() => setVerGrupo(null)}
@@ -318,10 +348,12 @@ function GrupoDestinoDialog({ aberto, onClose, sistema, onSistemaChange, valor, 
   onClose: () => void
   sistema: GrupoSistema[]
   onSistemaChange: (s: GrupoSistema[]) => void
-  valor: { destino: Destino; grupoId: string }
-  onConfirmar: (destino: Destino, grupoId: string) => void
+  valor: { destino: Destino; grupoId: string; paiId?: string | null }
+  onConfirmar: (r: { tipo: Destino; grupoId?: string; paiId?: string | null }) => void
 }) {
-  const [escolha, setEscolha] = useState<string | null>(valor.destino === 'existente' ? valor.grupoId : null)
+  const inicial = valor.destino === 'existente' ? valor.grupoId : valor.destino === 'por_canal' ? '__por_canal__' : null
+  const [escolha, setEscolha] = useState<string | null>(inicial)
+  const [canalPasta, setCanalPasta] = useState<string>(valor.paiId ?? '')
   const [expandido, setExpandido] = useState<Set<string>>(new Set())
   const [busca, setBusca] = useState('')
   const [criando, setCriando] = useState(false)
@@ -353,7 +385,8 @@ function GrupoDestinoDialog({ aberto, onClose, sistema, onSistemaChange, valor, 
   // Ao (re)abrir, sincroniza a escolha com o valor atual e expande as pastas.
   useEffect(() => {
     if (!aberto) return
-    setEscolha(valor.destino === 'existente' ? valor.grupoId : null)
+    setEscolha(valor.destino === 'existente' ? valor.grupoId : valor.destino === 'por_canal' ? '__por_canal__' : null)
+    setCanalPasta(valor.paiId ?? '')
     setExpandido(new Set(sistema.filter((g) => g.is_mestre).map((g) => g.id)))
     setBusca(''); setNome(''); setModo('grupo'); setPaiNovo('')
   }, [aberto]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -455,6 +488,32 @@ function GrupoDestinoDialog({ aberto, onClose, sistema, onSistemaChange, valor, 
             <span className="min-w-0 flex-1 text-sm font-medium">Sem grupo — só cadastrar no sistema</span>
           </button>
 
+          {/* Modo: um grupo por canal (dentro de uma pasta). */}
+          <button type="button" onClick={() => setEscolha('__por_canal__')}
+            className={cn('flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', escolha === '__por_canal__' ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
+            <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', escolha === '__por_canal__' ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
+              {escolha === '__por_canal__' && <Check className="h-3 w-3" />}
+            </span>
+            <Layers className="h-4 w-4 text-primary" />
+            <span className="min-w-0 flex-1 text-sm font-medium">Um grupo por canal <span className="font-normal text-muted-foreground">— cada canal vira um grupo (mesmo nome)</span></span>
+          </button>
+          {escolha === '__por_canal__' && (
+            <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+              <span className="shrink-0 text-xs text-muted-foreground">Criar dentro da pasta:</span>
+              <Select value={canalPasta || '__raiz__'} onValueChange={(v) => setCanalPasta(v === '__raiz__' ? '' : (v ?? ''))}>
+                <SelectTrigger className="h-8 flex-1">
+                  <SelectValue placeholder="Na raiz">
+                    {(value: string) => (value && value !== '__raiz__' ? pastas.find((p) => p.id === value)?.nome : null) ?? 'Na raiz'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__raiz__">Na raiz (sem pasta)</SelectItem>
+                  {pastas.map((p) => <SelectItem key={p.id} value={p.id}>{' '.repeat(p.depth * 2)}{p.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {q
             ? (() => {
                 const res = sistema.filter((g) => !g.is_mestre && g.nome.toLowerCase().includes(q))
@@ -497,7 +556,11 @@ function GrupoDestinoDialog({ aberto, onClose, sistema, onSistemaChange, valor, 
 
         <div className="flex items-center justify-end gap-2 border-t pt-3">
           <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition hover:bg-muted">Cancelar</button>
-          <button type="button" onClick={() => onConfirmar(escolha ? 'existente' : 'nenhum', escolha ?? '')}
+          <button type="button" onClick={() => onConfirmar(
+            escolha === '__por_canal__' ? { tipo: 'por_canal', paiId: canalPasta || null }
+              : escolha ? { tipo: 'existente', grupoId: escolha }
+              : { tipo: 'nenhum' },
+          )}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
             <Check className="h-4 w-4" /> Usar este destino
           </button>

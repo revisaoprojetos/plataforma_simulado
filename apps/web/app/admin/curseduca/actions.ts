@@ -211,6 +211,67 @@ export async function importarGruposCurseduca(ids: number[], destino: DestinoImp
   return executarImport({ tenantId: g.tenantId, cfg: g.cfg }, ids, destino, sincronizar, 400)
 }
 
+/** Cria um grupo (tolerante a pai_id ausente). Retorna o id ou null. */
+async function inserirGrupo(svc: ReturnType<typeof createAdminClient>, tenantId: string, nome: string, paiId: string | null): Promise<string | null> {
+  const payload: any = { tenant_id: tenantId, nome }
+  if (paiId) payload.pai_id = paiId
+  let r = await svc.from('simulado_grupos').insert(payload).select('id').single()
+  if (r.error && /pai_id/i.test(r.error.message)) { delete payload.pai_id; r = await svc.from('simulado_grupos').insert(payload).select('id').single() }
+  return r.error ? null : (r.data as any).id
+}
+
+export type ResultadoPorCanal = ResultadoImportCurseduca & { canais?: number; gruposCriados?: number; gruposReusados?: number }
+
+/**
+ * Importa vários canais da Curseduca criando UM grupo por canal (com o nome do canal),
+ * dentro da pasta escolhida. Se já existir um grupo com aquele nome, reaproveita e só
+ * ADICIONA os alunos (nunca remove os já vinculados). Agiliza importar muitos canais.
+ */
+export async function importarCurseducaPorCanal(ids: number[], paiId: string | null): Promise<ResultadoPorCanal> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão para cadastrar estudantes.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  if (!ids?.length) return { ok: false, error: 'Selecione ao menos um canal.' }
+  const svc = createAdminClient()
+
+  // Nomes dos canais da Curseduca.
+  let nomePorId = new Map<number, string>()
+  try {
+    const canais = await listarTodosGrupos(g.cfg)
+    nomePorId = new Map(canais.map((c) => [c.id, c.nome]))
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? 'Falha ao consultar a Curseduca.' }
+  }
+
+  // Grupos existentes (nome→id), ignorando pastas (mestre). Reaproveita por nome.
+  const existentes = await selecionarGrupos(svc, g.tenantId)
+  const idPorNome = new Map<string, string>()
+  for (const gr of existentes) if (!gr.is_mestre) { const k = gr.nome.trim().toLowerCase(); if (!idPorNome.has(k)) idPorNome.set(k, gr.id) }
+
+  const agg: ResultadoPorCanal = { ok: true, total: 0, novos: 0, jaExistiam: 0, atualizados: 0, vinculados: 0, removidos: 0, semIdentificador: 0, semDetalhe: 0, restante: 0, canais: ids.length, gruposCriados: 0, gruposReusados: 0 }
+  for (const id of ids) {
+    const nome = (nomePorId.get(id) ?? `Curseduca ${id}`).trim()
+    const key = nome.toLowerCase()
+    let grupoId = idPorNome.get(key)
+    if (grupoId) {
+      agg.gruposReusados = (agg.gruposReusados ?? 0) + 1
+    } else {
+      grupoId = (await inserirGrupo(svc, g.tenantId, nome, paiId)) ?? undefined
+      if (!grupoId) continue
+      idPorNome.set(key, grupoId)
+      agg.gruposCriados = (agg.gruposCriados ?? 0) + 1
+    }
+    // sincronizar=false → só ADICIONA alunos ao grupo, nunca remove os já vinculados.
+    const r = await executarImport({ tenantId: g.tenantId, cfg: g.cfg }, [id], { tipo: 'existente', grupoId }, false, 400)
+    if (r.ok) {
+      agg.total! += r.total ?? 0; agg.novos! += r.novos ?? 0; agg.jaExistiam! += r.jaExistiam ?? 0
+      agg.atualizados! += r.atualizados ?? 0; agg.vinculados! += r.vinculados ?? 0
+      agg.semIdentificador! += r.semIdentificador ?? 0; agg.semDetalhe! += r.semDetalhe ?? 0; agg.restante! += r.restante ?? 0
+    }
+  }
+  revalidatePath('/admin/estudantes'); revalidatePath('/admin/grupos')
+  return agg
+}
+
 // ── Import em segundo plano (job) ────────────────────────────────────────────
 /** Agenda uma importação para rodar em segundo plano (worker → /api/cron/curseduca-jobs). */
 export async function agendarImportacaoCurseduca(ids: number[], destino: DestinoImport, sincronizar = false): Promise<{ ok: boolean; jobId?: string; error?: string }> {
