@@ -193,7 +193,7 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
               <ArrowLeft className="h-4 w-4" /> Trocar plataforma
             </button>
           )}
-          <h1 className="mb-5 text-xl font-bold tracking-tight">{titulo}</h1>
+          <h1 className="mb-5 text-center text-xl font-bold tracking-tight">{titulo}</h1>
           {erro && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{erro}</div>}
           {formLogin}
         </div>
@@ -244,7 +244,7 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
               <ArrowLeft className="h-4 w-4" /> Trocar plataforma
             </button>
           )}
-          <h1 className="mb-6 text-2xl font-bold tracking-tight">{titulo}</h1>
+          <h1 className="mb-6 text-center text-2xl font-bold tracking-tight">{titulo}</h1>
 
           {erro && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{erro}</div>}
 
