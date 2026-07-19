@@ -101,15 +101,81 @@ export async function vincularGrupoAoBanco(bancoId: string, grupoId: string): Pr
   return { ok: true, vinculados }
 }
 
-/** Remove o vínculo do grupo com o banco (os estudantes já ligados permanecem). */
-export async function desvincularGrupoDoBanco(bancoId: string, grupoId: string): Promise<{ ok: boolean; error?: string }> {
+/**
+ * Estudantes que SAIRIAM do banco ao desvincular `grupoId`: estão SÓ nesse grupo (não em
+ * outro grupo ainda vinculado ao banco) E NÃO iniciaram nenhum simulado que herda o banco.
+ * Quem está em outro grupo vinculado ou já iniciou permanece.
+ */
+async function orfaosRemoviveis(svc: any, tenantId: string, bancoId: string, grupoId: string): Promise<string[]> {
+  const membros = new Set<string>(
+    (await fetchAll<any>(() => svc.from('simulado_grupo_membros').select('estudante_id').eq('tenant_id', tenantId).eq('grupo_id', grupoId).order('estudante_id')))
+      .map((m: any) => m.estudante_id).filter(Boolean))
+  if (!membros.size) return []
+
+  // Outros grupos AINDA vinculados ao banco (exceto o que está saindo) → quem estiver neles permanece.
+  const outros = (await fetchAll<any>(() => svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', bancoId).eq('tenant_id', tenantId)))
+    .map((l: any) => l.grupo_id).filter((id: string) => id && id !== grupoId)
+  const mantidos = new Set<string>()
+  if (outros.length) {
+    const rows = await fetchAllByIn<any>(outros, (chunk) => svc.from('simulado_grupo_membros').select('estudante_id').in('grupo_id', chunk).order('estudante_id'))
+    for (const r of rows) if (membros.has(r.estudante_id)) mantidos.add(r.estudante_id)
+  }
+
+  const pe = new Set<string>(
+    (await fetchAll<any>(() => svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).eq('tenant_id', tenantId).order('estudante_id')))
+      .map((x: any) => x.estudante_id))
+  const cand = [...membros].filter((e) => !mantidos.has(e) && pe.has(e))
+  if (!cand.length) return []
+
+  // Exclui quem JÁ INICIOU algum simulado que herda o banco (não remover quem está fazendo/fez).
+  const sims = ((await svc.from('simulado_simulados').select('id').eq('tenant_id', tenantId).filter('regras->>banco_base_id', 'eq', bancoId)).data ?? []).map((s: any) => s.id)
+  const started = new Set<string>()
+  for (const sid of sims) {
+    const ss = await fetchAllByIn<any>(cand, (chunk) => svc.from('simulado_sessoes_prova').select('estudante_id').eq('simulado_id', sid).eq('deletado', false).in('estudante_id', chunk))
+    for (const x of ss) started.add(x.estudante_id)
+  }
+  return cand.filter((e) => !started.has(e))
+}
+
+/** Preview: quantos alunos seriam removidos ao desvincular o grupo (para a confirmação). */
+export async function contarOrfaosDesvincular(bancoId: string, grupoId: string): Promise<{ ok: boolean; orfaos?: number; error?: string }> {
   const g = await guard()
   if (!g.ok) return g
   const svc = createAdminClient()
+  const orf = await orfaosRemoviveis(svc, g.tenantId, bancoId, grupoId)
+  return { ok: true, orfaos: orf.length }
+}
+
+/**
+ * Remove o vínculo do grupo com o banco E, em cascata, tira do banco/matrículas os alunos
+ * que ficaram SÓ nesse grupo e não iniciaram (quem está em outro grupo vinculado ou já
+ * iniciou permanece).
+ */
+export async function desvincularGrupoDoBanco(bancoId: string, grupoId: string): Promise<{ ok: boolean; removidos?: number; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+
+  // Calcula os órfãos ANTES de remover o vínculo (a função já ignora o próprio grupo).
+  const orfaos = await orfaosRemoviveis(svc, g.tenantId, bancoId, grupoId)
+
   const { error } = await svc.from('simulado_pasta_grupos').delete().eq('pasta_id', bancoId).eq('grupo_id', grupoId).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
+
+  let removidos = 0
+  if (orfaos.length) {
+    const sims = ((await svc.from('simulado_simulados').select('id').eq('tenant_id', g.tenantId).filter('regras->>banco_base_id', 'eq', bancoId)).data ?? []).map((s: any) => s.id)
+    for (let i = 0; i < orfaos.length; i += 80) {
+      const c = orfaos.slice(i, i + 80)
+      await svc.from('simulado_pasta_estudantes').delete().eq('pasta_id', bancoId).in('estudante_id', c)
+      for (const sid of sims) await svc.from('simulado_matriculas').delete().eq('simulado_id', sid).in('estudante_id', c)
+    }
+    removidos = orfaos.length
+  }
+
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_pasta_grupos', entidadeId: grupoId, depois: { banco: bancoId, orfaos_removidos: removidos } })
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
-  return { ok: true }
+  return { ok: true, removidos }
 }
 
 /** Cria um novo estudante (conta + perfil) e já o vincula ao banco. */

@@ -8,7 +8,8 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { UsersRound, X, Search, Check, Minus, Loader2, Link2, Unlink, Folder } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { vincularGrupoAoBanco, desvincularGrupoDoBanco, contarEstudantesUnicosGrupos } from '@/app/admin/banco-questoes/estudantes-actions'
+import { vincularGrupoAoBanco, desvincularGrupoDoBanco, contarEstudantesUnicosGrupos, contarOrfaosDesvincular } from '@/app/admin/banco-questoes/estudantes-actions'
+import { confirmar } from '@/components/ui/confirm-dialog'
 
 // Ramo da árvore (estilo explorador de arquivos): desenha o segmento vertical + o tick
 // horizontal de UM item. O segmento vai até embaixo (conecta ao próximo irmão), exceto no
@@ -96,9 +97,21 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
 
   function desvincular(id: string, nome: string) {
     start(async () => {
+      // Preview: quantos alunos (só neste grupo e não iniciados) sairão do banco/simulado.
+      const prev = await contarOrfaosDesvincular(bancoId, id)
+      const n = prev.ok ? (prev.orfaos ?? 0) : 0
+      const ok = await confirmar({
+        titulo: `Desvincular "${nome}"?`,
+        mensagem: n > 0
+          ? `${n.toLocaleString('pt-BR')} aluno(s) que estão SÓ neste grupo (e ainda não iniciaram) serão REMOVIDOS do banco e do simulado. Quem está também em outro grupo vinculado, ou já iniciou, permanece.`
+          : 'Nenhum aluno será removido (todos estão em outro grupo vinculado ou já iniciaram). Deseja desvincular o grupo?',
+        confirmar: 'Desvincular',
+        destrutivo: n > 0,
+      })
+      if (!ok) return
       const r = await desvincularGrupoDoBanco(bancoId, id)
       if (!r.ok) { toast.error(r.error ?? 'Erro ao desvincular'); return }
-      toast.success(`Grupo "${nome}" desvinculado`); router.refresh()
+      toast.success(`Grupo "${nome}" desvinculado${r.removidos ? ` · ${r.removidos.toLocaleString('pt-BR')} aluno(s) removido(s)` : ''}`); router.refresh()
     })
   }
   function vincular() {
