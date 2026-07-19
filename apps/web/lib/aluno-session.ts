@@ -27,15 +27,18 @@ export async function criarSessaoAluno(s: AlunoSession): Promise<void> {
     .setExpirationTime('7d')
     .sign(secret())
 
-  // Embed (iframe cross-site, ex.: Curseduca): o navegador só ARMAZENA e ENVIA o cookie
-  // de sessão num contexto de terceiro se for SameSite=None + Secure. Em produção (HTTPS)
-  // usamos None; em dev (HTTP) mantemos Lax porque None exige Secure (que não vale em http).
+  // Embed (iframe cross-site, ex.: app da Curseduca no MOBILE): não basta SameSite=None+Secure.
+  // Navegadores modernos particionam/bloqueiam cookies de terceiros — no mobile (iOS Safari,
+  // Android WebView) o cookie some e o portal cai no login. A solução cross-browser é o
+  // atributo `Partitioned` (CHIPS): o cookie é aceito e enviado DENTRO do iframe, particionado
+  // pelo site que embeda. Em dev (HTTP) mantemos Lax (None/Partitioned exigem Secure).
   const emProducao = process.env.NODE_ENV === 'production'
   const jar = await cookies()
   jar.set(COOKIE, token, {
     httpOnly: true,
     secure: emProducao,
     sameSite: emProducao ? 'none' : 'lax',
+    partitioned: emProducao || undefined, // CHIPS: cookie particionado p/ funcionar em iframe de terceiro
     path: '/',
     maxAge: MAX_AGE,
   })
@@ -61,6 +64,15 @@ export async function getSessaoAluno(): Promise<AlunoSession | null> {
 }
 
 export async function limparSessaoAluno(): Promise<void> {
+  const emProducao = process.env.NODE_ENV === 'production'
   const jar = await cookies()
-  jar.delete(COOKIE)
+  // Sobrescreve com os MESMOS atributos (inclusive Partitioned) p/ o navegador remover de fato.
+  jar.set(COOKIE, '', {
+    httpOnly: true,
+    secure: emProducao,
+    sameSite: emProducao ? 'none' : 'lax',
+    partitioned: emProducao || undefined,
+    path: '/',
+    maxAge: 0,
+  })
 }
