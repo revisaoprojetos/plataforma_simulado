@@ -62,16 +62,40 @@ export async function GET(request: NextRequest) {
     await page.setCacheEnabled(false)
     // Viewport A4 (px @96dpi) para o layout nascer no tamanho certo.
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 })
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 45_000 })
-    // Espera o paginador (cliente) medir e montar as folhas de conteúdo com as questões.
+    // domcontentloaded (não networkidle2): em dev o websocket do HMR nunca fica idle e
+    // o networkidle2 estourava os 45s SEMPRE. Esperamos o RESULTADO real (paginação
+    // pronta + recursos carregados) em vez de esperar a rede ficar ociosa.
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+    // Espera TODOS os paginadores terminarem de medir (nenhum `.caderno-medindo`
+    // restante — a medição só ocorre após fontes/imagens) e as folhas finais existirem.
+    // Assim capturamos com a paginação já correta (cards inteiros, quebras certas).
     await page.waitForFunction(
       () => {
-        const fs = document.querySelectorAll('.folha-cont')
-        return fs.length > 0 && Array.from(fs).some((f) => (f.textContent || '').trim().length > 0)
+        const medindo = document.querySelectorAll('.caderno-medindo').length
+        const folhas = document.querySelectorAll('.folha-cont')
+        return medindo === 0 && folhas.length > 0 && Array.from(folhas).some((f) => (f.textContent || '').trim().length > 0)
       },
-      { timeout: 12_000 },
+      { timeout: 25_000 },
     ).catch(() => {})
-    await new Promise((r) => setTimeout(r, 500))
+    // Garante fontes + imagens de CONTEÚDO e de FUNDO (letterhead via CSS background)
+    // realmente pintadas — senão saem em branco/sumidas no PDF.
+    await page.evaluate(async () => {
+      try { await (document as any).fonts?.ready } catch { /* noop */ }
+      const bg = new Set<string>()
+      document.querySelectorAll('*').forEach((el) => {
+        const b = getComputedStyle(el as Element).backgroundImage
+        const m = b && b.match(/url\(["']?([^"')]+)["']?\)/)
+        if (m && m[1] && !m[1].startsWith('data:')) bg.add(m[1])
+      })
+      const esperas: Promise<unknown>[] = []
+      document.querySelectorAll('img').forEach((img) => {
+        const el = img as HTMLImageElement
+        if (!el.complete) esperas.push(new Promise((r) => { el.onload = el.onerror = () => r(null) }))
+      })
+      bg.forEach((u) => esperas.push(new Promise((r) => { const im = new Image(); im.onload = im.onerror = () => r(null); im.src = u })))
+      await Promise.all(esperas)
+    }).catch(() => {})
+    await new Promise((r) => setTimeout(r, 200))
     await page.emulateMediaType('print')
     // preferCSSPageSize: respeita o `@page { size: A4; margin: 0 }` do CSS (senão o Chrome
     // reescala e quebra os cards). printBackground: mantém os fundos.
