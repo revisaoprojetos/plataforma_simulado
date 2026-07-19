@@ -35,7 +35,6 @@ import { iconeBanco } from '@/lib/banco-visual'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { abrirLinkTemado } from '@/lib/hud/abrir-temado'
 import { formatBrt } from '@/lib/brt'
-import { SimuladoAoVivo } from '@/components/admin/simulado-ao-vivo'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -128,7 +127,6 @@ function CardItem({ s, appUrl }: { s: SimuladoCard; appUrl: string }) {
   // Estado efetivo (modo configurado + override manual do admin).
   const efetivo = resolverLiberacoes(s.regras, { status: s.status, data_fim: s.data_fim })
   const [override, setOverride] = useState<Partial<Record<'nota' | 'gabarito' | 'caderno', boolean>>>({})
-  const [aoVivo, setAoVivo] = useState(false)
   const estado = {
     nota: override.nota ?? efetivo.notaLiberada,
     gabarito: override.gabarito ?? efetivo.gabaritoLiberado,
@@ -204,7 +202,7 @@ function CardItem({ s, appUrl }: { s: SimuladoCard; appUrl: string }) {
             <MoreHorizontal className="h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52">
-            <DropdownMenuItem onClick={() => setAoVivo(true)}><Radio className="mr-2 h-4 w-4" /> Ao vivo (online/progresso)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}/ao-vivo`)}><Radio className="mr-2 h-4 w-4" /> Ao vivo (online/progresso)</DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}`)}><Pencil className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}`)}><Trophy className="mr-2 h-4 w-4" /> Ranking</DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -259,8 +257,6 @@ function CardItem({ s, appUrl }: { s: SimuladoCard; appUrl: string }) {
           </div>
         )}
       </div>
-
-      {aoVivo && <SimuladoAoVivo simuladoId={s.id} titulo={s.titulo} onClose={() => setAoVivo(false)} />}
     </div>
   )
 }
