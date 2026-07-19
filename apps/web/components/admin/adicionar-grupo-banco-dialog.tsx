@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { UsersRound, X, Search, Check, Minus, Loader2, Link2, Unlink, Folder } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { vincularGrupoAoBanco, desvincularGrupoDoBanco } from '@/app/admin/banco-questoes/estudantes-actions'
+import { vincularGrupoAoBanco, desvincularGrupoDoBanco, contarEstudantesUnicosGrupos } from '@/app/admin/banco-questoes/estudantes-actions'
 
 // Ramo da árvore (estilo explorador de arquivos): desenha o segmento vertical + o tick
 // horizontal de UM item. O segmento vai até embaixo (conecta ao próximo irmão), exceto no
@@ -38,7 +38,23 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
+  // Estudantes ÚNICOS (dedup por estudante_id) dos grupos marcados — o real, sem contar
+  // o mesmo aluno de vários grupos. Recalculado (debounced) a cada mudança da seleção.
+  const [unicos, setUnicos] = useState<number | null>(null)
+  const [contando, setContando] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    const ids = [...sel]
+    if (!ids.length) { setUnicos(0); setContando(false); return }
+    setContando(true)
+    const t = setTimeout(async () => {
+      const r = await contarEstudantesUnicosGrupos(ids)
+      setUnicos(r.ok ? (r.distintos ?? 0) : null)
+      setContando(false)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [sel])
 
   useEffect(() => {
     if (!open) return
@@ -140,7 +156,7 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
           </span>
           <Folder className="h-4 w-4 shrink-0" style={{ color: g.cor ?? 'var(--muted-foreground)' }} />
           <span className="min-w-0 flex-1 truncate text-sm font-semibold">{g.nome}</span>
-          <span className="shrink-0 text-[11px] text-muted-foreground">{ids.length} grupo(s) · {totalMembros} membro(s)</span>
+          <span className="shrink-0 text-[11px] text-muted-foreground">{ids.length} grupo(s) · {totalMembros} membro(s) somados</span>
         </div>
         <div className="ml-[18px] mt-1.5">
           {filhos.length === 0
@@ -191,7 +207,17 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t px-5 py-3">
-              <span className="text-sm text-muted-foreground">{sel.size === 0 ? 'Nenhum grupo selecionado' : `${sel.size} grupo(s) selecionado(s)`}</span>
+              <span className="text-sm text-muted-foreground">
+                {sel.size === 0 ? 'Nenhum grupo selecionado' : (
+                  <>
+                    {sel.size} grupo(s) ·{' '}
+                    <b className="text-foreground">
+                      {contando ? <Loader2 className="inline h-3 w-3 animate-spin" /> : unicos == null ? '—' : unicos.toLocaleString('pt-BR')}
+                    </b>{' '}
+                    estudante(s) únicos
+                  </>
+                )}
+              </span>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
                 <Button onClick={vincular} disabled={pending || sel.size === 0}>

@@ -14,6 +14,22 @@ async function guard() {
   return { ok: true as const, tenantId: access.tenantId }
 }
 
+/**
+ * Conta estudantes ÚNICOS (distintos por estudante_id) somando os grupos informados.
+ * Usado no preview de "vincular grupo": somar `membros` de cada grupo conta o mesmo
+ * aluno várias vezes (quem está em N grupos entra N vezes) — aqui deduplicamos.
+ */
+export async function contarEstudantesUnicosGrupos(grupoIds: string[]): Promise<{ ok: boolean; distintos?: number; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const ids = [...new Set((grupoIds ?? []).filter(Boolean))]
+  if (!ids.length) return { ok: true, distintos: 0 }
+  const svc = createAdminClient()
+  const rows = await fetchAllByIn<{ estudante_id: string }>(ids, (chunk) =>
+    svc.from('simulado_grupo_membros').select('estudante_id').eq('tenant_id', g.tenantId).in('grupo_id', chunk).order('estudante_id'))
+  return { ok: true, distintos: new Set(rows.map((r) => r.estudante_id).filter(Boolean)).size }
+}
+
 /** Vincula estudantes já existentes ao banco (ignora os que já estão). */
 export async function vincularEstudantes(bancoId: string, estudanteIds: string[]): Promise<{ ok: boolean; vinculados?: number; error?: string }> {
   const g = await guard()
