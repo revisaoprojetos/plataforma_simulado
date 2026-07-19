@@ -13,6 +13,7 @@ import {
 import { SimuladoForm } from '@/components/admin/simulado-form'
 import { SimuladoActions } from '@/components/admin/simulado-actions'
 import { SimuladoQuestoesManager } from '@/components/admin/simulado-questoes-manager'
+import { SimuladoEstudantes } from '@/components/admin/simulado-estudantes'
 import { SimuladoCadernoLink } from '@/components/admin/simulado-caderno-link'
 import { SimuladoRelatorio } from '@/components/admin/simulado-relatorio'
 import { SimuladoRecorrecao } from '@/components/admin/simulado-recorrecao'
@@ -209,6 +210,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
           <TabsList>
             <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
             <TabsTrigger value="questoes">Questões ({totalQuestoes ?? 0})</TabsTrigger>
+            <TabsTrigger value="estudantes">Estudantes</TabsTrigger>
             <TabsTrigger value="sessoes">Sessões ({totalSessoes ?? 0})</TabsTrigger>
             <TabsTrigger value="relatorio">Relatório</TabsTrigger>
             <TabsTrigger value="recorrecao">Re-correção</TabsTrigger>
@@ -369,6 +371,19 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
                 questoesNoSimulado={questoesNoSimulado}
                 questoesDisponiveis={questoesDisponiveis}
               />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Estudantes linkados (matriculados) */}
+        <TabsContent value="estudantes">
+          <Card>
+            <CardHeader>
+              <CardTitle>Estudantes do Simulado</CardTitle>
+              <CardDescription>Todos os estudantes matriculados (linkados) neste simulado, com busca, filtros e ordenação.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SimuladoEstudantes simuladoId={id} />
             </CardContent>
           </Card>
         </TabsContent>

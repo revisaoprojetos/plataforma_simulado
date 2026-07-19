@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient, createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { fetchAll } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
@@ -139,6 +139,76 @@ export async function updateSimuladoAction(id: string, data: SimuladoData) {
   revalidatePath('/admin/simulados')
   revalidatePath(`/admin/simulados/${id}`)
   return { ok: true }
+}
+
+export interface EstudanteLinkado {
+  id: string
+  nome: string
+  email: string | null
+  cpf: string | null
+  telefone: string | null
+  classificacao: string
+  liberado: boolean
+  situacao: 'finalizou' | 'em_andamento' | 'nao_iniciou'
+  nota: number | null
+}
+
+/**
+ * Lista TODOS os estudantes matriculados (linkados) em um simulado, com a situação
+ * de cada um (finalizou / em andamento / não iniciou) e a nota. Carregado sob demanda
+ * pela aba "Estudantes" — pode ter milhares de linhas (passaportes), por isso usa
+ * fetchAll/fetchAllByIn para não truncar no teto de 1000 do PostgREST.
+ */
+export async function listarEstudantesSimulado(simuladoId: string): Promise<{ ok?: boolean; error?: string; estudantes?: EstudanteLinkado[] }> {
+  if (!(await checkPermission('simulados:view'))) return { error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  const svc = createAdminClient()
+
+  const { data: sim } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simuladoId).maybeSingle()
+  if (!sim) return { error: 'Simulado não encontrado.' }
+  if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
+
+  const matriculas = await fetchAll<{ estudante_id: string; liberado: boolean }>(() =>
+    svc.from('simulado_matriculas').select('estudante_id, liberado').eq('simulado_id', simuladoId).order('estudante_id'))
+  const estIds = [...new Set(matriculas.map((m) => m.estudante_id).filter(Boolean))]
+  if (!estIds.length) return { ok: true, estudantes: [] }
+
+  const [estRows, sessRows] = await Promise.all([
+    fetchAllByIn<any>(estIds, (chunk) =>
+      svc.from('simulado_estudantes').select('id, nome, email, cpf, telefone, classificacao').in('id', chunk).order('id')),
+    fetchAll<any>(() =>
+      svc.from('simulado_sessoes_prova').select('estudante_id, status, nota').eq('simulado_id', simuladoId).eq('deletado', false).order('estudante_id')),
+  ])
+
+  const libPorEst = new Map(matriculas.map((m) => [m.estudante_id, m.liberado]))
+  const estMap = new Map(estRows.map((e: any) => [e.id, e]))
+  const sessPorEst = new Map<string, any[]>()
+  for (const s of sessRows) {
+    const arr = sessPorEst.get(s.estudante_id) ?? []
+    arr.push(s)
+    sessPorEst.set(s.estudante_id, arr)
+  }
+
+  const estudantes: EstudanteLinkado[] = estIds.map((eid) => {
+    const e = estMap.get(eid) ?? {}
+    const ss = sessPorEst.get(eid) ?? []
+    const fin = ss.find((x) => x.status === 'finalizada')
+    const emand = ss.some((x) => x.status !== 'finalizada')
+    const situacao: EstudanteLinkado['situacao'] = fin ? 'finalizou' : emand ? 'em_andamento' : 'nao_iniciou'
+    return {
+      id: eid,
+      nome: e.nome ?? 'Estudante',
+      email: e.email ?? null,
+      cpf: e.cpf ?? null,
+      telefone: e.telefone ?? null,
+      classificacao: e.classificacao ?? 'normal',
+      liberado: !!libPorEst.get(eid),
+      situacao,
+      nota: fin?.nota ?? null,
+    }
+  }).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+
+  return { ok: true, estudantes }
 }
 
 /** Vincula (ou desvincula) explicitamente um caderno de design ao simulado — define o tema/HUD aplicado. */
