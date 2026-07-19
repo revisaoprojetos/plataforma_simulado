@@ -1,19 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { SimuladoForm } from '@/components/admin/simulado-form'
 import { SimuladoActions } from '@/components/admin/simulado-actions'
 import { SimuladoQuestoesManager } from '@/components/admin/simulado-questoes-manager'
 import { SimuladoEstudantes } from '@/components/admin/simulado-estudantes'
+import { SimuladoSessoes } from '@/components/admin/simulado-sessoes'
 import { SimuladoCadernoLink } from '@/components/admin/simulado-caderno-link'
 import { SimuladoRelatorio } from '@/components/admin/simulado-relatorio'
 import { SimuladoRecorrecao } from '@/components/admin/simulado-recorrecao'
@@ -36,12 +28,6 @@ const statusConfig: Record<string, { label: string; class: string }> = {
   rascunho: { label: 'Rascunho', class: 'bg-muted text-muted-foreground' },
   publicado: { label: 'Publicado', class: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
   encerrado: { label: 'Encerrado', class: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' },
-}
-
-const sessaoStatusMap: Record<string, string> = {
-  aguardando: 'Aguardando',
-  em_andamento: 'Em andamento',
-  finalizada: 'Finalizada',
 }
 
 export default async function SimuladoDetailPage({ params }: PageProps) {
@@ -393,52 +379,10 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
           <Card>
             <CardHeader>
               <CardTitle>Sessões de Prova</CardTitle>
+              <CardDescription>Todas as sessões deste simulado, com busca, filtros e ordenação.</CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Estudante</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Nota</TableHead>
-                    <TableHead>Início</TableHead>
-                    <TableHead>Fim</TableHead>
-                    <TableHead>Teste</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {!sessoes || sessoes.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                        Nenhuma sessão registrada.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    sessoes.map((s: any) => (
-                      <TableRow key={s.id}>
-                        <TableCell className="text-sm font-medium">
-                          {s.estudantes?.nome ?? '—'}
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm">{sessaoStatusMap[s.status] ?? s.status}</span>
-                        </TableCell>
-                        <TableCell>
-                          {s.nota !== null ? s.nota?.toFixed(1) : '—'}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatDate(s.iniciado_em)}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatDate(s.finalizado_em)}
-                        </TableCell>
-                        <TableCell>
-                          {s.is_teste && <Badge variant="outline">Teste</Badge>}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+            <CardContent>
+              <SimuladoSessoes simuladoId={id} />
             </CardContent>
           </Card>
         </TabsContent>

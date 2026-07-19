@@ -214,6 +214,51 @@ export async function listarEstudantesSimulado(simuladoId: string): Promise<{ ok
   return { ok: true, estudantes }
 }
 
+export interface SessaoLinkada {
+  id: string
+  estudante: string
+  status: string
+  nota: number | null
+  iniciado_em: string | null
+  finalizado_em: string | null
+  is_teste: boolean
+}
+
+/**
+ * Lista TODAS as sessões de prova de um simulado, com o nome do estudante. Carregado
+ * sob demanda pela aba "Sessões" — usa fetchAll (pode passar de 1000 num simulado grande).
+ */
+export async function listarSessoesSimulado(simuladoId: string): Promise<{ ok?: boolean; error?: string; sessoes?: SessaoLinkada[] }> {
+  if (!(await checkPermission('simulados:view'))) return { error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  const svc = createAdminClient()
+
+  const { data: sim } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simuladoId).maybeSingle()
+  if (!sim) return { error: 'Simulado não encontrado.' }
+  if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
+  const tid = tenantId ?? (sim as any).tenant_id
+
+  const [sessRows, estRows] = await Promise.all([
+    fetchAll<any>(() =>
+      svc.from('simulado_sessoes_prova').select('id, estudante_id, status, nota, iniciado_em, finalizado_em, is_teste').eq('simulado_id', simuladoId).eq('deletado', false).order('iniciado_em', { ascending: false })),
+    fetchAll<any>(() =>
+      svc.from('simulado_estudantes').select('id, nome').eq('tenant_id', tid).order('id')),
+  ])
+  const nomeMap = new Map(estRows.map((e: any) => [e.id, e.nome ?? 'Estudante']))
+
+  const sessoes: SessaoLinkada[] = sessRows.map((s: any) => ({
+    id: s.id,
+    estudante: nomeMap.get(s.estudante_id) ?? 'Estudante',
+    status: s.status ?? 'aguardando',
+    nota: s.nota ?? null,
+    iniciado_em: s.iniciado_em ?? null,
+    finalizado_em: s.finalizado_em ?? null,
+    is_teste: !!s.is_teste,
+  }))
+
+  return { ok: true, sessoes }
+}
+
 /** Vincula (ou desvincula) explicitamente um caderno de design ao simulado — define o tema/HUD aplicado. */
 export async function vincularCadernoSimulado(simuladoId: string, cadernoId: string | null) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
