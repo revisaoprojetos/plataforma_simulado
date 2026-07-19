@@ -276,16 +276,16 @@ async function verificarAcesso(
   estudanteId: string,
   simuladoId: string
 ): Promise<boolean> {
-  // Matrícula ativa e liberada para este simulado.
-  const { data: matricula } = await supabase
+  // Matrícula ativa e liberada para este simulado. IMPORTANTE: pode haver matrícula
+  // DUPLICADA (re-matrícula, sync de passaporte, etc.). `.maybeSingle()` LANÇA erro com
+  // 2+ linhas → retornava null → "sem matrícula" indevido. Buscamos TODAS e liberamos
+  // se ALGUMA estiver ativa e liberada.
+  const { data: matriculas } = await supabase
     .from('simulado_matriculas')
     .select('id, liberado, status')
     .eq('estudante_id', estudanteId)
     .eq('simulado_id', simuladoId)
-    .maybeSingle()
 
-  if (!matricula) return false
-  if (matricula.status && matricula.status !== 'ativa') return false
-  if (matricula.liberado === false) return false
-  return true
+  if (!matriculas || matriculas.length === 0) return false
+  return matriculas.some((m) => (!m.status || m.status === 'ativa') && m.liberado !== false)
 }
