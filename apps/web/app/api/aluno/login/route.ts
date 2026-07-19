@@ -34,12 +34,17 @@ export async function POST(request: NextRequest) {
     .maybeSingle()
   const metodo = (cfg?.metodo_identificacao as string) ?? 'email'
 
-  const { data: estudante } = await supabase
+  // deletado=false + limit(1): ignora cadastro soft-deletado e tolera e-mail duplicado
+  // (senão o .maybeSingle() falha com 2 linhas → "cadastro não encontrado" indevido).
+  const { data: estudantesMatch } = await supabase
     .from('simulado_estudantes')
     .select('id, nome, email, cpf, telefone')
     .eq('tenant_id', tenantId)
+    .eq('deletado', false)
     .ilike('email', email)
-    .maybeSingle()
+    .order('id')
+    .limit(1)
+  const estudante = estudantesMatch?.[0]
 
   if (!estudante) {
     return NextResponse.json({ message: 'Não encontramos seu cadastro nesta plataforma.' }, { status: 403 })

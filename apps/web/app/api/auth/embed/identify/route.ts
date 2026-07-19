@@ -118,12 +118,18 @@ export async function POST(request: NextRequest) {
   // 2. Buscar estudante por email no tenant do simulado
   const metodo = (simulado.metodo_identificacao as string) ?? 'email'
 
-  const { data: estudante } = await supabase
+  // deletado=false + limit(1): ignora cadastros soft-deletados e tolera duplicata (mesmo e-mail
+  // em 2 registros) — sem isso, o .maybeSingle() LANÇAVA erro com 2 linhas e virava "e-mail não
+  // encontrado" indevido (ex.: aluno com um cadastro apagado + um ativo).
+  const { data: estudantesMatch } = await supabase
     .from('simulado_estudantes')
     .select('id, nome, email, user_id, cpf, telefone, classificacao')
     .eq('tenant_id', simulado.tenant_id)
+    .eq('deletado', false)
     .ilike('email', email.toLowerCase().trim())
-    .maybeSingle()
+    .order('id')
+    .limit(1)
+  const estudante = estudantesMatch?.[0]
 
   if (!estudante) {
     return bloqueio(tenantId, 'bloqueio_identidade', { simulado: tituloSimulado })

@@ -100,6 +100,19 @@ export async function editarEstudanteAction(id: string, data: EditarEstudanteDat
   const { error } = await svc.from('simulado_estudantes').update(update).eq('id', id).eq('tenant_id', tenantId)
   if (error) return { error: error.message }
 
+  // Passaporte → entra automaticamente no grupo "Passaporte" (organização/filtro dos acessos).
+  // Idempotente: só insere se ainda não for membro. Não bloqueia o salvamento se falhar.
+  if ((data.classificacao || null) === 'passaporte') {
+    try {
+      const { data: gp } = await svc.from('simulado_grupos')
+        .select('id').eq('tenant_id', tenantId).eq('deletado', false).eq('is_mestre', false).ilike('nome', 'passaporte').limit(1).maybeSingle()
+      if (gp?.id) {
+        const { data: ja } = await svc.from('simulado_grupo_membros').select('id').eq('grupo_id', gp.id).eq('estudante_id', id).limit(1).maybeSingle()
+        if (!ja) await svc.from('simulado_grupo_membros').insert({ tenant_id: tenantId, grupo_id: gp.id, estudante_id: id })
+      }
+    } catch { /* não falha o salvamento por causa do grupo */ }
+  }
+
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_estudantes', entidadeId: id, antes, depois: update })
   revalidatePath(`/admin/estudantes/${id}`)
   revalidatePath('/admin/estudantes')
