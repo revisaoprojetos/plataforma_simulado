@@ -214,6 +214,60 @@ export async function listarEstudantesSimulado(simuladoId: string): Promise<{ ok
   return { ok: true, estudantes }
 }
 
+export interface ResumoAoVivo {
+  total: number        // estudantes matriculados (linkados)
+  online: number       // com sessão EM ANDAMENTO (fazendo agora)
+  finalizados: number  // já concluíram
+  naoIniciaram: number // matriculados que nunca abriram
+}
+
+/**
+ * Resumo "ao vivo" de um simulado: quantos estão fazendo agora (em andamento),
+ * quantos finalizaram e quantos ainda não iniciaram. Cada estudante entra em UM
+ * bucket (online > finalizado > não iniciou). Carregado sob demanda e com polling
+ * no painel — usa fetchAll (pode ter milhares de matriculados).
+ */
+export async function resumoAoVivoSimulado(simuladoId: string): Promise<{ ok?: boolean; error?: string; resumo?: ResumoAoVivo }> {
+  if (!(await checkPermission('simulados:view'))) return { error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  const svc = createAdminClient()
+
+  const { data: sim } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simuladoId).maybeSingle()
+  if (!sim) return { error: 'Simulado não encontrado.' }
+  if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
+
+  const [matriculas, sessoes] = await Promise.all([
+    fetchAll<any>(() => svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simuladoId).order('estudante_id')),
+    fetchAll<any>(() => svc.from('simulado_sessoes_prova').select('estudante_id, status').eq('simulado_id', simuladoId).eq('is_teste', false).eq('deletado', false).order('estudante_id')),
+  ])
+
+  const matSet = new Set<string>(matriculas.map((m: any) => m.estudante_id).filter(Boolean))
+  const total = matSet.size
+
+  // Por estudante: tem alguma finalizada? tem alguma em andamento (não finalizada)?
+  const porEst = new Map<string, { fin: boolean; and: boolean }>()
+  for (const s of sessoes) {
+    const eid = (s as any).estudante_id
+    if (!eid) continue
+    const e = porEst.get(eid) ?? { fin: false, and: false }
+    if ((s as any).status === 'finalizada') e.fin = true
+    else e.and = true // em_andamento / aguardando = está fazendo/online
+    porEst.set(eid, e)
+  }
+
+  let online = 0, finalizados = 0
+  const comSessao = new Set<string>()
+  for (const [eid, st] of porEst) {
+    if (!matSet.has(eid)) continue // conta só matriculados
+    comSessao.add(eid)
+    if (st.and) online++
+    else if (st.fin) finalizados++
+  }
+  const naoIniciaram = Math.max(0, total - comSessao.size)
+
+  return { ok: true, resumo: { total, online, finalizados, naoIniciaram } }
+}
+
 export interface SessaoLinkada {
   id: string
   estudante: string
