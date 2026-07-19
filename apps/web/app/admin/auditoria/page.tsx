@@ -4,7 +4,7 @@ import { getCurrentTenantId } from '@/lib/tenant'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { SecaoHeader } from '@/components/admin/secao-header'
-import { ScrollText, ShieldCheck, GraduationCap, LogIn, ClipboardList, BookOpen } from 'lucide-react'
+import { ScrollText, ShieldCheck, GraduationCap, LogIn, ClipboardList, BookOpen, ArrowUpDown } from 'lucide-react'
 import { AuditoriaFilters } from '@/components/admin/auditoria-filters'
 import { AuditoriaDiff } from '@/components/admin/auditoria-diff'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -16,7 +16,7 @@ const ITEMS_PER_PAGE = 30
 
 interface PageProps {
   searchParams: Promise<{
-    page?: string; tipo?: string; area?: string; sub?: string
+    page?: string; tipo?: string; area?: string; sub?: string; ord?: string; dir?: string
     acao?: string; entidade?: string; data_inicio?: string; data_fim?: string
   }>
 }
@@ -31,7 +31,6 @@ const acaoVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'out
 
 const isUuid = (s: unknown) => typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
 
-/** Data/hora em horário de Brasília: "DD/MM/AAAA HH:mm". */
 function fmtBR(iso?: string | null): string {
   const s = isoParaBrtLocal(iso)
   if (!s) return '—'
@@ -66,6 +65,9 @@ function NavTab({ href, active, icon: Icon, children }: { href: string; active: 
   )
 }
 
+type Col = { label: string; w: string; sort?: string; right?: boolean }
+type SortCtx = { ord: string; dir: 'asc' | 'desc'; href: (key: string) => string }
+
 export default async function AuditoriaPage({ searchParams }: PageProps) {
   const params = await searchParams
   const page = Number(params.page ?? 1) || 1
@@ -80,17 +82,24 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
   const sub = ['plataforma', 'simulados', 'cadernos'].includes(params.sub ?? '') ? (params.sub as string) : 'plataforma'
   const acessosEstud = tipo === 'acessos' && area === 'estudantes'
 
-  // Qual fonte de dados renderizar.
   const view: 'audit' | 'automacoes' | 'sessoes' | 'eventos' =
     ehAuto ? 'automacoes'
       : acessosEstud && sub === 'simulados' ? 'sessoes'
         : acessosEstud && sub === 'cadernos' ? 'eventos'
           : 'audit'
 
-  let logs: any[] | null = null
-  let sessoes: any[] | null = null
-  let eventos: any[] | null = null
-  let count = 0
+  // Ordenação (server-side): coluna permitida por visão + direção. Header alterna a direção.
+  const ALLOWED: Record<string, string[]> = { audit: ['criado_em', 'operacao', 'entidade'], automacoes: ['criado_em'], sessoes: ['iniciado_em', 'finalizado_em', 'status'], eventos: ['criado_em', 'tipo'] }
+  const defOrd = view === 'sessoes' ? 'iniciado_em' : 'criado_em'
+  const ord = ALLOWED[view].includes(params.ord ?? '') ? (params.ord as string) : defOrd
+  const dir: 'asc' | 'desc' = params.dir === 'asc' ? 'asc' : 'desc'
+  const baseSort: Record<string, string> = { tipo }
+  if (tipo === 'acessos') { baseSort.area = area; if (area === 'estudantes') baseSort.sub = sub }
+  for (const k of ['acao', 'entidade', 'data_inicio', 'data_fim'] as const) if (params[k]) baseSort[k] = params[k]!
+  const sortHref = (key: string) => `/admin/auditoria?${new URLSearchParams({ ...baseSort, ord: key, dir: ord === key && dir === 'desc' ? 'asc' : 'desc' }).toString()}`
+  const sortCtx: SortCtx = { ord, dir, href: sortHref }
+
+  let logs: any[] | null = null, sessoes: any[] | null = null, eventos: any[] | null = null, count = 0
   const nomesEst = new Map<string, { nome: string; email: string | null }>()
   const nomesSim = new Map<string, string>()
   const nomesAuto = new Map<string, string>()
@@ -99,19 +108,17 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
     let query = supabase
       .from('simulado_audit_logs')
       .select('id, ator_tipo, ator_id, operacao, entidade, entidade_id, dados_anteriores, dados_novos, detalhes, ip, user_agent, criado_em', { count: 'exact' })
-      .eq('tenant_id', tid).order('criado_em', { ascending: false }).range(offset, offset + ITEMS_PER_PAGE - 1)
-
+      .eq('tenant_id', tid).order(ord, { ascending: dir === 'asc' }).range(offset, offset + ITEMS_PER_PAGE - 1)
     if (tipo === 'acessos') {
       query = query.in('operacao', ACESSO_OPS)
       if (area === 'admin') query = query.neq('ator_tipo', 'estudante')
-      else query = query.eq('ator_tipo', 'estudante') // Estudantes › Plataforma (login/acesso)
+      else query = query.eq('ator_tipo', 'estudante')
     } else if (tipo === 'modificacoes') query = query.in('operacao', MODIFICACAO_OPS)
     else if (ehAuto) query = query.or('entidade.eq.simulado_assinaturas,entidade.eq.simulado_curseduca_sync,and(entidade.eq.simulado_estudantes,dados_novos->curseduca_grupos.not.is.null)')
     if (params.acao) query = query.eq('operacao', params.acao)
     if (params.entidade) query = query.ilike('entidade', `%${params.entidade}%`)
     if (params.data_inicio) query = query.gte('criado_em', params.data_inicio)
     if (params.data_fim) query = query.lte('criado_em', params.data_fim + 'T23:59:59Z')
-
     const r = await query; logs = r.data; count = r.count ?? 0
 
     if (ehAuto && logs?.length) {
@@ -120,7 +127,6 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
       if (grupoIds.length) { const { data } = await supabase.from('simulado_grupos').select('id, nome').in('id', grupoIds); for (const g of data ?? []) nomesAuto.set((g as any).id, (g as any).nome) }
       if (estIds.length) { const { data } = await supabase.from('simulado_estudantes').select('id, nome').in('id', estIds); for (const e of data ?? []) nomesAuto.set((e as any).id, (e as any).nome) }
     }
-    // Estudantes › Plataforma: resolve nome do aluno pelo entidade_id.
     if (acessosEstud && sub === 'plataforma' && logs?.length) {
       const ids = [...new Set(logs.filter((l) => isUuid(l.entidade_id)).map((l) => l.entidade_id as string))]
       if (ids.length) { const { data } = await supabase.from('simulado_estudantes').select('id, nome, email').in('id', ids); for (const e of data ?? []) nomesEst.set((e as any).id, { nome: (e as any).nome, email: (e as any).email }) }
@@ -131,7 +137,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
       .eq('tenant_id', tid).eq('is_teste', false).eq('deletado', false)
     if (params.data_inicio) q = q.gte('iniciado_em', params.data_inicio)
     if (params.data_fim) q = q.lte('iniciado_em', params.data_fim + 'T23:59:59Z')
-    q = q.order('iniciado_em', { ascending: false, nullsFirst: false }).range(offset, offset + ITEMS_PER_PAGE - 1)
+    q = q.order(ord, { ascending: dir === 'asc', nullsFirst: false }).range(offset, offset + ITEMS_PER_PAGE - 1)
     const r = await q; sessoes = r.data; count = r.count ?? 0
   } else if (view === 'eventos') {
     let q = supabase.from('simulado_relatorio_eventos')
@@ -139,11 +145,10 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
       .eq('tenant_id', tid)
     if (params.data_inicio) q = q.gte('criado_em', params.data_inicio)
     if (params.data_fim) q = q.lte('criado_em', params.data_fim + 'T23:59:59Z')
-    q = q.order('criado_em', { ascending: false }).range(offset, offset + ITEMS_PER_PAGE - 1)
+    q = q.order(ord, { ascending: dir === 'asc' }).range(offset, offset + ITEMS_PER_PAGE - 1)
     const r = await q; eventos = r.data; count = r.count ?? 0
   }
 
-  // Resolve nomes de aluno/simulado para as tabelas de sessões/eventos.
   if (view === 'sessoes' || view === 'eventos') {
     const linhas = (view === 'sessoes' ? sessoes : eventos) ?? []
     const eIds = [...new Set(linhas.map((l: any) => l.estudante_id).filter(isUuid))] as string[]
@@ -153,15 +158,12 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
   }
 
   const totalPages = Math.ceil((count ?? 0) / ITEMS_PER_PAGE)
-
   const titulo = tipo === 'acessos' ? 'Auditoria · Acessos' : tipo === 'modificacoes' ? 'Auditoria · Modificações' : ehAuto ? 'Auditoria · Automações' : 'Auditoria'
-  const subtitulo = tipo === 'acessos'
-    ? 'Controle de acessos por área — administradores e estudantes'
+  const subtitulo = tipo === 'acessos' ? 'Controle de acessos por área — administradores e estudantes'
     : tipo === 'modificacoes' ? 'Criações, edições, exclusões, liberações e anulações'
-      : ehAuto ? 'Tudo que as integrações fizeram sozinhas: importações Curseduca, liberações/cancelamentos Guru e sincronizações'
+      : ehAuto ? 'Tudo que as integrações fizeram sozinhas'
         : 'Registro imutável de todas as ações'
-  const base = { tipo: 'acessos' } as Record<string, string>
-  const qs = (extra: Record<string, string>) => new URLSearchParams({ ...base, ...extra }).toString()
+  const qs = (extra: Record<string, string>) => new URLSearchParams({ tipo: 'acessos', ...extra }).toString()
 
   return (
     <div className="space-y-6">
@@ -170,7 +172,6 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
         <p className="text-muted-foreground">{subtitulo} — {count ?? 0} entradas</p>
       </div>
 
-      {/* Tabs Admin / Estudantes (só em Acessos) */}
       {tipo === 'acessos' && (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
@@ -189,16 +190,17 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
 
       <AuditoriaFilters />
 
-      {/* AUTOMAÇÕES */}
       {view === 'automacoes' && (
-        <TabelaCard titulo="Automações" subtitulo={`${count ?? 0} evento(s)`} colunas={['Data/Hora', 'Origem', 'O que aconteceu', 'Detalhes']} vazio="Nenhuma automação registrada ainda." temLinhas={!!logs?.length}>
+        <TabelaCard titulo="Automações" subtitulo={`${count ?? 0} evento(s)`} sort={sortCtx}
+          cols={[{ label: 'Data/Hora', w: '18%', sort: 'criado_em' }, { label: 'Origem', w: '16%' }, { label: 'O que aconteceu', w: '54%' }, { label: 'Detalhes', w: '12%' }]}
+          vazio="Nenhuma automação registrada ainda." temLinhas={!!logs?.length}>
           {(logs ?? []).map((log) => {
             const r = resumoAutomacao(log, nomesAuto)
             return (
               <TableRow key={log.id}>
-                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{fmtBR(log.criado_em)}</TableCell>
-                <TableCell><Badge variant={log.operacao === 'BLOQUEAR' ? 'destructive' : 'default'}>{r.origem}</Badge></TableCell>
-                <TableCell className="text-sm">{r.texto}</TableCell>
+                <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(log.criado_em)}</TableCell>
+                <TableCell className="truncate"><Badge variant={log.operacao === 'BLOQUEAR' ? 'destructive' : 'default'}>{r.origem}</Badge></TableCell>
+                <TableCell className="truncate text-sm" title={r.texto}>{r.texto}</TableCell>
                 <TableCell><DetalhesCell log={log} /></TableCell>
               </TableRow>
             )
@@ -206,9 +208,10 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
         </TabelaCard>
       )}
 
-      {/* AUDIT LOGS (todos / modificações / acessos admin / estudante-plataforma) */}
       {view === 'audit' && acessosEstud && sub === 'plataforma' && (
-        <TabelaCard titulo="Acessos dos estudantes" subtitulo={`${count ?? 0} acesso(s)`} colunas={['Data/Hora', 'Estudante', 'Onde', 'IP']} vazio="Nenhum acesso de estudante registrado ainda." temLinhas={!!logs?.length}>
+        <TabelaCard titulo="Acessos dos estudantes" subtitulo={`${count ?? 0} acesso(s)`} sort={sortCtx}
+          cols={[{ label: 'Data/Hora', w: '24%', sort: 'criado_em' }, { label: 'Estudante', w: '34%' }, { label: 'Onde', w: '26%' }, { label: 'IP', w: '16%' }]}
+          vazio="Nenhum acesso de estudante registrado ainda." temLinhas={!!logs?.length}>
           {(logs ?? []).map((log) => {
             const est = isUuid(log.entidade_id) ? nomesEst.get(log.entidade_id) : null
             const nome = est?.nome ?? (log.dados_novos as any)?.nome ?? '—'
@@ -216,10 +219,10 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
             const onde = log.entidade === 'simulado_acesso' ? `Simulado${(log.dados_novos as any)?.simulado ? `: ${(log.dados_novos as any).simulado}` : ''}` : 'Portal do aluno'
             return (
               <TableRow key={log.id}>
-                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{fmtBR(log.criado_em)}</TableCell>
-                <TableCell><span className="font-medium">{nome}</span>{email && <span className="block text-xs text-muted-foreground">{email}</span>}</TableCell>
-                <TableCell className="text-sm">{onde}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">{log.ip ? String(log.ip) : '—'}</TableCell>
+                <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(log.criado_em)}</TableCell>
+                <TableCell className="truncate" title={nome}><span className="font-medium">{nome}</span>{email && <span className="block truncate text-xs text-muted-foreground">{email}</span>}</TableCell>
+                <TableCell className="truncate text-sm" title={onde}>{onde}</TableCell>
+                <TableCell className="truncate text-xs text-muted-foreground">{log.ip ? String(log.ip) : '—'}</TableCell>
               </TableRow>
             )
           })}
@@ -227,23 +230,26 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
       )}
 
       {view === 'audit' && !(acessosEstud && sub === 'plataforma') && (
-        <TabelaCard titulo="Registros" subtitulo={`${count ?? 0} entrada(s)`} colunas={['Data/Hora', 'Ação', 'Módulo', 'Ator', 'IP', 'Detalhes']} vazio="Nenhum registro encontrado." temLinhas={!!logs?.length}>
+        <TabelaCard titulo="Registros" subtitulo={`${count ?? 0} entrada(s)`} sort={sortCtx}
+          cols={[{ label: 'Data/Hora', w: '18%', sort: 'criado_em' }, { label: 'Ação', w: '13%', sort: 'operacao' }, { label: 'Módulo', w: '22%', sort: 'entidade' }, { label: 'Ator', w: '20%' }, { label: 'IP', w: '15%' }, { label: 'Detalhes', w: '12%' }]}
+          vazio="Nenhum registro encontrado." temLinhas={!!logs?.length}>
           {(logs ?? []).map((log) => (
             <TableRow key={log.id}>
-              <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{fmtBR(log.criado_em)}</TableCell>
-              <TableCell><Badge variant={acaoVariant[log.operacao] ?? 'outline'}>{log.operacao}</Badge></TableCell>
-              <TableCell className="font-mono text-xs text-muted-foreground">{log.entidade}</TableCell>
-              <TableCell className="text-xs text-muted-foreground"><span className="font-medium">{log.ator_tipo}</span>{log.ator_id && <span className="ml-1 font-mono opacity-60">{String(log.ator_id).slice(0, 8)}…</span>}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">{log.ip ? String(log.ip) : '—'}</TableCell>
+              <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(log.criado_em)}</TableCell>
+              <TableCell className="truncate"><Badge variant={acaoVariant[log.operacao] ?? 'outline'}>{log.operacao}</Badge></TableCell>
+              <TableCell className="truncate font-mono text-xs text-muted-foreground" title={log.entidade}>{log.entidade}</TableCell>
+              <TableCell className="truncate text-xs text-muted-foreground"><span className="font-medium">{log.ator_tipo}</span>{log.ator_id && <span className="ml-1 font-mono opacity-60">{String(log.ator_id).slice(0, 8)}…</span>}</TableCell>
+              <TableCell className="truncate text-xs text-muted-foreground">{log.ip ? String(log.ip) : '—'}</TableCell>
               <TableCell><DetalhesCell log={log} /></TableCell>
             </TableRow>
           ))}
         </TabelaCard>
       )}
 
-      {/* ESTUDANTES › SIMULADOS (início/término) */}
       {view === 'sessoes' && (
-        <TabelaCard titulo="Início e término de simulados" subtitulo={`${count ?? 0} sessão(ões)`} colunas={['Estudante', 'Simulado', 'Início', 'Término', 'Situação']} vazio="Nenhuma sessão registrada ainda." temLinhas={!!sessoes?.length}>
+        <TabelaCard titulo="Início e término de simulados" subtitulo={`${count ?? 0} sessão(ões)`} sort={sortCtx}
+          cols={[{ label: 'Estudante', w: '24%' }, { label: 'Simulado', w: '26%' }, { label: 'Início', w: '18%', sort: 'iniciado_em' }, { label: 'Término', w: '18%', sort: 'finalizado_em' }, { label: 'Situação', w: '14%', sort: 'status' }]}
+          vazio="Nenhuma sessão registrada ainda." temLinhas={!!sessoes?.length}>
           {(sessoes ?? []).map((s) => {
             const est = nomesEst.get(s.estudante_id)
             const stCfg: Record<string, { label: string; cls: string }> = {
@@ -254,28 +260,29 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
             const cfg = stCfg[s.status] ?? stCfg.aguardando
             return (
               <TableRow key={s.id}>
-                <TableCell><span className="font-medium">{est?.nome ?? '—'}</span>{est?.email && <span className="block text-xs text-muted-foreground">{est.email}</span>}</TableCell>
-                <TableCell className="text-sm">{nomesSim.get(s.simulado_id) ?? '—'}</TableCell>
-                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{fmtBR(s.iniciado_em)}</TableCell>
-                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{fmtBR(s.finalizado_em)}</TableCell>
-                <TableCell><span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', cfg.cls)}>{cfg.label}</span></TableCell>
+                <TableCell className="truncate" title={est?.nome}><span className="font-medium">{est?.nome ?? '—'}</span>{est?.email && <span className="block truncate text-xs text-muted-foreground">{est.email}</span>}</TableCell>
+                <TableCell className="truncate text-sm" title={nomesSim.get(s.simulado_id) ?? undefined}>{nomesSim.get(s.simulado_id) ?? '—'}</TableCell>
+                <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(s.iniciado_em)}</TableCell>
+                <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(s.finalizado_em)}</TableCell>
+                <TableCell className="truncate"><span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', cfg.cls)}>{cfg.label}</span></TableCell>
               </TableRow>
             )
           })}
         </TabelaCard>
       )}
 
-      {/* ESTUDANTES › CADERNOS (acessou/baixou) */}
       {view === 'eventos' && (
-        <TabelaCard titulo="Cadernos e relatórios" subtitulo={`${count ?? 0} evento(s)`} colunas={['Data/Hora', 'Estudante', 'Simulado', 'Ação']} vazio="Nenhum acesso a caderno/relatório registrado ainda." temLinhas={!!eventos?.length}>
+        <TabelaCard titulo="Cadernos e relatórios" subtitulo={`${count ?? 0} evento(s)`} sort={sortCtx}
+          cols={[{ label: 'Data/Hora', w: '24%', sort: 'criado_em' }, { label: 'Estudante', w: '32%' }, { label: 'Simulado', w: '28%' }, { label: 'Ação', w: '16%', sort: 'tipo' }]}
+          vazio="Nenhum acesso a caderno/relatório registrado ainda." temLinhas={!!eventos?.length}>
           {(eventos ?? []).map((e) => {
             const est = nomesEst.get(e.estudante_id)
             return (
               <TableRow key={e.id}>
-                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{fmtBR(e.criado_em)}</TableCell>
-                <TableCell><span className="font-medium">{est?.nome ?? '—'}</span>{est?.email && <span className="block text-xs text-muted-foreground">{est.email}</span>}</TableCell>
-                <TableCell className="text-sm">{nomesSim.get(e.simulado_id) ?? '—'}</TableCell>
-                <TableCell><Badge variant={e.tipo === 'baixou' ? 'default' : 'secondary'}>{e.tipo === 'baixou' ? 'Baixou' : 'Visualizou'}</Badge></TableCell>
+                <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(e.criado_em)}</TableCell>
+                <TableCell className="truncate" title={est?.nome}><span className="font-medium">{est?.nome ?? '—'}</span>{est?.email && <span className="block truncate text-xs text-muted-foreground">{est.email}</span>}</TableCell>
+                <TableCell className="truncate text-sm" title={nomesSim.get(e.simulado_id) ?? undefined}>{nomesSim.get(e.simulado_id) ?? '—'}</TableCell>
+                <TableCell className="truncate"><Badge variant={e.tipo === 'baixou' ? 'default' : 'secondary'}>{e.tipo === 'baixou' ? 'Baixou' : 'Visualizou'}</Badge></TableCell>
               </TableRow>
             )
           })}
@@ -287,19 +294,29 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
   )
 }
 
-function TabelaCard({ titulo, subtitulo, colunas, vazio, temLinhas, children }: { titulo: string; subtitulo: string; colunas: string[]; vazio: string; temLinhas: boolean; children: React.ReactNode }) {
+function SortHead({ col, sort }: { col: Col; sort?: SortCtx }) {
+  const inner = <>{col.label}{col.sort && <ArrowUpDown className={cn('ml-1 inline h-3 w-3', sort && sort.ord === col.sort ? 'text-primary' : 'text-muted-foreground/50')} />}</>
+  return (
+    <TableHead className={cn(col.right && 'text-right')}>
+      {col.sort && sort ? <Link href={sort.href(col.sort)} className="inline-flex items-center hover:text-foreground">{inner}</Link> : inner}
+    </TableHead>
+  )
+}
+
+function TabelaCard({ titulo, subtitulo, cols, vazio, temLinhas, sort, children }: { titulo: string; subtitulo: string; cols: Col[]; vazio: string; temLinhas: boolean; sort?: SortCtx; children: React.ReactNode }) {
   return (
     <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
       <SecaoHeader icon={ScrollText} titulo={titulo} subtitulo={subtitulo} />
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <Table>
+          <Table className="w-full table-fixed">
+            <colgroup>{cols.map((c, i) => <col key={i} style={{ width: c.w }} />)}</colgroup>
             <TableHeader>
-              <TableRow>{colunas.map((c) => <TableHead key={c} className={c === 'Detalhes' ? 'w-[80px]' : undefined}>{c}</TableHead>)}</TableRow>
+              <TableRow>{cols.map((c) => <SortHead key={c.label} col={c} sort={sort} />)}</TableRow>
             </TableHeader>
             <TableBody>
               {!temLinhas ? (
-                <TableRow><TableCell colSpan={colunas.length} className="py-8 text-center text-muted-foreground">{vazio}</TableCell></TableRow>
+                <TableRow><TableCell colSpan={cols.length} className="py-8 text-center text-muted-foreground">{vazio}</TableCell></TableRow>
               ) : children}
             </TableBody>
           </Table>
