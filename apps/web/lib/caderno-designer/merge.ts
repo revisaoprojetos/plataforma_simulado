@@ -2,6 +2,8 @@
 // (nome, contato, desempenho e acertos por disciplina) para preencher o caderno.
 // Usado pelo editor (preview por aluno) e pela impressão (?aluno / ?todos).
 
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+
 export type Registro = { id: string; nome: string; vars: Record<string, string>; respostas: Record<string, string> }
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -12,11 +14,14 @@ function slug(s: string): string {
 
 /** `svc` = createAdminClient(); filtra por tenant manualmente.
  *  `sessaoId` (opcional): usa exatamente essa tentativa. Sem ele, usa a mais recente de cada aluno.
+ *  `estudanteId` (opcional): gera SÓ para esse aluno (diagnóstico individual) — evita carregar
+ *   os milhares de alunos do banco e o teto de 1000 do PostgREST que fazia o diagnóstico
+ *   sair em branco para quem estava além do 1000.
  *  Cada tentativa é uma sessão distinta — nunca se mistura respostas de sessões diferentes. */
-export async function carregarRegistros(svc: any, tenantId: string, bancoId: string, bancoNome: string, sessaoId?: string): Promise<Registro[]> {
-  // Questões do banco + disciplina de cada uma.
-  const { data: vinc } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', tenantId)
-  const qids = (vinc ?? []).map((v: any) => v.questao_id)
+export async function carregarRegistros(svc: any, tenantId: string, bancoId: string, bancoNome: string, sessaoId?: string, estudanteId?: string, limite?: number): Promise<Registro[]> {
+  // Questões do banco + disciplina de cada uma. fetchAll: sem paginar, o PostgREST corta em 1000.
+  const vinc = await fetchAll<any>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', tenantId).order('questao_id'))
+  const qids = vinc.map((v: any) => v.questao_id)
   const totalQ = qids.length
 
   const discDaQuestao = new Map<string, string>()
@@ -28,8 +33,8 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
   if (qids.length) {
     // O PILAR vem da coluna `categoria` da questão (Lei seca / Jurisprudência / Doutrina).
     // `pilar_1/pilar_2` é opcional (fallback) para bases que usem esse formato.
-    const { data: qs } = await svc.from('simulado_questoes').select('id, categoria, pilar_1, pilar_2, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)').in('id', qids)
-    for (const q of qs ?? []) {
+    const qs = await fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questoes').select('id, categoria, pilar_1, pilar_2, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)').in('id', chunk).order('id'))
+    for (const q of qs) {
       const d = (q as any).disciplinas?.nome ?? 'Geral'
       discDaQuestao.set(q.id, d)
       discTotais.set(d, (discTotais.get(d) ?? 0) + 1)
@@ -52,19 +57,28 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
     }
   }
 
-  // Alunos vinculados ao banco.
-  const { data: pe } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).eq('tenant_id', tenantId)
-  const estIds = (pe ?? []).map((r: any) => r.estudante_id)
+  // Alunos: para diagnóstico individual, SÓ o aluno pedido (rápido e sem teto de 1000).
+  // Em massa (sem estudanteId), varre todos os vinculados ao banco com fetchAll.
+  let estIds: string[]
+  if (estudanteId) {
+    estIds = [estudanteId]
+  } else {
+    const pe = await fetchAll<any>(() => svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).eq('tenant_id', tenantId).order('estudante_id'))
+    estIds = [...new Set(pe.map((r: any) => r.estudante_id).filter(Boolean))]
+    // `limite` (preview do editor): computa a mala direta só para os N primeiros — evita
+    // processar milhares de alunos só para popular o seletor de pré-visualização.
+    if (limite && limite > 0) estIds = estIds.slice(0, limite)
+  }
   if (!estIds.length) return []
-  const { data: alunos } = await svc.from('simulado_estudantes').select('id, nome, email, telefone, cpf, classificacao').in('id', estIds).order('nome')
+  const alunos = await fetchAllByIn<any>(estIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, telefone, cpf, classificacao').in('id', chunk).order('nome'))
 
   // Letra de cada alternativa (por ordem) → fallback p/ respostas antigas sem a letra.
   const altLetra = new Map<string, string>() // alternativaId → "A"/"B"…
   const corretaLetra = new Map<string, string>() // questaoId → letra da alternativa correta
   if (qids.length) {
-    const { data: alts } = await svc.from('simulado_alternativas').select('id, questao_id, ordem, correta').in('questao_id', qids)
+    const alts = await fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_alternativas').select('id, questao_id, ordem, correta').in('questao_id', chunk).order('id'))
     const porQ = new Map<string, any[]>()
-    for (const a of alts ?? []) { const arr = porQ.get(a.questao_id) ?? []; arr.push(a); porQ.set(a.questao_id, arr) }
+    for (const a of alts) { const arr = porQ.get(a.questao_id) ?? []; arr.push(a); porQ.set(a.questao_id, arr) }
     for (const [qid, arr] of porQ) arr.sort((x, y) => x.ordem - y.ordem).forEach((a, i) => {
       altLetra.set(a.id, LETRA[i] ?? '?')
       if (a.correta) corretaLetra.set(qid, LETRA[i] ?? '?')
@@ -78,16 +92,17 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
   const marcadaPorAluno = new Map<string, Map<string, string>>() // est → (questaoId → letra)
   const infoPorAluno = new Map<string, Record<string, string>>() // est → { data, inicio, termino, tempo_total, respondidas, em_branco }
   if (qids.length) {
-    let sq = svc.from('simulado_sessoes_prova').select('id, estudante_id, iniciado_em, finalizado_em, status').in('estudante_id', estIds).eq('is_teste', false).eq('deletado', false)
-    if (sessaoId) sq = sq.eq('id', sessaoId)
-    const { data: sessoes } = await sq
-    const allSessIds = (sessoes ?? []).map((s: any) => s.id)
+    // Sessão exata (sessaoId) ou todas as tentativas reais dos alunos (paginado).
+    const sessoes = sessaoId
+      ? await fetchAll<any>(() => svc.from('simulado_sessoes_prova').select('id, estudante_id, iniciado_em, finalizado_em, status').eq('id', sessaoId).eq('deletado', false).order('id'))
+      : await fetchAllByIn<any>(estIds, (chunk) => svc.from('simulado_sessoes_prova').select('id, estudante_id, iniciado_em, finalizado_em, status').in('estudante_id', chunk).eq('is_teste', false).eq('deletado', false).order('id'))
+    const allSessIds = sessoes.map((s: any) => s.id)
 
     // Carrega as respostas de TODAS as sessões candidatas (pra saber quais têm respostas).
     const respPorSessao = new Map<string, any[]>()
     if (allSessIds.length) {
-      const { data: resp } = await svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta, alternativa_id, snapshot_gabarito').in('sessao_id', allSessIds).in('questao_id', qids)
-      for (const r of resp ?? []) { const arr = respPorSessao.get((r as any).sessao_id) ?? []; arr.push(r); respPorSessao.set((r as any).sessao_id, arr) }
+      const resp = await fetchAllByIn<any>(allSessIds, (chunk) => svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta, alternativa_id, snapshot_gabarito').in('sessao_id', chunk).in('questao_id', qids).order('id'))
+      for (const r of resp) { const arr = respPorSessao.get((r as any).sessao_id) ?? []; arr.push(r); respPorSessao.set((r as any).sessao_id, arr) }
     }
 
     // 1 sessão por aluno (a indicada, ou a "melhor"): prioriza ter RESPOSTAS, depois

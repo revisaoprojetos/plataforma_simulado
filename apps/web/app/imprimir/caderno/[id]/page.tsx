@@ -152,7 +152,9 @@ export default async function CadernoImprimirPage({
   let copias: { rotulo: string; data: CadernoData }[] = [{ rotulo: '', data }]
   if (bancoId && (todos === '1' || aluno)) {
     const { data: banco } = await svc.from('simulado_pastas').select('nome').eq('id', bancoId).maybeSingle()
-    const registros = await carregarRegistros(svc, access.tenantId ?? '00000000-0000-0000-0000-000000000000', bancoId, (banco as any)?.nome ?? caderno.nome, sessao)
+    // Diagnóstico individual (aluno definido): escopa a mala direta a ESSE aluno — rápido e
+    // sem o teto de 1000 que fazia sair em branco para quem estava além do 1000 no banco.
+    const registros = await carregarRegistros(svc, access.tenantId ?? '00000000-0000-0000-0000-000000000000', bancoId, (banco as any)?.nome ?? caderno.nome, sessao, todos === '1' ? undefined : (aluno || undefined))
     const escolhidos = todos === '1' ? registros : registros.filter((r) => r.id === aluno)
     if (escolhidos.length) copias = escolhidos.map((r) => ({ rotulo: r.nome, data: { ...data, vars: { ...data.vars, ...r.vars }, respostas: r.respostas } }))
   }

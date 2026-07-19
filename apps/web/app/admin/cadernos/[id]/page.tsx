@@ -75,7 +75,8 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
   }
 
   // Mala direta: alunos do banco vinculado, com suas variáveis reais.
-  const registros = bancoId ? await carregarRegistros(svc, access.tenantId ?? '00000000-0000-0000-0000-000000000000', bancoId, bancoNome ?? caderno.nome) : []
+  // Preview do editor: só os primeiros alunos populam o seletor (não os milhares do banco).
+  const registros = bancoId ? await carregarRegistros(svc, access.tenantId ?? '00000000-0000-0000-0000-000000000000', bancoId, bancoNome ?? caderno.nome, undefined, undefined, 500) : []
   if (registros.length) previewData.vars = { ...previewData.vars, ...registros[0].vars }
 
   previewData.gabaritoLiberado = true // no editor a correção sempre aparece (para desenhar)
