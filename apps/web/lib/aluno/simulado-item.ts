@@ -1,6 +1,18 @@
 import type { VisualSim } from '@/lib/aluno/simulado-visual'
+import { formatBrt } from '@/lib/brt'
 
-const fmt = (d?: string | null) => (d ? new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : null)
+// Sempre no horário de Brasília, para casar com o admin.
+const fmt = (d?: string | null) => formatBrt(d)
+
+/** Janela do simulado: início e fim; só o início quando não há fim. */
+function janelaTexto(inicio?: string | null, fim?: string | null): string | null {
+  const i = fmt(inicio)
+  const f = fmt(fim)
+  if (i && f) return `Início ${i} · Encerra ${f}`
+  if (i) return `Início ${i}`
+  if (f) return `Encerra ${f}`
+  return null
+}
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000
 
@@ -53,9 +65,11 @@ export function montarItensSimulado(
     if (modo === 'janela_fixa') {
       const ini = s.data_inicio ? new Date(s.data_inicio).getTime() : null
       const fim = s.data_fim ? new Date(s.data_fim).getTime() : null
-      if (ini && now < ini) { statusLabel = 'Agendado'; windowOk = false; quando = `Abre ${fmt(s.data_inicio)}`; tom = 'slate' }
-      else if (fim && now > fim) { statusLabel = 'Encerrado'; windowOk = false; quando = `Encerrou ${fmt(s.data_fim)}`; tom = 'rose' }
-      else { statusLabel = 'Ao vivo'; aoVivo = true; quando = fim ? `Encerra ${fmt(s.data_fim)}` : null; tom = 'emerald' }
+      // Card sempre mostra a janela completa (início e fim; só início se não houver fim).
+      quando = janelaTexto(s.data_inicio, s.data_fim)
+      if (ini && now < ini) { statusLabel = 'Agendado'; windowOk = false; tom = 'slate' }
+      else if (fim && now > fim) { statusLabel = 'Encerrado'; windowOk = false; tom = 'rose' }
+      else { statusLabel = 'Ao vivo'; aoVivo = true; tom = 'emerald' }
     } else if (modo === 'prazo_relativo') {
       const exp = expiraPorSim.get(s.id)
       if (exp && now > new Date(exp).getTime()) { statusLabel = 'Prazo expirado'; windowOk = false; quando = `Expirou ${fmt(exp)}`; tom = 'rose' }

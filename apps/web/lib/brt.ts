@@ -32,5 +32,14 @@ export function isoParaBrtLocal(iso?: string | null): string {
   return br.toISOString().slice(0, 16)
 }
 
+/** Formata um ISO/UTC como "DD/MM/AAAA HH:mm" no horário de Brasília (para exibir). */
+export function formatBrt(iso?: string | null): string | null {
+  const s = isoParaBrtLocal(iso)
+  if (!s) return null
+  const [d, t] = s.split('T')
+  const [y, mo, da] = d.split('-')
+  return `${da}/${mo}/${y} ${t}`
+}
+
 /** Rótulo padrão exibido ao lado dos campos de data/hora. */
 export const BRT_LABEL = 'Horário de Brasília (UTC−3)'

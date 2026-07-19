@@ -48,7 +48,7 @@ export function CardSimulado({ s }: { s: ItemSimulado }) {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
         {s.emAndamento && <span className="mb-1 inline-block rounded-md bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white backdrop-blur">Em andamento</span>}
         <h3 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{s.titulo}</h3>
-        {s.quando && <p className="mt-1 flex items-center gap-1 text-xs text-white/80"><Clock className="h-3 w-3" /> {s.quando}</p>}
+        {s.quando && <p className="mt-1 flex items-start gap-1 text-xs leading-snug text-white/80"><Clock className="mt-0.5 h-3 w-3 shrink-0" /> <span>{s.quando}</span></p>}
         {s.refazer && !s.emAndamento && <p className="text-[11px] text-white/70">Já feito {s.finalizadas}x{Number.isFinite(s.restantes) ? ` · ${s.restantes} restante(s)` : ''}</p>}
         {s.podeFazer ? (
           <span className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-black shadow-sm">
