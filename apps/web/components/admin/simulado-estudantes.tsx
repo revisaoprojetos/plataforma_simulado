@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { listarEstudantesSimulado, type EstudanteLinkado } from '@/app/admin/simulados/actions'
 
 type Campo = 'nome' | 'email' | 'situacao' | 'nota'
-const POR_PAGINA = 12
+const POR_PAGINA = 11
 
 const situacaoCfg: Record<string, { label: string; cls: string }> = {
   finalizou: { label: 'Finalizou', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
