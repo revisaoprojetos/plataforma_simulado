@@ -236,11 +236,16 @@ function CardItem({ s, appUrl }: { s: SimuladoCard; appUrl: string }) {
           <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur"><Clock className="h-3 w-3" /> {formatDur(s.tempo_limite_min)}</span>
         </div>
         {/* Janela do simulado (horário de Brasília): início e fim; só início quando não há fim. */}
-        {s.data_inicio && (
+        {s.modo_aplicacao === 'janela_fixa' && s.data_inicio ? (
           <div className="mt-1.5 space-y-0.5 text-[11px] font-medium text-white/85">
             <p className="flex items-center gap-1"><Calendar className="h-3 w-3 shrink-0" /> Início: {formatBrt(s.data_inicio)}</p>
             {s.data_fim && <p className="flex items-center gap-1"><Square className="h-3 w-3 shrink-0" /> Encerra: {formatBrt(s.data_fim)}</p>}
           </div>
+        ) : (
+          <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-white/85">
+            <Calendar className="h-3 w-3 shrink-0" />
+            {s.modo_aplicacao === 'aberto' ? 'Sempre disponível' : s.modo_aplicacao === 'prazo_relativo' ? 'Prazo definido por aluno' : 'Sem data definida'}
+          </p>
         )}
         {(estado.nota || estado.gabarito || estado.caderno) && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
