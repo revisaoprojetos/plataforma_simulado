@@ -12,7 +12,7 @@ import { SimuladoRecorrecao } from '@/components/admin/simulado-recorrecao'
 import { SimuladoAcessos } from '@/components/admin/simulado-acessos'
 import { SimuladoLiberacoes } from '@/components/admin/simulado-liberacoes'
 import { CopyLink } from '@/components/admin/copy-link'
-import { updateSimuladoAction } from '../actions'
+import { updateSimuladoAction, listarSessoesSimulado } from '../actions'
 import Link from 'next/link'
 import { ChevronLeft, Code, Layers, CalendarClock, Clock, KeyRound, Link2 } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
@@ -114,6 +114,9 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
     .order('atualizado_em', { ascending: false })
   const cadernos = (cadernosRaw ?? []).map((c: any) => ({ id: c.id as string, nome: (c.nome as string) ?? 'Caderno' }))
   const cadernoVinculado = ((simulado.regras as Record<string, unknown> | null)?.caderno_id as string | undefined) ?? null
+
+  // Sessões da aba (todas, com nome do aluno) — renderizadas no servidor, sem spinner no client.
+  const sessoesTab = (await listarSessoesSimulado(id)).sessoes ?? []
 
   // Tipo do simulado (objetiva/discursiva/mista) derivado das questões vinculadas.
   const tipoSim = tipoDoSimulado((questoes ?? []).map((sq: any) => sq.questoes?.tipo))
@@ -382,7 +385,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
               <CardDescription>Todas as sessões deste simulado, com busca, filtros e ordenação.</CardDescription>
             </CardHeader>
             <CardContent>
-              <SimuladoSessoes simuladoId={id} />
+              <SimuladoSessoes sessoes={sessoesTab} />
             </CardContent>
           </Card>
         </TabsContent>

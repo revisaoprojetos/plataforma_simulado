@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, ArrowUpDown, ListChecks } from 'lucide-react'
+import { Search, ArrowUpDown, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatBrt } from '@/lib/brt'
-import { listarSessoesSimulado, type SessaoLinkada } from '@/app/admin/simulados/actions'
+import type { SessaoLinkada } from '@/app/admin/simulados/actions'
 
 type Campo = 'estudante' | 'status' | 'nota' | 'iniciado_em'
 const POR_PAGINA = 11
@@ -17,27 +17,13 @@ const statusCfg: Record<string, { label: string; cls: string }> = {
   aguardando: { label: 'Aguardando', cls: 'bg-muted text-muted-foreground' },
 }
 
-export function SimuladoSessoes({ simuladoId }: { simuladoId: string }) {
-  const [carregando, setCarregando] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
-  const [dados, setDados] = useState<SessaoLinkada[]>([])
-
+export function SimuladoSessoes({ sessoes: dados }: { sessoes: SessaoLinkada[] }) {
   const [busca, setBusca] = useState('')
   const [fStatus, setFStatus] = useState<'todos' | 'finalizada' | 'em_andamento' | 'aguardando'>('todos')
   const [fTeste, setFTeste] = useState<'todos' | 'reais' | 'teste'>('todos')
   const [campo, setCampo] = useState<Campo>('iniciado_em')
   const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [pagina, setPagina] = useState(1)
-
-  useEffect(() => {
-    let vivo = true
-    setCarregando(true)
-    listarSessoesSimulado(simuladoId)
-      .then((r) => { if (!vivo) return; if (r.error) setErro(r.error); else setDados(r.sessoes ?? []) })
-      .catch(() => vivo && setErro('Falha ao carregar sessões.'))
-      .finally(() => vivo && setCarregando(false))
-    return () => { vivo = false }
-  }, [simuladoId])
 
   const filtrados = useMemo(() => {
     const q = busca.toLowerCase().trim()
@@ -71,13 +57,6 @@ export function SimuladoSessoes({ simuladoId }: { simuladoId: string }) {
   }
 
   const nTeste = dados.filter((s) => s.is_teste).length
-
-  if (carregando) {
-    return <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> Carregando sessões…</div>
-  }
-  if (erro) {
-    return <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{erro}</div>
-  }
 
   const Th = ({ c, children, className }: { c: Campo; children: React.ReactNode; className?: string }) => (
     <TableHead className={className}>
