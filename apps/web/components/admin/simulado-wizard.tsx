@@ -8,9 +8,10 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ListChecks, PenLine, Check, ChevronLeft, ChevronRight, Loader2, Search, Settings2, Users, Sparkles, FileText, CalendarClock, ShieldCheck, Info } from 'lucide-react'
+import { ListChecks, PenLine, Check, ChevronLeft, ChevronRight, Loader2, Search, Settings2, Users, Sparkles, FileText, CalendarClock, ShieldCheck, Info, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
+import { BRT_LABEL } from '@/lib/brt'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { toast } from 'sonner'
 
@@ -48,10 +49,10 @@ export function SimuladoWizard({
     prazo_valor: '', prazo_unidade: 'dias', tempo_limite_min: '', metodo_identificacao: 'email', embed_ativo: false,
   })
   const [regras, setRegras] = useState<Record<string, any>>({
-    embaralhar_questoes: true, embaralhar_alternativas: true, revisao_antes_enviar: true,
-    retentativas: 1, politica_nota: 'ultima',
+    embaralhar_questoes: false, embaralhar_alternativas: false, revisao_antes_enviar: true,
+    retentativas: 1, retentativas_ilimitadas: false, politica_nota: 'ultima',
     liberar_nota: 'manual', liberar_gabarito: 'manual', liberar_caderno: 'manual', caderno_publico: 'todos',
-    iniciar_atrasado: false, tempo_por_questao_seg: '', exibir_nota: true, mostrar_comentario: true, peso_padrao: 1,
+    iniciar_atrasado: false, tolerancia_atraso_min: '', tempo_por_questao_seg: '', exibir_nota: false, mostrar_comentario: false, peso_padrao: 1,
   })
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [estSel, setEstSel] = useState<Set<string>>(new Set())
@@ -131,9 +132,13 @@ export function SimuladoWizard({
         embed_ativo: info.embed_ativo,
         regras: {
           ...regras, tipo,
-          retentativas: Number(regras.retentativas) || 1,
+          // Ilimitadas = sem teto de tentativas: guardamos null (o motor trata <=0 como ilimitado).
+          retentativas: regras.retentativas_ilimitadas ? null : (Number(regras.retentativas) || 1),
+          retentativas_ilimitadas: !!regras.retentativas_ilimitadas,
           peso_padrao: Number(regras.peso_padrao) || 1,
           tempo_por_questao_seg: regras.tempo_por_questao_seg ? Number(regras.tempo_por_questao_seg) : null,
+          // Tolerância de atraso só faz sentido quando "iniciar atrasado" está ligado.
+          tolerancia_atraso_min: regras.iniciar_atrasado && regras.tolerancia_atraso_min ? Number(regras.tolerancia_atraso_min) : null,
           instrucoes: info.instrucoes.trim() || null,
           ...(info.modo_aplicacao === 'prazo_relativo' ? { prazo_valor: Number(info.prazo_valor) || null, prazo_unidade: info.prazo_unidade } : {}),
         },
@@ -321,9 +326,12 @@ export function SimuladoWizard({
                   </div>
                 </div>
                 {info.modo_aplicacao === 'janela_fixa' && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2"><Label>Início</Label><Input type="datetime-local" value={info.data_inicio} onChange={(e) => set('data_inicio', e.target.value)} /></div>
-                    <div className="space-y-2"><Label>Fim</Label><Input type="datetime-local" value={info.data_fim} onChange={(e) => set('data_fim', e.target.value)} /></div>
+                  <div className="space-y-1.5">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2"><Label>Início</Label><Input type="datetime-local" value={info.data_inicio} onChange={(e) => set('data_inicio', e.target.value)} /></div>
+                      <div className="space-y-2"><Label>Fim</Label><Input type="datetime-local" value={info.data_fim} onChange={(e) => set('data_fim', e.target.value)} /></div>
+                    </div>
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Clock className="h-3.5 w-3.5" /> {BRT_LABEL} — informe e confira sempre no horário de Brasília.</p>
                   </div>
                 )}
                 {info.modo_aplicacao === 'prazo_relativo' && (
@@ -466,12 +474,29 @@ export function SimuladoWizard({
                 <Toggle label="Embaralhar questões" v={regras.embaralhar_questoes} on={(v) => setR('embaralhar_questoes', v)} />
                 <Toggle label="Embaralhar alternativas" v={regras.embaralhar_alternativas} on={(v) => setR('embaralhar_alternativas', v)} dim={tipo === 'discursivo'} />
                 <Toggle label="Revisão antes de enviar" v={regras.revisao_antes_enviar} on={(v) => setR('revisao_antes_enviar', v)} />
-                <Toggle label="Permitir iniciar atrasado" v={regras.iniciar_atrasado} on={(v) => setR('iniciar_atrasado', v)} />
+                {/* Iniciar atrasado + tolerância (aparece só quando ligado) */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <Toggle label="Permitir iniciar atrasado" v={regras.iniciar_atrasado} on={(v) => setR('iniciar_atrasado', v)} />
+                  {regras.iniciar_atrasado && (
+                    <div className="flex items-center gap-1.5">
+                      <Label className="whitespace-nowrap text-xs text-muted-foreground">até</Label>
+                      <Input type="number" min={1} value={regras.tolerancia_atraso_min} onChange={(e) => setR('tolerancia_atraso_min', e.target.value)} placeholder="30" className="h-8 w-20" />
+                      <span className="text-xs text-muted-foreground">min de atraso</span>
+                    </div>
+                  )}
+                </div>
                 <Toggle label="Exibir nota ao aluno" v={regras.exibir_nota} on={(v) => setR('exibir_nota', v)} />
                 <Toggle label="Mostrar comentário do professor" v={regras.mostrar_comentario} on={(v) => setR('mostrar_comentario', v)} />
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-2"><Label>Tentativas permitidas</Label><Input type="number" min={1} value={regras.retentativas} onChange={(e) => setR('retentativas', e.target.value)} /></div>
+                <div className="space-y-2">
+                  <Label>Tentativas permitidas</Label>
+                  <Input type="number" min={1} value={regras.retentativas_ilimitadas ? '' : regras.retentativas} onChange={(e) => setR('retentativas', e.target.value)} disabled={regras.retentativas_ilimitadas} placeholder={regras.retentativas_ilimitadas ? 'Ilimitadas' : '1'} />
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                    <input type="checkbox" checked={!!regras.retentativas_ilimitadas} onChange={(e) => setR('retentativas_ilimitadas', e.target.checked)} className="h-3.5 w-3.5 rounded border" />
+                    Ilimitadas (pode fazer várias vezes)
+                  </label>
+                </div>
                 <div className="space-y-2">
                   <Label>Política de nota</Label>
                   <Select value={regras.politica_nota} onValueChange={(v) => setR('politica_nota', v)} items={{ ultima: 'Última', melhor: 'Melhor', media: 'Média' }}>

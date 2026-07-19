@@ -8,6 +8,7 @@ import { fetchAll } from '@/lib/supabase/fetch-all'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
+import { brtLocalParaIso } from '@/lib/brt'
 
 interface SimuladoData {
   titulo: string
@@ -42,8 +43,9 @@ export async function createSimuladoAction(data: SimuladoData) {
       titulo: data.titulo,
       descricao: data.descricao || null,
       modo_aplicacao: data.modo_aplicacao,
-      data_inicio: data.data_inicio || null,
-      data_fim: data.data_fim || null,
+      // Datas informadas em horário de Brasília → gravadas em UTC.
+      data_inicio: brtLocalParaIso(data.data_inicio),
+      data_fim: brtLocalParaIso(data.data_fim),
       tempo_limite_min: data.tempo_limite_min || null,
       metodo_identificacao: data.metodo_identificacao || null,
       embed_ativo: data.embed_ativo ?? false,
@@ -119,8 +121,9 @@ export async function updateSimuladoAction(id: string, data: SimuladoData) {
     titulo: data.titulo,
     descricao: data.descricao || null,
     modo_aplicacao: data.modo_aplicacao,
-    data_inicio: data.data_inicio || null,
-    data_fim: data.data_fim || null,
+    // Datas informadas em horário de Brasília → gravadas em UTC.
+    data_inicio: brtLocalParaIso(data.data_inicio),
+    data_fim: brtLocalParaIso(data.data_fim),
     tempo_limite_min: data.tempo_limite_min || null,
     metodo_identificacao: data.metodo_identificacao || null,
     embed_ativo: data.embed_ativo ?? false,

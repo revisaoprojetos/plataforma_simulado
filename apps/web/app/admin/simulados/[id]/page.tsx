@@ -20,13 +20,12 @@ import { SimuladoAcessos } from '@/components/admin/simulado-acessos'
 import { SimuladoLiberacoes } from '@/components/admin/simulado-liberacoes'
 import { CopyLink } from '@/components/admin/copy-link'
 import { updateSimuladoAction } from '../actions'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
 import Link from 'next/link'
 import { ChevronLeft, Code, Layers, CalendarClock, Clock, KeyRound, Link2 } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
+import { isoParaBrtLocal } from '@/lib/brt'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -161,19 +160,21 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
 
   function formatDate(date: string | null) {
     if (!date) return '—'
-    return format(new Date(date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+    // Sempre no horário de Brasília, independente do fuso do servidor.
+    const s = isoParaBrtLocal(date)
+    if (!s) return '—'
+    const [d, t] = s.split('T')
+    const [y, mo, da] = d.split('-')
+    return `${da}/${mo}/${y} às ${t} (Brasília)`
   }
 
   const initialFormData = {
     titulo: simulado.titulo,
     descricao: simulado.descricao ?? undefined,
     modo_aplicacao: simulado.modo_aplicacao,
-    data_inicio: simulado.data_inicio
-      ? new Date(simulado.data_inicio).toISOString().slice(0, 16)
-      : undefined,
-    data_fim: simulado.data_fim
-      ? new Date(simulado.data_fim).toISOString().slice(0, 16)
-      : undefined,
+    // Banco guarda UTC; o form edita em horário de Brasília.
+    data_inicio: simulado.data_inicio ? isoParaBrtLocal(simulado.data_inicio) : undefined,
+    data_fim: simulado.data_fim ? isoParaBrtLocal(simulado.data_fim) : undefined,
     tempo_limite_min: simulado.tempo_limite_min ?? undefined,
     metodo_identificacao: simulado.metodo_identificacao ?? undefined,
     embed_ativo: simulado.embed_ativo ?? false,

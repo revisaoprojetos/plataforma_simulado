@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/accordion'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { BRT_LABEL } from '@/lib/brt'
 
 const simuladoSchema = z.object({
   titulo: z.string().min(3, 'Título deve ter ao menos 3 caracteres'),
@@ -41,7 +42,11 @@ const simuladoSchema = z.object({
       embaralhar_questoes: z.boolean().optional(),
       embaralhar_alternativas: z.boolean().optional(),
       revisao_antes_enviar: z.boolean().optional(),
+      exibir_nota: z.boolean().optional(),
+      mostrar_comentario: z.boolean().optional(),
       retentativas: z.coerce.number().optional(),
+      retentativas_ilimitadas: z.boolean().optional(),
+      tolerancia_atraso_min: z.coerce.number().optional(),
       politica_nota: z.enum(['ultima', 'melhor', 'media']).optional(),
       liberar_nota: z.enum(['imediato', 'apos_janela', 'manual']).optional(),
       liberar_gabarito: z.enum(['imediato', 'apos_janela', 'manual']).optional(),
@@ -77,10 +82,13 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
       modo_aplicacao: 'janela_fixa',
       embed_ativo: false,
       regras: {
-        embaralhar_questoes: true,
-        embaralhar_alternativas: true,
+        embaralhar_questoes: false,
+        embaralhar_alternativas: false,
         revisao_antes_enviar: true,
+        exibir_nota: false,
+        mostrar_comentario: false,
         retentativas: 1,
+        retentativas_ilimitadas: false,
         politica_nota: 'ultima',
         liberar_nota: 'imediato',
         liberar_gabarito: 'apos_janela',
@@ -96,10 +104,25 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
 
   const modo = watch('modo_aplicacao')
   const embedAtivo = watch('embed_ativo')
+  const iniciarAtrasado = watch('regras.iniciar_atrasado')
+  const tentIlimitadas = watch('regras.retentativas_ilimitadas')
+
+  // Tempo limite: guardado em MINUTOS no banco, mas editado em Horas + Minutos.
+  const minIniciais = Number(initialData?.tempo_limite_min ?? 0) || 0
+  const [tlHoras, setTlHoras] = useState(minIniciais ? String(Math.floor(minIniciais / 60)) : '')
+  const [tlMin, setTlMin] = useState(minIniciais ? String(minIniciais % 60) : '')
 
   async function handleFormSubmit(data: SimuladoFormData) {
     setIsLoading(true)
     try {
+      const totalMin = (Number(tlHoras) || 0) * 60 + (Number(tlMin) || 0)
+      data.tempo_limite_min = totalMin > 0 ? totalMin : undefined
+      if (data.regras) {
+        // Ilimitadas = sem teto (o motor trata retentativas<=0 como ilimitado).
+        if (data.regras.retentativas_ilimitadas) data.regras.retentativas = 0
+        // Tolerância de atraso só vale com "iniciar atrasado" ligado.
+        if (!data.regras.iniciar_atrasado) data.regras.tolerancia_atraso_min = undefined
+      }
       const result = await onSubmit(data)
       if (result?.error) {
         toast.error(result.error)
@@ -157,7 +180,7 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
           <div className="space-y-2">
             <Label>Modo de Aplicação *</Label>
             <Select
-              defaultValue={initialData?.modo_aplicacao ?? 'janela_fixa'}
+              value={modo ?? 'janela_fixa'}
               onValueChange={(v) => setValue('modo_aplicacao', v as SimuladoFormData['modo_aplicacao'])}
             >
               <SelectTrigger>
@@ -169,38 +192,45 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
                 <SelectItem value="aberto">Aberto (sempre disponível)</SelectItem>
               </SelectContent>
             </Select>
+            {modo !== 'janela_fixa' && (
+              <p className="text-xs text-muted-foreground">Para agendar data e horário, escolha <b>Janela Fixa</b>.</p>
+            )}
           </div>
 
           {(modo === 'janela_fixa') && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="data_inicio">Data/Hora de Início</Label>
-                <Input
-                  id="data_inicio"
-                  type="datetime-local"
-                  {...register('data_inicio')}
-                />
+            <div className="space-y-1.5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="data_inicio">Data/Hora de Início</Label>
+                  <Input
+                    id="data_inicio"
+                    type="datetime-local"
+                    {...register('data_inicio')}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="data_fim">Data/Hora de Fim</Label>
+                  <Input
+                    id="data_fim"
+                    type="datetime-local"
+                    {...register('data_fim')}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="data_fim">Data/Hora de Fim</Label>
-                <Input
-                  id="data_fim"
-                  type="datetime-local"
-                  {...register('data_fim')}
-                />
-              </div>
+              <p className="text-xs text-muted-foreground">{BRT_LABEL} — informe e confira sempre no horário de Brasília.</p>
             </div>
           )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="tempo_limite_min">Tempo Limite (minutos)</Label>
-              <Input
-                id="tempo_limite_min"
-                type="number"
-                placeholder="Ex: 300"
-                {...register('tempo_limite_min')}
-              />
+              <Label>Tempo Limite</Label>
+              <div className="flex items-center gap-2">
+                <Input type="number" min={0} value={tlHoras} onChange={(e) => setTlHoras(e.target.value)} placeholder="0" className="w-20" />
+                <span className="text-sm text-muted-foreground">h</span>
+                <Input type="number" min={0} max={59} value={tlMin} onChange={(e) => setTlMin(e.target.value)} placeholder="0" className="w-20" />
+                <span className="text-sm text-muted-foreground">min</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Em branco = sem limite individual.</p>
             </div>
 
             <div className="space-y-2">
@@ -261,7 +291,7 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
                 <div className="flex items-center gap-3">
                   <Switch
                     id="embaralhar_questoes"
-                    defaultChecked={initialData?.regras?.embaralhar_questoes ?? true}
+                    defaultChecked={initialData?.regras?.embaralhar_questoes ?? false}
                     onCheckedChange={(v) => setValue('regras.embaralhar_questoes', v)}
                   />
                   <Label htmlFor="embaralhar_questoes">Embaralhar ordem das questões</Label>
@@ -269,7 +299,7 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
                 <div className="flex items-center gap-3">
                   <Switch
                     id="embaralhar_alternativas"
-                    defaultChecked={initialData?.regras?.embaralhar_alternativas ?? true}
+                    defaultChecked={initialData?.regras?.embaralhar_alternativas ?? false}
                     onCheckedChange={(v) => setValue('regras.embaralhar_alternativas', v)}
                   />
                   <Label htmlFor="embaralhar_alternativas">Embaralhar alternativas</Label>
@@ -286,10 +316,20 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
                     id="retentativas"
                     type="number"
                     min={1}
-                    placeholder="1"
+                    placeholder={tentIlimitadas ? 'Ilimitadas' : '1'}
+                    disabled={!!tentIlimitadas}
                     {...register('regras.retentativas')}
-                    className="max-w-[120px]"
+                    className="max-w-[160px]"
                   />
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      defaultChecked={initialData?.regras?.retentativas_ilimitadas ?? false}
+                      onChange={(e) => setValue('regras.retentativas_ilimitadas', e.target.checked)}
+                      className="h-4 w-4 rounded border"
+                    />
+                    Ilimitadas (pode fazer várias vezes)
+                  </label>
                 </div>
                 <div className="space-y-2">
                   <Label>Política de Nota</Label>
@@ -384,11 +424,40 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
                 </div>
                 <div className="flex items-center gap-3">
                   <Switch
+                    id="exibir_nota"
+                    defaultChecked={initialData?.regras?.exibir_nota ?? false}
+                    onCheckedChange={(v) => setValue('regras.exibir_nota', v)}
+                  />
+                  <Label htmlFor="exibir_nota">Exibir nota ao aluno</Label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="mostrar_comentario"
+                    defaultChecked={initialData?.regras?.mostrar_comentario ?? false}
+                    onCheckedChange={(v) => setValue('regras.mostrar_comentario', v)}
+                  />
+                  <Label htmlFor="mostrar_comentario">Mostrar comentário do professor</Label>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Switch
                     id="iniciar_atrasado"
-                    defaultChecked={initialData?.regras?.iniciar_atrasado ?? false}
+                    checked={!!iniciarAtrasado}
                     onCheckedChange={(v) => setValue('regras.iniciar_atrasado', v)}
                   />
                   <Label htmlFor="iniciar_atrasado">Permitir iniciar após a hora de início</Label>
+                  {iniciarAtrasado && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">até</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        placeholder="30"
+                        {...register('regras.tolerancia_atraso_min')}
+                        className="h-8 w-20"
+                      />
+                      <span className="text-xs text-muted-foreground">min de atraso</span>
+                    </span>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Política de Anulação</Label>
