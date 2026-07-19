@@ -22,6 +22,8 @@ export async function registrarRelatorioEvento(svc: SupabaseClient, e: Evento): 
       estudante_id: e.estudanteId ?? null,
       sessao_id: e.sessaoId ?? null,
       tipo: e.tipo,
+      // Sem DEFAULT no banco migrado — seta explícito (senão fica null → data vazia).
+      criado_em: new Date().toISOString(),
     })
   } catch {
     // ignora

@@ -72,6 +72,8 @@ export async function registrarAudit(params: AuditParams): Promise<void> {
       detalhes: { antes: params.antes ?? null, depois: params.depois ?? null },
       ip,
       user_agent: ua,
+      // A coluna não tem DEFAULT no banco migrado — seta explícito (senão fica null → data vazia).
+      criado_em: new Date().toISOString(),
     })
     if (error) console.error('[audit] insert falhou:', error.message, '| ip=', ip)
   } catch (e) {

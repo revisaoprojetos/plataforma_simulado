@@ -117,6 +117,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
   const nomesEst = new Map<string, { nome: string; email: string | null }>()
   const nomesSim = new Map<string, string>()
   const nomesAuto = new Map<string, string>()
+  const nomesAtor = new Map<string, string>()
 
   if (view === 'audit' || view === 'automacoes') {
     let query = supabase
@@ -148,6 +149,14 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
     if (acessosEstud && sub === 'plataforma' && logs?.length) {
       const ids = [...new Set(logs.filter((l) => isUuid(l.entidade_id)).map((l) => l.entidade_id as string))]
       if (ids.length) { const { data } = await supabase.from('simulado_estudantes').select('id, nome, email').in('id', ids); for (const e of data ?? []) nomesEst.set((e as any).id, { nome: (e as any).nome, email: (e as any).email }) }
+    }
+    // Registros (não-plataforma): resolve o NOME do ator (admin) pelo ator_id.
+    if (!ehAuto && !(acessosEstud && sub === 'plataforma') && logs?.length) {
+      const atorIds = [...new Set(logs.map((l) => l.ator_id).filter(isUuid))] as string[]
+      if (atorIds.length) {
+        const { data: adm } = await supabase.from('simulado_tenant_admins').select('user_id, nome').in('user_id', atorIds)
+        for (const a of adm ?? []) if ((a as any).user_id) nomesAtor.set((a as any).user_id, (a as any).nome)
+      }
     }
   } else if (view === 'sessoes') {
     let q = supabase.from('simulado_sessoes_prova')
@@ -264,18 +273,24 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
 
       {view === 'audit' && !(acessosEstud && sub === 'plataforma') && (
         <TabelaCard titulo="Registros" subtitulo={`${count ?? 0} entrada(s)`} sort={sortCtx}
-          cols={[{ label: 'Data/Hora', w: '18%', sort: 'criado_em' }, { label: 'Ação', w: '13%', sort: 'operacao' }, { label: 'Módulo', w: '22%', sort: 'entidade' }, { label: 'Ator', w: '20%' }, { label: 'IP', w: '15%' }, { label: 'Detalhes', w: '12%' }]}
+          cols={[{ label: 'Data/Hora', w: '17%', sort: 'criado_em' }, { label: 'Ator & Nome', w: '24%' }, { label: 'Ação', w: '13%', sort: 'operacao' }, { label: 'Módulo', w: '20%', sort: 'entidade' }, { label: 'IP', w: '14%' }, { label: 'Detalhes', w: '12%' }]}
           vazio="Nenhum registro encontrado." temLinhas={!!logs?.length}>
-          {(logs ?? []).map((log) => (
-            <TableRow key={log.id}>
-              <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(log.criado_em)}</TableCell>
-              <TableCell className="truncate"><Badge variant={acaoVariant[log.operacao] ?? 'outline'}>{log.operacao}</Badge></TableCell>
-              <TableCell className="truncate font-mono text-xs text-muted-foreground" title={log.entidade}>{log.entidade}</TableCell>
-              <TableCell className="truncate text-xs text-muted-foreground"><span className="font-medium">{log.ator_tipo}</span>{log.ator_id && <span className="ml-1 font-mono opacity-60">{String(log.ator_id).slice(0, 8)}…</span>}</TableCell>
-              <TableCell className="truncate text-xs text-muted-foreground">{log.ip ? String(log.ip) : '—'}</TableCell>
-              <TableCell><DetalhesCell log={log} /></TableCell>
-            </TableRow>
-          ))}
+          {(logs ?? []).map((log) => {
+            const nome = isUuid(log.ator_id) ? nomesAtor.get(log.ator_id) : null
+            return (
+              <TableRow key={log.id}>
+                <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(log.criado_em)}</TableCell>
+                <TableCell className="truncate" title={nome ?? log.ator_tipo}>
+                  <span className="font-medium">{nome ?? '—'}</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">{log.ator_tipo}{!nome && log.ator_id ? ` · ${String(log.ator_id).slice(0, 8)}…` : ''}</span>
+                </TableCell>
+                <TableCell className="truncate"><Badge variant={acaoVariant[log.operacao] ?? 'outline'}>{log.operacao}</Badge></TableCell>
+                <TableCell className="truncate font-mono text-xs text-muted-foreground" title={log.entidade}>{log.entidade}</TableCell>
+                <TableCell className="truncate text-xs text-muted-foreground">{log.ip ? String(log.ip) : '—'}</TableCell>
+                <TableCell><DetalhesCell log={log} /></TableCell>
+              </TableRow>
+            )
+          })}
         </TabelaCard>
       )}
 
