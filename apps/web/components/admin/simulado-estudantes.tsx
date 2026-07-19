@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { listarEstudantesSimulado, type EstudanteLinkado } from '@/app/admin/simulados/actions'
 
 type Campo = 'nome' | 'email' | 'situacao' | 'nota'
-const POR_PAGINA = 25
+const POR_PAGINA = 12
 
 const situacaoCfg: Record<string, { label: string; cls: string }> = {
   finalizou: { label: 'Finalizou', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
@@ -112,9 +112,9 @@ export function SimuladoEstudantes({ simuladoId }: { simuladoId: string }) {
         {filtrados.length} de {dados.length} estudante(s) linkado(s){nPassaporte ? ` · ${nPassaporte} passaporte` : ''}
       </p>
 
-      <div className="max-h-[calc(100vh-360px)] overflow-auto rounded-lg border">
+      <div className="overflow-hidden rounded-lg border">
         <Table>
-          <TableHeader className="sticky top-0 z-10 bg-background shadow-[0_1px_0_0_var(--border)]">
+          <TableHeader>
             <TableRow>
               <Th c="nome">Nome</Th>
               <Th c="email">E-mail</Th>
