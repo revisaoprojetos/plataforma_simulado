@@ -12,12 +12,12 @@ import { PaginationControls } from '@/components/admin/pagination-controls'
 import { isoParaBrtLocal } from '@/lib/brt'
 import { cn } from '@/lib/utils'
 
-const ITEMS_PER_PAGE = 30
+const ITEMS_PER_PAGE = 12
 
 interface PageProps {
   searchParams: Promise<{
     page?: string; tipo?: string; area?: string; sub?: string; ord?: string; dir?: string
-    acao?: string; entidade?: string; data_inicio?: string; data_fim?: string
+    q?: string; acao?: string; entidade?: string; data_inicio?: string; data_fim?: string
   }>
 }
 
@@ -99,6 +99,20 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
   const sortHref = (key: string) => `/admin/auditoria?${new URLSearchParams({ ...baseSort, ord: key, dir: ord === key && dir === 'desc' ? 'asc' : 'desc' }).toString()}`
   const sortCtx: SortCtx = { ord, dir, href: sortHref }
 
+  // Busca (q): nas visões de estudante, procura por nome/e-mail do aluno (e título do simulado);
+  // nas de audit_logs, procura por módulo/ação. Resolvida em ids para filtrar server-side.
+  const like = (params.q ?? '').replace(/[%,()*]/g, ' ').trim()
+  const NADA = '00000000-0000-0000-0000-000000000000'
+  let estIdsQ: string[] | null = null, simIdsQ: string[] | null = null
+  if (like && (view === 'sessoes' || view === 'eventos' || (acessosEstud && sub === 'plataforma'))) {
+    const { data } = await supabase.from('simulado_estudantes').select('id').eq('tenant_id', tid).eq('deletado', false).or(`nome.ilike.%${like}%,email.ilike.%${like}%`).limit(300)
+    estIdsQ = (data ?? []).map((e: any) => e.id)
+  }
+  if (like && (view === 'sessoes' || view === 'eventos')) {
+    const { data } = await supabase.from('simulado_simulados').select('id').eq('tenant_id', tid).ilike('titulo', `%${like}%`).limit(200)
+    simIdsQ = (data ?? []).map((s: any) => s.id)
+  }
+
   let logs: any[] | null = null, sessoes: any[] | null = null, eventos: any[] | null = null, count = 0
   const nomesEst = new Map<string, { nome: string; email: string | null }>()
   const nomesSim = new Map<string, string>()
@@ -119,6 +133,10 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
     if (params.entidade) query = query.ilike('entidade', `%${params.entidade}%`)
     if (params.data_inicio) query = query.gte('criado_em', params.data_inicio)
     if (params.data_fim) query = query.lte('criado_em', params.data_fim + 'T23:59:59Z')
+    if (like) {
+      if (acessosEstud && sub === 'plataforma') query = estIdsQ?.length ? query.in('entidade_id', estIdsQ) : query.eq('id', NADA)
+      else query = query.or(`entidade.ilike.%${like}%,operacao.ilike.%${like}%`)
+    }
     const r = await query; logs = r.data; count = r.count ?? 0
 
     if (ehAuto && logs?.length) {
@@ -137,6 +155,12 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
       .eq('tenant_id', tid).eq('is_teste', false).eq('deletado', false)
     if (params.data_inicio) q = q.gte('iniciado_em', params.data_inicio)
     if (params.data_fim) q = q.lte('iniciado_em', params.data_fim + 'T23:59:59Z')
+    if (like) {
+      const parts: string[] = []
+      if (estIdsQ?.length) parts.push(`estudante_id.in.(${estIdsQ.join(',')})`)
+      if (simIdsQ?.length) parts.push(`simulado_id.in.(${simIdsQ.join(',')})`)
+      q = parts.length ? q.or(parts.join(',')) : q.eq('id', NADA)
+    }
     q = q.order(ord, { ascending: dir === 'asc', nullsFirst: false }).range(offset, offset + ITEMS_PER_PAGE - 1)
     const r = await q; sessoes = r.data; count = r.count ?? 0
   } else if (view === 'eventos') {
@@ -145,6 +169,12 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
       .eq('tenant_id', tid)
     if (params.data_inicio) q = q.gte('criado_em', params.data_inicio)
     if (params.data_fim) q = q.lte('criado_em', params.data_fim + 'T23:59:59Z')
+    if (like) {
+      const parts: string[] = []
+      if (estIdsQ?.length) parts.push(`estudante_id.in.(${estIdsQ.join(',')})`)
+      if (simIdsQ?.length) parts.push(`simulado_id.in.(${simIdsQ.join(',')})`)
+      q = parts.length ? q.or(parts.join(',')) : q.eq('id', NADA)
+    }
     q = q.order(ord, { ascending: dir === 'asc' }).range(offset, offset + ITEMS_PER_PAGE - 1)
     const r = await q; eventos = r.data; count = r.count ?? 0
   }
@@ -188,7 +218,10 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      <AuditoriaFilters />
+      <AuditoriaFilters
+        mostrarAcao={view === 'audit' && !(acessosEstud && sub === 'plataforma')}
+        buscaPlaceholder={view === 'sessoes' || view === 'eventos' ? 'Buscar por estudante ou simulado…' : acessosEstud ? 'Buscar por estudante…' : 'Buscar por módulo ou ação…'}
+      />
 
       {view === 'automacoes' && (
         <TabelaCard titulo="Automações" subtitulo={`${count ?? 0} evento(s)`} sort={sortCtx}
@@ -309,7 +342,7 @@ function TabelaCard({ titulo, subtitulo, cols, vazio, temLinhas, sort, children 
       <SecaoHeader icon={ScrollText} titulo={titulo} subtitulo={subtitulo} />
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <Table className="w-full table-fixed">
+          <Table className="w-full table-fixed text-sm [&_td]:py-2 [&_th]:h-9 [&_th]:py-0">
             <colgroup>{cols.map((c, i) => <col key={i} style={{ width: c.w }} />)}</colgroup>
             <TableHeader>
               <TableRow>{cols.map((c) => <SortHead key={c.label} col={c} sort={sort} />)}</TableRow>
