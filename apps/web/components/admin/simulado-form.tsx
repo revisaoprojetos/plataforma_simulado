@@ -193,7 +193,12 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
               </SelectContent>
             </Select>
             {modo !== 'janela_fixa' && (
-              <p className="text-xs text-muted-foreground">Para agendar data e horário, escolha <b>Janela Fixa</b>.</p>
+              <p className="text-xs text-muted-foreground">
+                Para agendar data e horário,{' '}
+                <button type="button" onClick={() => setValue('modo_aplicacao', 'janela_fixa')} className="font-medium text-primary underline underline-offset-2 hover:opacity-80">
+                  mudar para Janela Fixa
+                </button>{' '}— os campos de data/hora aparecem logo abaixo.
+              </p>
             )}
           </div>
 
