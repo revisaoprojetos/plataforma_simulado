@@ -21,14 +21,21 @@ export function SimuladoProgresso({ simuladoId }: { simuladoId: string }) {
   const [dir, setDir] = useState<'asc' | 'desc'>('asc')
   const [pagina, setPagina] = useState(1)
 
-  async function carregar() {
-    setCarregando(true)
+  const [atualizadoEm, setAtualizadoEm] = useState('')
+  async function carregar(silencioso = false) {
+    if (!silencioso) setCarregando(true)
     const r = await progressoEstudantesSimulado(simuladoId)
     if (r.error) setErro(r.error)
-    else { setDados(r.estudantes ?? []); setTotal(r.total ?? 0); setErro(null) }
+    else { setDados(r.estudantes ?? []); setTotal(r.total ?? 0); setErro(null); setAtualizadoEm(new Date().toLocaleTimeString('pt-BR')) }
     setCarregando(false)
   }
-  useEffect(() => { carregar() /* eslint-disable-next-line */ }, [simuladoId])
+  // Ao vivo: carrega ao abrir e atualiza sozinho a cada 15s.
+  useEffect(() => {
+    carregar()
+    const t = setInterval(() => carregar(true), 15_000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simuladoId])
 
   const filtrados = useMemo(() => {
     const q = busca.toLowerCase().trim()
@@ -79,13 +86,14 @@ export function SimuladoProgresso({ simuladoId }: { simuladoId: string }) {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou e-mail…" className="pl-8" />
         </div>
-        <button type="button" onClick={carregar} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm hover:bg-muted">
+        <button type="button" onClick={() => carregar()} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm hover:bg-muted">
           <RefreshCw className={cn('h-4 w-4', carregando && 'animate-spin')} /> Atualizar
         </button>
       </div>
 
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
         <Users className="h-3.5 w-3.5" /> {filtrados.length} de {dados.length} estudante(s) · {total} questão(ões) no simulado
+        <span className="ml-1 inline-flex items-center gap-1">· <span className="relative flex h-1.5 w-1.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" /><span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" /></span> ao vivo (15s){atualizadoEm && ` · ${atualizadoEm}`}</span>
       </p>
 
       <div className="overflow-hidden rounded-lg border">

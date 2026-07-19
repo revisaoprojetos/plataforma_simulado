@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Users, CheckCircle2, Clock, ArrowRight, ClipboardList } from 'lucide-react'
+import { Users, CheckCircle2, Clock, ArrowRight } from 'lucide-react'
 import { BarraBusca, FiltroSelect, Vazio } from '@/components/admin/relatorios/lista-kit'
 import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
+import { iconeBanco } from '@/lib/banco-visual'
 import type { ResumoSimulado } from '../_resumos'
 
 const nota = (n: number | null) => (n == null ? '—' : n.toFixed(1).replace('.', ','))
@@ -46,18 +47,23 @@ export function SimuladosLista({ itens }: { itens: ResumoSimulado[] }) {
         <Vazio>Nenhum simulado encontrado.</Vazio>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {lista.map((s) => (
+          {lista.map((s) => {
+            const Icon = iconeBanco(s.icone)
+            const cor = s.cor ?? '#6d28d9'
+            return (
             <Link key={s.id} href={`/admin/relatorios/simulados?simulado=${s.id}`}
-              className="group relative overflow-hidden rounded-2xl border bg-card p-4 transition hover:border-primary/50 hover:shadow-md">
-              {/* fita superior estilo folha de prova */}
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/70 to-primary/20" />
-              <div className="mb-3 flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><ClipboardList className="h-4.5 w-4.5" /></span>
-                  <TipoSimuladoBadge tipo={s.tipo} />
-                </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+              className="group relative flex flex-col overflow-hidden rounded-2xl border bg-card transition hover:border-primary/50 hover:shadow-md">
+              {/* Capa (banner): imagem do banco ou degradê da cor + ícone */}
+              <div className="relative h-24 w-full overflow-hidden" style={s.capa ? undefined : { background: `linear-gradient(135deg, ${cor} 0%, color-mix(in oklab, ${cor} 55%, #0f172a) 130%)` }}>
+                {s.capa
+                  ? <img src={s.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  : <Icon className="absolute -right-3 -top-3 h-20 w-20 text-white/10" />}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                <span className="absolute left-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white ring-1 ring-white/25 backdrop-blur"><Icon className="h-4 w-4" /></span>
+                <span className="absolute right-2.5 top-2.5"><TipoSimuladoBadge tipo={s.tipo} /></span>
+                <ArrowRight className="absolute bottom-2.5 right-2.5 h-4 w-4 text-white/80 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
               </div>
+              <div className="flex flex-1 flex-col p-4">
               <h3 className="mb-3 line-clamp-2 min-h-[2.5rem] font-semibold leading-snug">{s.titulo}</h3>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <Metric icon={<Users className="h-3.5 w-3.5" />} valor={s.participantes} rotulo="alunos" />
@@ -71,8 +77,9 @@ export function SimuladosLista({ itens }: { itens: ResumoSimulado[] }) {
                 <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {fmtData(s.ultimaAtividade)}</span>
                 {s.emAndamento > 0 && <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">{s.emAndamento} em andamento</span>}
               </div>
+              </div>
             </Link>
-          ))}
+          )})}
         </div>
       )}
     </div>

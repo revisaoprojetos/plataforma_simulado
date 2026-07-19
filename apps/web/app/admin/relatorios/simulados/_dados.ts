@@ -1,6 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
 import type { DadosRelatorioSimulado, LinhaExportSimulado } from './relatorio-simulado-view'
 
@@ -53,12 +53,13 @@ export async function montarRelatorioSimulado(svc: SupabaseClient, simId: string
     const c = arr.find((a) => a.correta); if (c) corretaAltPorQ.set(qid, c.id)
   }
 
-  // Sessões reais (não teste).
-  const { data: sessoes } = await svc
+  // Sessões reais (não teste). fetchAll: sem paginar o PostgREST corta em 1000 e as contagens
+  // (matriculados/acessaram/finalizados) saem truncadas.
+  const sessoes = await fetchAll<any>(() => svc
     .from('simulado_sessoes_prova')
     .select('id, estudante_id, status, nota, tentativa_num, iniciado_em, finalizado_em')
-    .eq('simulado_id', simId).eq('is_teste', false).eq('deletado', false)
-  const sess = (sessoes ?? []) as any[]
+    .eq('simulado_id', simId).eq('is_teste', false).eq('deletado', false).order('id'))
+  const sess = sessoes as any[]
   const finalizadasAll = sess.filter((s) => s.status === 'finalizada')
 
   // Configuração de tentativas do simulado.
@@ -173,10 +174,10 @@ export async function montarRelatorioSimulado(svc: SupabaseClient, simId: string
 
   // Total de estudantes matriculados no simulado: toda matrícula (liberada ou bloqueada) + acesso avulso + quem já tem sessão.
   const atribuidosSet = new Set<string>(sess.map((s) => s.estudante_id).filter(Boolean))
-  const { data: mats } = await svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simId)
-  for (const m of (mats ?? []) as any[]) if (m.estudante_id) atribuidosSet.add(m.estudante_id)
-  const { data: acs } = await svc.from('simulado_acessos').select('estudante_id').eq('simulado_id', simId)
-  for (const a of (acs ?? []) as any[]) if (a.estudante_id) atribuidosSet.add(a.estudante_id)
+  const mats = await fetchAll<any>(() => svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simId).order('estudante_id'))
+  for (const m of mats) if (m.estudante_id) atribuidosSet.add(m.estudante_id)
+  const acs = await fetchAll<any>(() => svc.from('simulado_acessos').select('estudante_id').eq('simulado_id', simId).order('estudante_id'))
+  for (const a of acs) if (a.estudante_id) atribuidosSet.add(a.estudante_id)
 
   // Engajamento: acessos e uso de relatório por aluno (distintos).
   const acessaramSet = new Set(sess.filter((s) => s.iniciado_em).map((s) => s.estudante_id).filter(Boolean))

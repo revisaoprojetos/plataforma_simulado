@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { tipoDoSimulado, type TipoSimulado } from '@/lib/simulado/tipo'
+import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 
 export type ResumoSimulado = {
@@ -14,19 +15,25 @@ export type ResumoSimulado = {
   emAndamento: number
   notaMedia: number | null
   ultimaAtividade: string | null
+  cor: string | null
+  icone: string | null
+  capa: string | null
 }
 
 /** Resumo de todos os simulados do tenant, para a listagem de relatórios/ranking. */
 export async function resumosSimulados(svc: SupabaseClient, tenantId: string | null): Promise<ResumoSimulado[]> {
   const { data: sims } = await svc
     .from('simulado_simulados')
-    .select('id, titulo, status, created_at')
+    .select('id, titulo, status, created_at, regras')
     .eq('deletado', false)
     .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('created_at', { ascending: false })
   const simulados = (sims ?? []) as any[]
   if (!simulados.length) return []
   const simIds = simulados.map((s) => s.id)
+
+  // Visual (cor/ícone/capa) do banco vinculado — mesma resolução dos cards de simulado.
+  const visual = await resolverVisualSimulados(svc, simulados.map((s) => ({ id: s.id, regras: s.regras })))
 
   // Tipo de cada simulado (a partir dos tipos das questões).
   const tiposPorSim = new Map<string, (string | null)[]>()
@@ -61,6 +68,7 @@ export async function resumosSimulados(svc: SupabaseClient, tenantId: string | n
   return simulados.map((s) => {
     const a = agg.get(s.id)
     const notas = a?.notas ?? []
+    const vis = visual.get(s.id)
     return {
       id: s.id,
       titulo: s.titulo ?? 'Simulado',
@@ -72,6 +80,9 @@ export async function resumosSimulados(svc: SupabaseClient, tenantId: string | n
       emAndamento: a?.and ?? 0,
       notaMedia: notas.length ? notas.reduce((x, y) => x + y, 0) / notas.length : null,
       ultimaAtividade: a?.ult ?? null,
+      cor: vis?.cor ?? null,
+      icone: vis?.icone ?? null,
+      capa: vis?.capa ?? null,
     }
   }).filter((r) => !OCULTAR_DISCURSIVA || r.tipo !== 'discursiva')
 }
