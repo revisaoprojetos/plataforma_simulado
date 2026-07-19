@@ -208,6 +208,26 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
     sessao?.tempo_limite_min ?? null
   )
 
+  // Pega mudanças no TEMPO LIMITE feitas durante a prova (ex.: admin muda 3h→5h) SEM recarregar:
+  // consulta um endpoint leve ao trocar de questão e a cada 30s; atualiza o cronômetro se mudou.
+  useEffect(() => {
+    if (!sessionToken || status !== 'em_andamento') return
+    let vivo = true
+    const sync = async () => {
+      try {
+        const r = await fetch(`/api/sessoes/tempo?st=${sessionToken}`)
+        if (!r.ok) return
+        const d = await r.json()
+        const novo = d?.tempo_limite_min ?? null
+        if (!vivo) return
+        setSessao((s) => (s && s.tempo_limite_min !== novo ? { ...s, tempo_limite_min: novo } : s))
+      } catch { /* rede instável — tenta no próximo ciclo */ }
+    }
+    sync() // ao entrar nesta questão
+    const t = setInterval(sync, 30_000) // rede de segurança
+    return () => { vivo = false; clearInterval(t) }
+  }, [sessionToken, status, questaoIndex])
+
   // Auto-finalizar ao esgotar tempo
   useEffect(() => {
     if (segundosRestantes === 0 && status === 'em_andamento') {
