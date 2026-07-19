@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { criarSessaoAluno } from '@/lib/aluno-session'
 import { rateLimit } from '@/lib/rate-limit'
+import { registrarAudit } from '@/lib/audit'
 
 // POST /api/aluno/login — login leve persistente do aluno (sem senha).
 export async function POST(request: NextRequest) {
@@ -61,5 +62,7 @@ export async function POST(request: NextRequest) {
   }
 
   await criarSessaoAluno({ estudanteId: estudante.id, tenantId, nome: estudante.nome ?? 'Aluno', email: (estudante.email as string | null) ?? email })
+  // Auditoria: acesso do aluno à plataforma (portal). ator_id fica no entidade_id p/ evitar FK.
+  await registrarAudit({ operacao: 'LOGIN', entidade: 'aluno_portal', entidadeId: estudante.id, atorTipo: 'estudante', tenantId, depois: { nome: estudante.nome ?? 'Aluno', email: (estudante.email as string | null) ?? email } })
   return NextResponse.json({ ok: true })
 }

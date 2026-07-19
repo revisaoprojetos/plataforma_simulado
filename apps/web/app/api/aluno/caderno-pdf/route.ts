@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { existsSync } from 'node:fs'
 import { createAdminClient } from '@/lib/supabase/server'
+import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
 import puppeteer from 'puppeteer-core'
 
 export const runtime = 'nodejs'
@@ -43,8 +44,19 @@ export async function GET(request: NextRequest) {
 
   // Valida a sessão (credencial do aluno).
   const svc = createAdminClient()
-  const { data: sess } = await svc.from('simulado_sessoes_prova').select('id, tenant_id').eq('id', sessao).maybeSingle()
+  const { data: sess } = await svc.from('simulado_sessoes_prova').select('id, tenant_id, simulado_id, estudante_id').eq('id', sessao).maybeSingle()
   if (!sess) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+
+  // Auditoria: o aluno baixou o caderno (PDF). Best-effort, não bloqueia a geração.
+  if ((sess as any).tenant_id) {
+    await registrarRelatorioEvento(svc, {
+      tenantId: (sess as any).tenant_id,
+      simuladoId: (sess as any).simulado_id,
+      estudanteId: (sess as any).estudante_id,
+      sessaoId: (sess as any).id,
+      tipo: 'baixou',
+    })
+  }
 
   const exec = acharNavegador()
   if (!exec) return NextResponse.json({ message: 'Nenhum navegador (Edge/Chrome) encontrado para gerar o PDF.' }, { status: 503 })

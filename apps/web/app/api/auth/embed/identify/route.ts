@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getTenantMensagem, getTenantContato, type TenantContato } from '@/lib/tenant-messages'
 import { rateLimit } from '@/lib/rate-limit'
+import { registrarAudit } from '@/lib/audit'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { contatoEstudante } from '@/lib/webhooks/payload'
 
@@ -269,6 +270,12 @@ export async function POST(request: NextRequest) {
       tentativa: tentativaNum,
     })
   }
+
+  // Auditoria: acesso do aluno ao simulado (entrada na prova).
+  await registrarAudit({
+    operacao: 'LOGIN', entidade: 'simulado_acesso', entidadeId: estudante.id, atorTipo: 'estudante', tenantId,
+    depois: { nome: estudante.nome ?? 'Aluno', email: estudante.email ?? null, simulado_id: simulado.id, simulado: tituloSimulado, sessao_id: sessaoId },
+  })
 
   return NextResponse.json({
     sessao_id: sessaoId,
