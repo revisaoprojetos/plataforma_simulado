@@ -320,9 +320,9 @@ export function SimuladoWizard({
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Tempo limite (min)</Label>
-                    <Input type="number" min={0} value={info.tempo_limite_min} onChange={(e) => set('tempo_limite_min', e.target.value)} placeholder="ex.: 180" />
-                    <p className="text-xs text-muted-foreground">Em branco = sem limite individual.</p>
+                    <Label>Tempo de prova</Label>
+                    <Input type="time" value={info.tempo_limite_min ? `${String(Math.floor(Number(info.tempo_limite_min) / 60)).padStart(2, '0')}:${String(Number(info.tempo_limite_min) % 60).padStart(2, '0')}` : ''} onChange={(e) => { const [h, m] = (e.target.value || '').split(':'); const tot = (Number(h) || 0) * 60 + (Number(m) || 0); set('tempo_limite_min', tot ? String(tot) : '') }} className="w-40" />
+                    <p className="text-xs text-muted-foreground">Duração (horas:minutos). Em branco = sem limite individual.</p>
                   </div>
                 </div>
                 {info.modo_aplicacao === 'janela_fixa' && (

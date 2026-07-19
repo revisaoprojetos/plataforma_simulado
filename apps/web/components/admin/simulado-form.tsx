@@ -107,15 +107,16 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
   const iniciarAtrasado = watch('regras.iniciar_atrasado')
   const tentIlimitadas = watch('regras.retentativas_ilimitadas')
 
-  // Tempo limite: guardado em MINUTOS no banco, mas editado em Horas + Minutos.
+  // Tempo de prova: guardado em MINUTOS no banco, mas editado como hora (HH:mm).
   const minIniciais = Number(initialData?.tempo_limite_min ?? 0) || 0
-  const [tlHoras, setTlHoras] = useState(minIniciais ? String(Math.floor(minIniciais / 60)) : '')
-  const [tlMin, setTlMin] = useState(minIniciais ? String(minIniciais % 60) : '')
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const [tempoProva, setTempoProva] = useState(minIniciais ? `${pad(Math.floor(minIniciais / 60))}:${pad(minIniciais % 60)}` : '')
 
   async function handleFormSubmit(data: SimuladoFormData) {
     setIsLoading(true)
     try {
-      const totalMin = (Number(tlHoras) || 0) * 60 + (Number(tlMin) || 0)
+      const [h, m] = tempoProva.split(':')
+      const totalMin = (Number(h) || 0) * 60 + (Number(m) || 0)
       data.tempo_limite_min = totalMin > 0 ? totalMin : undefined
       if (data.regras) {
         // Ilimitadas = sem teto (o motor trata retentativas<=0 como ilimitado).
@@ -228,14 +229,9 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Tempo Limite</Label>
-              <div className="flex items-center gap-2">
-                <Input type="number" min={0} value={tlHoras} onChange={(e) => setTlHoras(e.target.value)} placeholder="0" className="w-20" />
-                <span className="text-sm text-muted-foreground">h</span>
-                <Input type="number" min={0} max={59} value={tlMin} onChange={(e) => setTlMin(e.target.value)} placeholder="0" className="w-20" />
-                <span className="text-sm text-muted-foreground">min</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Em branco = sem limite individual.</p>
+              <Label htmlFor="tempo_prova">Tempo de Prova</Label>
+              <Input id="tempo_prova" type="time" value={tempoProva} onChange={(e) => setTempoProva(e.target.value)} className="w-40" />
+              <p className="text-xs text-muted-foreground">Duração da prova (horas:minutos). Em branco = sem limite individual.</p>
             </div>
 
             <div className="space-y-2">
