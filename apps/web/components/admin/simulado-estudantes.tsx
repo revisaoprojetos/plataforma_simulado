@@ -112,9 +112,9 @@ export function SimuladoEstudantes({ simuladoId }: { simuladoId: string }) {
         {filtrados.length} de {dados.length} estudante(s) linkado(s){nPassaporte ? ` · ${nPassaporte} passaporte` : ''}
       </p>
 
-      <div className="overflow-hidden rounded-lg border">
+      <div className="max-h-[calc(100vh-360px)] overflow-auto rounded-lg border">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 bg-background shadow-[0_1px_0_0_var(--border)]">
             <TableRow>
               <Th c="nome">Nome</Th>
               <Th c="email">E-mail</Th>

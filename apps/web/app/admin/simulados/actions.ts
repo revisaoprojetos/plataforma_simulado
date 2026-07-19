@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient, createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
@@ -157,7 +157,7 @@ export interface EstudanteLinkado {
  * Lista TODOS os estudantes matriculados (linkados) em um simulado, com a situação
  * de cada um (finalizou / em andamento / não iniciou) e a nota. Carregado sob demanda
  * pela aba "Estudantes" — pode ter milhares de linhas (passaportes), por isso usa
- * fetchAll/fetchAllByIn para não truncar no teto de 1000 do PostgREST.
+ * fetchAll para não truncar no teto de 1000 do PostgREST.
  */
 export async function listarEstudantesSimulado(simuladoId: string): Promise<{ ok?: boolean; error?: string; estudantes?: EstudanteLinkado[] }> {
   if (!(await checkPermission('simulados:view'))) return { error: 'Sem permissão.' }
@@ -167,18 +167,21 @@ export async function listarEstudantesSimulado(simuladoId: string): Promise<{ ok
   const { data: sim } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simuladoId).maybeSingle()
   if (!sim) return { error: 'Simulado não encontrado.' }
   if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
+  const tid = tenantId ?? (sim as any).tenant_id
 
-  const matriculas = await fetchAll<{ estudante_id: string; liberado: boolean }>(() =>
-    svc.from('simulado_matriculas').select('estudante_id, liberado').eq('simulado_id', simuladoId).order('estudante_id'))
-  const estIds = [...new Set(matriculas.map((m) => m.estudante_id).filter(Boolean))]
-  if (!estIds.length) return { ok: true, estudantes: [] }
-
-  const [estRows, sessRows] = await Promise.all([
-    fetchAllByIn<any>(estIds, (chunk) =>
-      svc.from('simulado_estudantes').select('id, nome, email, cpf, telefone, classificacao').in('id', chunk).order('id')),
+  // Tudo em paralelo. Em vez de buscar estudantes por lotes de ids (dezenas de idas
+  // ao banco quando há milhares de passaportes), varremos os estudantes do tenant
+  // paginados (poucas páginas) e cruzamos em memória com as matrículas — bem mais rápido.
+  const [matriculas, estRows, sessRows] = await Promise.all([
+    fetchAll<{ estudante_id: string; liberado: boolean }>(() =>
+      svc.from('simulado_matriculas').select('estudante_id, liberado').eq('simulado_id', simuladoId).order('estudante_id')),
+    fetchAll<any>(() =>
+      svc.from('simulado_estudantes').select('id, nome, email, cpf, telefone, classificacao').eq('tenant_id', tid).eq('deletado', false).order('id')),
     fetchAll<any>(() =>
       svc.from('simulado_sessoes_prova').select('estudante_id, status, nota').eq('simulado_id', simuladoId).eq('deletado', false).order('estudante_id')),
   ])
+  const estIds = [...new Set(matriculas.map((m) => m.estudante_id).filter(Boolean))]
+  if (!estIds.length) return { ok: true, estudantes: [] }
 
   const libPorEst = new Map(matriculas.map((m) => [m.estudante_id, m.liberado]))
   const estMap = new Map(estRows.map((e: any) => [e.id, e]))
