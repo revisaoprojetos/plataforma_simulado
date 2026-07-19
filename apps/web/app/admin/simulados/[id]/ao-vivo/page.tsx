@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AoVivoPainel } from '@/components/admin/simulado-ao-vivo'
-import { SimuladoEstudantes } from '@/components/admin/simulado-estudantes'
+import { SimuladoProgresso } from '@/components/admin/simulado-progresso'
 
 export default async function AoVivoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -38,10 +38,10 @@ export default async function AoVivoPage({ params }: { params: Promise<{ id: str
             <Card>
               <CardHeader>
                 <CardTitle>Progresso individual</CardTitle>
-                <CardDescription>Cada estudante matriculado e sua situação (fazendo agora / finalizou / não iniciou), com busca, filtros e ordenação.</CardDescription>
+                <CardDescription>Por estudante: barra de progresso, respondidas, acertos, erros, em branco e média — com busca e ordenação.</CardDescription>
               </CardHeader>
               <CardContent>
-                <SimuladoEstudantes simuladoId={id} />
+                <SimuladoProgresso simuladoId={id} />
               </CardContent>
             </Card>
           </TabsContent>

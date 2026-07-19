@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient, createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { fetchAll } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
@@ -219,6 +219,83 @@ export interface ResumoAoVivo {
   online: number       // com sessão EM ANDAMENTO (fazendo agora)
   finalizados: number  // já concluíram
   naoIniciaram: number // matriculados que nunca abriram
+}
+
+export interface ProgressoEstudante {
+  id: string
+  nome: string
+  email: string | null
+  respondidas: number  // questões marcadas (acertos + erros)
+  acertos: number
+  erros: number
+  emBranco: number
+  media: number        // aproveitamento 0–100 (acertos / total)
+}
+
+/**
+ * Progresso individual dos estudantes num simulado: por aluno, respondidas/acertos/erros/
+ * em branco e média (aproveitamento). Usa a tentativa MAIS RECENTE de cada um. Carregado
+ * sob demanda (pode ter milhares de matriculados) — fetchAll/fetchAllByIn.
+ */
+export async function progressoEstudantesSimulado(simuladoId: string): Promise<{ ok?: boolean; error?: string; total?: number; estudantes?: ProgressoEstudante[] }> {
+  if (!(await checkPermission('simulados:view'))) return { error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  const svc = createAdminClient()
+
+  const { data: sim } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simuladoId).maybeSingle()
+  if (!sim) return { error: 'Simulado não encontrado.' }
+  if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
+  const tid = tenantId ?? (sim as any).tenant_id
+
+  const provaQ = await fetchAll<any>(() => svc.from('simulado_prova_questoes').select('questao_id, anulada').eq('simulado_id', simuladoId).order('questao_id'))
+  const total = provaQ.filter((q: any) => q.anulada !== true).length
+
+  const [matriculas, estRows, sessRows] = await Promise.all([
+    fetchAll<any>(() => svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simuladoId).order('estudante_id')),
+    fetchAll<any>(() => svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tid).eq('deletado', false).order('id')),
+    fetchAll<any>(() => svc.from('simulado_sessoes_prova').select('id, estudante_id, iniciado_em').eq('simulado_id', simuladoId).eq('is_teste', false).eq('deletado', false).order('estudante_id')),
+  ])
+  const estMap = new Map(estRows.map((e: any) => [e.id, e]))
+
+  // Tentativa mais recente por aluno.
+  const sessByEst = new Map<string, any>()
+  for (const s of sessRows) {
+    const cur = sessByEst.get(s.estudante_id)
+    if (!cur || new Date(s.iniciado_em ?? 0).getTime() > new Date(cur.iniciado_em ?? 0).getTime()) sessByEst.set(s.estudante_id, s)
+  }
+  const chosenIds = [...sessByEst.values()].map((s: any) => s.id)
+  const resp = chosenIds.length
+    ? await fetchAllByIn<any>(chosenIds, (chunk) => svc.from('simulado_respostas_objetivas').select('sessao_id, correta').in('sessao_id', chunk).order('id'))
+    : []
+  const bySess = new Map<string, { resp: number; ok: number }>()
+  for (const r of resp) {
+    const a = bySess.get(r.sessao_id) ?? { resp: 0, ok: 0 }
+    a.resp++; if (r.correta) a.ok++
+    bySess.set(r.sessao_id, a)
+  }
+
+  // Base: matriculados + quem tem sessão (ex.: passaporte que fez sem matrícula).
+  const base = new Set<string>([...matriculas.map((m: any) => m.estudante_id).filter(Boolean), ...sessByEst.keys()])
+
+  const estudantes: ProgressoEstudante[] = [...base].map((eid) => {
+    const e: any = estMap.get(eid) ?? {}
+    const sess = sessByEst.get(eid)
+    const agg = sess ? (bySess.get(sess.id) ?? { resp: 0, ok: 0 }) : { resp: 0, ok: 0 }
+    const respondidas = agg.resp
+    const acertos = agg.ok
+    return {
+      id: eid,
+      nome: e.nome ?? 'Estudante',
+      email: e.email ?? null,
+      respondidas,
+      acertos,
+      erros: Math.max(0, respondidas - acertos),
+      emBranco: Math.max(0, total - respondidas),
+      media: total ? Math.round((acertos / total) * 1000) / 10 : 0,
+    }
+  }).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+
+  return { ok: true, total, estudantes }
 }
 
 /**
