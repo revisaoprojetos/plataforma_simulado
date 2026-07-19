@@ -282,6 +282,31 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
                     <p className="text-xs text-muted-foreground">O aluno pode fazer login antes do horário e fica numa tela de espera com contagem regressiva; o simulado abre sozinho ao chegar a hora — sem gastar tempo de prova. (Só faz efeito no modo Janela Fixa, com data/hora de início.)</p>
                   </div>
                 </div>
+
+                <div className="flex items-start gap-3">
+                  <Switch
+                    id="iniciar_atrasado"
+                    checked={!!iniciarAtrasado}
+                    onCheckedChange={(v) => setValue('regras.iniciar_atrasado', v)}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <Label htmlFor="iniciar_atrasado">Permitir iniciar após a hora de início</Label>
+                    <p className="text-xs text-muted-foreground">O aluno pode começar mesmo depois do horário de início. Defina a tolerância — até quantos minutos de atraso ainda é permitido entrar.</p>
+                    {iniciarAtrasado && (
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <span className="text-xs text-muted-foreground">Tolerância: até</span>
+                        <Input
+                          type="number"
+                          min={1}
+                          placeholder="30"
+                          {...register('regras.tolerancia_atraso_min')}
+                          className="h-8 w-24"
+                        />
+                        <span className="text-xs text-muted-foreground">min de atraso</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </AccordionContent>
             </AccordionItem>
 
@@ -437,27 +462,6 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
                     onCheckedChange={(v) => setValue('regras.mostrar_comentario', v)}
                   />
                   <Label htmlFor="mostrar_comentario">Mostrar comentário do professor</Label>
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Switch
-                    id="iniciar_atrasado"
-                    checked={!!iniciarAtrasado}
-                    onCheckedChange={(v) => setValue('regras.iniciar_atrasado', v)}
-                  />
-                  <Label htmlFor="iniciar_atrasado">Permitir iniciar após a hora de início</Label>
-                  {iniciarAtrasado && (
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="text-xs text-muted-foreground">até</span>
-                      <Input
-                        type="number"
-                        min={1}
-                        placeholder="30"
-                        {...register('regras.tolerancia_atraso_min')}
-                        className="h-8 w-20"
-                      />
-                      <span className="text-xs text-muted-foreground">min de atraso</span>
-                    </span>
-                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Política de Anulação</Label>
