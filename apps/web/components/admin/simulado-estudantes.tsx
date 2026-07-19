@@ -163,10 +163,14 @@ export function SimuladoEstudantes({ simuladoId }: { simuladoId: string }) {
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Página {paginaAtual} de {totalPaginas}</span>
           <div className="flex gap-1.5">
+            <button type="button" onClick={() => setPagina(1)} disabled={paginaAtual <= 1}
+              className="rounded-lg border px-3 py-1 disabled:opacity-40 hover:bg-muted">Início</button>
             <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={paginaAtual <= 1}
               className="rounded-lg border px-3 py-1 disabled:opacity-40 hover:bg-muted">Anterior</button>
             <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={paginaAtual >= totalPaginas}
               className="rounded-lg border px-3 py-1 disabled:opacity-40 hover:bg-muted">Próxima</button>
+            <button type="button" onClick={() => setPagina(totalPaginas)} disabled={paginaAtual >= totalPaginas}
+              className="rounded-lg border px-3 py-1 disabled:opacity-40 hover:bg-muted">Final</button>
           </div>
         </div>
       )}
