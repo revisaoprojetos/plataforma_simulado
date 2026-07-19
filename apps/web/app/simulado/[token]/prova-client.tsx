@@ -228,11 +228,33 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
     return () => { vivo = false; clearInterval(t) }
   }, [sessionToken, status, questaoIndex])
 
-  // Auto-finalizar ao esgotar tempo
+  // Auto-finalizar ao esgotar tempo — com CONFIRMAÇÃO no servidor.
+  // Antes de encerrar, revalida o tempo limite atual: se o admin estendeu (ex.: 3h→5h) e ainda
+  // há tempo, atualiza o cronômetro e NÃO finaliza. Assim, um cronômetro desatualizado nunca
+  // encerra a prova cedo, mesmo sem o aluno recarregar.
   useEffect(() => {
-    if (segundosRestantes === 0 && status === 'em_andamento') {
-      handleFinalizar()
-    }
+    if (segundosRestantes !== 0 || status !== 'em_andamento') return
+    let cancel = false
+    ;(async () => {
+      try {
+        const r = await fetch(`/api/sessoes/tempo?st=${sessionToken}`)
+        if (r.ok) {
+          const d = await r.json()
+          const novo = d?.tempo_limite_min ?? null
+          if (!cancel && novo != null && sessao?.iniciado_em) {
+            const fimMs = new Date(sessao.iniciado_em).getTime() + novo * 60_000
+            if (Date.now() < fimMs - 1_000) {
+              // Ainda há tempo (foi estendido) → atualiza o cronômetro e segue a prova.
+              setSessao((s) => (s ? { ...s, tempo_limite_min: novo } : s))
+              return
+            }
+          }
+        }
+      } catch { /* rede instável: por segurança, finaliza como antes */ }
+      if (!cancel) handleFinalizar()
+    })()
+    return () => { cancel = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segundosRestantes])
 
   // Auto-save
