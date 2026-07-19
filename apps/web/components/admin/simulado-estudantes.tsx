@@ -113,7 +113,16 @@ export function SimuladoEstudantes({ simuladoId }: { simuladoId: string }) {
       </p>
 
       <div className="overflow-hidden rounded-lg border">
-        <Table>
+        <Table className="w-full table-fixed">
+          <colgroup>
+            <col className="w-[22%]" />
+            <col className="w-[24%]" />
+            <col className="w-[13%]" />
+            <col className="w-[13%]" />
+            <col className="w-[12%]" />
+            <col className="w-[10%]" />
+            <col className="w-[6%]" />
+          </colgroup>
           <TableHeader>
             <TableRow>
               <Th c="nome">Nome</Th>
@@ -132,16 +141,16 @@ export function SimuladoEstudantes({ simuladoId }: { simuladoId: string }) {
               const sit = situacaoCfg[e.situacao] ?? situacaoCfg.nao_iniciou
               return (
                 <TableRow key={e.id}>
-                  <TableCell className="font-medium">{e.nome}</TableCell>
-                  <TableCell className="text-muted-foreground">{e.email ?? '—'}</TableCell>
-                  <TableCell className="text-muted-foreground">{e.cpf ?? '—'}</TableCell>
-                  <TableCell className="text-muted-foreground">{e.telefone ?? '—'}</TableCell>
-                  <TableCell>
+                  <TableCell className="truncate font-medium" title={e.nome}>{e.nome}</TableCell>
+                  <TableCell className="truncate text-muted-foreground" title={e.email ?? undefined}>{e.email ?? '—'}</TableCell>
+                  <TableCell className="truncate text-muted-foreground" title={e.cpf ?? undefined}>{e.cpf ?? '—'}</TableCell>
+                  <TableCell className="truncate text-muted-foreground" title={e.telefone ?? undefined}>{e.telefone ?? '—'}</TableCell>
+                  <TableCell className="truncate">
                     <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', e.classificacao === 'passaporte' ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' : 'bg-muted text-muted-foreground')}>
                       {e.classificacao === 'passaporte' ? 'Passaporte' : 'Normal'}
                     </span>
                   </TableCell>
-                  <TableCell><span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', sit.cls)}>{sit.label}</span></TableCell>
+                  <TableCell className="truncate"><span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', sit.cls)}>{sit.label}</span></TableCell>
                   <TableCell className="text-right tabular-nums">{e.nota != null ? e.nota.toFixed(1) : '—'}</TableCell>
                 </TableRow>
               )
