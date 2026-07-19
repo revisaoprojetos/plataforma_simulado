@@ -35,6 +35,8 @@ export type ItemSimulado = {
   quando: string | null
   tom: string
   podeFazer: boolean
+  /** Agendado + regra de entrada antecipada: pode entrar e ficar na tela de espera. */
+  podeAguardar: boolean
   refazer: boolean
   /** aberto (criado) há menos de 1 dia → mostra a fita "novo". */
   novo: boolean
@@ -76,10 +78,13 @@ export function montarItensSimulado(
       else { statusLabel = 'Prazo'; quando = exp ? `Até ${fmt(exp)}` : 'Sem prazo definido'; tom = 'amber' }
     }
     const podeFazer = windowOk && s.status === 'publicado' && !!s.embed_token && (restantes > 0 || emAndamento)
+    // Entrada antecipada: simulado Agendado (ainda não abriu) fica clicável quando a regra
+    // permite — o aluno se identifica e cai na tela de espera com contagem (sem gastar tempo).
+    const podeAguardar = statusLabel === 'Agendado' && !!regras.entrada_antecipada && s.status === 'publicado' && !!s.embed_token
     const refazer = finalizadas > 0 && restantes > 0
     // "Novo" = aberto há < 1 dia: prioriza quando foi publicado; cai no created_at.
     const abertoEm = regras.publicado_em ?? s.created_at
     const novo = !!abertoEm && now - new Date(abertoEm).getTime() < UM_DIA_MS
-    return { ...s, finalizadas, restantes, emAndamento, statusLabel, aoVivo, windowOk, quando, tom, podeFazer, refazer, novo, vis: visual.get(s.id) ?? null }
+    return { ...s, finalizadas, restantes, emAndamento, statusLabel, aoVivo, windowOk, quando, tom, podeFazer, podeAguardar, refazer, novo, vis: visual.get(s.id) ?? null }
   })
 }

@@ -35,7 +35,7 @@ export function CardSimulado({ s }: { s: ItemSimulado }) {
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
 
       {s.novo && <FitaNovo />}
-      {s.podeFazer && <Link href={`/simulado/${s.embed_token}`} className="absolute inset-0 z-10" aria-label={s.titulo} />}
+      {(s.podeFazer || s.podeAguardar) && <Link href={`/simulado/${s.embed_token}`} className="absolute inset-0 z-10" aria-label={s.titulo} />}
 
       <span className="pointer-events-none absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: cor }}><BancoIcon className="h-4 w-4" /></span>
       <span className={cn('pointer-events-none absolute right-3 z-20 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur', s.novo ? 'top-11' : 'top-3', s.aoVivo ? 'bg-emerald-500/90' : 'bg-black/45')}>
@@ -53,6 +53,10 @@ export function CardSimulado({ s }: { s: ItemSimulado }) {
         {s.podeFazer ? (
           <span className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-black shadow-sm">
             {s.emAndamento ? <><RotateCcw className="h-4 w-4" /> Continuar</> : s.refazer ? <><RotateCcw className="h-4 w-4" /> Refazer</> : <><Play className="h-4 w-4" /> Fazer agora</>}
+          </span>
+        ) : s.podeAguardar ? (
+          <span className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-black shadow-sm">
+            <Clock className="h-4 w-4" /> Entrar e aguardar início
           </span>
         ) : (
           <span className="mt-2 block rounded-lg bg-black/45 px-3 py-2 text-center text-xs text-white/80 backdrop-blur">{s.statusLabel === 'Agendado' ? 'Ainda não abriu' : 'Indisponível'}</span>
