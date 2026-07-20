@@ -139,12 +139,30 @@ async function matricular(svc: any, tenantId: string, estudanteId: string, simul
   } catch { /* ignora */ }
 }
 
-/** Adiciona o estudante a um grupo, idempotente. */
+/**
+ * Propaga o acesso do GRUPO aos BANCOS vinculados a ele (`simulado_pasta_grupos`): entra na
+ * pasta e é matriculado nos simulados VIVOS que herdam do banco. É o que faltava para um membro
+ * ADICIONADO ao grupo DEPOIS do vínculo (ex.: comprador novo da Guru) receber os simulados do banco.
+ */
+async function propagarGrupoAosBancos(svc: any, tenantId: string, grupoId: string, estudanteId: string) {
+  try {
+    const { data: links } = await svc.from('simulado_pasta_grupos').select('pasta_id').eq('grupo_id', grupoId)
+    const bancoIds = [...new Set((links ?? []).map((l: any) => l.pasta_id).filter(Boolean))] as string[]
+    for (const pastaId of bancoIds) {
+      const { data: ja } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', pastaId).eq('estudante_id', estudanteId).maybeSingle()
+      if (!ja) await svc.from('simulado_pasta_estudantes').insert({ tenant_id: tenantId, pasta_id: pastaId, estudante_id: estudanteId })
+      for (const sid of await simuladosVivosDaPasta(svc, tenantId, pastaId)) await matricular(svc, tenantId, estudanteId, sid)
+    }
+  } catch { /* ignora */ }
+}
+
+/** Adiciona o estudante a um grupo (idempotente) E propaga o acesso aos bancos vinculados. */
 async function entrarGrupo(svc: any, tenantId: string, grupoId: string, estudanteId: string) {
   try {
     const { data } = await svc.from('simulado_grupo_membros').select('id').eq('grupo_id', grupoId).eq('estudante_id', estudanteId).maybeSingle()
     if (!data) await svc.from('simulado_grupo_membros').insert({ tenant_id: tenantId, grupo_id: grupoId, estudante_id: estudanteId })
   } catch { /* ignora */ }
+  await propagarGrupoAosBancos(svc, tenantId, grupoId, estudanteId)
 }
 
 async function conceder(svc: any, tenantId: string, estudanteId: string, m: Mapeamento) {
@@ -156,12 +174,8 @@ async function conceder(svc: any, tenantId: string, estudanteId: string, m: Mape
     const gp = await grupoPassaporte(svc, tenantId)
     if (gp) await entrarGrupo(svc, tenantId, gp, estudanteId)
   }
-  if (m.grupoId) {
-    try {
-      const { data } = await svc.from('simulado_grupo_membros').select('id').eq('grupo_id', m.grupoId).eq('estudante_id', estudanteId).maybeSingle()
-      if (!data) await svc.from('simulado_grupo_membros').insert({ tenant_id: tenantId, grupo_id: m.grupoId, estudante_id: estudanteId })
-    } catch { /* ignora */ }
-  }
+  // Grupo do produto: entra no grupo E herda os simulados dos bancos vinculados a ele.
+  if (m.grupoId) await entrarGrupo(svc, tenantId, m.grupoId, estudanteId)
   // Pasta (banco): entra na pasta + libera os simulados VIVOS dela (encerrados ficam de fora).
   // Como fica na pasta, também herda automaticamente os simulados FUTUROS criados a partir dela.
   if (m.pastaId) {
