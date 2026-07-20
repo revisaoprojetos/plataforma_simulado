@@ -3,7 +3,8 @@ import { getCurrentAccess } from '@/lib/auth/permissions'
 import { Card, CardContent } from '@/components/ui/card'
 import { ComentarioModerar } from '@/components/admin/comentario-moderar'
 import { SecaoHeader } from '@/components/admin/secao-header'
-import { ShieldAlert, MessageSquare } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
+import { SemPermissao } from '@/components/ui/alert-box'
 
 export default async function ComentariosModeracaoPage() {
   const access = await getCurrentAccess()
@@ -12,9 +13,7 @@ export default async function ComentariosModeracaoPage() {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-bold tracking-tight">Comentários</h1>
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-300">
-          <ShieldAlert className="h-4 w-4" /> Sem permissão.
-        </div>
+        <SemPermissao>Sem permissão.</SemPermissao>
       </div>
     )
   }

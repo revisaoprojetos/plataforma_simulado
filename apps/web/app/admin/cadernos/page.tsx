@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { CadernosClient } from '@/components/admin/cadernos-client'
-import { ShieldAlert } from 'lucide-react'
+import { SemPermissao } from '@/components/ui/alert-box'
 
 function contarBlocos(config: any): number {
   if (config?.docsV2) {
@@ -19,9 +19,7 @@ export default async function CadernosAdminPage() {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-bold tracking-tight">Cadernos de prova</h1>
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-300">
-          <ShieldAlert className="h-4 w-4" /> Sem permissão.
-        </div>
+        <SemPermissao>Sem permissão.</SemPermissao>
       </div>
     )
   }

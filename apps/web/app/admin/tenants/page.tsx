@@ -7,7 +7,8 @@ import {
 } from '@/components/ui/table'
 import { NovoTenantForm } from '@/components/admin/novo-tenant-form'
 import { SecaoHeader } from '@/components/admin/secao-header'
-import { ShieldAlert, Building2, Plus } from 'lucide-react'
+import { Building2, Plus } from 'lucide-react'
+import { SemPermissao } from '@/components/ui/alert-box'
 
 export default async function TenantsPage() {
   const access = await getCurrentAccess()
@@ -17,10 +18,7 @@ export default async function TenantsPage() {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-bold tracking-tight">Plataformas</h1>
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-300">
-          <ShieldAlert className="h-4 w-4" />
-          Você não tem permissão para gerenciar plataformas.
-        </div>
+        <SemPermissao>Você não tem permissão para gerenciar plataformas.</SemPermissao>
       </div>
     )
   }
