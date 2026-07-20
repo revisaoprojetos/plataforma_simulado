@@ -6,6 +6,7 @@ import { SimuladoActions } from '@/components/admin/simulado-actions'
 import { SimuladoQuestoesManager } from '@/components/admin/simulado-questoes-manager'
 import { SimuladoEstudantes } from '@/components/admin/simulado-estudantes'
 import { SimuladoSessoes } from '@/components/admin/simulado-sessoes'
+import { SimuladoManutencao } from '@/components/admin/simulado-manutencao'
 import { SimuladoCadernoLink } from '@/components/admin/simulado-caderno-link'
 import { SimuladoRelatorio } from '@/components/admin/simulado-relatorio'
 import { SimuladoRecorrecao } from '@/components/admin/simulado-recorrecao'
@@ -204,6 +205,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
             <TabsTrigger value="relatorio">Relatório</TabsTrigger>
             <TabsTrigger value="recorrecao">Re-correção</TabsTrigger>
             <TabsTrigger value="acessos">Acessos</TabsTrigger>
+            <TabsTrigger value="manutencao">Manutenção</TabsTrigger>
             <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
           </TabsList>
           <Link href={`/admin/simulados/${id}/embed`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
@@ -401,6 +403,10 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
 
         <TabsContent value="acessos">
           <SimuladoAcessos simuladoId={id} modoAplicacao={simulado.modo_aplicacao} />
+        </TabsContent>
+
+        <TabsContent value="manutencao">
+          <SimuladoManutencao simuladoId={id} inicial={(simulado.regras as any)?.manutencao ?? null} />
         </TabsContent>
 
         <TabsContent value="configuracoes">

@@ -395,6 +395,24 @@ export async function listarSessoesSimulado(simuladoId: string): Promise<{ ok?: 
   return { ok: true, sessoes }
 }
 
+/** Salva a manutenção do simulado (regras.manutencao). Datas em horário de Brasília → UTC. */
+export async function salvarManutencaoSimulado(simuladoId: string, dados: { ativo: boolean; inicio: string | null; fim: string | null }): Promise<{ ok?: boolean; error?: string }> {
+  if (!(await checkPermission('simulados:update'))) return { error: 'Você não tem permissão para editar simulados.' }
+  const tenantId = await getCurrentTenantId()
+  const svc = createAdminClient()
+  const { data: antes } = await svc.from('simulado_simulados').select('regras, tenant_id').eq('id', simuladoId).maybeSingle()
+  if (!antes) return { error: 'Simulado não encontrado.' }
+  if (tenantId && (antes as any).tenant_id && (antes as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
+  const manutencao = { ativo: !!dados.ativo, inicio: brtLocalParaIso(dados.inicio), fim: brtLocalParaIso(dados.fim) }
+  const regras = { ...(((antes as any).regras as Record<string, unknown>) ?? {}), manutencao }
+  const { error } = await svc.from('simulado_simulados').update({ regras }).eq('id', simuladoId)
+  if (error) return { error: error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_simulados', entidadeId: simuladoId, depois: { manutencao } })
+  revalidatePath('/admin/simulados')
+  revalidatePath(`/admin/simulados/${simuladoId}`)
+  return { ok: true }
+}
+
 /** Vincula (ou desvincula) explicitamente um caderno de design ao simulado — define o tema/HUD aplicado. */
 export async function vincularCadernoSimulado(simuladoId: string, cadernoId: string | null) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }

@@ -150,13 +150,16 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
       const ids = [...new Set(logs.filter((l) => isUuid(l.entidade_id)).map((l) => l.entidade_id as string))]
       if (ids.length) { const { data } = await supabase.from('simulado_estudantes').select('id, nome, email').in('id', ids); for (const e of data ?? []) nomesEst.set((e as any).id, { nome: (e as any).nome, email: (e as any).email }) }
     }
-    // Registros (não-plataforma): resolve o NOME do ator (admin) pelo ator_id.
+    // Registros (não-plataforma): resolve o NOME do ator (admin) via auth.users (metadata.nome/email).
     if (!ehAuto && !(acessosEstud && sub === 'plataforma') && logs?.length) {
-      const atorIds = [...new Set(logs.map((l) => l.ator_id).filter(isUuid))] as string[]
-      if (atorIds.length) {
-        const { data: adm } = await supabase.from('simulado_tenant_admins').select('user_id, nome').in('user_id', atorIds)
-        for (const a of adm ?? []) if ((a as any).user_id) nomesAtor.set((a as any).user_id, (a as any).nome)
-      }
+      const atorIds = [...new Set(logs.map((l) => (l.actor_user_id ?? l.ator_id)).filter(isUuid))] as string[]
+      await Promise.all(atorIds.map(async (uid) => {
+        try {
+          const { data } = await supabase.auth.admin.getUserById(uid)
+          const u = data?.user
+          if (u) nomesAtor.set(uid, ((u.user_metadata as any)?.nome as string) || u.email || '')
+        } catch { /* ignora */ }
+      }))
     }
   } else if (view === 'sessoes') {
     let q = supabase.from('simulado_sessoes_prova')
