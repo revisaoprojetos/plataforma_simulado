@@ -10,6 +10,7 @@ import { AuditoriaDiff } from '@/components/admin/auditoria-diff'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { PaginationControls } from '@/components/admin/pagination-controls'
 import { isoParaBrtLocal } from '@/lib/brt'
+import { resumoRegistro } from '@/lib/auditoria/resumo'
 import { cn } from '@/lib/utils'
 
 const ITEMS_PER_PAGE = 12
@@ -120,6 +121,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
   const nomesSim = new Map<string, string>()
   const nomesAuto = new Map<string, string>()
   const nomesAtor = new Map<string, string>()
+  const nomesEntidade = new Map<string, string>() // entidade_id → nome (simulado/banco/estudante/caderno/grupo)
 
   if (view === 'audit' || view === 'automacoes') {
     let query = supabase
@@ -152,16 +154,37 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
       const ids = [...new Set(logs.filter((l) => isUuid(l.entidade_id)).map((l) => l.entidade_id as string))]
       if (ids.length) { const { data } = await supabase.from('simulado_estudantes').select('id, nome, email').in('id', ids); for (const e of data ?? []) nomesEst.set((e as any).id, { nome: (e as any).nome, email: (e as any).email }) }
     }
-    // Registros (não-plataforma): resolve o NOME do ator (admin) via auth.users (metadata.nome/email).
+    // Registros (não-plataforma): resolve o NOME do ator (admin) via auth.users (metadata.nome/email)
+    // e o NOME da entidade afetada (simulado/banco/estudante/caderno/grupo) para o resumo "O que aconteceu".
     if (!ehAuto && !(acessosEstud && sub === 'plataforma') && logs?.length) {
       const atorIds = [...new Set(logs.map((l) => (l.actor_user_id ?? l.ator_id)).filter(isUuid))] as string[]
-      await Promise.all(atorIds.map(async (uid) => {
+      const resolverAtores = Promise.all(atorIds.map(async (uid) => {
         try {
           const { data } = await supabase.auth.admin.getUserById(uid)
           const u = data?.user
           if (u) nomesAtor.set(uid, ((u.user_metadata as any)?.nome as string) || u.email || '')
         } catch { /* ignora */ }
       }))
+
+      const TBL_NOME: Record<string, [string, string]> = {
+        simulado_simulados: ['simulado_simulados', 'titulo'],
+        simulado_pastas: ['simulado_pastas', 'nome'],
+        simulado_estudantes: ['simulado_estudantes', 'nome'],
+        simulado_cadernos_designer: ['simulado_cadernos_designer', 'nome'],
+        simulado_grupos: ['simulado_grupos', 'nome'],
+      }
+      const idsPorEnt = new Map<string, Set<string>>()
+      for (const l of logs) {
+        if (!isUuid(l.entidade_id) || !TBL_NOME[l.entidade]) continue
+        const s = idsPorEnt.get(l.entidade) ?? new Set<string>()
+        s.add(l.entidade_id as string); idsPorEnt.set(l.entidade, s)
+      }
+      const resolverEntidades = Promise.all([...idsPorEnt].map(async ([ent, ids]) => {
+        const [tbl, col] = TBL_NOME[ent]
+        const { data } = await supabase.from(tbl).select(`id, ${col}`).in('id', [...ids])
+        for (const r of data ?? []) if ((r as any)[col]) nomesEntidade.set((r as any).id, (r as any)[col] as string)
+      }))
+      await Promise.all([resolverAtores, resolverEntidades])
     }
   } else if (view === 'sessoes') {
     let q = supabase.from('simulado_sessoes_prova')
@@ -252,7 +275,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
                 <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(log.criado_em)}</TableCell>
                 <TableCell className="truncate"><Badge variant={log.operacao === 'BLOQUEAR' ? 'destructive' : 'default'}>{r.origem}</Badge></TableCell>
                 <TableCell className="truncate text-sm" title={r.texto}>{r.texto}</TableCell>
-                <TableCell><DetalhesCell log={log} /></TableCell>
+                <TableCell><DetalhesCell log={log} resumo={`${r.origem} — ${r.texto}`} ator={r.origem} /></TableCell>
               </TableRow>
             )
           })}
@@ -282,10 +305,11 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
 
       {view === 'audit' && !(acessosEstud && sub === 'plataforma') && (
         <TabelaCard titulo="Registros" subtitulo={`${count ?? 0} entrada(s)`} sort={sortCtx}
-          cols={[{ label: 'Data/Hora', w: '17%', sort: 'criado_em' }, { label: 'Ator & Nome', w: '24%' }, { label: 'Ação', w: '13%', sort: 'operacao' }, { label: 'Módulo', w: '20%', sort: 'entidade' }, { label: 'IP', w: '14%' }, { label: 'Detalhes', w: '12%' }]}
+          cols={[{ label: 'Data/Hora', w: '15%', sort: 'criado_em' }, { label: 'Ator & Nome', w: '20%' }, { label: 'Ação', w: '11%', sort: 'operacao' }, { label: 'O que aconteceu', w: '40%', sort: 'entidade' }, { label: 'IP', w: '8%' }, { label: '', w: '6%', right: true }]}
           vazio="Nenhum registro encontrado." temLinhas={!!logs?.length}>
           {(logs ?? []).map((log) => {
             const nome = isUuid(log.ator_id) ? nomesAtor.get(log.ator_id) : null
+            const resumo = resumoRegistro(log, nomesEntidade)
             return (
               <TableRow key={log.id}>
                 <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(log.criado_em)}</TableCell>
@@ -294,9 +318,9 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
                   <span className="block truncate text-[11px] text-muted-foreground">{log.ator_tipo}{!nome && log.ator_id ? ` · ${String(log.ator_id).slice(0, 8)}…` : ''}</span>
                 </TableCell>
                 <TableCell className="truncate"><Badge variant={acaoVariant[log.operacao] ?? 'outline'}>{log.operacao}</Badge></TableCell>
-                <TableCell className="truncate font-mono text-xs text-muted-foreground" title={log.entidade}>{log.entidade}</TableCell>
-                <TableCell className="truncate text-xs text-muted-foreground">{log.ip ? String(log.ip) : '—'}</TableCell>
-                <TableCell><DetalhesCell log={log} /></TableCell>
+                <TableCell className="truncate text-sm" title={resumo}>{resumo}</TableCell>
+                <TableCell className="truncate text-xs text-muted-foreground" title={log.ip ? String(log.ip) : undefined}>{log.ip ? String(log.ip) : '—'}</TableCell>
+                <TableCell className="text-right"><DetalhesCell log={log} resumo={resumo} ator={nome ?? log.ator_tipo} /></TableCell>
               </TableRow>
             )
           })}
@@ -400,13 +424,22 @@ function TabelaCard({ titulo, subtitulo, cols, vazio, temLinhas, sort, children 
   )
 }
 
-function DetalhesCell({ log }: { log: any }) {
-  if (!(log.dados_anteriores || log.dados_novos || log.detalhes)) return null
+function DetalhesCell({ log, resumo, ator }: { log: any; resumo?: string; ator?: string | null }) {
+  const temDados = !!(log.dados_anteriores || log.dados_novos || log.detalhes)
+  // Exibe sempre que houver resumo (o contexto quem/quando/IP já vale por si), senão exige dados.
+  if (!temDados && !resumo) return null
   return (
     <AuditoriaDiff
       antes={(log.dados_anteriores as Record<string, unknown> | null) ?? ((log.detalhes as Record<string, unknown>)?.antes as Record<string, unknown> | null)}
       depois={(log.dados_novos as Record<string, unknown> | null) ?? ((log.detalhes as Record<string, unknown>)?.depois as Record<string, unknown> | null)}
       raw={(log.detalhes as Record<string, unknown>) ?? {}}
+      resumo={resumo}
+      operacao={log.operacao}
+      entidade={log.entidade}
+      ator={ator}
+      quando={fmtBR(log.criado_em)}
+      ip={log.ip ? String(log.ip) : null}
+      userAgent={log.user_agent ? String(log.user_agent) : null}
     />
   )
 }
