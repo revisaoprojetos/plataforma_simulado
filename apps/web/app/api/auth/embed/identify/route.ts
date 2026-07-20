@@ -108,6 +108,20 @@ export async function POST(request: NextRequest) {
 
   // Verificar janela temporal se aplicável.
   const agora = new Date()
+
+  // Manutenção: se ativa e dentro da janela, o aluno vê um aviso e NÃO acessa a prova.
+  const manut = (regrasSim.manutencao ?? null) as { ativo?: boolean; inicio?: string | null; fim?: string | null } | null
+  if (manut?.ativo) {
+    const mIni = manut.inicio ? new Date(manut.inicio) : null
+    const mFim = manut.fim ? new Date(manut.fim) : null
+    const emManutencao = (!mIni || agora >= mIni) && (!mFim || agora <= mFim)
+    if (emManutencao) {
+      const fmtM = (d: Date) => d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      const msg = `Este simulado está em manutenção${mFim ? ` até ${fmtM(mFim)} (horário de Brasília)` : ''}. Tente novamente mais tarde.`
+      return NextResponse.json({ titulo: 'Simulado em manutenção', message: msg, tipo: 'nao_iniciado' }, { status: 403 })
+    }
+  }
+
   const antesDoInicio = !!simulado.data_inicio && new Date(simulado.data_inicio) > agora
   if (antesDoInicio && !entradaAntecipada) {
     return bloqueio(tenantId, 'bloqueio_fora_janela', { simulado: tituloSimulado })

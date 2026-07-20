@@ -116,6 +116,11 @@ export async function updateSimuladoAction(id: string, data: SimuladoData) {
   // MERGE das regras: o form envia só as chaves do schema; preserva as demais já salvas
   // (banco_base_id, caderno_id, liberações manuais de nota/gabarito/caderno etc.).
   const regrasMescladas = { ...((antes as any).regras ?? {}), ...(data.regras ?? {}) }
+  // Manutenção: datas informadas em horário de Brasília → gravadas em UTC.
+  if ((regrasMescladas as any).manutencao) {
+    const mn = (regrasMescladas as any).manutencao
+    ;(regrasMescladas as any).manutencao = { ativo: !!mn.ativo, inicio: brtLocalParaIso(mn.inicio), fim: brtLocalParaIso(mn.fim) }
+  }
 
   const patch = {
     titulo: data.titulo,

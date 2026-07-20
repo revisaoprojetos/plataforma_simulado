@@ -59,7 +59,7 @@ export function CardSimulado({ s }: { s: ItemSimulado }) {
             <Clock className="h-4 w-4" /> Entrar e aguardar início
           </span>
         ) : (
-          <span className="mt-2 block rounded-lg bg-black/45 px-3 py-2 text-center text-xs text-white/80 backdrop-blur">{s.statusLabel === 'Agendado' ? 'Ainda não abriu' : 'Indisponível'}</span>
+          <span className="mt-2 block rounded-lg bg-black/45 px-3 py-2 text-center text-xs text-white/80 backdrop-blur">{s.statusLabel === 'Agendado' ? 'Ainda não abriu' : s.statusLabel === 'Em manutenção' ? '🔧 Em manutenção' : 'Indisponível'}</span>
         )}
       </div>
     </div>

@@ -77,6 +77,16 @@ export function montarItensSimulado(
       if (exp && now > new Date(exp).getTime()) { statusLabel = 'Prazo expirado'; windowOk = false; quando = `Expirou ${fmt(exp)}`; tom = 'rose' }
       else { statusLabel = 'Prazo'; quando = exp ? `Até ${fmt(exp)}` : 'Sem prazo definido'; tom = 'amber' }
     }
+    // Manutenção: sobrepõe o status enquanto ativa e dentro da janela (bloqueia acesso).
+    const mnt = (regras.manutencao ?? null) as { ativo?: boolean; inicio?: string | null; fim?: string | null } | null
+    if (mnt?.ativo) {
+      const mi = mnt.inicio ? new Date(mnt.inicio).getTime() : null
+      const mf = mnt.fim ? new Date(mnt.fim).getTime() : null
+      if ((!mi || now >= mi) && (!mf || now <= mf)) {
+        statusLabel = 'Em manutenção'; windowOk = false; aoVivo = false; tom = 'amber'
+        quando = mf ? `Manutenção até ${fmt(mnt.fim)}` : 'Em manutenção'
+      }
+    }
     const podeFazer = windowOk && s.status === 'publicado' && !!s.embed_token && (restantes > 0 || emAndamento)
     // Entrada antecipada: simulado Agendado (ainda não abriu) fica clicável quando a regra
     // permite — o aluno se identifica e cai na tela de espera com contagem (sem gastar tempo).

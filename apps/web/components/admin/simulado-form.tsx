@@ -26,7 +26,8 @@ import {
 } from '@/components/ui/accordion'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { BRT_LABEL } from '@/lib/brt'
+import { BRT_LABEL, isoParaBrtLocal } from '@/lib/brt'
+import { Wrench } from 'lucide-react'
 
 const simuladoSchema = z.object({
   titulo: z.string().min(3, 'Título deve ter ao menos 3 caracteres'),
@@ -112,6 +113,12 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
   const pad = (n: number) => String(n).padStart(2, '0')
   const [tempoProva, setTempoProva] = useState(minIniciais ? `${pad(Math.floor(minIniciais / 60))}:${pad(minIniciais % 60)}` : '')
 
+  // Manutenção: enquanto ativa e dentro da janela, o aluno vê um aviso em vez da prova.
+  const mnt = ((initialData?.regras as any)?.manutencao ?? {}) as { ativo?: boolean; inicio?: string; fim?: string }
+  const [manutAtivo, setManutAtivo] = useState(!!mnt.ativo)
+  const [manutInicio, setManutInicio] = useState(mnt.inicio ? isoParaBrtLocal(mnt.inicio) : '')
+  const [manutFim, setManutFim] = useState(mnt.fim ? isoParaBrtLocal(mnt.fim) : '')
+
   async function handleFormSubmit(data: SimuladoFormData) {
     setIsLoading(true)
     try {
@@ -123,6 +130,8 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
         if (data.regras.retentativas_ilimitadas) data.regras.retentativas = 0
         // Tolerância de atraso só vale com "iniciar atrasado" ligado.
         if (!data.regras.iniciar_atrasado) data.regras.tolerancia_atraso_min = undefined
+        // Manutenção (datas em horário de Brasília; a action converte p/ UTC).
+        ;(data.regras as any).manutencao = { ativo: manutAtivo, inicio: manutInicio || null, fim: manutFim || null }
       }
       const result = await onSubmit(data)
       if (result?.error) {
@@ -482,6 +491,31 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+        </CardContent>
+      </Card>
+
+      {/* Manutenção — mostra um aviso ao aluno em vez da prova, dentro da janela definida. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Wrench className="h-4 w-4 text-amber-500" /> Manutenção</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-start gap-3">
+            <Switch id="manut_ativo" checked={manutAtivo} onCheckedChange={setManutAtivo} className="mt-0.5" />
+            <div>
+              <Label htmlFor="manut_ativo">Colocar o simulado em manutenção</Label>
+              <p className="text-xs text-muted-foreground">Enquanto ativa (e dentro da janela abaixo), o aluno vê um aviso de manutenção — não consegue iniciar/retomar a prova. Deixe a janela em branco para manutenção imediata até você desligar.</p>
+            </div>
+          </div>
+          {manutAtivo && (
+            <div className="space-y-1.5 rounded-lg border bg-amber-500/5 p-3">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2"><Label htmlFor="manut_inicio">Início da manutenção</Label><Input id="manut_inicio" type="datetime-local" value={manutInicio} onChange={(e) => setManutInicio(e.target.value)} /></div>
+                <div className="space-y-2"><Label htmlFor="manut_fim">Fim da manutenção</Label><Input id="manut_fim" type="datetime-local" value={manutFim} onChange={(e) => setManutFim(e.target.value)} /></div>
+              </div>
+              <p className="text-xs text-muted-foreground">{BRT_LABEL}. Em branco = sem limite (início já, fim manual). O aluno vê o período nesta faixa.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
