@@ -155,7 +155,8 @@ function Assinaturas({ provider }: { provider: Provider }) {
 
   const filtrados = (itens ?? []).filter((a) => {
     const q = busca.trim().toLowerCase()
-    return !q || `${a.nome} ${a.email ?? ''} ${a.cpf ?? ''} ${a.produtoNome ?? ''}`.toLowerCase().includes(q)
+    // Inclui o ID do produto (produtoRef) além do nome → dá p/ filtrar por "1783709089".
+    return !q || `${a.nome} ${a.email ?? ''} ${a.cpf ?? ''} ${a.produtoNome ?? ''} ${a.produtoRef ?? ''}`.toLowerCase().includes(q)
   })
   const key = (a: AssinaturaGuruDTO) => `${a.pessoaExternalId}::${a.entExternalId}`
   const toggle = (a: AssinaturaGuruDTO) => setSel((p) => { const n = new Set(p); const k = key(a); n.has(k) ? n.delete(k) : n.add(k); return n })
@@ -187,7 +188,7 @@ function Assinaturas({ provider }: { provider: Provider }) {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-48 flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, e-mail, CPF, produto…" className="pl-8" />
+          <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, e-mail, CPF, produto ou ID do produto…" className="pl-8" />
         </div>
         <Button variant="outline" onClick={sincronizar} disabled={sincronizando || carregando}>
           {sincronizando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DownloadCloud className="mr-2 h-4 w-4" />} Sincronizar da {nomeProv}
