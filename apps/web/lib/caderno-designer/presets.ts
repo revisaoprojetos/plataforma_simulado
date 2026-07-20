@@ -91,45 +91,6 @@ export const PRESETS_CADERNO: CadernoPreset[] = [
     build: () => docCapturado(CADERNO_PERGUNTAS_DOC),
   },
   {
-    id: 'prova-completa',
-    nome: 'Prova completa',
-    descricao: 'Capa + questões (enunciado e alternativas) por questão.',
-    build: () => doc([
-      page('capa', 'Capa', [
-        blk('cabecalho-prova', { campos: [{ rotulo: 'Banca', valor: '' }, { rotulo: 'Órgão', valor: '' }, { rotulo: 'Cargo', valor: '' }, { rotulo: 'Ano', valor: '' }], colunas: 2 }),
-        blk('espacador', { altura: 16 }),
-        blk('titulo-secao', { texto: '{simulado}', nivel: 1, align: 'center' }),
-        blk('espacador', { altura: 12 }),
-        blk('identificacao', { titulo: 'Identificação do candidato', campos: ['Nome completo', 'Nº de inscrição', 'Data'] }),
-        blk('espacador', { altura: 12 }),
-        blk('instrucoes', { titulo: 'Instruções', texto: 'Leia atentamente cada questão. Marque apenas uma alternativa por questão.' }),
-      ]),
-      page('conteudo', 'Questões', [
-        blk('repeticao', { gap: 18 }, [
-          blk('titulo-secao', { texto: 'Questão {q_num}', nivel: 2, align: 'left', mostrarLinha: false }),
-          blk('texto-livre', { texto: '{q_enunciado}', size: 12 }),
-          blk('alternativas', { mostrarGabarito: false }),
-        ]),
-      ]),
-    ]),
-  },
-  {
-    id: 'folha-respostas',
-    nome: 'Folha de respostas',
-    descricao: 'Cartão-resposta (grade de bolhas) + identificação + assinatura.',
-    build: () => doc([
-      page('gabarito', 'Folha de respostas', [
-        blk('titulo-secao', { texto: 'Folha de Respostas', nivel: 1, align: 'center' }),
-        blk('espacador', { altura: 8 }),
-        blk('identificacao', { titulo: '', campos: ['Nome completo', 'Nº de inscrição'] }),
-        blk('espacador', { altura: 12 }),
-        blk('gabarito-grid', { titulo: '', numQuestoes: null, numAlternativas: 5, colunas: 2, estilo: 'circulo' }),
-        blk('espacador', { altura: 24 }),
-        blk('assinatura', { assinaturas: ['Assinatura do candidato'], align: 'left', larguraLinha: 240 }),
-      ]),
-    ]),
-  },
-  {
     id: 'caderno-redacao',
     nome: 'Caderno de redação',
     descricao: 'Instruções + folha pautada para resposta discursiva.',
@@ -139,23 +100,6 @@ export const PRESETS_CADERNO: CadernoPreset[] = [
         blk('instrucoes', { titulo: 'Proposta', texto: 'Desenvolva um texto dissertativo-argumentativo sobre o tema proposto.' }),
         blk('espacador', { altura: 10 }),
         blk('linhas-resposta', { quantidade: 30, rotulo: '', altura: 30 }),
-      ]),
-    ]),
-  },
-  {
-    id: 'gabarito-comentado',
-    nome: 'Gabarito comentado',
-    descricao: 'Enunciado + alternativas com gabarito + correção por questão.',
-    build: () => doc([
-      page('gabarito', 'Gabarito comentado', [
-        blk('titulo-secao', { texto: 'Gabarito Comentado — {simulado}', nivel: 1, align: 'center' }),
-        blk('espacador', { altura: 8 }),
-        blk('repeticao', { gap: 16 }, [
-          blk('titulo-secao', { texto: 'Questão {q_num}', nivel: 2, mostrarLinha: false }),
-          blk('texto-livre', { texto: '{q_enunciado}', size: 12 }),
-          blk('alternativas', { mostrarGabarito: true }),
-          blk('gabarito-correcao', { rotulo: 'Sua resposta:', mostrarCorreta: true }),
-        ]),
       ]),
     ]),
   },
