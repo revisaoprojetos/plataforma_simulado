@@ -105,6 +105,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
     supabase
       .from('simulado_questoes')
       .select('id, enunciado, status, disciplinas:simulado_disciplinas(nome)')
+      .eq('deletado', false)
       .order('created_at', { ascending: false }),
   ])
 

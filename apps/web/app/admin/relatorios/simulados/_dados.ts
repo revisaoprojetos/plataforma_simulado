@@ -174,16 +174,20 @@ export async function montarRelatorioSimulado(svc: SupabaseClient, simId: string
 
   // Total de estudantes matriculados no simulado: toda matrícula (liberada ou bloqueada) + acesso avulso + quem já tem sessão.
   const atribuidosSet = new Set<string>(sess.map((s) => s.estudante_id).filter(Boolean))
-  const mats = await fetchAll<any>(() => svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simId).order('estudante_id'))
+  // Matrículas, acessos avulsos e eventos de relatório são leituras independentes — em paralelo.
+  const [mats, acs, evRes] = await Promise.all([
+    fetchAll<any>(() => svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simId).order('estudante_id')),
+    fetchAll<any>(() => svc.from('simulado_acessos').select('estudante_id').eq('simulado_id', simId).order('estudante_id')),
+    svc.from('simulado_relatorio_eventos').select('estudante_id, tipo').eq('simulado_id', simId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000'),
+  ])
   for (const m of mats) if (m.estudante_id) atribuidosSet.add(m.estudante_id)
-  const acs = await fetchAll<any>(() => svc.from('simulado_acessos').select('estudante_id').eq('simulado_id', simId).order('estudante_id'))
   for (const a of acs) if (a.estudante_id) atribuidosSet.add(a.estudante_id)
 
   // Engajamento: acessos e uso de relatório por aluno (distintos).
   const acessaramSet = new Set(sess.filter((s) => s.iniciado_em).map((s) => s.estudante_id).filter(Boolean))
   const finalizaramSet = new Set(finalizadas.map((s) => s.estudante_id).filter(Boolean))
   const visSet = new Set<string>(), baixSet = new Set<string>()
-  const { data: eventos } = await svc.from('simulado_relatorio_eventos').select('estudante_id, tipo').eq('simulado_id', simId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+  const eventos = evRes.data
   for (const ev of (eventos ?? []) as any[]) {
     if (!ev.estudante_id) continue
     if (ev.tipo === 'visualizou') visSet.add(ev.estudante_id)

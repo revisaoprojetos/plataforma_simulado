@@ -13,6 +13,7 @@ import { ptBR } from 'date-fns/locale'
 import { MatriculasFilters } from '@/components/admin/matriculas-filters'
 import { MatriculaActions } from '@/components/admin/matricula-actions'
 import { PaginationControls } from '@/components/admin/pagination-controls'
+import { ExportMatriculasButton } from '@/components/admin/export-matriculas-button'
 import { SecaoHeader } from '@/components/admin/secao-header'
 
 const ITEMS_PER_PAGE = 30
@@ -55,10 +56,13 @@ export default async function MatriculasPage({ searchParams }: PageProps) {
             {count ?? 0} matrículas registradas
           </p>
         </div>
-        <Link href="/admin/matriculas/nova" className={buttonVariants()}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Matrícula
-        </Link>
+        <div className="flex items-center gap-2">
+          <ExportMatriculasButton filtros={{ liberado: params.liberado, estudante_id: params.estudante_id }} />
+          <Link href="/admin/matriculas/nova" className={buttonVariants()}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova Matrícula
+          </Link>
+        </div>
       </div>
 
       <MatriculasFilters />

@@ -19,6 +19,7 @@ import { PaginationControls } from '@/components/admin/pagination-controls'
 import { CopiarCodigo } from '@/components/admin/copiar-codigo'
 import { codigoQuestao } from '@/lib/codigo-questao'
 import { NovaQuestaoDialog } from '@/components/admin/nova-questao-dialog'
+import { ExportQuestoesButton } from '@/components/admin/export-questoes-button'
 import { SecaoHeader } from '@/components/admin/secao-header'
 
 const ITEMS_PER_PAGE = 20
@@ -102,7 +103,10 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
             {count ?? 0} questões cadastradas
           </p>
         </div>
-        <NovaQuestaoDialog />
+        <div className="flex items-center gap-2">
+          <ExportQuestoesButton filtros={{ q, status, disciplina, dificuldade, tipo }} />
+          <NovaQuestaoDialog />
+        </div>
       </div>
 
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>

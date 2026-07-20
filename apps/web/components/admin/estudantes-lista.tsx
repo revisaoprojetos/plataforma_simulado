@@ -6,6 +6,8 @@ import { Search, Users, Crown, ClipboardCheck, X, ArrowUpRight, GraduationCap, A
 import { cn } from '@/lib/utils'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { ExcluirEstudanteButton } from '@/components/admin/excluir-estudante-button'
+import { ExportButton } from '@/components/admin/export-button'
+import type { ColunaExport } from '@/lib/exportar'
 
 export type EstudanteRow = {
   id: string; nome: string; email: string | null; cpf: string | null; telefone: string | null
@@ -76,6 +78,17 @@ export function EstudantesLista({ estudantes }: { estudantes: EstudanteRow[] }) 
   const totalPass = estudantes.filter((e) => e.classificacao === 'passaporte').length
   const totalFeitos = estudantes.reduce((a, e) => a + e.feitos, 0)
 
+  const colunasExport: ColunaExport<EstudanteRow>[] = [
+    { titulo: 'Nome', valor: (e) => e.nome, largura: 32 },
+    { titulo: 'E-mail', valor: (e) => e.email, largura: 30 },
+    { titulo: 'CPF', valor: (e) => e.cpf },
+    { titulo: 'Telefone', valor: (e) => e.telefone },
+    { titulo: 'Plano', valor: (e) => (e.classificacao === 'passaporte' ? 'Passaporte' : 'Padrão') },
+    { titulo: 'Simulados feitos', valor: (e) => e.feitos },
+    { titulo: 'Média', valor: (e) => (e.media != null ? e.media.toFixed(1).replace('.', ',') : '') },
+    { titulo: 'Cadastrado em', valor: (e) => fmtData(e.created_at) },
+  ]
+
   return (
     <div className="space-y-4">
       {/* KPIs */}
@@ -103,6 +116,8 @@ export function EstudantesLista({ estudantes }: { estudantes: EstudanteRow[] }) 
               </button>
             ))}
           </div>
+          <ExportButton rows={ordenados} colunas={colunasExport} nomeBase="estudantes" titulo="Estudantes"
+            subtitulo={`${filtrados.length} de ${estudantes.length} estudante(s)`} />
         </div>
 
         <div className="px-3 py-2 text-xs text-muted-foreground">Exibindo <b className="tabular-nums text-foreground">{filtrados.length}</b> de {estudantes.length}</div>
