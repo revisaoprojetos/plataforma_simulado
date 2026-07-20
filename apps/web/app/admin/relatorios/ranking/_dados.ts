@@ -1,6 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { normalizarCriterios, idadeEmAnos, type CriteriosRanking, type EntradaRanking } from '@/lib/simulado/ranking'
 
 type GrupoBanco = { id: string; nome: string; disciplinas: string[] }
@@ -45,11 +45,13 @@ export async function montarRankingSimulado(svc: SupabaseClient, simId: string, 
   for (const qid of qIds) { const gid = grupoDaDisc(discDeQ.get(qid) ?? ''); if (gid) contGrupo.set(gid, (contGrupo.get(gid) ?? 0) + 1) }
   const gruposView = grupos.map((g) => ({ id: g.id, nome: g.nome, count: contGrupo.get(g.id) ?? 0 }))
 
-  // Sessões finalizadas (uma por aluno: a de maior nota).
-  const { data: sess } = await svc.from('simulado_sessoes_prova')
-    .select('id, estudante_id, nota, status, iniciado_em, finalizado_em').eq('simulado_id', simId).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada')
+  // Sessões finalizadas (uma por aluno: a de maior nota). fetchAll: sem isso, simulados com
+  // 1000+ finalizadas truncariam o ranking (teto de ~1000 do PostgREST).
+  const sess = await fetchAll<any>(() => svc.from('simulado_sessoes_prova')
+    .select('id, estudante_id, nota, status, iniciado_em, finalizado_em')
+    .eq('simulado_id', simId).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada').order('id'))
   const melhorSess = new Map<string, any>()
-  for (const s of (sess ?? []) as any[]) {
+  for (const s of sess) {
     const cur = melhorSess.get(s.estudante_id)
     if (!cur || (Number(s.nota ?? -1) > Number(cur.nota ?? -1))) melhorSess.set(s.estudante_id, s)
   }

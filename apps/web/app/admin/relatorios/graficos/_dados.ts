@@ -17,11 +17,12 @@ export async function montarRelatorioGrafico(svc: SupabaseClient, tenantId: stri
 
   let sessoes: any[] = []
   if (simIds.length) {
-    const { data } = await svc.from('simulado_sessoes_prova')
-      .select('id, simulado_id, status, nota, iniciado_em, estudante_id')
-      .in('simulado_id', simIds).eq('is_teste', false).eq('deletado', false)
-      .order('iniciado_em', { ascending: false }).limit(5000)
-    sessoes = (data ?? []) as any[]
+    // fetchAllByIn: o `.limit(5000)` truncava em ~1000 (teto do PostgREST) → contagens/gráficos incoerentes.
+    sessoes = await fetchAllByIn<any>(simIds, (chunk) =>
+      svc.from('simulado_sessoes_prova')
+        .select('id, simulado_id, status, nota, iniciado_em, estudante_id')
+        .in('simulado_id', chunk).eq('is_teste', false).eq('deletado', false).order('id'))
+    sessoes.sort((a, b) => (b.iniciado_em ?? '').localeCompare(a.iniciado_em ?? '')) // mais recentes primeiro (como antes)
   }
 
   const acPorSess = new Map<string, number>(), ttPorSess = new Map<string, number>()

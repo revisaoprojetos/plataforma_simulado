@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { DadosRelatorioDisciplina } from './relatorio-disciplina-view'
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
@@ -22,13 +23,15 @@ export async function montarRelatorioDisciplina(svc: SupabaseClient, discId: str
   let totAc = 0, totTt = 0
 
   if (qIds.length) {
-    const { data: resp } = await svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('questao_id', qIds)
-    const respArr = (resp ?? []) as any[]
+    // fetchAllByIn nas respostas E nas sessões: sem isso ambos truncam em ~1000 → stats da disciplina incoerentes.
+    const respArr = await fetchAllByIn<any>(qIds, (chunk) =>
+      svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('questao_id', chunk).order('id'))
     const sessIds = [...new Set(respArr.map((r) => r.sessao_id))]
     const sessInfo = new Map<string, { simulado_id: string; estudante_id: string; data: string | null; teste: boolean }>()
     if (sessIds.length) {
-      const { data: sess } = await svc.from('simulado_sessoes_prova').select('id, simulado_id, estudante_id, iniciado_em, is_teste, deletado').in('id', sessIds)
-      for (const s of (sess ?? []) as any[]) if (!s.deletado) sessInfo.set(s.id, { simulado_id: s.simulado_id, estudante_id: s.estudante_id, data: s.iniciado_em, teste: !!s.is_teste })
+      const sess = await fetchAllByIn<any>(sessIds, (chunk) =>
+        svc.from('simulado_sessoes_prova').select('id, simulado_id, estudante_id, iniciado_em, is_teste, deletado').in('id', chunk))
+      for (const s of sess) if (!s.deletado) sessInfo.set(s.id, { simulado_id: s.simulado_id, estudante_id: s.estudante_id, data: s.iniciado_em, teste: !!s.is_teste })
     }
     for (const r of respArr) {
       const si = sessInfo.get(r.sessao_id); if (!si || si.teste) continue

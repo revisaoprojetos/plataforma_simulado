@@ -7,6 +7,7 @@
 // e SVG com `currentColor` — robusto no claro e no escuro, e no estilo do Ranking.
 
 import { useId, useState } from 'react'
+import { Inbox } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { usePdfDownloads } from '@/components/pdf-downloads-provider'
@@ -126,9 +127,16 @@ export function KpiCard({ icon, tom = 'primary', label, valor, sub }: {
   )
 }
 
-/** Estado vazio padrão (dentro de um painel). */
-export function Vazio({ children }: { children: React.ReactNode }) {
-  return <div className="py-10 text-center text-sm text-muted-foreground">{children}</div>
+/** Estado vazio padrão (dentro de um painel) — ícone tintado + mensagem. */
+export function Vazio({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2.5 py-10 text-center">
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground/60">
+        {icon ?? <Inbox className="h-5 w-5" />}
+      </span>
+      <p className="max-w-xs text-sm text-muted-foreground">{children}</p>
+    </div>
+  )
 }
 
 type ItemBarra = { rotulo: string; valor: number; sub?: string }

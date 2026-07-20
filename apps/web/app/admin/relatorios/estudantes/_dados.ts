@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { DadosRelatorioEstudante } from './relatorio-estudante-view'
 
 const fmtDur = (min: number) => { const h = Math.floor(min / 60), m = Math.round(min % 60); return h > 0 ? `${h}h ${String(m).padStart(2, '0')}min` : `${m}min` }
@@ -41,13 +42,15 @@ export async function montarRelatorioEstudante(svc: SupabaseClient, estId: strin
   // Turma: respostas de TODOS (sessões reais) às mesmas questões → acerto por disciplina.
   const acDiscTurma = new Map<string, { ac: number; tt: number }>()
   if (qidsAluno.length) {
-    const { data: tResp } = await svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('questao_id', qidsAluno).limit(20000)
-    const tArr = (tResp ?? []) as any[]
+    // fetchAllByIn: sem isso o PostgREST trunca em ~1000 e a comparação aluno×turma fica incoerente.
+    const tArr = await fetchAllByIn<any>(qidsAluno, (chunk) =>
+      svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('questao_id', chunk).order('id'))
     const tSessIds = [...new Set(tArr.map((r) => r.sessao_id))]
     const teste = new Set<string>()
     if (tSessIds.length) {
-      const { data: ts } = await svc.from('simulado_sessoes_prova').select('id, is_teste, deletado').in('id', tSessIds)
-      for (const s of (ts ?? []) as any[]) if (s.is_teste || s.deletado) teste.add(s.id)
+      const ts = await fetchAllByIn<any>(tSessIds, (chunk) =>
+        svc.from('simulado_sessoes_prova').select('id, is_teste, deletado').in('id', chunk))
+      for (const s of ts) if (s.is_teste || s.deletado) teste.add(s.id)
     }
     for (const r of tArr) {
       if (teste.has(r.sessao_id)) continue
