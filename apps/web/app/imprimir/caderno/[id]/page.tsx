@@ -268,6 +268,8 @@ export default async function CadernoImprimirPage({
             // expandida) para o paginador distribuir por página; os demais blocos são itens únicos.
             const itensDaPagina = (page: any) =>
               page.blocks.filter((b: any) => b.type !== 'plano-fundo').flatMap((block: any) => {
+                // Quebra de página manual → o paginador fecha a folha aqui (marcador não renderiza).
+                if (block.type === 'quebra-pagina') return [{ key: `${ci}-${page.id}-${block.id}`, gapTop: 0, quebra: true, node: null }]
                 if (block.type === 'repeticao') {
                   const qtd = block.attributes?.quantidade as number | null | undefined
                   const gapQ = (block.attributes?.gap as number | undefined) ?? 16 // espaço ENTRE questões (igual ao editor)

@@ -1,11 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { SHEET_W, PAD_H } from '@/lib/caderno-designer/types'
+import { PAD_H, CONT_W } from '@/lib/caderno-designer/types'
 
 const MM = 3.7795
 const PAGE_H = 297 * MM // altura A4 em px @96dpi
-const CONT_W = SHEET_W - 2 * PAD_H // largura útil do conteúdo (igual ao editor)
 
 /**
  * Paginador determinístico do caderno para impressão/PDF.
@@ -26,7 +25,7 @@ export function PaginadorCaderno({
   rodH,
   fundo,
 }: {
-  itens: { key: string; node: React.ReactNode; gapTop?: number }[]
+  itens: { key: string; node: React.ReactNode; gapTop?: number; quebra?: boolean }[]
   letterhead?: string | null
   opac?: number
   cabH: number // px reservados no topo da 1ª página do conteúdo (igual ao editor)
@@ -55,6 +54,12 @@ export function PaginadorCaderno({
       let atual: number[] = []
       let h = 0
       for (let i = 0; i < alturas.length; i++) {
+        // Quebra de página MANUAL: fecha a folha atual (se tiver conteúdo) e segue na próxima.
+        // O marcador não é renderizado (é invisível no PDF).
+        if (itens[i].quebra) {
+          if (atual.length) { grupos.push(atual); atual = []; h = 0 }
+          continue
+        }
         const safe = PAGE_H - (grupos.length === 0 ? cabH : cabCont) - rodH - BUF
         const alt = alturas[i]
         const gap = atual.length ? (itens[i].gapTop || 0) : 0 // 1º item da página não tem gap

@@ -27,7 +27,11 @@ export async function pdfCadernoProcessor(job: Job<PdfCadernoData>) {
 
   try {
     // 1. URL → PDF (Gotenberg/Chromium)
-    const pdf = await urlParaPdf(url)
+    // Margem 0: o HTML do caderno já define suas margens (padding + @page margin:0). A margem
+    // padrão do Gotenberg (0.4") era SOMADA por cima → folha espremida (editor ≠ PDF). Zerar
+    // alinha o PDF ao preview. Reverter sem redeploy: env CADERNO_PDF_MARGEM=0.4.
+    const m = process.env.CADERNO_PDF_MARGEM != null ? Number(process.env.CADERNO_PDF_MARGEM) : 0
+    const pdf = await urlParaPdf(url, { marginTop: m, marginBottom: m, marginLeft: m, marginRight: m })
 
     // 2. Upload no storage (bucket público `pdfs`)
     const path = `${tenantId}/${jobId}.pdf`

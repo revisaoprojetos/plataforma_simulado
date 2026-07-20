@@ -9,6 +9,9 @@ export const SHEET_W = 794 // 210mm
 export const SHEET_H = 1123 // 297mm
 export const PAD_H = 64 // ~48pt
 export const PAD_V = 48 // ~36pt
+/** Largura útil do conteúdo (folha − 2×padding lateral). Fonte ÚNICA p/ editor, admin e paginador
+ * — garante que a quebra de linha caia no mesmo ponto no preview e no PDF. */
+export const CONT_W = SHEET_W - 2 * PAD_H // 666px
 
 export type BlockCategory = 'conteudo' | 'avaliacao' | 'identificacao' | 'estrutura'
 
