@@ -217,6 +217,61 @@ export async function listarEstudantesSimulado(simuladoId: string): Promise<{ ok
   return { ok: true, estudantes }
 }
 
+/**
+ * Remove as matrículas de PASSAPORTE que sobraram da regra antiga (passaporte matriculado em
+ * TODO simulado). Mantém quem é estudante do banco do simulado, quem já iniciou a prova e quem
+ * tem acesso avulso — remove só os passaportes "de bypass" que não pertencem a este simulado.
+ */
+export async function removerPassaportesIndevidos(simuladoId: string): Promise<{ ok?: boolean; error?: string; removidos?: number }> {
+  if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  const svc = createAdminClient()
+
+  const { data: sim } = await svc.from('simulado_simulados').select('id, tenant_id, regras').eq('id', simuladoId).maybeSingle()
+  if (!sim) return { error: 'Simulado não encontrado.' }
+  if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
+  const tid = tenantId ?? (sim as any).tenant_id
+  const bancoId = ((sim as any).regras as any)?.banco_base_id as string | undefined
+
+  const mats = await fetchAll<{ estudante_id: string }>(() =>
+    svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simuladoId).order('estudante_id'))
+  const matIds = [...new Set(mats.map((m) => m.estudante_id).filter(Boolean))]
+  if (!matIds.length) return { ok: true, removidos: 0 }
+
+  // Passaportes entre os matriculados.
+  const ests = await fetchAllByIn<{ id: string; classificacao: string | null }>(matIds, (chunk) =>
+    svc.from('simulado_estudantes').select('id, classificacao').in('id', chunk).order('id'))
+  const passaportes = new Set(ests.filter((e) => e.classificacao === 'passaporte').map((e) => e.id))
+  if (!passaportes.size) return { ok: true, removidos: 0 }
+
+  // Protegidos: estudantes do banco + quem iniciou + quem tem acesso avulso.
+  const bancoMembros = new Set<string>()
+  if (bancoId) {
+    const bm = await fetchAll<{ estudante_id: string }>(() =>
+      svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).order('estudante_id'))
+    for (const r of bm) if (r.estudante_id) bancoMembros.add(r.estudante_id)
+  }
+  const sess = await fetchAll<{ estudante_id: string }>(() =>
+    svc.from('simulado_sessoes_prova').select('estudante_id').eq('simulado_id', simuladoId).order('estudante_id'))
+  const iniciou = new Set(sess.map((s) => s.estudante_id).filter(Boolean))
+  const acs = await fetchAll<{ estudante_id: string }>(() =>
+    svc.from('simulado_acessos').select('estudante_id').eq('simulado_id', simuladoId).order('estudante_id'))
+  const comAcesso = new Set(acs.map((a) => a.estudante_id).filter(Boolean))
+
+  const remover = [...passaportes].filter((id) => !bancoMembros.has(id) && !iniciou.has(id) && !comAcesso.has(id))
+  if (!remover.length) return { ok: true, removidos: 0 }
+
+  for (let i = 0; i < remover.length; i += 300) {
+    const lote = remover.slice(i, i + 300)
+    const { error } = await svc.from('simulado_matriculas').delete().eq('simulado_id', simuladoId).in('estudante_id', lote)
+    if (error) return { error: error.message }
+  }
+
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_matriculas', entidadeId: simuladoId, tenantId: tid, depois: { passaportes_removidos: remover.length } })
+  revalidatePath(`/admin/simulados/${simuladoId}`)
+  return { ok: true, removidos: remover.length }
+}
+
 export interface ResumoAoVivo {
   total: number        // estudantes matriculados (linkados)
   online: number       // com sessão EM ANDAMENTO (fazendo agora)

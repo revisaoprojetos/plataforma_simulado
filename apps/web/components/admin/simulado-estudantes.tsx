@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, ArrowUpDown, Users } from 'lucide-react'
+import { Loader2, Search, ArrowUpDown, Users, UserMinus } from 'lucide-react'
+import { toast } from 'sonner'
+import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
-import { listarEstudantesSimulado, type EstudanteLinkado } from '@/app/admin/simulados/actions'
+import { listarEstudantesSimulado, removerPassaportesIndevidos, type EstudanteLinkado } from '@/app/admin/simulados/actions'
 
 type Campo = 'nome' | 'email' | 'situacao' | 'nota'
 const POR_PAGINA = 11
@@ -28,6 +31,8 @@ export function SimuladoEstudantes({ simuladoId }: { simuladoId: string }) {
   const [dir, setDir] = useState<'asc' | 'desc'>('asc')
   const [pagina, setPagina] = useState(1)
 
+  const [limpando, setLimpando] = useState(false)
+
   useEffect(() => {
     let vivo = true
     setCarregando(true)
@@ -37,6 +42,25 @@ export function SimuladoEstudantes({ simuladoId }: { simuladoId: string }) {
       .finally(() => vivo && setCarregando(false))
     return () => { vivo = false }
   }, [simuladoId])
+
+  async function limparPassaportes() {
+    const ok = await confirmar({
+      titulo: 'Remover passaportes indevidos',
+      mensagem: 'Remover deste simulado os passaportes que NÃO são estudantes do banco dele e ainda não iniciaram a prova?\n\nMantém quem já começou, quem tem acesso avulso e os estudantes do banco.',
+      confirmar: 'Remover',
+      destrutivo: true,
+    })
+    if (!ok) return
+    setLimpando(true)
+    try {
+      const r = await removerPassaportesIndevidos(simuladoId)
+      if (r.error) { toast.error(r.error); return }
+      toast.success(r.removidos ? `${r.removidos} passaporte(s) removido(s)` : 'Nenhum passaporte indevido encontrado')
+      const rr = await listarEstudantesSimulado(simuladoId)
+      if (!rr.error) setDados(rr.estudantes ?? [])
+    } catch { toast.error('Falha ao remover.') }
+    finally { setLimpando(false) }
+  }
 
   const filtrados = useMemo(() => {
     const q = busca.toLowerCase().trim()
@@ -107,10 +131,19 @@ export function SimuladoEstudantes({ simuladoId }: { simuladoId: string }) {
         </select>
       </div>
 
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Users className="h-3.5 w-3.5" />
-        {filtrados.length} de {dados.length} estudante(s) linkado(s){nPassaporte ? ` · ${nPassaporte} passaporte` : ''}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Users className="h-3.5 w-3.5" />
+          {filtrados.length} de {dados.length} estudante(s) linkado(s){nPassaporte ? ` · ${nPassaporte} passaporte` : ''}
+        </p>
+        {nPassaporte > 0 && (
+          <Button type="button" size="sm" variant="outline" onClick={limparPassaportes} disabled={limpando}
+            className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-900/50 dark:text-amber-400 dark:hover:bg-amber-900/20">
+            {limpando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <UserMinus className="mr-1.5 h-4 w-4" />}
+            Remover passaportes indevidos
+          </Button>
+        )}
+      </div>
 
       <div className="overflow-hidden rounded-lg border">
         <Table className="w-full table-fixed">
