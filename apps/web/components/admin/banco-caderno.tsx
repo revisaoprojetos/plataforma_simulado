@@ -62,8 +62,10 @@ export async function BancoCaderno({ bancoId, cor = '#6d28d9' }: { bancoId: stri
     const docs = (cfg.docsV2 ?? {}) as Record<string, unknown>
     modalidades = mesclarModalidades(cfg.modalidadesV2)
       .filter((m) => m.id !== 'caderno_completo') // descontinuado para o aluno
-      .filter((m) => temConteudo(docs[m.id]) || m.id === 'caderno_perguntas')
-      .map((m) => ({ id: m.id, nome: m.nome }))
+      // Sempre mostra as entregas-padrão do aluno (Caderno de questões e Diagnóstico), além das
+      // demais que tiverem conteúdo. Diagnóstico sem conteúdo aparece como card "monte…".
+      .filter((m) => temConteudo(docs[m.id]) || m.id === 'caderno_perguntas' || m.id === 'diagnostico')
+      .map((m) => ({ id: m.id, nome: m.nome, vazio: !temConteudo(docs[m.id]) && m.id === 'diagnostico' }))
     material = materialDoConfig(cfg)
   }
 

@@ -23,7 +23,7 @@ import { associarCaderno, subirMaterialPdf, removerMaterialPdf } from '@/app/adm
 import type { MaterialCaderno } from '@/lib/caderno-designer/material'
 
 interface Caderno { id: string; nome: string; descricao?: string | null; cor?: string | null; icone?: string | null; capa?: string | null }
-interface Modalidade { id: string; nome: string }
+interface Modalidade { id: string; nome: string; vazio?: boolean }
 const SEM = '__sem__'
 
 /** Ícone por modalidade interna do caderno. */
@@ -348,24 +348,37 @@ function ColunaCaderno({ cadernoId, cor, modalidade }: { cadernoId: string; cor:
       <div className="flex items-center gap-2 border-b px-2.5 py-2" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent)` }}>
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white shadow-sm" style={{ background: cor }}><Icon className="h-3.5 w-3.5" /></span>
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{modalidade.nome}</span>
-        <a href={`/imprimir/caderno/${cadernoId}?mod=${modalidade.id}`} target="_blank" rel="noreferrer" title="Abrir em tela cheia / imprimir"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ExternalLink className="h-4 w-4" /></a>
+        {!modalidade.vazio && (
+          <a href={`/imprimir/caderno/${cadernoId}?mod=${modalidade.id}`} target="_blank" rel="noreferrer" title="Abrir em tela cheia / imprimir"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ExternalLink className="h-4 w-4" /></a>
+        )}
       </div>
       {/* Preview embutido — role dentro para ver as próximas páginas */}
       <div ref={boxRef} className="relative w-full overflow-hidden bg-neutral-200 dark:bg-neutral-800" style={{ height: boxH }}>
-        {!carregado && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-neutral-100 text-muted-foreground dark:bg-neutral-900">
-            <Loader2 className="h-6 w-6 animate-spin" />
-            <span className="text-xs">Carregando preview…</span>
+        {modalidade.vazio ? (
+          // Modalidade sem conteúdo montado (ex.: Diagnóstico) → CTA em vez de preview quebrado.
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-neutral-100 px-6 text-center text-muted-foreground dark:bg-neutral-900">
+            <Icon className="h-7 w-7" />
+            <span className="text-sm font-medium">{modalidade.nome} ainda não montado</span>
+            <span className="text-xs">Monte o modelo em <strong>Cadernos de Prova</strong> para o aluno recebê-lo.</span>
           </div>
+        ) : (
+          <>
+            {!carregado && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-neutral-100 text-muted-foreground dark:bg-neutral-900">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <span className="text-xs">Carregando preview…</span>
+              </div>
+            )}
+            <iframe
+              src={`/imprimir/caderno/${cadernoId}?mod=${modalidade.id}&embed=1&rawimg=1`}
+              title={modalidade.nome}
+              loading="lazy"
+              onLoad={() => setCarregado(true)}
+              style={{ width: A4_W, height: A4_H, transform: `scale(${s})`, transformOrigin: 'top left', border: 0 }}
+            />
+          </>
         )}
-        <iframe
-          src={`/imprimir/caderno/${cadernoId}?mod=${modalidade.id}&embed=1&rawimg=1`}
-          title={modalidade.nome}
-          loading="lazy"
-          onLoad={() => setCarregado(true)}
-          style={{ width: A4_W, height: A4_H, transform: `scale(${s})`, transformOrigin: 'top left', border: 0 }}
-        />
       </div>
     </div>
   )

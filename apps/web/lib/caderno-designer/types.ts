@@ -120,6 +120,7 @@ export function mesclarModalidades(saved?: Modalidade[]): Modalidade[] {
     return { ...m, nome: MODALIDADE_RENOMEAR[m.nome] ?? m.nome }
   })
   garantirMod(norm, 'caderno_perguntas')
+  garantirMod(norm, 'diagnostico') // garante a modalidade Diagnóstico (aparece se tiver conteúdo)
   return norm
 }
 

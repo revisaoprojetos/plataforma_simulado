@@ -189,7 +189,7 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
       {open && createPortal(
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="animate-page absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => setOpen(false)} />
-          <div role="dialog" aria-modal="true" className="animate-pop relative flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+          <div role="dialog" aria-modal="true" className="animate-pop relative flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
             <div className="flex items-center justify-between border-b px-5 py-3">
               <h3 className="flex items-center gap-2 text-sm font-semibold"><UsersRound className="h-4 w-4" /> Vincular grupo ao banco</h3>
               <button type="button" onClick={() => setOpen(false)} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
