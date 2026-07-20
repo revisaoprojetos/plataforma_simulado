@@ -2,7 +2,7 @@
 
 import { Fragment, useLayoutEffect, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, Printer, Plus, Trash2, ArrowUp, ArrowDown, FileText, Palette, LayoutTemplate, ChevronLeft, ChevronRight, Columns2, PanelTop, PanelBottom, Minus, Wallpaper, Database, Users, Repeat, Copy, GripVertical, Undo2, Redo2 } from 'lucide-react'
+import { Loader2, Save, Printer, Plus, Trash2, ArrowUp, ArrowDown, FileText, Palette, LayoutTemplate, ChevronLeft, ChevronRight, Columns2, PanelTop, PanelBottom, Minus, Wallpaper, Database, Users, Repeat, Copy, GripVertical, Undo2, Redo2, FileUp } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -15,7 +15,7 @@ import { HudSimuladoEditor } from '@/components/admin/hud-simulado-editor'
 import { HexColorField } from '@/components/admin/hex-color-field'
 import { GerarPdfServidor } from '@/components/admin/gerar-pdf-servidor'
 import { MonitorPlay, GitBranch } from 'lucide-react'
-import { salvarCadernoDesignerV2, getGruposBanco, getAssuntosBanco } from '@/app/admin/cadernos/actions'
+import { salvarCadernoDesignerV2, getGruposBanco, getAssuntosBanco, converterWordAction } from '@/app/admin/cadernos/actions'
 import { PRESETS_CADERNO, type CadernoPreset } from '@/lib/caderno-designer/presets'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
@@ -376,6 +376,8 @@ export function CadernoEditorV2({
   const mods0 = mesclarModalidades(inicial.modalidadesV2)
   const mods0Vis = OCULTAR_DISCURSIVA ? mods0.filter((m) => !ehDiscursiva(m)) : mods0
   const [modalidades, setModalidades] = useState<Modalidade[]>(mods0)
+  const [importando, setImportando] = useState(false)
+  const fileWordRef = useRef<HTMLInputElement>(null)
   const modalidadesVisiveis = OCULTAR_DISCURSIVA ? modalidades.filter((m) => !ehDiscursiva(m)) : modalidades
   const [docs, setDocs] = useState<Record<string, CadernoDoc>>(() => {
     const d = { ...(inicial.docsV2 ?? {}) }
@@ -643,6 +645,22 @@ export function CadernoEditorV2({
       r.ok ? toast.success('Caderno salvo') : toast.error(r.error ?? 'Erro ao salvar')
     })
   }
+  async function importarWord(file: File) {
+    const nomeMod = modalidades.find((m) => m.id === modAtiva)?.nome ?? 'esta modalidade'
+    if (!(await confirmar({ titulo: 'Importar Word (.docx)', mensagem: `Isso vai SUBSTITUIR o conteúdo de "${nomeMod}" pelo do arquivo "${file.name}". Você revisa no editor e salva depois. Continuar?`, confirmar: 'Importar', destrutivo: true }))) return
+    setImportando(true)
+    try {
+      const dataUri = await new Promise<string>((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(new Error('leitura')); fr.readAsDataURL(file) })
+      const r = await converterWordAction(dataUri)
+      if (!r.ok || !r.doc) { toast.error(r.error ?? 'Falha ao importar o Word.'); return }
+      const imp = r.doc as CadernoDoc
+      setDoc((d) => ({ ...d, pages: imp.pages.length ? imp.pages : d.pages }))
+      setSelBlock(null); setSelPage(null)
+      toast.success(`Word importado: ${r.resumo?.blocos ?? 0} bloco(s)${r.resumo?.imagens ? ` · ${r.resumo.imagens} imagem(ns)` : ''}. Revise e salve.`)
+    } catch (e) { toast.error('Erro ao ler o arquivo.'); console.error(e) }
+    finally { setImportando(false) }
+  }
+
   function vincularBanco(novoId: string | null) {
     setBancoId(novoId)
     start(async () => {
@@ -735,6 +753,11 @@ export function CadernoEditorV2({
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={desfazer} disabled={undoStack.length === 0} title="Desfazer (Ctrl+Z)"><Undo2 className="h-4 w-4" /></Button>
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={refazer} disabled={redoStack.length === 0} title="Refazer (Ctrl+Shift+Z)"><Redo2 className="h-4 w-4" /></Button>
           </div>
+          <input ref={fileWordRef} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) importarWord(f); e.target.value = '' }} />
+          <Button variant="outline" size="sm" onClick={() => fileWordRef.current?.click()} disabled={importando} title="Importar um Word (.docx) para esta modalidade">
+            {importando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileUp className="mr-1.5 h-4 w-4" />} Importar Word
+          </Button>
           <a href={`/imprimir/caderno/${cadernoId}?mod=${modAtiva}${regAtual ? `&aluno=${regAtual.id}` : ''}`} target="_blank" rel="noreferrer">
             <Button variant="outline" size="sm"><Printer className="mr-1.5 h-4 w-4" /> Imprimir/PDF</Button>
           </a>

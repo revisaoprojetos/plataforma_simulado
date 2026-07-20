@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // Monorepo pnpm: inclui os pacotes do workspace (ex.: `shared`) no build standalone.
   outputFileTracingRoot: path.join(dir, "../../"),
+  // mammoth (parser .docx) usa deps de node / requires dinâmicos — não bundlear.
+  serverExternalPackages: ["mammoth"],
   images: {
     remotePatterns: [
       {
