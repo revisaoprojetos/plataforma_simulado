@@ -247,15 +247,15 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
 
           <div className="mt-5 grid grid-cols-2 gap-2">
             <div className={BTN_CADERNO} style={STYLE_CADERNO}><FileText className="mr-1.5 h-4 w-4" /> Caderno de gabarito PDF</div>
-            <div className={BTN_CADERNO} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Caderno completo PDF</div>
+            <div className={BTN_CADERNO} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Enunciados PDF</div>
           </div>
 
           {/* Voltar ao menu — logo abaixo dos downloads */}
           {/* Cadernos "como você fez" (sem gabarito), um por modalidade — a navegação fica na barra superior. */}
           <div className="mt-2 grid gap-2 sm:grid-cols-3">
             <div className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Folha de Respostas</div>
-            <div className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Caderno Completo</div>
             <div className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Enunciados</div>
+            <div className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Caderno Completo</div>
           </div>
         </div>
 

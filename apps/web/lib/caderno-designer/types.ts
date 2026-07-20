@@ -72,8 +72,10 @@ export type Modalidade = { id: string; nome: string }
 export const MODALIDADES_PADRAO: Modalidade[] = [
   { id: 'gabarito_objetivo', nome: 'Folha de Respostas' },
   { id: 'gabarito_discursivo', nome: 'Caderno Discursivo' },
-  { id: 'caderno_completo', nome: 'Caderno Completo' },
-  { id: 'caderno_perguntas', nome: 'Enunciados' },
+  // Troca de rótulos (id intacto): a modalidade "completa" chama-se "Enunciados"
+  // e a de só-enunciado chama-se "Caderno Completo".
+  { id: 'caderno_completo', nome: 'Enunciados' },
+  { id: 'caderno_perguntas', nome: 'Caderno Completo' },
   { id: 'diagnostico', nome: 'Diagnóstico' },
 ]
 
@@ -82,9 +84,13 @@ export const MODALIDADE_RENOMEAR: Record<string, string> = {
   'Gabarito Objetivo': 'Folha de Respostas',
   'Caderno Objetivo': 'Folha de Respostas',
   'Gabarito Discursivo': 'Caderno Discursivo',
-  'Caderno de Perguntas': 'Enunciados',
-  'Caderno de Questões': 'Enunciados',
 }
+
+// Troca determinística POR ID dos rótulos das duas entregas padrão (idempotente):
+// normaliza qualquer nome "de sistema" para o novo rótulo, preservando nomes custom.
+// Ambos os conjuntos incluem os nomes pré- E pós-troca → aplicar N vezes é estável.
+const NOMES_SISTEMA_COMPLETO = new Set(['Caderno Completo', 'Caderno completo', 'Enunciados', 'Enunciado'])
+const NOMES_SISTEMA_PERGUNTAS = new Set(['Enunciados', 'Enunciado', 'Caderno de Perguntas', 'Caderno de Questões', 'Caderno Completo', 'Caderno completo'])
 
 /** Garante que uma modalidade-padrão exista, inserindo-a antes do "Diagnóstico" (ou no fim). */
 function garantirMod(norm: Modalidade[], id: string) {
@@ -102,7 +108,13 @@ function garantirMod(norm: Modalidade[], id: string) {
  */
 export function mesclarModalidades(saved?: Modalidade[]): Modalidade[] {
   const base = saved?.length ? saved : MODALIDADES_PADRAO
-  const norm = base.map((m) => ({ ...m, nome: MODALIDADE_RENOMEAR[m.nome] ?? m.nome }))
+  const norm = base.map((m) => {
+    // Troca por ID das duas entregas padrão (só quando o nome salvo é um rótulo de
+    // sistema; nomes custom do usuário são preservados).
+    if (m.id === 'caderno_completo' && NOMES_SISTEMA_COMPLETO.has(m.nome)) return { ...m, nome: 'Enunciados' }
+    if (m.id === 'caderno_perguntas' && NOMES_SISTEMA_PERGUNTAS.has(m.nome)) return { ...m, nome: 'Caderno Completo' }
+    return { ...m, nome: MODALIDADE_RENOMEAR[m.nome] ?? m.nome }
+  })
   garantirMod(norm, 'caderno_completo')
   garantirMod(norm, 'caderno_perguntas')
   return norm

@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
       const { data: qp } = await admin.from('simulado_questao_pasta').select('pasta_id').in('questao_id', qids)
       const pastaIds = [...new Set((qp ?? []).map((r: any) => r.pasta_id))]
       if (pastaIds.length) {
-        const { data: cads } = await admin.from('simulado_cadernos_designer').select('id, config').order('atualizado_em', { ascending: false })
+        const { data: cads } = await admin.from('simulado_cadernos_designer').select('id, config').eq('tenant_id', sessao.tenant_id).order('atualizado_em', { ascending: false })
         const cad = (cads ?? []).find((c: any) => c.config?.bancoId && pastaIds.includes(c.config.bancoId))
         cadernoId = (cad?.id as string) ?? null
         if (cad) {
