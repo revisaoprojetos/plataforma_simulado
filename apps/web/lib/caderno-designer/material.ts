@@ -24,11 +24,11 @@ export function materialDoConfig(config: unknown): MaterialCaderno {
 }
 
 /**
- * O "Enunciado" do aluno = o PDF importado (empresa/EBT). É um caderno A MAIS
+ * O "Gabarito Comentado" do aluno = o PDF importado (empresa/EBT). É um caderno A MAIS
  * (não substitui os do sistema); aparece só quando há PDF de fato. O nome exibido
- * ao aluno é sempre "Enunciado" (o `pdfNome` fica para telas de admin).
+ * ao aluno é sempre "Gabarito Comentado" (o `pdfNome` fica para telas de admin).
  */
 export function enunciadoPdf(config: unknown): { url: string; nome: string } | null {
   const m = materialDoConfig(config)
-  return m.pdfUrl ? { url: m.pdfUrl, nome: 'Enunciado' } : null
+  return m.pdfUrl ? { url: m.pdfUrl, nome: 'Gabarito Comentado' } : null
 }

@@ -9,7 +9,7 @@ export interface ModalidadeAluno {
   semGab: boolean
   /** "Com correção" — disponível quando a nota/gabarito é liberado. */
   comGab: boolean
-  /** Quando é o Enunciado (PDF importado): baixa o arquivo direto. */
+  /** Quando é o Gabarito Comentado (PDF importado): baixa o arquivo direto. */
   pdfUrl?: string
 }
 
@@ -24,7 +24,7 @@ const temConteudo = (d: any) =>
  *  - Folha de Respostas  → como fez (sem gabarito) E com gabarito ao liberar
  *  - Caderno de questões → só as questões, sem resposta (só "como fez")
  *  - Diagnóstico         → só quando liberado
- *  - Enunciado (PDF)     → PDF importado, só quando liberado (some se não houver PDF)
+ *  - Gabarito Comentado (PDF) → PDF importado, só quando liberado (some se não houver PDF)
  */
 export function modalidadesDoAluno(config: unknown, tipo: TipoSimulado | null): ModalidadeAluno[] {
   const cfg = (config ?? {}) as any

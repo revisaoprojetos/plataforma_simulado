@@ -247,7 +247,7 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
 
           <div className="mt-5 grid grid-cols-2 gap-2">
             <div className={BTN_CADERNO} style={STYLE_CADERNO}><FileText className="mr-1.5 h-4 w-4" /> Folha de Respostas PDF</div>
-            <div className={BTN_CADERNO} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Enunciado (PDF)</div>
+            <div className={BTN_CADERNO} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Gabarito Comentado (PDF)</div>
           </div>
 
           {/* Voltar ao menu — logo abaixo dos downloads */}

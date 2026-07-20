@@ -88,7 +88,7 @@ export function BancoCadernoClient({
       const r = await subirMaterialPdf(atual, bancoId, dataUrl, file.name)
       if (!r.ok) { toast.error(r.error ?? 'Falha ao enviar'); return }
       setMatPdfUrl(r.url ?? ''); setMatPdfNome(r.nome ?? file.name.replace(/\.pdf$/i, ''))
-      toast.success('Enunciado (PDF) enviado')
+      toast.success('Gabarito Comentado (PDF) enviado')
       router.refresh()
     } catch { toast.error('Falha ao ler o arquivo.') }
     finally { setMatBusy(false) }
@@ -96,13 +96,13 @@ export function BancoCadernoClient({
 
   async function removerPdf() {
     if (!atual || matBusy) return
-    if (!(await confirmar({ mensagem: 'Remover o Enunciado (PDF importado)?\n\nO aluno deixa de ver o caderno “Enunciado”.', destrutivo: true }))) return
+    if (!(await confirmar({ mensagem: 'Remover o Gabarito Comentado (PDF importado)?\n\nO aluno deixa de ver o caderno “Gabarito Comentado”.', destrutivo: true }))) return
     setMatBusy(true)
     const r = await removerMaterialPdf(atual, bancoId)
     setMatBusy(false)
     if (!r.ok) { toast.error(r.error ?? 'Erro'); return }
     setMatPdfUrl(''); setMatPdfNome('')
-    toast.success('Enunciado removido')
+    toast.success('Gabarito Comentado removido')
     router.refresh()
   }
 
@@ -219,7 +219,7 @@ export function BancoCadernoClient({
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Material do aluno</p>
-              <span className="text-[11px] text-muted-foreground">Cadernos que o aluno recebe ao finalizar — os do sistema e o Enunciado (PDF importado que você envia).</span>
+              <span className="text-[11px] text-muted-foreground">Cadernos que o aluno recebe ao finalizar — os do sistema e o Gabarito Comentado (PDF importado que você envia).</span>
             </div>
             {cols > 4 ? (
               /* Muitos cadernos: rolagem horizontal com setas. */
@@ -283,7 +283,7 @@ function EnunciadoCard({ cor, pdfUrl, pdfNome, busy, onUpload, onRemover }: {
     <div className="flex min-w-0 flex-col overflow-hidden rounded-xl border-2 bg-card shadow-md" style={{ borderColor: cor }}>
       <div className="flex items-center gap-2 border-b px-2.5 py-2" style={{ background: `linear-gradient(90deg, ${cor}24, transparent)` }}>
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white shadow-sm" style={{ background: cor }}><BookOpenCheck className="h-3.5 w-3.5" /></span>
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold">Enunciado</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">Gabarito Comentado</span>
         {pdfUrl && (
           <a href={pdfUrl} target="_blank" rel="noreferrer" title="Abrir PDF"
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ExternalLink className="h-4 w-4" /></a>
@@ -299,7 +299,7 @@ function EnunciadoCard({ cor, pdfUrl, pdfNome, busy, onUpload, onRemover }: {
             <object data={`${pdfUrl}#toolbar=0&navpanes=0&view=FitH`} type="application/pdf" className="h-full w-full" style={{ border: 0 }}>
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-neutral-100 px-6 text-center text-muted-foreground dark:bg-neutral-900">
                 <FileText className="h-8 w-8" />
-                <span className="text-sm font-medium">PDF do Enunciado enviado</span>
+                <span className="text-sm font-medium">PDF do Gabarito Comentado enviado</span>
                 <a href={pdfUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-primary underline">Abrir PDF em nova aba</a>
               </div>
             </object>
@@ -313,18 +313,18 @@ function EnunciadoCard({ cor, pdfUrl, pdfNome, busy, onUpload, onRemover }: {
           <button type="button" onClick={onUpload} disabled={busy}
             className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-neutral-100 text-muted-foreground transition-colors hover:bg-neutral-50 hover:text-foreground disabled:opacity-60 dark:bg-neutral-900 dark:hover:bg-neutral-800">
             {busy ? <Loader2 className="h-7 w-7 animate-spin" /> : <FileUp className="h-7 w-7" />}
-            <span className="text-sm font-medium">Enviar o Enunciado (PDF)</span>
+            <span className="text-sm font-medium">Enviar o Gabarito Comentado (PDF)</span>
             <span className="px-6 text-center text-xs text-muted-foreground">Ex.: caderno pronto da EBT · máx. ~8 MB</span>
           </button>
         )}
       </div>
 
-      {/* Rodapé: o Enunciado só aparece ao aluno quando há PDF */}
+      {/* Rodapé: o Gabarito Comentado só aparece ao aluno quando há PDF */}
       <div className="flex items-center gap-1.5 border-t px-2.5 py-1.5 text-[11px]">
         {pdfUrl ? (
-          <><Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" /><span className="min-w-0 truncate text-emerald-700 dark:text-emerald-400">Aluno recebe: <strong>{pdfNome || 'Enunciado (PDF)'}</strong></span></>
+          <><Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" /><span className="min-w-0 truncate text-emerald-700 dark:text-emerald-400">Aluno recebe: <strong>{pdfNome || 'Gabarito Comentado'}</strong></span></>
         ) : (
-          <><FileUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><span className="min-w-0 truncate text-muted-foreground">Sem Enunciado — envie o PDF importado</span></>
+          <><FileUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><span className="min-w-0 truncate text-muted-foreground">Sem Gabarito Comentado — envie o PDF importado</span></>
         )}
       </div>
     </div>
