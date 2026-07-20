@@ -61,7 +61,8 @@ export async function BancoCaderno({ bancoId, cor = '#6d28d9' }: { bancoId: stri
     const cfg = ((cad as any)?.config ?? {}) as any
     const docs = (cfg.docsV2 ?? {}) as Record<string, unknown>
     modalidades = mesclarModalidades(cfg.modalidadesV2)
-      .filter((m) => temConteudo(docs[m.id]))
+      .filter((m) => m.id !== 'caderno_completo') // descontinuado para o aluno
+      .filter((m) => temConteudo(docs[m.id]) || m.id === 'caderno_perguntas')
       .map((m) => ({ id: m.id, nome: m.nome }))
     material = materialDoConfig(cfg)
   }

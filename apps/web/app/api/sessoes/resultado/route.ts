@@ -4,9 +4,8 @@ import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
-import { mesclarModalidades } from '@/lib/caderno-designer/types'
-import { usaPdfImportado } from '@/lib/caderno-designer/material'
-import { tipoDoSimulado, filtrarModsPorTipo } from '@/lib/simulado/tipo'
+import { modalidadesDoAluno, type ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
+import { tipoDoSimulado } from '@/lib/simulado/tipo'
 
 // GET /api/sessoes/resultado?st={sessao_id}
 // Dados da central de revisão: resumo + questões com resposta do aluno.
@@ -180,7 +179,7 @@ export async function GET(request: NextRequest) {
 
   // Caderno vinculado + suas modalidades (para o download "como você fez" por modalidade).
   let cadernoId: string | null = null
-  let modalidades: { id: string; nome: string; semGab: boolean; comGab: boolean; pdfUrl?: string }[] = []
+  let modalidades: ModalidadeAluno[] = []
   try {
     const qids = questoes.map((q: any) => q.id).filter(Boolean)
     if (qids.length) {
@@ -191,22 +190,8 @@ export async function GET(request: NextRequest) {
         const cad = (cads ?? []).find((c: any) => c.config?.bancoId && pastaIds.includes(c.config.bancoId))
         cadernoId = (cad?.id as string) ?? null
         if (cad) {
-          const cfg = (cad.config ?? {}) as any
-          // PDF importado substitui o caderno do sistema (uma só entrega: o PDF pronto).
-          const pdf = usaPdfImportado(cfg)
-          if (pdf) {
-            modalidades = [{ id: 'pdf-importado', nome: pdf.nome, semGab: true, comGab: false, pdfUrl: pdf.url }]
-          } else {
-            const docs = (cfg.docsV2 ?? {}) as Record<string, any>
-            const temConteudo = (d: any) => !!d && Array.isArray(d.pages) && d.pages.some((p: any) => (p.blocks ?? []).some((b: any) => b.type !== 'plano-fundo'))
-            const tipo = tipoDoSimulado(questoes.map((q: any) => q.tipo))
-            // "Caderno de Perguntas" é entrega-padrão: aparece mesmo sem doc próprio salvo
-            // (o motor de impressão usa a semente). As demais exigem conteúdo desenhado.
-            modalidades = filtrarModsPorTipo(mesclarModalidades(cfg.modalidadesV2), tipo)
-              .filter((m) => temConteudo(docs[m.id]) || m.id === 'caderno_perguntas')
-              // semGab (como você fez): tudo menos Diagnóstico | comGab (com gabarito): tudo menos Caderno de Questões
-              .map((m) => ({ id: m.id, nome: m.nome, semGab: m.id !== 'diagnostico', comGab: m.id !== 'caderno_perguntas' }))
-          }
+          const tipo = tipoDoSimulado(questoes.map((q: any) => q.tipo))
+          modalidades = modalidadesDoAluno(cad.config, tipo)
         }
       }
     }

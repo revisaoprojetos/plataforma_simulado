@@ -324,21 +324,6 @@ async function lerConfigCaderno(svc: ReturnType<typeof createAdminClient>, cader
   return { config: (((data as any)?.config ?? {}) as Record<string, unknown>), existe: !!data }
 }
 
-/** Define qual material o aluno baixa: 'sistema' (caderno gerado) ou 'pdf' (importado). */
-export async function definirFonteMaterial(cadernoId: string, bancoId: string, fonte: 'sistema' | 'pdf'): Promise<{ ok: boolean; error?: string }> {
-  const g = await guard()
-  if (!g.ok) return g
-  const svc = createAdminClient()
-  const { config, existe } = await lerConfigCaderno(svc, cadernoId, g.tenantId)
-  if (!existe) return { ok: false, error: 'Caderno não encontrado.' }
-  const material = { ...(config.material as any ?? {}), fonte }
-  const { error } = await svc.from('simulado_cadernos_designer').update({ config: { ...config, material } }).eq('id', cadernoId).eq('tenant_id', g.tenantId)
-  if (error) return { ok: false, error: error.message }
-  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: cadernoId, depois: { material_fonte: fonte } })
-  revalidatePath(`/admin/banco-questoes/${bancoId}`)
-  return { ok: true }
-}
-
 /** Sobe o PDF pronto do "caderno completo" (empresa) e passa a mostrá-lo ao aluno. */
 export async function subirMaterialPdf(cadernoId: string, bancoId: string, dataUrl: string, nomeArquivo: string): Promise<{ ok: boolean; url?: string; nome?: string; error?: string }> {
   const g = await guard()

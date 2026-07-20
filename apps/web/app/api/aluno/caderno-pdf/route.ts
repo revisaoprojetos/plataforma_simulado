@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const cadernoId = searchParams.get('caderno')
   const sessao = searchParams.get('sessao')
-  const mod = searchParams.get('mod') || 'caderno_completo'
+  const mod = searchParams.get('mod') || 'caderno_perguntas'
   const aluno = searchParams.get('aluno') || ''
   const comGabarito = searchParams.get('gabarito') === '1' // versão "com correção"
   const nomeArquivo = (searchParams.get('nome') || 'caderno').replace(/[\\/:*?"<>|]+/g, '').slice(0, 120)

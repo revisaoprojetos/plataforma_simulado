@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { iconeBanco } from '@/lib/banco-visual'
-import { associarCaderno, definirFonteMaterial, subirMaterialPdf, removerMaterialPdf } from '@/app/admin/banco-questoes/estudantes-actions'
+import { associarCaderno, subirMaterialPdf, removerMaterialPdf } from '@/app/admin/banco-questoes/estudantes-actions'
 import type { MaterialCaderno } from '@/lib/caderno-designer/material'
 
 interface Caderno { id: string; nome: string; descricao?: string | null; cor?: string | null; icone?: string | null; capa?: string | null }
@@ -61,35 +61,17 @@ export function BancoCadernoClient({
   const [salvandoId, setSalvandoId] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Material para download do aluno (caderno do sistema × PDF importado).
-  const [matFonte, setMatFonte] = useState<'sistema' | 'pdf'>(material?.fonte ?? 'sistema')
+  // Enunciado do aluno = PDF importado (caderno A MAIS). Só upload / preview / remoção.
   const [matPdfUrl, setMatPdfUrl] = useState(material?.pdfUrl ?? '')
   const [matPdfNome, setMatPdfNome] = useState(material?.pdfNome ?? '')
   const [matBusy, setMatBusy] = useState(false)
-  // Qual lado está em PREVIEW no card (a escolha persistida é `matFonte`).
-  const [abaMaterial, setAbaMaterial] = useState<'sistema' | 'importado'>(material?.fonte === 'pdf' && material?.pdfUrl ? 'importado' : 'sistema')
   const filePdfRef = useRef<HTMLInputElement>(null)
 
   // Ressincroniza com o servidor quando o material muda (ex.: trocou o caderno associado).
   useEffect(() => {
-    setMatFonte(material?.fonte ?? 'sistema')
     setMatPdfUrl(material?.pdfUrl ?? '')
     setMatPdfNome(material?.pdfNome ?? '')
-    setAbaMaterial(material?.fonte === 'pdf' && material?.pdfUrl ? 'importado' : 'sistema')
   }, [material])
-
-  async function escolherFonte(f: 'sistema' | 'pdf') {
-    if (!atual) { toast.error('Associe um caderno acima primeiro.'); return }
-    if (matBusy || f === matFonte) return
-    if (f === 'pdf' && !matPdfUrl) { filePdfRef.current?.click(); return } // sem PDF → pede o upload
-    const anterior = matFonte
-    setMatFonte(f); setMatBusy(true)
-    const r = await definirFonteMaterial(atual, bancoId, f)
-    setMatBusy(false)
-    if (!r.ok) { setMatFonte(anterior); toast.error(r.error ?? 'Erro'); return }
-    toast.success(f === 'pdf' ? 'Alunos verão o PDF importado' : 'Alunos verão o caderno do sistema')
-    router.refresh()
-  }
 
   async function enviarPdf(file: File) {
     if (!atual) { toast.error('Associe um caderno acima primeiro.'); return }
@@ -105,8 +87,8 @@ export function BancoCadernoClient({
       })
       const r = await subirMaterialPdf(atual, bancoId, dataUrl, file.name)
       if (!r.ok) { toast.error(r.error ?? 'Falha ao enviar'); return }
-      setMatPdfUrl(r.url ?? ''); setMatPdfNome(r.nome ?? file.name.replace(/\.pdf$/i, '')); setMatFonte('pdf'); setAbaMaterial('importado')
-      toast.success('PDF enviado — alunos verão o material importado')
+      setMatPdfUrl(r.url ?? ''); setMatPdfNome(r.nome ?? file.name.replace(/\.pdf$/i, ''))
+      toast.success('Enunciado (PDF) enviado')
       router.refresh()
     } catch { toast.error('Falha ao ler o arquivo.') }
     finally { setMatBusy(false) }
@@ -114,13 +96,13 @@ export function BancoCadernoClient({
 
   async function removerPdf() {
     if (!atual || matBusy) return
-    if (!(await confirmar({ mensagem: 'Remover o PDF importado?\n\nOs alunos voltam a baixar o caderno gerado pelo sistema.', destrutivo: true }))) return
+    if (!(await confirmar({ mensagem: 'Remover o Enunciado (PDF importado)?\n\nO aluno deixa de ver o caderno “Enunciado”.', destrutivo: true }))) return
     setMatBusy(true)
     const r = await removerMaterialPdf(atual, bancoId)
     setMatBusy(false)
     if (!r.ok) { toast.error(r.error ?? 'Erro'); return }
-    setMatPdfUrl(''); setMatPdfNome(''); setMatFonte('sistema'); setAbaMaterial('sistema')
-    toast.success('PDF removido')
+    setMatPdfUrl(''); setMatPdfNome('')
+    toast.success('Enunciado removido')
     router.refresh()
   }
 
@@ -225,24 +207,19 @@ export function BancoCadernoClient({
       {cadernoAtual && (() => {
         const cId = cadernoAtual.id
         const cCor = cadernoAtual.cor ?? '#6d28d9'
-        // A entrega principal (id caderno_perguntas) vira o card de Material com a escolha
-        // sistema × PDF; as demais (Folha de Respostas, Enunciados, Diagnóstico…) ficam ao lado.
-        const auxiliares = modalidades.filter((m) => m.id !== 'caderno_perguntas')
+        // Cadernos do sistema (sem o "Caderno Completo", descontinuado) + o card do
+        // Enunciado (PDF importado), que é um caderno A MAIS que o admin envia.
+        const auxiliares = modalidades.filter((m) => m.id !== 'caderno_completo')
         const cols = 1 + auxiliares.length
-        const materialCard = (
-          <MaterialCard
-            cadernoId={cId} cor={cCor} aba={abaMaterial} pdfUrl={matPdfUrl} pdfNome={matPdfNome} busy={matBusy} fontePersistida={matFonte}
-            onVerSistema={() => { setAbaMaterial('sistema'); escolherFonte('sistema') }}
-            onVerImportado={() => { if (matPdfUrl) { setAbaMaterial('importado'); escolherFonte('pdf') } else filePdfRef.current?.click() }}
-            onUpload={() => filePdfRef.current?.click()}
-            onRemover={removerPdf}
-          />
+        const enunciadoCard = (
+          <EnunciadoCard cor={cCor} pdfUrl={matPdfUrl} pdfNome={matPdfNome} busy={matBusy}
+            onUpload={() => filePdfRef.current?.click()} onRemover={removerPdf} />
         )
         return (
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Material do aluno</p>
-              <span className="text-[11px] text-muted-foreground">Área de download dos cadernos — escolha o caderno do sistema ou um PDF importado; o preview mostra o que o aluno recebe.</span>
+              <span className="text-[11px] text-muted-foreground">Cadernos que o aluno recebe ao finalizar — os do sistema e o Enunciado (PDF importado que você envia).</span>
             </div>
             {cols > 4 ? (
               /* Muitos cadernos: rolagem horizontal com setas. */
@@ -252,7 +229,7 @@ export function BancoCadernoClient({
                   <ChevronLeft className="h-4 w-4" />
                 </button>
                 <div ref={scrollRef} className="flex gap-4 overflow-x-auto scroll-smooth px-6 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <div className="w-[360px] shrink-0">{materialCard}</div>
+                  <div className="w-[360px] shrink-0">{enunciadoCard}</div>
                   {auxiliares.map((m) => (
                     <div key={m.id} className="w-[320px] shrink-0"><ColunaCaderno cadernoId={cId} cor={cCor} modalidade={m} /></div>
                   ))}
@@ -265,7 +242,7 @@ export function BancoCadernoClient({
             ) : (
               /* Poucos: colunas iguais alinhadas (com teto de largura p/ não esticar demais). */
               <div className="mx-auto grid gap-4" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, maxWidth: cols * 380 }}>
-                {materialCard}
+                {enunciadoCard}
                 {auxiliares.map((m) => (
                   <ColunaCaderno key={m.id} cadernoId={cId} cor={cCor} modalidade={m} />
                 ))}
@@ -280,25 +257,18 @@ export function BancoCadernoClient({
   )
 }
 
-/** Card do MATERIAL DO ALUNO: preview A4 + escolha Enunciados (sistema) × PDF importado.
- *  O preview segue a aba selecionada; a escolha persistida é indicada no rodapé. */
-function MaterialCard({ cadernoId, cor, aba, pdfUrl, pdfNome, busy, fontePersistida, onVerSistema, onVerImportado, onUpload, onRemover }: {
-  cadernoId: string
+/** Card do ENUNCIADO do aluno = PDF importado (caderno A MAIS): preview + upload/remoção. */
+function EnunciadoCard({ cor, pdfUrl, pdfNome, busy, onUpload, onRemover }: {
   cor: string
-  aba: 'sistema' | 'importado'
   pdfUrl: string
   pdfNome: string
   busy: boolean
-  fontePersistida: 'sistema' | 'pdf'
-  onVerSistema: () => void
-  onVerImportado: () => void
   onUpload: () => void
   onRemover: () => void
 }) {
   const A4_W = 794, A4_H = 1123
   const boxRef = useRef<HTMLDivElement>(null)
   const [w, setW] = useState(320)
-  const [carregado, setCarregado] = useState(false)
   useEffect(() => {
     const el = boxRef.current
     if (!el) return
@@ -308,43 +278,23 @@ function MaterialCard({ cadernoId, cor, aba, pdfUrl, pdfNome, busy, fontePersist
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  const s = w / A4_W
   const boxH = Math.round(w * (A4_H / A4_W))
-  const urlSistema = `/imprimir/caderno/${cadernoId}?mod=caderno_perguntas`
-  const alunoPdf = fontePersistida === 'pdf' && !!pdfUrl
-  // O card se chama pelo CADERNO que está mostrando (não "Material do aluno").
-  const TituloIcon = aba === 'importado' ? BookOpenCheck : FileText
-  const tituloCard = aba === 'importado' ? (pdfNome || 'PDF importado') : 'Caderno Completo'
   return (
     <div className="flex min-w-0 flex-col overflow-hidden rounded-xl border-2 bg-card shadow-md" style={{ borderColor: cor }}>
-      {/* Cabeçalho + toggle de fonte */}
-      <div style={{ background: `linear-gradient(90deg, ${cor}24, transparent)` }}>
-        <div className="flex items-center gap-2 px-2.5 pt-2">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white shadow-sm" style={{ background: cor }}><TituloIcon className="h-3.5 w-3.5" /></span>
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold">{tituloCard}</span>
-          <a href={aba === 'sistema' ? urlSistema : (pdfUrl || '#')} target="_blank" rel="noreferrer" title="Abrir em tela cheia"
-            className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground', aba === 'importado' && !pdfUrl && 'pointer-events-none opacity-40')}><ExternalLink className="h-4 w-4" /></a>
-        </div>
-        <div className="flex gap-1 p-2">
-          <SegBtn ativo={aba === 'sistema'} disabled={busy} icon={FileText} label="Caderno do sistema" onClick={onVerSistema} />
-          <SegBtn ativo={aba === 'importado'} disabled={busy} icon={FileUp} label="PDF importado" onClick={onVerImportado} />
-        </div>
+      <div className="flex items-center gap-2 border-b px-2.5 py-2" style={{ background: `linear-gradient(90deg, ${cor}24, transparent)` }}>
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white shadow-sm" style={{ background: cor }}><BookOpenCheck className="h-3.5 w-3.5" /></span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">Enunciado</span>
+        {pdfUrl && (
+          <a href={pdfUrl} target="_blank" rel="noreferrer" title="Abrir PDF"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ExternalLink className="h-4 w-4" /></a>
+        )}
       </div>
 
-      {/* Preview: caderno do sistema (escalado) OU o PDF importado OU o dropzone */}
+      {/* Preview do PDF importado OU dropzone de upload */}
       <div ref={boxRef} className="relative w-full overflow-hidden bg-neutral-200 dark:bg-neutral-800" style={{ height: boxH }}>
-        {aba === 'sistema' ? (
+        {pdfUrl ? (
           <>
-            {!carregado && <PreviewLoading />}
-            <iframe
-              src={`${urlSistema}&embed=1&rawimg=1`}
-              title="Caderno do sistema" loading="lazy" onLoad={() => setCarregado(true)}
-              style={{ width: A4_W, height: A4_H, transform: `scale(${s})`, transformOrigin: 'top left', border: 0 }}
-            />
-          </>
-        ) : pdfUrl ? (
-          <>
-            <iframe src={`${pdfUrl}#toolbar=0&navpanes=0&view=FitH`} title={pdfNome || 'PDF importado'} className="h-full w-full" style={{ border: 0 }} />
+            <iframe src={`${pdfUrl}#toolbar=0&navpanes=0&view=FitH`} title={pdfNome || 'Enunciado (PDF)'} className="h-full w-full" style={{ border: 0 }} />
             <div className="absolute right-2 top-2 z-10 flex gap-1.5">
               <button type="button" onClick={onUpload} disabled={busy} className="rounded-md bg-background/90 px-2 py-1 text-xs font-medium shadow ring-1 ring-border backdrop-blur transition-colors hover:bg-background disabled:opacity-60">Trocar</button>
               <button type="button" onClick={onRemover} disabled={busy} title="Remover PDF" className="rounded-md bg-background/90 px-2 py-1 text-xs font-medium text-destructive shadow ring-1 ring-border backdrop-blur transition-colors hover:bg-background disabled:opacity-60"><Trash2 className="h-3.5 w-3.5" /></button>
@@ -354,40 +304,20 @@ function MaterialCard({ cadernoId, cor, aba, pdfUrl, pdfNome, busy, fontePersist
           <button type="button" onClick={onUpload} disabled={busy}
             className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-neutral-100 text-muted-foreground transition-colors hover:bg-neutral-50 hover:text-foreground disabled:opacity-60 dark:bg-neutral-900 dark:hover:bg-neutral-800">
             {busy ? <Loader2 className="h-7 w-7 animate-spin" /> : <FileUp className="h-7 w-7" />}
-            <span className="text-sm font-medium">Enviar PDF importado</span>
+            <span className="text-sm font-medium">Enviar o Enunciado (PDF)</span>
             <span className="px-6 text-center text-xs text-muted-foreground">Ex.: caderno pronto da EBT · máx. ~8 MB</span>
           </button>
         )}
       </div>
 
-      {/* Rodapé: o que o aluno REALMENTE baixa (escolha persistida) */}
+      {/* Rodapé: o Enunciado só aparece ao aluno quando há PDF */}
       <div className="flex items-center gap-1.5 border-t px-2.5 py-1.5 text-[11px]">
-        {alunoPdf ? (
-          <><Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" /><span className="min-w-0 truncate text-emerald-700 dark:text-emerald-400">Aluno baixa: <strong>{pdfNome || 'PDF importado'}</strong></span></>
+        {pdfUrl ? (
+          <><Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" /><span className="min-w-0 truncate text-emerald-700 dark:text-emerald-400">Aluno recebe: <strong>{pdfNome || 'Enunciado (PDF)'}</strong></span></>
         ) : (
-          <><FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><span className="min-w-0 truncate text-muted-foreground">Aluno baixa: <strong className="text-foreground">caderno do sistema</strong></span></>
+          <><FileUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><span className="min-w-0 truncate text-muted-foreground">Sem Enunciado — envie o PDF importado</span></>
         )}
       </div>
-    </div>
-  )
-}
-
-/** Botão do segmento (Enunciados | PDF importado). */
-function SegBtn({ ativo, disabled, icon: Icon, label, onClick }: { ativo: boolean; disabled?: boolean; icon: typeof FileText; label: string; onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} disabled={disabled}
-      className={cn('flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-60',
-        ativo ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'bg-background hover:bg-muted')}>
-      <Icon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{label}</span>
-    </button>
-  )
-}
-
-/** Spinner de preview (folha ainda carregando). */
-function PreviewLoading() {
-  return (
-    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-neutral-100 text-muted-foreground dark:bg-neutral-900">
-      <Loader2 className="h-6 w-6 animate-spin" /><span className="text-xs">Carregando preview…</span>
     </div>
   )
 }

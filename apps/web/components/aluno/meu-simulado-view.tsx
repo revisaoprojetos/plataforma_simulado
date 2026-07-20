@@ -83,10 +83,8 @@ export function MeuSimuladoView({
   // Baixa o caderno como ARQUIVO PDF (attachment) — 1 clique → salvar arquivo. O servidor
   // renderiza a página de impressão (Edge headless) COM os fundos/cards e devolve o PDF.
   // Fallback: se a geração falhar (ex.: sem navegador no host), abre a página com print=1.
-  // PDF importado (material pronto): entrega direta do arquivo, sem gerar no servidor.
-  const modPdf = useMemo(() => modalidades.find((m) => m.pdfUrl), [modalidades])
-
   async function baixarCaderno(sessaoId: string, mod: string, nome: string, gab = false) {
+    // Enunciado = PDF importado: entrega direta do arquivo, sem gerar no servidor.
     const md = modalidades.find((m) => m.id === mod)
     if (md?.pdfUrl) { abrir(md.pdfUrl); return }
     if (!cadernoId) { abrir(cadUrl(sessaoId, mod, gab)); return }
@@ -286,22 +284,7 @@ export function MeuSimuladoView({
             {modalTent && `Tentativa ${modalTent.n} · ${fmtData(modalTent.finalizado)}${modalTent.nota != null && notaLiberada ? ` · nota ${nota(modalTent.nota)}` : ''}`}
           </DialogDescription>
         </DialogHeader>
-        {modalTent && modPdf && (
-          /* PDF importado (empresa): o material pronto substitui os cadernos do sistema. */
-          <div className="p-5">
-            <section className="rounded-2xl border border-primary/25 bg-primary/[0.04] p-3">
-              <div className="mb-2.5 flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm"><FileText className="h-4 w-4" /></span>
-                <div className="leading-tight">
-                  <h4 className="text-sm font-semibold">Material completo</h4>
-                  <p className="text-[11px] text-muted-foreground">PDF pronto · disponível para download</p>
-                </div>
-              </div>
-              <BtnCaderno nome={modPdf.nome} onClick={() => abrir(modPdf.pdfUrl!)} />
-            </section>
-          </div>
-        )}
-        {modalTent && !modPdf && (
+        {modalTent && (
           <div className="grid gap-3 p-5 sm:grid-cols-2">
             {/* Como você fez — sem gabarito (sempre disponível) */}
             <section className="rounded-2xl border bg-muted/20 p-3">

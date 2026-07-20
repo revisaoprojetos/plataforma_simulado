@@ -15,7 +15,7 @@ import { EditarEstudanteButton } from '@/components/admin/editar-estudante-butto
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
 import { mesclarModalidades } from '@/lib/caderno-designer/types'
-import { usaPdfImportado } from '@/lib/caderno-designer/material'
+import { enunciadoPdf } from '@/lib/caderno-designer/material'
 import { tipoDoSimulado, filtrarModsPorTipo, type TipoSimulado } from '@/lib/simulado/tipo'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -137,8 +137,10 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
         const { data: cads } = await svc.from('simulado_cadernos_designer').select('id, config').in('id', cadIds)
         for (const c of cads ?? []) {
           const cfg = (c as any).config
-          const pdf = usaPdfImportado(cfg)
-          modsPorCad.set((c as any).id, pdf ? [{ id: 'pdf-importado', nome: pdf.nome, pdfUrl: pdf.url }] : mesclarModalidades(cfg?.modalidadesV2))
+          // Cadernos do sistema (sem o "Caderno Completo") + o Enunciado (PDF importado) como extra.
+          const sistema = mesclarModalidades(cfg?.modalidadesV2).filter((m) => m.id !== 'caderno_completo')
+          const pdf = enunciadoPdf(cfg)
+          modsPorCad.set((c as any).id, [...sistema, ...(pdf ? [{ id: 'pdf-importado', nome: pdf.nome, pdfUrl: pdf.url }] : [])])
         }
       }
       // grupos de disciplinas das pastas usadas (tolerante: coluna pode não existir).

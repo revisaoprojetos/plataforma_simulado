@@ -72,10 +72,10 @@ export type Modalidade = { id: string; nome: string }
 export const MODALIDADES_PADRAO: Modalidade[] = [
   { id: 'gabarito_objetivo', nome: 'Folha de Respostas' },
   { id: 'gabarito_discursivo', nome: 'Caderno Discursivo' },
-  // Troca de rótulos (id intacto): a modalidade "completa" chama-se "Enunciados"
-  // e a de só-enunciado chama-se "Caderno Completo".
-  { id: 'caderno_completo', nome: 'Enunciados' },
-  { id: 'caderno_perguntas', nome: 'Caderno Completo' },
+  // "caderno_completo" (com respostas marcadas) não é mais entregue ao aluno, mas o
+  // rótulo é mantido para o editor. "caderno_perguntas" = "Caderno de questões".
+  { id: 'caderno_completo', nome: 'Caderno Completo' },
+  { id: 'caderno_perguntas', nome: 'Caderno de questões' },
   { id: 'diagnostico', nome: 'Diagnóstico' },
 ]
 
@@ -86,11 +86,13 @@ export const MODALIDADE_RENOMEAR: Record<string, string> = {
   'Gabarito Discursivo': 'Caderno Discursivo',
 }
 
-// Troca determinística POR ID dos rótulos das duas entregas padrão (idempotente):
-// normaliza qualquer nome "de sistema" para o novo rótulo, preservando nomes custom.
-// Ambos os conjuntos incluem os nomes pré- E pós-troca → aplicar N vezes é estável.
-const NOMES_SISTEMA_COMPLETO = new Set(['Caderno Completo', 'Caderno completo', 'Enunciados', 'Enunciado'])
-const NOMES_SISTEMA_PERGUNTAS = new Set(['Enunciados', 'Enunciado', 'Caderno de Perguntas', 'Caderno de Questões', 'Caderno Completo', 'Caderno completo'])
+// Normalização determinística POR ID dos rótulos das duas entregas padrão (idempotente):
+// qualquer nome "de sistema" (inclui variantes históricas) vira o rótulo atual; nomes
+// custom do usuário são preservados. Aplicar N vezes é estável.
+const NOMES_ENTREGA_SISTEMA = new Set([
+  'Caderno Completo', 'Caderno completo', 'Enunciados', 'Enunciado',
+  'Caderno de Perguntas', 'Caderno de Questões', 'Caderno de questões',
+])
 
 /** Garante que uma modalidade-padrão exista, inserindo-a antes do "Diagnóstico" (ou no fim). */
 function garantirMod(norm: Modalidade[], id: string) {
@@ -103,19 +105,20 @@ function garantirMod(norm: Modalidade[], id: string) {
 }
 
 /**
- * Aplica renomeações e garante as modalidades "Caderno Completo" e "Caderno de Perguntas"
- * em cadernos existentes (entregas padrão liberadas ao aluno).
+ * Aplica renomeações e garante a entrega padrão "Caderno de questões" em cadernos
+ * existentes. NÃO garante mais o "Caderno Completo" (descontinuado para o aluno) — se
+ * ele existir num caderno legado é mantido, mas nunca é re-injetado. Consumidores da
+ * ENTREGA ao aluno devem sempre filtrar `caderno_completo` (ver entrega-aluno.ts).
  */
 export function mesclarModalidades(saved?: Modalidade[]): Modalidade[] {
   const base = saved?.length ? saved : MODALIDADES_PADRAO
   const norm = base.map((m) => {
-    // Troca por ID das duas entregas padrão (só quando o nome salvo é um rótulo de
+    // Normaliza por ID as duas entregas padrão (só quando o nome salvo é um rótulo de
     // sistema; nomes custom do usuário são preservados).
-    if (m.id === 'caderno_completo' && NOMES_SISTEMA_COMPLETO.has(m.nome)) return { ...m, nome: 'Enunciados' }
-    if (m.id === 'caderno_perguntas' && NOMES_SISTEMA_PERGUNTAS.has(m.nome)) return { ...m, nome: 'Caderno Completo' }
+    if (m.id === 'caderno_completo' && NOMES_ENTREGA_SISTEMA.has(m.nome)) return { ...m, nome: 'Caderno Completo' }
+    if (m.id === 'caderno_perguntas' && NOMES_ENTREGA_SISTEMA.has(m.nome)) return { ...m, nome: 'Caderno de questões' }
     return { ...m, nome: MODALIDADE_RENOMEAR[m.nome] ?? m.nome }
   })
-  garantirMod(norm, 'caderno_completo')
   garantirMod(norm, 'caderno_perguntas')
   return norm
 }

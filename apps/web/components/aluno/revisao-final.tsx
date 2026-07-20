@@ -251,7 +251,7 @@ export function RevisaoFinal({
   // Downloads: gabarito (folha de respostas) e caderno completo.
   const urlGabarito = `/imprimir/resultado/${sessionToken}`
   const urlCompleto = data?.caderno_id
-    ? `/imprimir/caderno/${data.caderno_id}?mod=caderno_completo&sessao=${sessionToken}${data.estudante_id ? `&aluno=${data.estudante_id}` : ''}`
+    ? `/imprimir/caderno/${data.caderno_id}?mod=caderno_perguntas&sessao=${sessionToken}${data.estudante_id ? `&aluno=${data.estudante_id}` : ''}`
     : urlGabarito
   // "Como você fez, sem gabarito": modalidades do caderno com as marcações do aluno,
   // sem revelar a correta (semgab=1). Sempre disponível — não depende do gabarito.
@@ -313,7 +313,7 @@ export function RevisaoFinal({
     if (qual === 'completo' && !data?.caderno_id) { window.open(urlCompleto, '_blank', 'noopener,noreferrer'); return }
     const payload = qual === 'gabarito'
       ? { sessaoToken: sessionToken, tipo: 'resultado' as const, titulo: 'Gabarito' }
-      : { sessaoToken: sessionToken, tipo: 'caderno' as const, cadernoId: data?.caderno_id, mod: 'caderno_completo', titulo: 'Caderno completo' }
+      : { sessaoToken: sessionToken, tipo: 'caderno' as const, cadernoId: data?.caderno_id, mod: 'caderno_perguntas', titulo: 'Caderno de questões' }
     marcarPdf(qual, true)
     try {
       const res = await fetch('/api/pdf/publico', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })

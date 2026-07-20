@@ -6,9 +6,7 @@ import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
 import { iconeBanco } from '@/lib/banco-visual'
 import { tiposDeSimulados } from '@/lib/simulado/tipo'
-import { filtrarModsPorTipo } from '@/lib/simulado/tipo'
-import { mesclarModalidades } from '@/lib/caderno-designer/types'
-import { usaPdfImportado } from '@/lib/caderno-designer/material'
+import { modalidadesDoAluno, type ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
 import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
 import { ArrowLeft, ShieldCheck } from 'lucide-react'
 import { montarComparativo } from '@/lib/simulado/comparativo'
@@ -103,22 +101,12 @@ export default async function EstudanteSimuladoPage({ params }: { params: Promis
     montarComparativo(svc, simuladoId, { minhaNota: melhor.nota != null ? Number(melhor.nota) : null, minhaSessaoId: melhor.id }),
   ])
 
-  // Modalidades do caderno do designer (só as com conteúdo real), filtradas pelo tipo do simulado.
-  const temConteudo = (d: any) => !!d && Array.isArray(d.pages) && d.pages.some((p: any) => (p.blocks ?? []).some((b: any) => b.type !== 'plano-fundo'))
-  let modalidades: { id: string; nome: string; semGab: boolean; comGab: boolean; pdfUrl?: string }[] = []
+  // Cadernos do aluno (fonte única): Folha de Respostas, Caderno de questões,
+  // Diagnóstico e o Enunciado (PDF importado). Aqui o admin vê tudo liberado.
+  let modalidades: ModalidadeAluno[] = []
   if (cadernoId) {
     const { data: cad } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoId).maybeSingle()
-    const cfg = ((cad as any)?.config ?? {}) as any
-    const pdf = usaPdfImportado(cfg)
-    if (pdf) {
-      modalidades = [{ id: 'pdf-importado', nome: pdf.nome, semGab: true, comGab: false, pdfUrl: pdf.url }]
-    } else {
-      const docs = (cfg.docsV2 ?? {}) as Record<string, unknown>
-      // semGab (como você fez): tudo menos Diagnóstico | comGab (com correção): tudo menos Caderno de Questões (só enunciado)
-      modalidades = filtrarModsPorTipo(mesclarModalidades(cfg.modalidadesV2), tipo)
-        .filter((m) => temConteudo(docs[m.id]) || m.id === 'caderno_perguntas')
-        .map((m) => ({ id: m.id, nome: m.nome, semGab: m.id !== 'diagnostico', comGab: m.id !== 'caderno_perguntas' }))
-    }
+    modalidades = modalidadesDoAluno((cad as any)?.config, tipo)
   }
 
   return (

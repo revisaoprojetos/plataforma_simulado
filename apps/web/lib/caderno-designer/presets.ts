@@ -80,13 +80,13 @@ export const PRESETS_CADERNO: CadernoPreset[] = [
   },
   {
     id: 'caderno-completo',
-    nome: 'Enunciados',
+    nome: 'Caderno completo',
     descricao: 'Modelo pronto (Simulado AGU): capa + dados do estudante + questões (enunciado, alternativas e resposta marcada) com cabeçalho/rodapé. Reenvie as imagens de fundo.',
     build: () => docCapturado(CADERNO_COMPLETO_DOC),
   },
   {
     id: 'caderno-perguntas',
-    nome: 'Caderno completo',
+    nome: 'Caderno de questões',
     descricao: 'Modelo pronto (Simulado AGU): capa + dados do estudante + enunciados e alternativas de cada questão. Reenvie as imagens de fundo.',
     build: () => docCapturado(CADERNO_PERGUNTAS_DOC),
   },

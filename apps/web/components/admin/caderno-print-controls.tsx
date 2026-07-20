@@ -17,7 +17,7 @@ export function CadernoPrintControls() {
     const sessao = params.get('sessao')
     if (!cadernoId || !sessao) { toast.error('Não foi possível identificar o caderno para gerar o PDF.'); return }
 
-    const mod = params.get('mod') || 'caderno_completo'
+    const mod = params.get('mod') || 'caderno_perguntas'
     const aluno = params.get('aluno') || ''
     const comGabarito = params.get('gabarito') === '1'
     const nome = (params.get('nome') || 'caderno').replace(/[\\/:*?"<>|]+/g, '').slice(0, 120) || 'caderno'

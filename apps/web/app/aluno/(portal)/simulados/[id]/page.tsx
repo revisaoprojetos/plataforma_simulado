@@ -8,9 +8,8 @@ import { montarComparativo } from '@/lib/simulado/comparativo'
 import { montarResultadoAluno, type SessaoInput } from '@/lib/simulado/resultado-aluno'
 import { montarDesempenhoAluno } from '@/lib/simulado/desempenho-aluno'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
-import { filtrarModsPorTipo, tiposDeSimulados } from '@/lib/simulado/tipo'
-import { mesclarModalidades } from '@/lib/caderno-designer/types'
-import { usaPdfImportado } from '@/lib/caderno-designer/material'
+import { tiposDeSimulados } from '@/lib/simulado/tipo'
+import { modalidadesDoAluno, type ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
 import { MeuSimuladoView } from '@/components/aluno/meu-simulado-view'
 
 const notaTone = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
@@ -79,29 +78,13 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
     montarDesempenhoAluno(svc, estId),
   ])
 
-  // Modalidades do CADERNO DO DESIGNER (só as que têm documento com conteúdo real),
-  // filtradas pelo tipo do simulado. `temGabarito` = tem versão com correção (o
-  // Diagnóstico não tem). Docs vazios (sem blocos além do plano-fundo) são ignorados
-  // para não exibir botão de caderno em branco.
+  // Cadernos que o aluno recebe ao finalizar (fonte única: modalidadesDoAluno):
+  // Folha de Respostas, Caderno de questões, Diagnóstico e o Enunciado (PDF importado).
   const tipo = (await tiposDeSimulados(svc, [id])).get(id) ?? null
-  const temConteudo = (d: any) => !!d && Array.isArray(d.pages) && d.pages.some((p: any) => (p.blocks ?? []).some((b: any) => b.type !== 'plano-fundo'))
-  // Disponibilidade por etapa:
-  //  - semGab ("como você fez", logo após terminar): tudo, MENOS o Diagnóstico (que precisa do resultado).
-  //  - comGab ("com correção", quando o gabarito é liberado): tudo, MENOS o Caderno de Questões (só enunciado).
-  let modalidades: { id: string; nome: string; semGab: boolean; comGab: boolean; pdfUrl?: string }[] = []
+  let modalidades: ModalidadeAluno[] = []
   if (cadernoId) {
     const { data: cad } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoId).maybeSingle()
-    const cfg = ((cad as any)?.config ?? {}) as any
-    // Se o banco optou por um PDF importado, ele SUBSTITUI o caderno do sistema.
-    const pdf = usaPdfImportado(cfg)
-    if (pdf) {
-      modalidades = [{ id: 'pdf-importado', nome: pdf.nome, semGab: true, comGab: false, pdfUrl: pdf.url }]
-    } else {
-      const docs = (cfg.docsV2 ?? {}) as Record<string, unknown>
-      modalidades = filtrarModsPorTipo(mesclarModalidades(cfg.modalidadesV2), tipo)
-        .filter((m) => temConteudo(docs[m.id]) || m.id === 'caderno_perguntas')
-        .map((m) => ({ id: m.id, nome: m.nome, semGab: m.id !== 'diagnostico', comGab: m.id !== 'caderno_perguntas' }))
-    }
+    modalidades = modalidadesDoAluno((cad as any)?.config, tipo)
   }
 
   return (

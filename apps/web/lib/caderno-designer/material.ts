@@ -24,10 +24,11 @@ export function materialDoConfig(config: unknown): MaterialCaderno {
 }
 
 /**
- * Quando o aluno deve receber o PDF importado no lugar do caderno do sistema.
- * Retorna `{ url, nome }` só se a fonte for 'pdf' E houver PDF de fato.
+ * O "Enunciado" do aluno = o PDF importado (empresa/EBT). É um caderno A MAIS
+ * (não substitui os do sistema); aparece só quando há PDF de fato. O nome exibido
+ * ao aluno é sempre "Enunciado" (o `pdfNome` fica para telas de admin).
  */
-export function usaPdfImportado(config: unknown): { url: string; nome: string } | null {
+export function enunciadoPdf(config: unknown): { url: string; nome: string } | null {
   const m = materialDoConfig(config)
-  return m.fonte === 'pdf' && m.pdfUrl ? { url: m.pdfUrl, nome: m.pdfNome || 'Material completo (PDF)' } : null
+  return m.pdfUrl ? { url: m.pdfUrl, nome: 'Enunciado' } : null
 }
