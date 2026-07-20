@@ -33,13 +33,14 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
   if (qids.length) {
     // O PILAR vem da coluna `categoria` da questão (Lei seca / Jurisprudência / Doutrina).
     // `pilar_1/pilar_2` é opcional (fallback) para bases que usem esse formato.
-    const qs = await fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questoes').select('id, categoria, pilar_1, pilar_2, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)').in('id', chunk).order('id'))
+    const qs = await fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questoes').select('id, categoria, pilar_1, pilar_2, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)').in('id', chunk).order('id'))
     for (const q of qs) {
       const d = (q as any).disciplinas?.nome ?? 'Geral'
       discDaQuestao.set(q.id, d)
       discTotais.set(d, (discTotais.get(d) ?? 0) + 1)
-      // Assunto principal (da importação) — usado no bloco "Diagnóstico — Disciplina".
-      const as = (q as any).assuntos?.nome as string | undefined
+      // Assunto principal: FK simulado_assuntos (preferido) OU o texto livre assunto_detalhe
+      // (fallback p/ bases importadas sem a taxonomia formal). Usado no "Diagnóstico — Disciplina".
+      const as = (((q as any).assuntos?.nome ?? (q as any).assunto_detalhe) as string | undefined)?.toString().trim() || undefined
       if (as) {
         assuntoDaQuestao.set(q.id, as)
         const set = assuntosTodosPorDisc.get(d) ?? new Set<string>(); set.add(as); assuntosTodosPorDisc.set(d, set)
