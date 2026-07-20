@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { registrarAudit } from '@/lib/audit'
 import { ehProdutoPassaporte } from '@/lib/integracoes/normalizar-mapa'
+import { propagarGrupoAosBancos } from '@/lib/simulado/propagar-grupo'
 import { configDoEnv, listarMembrosDoGrupo, detalheMembro, type CurseducaCfg, type MembroCurseduca, type DetalheMembro } from '@/lib/curseduca/client'
 import type { DestinoImport, ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
 import { descriptografar } from '@/lib/crypto'
@@ -199,7 +200,7 @@ export async function executarImport(
       const novosVinc = unicos.filter((id) => !set.has(id))
       if (novosVinc.length) {
         const { error } = await svc.from('simulado_grupo_membros').insert(novosVinc.map((estudante_id) => ({ tenant_id: g.tenantId, grupo_id: grupoDestinoId, estudante_id })))
-        if (!error) vinculados = novosVinc.length
+        if (!error) { vinculados = novosVinc.length; await propagarGrupoAosBancos(svc, g.tenantId, grupoDestinoId, novosVinc) }
       }
     }
 
@@ -244,6 +245,7 @@ export async function executarImport(
           for (let i = 0; i < novosGp.length; i += 200) {
             await svc.from('simulado_grupo_membros').insert(novosGp.slice(i, i + 200).map((estudante_id) => ({ tenant_id: g.tenantId, grupo_id: gpId, estudante_id })))
           }
+          if (novosGp.length) await propagarGrupoAosBancos(svc, g.tenantId, gpId, novosGp)
         }
       }
     }
