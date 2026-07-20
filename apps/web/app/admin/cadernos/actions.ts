@@ -81,7 +81,7 @@ export async function salvarCadernoDesignerV2(
  * NÃO grava nada — o editor insere o resultado no estado e o admin revisa e salva.
  * O mammoth é carregado sob demanda (dynamic import) e roda fora do bundle (serverExternalPackages).
  */
-export async function converterWordAction(base64: string): Promise<{ ok: boolean; doc?: unknown; avisos?: string[]; resumo?: { blocos: number; imagens: number; tabelas: number }; error?: string }> {
+export async function converterWordAction(base64: string): Promise<{ ok: boolean; doc?: unknown; avisos?: string[]; resumo?: { blocos: number; imagens: number; tipo: 'diagnostico' | 'generico' }; error?: string }> {
   if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
   try {
     const b64 = base64.includes(',') ? base64.slice(base64.indexOf(',') + 1) : base64 // tolera "data:...;base64,"
