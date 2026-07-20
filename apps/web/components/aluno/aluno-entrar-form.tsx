@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { GraduationCap, Loader2 } from 'lucide-react'
+import { AlertBox } from '@/components/ui/alert-box'
+import { GraduationCap, Loader2, Wrench } from 'lucide-react'
 
 type Metodo = 'email' | 'email_cpf' | 'email_telefone'
 
@@ -15,11 +16,13 @@ export function AlunoEntrarForm({ metodo, plataforma }: { metodo: Metodo; plataf
   const [cpf, setCpf] = useState('')
   const [telefone, setTelefone] = useState('')
   const [erro, setErro] = useState<string | null>(null)
+  const [manutencao, setManutencao] = useState<{ titulo: string; mensagem: string } | null>(null)
   const [carregando, setCarregando] = useState(false)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setErro(null)
+    setManutencao(null)
     setCarregando(true)
     try {
       const res = await fetch('/api/aluno/login', {
@@ -29,7 +32,8 @@ export function AlunoEntrarForm({ metodo, plataforma }: { metodo: Metodo; plataf
       })
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
-        setErro(j.message ?? 'Não foi possível entrar.')
+        if (j.manutencao) setManutencao({ titulo: j.titulo ?? 'Plataforma em manutenção', mensagem: j.message ?? 'Estamos em manutenção. Tente novamente mais tarde.' })
+        else setErro(j.message ?? 'Não foi possível entrar.')
         return
       }
       router.push('/aluno')
@@ -71,6 +75,7 @@ export function AlunoEntrarForm({ metodo, plataforma }: { metodo: Metodo; plataf
             </div>
           )}
 
+          {manutencao && <AlertBox variante="aviso" icon={Wrench} titulo={manutencao.titulo}>{manutencao.mensagem}</AlertBox>}
           {erro && <p className="rounded-md bg-destructive/10 p-2.5 text-sm text-destructive">{erro}</p>}
 
           <Button type="submit" className="w-full" disabled={carregando || !email}>

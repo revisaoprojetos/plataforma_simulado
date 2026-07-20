@@ -36,6 +36,7 @@ import {
   Plug,
   Zap,
   Palette,
+  ServerCog,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -146,6 +147,7 @@ const navGroups: NavGroup[] = [
       { label: 'Permissões (RBAC)', href: '/admin/rbac', icon: ShieldCheck, perm: 'rbac:view' },
       { label: 'API Keys', href: '/admin/api-keys', icon: KeyRound, perm: 'api_keys:manage' },
       { label: 'Aparência', href: '/admin/configuracoes', icon: Palette, exact: true, perm: 'configuracoes:view' },
+      { label: 'Sistema', href: '/admin/sistema', icon: ServerCog, perm: 'configuracoes:view' },
       { label: 'Mensagens', href: '/admin/configuracoes/mensagens', icon: MessageSquare, perm: 'configuracoes:view' },
       { label: 'Lixeira', href: '/admin/lixeira', icon: Trash2, perm: 'questoes:view' },
       { label: 'Ajuda', href: '/admin/ajuda', icon: HelpCircle },

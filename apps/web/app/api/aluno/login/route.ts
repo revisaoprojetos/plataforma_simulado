@@ -4,6 +4,7 @@ import { getCurrentTenantId } from '@/lib/tenant'
 import { criarSessaoAluno } from '@/lib/aluno-session'
 import { rateLimit } from '@/lib/rate-limit'
 import { registrarAudit } from '@/lib/audit'
+import { getManutencaoSistema, emManutencaoAgora } from '@/lib/sistema/manutencao'
 
 // POST /api/aluno/login — login leve persistente do aluno (sem senha).
 export async function POST(request: NextRequest) {
@@ -19,6 +20,12 @@ export async function POST(request: NextRequest) {
 
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return NextResponse.json({ message: 'Plataforma não encontrada.' }, { status: 404 })
+
+  // Manutenção da plataforma: bloqueia novos acessos ao portal (quem já está numa prova não passa por aqui).
+  const manut = await getManutencaoSistema()
+  if (emManutencaoAgora(manut)) {
+    return NextResponse.json({ message: manut.mensagem, titulo: manut.titulo, manutencao: true }, { status: 503 })
+  }
 
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
   if (!rateLimit(`aluno-login:${ip}`, 8, 5 * 60 * 1000).ok || !rateLimit(`aluno-login:${email}`, 5, 5 * 60 * 1000).ok) {
