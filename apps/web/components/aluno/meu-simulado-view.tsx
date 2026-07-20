@@ -243,7 +243,7 @@ export function MeuSimuladoView({
                               ? <span className={cn('shrink-0 text-sm font-bold tabular-nums', t.nota != null && notaTone(Number(t.nota)))}>{nota(t.nota)}</span>
                               : <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
                           </button>
-                          <button type="button" onClick={() => setModalTent(t)} title="Baixar cadernos"
+                          <button type="button" onClick={() => setModalTent(t)} title="Material para download"
                             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground">
                             <MoreVertical className="h-4 w-4" />
                           </button>
@@ -275,7 +275,7 @@ export function MeuSimuladoView({
         <DialogHeader className="border-b px-5 py-4">
           <DialogTitle className="flex items-center gap-2 text-base">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><Download className="h-4 w-4" /></span>
-            Baixar cadernos
+            Material para download
           </DialogTitle>
           <DialogDescription>
             {modalTent && `Tentativa ${modalTent.n} · ${fmtData(modalTent.finalizado)}${modalTent.nota != null && notaLiberada ? ` · nota ${nota(modalTent.nota)}` : ''}`}

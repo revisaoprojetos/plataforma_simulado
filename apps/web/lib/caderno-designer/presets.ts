@@ -86,8 +86,8 @@ export const PRESETS_CADERNO: CadernoPreset[] = [
   },
   {
     id: 'caderno-perguntas',
-    nome: 'Caderno de perguntas',
-    descricao: 'Modelo pronto (Simulado AGU): capa + dados do estudante + perguntas e alternativas de cada questão. Reenvie as imagens de fundo.',
+    nome: 'Enunciados',
+    descricao: 'Modelo pronto (Simulado AGU): capa + dados do estudante + enunciados e alternativas de cada questão. Reenvie as imagens de fundo.',
     build: () => docCapturado(CADERNO_PERGUNTAS_DOC),
   },
   {

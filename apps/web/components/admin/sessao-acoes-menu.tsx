@@ -98,7 +98,7 @@ export function SessaoAcoesMenu({
         {temResultado && (
           <>
             <DropdownMenuGroup>
-              <DropdownMenuLabel>Baixar caderno (PDF)</DropdownMenuLabel>
+              <DropdownMenuLabel>Material para download</DropdownMenuLabel>
               {cadId && mods.length ? (
                 // Cada modalidade gera o PDF no servidor (worker + Gotenberg); se indisponível, abre no navegador.
                 mods.map((m) => (

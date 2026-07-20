@@ -255,7 +255,7 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
           <div className="mt-2 grid gap-2 sm:grid-cols-3">
             <div className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Folha de Respostas</div>
             <div className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Caderno Completo</div>
-            <div className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Caderno de Perguntas</div>
+            <div className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Enunciados</div>
           </div>
         </div>
 

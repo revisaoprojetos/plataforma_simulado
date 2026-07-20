@@ -73,7 +73,7 @@ export const MODALIDADES_PADRAO: Modalidade[] = [
   { id: 'gabarito_objetivo', nome: 'Folha de Respostas' },
   { id: 'gabarito_discursivo', nome: 'Caderno Discursivo' },
   { id: 'caderno_completo', nome: 'Caderno Completo' },
-  { id: 'caderno_perguntas', nome: 'Caderno de Questões' },
+  { id: 'caderno_perguntas', nome: 'Enunciados' },
   { id: 'diagnostico', nome: 'Diagnóstico' },
 ]
 
@@ -82,7 +82,8 @@ export const MODALIDADE_RENOMEAR: Record<string, string> = {
   'Gabarito Objetivo': 'Folha de Respostas',
   'Caderno Objetivo': 'Folha de Respostas',
   'Gabarito Discursivo': 'Caderno Discursivo',
-  'Caderno de Perguntas': 'Caderno de Questões',
+  'Caderno de Perguntas': 'Enunciados',
+  'Caderno de Questões': 'Enunciados',
 }
 
 /** Garante que uma modalidade-padrão exista, inserindo-a antes do "Diagnóstico" (ou no fim). */

@@ -425,7 +425,7 @@ export function RevisaoFinal({
                 </div>
               ) : (
                 <a href={urlComoFezFallback} target="_blank" rel="noopener noreferrer" className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}>
-                  <FileStack className="mr-1.5 h-4 w-4" /> Baixar caderno (como você fez)
+                  <FileStack className="mr-1.5 h-4 w-4" /> Material para download (como você fez)
                 </a>
               )
             })()}
