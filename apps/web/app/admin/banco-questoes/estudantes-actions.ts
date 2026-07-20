@@ -344,7 +344,13 @@ export async function subirMaterialPdf(cadernoId: string, bancoId: string, dataU
   // Nome do arquivo com hash do conteúdo → cada versão é uma URL nova (evita cache velho).
   const hash = createHash('sha1').update(buf).digest('hex').slice(0, 10)
   const path = `materiais/${g.tenantId}/${cadernoId}-${hash}.pdf`
-  const { error: upErr } = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true })
+  // Garante o bucket 'pdfs' (público) — em projetos novos ele pode não existir ("Bucket not found").
+  try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
+  let { error: upErr } = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true })
+  if (upErr && /bucket.*not.*found/i.test(upErr.message)) {
+    await svc.storage.createBucket('pdfs', { public: true }).catch(() => {})
+    ;({ error: upErr } = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true }))
+  }
   if (upErr) return { ok: false, error: upErr.message }
   const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
 

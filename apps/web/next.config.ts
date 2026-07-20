@@ -22,8 +22,9 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       allowedOrigins: ["localhost:3000"],
-      // Cadernos do designer podem ficar grandes (imagens, muitos blocos) — sobe o limite do body.
-      bodySizeLimit: "12mb",
+      // Cadernos do designer podem chegar grandes no PRIMEIRO save (fundos em base64, antes de
+      // hospedar). Margem folgada; depois de salvar as imagens viram URL e o doc fica leve.
+      bodySizeLimit: "30mb",
     },
   },
 };

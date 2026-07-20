@@ -1,10 +1,12 @@
 'use server'
 
+import { createHash } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
+import { hospedarImagensDoc } from '@/lib/caderno-designer/hospedar-imagens'
 
 export interface CadernoBloco {
   id: string
@@ -58,13 +60,16 @@ export async function salvarCadernoConfig(id: string, config: CadernoConfig): Pr
 export async function salvarCadernoDesignerV2(
   id: string,
   payload: { docsV2: Record<string, unknown>; modalidadesV2: unknown[]; cores: Record<string, string>; bancoId?: string | null; hudCores?: Record<string, string>; hudPorPagina?: Record<string, Record<string, string>> },
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; docsV2?: Record<string, unknown> }> {
   if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
   const access = await getCurrentAccess()
   if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
   const { data: atual } = await svc.from('simulado_cadernos_designer').select('config').eq('id', id).eq('tenant_id', access.tenantId).maybeSingle()
   if (!atual) return { ok: false, error: 'Caderno não encontrado.' }
+  // Sobe as imagens de fundo (base64) pro storage e troca por URL → o doc no banco fica LEVE
+  // (evita config de vários MB, que estourava o limite do save e travava o editor).
+  try { for (const d of Object.values(payload.docsV2 ?? {})) await hospedarImagensDoc(d, svc) } catch { /* se falhar, salva como está */ }
   const merged = { ...((atual.config as Record<string, unknown>) ?? {}), ...payload }
   const { error } = await svc
     .from('simulado_cadernos_designer')
@@ -73,7 +78,32 @@ export async function salvarCadernoDesignerV2(
     .eq('tenant_id', access.tenantId)
   if (error) return { ok: false, error: error.message }
   revalidatePath(`/admin/cadernos/${id}`)
-  return { ok: true }
+  // Devolve os docs já com URLs → o editor troca o estado e os próximos saves ficam leves.
+  return { ok: true, docsV2: payload.docsV2 }
+}
+
+/**
+ * Sobe UMA imagem (base64) do editor pro storage e devolve a URL pública. Usado pelo editor
+ * ANTES de salvar: troca cada fundo base64 por URL em requests pequenos → o save final fica
+ * leve e não estoura o limite do body. Dedupe por hash do conteúdo (não reenvia o mesmo fundo).
+ */
+export async function hospedarImagemCadernoAction(dataUri: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
+  const m = /^data:image\/([a-z0-9.+-]+);base64,(.+)$/i.exec(dataUri || '')
+  if (!m) return { ok: false, error: 'Imagem inválida.' }
+  const tipo = m[1].toLowerCase()
+  const ext = tipo === 'jpeg' ? 'jpg' : tipo
+  let buf: Buffer
+  try { buf = Buffer.from(m[2], 'base64') } catch { return { ok: false, error: 'Imagem inválida.' } }
+  if (!buf.length) return { ok: false, error: 'Imagem vazia.' }
+  const svc = createAdminClient()
+  const hash = createHash('sha1').update(buf).digest('hex').slice(0, 24)
+  const path = `assets/${hash}.${ext}`
+  try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
+  const { error } = await svc.storage.from('pdfs').upload(path, buf, { contentType: `image/${tipo}`, upsert: true })
+  if (error && !/exists/i.test(error.message)) return { ok: false, error: error.message }
+  const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
+  return { ok: true, url }
 }
 
 /**

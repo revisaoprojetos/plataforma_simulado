@@ -294,8 +294,17 @@ function EnunciadoCard({ cor, pdfUrl, pdfNome, busy, onUpload, onRemover }: {
       <div ref={boxRef} className="relative w-full overflow-hidden bg-neutral-200 dark:bg-neutral-800" style={{ height: boxH }}>
         {pdfUrl ? (
           <>
-            <iframe src={`${pdfUrl}#toolbar=0&navpanes=0&view=FitH`} title={pdfNome || 'Enunciado (PDF)'} className="h-full w-full" style={{ border: 0 }} />
+            {/* <object> renderiza o PDF inline (não sofre X-Frame-Options como o <iframe>);
+                se o navegador não exibir PDF inline, mostra o fallback com "Abrir PDF". */}
+            <object data={`${pdfUrl}#toolbar=0&navpanes=0&view=FitH`} type="application/pdf" className="h-full w-full" style={{ border: 0 }}>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-neutral-100 px-6 text-center text-muted-foreground dark:bg-neutral-900">
+                <FileText className="h-8 w-8" />
+                <span className="text-sm font-medium">PDF do Enunciado enviado</span>
+                <a href={pdfUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-primary underline">Abrir PDF em nova aba</a>
+              </div>
+            </object>
             <div className="absolute right-2 top-2 z-10 flex gap-1.5">
+              <a href={pdfUrl} target="_blank" rel="noreferrer" title="Abrir PDF" className="rounded-md bg-background/90 px-2 py-1 text-xs font-medium shadow ring-1 ring-border backdrop-blur transition-colors hover:bg-background"><ExternalLink className="h-3.5 w-3.5" /></a>
               <button type="button" onClick={onUpload} disabled={busy} className="rounded-md bg-background/90 px-2 py-1 text-xs font-medium shadow ring-1 ring-border backdrop-blur transition-colors hover:bg-background disabled:opacity-60">Trocar</button>
               <button type="button" onClick={onRemover} disabled={busy} title="Remover PDF" className="rounded-md bg-background/90 px-2 py-1 text-xs font-medium text-destructive shadow ring-1 ring-border backdrop-blur transition-colors hover:bg-background disabled:opacity-60"><Trash2 className="h-3.5 w-3.5" /></button>
             </div>

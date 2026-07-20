@@ -15,7 +15,7 @@ import { HudSimuladoEditor } from '@/components/admin/hud-simulado-editor'
 import { HexColorField } from '@/components/admin/hex-color-field'
 import { GerarPdfServidor } from '@/components/admin/gerar-pdf-servidor'
 import { MonitorPlay, GitBranch } from 'lucide-react'
-import { salvarCadernoDesignerV2, getGruposBanco, getAssuntosBanco, converterWordAction } from '@/app/admin/cadernos/actions'
+import { salvarCadernoDesignerV2, hospedarImagemCadernoAction, getGruposBanco, getAssuntosBanco, converterWordAction } from '@/app/admin/cadernos/actions'
 import { PRESETS_CADERNO, type CadernoPreset } from '@/lib/caderno-designer/presets'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
@@ -639,10 +639,47 @@ export function CadernoEditorV2({
     toast.success(`Modelo "${p.nome}" aplicado`)
   }
 
+  // Sobe os fundos base64 pro storage (requests pequenos, 1 por imagem, com dedupe) e devolve
+  // os docs com URLs no lugar do base64 — assim o SAVE final vai leve e não estoura o limite.
+  async function hospedarFundos(atual: Record<string, CadernoDoc>): Promise<Record<string, CadernoDoc>> {
+    const cache = new Map<string, string>()
+    const up = async (b64: string): Promise<string> => {
+      if (cache.has(b64)) return cache.get(b64)!
+      try { const r = await hospedarImagemCadernoAction(b64); const u = r.ok && r.url ? r.url : b64; cache.set(b64, u); return u } catch { cache.set(b64, b64); return b64 }
+    }
+    const walk = async (blocks: any[]) => {
+      for (const b of blocks ?? []) {
+        const a = b?.attributes
+        if (a && typeof a.url === 'string' && a.url.startsWith('data:image')) a.url = await up(a.url)
+        if (Array.isArray(b?.innerBlocks)) await walk(b.innerBlocks)
+      }
+    }
+    const copia: Record<string, CadernoDoc> = JSON.parse(JSON.stringify(atual))
+    for (const doc of Object.values(copia)) {
+      for (const p of (doc as any).pages ?? []) await walk(p.blocks)
+      await walk((doc as any).cabecalho ?? [])
+      await walk((doc as any).rodape ?? [])
+    }
+    return copia
+  }
+
   function salvar() {
     start(async () => {
-      const r = await salvarCadernoDesignerV2(cadernoId, { docsV2: docs, modalidadesV2: modalidades, cores, hudCores, hudPorPagina, bancoId })
-      r.ok ? toast.success('Caderno salvo') : toast.error(r.error ?? 'Erro ao salvar')
+      try {
+        // 1) Sobe as imagens (base64 → URL) em requests pequenos. 2) Salva o doc já leve.
+        const docsLeves = await hospedarFundos(docs)
+        setDocs(docsLeves)
+        const r = await salvarCadernoDesignerV2(cadernoId, { docsV2: docsLeves, modalidadesV2: modalidades, cores, hudCores, hudPorPagina, bancoId })
+        if (r.ok) {
+          if (r.docsV2) setDocs(r.docsV2 as any)
+          toast.success('Caderno salvo')
+        } else toast.error(r.error ?? 'Erro ao salvar')
+      } catch (e) {
+        // NUNCA deixa o erro subir (senão a tela quebra e perde o trabalho). O estado local
+        // fica intacto — o admin tenta de novo.
+        console.error(e)
+        toast.error('Não consegui salvar agora (caderno grande ou conexão instável). Seu trabalho NÃO foi perdido — tente salvar de novo.')
+      }
     })
   }
   async function importarWord(file: File) {
