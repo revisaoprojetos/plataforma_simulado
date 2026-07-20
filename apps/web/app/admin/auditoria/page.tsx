@@ -17,7 +17,7 @@ const ITEMS_PER_PAGE = 12
 interface PageProps {
   searchParams: Promise<{
     page?: string; tipo?: string; area?: string; sub?: string; ord?: string; dir?: string
-    q?: string; acao?: string; entidade?: string; data_inicio?: string; data_fim?: string
+    q?: string; evt?: string; acao?: string; entidade?: string; data_inicio?: string; data_fim?: string
   }>
 }
 
@@ -114,6 +114,8 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
   }
 
   let logs: any[] | null = null, sessoes: any[] | null = null, eventos: any[] | null = null, count = 0
+  let cVis = 0, cBx = 0 // contagens Visualizou/Baixou (subtítulo da aba Cadernos)
+  const evt = ['visualizou', 'baixou'].includes(params.evt ?? '') ? (params.evt as string) : null
   const nomesEst = new Map<string, { nome: string; email: string | null }>()
   const nomesSim = new Map<string, string>()
   const nomesAuto = new Map<string, string>()
@@ -179,6 +181,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
     let q = supabase.from('simulado_relatorio_eventos')
       .select('id, estudante_id, simulado_id, tipo, criado_em', { count: 'exact' })
       .eq('tenant_id', tid)
+    if (evt) q = q.eq('tipo', evt)
     if (params.data_inicio) q = q.gte('criado_em', params.data_inicio)
     if (params.data_fim) q = q.lte('criado_em', params.data_fim + 'T23:59:59Z')
     if (like) {
@@ -188,7 +191,10 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
       q = parts.length ? q.or(parts.join(',')) : q.eq('id', NADA)
     }
     q = q.order(ord, { ascending: dir === 'asc' }).range(offset, offset + ITEMS_PER_PAGE - 1)
-    const r = await q; eventos = r.data; count = r.count ?? 0
+    // Contagens por tipo (respeitando o período), para o subtítulo "X viram · Y baixaram".
+    const cbase = () => { let c = supabase.from('simulado_relatorio_eventos').select('*', { count: 'exact', head: true }).eq('tenant_id', tid); if (params.data_inicio) c = c.gte('criado_em', params.data_inicio); if (params.data_fim) c = c.lte('criado_em', params.data_fim + 'T23:59:59Z'); return c }
+    const [rEv, rVis, rBx] = await Promise.all([q, cbase().eq('tipo', 'visualizou'), cbase().eq('tipo', 'baixou')])
+    eventos = rEv.data; count = rEv.count ?? 0; cVis = rVis.count ?? 0; cBx = rBx.count ?? 0
   }
 
   if (view === 'sessoes' || view === 'eventos') {
@@ -322,8 +328,23 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
         </TabelaCard>
       )}
 
-      {view === 'eventos' && (
-        <TabelaCard titulo="Cadernos e relatórios" subtitulo={`${count ?? 0} evento(s)`} sort={sortCtx}
+      {view === 'eventos' && (() => {
+        const evtHref = (v: string | null) => {
+          const p = new URLSearchParams({ tipo: 'acessos', area: 'estudantes', sub: 'cadernos' })
+          if (params.q) p.set('q', params.q)
+          if (params.data_inicio) p.set('data_inicio', params.data_inicio)
+          if (params.data_fim) p.set('data_fim', params.data_fim)
+          if (v) p.set('evt', v)
+          return `/admin/auditoria?${p.toString()}`
+        }
+        return (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <NavTab href={evtHref(null)} active={!evt} icon={BookOpen}>Todos</NavTab>
+            <NavTab href={evtHref('visualizou')} active={evt === 'visualizou'} icon={GraduationCap}>Visualizou ({cVis})</NavTab>
+            <NavTab href={evtHref('baixou')} active={evt === 'baixou'} icon={LogIn}>Baixou ({cBx})</NavTab>
+          </div>
+        <TabelaCard titulo="Cadernos e relatórios" subtitulo={`${cVis} viram · ${cBx} baixaram`} sort={sortCtx}
           cols={[{ label: 'Data/Hora', w: '24%', sort: 'criado_em' }, { label: 'Estudante', w: '32%' }, { label: 'Simulado', w: '28%' }, { label: 'Ação', w: '16%', sort: 'tipo' }]}
           vazio="Nenhum acesso a caderno/relatório registrado ainda." temLinhas={!!eventos?.length}>
           {(eventos ?? []).map((e) => {
@@ -338,7 +359,9 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
             )
           })}
         </TabelaCard>
-      )}
+        </div>
+        )
+      })()}
 
       <PaginationControls page={page} totalPages={totalPages} />
     </div>
