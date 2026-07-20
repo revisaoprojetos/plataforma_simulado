@@ -69,7 +69,9 @@ export async function createSimuladoAction(data: SimuladoData) {
     )
   }
 
-  // Matricula os estudantes: herdados do banco base + escolhidos manualmente + TODOS os passaportes.
+  // Matricula os estudantes: herdados do banco base (inclui os passaportes SÓ se o grupo
+  // "Passaporte" estiver vinculado ao banco) + escolhidos manualmente. Sem bypass global:
+  // passaporte só entra quando o grupo dele está vinculado ao banco do simulado.
   let herdados = 0
   {
     const svc = await createServiceClient()
@@ -78,10 +80,6 @@ export async function createSimuladoAction(data: SimuladoData) {
       const { data: alunos } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', data.bancoBaseId).eq('tenant_id', tenantId)
       for (const a of (alunos ?? []) as any[]) if (a.estudante_id) aMatricular.add(a.estudante_id)
     }
-    // Passaporte entra em TODO simulado criado (aparece em relatórios/ranking; a regra de acesso vale por cima).
-    const passaportes = await fetchAll<{ id: string }>(() =>
-      svc.from('simulado_estudantes').select('id').eq('tenant_id', tenantId).eq('classificacao', 'passaporte').eq('deletado', false).order('id', { ascending: true }))
-    for (const p of passaportes) aMatricular.add(p.id)
 
     const estIds = [...aMatricular]
     if (estIds.length) {

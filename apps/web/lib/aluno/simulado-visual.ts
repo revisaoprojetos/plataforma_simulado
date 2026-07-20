@@ -42,9 +42,14 @@ export async function resolverVisualSimulados(svc: SupabaseClient, simulados: { 
   const pastaIds = [...new Set([...pastaDeSim.values()])]
   if (pastaIds.length) {
     let pastas: any[] = []
-    const r = await svc.from('simulado_pastas').select('id, cor, icone, capa_url').in('id', pastaIds)
-    if (!r.error) pastas = r.data ?? []
-    const vis = new Map<string, VisualSim>(pastas.map((p: any) => [p.id, { cor: p.cor ?? null, icone: p.icone ?? null, capa: p.capa_url ?? null }]))
+    // Prefere a capa DO CARD (capa_card_url); cai p/ a capa/banner (capa_url). Tolerante caso
+    // a coluna capa_card_url ainda não exista no ambiente.
+    const r = await svc.from('simulado_pastas').select('id, cor, icone, capa_url, capa_card_url').in('id', pastaIds)
+    if (r.error && /capa_card_url|column/i.test(r.error.message)) {
+      const r2 = await svc.from('simulado_pastas').select('id, cor, icone, capa_url').in('id', pastaIds)
+      pastas = r2.data ?? []
+    } else if (!r.error) pastas = r.data ?? []
+    const vis = new Map<string, VisualSim>(pastas.map((p: any) => [p.id, { cor: p.cor ?? null, icone: p.icone ?? null, capa: (p.capa_card_url ?? p.capa_url) ?? null }]))
     for (const [sim, pid] of pastaDeSim) { const v = vis.get(pid); if (v) visual.set(sim, v) }
   }
   return visual

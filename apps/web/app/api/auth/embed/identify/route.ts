@@ -184,10 +184,8 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .maybeSingle()
     if (!acesso) {
-      // Passaporte acessa TODOS os simulados (inclui prazo relativo) — sem acesso avulso vira acesso livre.
-      if (estudante.classificacao !== 'passaporte') {
-        return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
-      }
+      // Sem bypass de passaporte: exige acesso avulso (prazo relativo) como qualquer aluno.
+      return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
     } else {
       if (acesso.expira_em && new Date(acesso.expira_em) < new Date()) {
         return bloqueio(tenantId, 'bloqueio_prazo_expirado', { nome: estudante.nome ?? '', simulado: tituloSimulado })
@@ -195,8 +193,9 @@ export async function POST(request: NextRequest) {
       acessoAvulso = acesso
     }
   } else {
-    // Passaporte tem acesso a todos os simulados; senão exige matrícula liberada.
-    const temAcesso = estudante.classificacao === 'passaporte' || await verificarAcesso(supabase, estudante.id, simulado.id)
+    // Acesso SEMPRE por matrícula liberada (o passaporte a recebe via grupo "Passaporte"
+    // vinculado ao banco do simulado — sem bypass global por classificação).
+    const temAcesso = await verificarAcesso(supabase, estudante.id, simulado.id)
     if (!temAcesso) {
       return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
     }
