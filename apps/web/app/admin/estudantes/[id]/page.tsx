@@ -15,6 +15,7 @@ import { EditarEstudanteButton } from '@/components/admin/editar-estudante-butto
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
 import { mesclarModalidades } from '@/lib/caderno-designer/types'
+import { usaPdfImportado } from '@/lib/caderno-designer/material'
 import { tipoDoSimulado, filtrarModsPorTipo, type TipoSimulado } from '@/lib/simulado/tipo'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -96,7 +97,7 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
   // simulado → questões (prova_questoes) → bancos (questao_pasta) → pastas.caderno_id.
   const simIds = [...new Set(reais.map((s: any) => s.simulado_id).filter(Boolean))] as string[]
   const cadernoPorSim = new Map<string, string>()
-  const modsPorCad = new Map<string, { id: string; nome: string }[]>()
+  const modsPorCad = new Map<string, { id: string; nome: string; pdfUrl?: string }[]>()
   const tipoSimPorSim = new Map<string, TipoSimulado | null>()  // objetiva/discursiva/mista
   const pastaPorSim = new Map<string, string>()                 // banco que mais cobre o simulado
   const gruposPorPasta = new Map<string, GrupoBanco[]>()        // grupos de disciplinas por banco
@@ -134,7 +135,11 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
       const cadIds = [...new Set([...cadernoPorSim.values()])]
       if (cadIds.length) {
         const { data: cads } = await svc.from('simulado_cadernos_designer').select('id, config').in('id', cadIds)
-        for (const c of cads ?? []) modsPorCad.set((c as any).id, mesclarModalidades((c as any).config?.modalidadesV2))
+        for (const c of cads ?? []) {
+          const cfg = (c as any).config
+          const pdf = usaPdfImportado(cfg)
+          modsPorCad.set((c as any).id, pdf ? [{ id: 'pdf-importado', nome: pdf.nome, pdfUrl: pdf.url }] : mesclarModalidades(cfg?.modalidadesV2))
+        }
       }
       // grupos de disciplinas das pastas usadas (tolerante: coluna pode não existir).
       const pastasUsadas = [...new Set([...pastaPorSim.values()])]

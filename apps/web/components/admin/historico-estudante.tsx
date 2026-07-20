@@ -27,7 +27,7 @@ export type SessaoRow = {
   porGrupo: Disc[]
   porDisciplina: Disc[]
   cadId: string | null
-  mods: { id: string; nome: string }[]
+  mods: { id: string; nome: string; pdfUrl?: string }[]
   simuladoId: string
   temResultado: boolean
   tipo?: TipoSimulado | null

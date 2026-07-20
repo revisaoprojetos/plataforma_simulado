@@ -1,5 +1,6 @@
 'use server'
 
+import { createHash } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createServiceClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
@@ -310,6 +311,78 @@ export async function associarCaderno(bancoId: string, cadernoId: string | null)
   const { error } = await svc.from('simulado_pastas').update({ caderno_id: cadernoId }).eq('id', bancoId).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: bancoId, depois: { caderno_id: cadernoId } })
+  revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  return { ok: true }
+}
+
+// ── Material para download do aluno (Enunciados do sistema × PDF importado) ────────
+// Guardado em `simulado_cadernos_designer.config.material`. Requer um caderno associado.
+
+/** Lê o config atual do caderno (para mesclar `material` sem sobrescrever o resto). */
+async function lerConfigCaderno(svc: ReturnType<typeof createAdminClient>, cadernoId: string, tenantId: string) {
+  const { data } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoId).eq('tenant_id', tenantId).maybeSingle()
+  return { config: (((data as any)?.config ?? {}) as Record<string, unknown>), existe: !!data }
+}
+
+/** Define qual material o aluno baixa: 'sistema' (caderno gerado) ou 'pdf' (importado). */
+export async function definirFonteMaterial(cadernoId: string, bancoId: string, fonte: 'sistema' | 'pdf'): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+  const { config, existe } = await lerConfigCaderno(svc, cadernoId, g.tenantId)
+  if (!existe) return { ok: false, error: 'Caderno não encontrado.' }
+  const material = { ...(config.material as any ?? {}), fonte }
+  const { error } = await svc.from('simulado_cadernos_designer').update({ config: { ...config, material } }).eq('id', cadernoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: cadernoId, depois: { material_fonte: fonte } })
+  revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  return { ok: true }
+}
+
+/** Sobe o PDF pronto do "caderno completo" (empresa) e passa a mostrá-lo ao aluno. */
+export async function subirMaterialPdf(cadernoId: string, bancoId: string, dataUrl: string, nomeArquivo: string): Promise<{ ok: boolean; url?: string; nome?: string; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const base64 = dataUrl.includes(',') ? dataUrl.slice(dataUrl.indexOf(',') + 1) : dataUrl
+  let buf: Buffer
+  try { buf = Buffer.from(base64, 'base64') } catch { return { ok: false, error: 'Arquivo inválido.' } }
+  if (!buf.length) return { ok: false, error: 'Arquivo vazio.' }
+  // Limite abaixo do bodySizeLimit (12 MB) considerando o inchaço do base64 (~33%).
+  if (buf.length > 8 * 1024 * 1024) return { ok: false, error: 'PDF muito grande (máx. ~8 MB).' }
+  // Validação server-side por magic bytes (padrão S3): PDF começa com "%PDF".
+  if (buf.subarray(0, 4).toString('latin1') !== '%PDF') return { ok: false, error: 'O arquivo não é um PDF válido.' }
+
+  const svc = createAdminClient()
+  const { config, existe } = await lerConfigCaderno(svc, cadernoId, g.tenantId)
+  if (!existe) return { ok: false, error: 'Caderno não encontrado.' }
+
+  // Nome do arquivo com hash do conteúdo → cada versão é uma URL nova (evita cache velho).
+  const hash = createHash('sha1').update(buf).digest('hex').slice(0, 10)
+  const path = `materiais/${g.tenantId}/${cadernoId}-${hash}.pdf`
+  const { error: upErr } = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true })
+  if (upErr) return { ok: false, error: upErr.message }
+  const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
+
+  const nome = (nomeArquivo || 'Material completo').replace(/\.pdf$/i, '').trim() || 'Material completo'
+  const material = { fonte: 'pdf', pdfUrl: url, pdfNome: nome }
+  const { error } = await svc.from('simulado_cadernos_designer').update({ config: { ...config, material } }).eq('id', cadernoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: cadernoId, depois: { material_pdf: nome } })
+  revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  return { ok: true, url, nome }
+}
+
+/** Remove o PDF importado e volta a mostrar o caderno gerado pelo sistema. */
+export async function removerMaterialPdf(cadernoId: string, bancoId: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+  const { config, existe } = await lerConfigCaderno(svc, cadernoId, g.tenantId)
+  if (!existe) return { ok: false, error: 'Caderno não encontrado.' }
+  const material = { fonte: 'sistema', pdfUrl: '', pdfNome: '' }
+  const { error } = await svc.from('simulado_cadernos_designer').update({ config: { ...config, material } }).eq('id', cadernoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: cadernoId, depois: { material_pdf: null } })
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return { ok: true }
 }

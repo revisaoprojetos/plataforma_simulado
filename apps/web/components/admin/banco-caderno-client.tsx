@@ -14,11 +14,13 @@ import {
   DialogTrigger,
   DialogClose,
 } from '@/components/ui/dialog'
-import { FileText, Check, Loader2, Search, ChevronDown, ChevronLeft, ChevronRight, Ban, ListChecks, PenLine, BookOpenCheck, Stethoscope, ExternalLink } from 'lucide-react'
+import { FileText, Check, Loader2, Search, ChevronDown, ChevronLeft, ChevronRight, Ban, ListChecks, PenLine, BookOpenCheck, Stethoscope, ExternalLink, FileUp, Trash2, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { confirmar } from '@/components/ui/confirm-dialog'
 import { iconeBanco } from '@/lib/banco-visual'
-import { associarCaderno } from '@/app/admin/banco-questoes/estudantes-actions'
+import { associarCaderno, definirFonteMaterial, subirMaterialPdf, removerMaterialPdf } from '@/app/admin/banco-questoes/estudantes-actions'
+import type { MaterialCaderno } from '@/lib/caderno-designer/material'
 
 interface Caderno { id: string; nome: string; descricao?: string | null; cor?: string | null; icone?: string | null; capa?: string | null }
 interface Modalidade { id: string; nome: string }
@@ -38,6 +40,7 @@ export function BancoCadernoClient({
   cadernoAtualId,
   cadernos,
   modalidades = [],
+  material,
   cor = '#6d28d9',
 }: {
   bancoId: string
@@ -45,6 +48,8 @@ export function BancoCadernoClient({
   cadernos: Caderno[]
   /** Cadernos internos (Objetivo / Completo / Diagnóstico…) do caderno associado. */
   modalidades?: Modalidade[]
+  /** O que o aluno baixa: caderno do sistema × PDF importado. */
+  material?: MaterialCaderno
   cor?: string
 }) {
   const router = useRouter()
@@ -55,6 +60,58 @@ export function BancoCadernoClient({
   const [pending, start] = useTransition()
   const [salvandoId, setSalvandoId] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Material para download do aluno (Enunciados do sistema × PDF importado).
+  const [matFonte, setMatFonte] = useState<'sistema' | 'pdf'>(material?.fonte ?? 'sistema')
+  const [matPdfUrl, setMatPdfUrl] = useState(material?.pdfUrl ?? '')
+  const [matPdfNome, setMatPdfNome] = useState(material?.pdfNome ?? '')
+  const [matBusy, setMatBusy] = useState(false)
+  const filePdfRef = useRef<HTMLInputElement>(null)
+
+  async function escolherFonte(f: 'sistema' | 'pdf') {
+    if (!atual) { toast.error('Associe um caderno acima primeiro.'); return }
+    if (f === matFonte) return
+    if (f === 'pdf' && !matPdfUrl) { filePdfRef.current?.click(); return } // sem PDF → pede o upload
+    const anterior = matFonte
+    setMatFonte(f); setMatBusy(true)
+    const r = await definirFonteMaterial(atual, bancoId, f)
+    setMatBusy(false)
+    if (!r.ok) { setMatFonte(anterior); toast.error(r.error ?? 'Erro'); return }
+    toast.success(f === 'pdf' ? 'Alunos verão o PDF importado' : 'Alunos verão os Enunciados do sistema')
+    router.refresh()
+  }
+
+  async function enviarPdf(file: File) {
+    if (!atual) { toast.error('Associe um caderno acima primeiro.'); return }
+    if (file.type && file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) { toast.error('Envie um arquivo PDF.'); return }
+    if (file.size > 8 * 1024 * 1024) { toast.error('PDF muito grande (máx. ~8 MB).'); return }
+    setMatBusy(true)
+    try {
+      const dataUrl: string = await new Promise((res, rej) => {
+        const fr = new FileReader()
+        fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(new Error('leitura'))
+        fr.readAsDataURL(file)
+      })
+      const r = await subirMaterialPdf(atual, bancoId, dataUrl, file.name)
+      if (!r.ok) { toast.error(r.error ?? 'Falha ao enviar'); return }
+      setMatPdfUrl(r.url ?? ''); setMatPdfNome(r.nome ?? file.name.replace(/\.pdf$/i, '')); setMatFonte('pdf')
+      toast.success('PDF enviado — alunos verão o material importado')
+      router.refresh()
+    } catch { toast.error('Falha ao ler o arquivo.') }
+    finally { setMatBusy(false) }
+  }
+
+  async function removerPdf() {
+    if (!atual) return
+    if (!(await confirmar({ mensagem: 'Remover o PDF importado?\n\nOs alunos voltam a baixar os Enunciados gerados pelo sistema.', destrutivo: true }))) return
+    setMatBusy(true)
+    const r = await removerMaterialPdf(atual, bancoId)
+    setMatBusy(false)
+    if (!r.ok) { toast.error(r.error ?? 'Erro'); return }
+    setMatPdfUrl(''); setMatPdfNome(''); setMatFonte('sistema')
+    toast.success('PDF removido')
+    router.refresh()
+  }
 
   const cadernoAtual = useMemo(() => cadernos.find((c) => c.id === atual) ?? null, [atual, cadernos])
   const filtrados = useMemo(() => {
@@ -80,6 +137,7 @@ export function BancoCadernoClient({
   }
 
   return (
+    <div className="space-y-4">
     <Card className="w-full overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
       <div className="flex items-center gap-3 border-b px-4 py-3.5" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent 55%)` }}>
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}><FileText className="h-5 w-5" /></span>
@@ -191,6 +249,77 @@ export function BancoCadernoClient({
       )}
       </CardContent>
     </Card>
+
+    {/* Material para download do aluno: Enunciados (sistema) × PDF importado (ex.: EBT) */}
+    <Card className="w-full overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+      <div className="flex items-center gap-3 border-b px-4 py-3.5" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent 55%)` }}>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}><Download className="h-5 w-5" /></span>
+        <div>
+          <h3 className="text-sm font-semibold leading-tight">Material para download do aluno</h3>
+          <p className="text-xs text-muted-foreground">O que o aluno baixa: os Enunciados gerados aqui ou um PDF pronto que você importa</p>
+        </div>
+      </div>
+      <CardContent className="space-y-3 px-4 pb-4 pt-4">
+        {!atual ? (
+          <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">Associe um caderno acima para configurar o material do aluno.</p>
+        ) : (
+          <>
+            <input ref={filePdfRef} type="file" accept="application/pdf,.pdf" hidden
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarPdf(f); e.currentTarget.value = '' }} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <OpcaoFonte ativo={matFonte === 'sistema'} disabled={matBusy} icon={FileText}
+                titulo="Enunciados (sistema)" desc="Caderno gerado automaticamente a partir das questões" onClick={() => escolherFonte('sistema')} />
+              <OpcaoFonte ativo={matFonte === 'pdf'} disabled={matBusy} icon={FileUp}
+                titulo="PDF importado" desc={matPdfNome || 'Envie o caderno completo pronto (ex.: EBT)'} onClick={() => escolherFonte('pdf')} />
+            </div>
+
+            <div className="rounded-xl border bg-muted/20 p-3">
+              {matPdfUrl ? (
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><FileText className="h-5 w-5" /></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{matPdfNome || 'Material.pdf'}</p>
+                    <a href={matPdfUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">Abrir PDF</a>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => filePdfRef.current?.click()} disabled={matBusy}>
+                    {matBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Trocar'}
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={removerPdf} disabled={matBusy} className="text-destructive hover:text-destructive" title="Remover PDF"><Trash2 className="h-4 w-4" /></Button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => filePdfRef.current?.click()} disabled={matBusy}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed py-6 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:opacity-60">
+                  {matBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />} Enviar PDF do caderno completo
+                </button>
+              )}
+            </div>
+
+            {matFonte === 'pdf' && matPdfUrl && (
+              <p className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"><Check className="h-3.5 w-3.5" /> Os alunos deste banco baixam o PDF importado no “Material para download”.</p>
+            )}
+            {matFonte === 'sistema' && (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><FileText className="h-3.5 w-3.5" /> Os alunos baixam os Enunciados gerados pelo sistema.</p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+    </div>
+  )
+}
+
+/** Opção (Enunciados × PDF) do material do aluno. */
+function OpcaoFonte({ ativo, disabled, icon: Icon, titulo, desc, onClick }: { ativo: boolean; disabled?: boolean; icon: typeof FileText; titulo: string; desc: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled}
+      className={cn('group flex items-start gap-3 rounded-xl border p-3 text-left transition-all disabled:opacity-60',
+        ativo ? 'border-primary ring-2 ring-primary/60 bg-primary/[0.04]' : 'hover:border-primary/40 hover:bg-muted/40')}>
+      <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', ativo ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}><Icon className="h-4 w-4" /></span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5 text-sm font-semibold">{titulo}{ativo && <Check className="h-3.5 w-3.5 text-primary" />}</span>
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{desc}</span>
+      </span>
+    </button>
   )
 }
 

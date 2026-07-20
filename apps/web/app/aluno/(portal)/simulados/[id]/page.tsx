@@ -10,6 +10,7 @@ import { montarDesempenhoAluno } from '@/lib/simulado/desempenho-aluno'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { filtrarModsPorTipo, tiposDeSimulados } from '@/lib/simulado/tipo'
 import { mesclarModalidades } from '@/lib/caderno-designer/types'
+import { usaPdfImportado } from '@/lib/caderno-designer/material'
 import { MeuSimuladoView } from '@/components/aluno/meu-simulado-view'
 
 const notaTone = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
@@ -87,14 +88,20 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
   // Disponibilidade por etapa:
   //  - semGab ("como você fez", logo após terminar): tudo, MENOS o Diagnóstico (que precisa do resultado).
   //  - comGab ("com correção", quando o gabarito é liberado): tudo, MENOS o Caderno de Questões (só enunciado).
-  let modalidades: { id: string; nome: string; semGab: boolean; comGab: boolean }[] = []
+  let modalidades: { id: string; nome: string; semGab: boolean; comGab: boolean; pdfUrl?: string }[] = []
   if (cadernoId) {
     const { data: cad } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoId).maybeSingle()
     const cfg = ((cad as any)?.config ?? {}) as any
-    const docs = (cfg.docsV2 ?? {}) as Record<string, unknown>
-    modalidades = filtrarModsPorTipo(mesclarModalidades(cfg.modalidadesV2), tipo)
-      .filter((m) => temConteudo(docs[m.id]) || m.id === 'caderno_perguntas')
-      .map((m) => ({ id: m.id, nome: m.nome, semGab: m.id !== 'diagnostico', comGab: m.id !== 'caderno_perguntas' }))
+    // Se o banco optou por um PDF importado, ele SUBSTITUI o caderno do sistema.
+    const pdf = usaPdfImportado(cfg)
+    if (pdf) {
+      modalidades = [{ id: 'pdf-importado', nome: pdf.nome, semGab: true, comGab: false, pdfUrl: pdf.url }]
+    } else {
+      const docs = (cfg.docsV2 ?? {}) as Record<string, unknown>
+      modalidades = filtrarModsPorTipo(mesclarModalidades(cfg.modalidadesV2), tipo)
+        .filter((m) => temConteudo(docs[m.id]) || m.id === 'caderno_perguntas')
+        .map((m) => ({ id: m.id, nome: m.nome, semGab: m.id !== 'diagnostico', comGab: m.id !== 'caderno_perguntas' }))
+    }
   }
 
   return (

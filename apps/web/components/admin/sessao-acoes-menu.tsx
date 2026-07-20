@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { excluirSessaoAction } from '@/app/admin/estudantes/actions'
 
-type Mod = { id: string; nome: string }
+type Mod = { id: string; nome: string; pdfUrl?: string }
 
 function IconeMod({ nome }: { nome: string }) {
   const n = (nome ?? '').toLowerCase()
@@ -61,6 +61,8 @@ export function SessaoAcoesMenu({
   const acaoNavegador = (url: string) => ({ label: 'Abrir no navegador', onClick: () => window.open(url, '_blank', 'noopener,noreferrer') })
 
   async function gerarCaderno(m: Mod) {
+    // PDF importado (material pronto da empresa): baixa o arquivo direto, sem worker.
+    if (m.pdfUrl) { baixar(m.pdfUrl); return }
     if (!cadId || enviando.has(m.id)) return
     const fallbackUrl = urlNavegador(m)
     marcarEnviando(m.id, true)

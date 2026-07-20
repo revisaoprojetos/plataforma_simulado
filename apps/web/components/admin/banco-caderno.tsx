@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { BancoCadernoClient } from '@/components/admin/banco-caderno-client'
 import { mesclarModalidades } from '@/lib/caderno-designer/types'
+import { materialDoConfig, type MaterialCaderno } from '@/lib/caderno-designer/material'
 import { AlertTriangle } from 'lucide-react'
 
 /** Modalidade (caderno interno) tem conteúdo se alguma página tem bloco além do plano-fundo. */
@@ -54,6 +55,7 @@ export async function BancoCaderno({ bancoId, cor = '#6d28d9' }: { bancoId: stri
   // considerando só as que têm conteúdo real.
   const cadernoAtualId = (banco?.caderno_id as string) ?? null
   let modalidades: { id: string; nome: string }[] = []
+  let material: MaterialCaderno = { fonte: 'sistema', pdfUrl: '', pdfNome: '' }
   if (cadernoAtualId) {
     const { data: cad } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoAtualId).maybeSingle()
     const cfg = ((cad as any)?.config ?? {}) as any
@@ -61,7 +63,8 @@ export async function BancoCaderno({ bancoId, cor = '#6d28d9' }: { bancoId: stri
     modalidades = mesclarModalidades(cfg.modalidadesV2)
       .filter((m) => temConteudo(docs[m.id]))
       .map((m) => ({ id: m.id, nome: m.nome }))
+    material = materialDoConfig(cfg)
   }
 
-  return <BancoCadernoClient bancoId={bancoId} cadernoAtualId={cadernoAtualId} cadernos={cadernos} modalidades={modalidades} cor={cor} />
+  return <BancoCadernoClient bancoId={bancoId} cadernoAtualId={cadernoAtualId} cadernos={cadernos} modalidades={modalidades} material={material} cor={cor} />
 }

@@ -69,7 +69,7 @@ interface Resultado {
   finalizado_em: string | null
   estudante_id: string | null
   caderno_id: string | null
-  modalidades?: { id: string; nome: string; semGab?: boolean; comGab?: boolean }[]
+  modalidades?: { id: string; nome: string; semGab?: boolean; comGab?: boolean; pdfUrl?: string }[]
   posicao: number | null
   total_participantes: number
   stats_por_disciplina: StatDisciplina[]
@@ -270,6 +270,9 @@ export function RevisaoFinal({
   async function baixarComoFez(mod: string, nome: string, gab = false) {
     const key = `pdf:${mod}:${gab ? 'g' : 's'}`
     if (gerandoPdf.has(key)) return
+    // PDF importado (material pronto da empresa): entrega direta do arquivo.
+    const md = modalidades.find((m) => m.id === mod)
+    if (md?.pdfUrl) { window.open(md.pdfUrl, '_blank', 'noopener,noreferrer'); return }
     if (!data?.caderno_id) { window.open(`${urlComoFezFallback}&print=1`, '_blank', 'noopener,noreferrer'); return }
     const limpar = (s?: string) => (s ?? '').trim().replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_')
     const arquivo = [data?.aluno_nome, data?.titulo, nome].map(limpar).filter(Boolean).join('_') || 'caderno'
