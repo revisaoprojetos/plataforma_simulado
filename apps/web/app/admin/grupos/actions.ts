@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentAccess } from '@/lib/auth/permissions'
+import { matricularEmSimuladosDoBanco } from '@/lib/simulado/matricular-banco'
 
 async function guard() {
   const a = await getCurrentAccess()
@@ -145,6 +146,9 @@ async function sincronizarBancosDoGrupo(svc: ReturnType<typeof createAdminClient
       await svc.from('simulado_pasta_estudantes').insert(novos.map((estudante_id) => ({ tenant_id: tenantId, pasta_id: pastaId, estudante_id })))
       revalidatePath(`/admin/banco-questoes/${pastaId}`)
     }
+    // Matricula nos simulados que herdam do banco (idempotente) — SEM isto o aluno aparece
+    // no banco mas o simulado não abre para ele (a matrícula é o gate de acesso).
+    try { await matricularEmSimuladosDoBanco(svc, tenantId, pastaId, estudanteIds) } catch { /* best-effort */ }
   }
 }
 
