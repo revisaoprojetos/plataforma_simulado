@@ -627,6 +627,34 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco, assunt
         </div>
       )
     }
+    case 'diag-pilar':
+      return (
+        <div className="space-y-3">
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Um pilar único (dá pra empilhar vários e montar o layout que quiser). A <b>chave</b> casa com o desempenho do aluno (ex.: <code>lei_seca</code>); o <b>texto de faixa</b> é escolhido pelo % real (0–50 / 51–80 / 81–100).</p>
+          <Row label="Nome exibido"><input value={a.nome ?? ''} onChange={(e) => set('nome', e.target.value)} className={inputCls} placeholder="LEI SECA" /></Row>
+          <Row label="Chave do pilar"><input value={a.chave ?? ''} onChange={(e) => set('chave', e.target.value.trim())} className={inputCls} placeholder="lei_seca" /></Row>
+          <textarea value={a.f1 ?? ''} onChange={(e) => set('f1', e.target.value)} rows={2} className={inputCls} placeholder="Texto faixa 0–50" />
+          <textarea value={a.f2 ?? ''} onChange={(e) => set('f2', e.target.value)} rows={2} className={inputCls} placeholder="Texto faixa 51–80" />
+          <textarea value={a.f3 ?? ''} onChange={(e) => set('f3', e.target.value)} rows={2} className={inputCls} placeholder="Texto faixa 81–100" />
+          <div className="border-t pt-2" />
+          <FonteSelect value={a.fonte ?? ''} onChange={(v) => set('fonte', v)} />
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarLinhaInterna !== false} onChange={(e) => set('mostrarLinhaInterna', e.target.checked)} className="h-4 w-4 rounded border" /> Linha interna (antes do texto)</label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarLabel !== false} onChange={(e) => set('mostrarLabel', e.target.checked)} className="h-4 w-4 rounded border" /> Mostrar rótulo “TEXTO MODULADO”</label>
+          {a.mostrarLabel !== false && <Row label="Texto do rótulo"><input value={a.textoLabel ?? ''} onChange={(e) => set('textoLabel', e.target.value)} className={inputCls} placeholder="TEXTO MODULADO" /></Row>}
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarFaixa !== false} onChange={(e) => set('mostrarFaixa', e.target.checked)} className="h-4 w-4 rounded border" /> Mostrar rótulo da faixa (0-50 / 51-80 / 81-100)</label>
+          <Faixa label="Tamanho do título (px)" min={8} max={24} value={a.tamTitulo ?? 12} onChange={(v) => set('tamTitulo', v)} />
+          <Faixa label="Tamanho do % (px)" min={12} max={40} value={a.tamPct ?? 22} onChange={(v) => set('tamPct', v)} />
+          <div className="border-t pt-2" />
+          <Cor label="Cor de fundo" value={a.corFundo} onChange={(v) => set('corFundo', v)} />
+          <Cor label="Cor do título" value={a.corTitulo} onChange={(v) => set('corTitulo', v)} />
+          <Cor label="Cor do %" value={a.corPct} onChange={(v) => set('corPct', v)} />
+          <Cor label="Cor de “X de N questões”" value={a.corQuestoes} onChange={(v) => set('corQuestoes', v)} />
+          <Cor label="Cor da linha interna" value={a.corLinhaInterna} onChange={(v) => set('corLinhaInterna', v)} />
+          <Cor label="Cor do rótulo (TEXTO MODULADO)" value={a.corLabel} onChange={(v) => set('corLabel', v)} />
+          <Cor label="Cor da faixa (0-50…)" value={a.corFaixa} onChange={(v) => set('corFaixa', v)} />
+          <Cor label="Cor do texto modulado" value={a.corTexto} onChange={(v) => set('corTexto', v)} />
+        </div>
+      )
     case 'diag-pilares': {
       const pilares: any[] = Array.isArray(a.pilares) ? a.pilares : []
       const setP = (i: number, k: string, v: string) => set('pilares', pilares.map((p, idx) => idx === i ? { ...p, [k]: v } : p))

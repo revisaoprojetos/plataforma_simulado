@@ -188,8 +188,8 @@ function converterDiagnostico(linhas: Linha[]): CadernoDoc {
   if (pilares.length) {
     conteudo.push(bloco('card', {}, [txt('DESEMPENHO POR PILAR', { bold: true })]))
     conteudo.push(espacador())
-    conteudo.push(bloco('diag-pilares', { pilares }))
-    conteudo.push(espacador())
+    // Um bloco diag-pilar (único) por pilar — editável e reordenável separadamente.
+    for (const p of pilares) { conteudo.push(bloco('diag-pilar', { chave: p.chave, nome: p.nome, f1: p.f1, f2: p.f2, f3: p.f3 })); conteudo.push(espacador()) }
   }
   if (grupos.length) {
     conteudo.push(bloco('card', {}, [txt('DESEMPENHO POR DISCIPLINA', { bold: true })]))

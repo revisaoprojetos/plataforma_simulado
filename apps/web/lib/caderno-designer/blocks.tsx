@@ -105,6 +105,12 @@ export const BLOCKS: BlockMeta[] = [
       corTitulo: '#243b7a', corPct: '#243b7a', corQuestoes: '#c0392b', corLabel: '#777777', corFaixa: '#999999', corTexto: '#222222', corLinhaInterna: '#d9c9a0',
       tamTitulo: 12, tamPct: 22, mostrarFaixa: true, mostrarLinhaInterna: true, fonte: '',
     } },
+  { type: 'diag-pilar', title: 'Diagnóstico — Pilar (único)', icon: LayoutGrid, category: 'avaliacao', dynamic: true, supportsVars: true,
+    defaults: {
+      chave: 'lei_seca', nome: 'LEI SECA', f1: '', f2: '', f3: '',
+      corFundo: '#fef3d6', corTitulo: '#243b7a', corPct: '#243b7a', corQuestoes: '#c0392b', corLabel: '#777777', corFaixa: '#999999', corTexto: '#222222', corLinhaInterna: '#d9c9a0',
+      tamTitulo: 12, tamPct: 22, mostrarFaixa: true, mostrarLinhaInterna: true, padding: 12, bordaRaio: 4, fonte: '',
+    } },
 ]
 
 export function getBlockMeta(type: string): BlockMeta | undefined {
@@ -606,8 +612,11 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
         </div>
       )
     }
-    case 'diag-pilares': {
-      const pilares: any[] = Array.isArray(a.pilares) ? a.pilares : []
+    case 'diag-pilares':
+    case 'diag-pilar': {
+      const pilares: any[] = block.type === 'diag-pilar'
+        ? [{ chave: a.chave, nome: a.nome, f1: a.f1, f2: a.f2, f3: a.f3 }]
+        : (Array.isArray(a.pilares) ? a.pilares : [])
       const bordaDiv = `${a.divisoriaEspessura ?? 1}px solid ${a.divisoriaCor || '#cbb26b'}`
       const val = (tok: string, def: string) => { const r = applyVars(tok, data.vars); return /\{/.test(r) ? def : r }
       const numPct = (chave: string) => { const n = parseFloat(val(`{pct_pilar_${chave}}`, '0').replace(/[^0-9.,-]/g, '').replace(',', '.')); return isNaN(n) ? 0 : n }
