@@ -101,6 +101,7 @@ export function RelatorioSimuladoView({ d, print }: { d: DadosRelatorioSimulado;
     setGerando(true)
     try {
       const ExcelJS = (await import('exceljs')).default
+      const { estilizarLinhas } = await import('@/lib/relatorios/excel-kit')
       const wb = new ExcelJS.Workbook()
       const PURPLE = 'FF5B21B6', LIGHT = 'FFEEE9F9'
       const letra = (i: number) => String.fromCharCode(65 + i)
@@ -126,6 +127,7 @@ export function RelatorioSimuladoView({ d, print }: { d: DadosRelatorioSimulado;
 
       const tTit = wsD.addRow([d.titulo || 'Simulado']); tTit.getCell(1).font = { bold: true, size: 16 }; wsD.mergeCells(tTit.number, 1, tTit.number, 5)
       const tSub = wsD.addRow([`Relatório do simulado — ${tipoLabel}`]); tSub.getCell(1).font = { italic: true, color: { argb: 'FF777777' } }; wsD.mergeCells(tSub.number, 1, tSub.number, 5)
+      const tDt = wsD.addRow([`Exportado em ${new Date().toLocaleString('pt-BR')}`]); tDt.getCell(1).font = { italic: true, size: 9, color: { argb: 'FF999999' } }; wsD.mergeCells(tDt.number, 1, tDt.number, 5)
       branco()
 
       secao('Resumo')
@@ -232,6 +234,7 @@ export function RelatorioSimuladoView({ d, print }: { d: DadosRelatorioSimulado;
       headQ.height = 28
       headQ.eachCell((c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PURPLE } } })
       wsQ.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cabQ.length } }
+      estilizarLinhas(wsQ, 2, wsQ.rowCount, cabQ.length) // designer: zebra + bordas
 
       // ── Aba 3: Análise por aluno ──
       const ws = wb.addWorksheet('Análise por aluno', { views: [{ state: 'frozen', ySplit: 1, xSplit: 1 }] })
@@ -244,6 +247,7 @@ export function RelatorioSimuladoView({ d, print }: { d: DadosRelatorioSimulado;
       head.eachCell((c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PURPLE } } })
       ws.columns.forEach((col, i) => { col.width = i === 1 ? 26 : i === 2 ? 26 : i < 5 ? 16 : 12 })
       ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cabecalho.length } }
+      estilizarLinhas(ws, 2, ws.rowCount, cabecalho.length) // designer: zebra + bordas
 
       const buf = await wb.xlsx.writeBuffer()
       baixarBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `${nomeArq}.xlsx`)

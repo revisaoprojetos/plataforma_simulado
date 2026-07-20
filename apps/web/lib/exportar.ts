@@ -44,7 +44,7 @@ export async function baixarExcel<T>(
   nomeArquivo: string,
   opts?: { titulo?: string; subtitulo?: string },
 ) {
-  const { novoWorkbook, cabecalho, titulo: tituloFn, baixarWorkbook } = await import('@/lib/relatorios/excel-kit')
+  const { novoWorkbook, cabecalho, titulo: tituloFn, estilizarLinhas, baixarWorkbook } = await import('@/lib/relatorios/excel-kit')
   const wb = await novoWorkbook()
   const ws = wb.addWorksheet('Dados')
   const ncols = colunas.length
@@ -53,6 +53,9 @@ export async function baixarExcel<T>(
   const linhaCab = ws.rowCount + 1
   cabecalho(ws, colunas.map((c) => c.titulo))
   for (const r of rows) ws.addRow(colunas.map((c) => { const v = c.valor(r); return v == null ? '' : v }))
+
+  // Designer: zebra + bordas finas nas linhas de dados.
+  estilizarLinhas(ws, linhaCab + 1, ws.rowCount, ncols)
 
   colunas.forEach((c, i) => {
     ws.getColumn(i + 1).width = c.largura ?? Math.min(48, Math.max(12, c.titulo.length + 6))

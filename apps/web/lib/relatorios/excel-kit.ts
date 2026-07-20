@@ -38,6 +38,20 @@ export function cabecalho(ws: Worksheet, cols: (string | number)[], argb = CORES
   return row
 }
 
+/** Aplica zebra (linhas alternadas) + bordas finas num intervalo de linhas de dados. */
+export function estilizarLinhas(ws: Worksheet, primeira: number, ultima: number, ncols: number) {
+  const borda = { style: 'thin' as const, color: { argb: 'FFE5E7EB' } }
+  for (let r = primeira; r <= ultima; r++) {
+    const row = ws.getRow(r)
+    const zebra = (r - primeira) % 2 === 1
+    for (let c = 1; c <= ncols; c++) {
+      const cell = row.getCell(c)
+      if (zebra) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CORES.cinzaClaro } }
+      cell.border = { bottom: borda, right: borda }
+    }
+  }
+}
+
 /** Faixa de seção (barra roxa mesclada). */
 export function secao(ws: Worksheet, txt: string, ncols: number, argb = CORES.roxo) {
   const row = ws.addRow([txt]); row.height = 20
