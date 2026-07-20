@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { tipoDoSimulado, type TipoSimulado } from '@/lib/simulado/tipo'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
@@ -10,8 +11,8 @@ export type ResumoSimulado = {
   status: string | null
   criadoEm: string | null
   tipo: TipoSimulado | null
-  participantes: number   // estudantes distintos com sessão real
-  finalizadas: number
+  participantes: number   // total de alunos no simulado (matriculados + acessos + com sessão)
+  finalizadas: number     // alunos DISTINTOS que finalizaram de verdade
   emAndamento: number
   notaMedia: number | null
   ultimaAtividade: string | null
@@ -35,35 +36,35 @@ export async function resumosSimulados(svc: SupabaseClient, tenantId: string | n
   // Visual (cor/ícone/capa) do banco vinculado — mesma resolução dos cards de simulado.
   const visual = await resolverVisualSimulados(svc, simulados.map((s) => ({ id: s.id, regras: s.regras })))
 
-  // Tipo de cada simulado (a partir dos tipos das questões).
+  // Tipo, sessões, matrículas e acessos por simulado.
+  // fetchAllByIn: o `.limit(20000)` truncava em ~1000 (teto do PostgREST) → alunos/feitos/nota errados.
+  const [pq, sess, mats, acs] = await Promise.all([
+    fetchAllByIn<any>(simIds, (chunk) => svc.from('simulado_prova_questoes').select('simulado_id, questoes:simulado_questoes(tipo)').in('simulado_id', chunk)),
+    fetchAllByIn<any>(simIds, (chunk) => svc.from('simulado_sessoes_prova').select('simulado_id, estudante_id, status, nota, iniciado_em').in('simulado_id', chunk).eq('is_teste', false).eq('deletado', false).order('id')),
+    fetchAllByIn<any>(simIds, (chunk) => svc.from('simulado_matriculas').select('simulado_id, estudante_id').in('simulado_id', chunk)),
+    fetchAllByIn<any>(simIds, (chunk) => svc.from('simulado_acessos').select('simulado_id, estudante_id').in('simulado_id', chunk)),
+  ])
+
   const tiposPorSim = new Map<string, (string | null)[]>()
-  const { data: pq } = await svc
-    .from('simulado_prova_questoes')
-    .select('simulado_id, questoes:simulado_questoes(tipo)')
-    .in('simulado_id', simIds)
-  for (const r of (pq ?? []) as any[]) {
+  for (const r of pq) {
     const arr = tiposPorSim.get(r.simulado_id) ?? []
     arr.push(r.questoes?.tipo ?? null)
     tiposPorSim.set(r.simulado_id, arr)
   }
 
-  // Sessões reais → agregados por simulado.
-  const { data: sess } = await svc
-    .from('simulado_sessoes_prova')
-    .select('simulado_id, estudante_id, status, nota, iniciado_em')
-    .in('simulado_id', simIds)
-    .eq('is_teste', false)
-    .eq('deletado', false)
-    .limit(20000)
-  const agg = new Map<string, { est: Set<string>; fin: number; and: number; notas: number[]; ult: string | null }>()
-  for (const s of (sess ?? []) as any[]) {
-    const a = agg.get(s.simulado_id) ?? { est: new Set<string>(), fin: 0, and: 0, notas: [], ult: null }
-    if (s.estudante_id) a.est.add(s.estudante_id)
-    if (s.status === 'finalizada') { a.fin++; if (s.nota != null) a.notas.push(Number(s.nota)) }
-    else if (s.status === 'em_andamento') a.and++
+  // Agregados por simulado: alunos atribuídos (total), quem FINALIZOU de verdade (distintos), notas.
+  type Ag = { assign: Set<string>; finStud: Set<string>; andStud: Set<string>; notas: number[]; ult: string | null }
+  const agg = new Map<string, Ag>()
+  const ag = (id: string): Ag => { let a = agg.get(id); if (!a) { a = { assign: new Set(), finStud: new Set(), andStud: new Set(), notas: [], ult: null }; agg.set(id, a) } return a }
+  for (const s of sess) {
+    const a = ag(s.simulado_id)
+    if (s.estudante_id) a.assign.add(s.estudante_id)
+    if (s.status === 'finalizada') { if (s.estudante_id) a.finStud.add(s.estudante_id); if (s.nota != null) a.notas.push(Number(s.nota)) }
+    else if (s.status === 'em_andamento' && s.estudante_id) a.andStud.add(s.estudante_id)
     if (s.iniciado_em && (!a.ult || s.iniciado_em > a.ult)) a.ult = s.iniciado_em
-    agg.set(s.simulado_id, a)
   }
+  for (const m of mats) if (m.simulado_id && m.estudante_id) ag(m.simulado_id).assign.add(m.estudante_id)
+  for (const x of acs) if (x.simulado_id && x.estudante_id) ag(x.simulado_id).assign.add(x.estudante_id)
 
   return simulados.map((s) => {
     const a = agg.get(s.id)
@@ -75,9 +76,9 @@ export async function resumosSimulados(svc: SupabaseClient, tenantId: string | n
       status: s.status ?? null,
       criadoEm: s.created_at ?? null,
       tipo: tipoDoSimulado(tiposPorSim.get(s.id) ?? []),
-      participantes: a ? a.est.size : 0,
-      finalizadas: a?.fin ?? 0,
-      emAndamento: a?.and ?? 0,
+      participantes: a ? a.assign.size : 0,   // total de alunos no simulado (matriculados + acessos + com sessão)
+      finalizadas: a ? a.finStud.size : 0,      // alunos que finalizaram de verdade (distintos)
+      emAndamento: a ? a.andStud.size : 0,
       notaMedia: notas.length ? notas.reduce((x, y) => x + y, 0) / notas.length : null,
       ultimaAtividade: a?.ult ?? null,
       cor: vis?.cor ?? null,
