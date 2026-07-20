@@ -4,12 +4,12 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Plus, Loader2, Search, Pencil, Printer, Trash2, NotebookPen, Palette, MoreVertical } from 'lucide-react'
+import { Plus, Loader2, Search, Pencil, Printer, Trash2, NotebookPen, Palette, MoreVertical, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { criarCaderno, excluirCaderno } from '@/app/admin/cadernos/actions'
+import { criarCaderno, excluirCaderno, duplicarCaderno } from '@/app/admin/cadernos/actions'
 import { iconeBanco } from '@/lib/banco-visual'
 import { EditarCadernoDialog, type CadernoPatch } from '@/components/admin/editar-caderno-dialog'
 
@@ -22,6 +22,7 @@ export function CadernosClient({ cadernos }: { cadernos: CadernoItem[] }) {
   const [nome, setNome] = useState('')
   const [pending, start] = useTransition()
   const [excluindo, setExcluindo] = useState<string | null>(null)
+  const [duplicando, setDuplicando] = useState<string | null>(null)
   const [editando, setEditando] = useState<CadernoItem | null>(null)
 
   const filtrados = useMemo(() => {
@@ -52,6 +53,16 @@ export function CadernosClient({ cadernos }: { cadernos: CadernoItem[] }) {
       if (r.ok) { setLista((l) => l.filter((c) => c.id !== id)); toast.success('Caderno excluído') }
       else toast.error(r.error ?? 'Erro ao excluir')
       setExcluindo(null)
+    })
+  }
+
+  function duplicar(id: string) {
+    setDuplicando(id)
+    start(async () => {
+      const r = await duplicarCaderno(id)
+      if (r.ok && r.caderno) { setLista((l) => [r.caderno!, ...l]); toast.success('Caderno duplicado') }
+      else toast.error(r.error ?? 'Erro ao duplicar')
+      setDuplicando(null)
     })
   }
 
@@ -120,7 +131,7 @@ export function CadernosClient({ cadernos }: { cadernos: CadernoItem[] }) {
                   <div className="absolute right-2 top-2 z-30">
                     <DropdownMenu>
                       <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg text-white/85 outline-none transition-colors hover:bg-white/20 hover:text-white focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Ações do caderno">
-                        {excluindo === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
+                        {excluindo === c.id || duplicando === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-44">
                         <DropdownMenuItem render={<Link href={`/admin/cadernos/${c.id}`} />}>
@@ -128,6 +139,9 @@ export function CadernosClient({ cadernos }: { cadernos: CadernoItem[] }) {
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setEditando(c)}>
                           <Palette className="mr-2 h-4 w-4" /> Personalizar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => duplicar(c.id)}>
+                          <Copy className="mr-2 h-4 w-4" /> Duplicar
                         </DropdownMenuItem>
                         <DropdownMenuItem render={<Link href={`/imprimir/caderno/${c.id}`} target="_blank" />}>
                           <Printer className="mr-2 h-4 w-4" /> Imprimir

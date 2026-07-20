@@ -41,6 +41,64 @@ export async function criarCaderno(nome: string): Promise<{ ok: boolean; id?: st
   return { ok: true, id: data.id }
 }
 
+function contarBlocosConfig(config: any): number {
+  if (config?.docsV2) {
+    let n = 0
+    for (const doc of Object.values(config.docsV2) as any[]) for (const p of doc?.pages ?? []) n += (p.blocks?.length ?? 0)
+    return n
+  }
+  return (config?.blocos ?? []).length
+}
+
+/**
+ * Duplica um caderno com TODA a configuração (docsV2/modalidadesV2/cores/material/bancoId…),
+ * cor, ícone e capa. As imagens de fundo ficam hospedadas por URL no config → a cópia só
+ * referencia as mesmas URLs (não precisa reenviar). Devolve o item já pronto pra lista.
+ */
+export async function duplicarCaderno(
+  id: string,
+): Promise<{ ok: boolean; error?: string; caderno?: { id: string; nome: string; blocos: number; cor: string | null; icone: string | null; capa: string | null } }> {
+  if (!(await checkPermission('questoes:create')) && !(await checkPermission('questoes:update'))) {
+    return { ok: false, error: 'Sem permissão.' }
+  }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+
+  // Lê a origem (tolerante caso as colunas de personalização não existam).
+  let origem: any = null
+  {
+    const r = await svc.from('simulado_cadernos_designer').select('nome, config, cor, icone, capa_url').eq('id', id).eq('tenant_id', access.tenantId).eq('deletado', false).maybeSingle()
+    if (r.error && /cor|icone|capa_url|column/i.test(r.error.message)) {
+      const r2 = await svc.from('simulado_cadernos_designer').select('nome, config').eq('id', id).eq('tenant_id', access.tenantId).eq('deletado', false).maybeSingle()
+      origem = r2.data
+    } else origem = r.data
+  }
+  if (!origem) return { ok: false, error: 'Caderno não encontrado.' }
+
+  const novoNome = `${origem.nome} (cópia)`
+  const payloadFull = { tenant_id: access.tenantId, nome: novoNome, config: origem.config ?? {}, cor: origem.cor ?? null, icone: origem.icone ?? null, capa_url: origem.capa_url ?? null }
+
+  let novo: any = null
+  {
+    const r = await svc.from('simulado_cadernos_designer').insert(payloadFull).select('id').single()
+    if (r.error && /cor|icone|capa_url|column/i.test(r.error.message)) {
+      const r2 = await svc.from('simulado_cadernos_designer').insert({ tenant_id: access.tenantId, nome: novoNome, config: origem.config ?? {} }).select('id').single()
+      if (r2.error) return { ok: false, error: r2.error.message }
+      novo = r2.data
+    } else if (r.error) {
+      return { ok: false, error: r.error.message }
+    } else novo = r.data
+  }
+
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_cadernos_designer', entidadeId: novo.id, depois: { nome: novoNome, duplicadoDe: id } })
+  revalidatePath('/admin/cadernos')
+  return {
+    ok: true,
+    caderno: { id: novo.id, nome: novoNome, blocos: contarBlocosConfig(origem.config), cor: origem.cor ?? null, icone: origem.icone ?? null, capa: origem.capa_url ?? null },
+  }
+}
+
 export async function salvarCadernoConfig(id: string, config: CadernoConfig): Promise<{ ok: boolean; error?: string }> {
   if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
   const access = await getCurrentAccess()

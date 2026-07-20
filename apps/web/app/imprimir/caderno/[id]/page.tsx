@@ -60,7 +60,18 @@ export default async function CadernoImprimirPage({
   const docsV2: Record<string, CadernoDoc> | undefined = config.docsV2
   const modalidadesV2: { id: string; nome: string }[] = config.modalidadesV2 ?? []
   const theme = resolveTheme(config.cores)
-  const bancoId: string | null = config.bancoId ?? null
+  let bancoId: string | null = config.bancoId ?? null
+  // Diagnóstico individual: o banco vem do SIMULADO da sessão (não o fixo do caderno) — assim
+  // o MESMO caderno serve a vários simulados/disciplinas e cada aluno vê os dados do SEU simulado.
+  if (sessao) {
+    const { data: sessB } = await svc.from('simulado_sessoes_prova').select('simulado_id').eq('id', sessao).maybeSingle()
+    const simIdB = (sessB as any)?.simulado_id
+    if (simIdB) {
+      const { data: simB } = await svc.from('simulado_simulados').select('regras').eq('id', simIdB).maybeSingle()
+      const bb = ((simB as any)?.regras as any)?.banco_base_id as string | undefined
+      if (bb) bancoId = bb
+    }
+  }
 
   // ---- Questões: do banco vinculado ou publicadas do tenant ----
   let questoes: any[] | null = null
