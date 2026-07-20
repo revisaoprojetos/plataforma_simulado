@@ -262,7 +262,6 @@ export async function montarRelatorioSimulado(svc: SupabaseClient, simId: string
   const porQuestao = [...acPorQ.entries()]
     .map(([qid, v]) => ({ ord: ordemDeQ.get(qid) ?? 0, rotulo: `Q${(ordemDeQ.get(qid) ?? 0) + 1}`, ac: v.ac, tt: v.tt, pct: v.tt ? Math.round((v.ac / v.tt) * 100) : 0 }))
     .sort((a, b) => a.ord - b.ord)
-    .slice(0, 60)
     .map(({ ord, ...r }) => r)
 
   // Detalhamento por questão (todas, na ordem da prova) — para a mentoria dos professores.
