@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { getTenantTheme } from '@/lib/tenant-theme'
 import { registrarAudit } from '@/lib/audit'
+import { Palette } from 'lucide-react'
 import { ConfiguracoesTabs } from './configuracoes-tabs'
 
 // ─── Server action ─────────────────────────────────────────────────────────────
@@ -52,11 +53,16 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
-        <p className="text-muted-foreground">
-          Gerencie a identidade visual e informações de contato da plataforma.
-        </p>
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Palette className="h-5 w-5" />
+        </span>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Aparência da plataforma</h1>
+          <p className="text-muted-foreground">
+            Identidade visual, cores, tema claro/escuro e telas de carregamento — tudo em um só lugar.
+          </p>
+        </div>
       </div>
 
       <ConfiguracoesTabs tema={tema} salvarTema={salvarTema} />

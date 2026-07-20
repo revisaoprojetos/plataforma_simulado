@@ -11,7 +11,6 @@ import {
   UsersRound,
   BarChart3,
   Database,
-  Settings,
   ShieldCheck,
   ClipboardCheck,
   CreditCard,
@@ -36,6 +35,7 @@ import {
   Share2,
   Plug,
   Zap,
+  Palette,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -145,7 +145,7 @@ const navGroups: NavGroup[] = [
       { label: 'Plataformas', href: '/admin/tenants', icon: Building2, perm: 'tenants:manage' },
       { label: 'Permissões (RBAC)', href: '/admin/rbac', icon: ShieldCheck, perm: 'rbac:view' },
       { label: 'API Keys', href: '/admin/api-keys', icon: KeyRound, perm: 'api_keys:manage' },
-      { label: 'Configurações', href: '/admin/configuracoes', icon: Settings, exact: true, perm: 'configuracoes:view' },
+      { label: 'Aparência', href: '/admin/configuracoes', icon: Palette, exact: true, perm: 'configuracoes:view' },
       { label: 'Mensagens', href: '/admin/configuracoes/mensagens', icon: MessageSquare, perm: 'configuracoes:view' },
       { label: 'Lixeira', href: '/admin/lixeira', icon: Trash2, perm: 'questoes:view' },
       { label: 'Ajuda', href: '/admin/ajuda', icon: HelpCircle },
