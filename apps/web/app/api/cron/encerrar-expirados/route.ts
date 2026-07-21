@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { rankearSimulado } from '@/lib/ranking'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
+import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,13 +64,14 @@ async function processar() {
   const agora = new Date().toISOString()
   const cache = new Map<string, number>()
   const afetados = new Set<string>()
+  const tenantsAfetados = new Set<string>() // p/ invalidar o cache de relatórios (1x por tenant, no fim)
   let sessoesEncerradas = 0
   let simuladosEncerrados = 0
 
   // 1) Janela fixa expirada → encerra simulado + finaliza sessões em andamento.
   const { data: sims } = await svc
     .from('simulado_simulados')
-    .select('id')
+    .select('id, tenant_id')
     .eq('modo_aplicacao', 'janela_fixa')
     .eq('status', 'publicado')
     .not('data_fim', 'is', null)
@@ -82,7 +84,7 @@ async function processar() {
       .eq('status', 'em_andamento')
       .eq('deletado', false)
     for (const s of (sess ?? []) as SessaoMin[]) {
-      if (await finalizarSessao(svc, s, cache)) { sessoesEncerradas++; afetados.add(sim.id) }
+      if (await finalizarSessao(svc, s, cache)) { sessoesEncerradas++; afetados.add(sim.id); if (s.tenant_id) tenantsAfetados.add(s.tenant_id) }
     }
     const { data: enc } = await svc
       .from('simulado_simulados')
@@ -90,7 +92,7 @@ async function processar() {
       .eq('id', sim.id)
       .eq('status', 'publicado')
       .select('id')
-    if (enc?.length) { simuladosEncerrados++; afetados.add(sim.id) }
+    if (enc?.length) { simuladosEncerrados++; afetados.add(sim.id); if (sim.tenant_id) tenantsAfetados.add(sim.tenant_id) }
   }
 
   // 2) Sessões em andamento com tempo individual (ou data_fim) estourado — qualquer modo.
@@ -114,12 +116,15 @@ async function processar() {
     if (meta.tempo && s.iniciado_em) expira = new Date(s.iniciado_em).getTime() + meta.tempo * 60_000
     if (meta.dataFim) { const df = new Date(meta.dataFim).getTime(); expira = expira === null ? df : Math.min(expira, df) }
     if (expira !== null && expira < nowMs) {
-      if (await finalizarSessao(svc, s, cache)) { sessoesEncerradas++; afetados.add(s.simulado_id) }
+      if (await finalizarSessao(svc, s, cache)) { sessoesEncerradas++; afetados.add(s.simulado_id); if (s.tenant_id) tenantsAfetados.add(s.tenant_id) }
     }
   }
 
   // 3) Recalcula o ranking de cada simulado afetado.
   for (const id of afetados) await rankearSimulado(svc, id)
+
+  // 4) Invalida o cache de relatórios dos tenants afetados (1x por tenant, não por sessão).
+  for (const t of tenantsAfetados) await invalidarRelatorios(t)
 
   return { ok: true, simuladosEncerrados, sessoesEncerradas, simuladosAfetados: afetados.size }
 }

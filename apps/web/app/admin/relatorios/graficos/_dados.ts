@@ -2,11 +2,16 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { DadosRelatorioGrafico } from './relatorio-grafico-view'
+import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 
 const STATUS_LABEL: Record<string, string> = { finalizada: 'Finalizadas', em_andamento: 'Em andamento', aguardando: 'Aguardando' }
 
-/** Monta a visão geral da plataforma (totais, séries temporais, disciplinas, distribuição). */
+/** Monta a visão geral da plataforma (totais, séries temporais, disciplinas, distribuição). Cacheado por tenant. */
 export async function montarRelatorioGrafico(svc: SupabaseClient, tenantId: string | null): Promise<DadosRelatorioGrafico> {
+  return remember(chaveRelatorio(tenantId, 'graficos'), TTL_RELATORIO, () => _montarRelatorioGrafico(svc, tenantId))
+}
+
+async function _montarRelatorioGrafico(svc: SupabaseClient, tenantId: string | null): Promise<DadosRelatorioGrafico> {
   const { data: sims } = await svc.from('simulado_simulados').select('id').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
   const simIds = (sims ?? []).map((s: any) => s.id)
 

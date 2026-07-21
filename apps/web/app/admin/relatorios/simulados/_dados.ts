@@ -3,13 +3,18 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
 import type { DadosRelatorioSimulado, LinhaExportSimulado } from './relatorio-simulado-view'
+import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 
 const fmtDur = (min: number) => { const h = Math.floor(min / 60), m = Math.round(min % 60); return h > 0 ? `${h}h ${String(m).padStart(2, '0')}min` : `${m}min` }
 const fmtSeg = (seg: number) => { const s = Math.round(seg); const m = Math.floor(s / 60), r = s % 60; return m > 0 ? `${m}min ${String(r).padStart(2, '0')}s` : `${r}s` }
 const labelClass = (c?: string | null) => (c === 'passaporte' ? 'Passaporte' : c === 'normal' ? 'Normal' : (c ?? '—'))
 
-/** Monta o relatório completo de um simulado (KPIs, gráficos, ranking e linhas do export). */
+/** Monta o relatório completo de um simulado (KPIs, gráficos, ranking e linhas do export). Cacheado por tenant. */
 export async function montarRelatorioSimulado(svc: SupabaseClient, simId: string, tenantId: string | null): Promise<DadosRelatorioSimulado | null> {
+  return remember(chaveRelatorio(tenantId, 'simulado', simId), TTL_RELATORIO, () => _montarRelatorioSimulado(svc, simId, tenantId))
+}
+
+async function _montarRelatorioSimulado(svc: SupabaseClient, simId: string, tenantId: string | null): Promise<DadosRelatorioSimulado | null> {
   const { data: alvo } = await svc.from('simulado_simulados').select('id, titulo, modo_aplicacao, regras').eq('id', simId).eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
   if (!alvo) return null
 

@@ -2,12 +2,17 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { DadosRelatorioEstudante } from './relatorio-estudante-view'
+import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 
 const fmtDur = (min: number) => { const h = Math.floor(min / 60), m = Math.round(min % 60); return h > 0 ? `${h}h ${String(m).padStart(2, '0')}min` : `${m}min` }
 const fmtData = (s?: string | null) => (s ? new Date(s).toLocaleDateString('pt-BR') : '—')
 
-/** Monta o relatório completo de um estudante (KPIs, evolução, aluno×turma, histórico). */
+/** Monta o relatório completo de um estudante (KPIs, evolução, aluno×turma, histórico). Cacheado por tenant. */
 export async function montarRelatorioEstudante(svc: SupabaseClient, estId: string, tenantId: string | null): Promise<DadosRelatorioEstudante | null> {
+  return remember(chaveRelatorio(tenantId, 'estudante', estId), TTL_RELATORIO, () => _montarRelatorioEstudante(svc, estId, tenantId))
+}
+
+async function _montarRelatorioEstudante(svc: SupabaseClient, estId: string, tenantId: string | null): Promise<DadosRelatorioEstudante | null> {
   const { data: alvo } = await svc.from('simulado_estudantes').select('id, nome').eq('id', estId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
   if (!alvo) return null
 

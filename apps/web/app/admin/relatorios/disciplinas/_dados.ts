@@ -2,11 +2,16 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { DadosRelatorioDisciplina } from './relatorio-disciplina-view'
+import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
 
-/** Monta o relatório completo de uma disciplina (KPIs, por assunto, por simulado, evolução). */
+/** Monta o relatório completo de uma disciplina (KPIs, por assunto, por simulado, evolução). Cacheado por tenant. */
 export async function montarRelatorioDisciplina(svc: SupabaseClient, discId: string, tenantId: string | null): Promise<DadosRelatorioDisciplina | null> {
+  return remember(chaveRelatorio(tenantId, 'disciplina', discId), TTL_RELATORIO, () => _montarRelatorioDisciplina(svc, discId, tenantId))
+}
+
+async function _montarRelatorioDisciplina(svc: SupabaseClient, discId: string, tenantId: string | null): Promise<DadosRelatorioDisciplina | null> {
   const { data: alvo } = await svc.from('simulado_disciplinas').select('id, nome').eq('id', discId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
   if (!alvo) return null
 

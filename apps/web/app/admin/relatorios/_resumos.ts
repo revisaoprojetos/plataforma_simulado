@@ -4,6 +4,7 @@ import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { tipoDoSimulado, type TipoSimulado } from '@/lib/simulado/tipo'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
+import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 
 export type ResumoSimulado = {
   id: string
@@ -21,8 +22,12 @@ export type ResumoSimulado = {
   capa: string | null
 }
 
-/** Resumo de todos os simulados do tenant, para a listagem de relatórios/ranking. */
+/** Resumo de todos os simulados do tenant, para a listagem de relatórios/ranking. Cacheado por tenant. */
 export async function resumosSimulados(svc: SupabaseClient, tenantId: string | null): Promise<ResumoSimulado[]> {
+  return remember(chaveRelatorio(tenantId, 'resumos'), TTL_RELATORIO, () => _resumosSimulados(svc, tenantId))
+}
+
+async function _resumosSimulados(svc: SupabaseClient, tenantId: string | null): Promise<ResumoSimulado[]> {
   const { data: sims } = await svc
     .from('simulado_simulados')
     .select('id, titulo, status, created_at, regras')

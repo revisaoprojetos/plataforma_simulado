@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { registrarAudit } from '@/lib/audit'
+import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
 import { ehProdutoPassaporte } from '@/lib/integracoes/normalizar-mapa'
 import { propagarGrupoAosBancos } from '@/lib/simulado/propagar-grupo'
 import { configDoEnv, listarMembrosDoGrupo, detalheMembro, type CurseducaCfg, type MembroCurseduca, type DetalheMembro } from '@/lib/curseduca/client'
@@ -255,6 +256,7 @@ export async function executarImport(
     // ficam invisíveis por cache até o TTL — foi o que pareceu "não foi pro grupo").
     revalidatePath('/admin/estudantes'); revalidatePath('/admin/grupos', 'layout')
     if (grupoDestinoId) revalidatePath(`/admin/grupos/${grupoDestinoId}`)
+    await invalidarRelatorios(g.tenantId) // rosters/matrículas mudaram → recalcula contagens dos relatórios
     return { ok: true, total, novos, jaExistiam, atualizados, vinculados, removidos, semIdentificador, semDetalhe, restante, grupoNome }
   } catch (e: any) {
     return { ok: false, error: e?.message ?? 'Falha na importação.' }

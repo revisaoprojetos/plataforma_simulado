@@ -6,6 +6,7 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { rankearSimulado } from '@/lib/ranking'
 import { contextoNota, calcularNotaSessao } from '@/lib/simulado/nota'
+import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
 
 type Politica = 'pontua_todos' | 'desconsidera'
 
@@ -112,6 +113,7 @@ export async function anularQuestao(
 
   await registrarAudit({ operacao: 'ANULAR', entidade: 'simulado_prova_questoes', entidadeId: vinculo.id, depois: { questao_id: questaoId, politica, motivo } })
 
+  await invalidarRelatorios(access.tenantId)
   revalidatePath(`/admin/simulados/${simuladoId}`)
   return { ok: true, afetados: lista.length }
 }
@@ -234,6 +236,7 @@ export async function trocarAlternativa(
 
   await registrarAudit({ operacao: 'RECORRIGIR', entidade: 'simulado_prova_questoes', entidadeId: vinculo.id, depois: { questao_id: questaoId, nova_alternativa_id: novaAlternativaId, motivo } })
 
+  await invalidarRelatorios(access.tenantId)
   revalidatePath(`/admin/simulados/${simuladoId}`)
   return { ok: true, afetados: lista.length }
 }
@@ -321,6 +324,7 @@ export async function removerCorrecao(
 
   await registrarAudit({ operacao: 'RECORRIGIR', entidade: 'simulado_prova_questoes', entidadeId: vinculo.id, depois: { questao_id: questaoId, acao: 'remover_correcao' } })
 
+  await invalidarRelatorios(access.tenantId)
   revalidatePath(`/admin/simulados/${simuladoId}`)
   return { ok: true, afetados: lista.length }
 }

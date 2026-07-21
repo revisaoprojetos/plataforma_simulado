@@ -2,6 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { normalizarCriterios, idadeEmAnos, type CriteriosRanking, type EntradaRanking } from '@/lib/simulado/ranking'
+import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 
 type GrupoBanco = { id: string; nome: string; disciplinas: string[] }
 export type DadosRanking = {
@@ -13,8 +14,16 @@ export type DadosRanking = {
   afetados: number
 }
 
-/** Monta o ranking de um simulado (classificação + grupos + critérios + impactos). */
+/** Monta o ranking de um simulado (classificação + grupos + critérios + impactos).
+ * Cacheado por tenant; a chave inclui o DIA — o desempate por idade muda no máx. 1x/ano. */
 export async function montarRankingSimulado(svc: SupabaseClient, simId: string, agoraIso: string): Promise<DadosRanking | null> {
+  const dia = agoraIso.slice(0, 10)
+  const { data: t } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simId).maybeSingle()
+  const tenantId = (t as any)?.tenant_id ?? null
+  return remember(chaveRelatorio(tenantId, 'ranking', simId, dia), TTL_RELATORIO, () => _montarRankingSimulado(svc, simId, agoraIso))
+}
+
+async function _montarRankingSimulado(svc: SupabaseClient, simId: string, agoraIso: string): Promise<DadosRanking | null> {
   const { data: sim } = await svc.from('simulado_simulados').select('titulo, regras').eq('id', simId).maybeSingle()
   if (!sim) return null
   const criterios: CriteriosRanking = normalizarCriterios((sim as any)?.regras?.ranking)
