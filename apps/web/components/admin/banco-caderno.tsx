@@ -3,6 +3,7 @@ import { getCurrentTenantId } from '@/lib/tenant'
 import { BancoCadernoClient } from '@/components/admin/banco-caderno-client'
 import { mesclarModalidades } from '@/lib/caderno-designer/types'
 import { materialDoConfig, type MaterialCaderno } from '@/lib/caderno-designer/material'
+import { capasDeBancoPorCaderno } from '@/lib/simulado/capa-caderno'
 import { AlertTriangle } from 'lucide-react'
 
 /** Modalidade (caderno interno) tem conteúdo se alguma página tem bloco além do plano-fundo. */
@@ -46,9 +47,11 @@ export async function BancoCaderno({ bancoId, cor = '#6d28d9' }: { bancoId: stri
       cadernosRaw = r2.data
     } else cadernosRaw = r.data
   }
+  // Caderno vinculado a um banco herda a CAPA do banco na visualização (senão usa a própria).
+  const capasBanco = await capasDeBancoPorCaderno(svc, tenantId ?? '00000000-0000-0000-0000-000000000000')
   const cadernos = (cadernosRaw ?? []).map((c: any) => ({
     id: c.id, nome: c.nome, descricao: c.descricao ?? null,
-    cor: c.cor ?? null, icone: c.icone ?? null, capa: c.capa_url ?? null,
+    cor: c.cor ?? null, icone: c.icone ?? null, capa: capasBanco.get(c.id) ?? c.capa_url ?? null,
   }))
 
   // Modalidades internas (Objetivo / Completo / Diagnóstico…) do caderno associado,

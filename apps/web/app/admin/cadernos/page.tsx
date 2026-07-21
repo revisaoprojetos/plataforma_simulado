@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { CadernosClient } from '@/components/admin/cadernos-client'
+import { capasDeBancoPorCaderno } from '@/lib/simulado/capa-caderno'
 import { SemPermissao } from '@/components/ui/alert-box'
 
 function contarBlocos(config: any): number {
@@ -35,7 +36,9 @@ export default async function CadernosAdminPage() {
     } else cadernos = r.data
   }
 
-  const lista = (cadernos ?? []).map((c: any) => ({ id: c.id, nome: c.nome, blocos: contarBlocos(c.config), cor: c.cor ?? null, icone: c.icone ?? null, capa: c.capa_url ?? null }))
+  // Caderno vinculado a um banco herda a CAPA do banco (senão usa a própria).
+  const capasBanco = await capasDeBancoPorCaderno(svc, access.tenantId ?? '00000000-0000-0000-0000-000000000000')
+  const lista = (cadernos ?? []).map((c: any) => ({ id: c.id, nome: c.nome, blocos: contarBlocos(c.config), cor: c.cor ?? null, icone: c.icone ?? null, capa: capasBanco.get(c.id) ?? c.capa_url ?? null }))
 
   return (
     <div className="space-y-6">
