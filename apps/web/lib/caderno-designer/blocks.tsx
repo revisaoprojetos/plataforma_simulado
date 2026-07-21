@@ -539,9 +539,17 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
       )
     }
     case 'diag-grupo-header': {
-      const chaves: string[] = Array.isArray(a.chaves) ? a.chaves : []
+      const chavesCfg: string[] = Array.isArray(a.chaves) ? a.chaves : []
       const val = (tok: string, def: string) => { const r = applyVars(tok, data.vars); return /\{/.test(r) ? def : r }
       const numDe = (tok: string) => parseInt(val(tok, '0').replace(/[^0-9-]/g, ''), 10) || 0
+      // Disciplinas realmente presentes no banco (das vars do merge): total_<slug> (exclui pilares/total_questoes).
+      const chavesBanco = Object.keys(data.vars || {})
+        .filter((k) => k.startsWith('total_') && !k.startsWith('total_pilar_') && k !== 'total_questoes')
+        .map((k) => k.slice('total_'.length))
+      const somaTotCfg = chavesCfg.reduce((s, k) => s + numDe(`{total_${k}}`), 0)
+      // Fallback: se as chaves gravadas não batem com o banco atual (total 0, ex.: caderno herdado de
+      // outro banco), soma TODAS as disciplinas do banco — o grupo passa a contar corretamente.
+      const chaves = somaTotCfg > 0 || chavesBanco.length === 0 ? chavesCfg : chavesBanco
       const somaAc = chaves.reduce((s, k) => s + numDe(`{acerto_${k}}`), 0)
       const somaTot = chaves.reduce((s, k) => s + numDe(`{total_${k}}`), 0)
       return (
@@ -581,9 +589,16 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
       )
     }
     case 'diag-grupo': {
-      const disc: any[] = Array.isArray(a.disciplinas) ? a.disciplinas : []
+      const discCfg: any[] = Array.isArray(a.disciplinas) ? a.disciplinas : []
       const val = (tok: string, def: string) => { const r = applyVars(tok, data.vars); return /\{/.test(r) ? def : r }
       const numDe = (tok: string) => parseInt(val(tok, '0').replace(/[^0-9-]/g, ''), 10) || 0
+      const somaTotCfg = discCfg.reduce((s, d) => s + numDe(`{total_${d.chave}}`), 0)
+      // Fallback (igual ao diag-grupo-header): chaves gravadas sem questões no banco atual → usa as disciplinas reais do banco.
+      const humanoDisc = (slug: string) => slug.replace(/_/g, ' ').replace(/^./, (ch) => ch.toUpperCase())
+      const discBanco = Object.keys(data.vars || {})
+        .filter((k) => k.startsWith('total_') && !k.startsWith('total_pilar_') && k !== 'total_questoes')
+        .map((k) => { const chave = k.slice('total_'.length); return { chave, nome: humanoDisc(chave), assunto: '' } })
+      const disc = somaTotCfg > 0 || discBanco.length === 0 ? discCfg : discBanco
       const somaAc = disc.reduce((s, d) => s + numDe(`{acerto_${d.chave}}`), 0)
       const somaTot = disc.reduce((s, d) => s + numDe(`{total_${d.chave}}`), 0)
       return (
