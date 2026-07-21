@@ -34,13 +34,18 @@ export async function hospedarImagensDoc(doc: any, svc: any): Promise<void> {
     return url
   }
 
+  // Sobe base64 de QUALQUER atributo (não só `url`) — recursivo no objeto de atributos.
+  async function hostAttrs(o: any): Promise<void> {
+    if (!o || typeof o !== 'object') return
+    for (const k of Object.keys(o)) {
+      const v = o[k]
+      if (typeof v === 'string' && v.startsWith('data:image')) { const u = await urlDe(v); if (u) o[k] = u }
+      else if (v && typeof v === 'object') await hostAttrs(v)
+    }
+  }
   async function walk(blocks: any[]) {
     for (const b of blocks ?? []) {
-      const a = b?.attributes
-      if (a && typeof a.url === 'string' && a.url.startsWith('data:image')) {
-        const u = await urlDe(a.url)
-        if (u) a.url = u
-      }
+      if (b?.attributes) await hostAttrs(b.attributes)
       if (b?.innerBlocks) await walk(b.innerBlocks)
     }
   }

@@ -647,10 +647,20 @@ export function CadernoEditorV2({
       if (cache.has(b64)) return cache.get(b64)!
       try { const r = await hospedarImagemCadernoAction(b64); const u = r.ok && r.url ? r.url : b64; cache.set(b64, u); return u } catch { cache.set(b64, b64); return b64 }
     }
+    // Sobe QUALQUER base64 de imagem em QUALQUER atributo (não só `url`): fundo, capa,
+    // cabeçalho, etc. podem guardar a imagem em outra chave — se escapar, o config vai pesado
+    // e o save estoura. Varre recursivamente o objeto de atributos.
+    const hostAttrs = async (o: any): Promise<void> => {
+      if (!o || typeof o !== 'object') return
+      for (const k of Object.keys(o)) {
+        const v = o[k]
+        if (typeof v === 'string' && v.startsWith('data:image')) o[k] = await up(v)
+        else if (v && typeof v === 'object') await hostAttrs(v)
+      }
+    }
     const walk = async (blocks: any[]) => {
       for (const b of blocks ?? []) {
-        const a = b?.attributes
-        if (a && typeof a.url === 'string' && a.url.startsWith('data:image')) a.url = await up(a.url)
+        if (b?.attributes) await hostAttrs(b.attributes)
         if (Array.isArray(b?.innerBlocks)) await walk(b.innerBlocks)
       }
     }

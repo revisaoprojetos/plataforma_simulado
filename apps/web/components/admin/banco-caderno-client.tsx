@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { iconeBanco } from '@/lib/banco-visual'
-import { associarCaderno, subirMaterialPdf, removerMaterialPdf } from '@/app/admin/banco-questoes/estudantes-actions'
+import { associarCaderno, removerMaterialPdf } from '@/app/admin/banco-questoes/estudantes-actions'
 import type { MaterialCaderno } from '@/lib/caderno-designer/material'
 
 interface Caderno { id: string; nome: string; descricao?: string | null; cor?: string | null; icone?: string | null; capa?: string | null }
@@ -80,17 +80,16 @@ export function BancoCadernoClient({
     if (file.size > 8 * 1024 * 1024) { toast.error('PDF muito grande (máx. ~8 MB).'); return }
     setMatBusy(true)
     try {
-      const dataUrl: string = await new Promise((res, rej) => {
-        const fr = new FileReader()
-        fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(new Error('leitura'))
-        fr.readAsDataURL(file)
-      })
-      const r = await subirMaterialPdf(atual, bancoId, dataUrl, file.name)
-      if (!r.ok) { toast.error(r.error ?? 'Falha ao enviar'); return }
+      // Envia o arquivo direto (multipart) — sem base64/FileReader, sem limite de server action.
+      const fd = new FormData()
+      fd.append('file', file); fd.append('cadernoId', atual); fd.append('bancoId', bancoId ?? '')
+      const resp = await fetch('/api/admin/material-pdf', { method: 'POST', body: fd })
+      const r = await resp.json().catch(() => ({ ok: false, error: 'Resposta inválida do servidor.' }))
+      if (!resp.ok || !r.ok) { toast.error(r.error ?? 'Falha ao enviar o PDF.'); return }
       setMatPdfUrl(r.url ?? ''); setMatPdfNome(r.nome ?? file.name.replace(/\.pdf$/i, ''))
       toast.success('Gabarito Comentado (PDF) enviado')
       router.refresh()
-    } catch { toast.error('Falha ao ler o arquivo.') }
+    } catch { toast.error('Falha ao enviar o PDF (conexão instável). Tente de novo.') }
     finally { setMatBusy(false) }
   }
 
