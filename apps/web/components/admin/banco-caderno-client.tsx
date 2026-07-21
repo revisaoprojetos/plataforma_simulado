@@ -414,8 +414,8 @@ function CadernoCard({ c, selecionado, onClick }: { c: Caderno; selecionado: boo
         )}
       </div>
       <div className="p-3">
-        <p className="line-clamp-2 text-sm font-semibold leading-tight">{c.nome}</p>
-        {c.descricao && <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{c.descricao}</p>}
+        <p className="line-clamp-3 text-sm font-semibold leading-snug" title={c.nome}>{c.nome}</p>
+        {c.descricao && <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground" title={c.descricao}>{c.descricao}</p>}
       </div>
     </button>
   )
