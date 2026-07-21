@@ -766,16 +766,16 @@ export function CadernoEditorV2({
             <p className="truncate text-xs text-muted-foreground">Editor de blocos · {modalidadesVisiveis.length} modalidade(s)</p>
           </div>
           {/* Vínculo com banco: alimenta as variáveis com os dados reais daquele banco */}
-          <label className="ml-3 flex shrink-0 items-center gap-1.5 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs">
-            <Database className="h-3.5 w-3.5 text-primary" />
-            <span className="text-muted-foreground">Banco:</span>
-            <select value={bancoId ?? ''} onChange={(e) => vincularBanco(e.target.value || null)} className="bg-transparent text-sm font-medium outline-none">
+          <label className="ml-3 flex min-w-0 items-center gap-1.5 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs">
+            <Database className="h-3.5 w-3.5 shrink-0 text-primary" />
+            <span className="shrink-0 text-muted-foreground">Banco:</span>
+            <select value={bancoId ?? ''} onChange={(e) => vincularBanco(e.target.value || null)} className="min-w-0 max-w-[220px] truncate bg-transparent text-sm font-medium outline-none">
               <option value="">Nenhum (exemplo)</option>
               {bancos.map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}
             </select>
           </label>
           <button onClick={() => setHudMode(true)} title="Personalizar as cores da interface da prova (HUD do simulado)"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/50 bg-gradient-to-r from-primary/20 to-primary/5 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm transition-all hover:-translate-y-px hover:from-primary/30 hover:to-primary/10 hover:shadow">
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-primary/50 bg-gradient-to-r from-primary/20 to-primary/5 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm transition-all hover:-translate-y-px hover:from-primary/30 hover:to-primary/10 hover:shadow">
             <MonitorPlay className="h-4 w-4" /> HUD de Simulado
           </button>
         </div>

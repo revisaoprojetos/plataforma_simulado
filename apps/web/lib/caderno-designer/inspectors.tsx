@@ -143,15 +143,40 @@ function Faixa({ label, min, max, step = 1, value, onChange }: { label: string; 
   )
 }
 
-/** Limites editáveis das 3 faixas de desempenho do pilar (baixa/média/alta). Padrão 0-49 / 50-80 / 81-100. */
+/** Limites editáveis das 3 faixas de desempenho do pilar (baixa/média/alta). Padrão 0-49 / 50-80 / 81-100.
+ * Mostra os 3 intervalos completos (início → fim); os "fins" da baixa e da média são editáveis e os
+ * "inícios" das faixas seguintes se ajustam sozinhos (média começa em fim_baixa+1, alta em fim_média+1). */
 function LimitesFaixa({ a, set }: { a: any; set: (k: string, v: any) => void }) {
   const lim1 = Number.isFinite(a.faixaLim1) ? a.faixaLim1 : 49
   const lim2 = Number.isFinite(a.faixaLim2) ? a.faixaLim2 : 80
+  const setL1 = (v: number) => { if (Number.isFinite(v)) set('faixaLim1', Math.max(1, Math.min(Math.round(v), lim2 - 1))) }
+  const setL2 = (v: number) => { if (Number.isFinite(v)) set('faixaLim2', Math.max(lim1 + 1, Math.min(Math.round(v), 99))) }
+  const boxCls = 'w-12 shrink-0 rounded-md border py-1 text-center text-xs font-bold tabular-nums outline-none focus:ring-1 focus:ring-ring'
+  const fixo = 'w-12 shrink-0 rounded-md border border-dashed bg-muted/40 py-1 text-center text-xs font-semibold tabular-nums text-muted-foreground'
+  const Linha = ({ cor, nome, ini, fim }: { cor: string; nome: string; ini: React.ReactNode; fim: React.ReactNode }) => (
+    <div className="flex items-center gap-2">
+      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: cor }} />
+      <span className="w-12 shrink-0 text-xs font-medium">{nome}</span>
+      {ini}
+      <span className="text-[11px] text-muted-foreground">→</span>
+      {fim}
+    </div>
+  )
   return (
-    <div className="space-y-2 rounded-md border bg-muted/20 p-2">
-      <p className="text-[11px] text-muted-foreground">Faixas de desempenho (regra do texto): <b>Baixa 0–{lim1}</b> · Média {lim1 + 1}–{lim2} · Alta {lim2 + 1}–100</p>
-      <Faixa label="Fim da faixa baixa (0 até…)" min={1} max={98} value={lim1} onChange={(v) => { const nv = Math.min(v, lim2 - 1); set('faixaLim1', nv) }} />
-      <Faixa label="Fim da faixa média (até…)" min={2} max={99} value={lim2} onChange={(v) => { const nv = Math.max(v, lim1 + 1); set('faixaLim2', nv) }} />
+    <div className="space-y-2 rounded-md border bg-muted/20 p-2.5">
+      <p className="text-[11px] font-medium text-muted-foreground">Faixas de desempenho — a regra que escolhe qual texto aparece pela % do aluno</p>
+      <div className="space-y-1.5">
+        <Linha cor="#dc2626" nome="Baixa"
+          ini={<span className={fixo}>0</span>}
+          fim={<input type="number" min={1} max={lim2 - 1} value={lim1} onChange={(e) => setL1(Number(e.target.value))} className={boxCls} />} />
+        <Linha cor="#f59e0b" nome="Média"
+          ini={<span className={fixo}>{lim1 + 1}</span>}
+          fim={<input type="number" min={lim1 + 1} max={99} value={lim2} onChange={(e) => setL2(Number(e.target.value))} className={boxCls} />} />
+        <Linha cor="#16a34a" nome="Alta"
+          ini={<span className={fixo}>{lim2 + 1}</span>}
+          fim={<span className={fixo}>100</span>} />
+      </div>
+      <p className="text-[10px] text-muted-foreground">Só os números com borda cheia são editáveis; os demais se ajustam automaticamente.</p>
     </div>
   )
 }
