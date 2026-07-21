@@ -160,14 +160,22 @@ export async function duplicarBanco(id: string): Promise<{ ok: boolean; id?: str
   if (!g.ok) return g
 
   const svc = createAdminClient()
-  const { data: orig } = await svc.from('simulado_pastas').select('nome').eq('id', id).eq('tenant_id', g.tenantId).maybeSingle()
+  // Lê nome + pasta (pai_id) do original — a cópia nasce na MESMA pasta. Tolerante à coluna.
+  let orig: any = null
+  {
+    const r = await svc.from('simulado_pastas').select('nome, pai_id').eq('id', id).eq('tenant_id', g.tenantId).maybeSingle()
+    if (r.error && /pai_id|column/i.test(r.error.message)) {
+      const r2 = await svc.from('simulado_pastas').select('nome').eq('id', id).eq('tenant_id', g.tenantId).maybeSingle()
+      orig = r2.data
+    } else orig = r.data
+  }
   if (!orig) return { ok: false, error: 'Banco não encontrado.' }
 
-  const { data: novo, error } = await svc
-    .from('simulado_pastas')
-    .insert({ tenant_id: g.tenantId, nome: `${orig.nome} (cópia)` })
-    .select('id')
-    .single()
+  const insBase: Record<string, unknown> = { tenant_id: g.tenantId, nome: `${orig.nome} (cópia)` }
+  if (orig.pai_id) insBase.pai_id = orig.pai_id
+  let ins = await svc.from('simulado_pastas').insert(insBase).select('id').single()
+  if (ins.error && /pai_id/i.test(ins.error.message) && 'pai_id' in insBase) { delete insBase.pai_id; ins = await svc.from('simulado_pastas').insert(insBase).select('id').single() }
+  const { data: novo, error } = ins
   if (error) return { ok: false, error: error.message }
 
   // Copia os vínculos de questões.
