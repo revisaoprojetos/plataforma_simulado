@@ -18,15 +18,12 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
   // recurso de pastas some, mas os bancos continuam listados normalmente.
   let pastas: any[] = []
   {
-    const full = 'id, nome, cor, icone, capa_url, capa_card_url, tipo, pai_id, is_folder'
-    let r: { data: any[] | null; error: { message: string } | null } = await svc.from('simulado_pastas').select(full).eq('deletado', false).eq('tenant_id', tid).order('nome')
-    if (r.error && /pai_id|is_folder/i.test(r.error.message)) {
-      r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, capa_card_url, tipo').eq('deletado', false).eq('tenant_id', tid).order('nome')
-    }
-    if (r.error && /cor|icone|capa_url|capa_card_url|tipo|column/i.test(r.error.message)) {
-      r = await svc.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tid).order('nome')
-    }
-    pastas = (r.data ?? []).map((b: any) => ({ ...b, pai_id: b.pai_id ?? null, is_folder: b.is_folder ?? false }))
+    const sel = (cols: string) => svc.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid).order('nome')
+    let r: { data: any[] | null; error: { message: string } | null } = await sel('id, nome, cor, icone, capa_url, capa_card_url, tipo, pai_id, is_folder, folder_area')
+    if (r.error && /folder_area/i.test(r.error.message)) r = await sel('id, nome, cor, icone, capa_url, capa_card_url, tipo, pai_id, is_folder')
+    if (r.error && /pai_id|is_folder/i.test(r.error.message)) r = await sel('id, nome, cor, icone, capa_url, capa_card_url, tipo')
+    if (r.error && /cor|icone|capa_url|capa_card_url|tipo|column/i.test(r.error.message)) r = await sel('id, nome')
+    pastas = (r.data ?? []).map((b: any) => ({ ...b, pai_id: b.pai_id ?? null, is_folder: b.is_folder ?? false, folder_area: b.folder_area ?? null }))
   }
 
   // Contagem de questões E de estudantes por banco — paginado (fetchAll) para não truncar em
@@ -40,7 +37,8 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
   const contEstudantes = new Map<string, number>()
   for (const e of estudantes) contEstudantes.set(e.pasta_id, (contEstudantes.get(e.pasta_id) ?? 0) + 1)
 
-  const folders = pastas.filter((p) => p.is_folder)
+  // Só pastas do CONTEXTO banco (exclui as pastas da Aplicação de Simulado, folder_area='simulado').
+  const folders = pastas.filter((p) => p.is_folder && p.folder_area !== 'simulado')
   const bancosAll = pastas.filter((p) => !p.is_folder)
   const bancosPorPasta = new Map<string, number>()
   for (const b of bancosAll) if (b.pai_id) bancosPorPasta.set(b.pai_id, (bancosPorPasta.get(b.pai_id) ?? 0) + 1)

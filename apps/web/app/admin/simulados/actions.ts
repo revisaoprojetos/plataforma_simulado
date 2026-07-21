@@ -446,6 +446,20 @@ export async function onlinePorSimulado(simuladoIds: string[]): Promise<Record<s
   return out
 }
 
+/** Move um simulado para dentro de uma pasta da Aplicação de Simulado (ou raiz quando pastaId=null). */
+export async function moverSimuladoParaPasta(simuladoId: string, pastaId: string | null): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_simulados').update({ pasta_id: pastaId }).eq('id', simuladoId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+  if (error) {
+    if (/pasta_id|column/i.test(error.message)) return { ok: false, error: 'Recurso de pastas indisponível: rode a migration simulado_pasta (simulado_simulados.pasta_id).' }
+    return { ok: false, error: error.message }
+  }
+  revalidatePath('/admin/simulados')
+  return { ok: true }
+}
+
 export interface SessaoLinkada {
   id: string
   estudante: string

@@ -1,10 +1,14 @@
 'use client'
-import { confirmar } from '@/components/ui/confirm-dialog'
+import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
 
 import { useState, useTransition, useMemo, useEffect } from 'react'
+import type React from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
+import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
+import { criarPastaFolder, excluirPastaFolder } from '@/app/admin/banco-questoes/actions'
 import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
 import type { TipoSimulado } from '@/lib/simulado/tipo'
 import {
@@ -29,6 +33,15 @@ import {
   Lock,
   Unlock,
   Radio,
+  FolderPlus,
+  Folder,
+  FolderOpen,
+  ChevronLeft,
+  FolderInput,
+  Palette,
+  X,
+  Check,
+  Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
@@ -45,6 +58,7 @@ import {
   deleteSimuladoAction,
   liberarItemAction,
   onlinePorSimulado,
+  moverSimuladoParaPasta,
 } from '@/app/admin/simulados/actions'
 
 export interface SimuladoCard {
@@ -122,7 +136,7 @@ function SeloLib({ label }: { label: string }) {
   )
 }
 
-function CardItem({ s, appUrl, online }: { s: SimuladoCard; appUrl: string; online: number }) {
+function CardItem({ s, appUrl, online, onMover }: { s: SimuladoCard; appUrl: string; online: number; onMover?: () => void }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   // Estado efetivo (modo configurado + override manual do admin).
@@ -209,6 +223,7 @@ function CardItem({ s, appUrl, online }: { s: SimuladoCard; appUrl: string; onli
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={copiarLink}><Copy className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
             <DropdownMenuItem onClick={abrirSimulado}><ExternalLink className="mr-2 h-4 w-4" /> Abrir simulado</DropdownMenuItem>
+            {onMover && <DropdownMenuItem onClick={onMover}><FolderInput className="mr-2 h-4 w-4" /> Mover para pasta</DropdownMenuItem>}
             <DropdownMenuSeparator />
             {s.status === 'publicado' && <DropdownMenuItem onClick={() => acao(encerrarSimuladoAction, 'Simulado encerrado')}><Square className="mr-2 h-4 w-4" /> Encerrar</DropdownMenuItem>}
             {s.status === 'encerrado' && <DropdownMenuItem onClick={() => acao(reabrirSimuladoAction, 'Simulado reaberto')}><Play className="mr-2 h-4 w-4" /> Reabrir</DropdownMenuItem>}
@@ -271,9 +286,19 @@ function CardItem({ s, appUrl, online }: { s: SimuladoCard; appUrl: string; onli
   )
 }
 
-export function SimuladosBoard({ simulados, appUrl, onlineInicial = {} }: { simulados: SimuladoCard[]; appUrl: string; onlineInicial?: Record<string, number> }) {
+type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; count: number }
+type DestinoSim = { id: string; nome: string }
+
+export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null }: {
+  simulados: SimuladoCard[]; appUrl: string; onlineInicial?: Record<string, number>
+  folders?: PastaSim[]; destinos?: DestinoSim[]; atual?: { id: string; nome: string } | null
+}) {
+  const router = useRouter()
+  const [pending, start] = useTransition()
   const [busca, setBusca] = useState('')
   const [modo, setModo] = useState<string>('todos')
+  const [movendo, setMovendo] = useState<SimuladoCard | null>(null)
+  const [editandoPasta, setEditandoPasta] = useState<PastaSim | null>(null)
   // "Fazendo agora" por simulado, atualizado sozinho (polling) — igual ao painel "Ao vivo".
   const [online, setOnline] = useState<Record<string, number>>(onlineInicial)
   useEffect(() => {
@@ -292,6 +317,10 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {} }: { simu
       return okBusca && okModo
     })
   }, [simulados, busca, modo])
+  const foldersF = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    return q ? folders.filter((f) => f.nome.toLowerCase().includes(q)) : folders
+  }, [folders, busca])
 
   const filtros = [
     { v: 'todos', label: 'Todos' },
@@ -300,30 +329,56 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {} }: { simu
     { v: 'aberto', label: 'Aberto' },
   ]
 
+  // O diálogo abre FORA da transition (senão o setState que mostra o pop-up é adiado).
+  async function novaPasta() {
+    const nome = await pedirTexto({ titulo: 'Nova pasta', label: 'Nome da pasta', placeholder: 'ex.: Semana de Atualização', confirmar: 'Criar pasta' })
+    if (!nome) return
+    start(async () => { const r = await criarPastaFolder(nome, null, 'simulado'); if (r.ok) { toast.success('Pasta criada'); router.refresh() } else toast.error(r.error ?? 'Erro ao criar') })
+  }
+  async function excluirPasta(f: PastaSim) {
+    if (!(await confirmar({ mensagem: `Excluir a pasta "${f.nome}"? Os simulados dentro dela voltam para a raiz (não são apagados).`, destrutivo: true }))) return
+    start(async () => { const r = await excluirPastaFolder(f.id); if (r.ok) { toast.success('Pasta excluída'); router.refresh() } else toast.error(r.error ?? 'Erro') })
+  }
+  const podeMover = destinos.length > 0 || !!atual
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <Input
-          placeholder="Buscar simulado…"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          className="lg:max-w-xl"
-        />
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          {atual ? (
+            <Link href="/admin/simulados" className="inline-flex items-center gap-1 rounded-lg border bg-card px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-muted"><ChevronLeft className="h-4 w-4" /> Todas as pastas</Link>
+          ) : (
+            <button type="button" onClick={novaPasta} disabled={pending} className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted disabled:opacity-50"><FolderPlus className="h-4 w-4" /> Nova pasta</button>
+          )}
+          <Input placeholder={atual ? `Buscar em “${atual.nome}”…` : 'Buscar simulado…'} value={busca} onChange={(e) => setBusca(e.target.value)} className="min-w-[180px] flex-1 lg:max-w-md" />
+        </div>
         <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
           {filtros.map((f) => (
-            <button
-              key={f.v}
-              onClick={() => setModo(f.v)}
-              className={cn(
-                'rounded-md px-3 py-1 text-sm font-medium transition-colors',
-                modo === f.v ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:bg-[var(--tab-active,var(--background))] hover:text-[color:var(--tab-active-foreground,var(--foreground))]',
-              )}
-            >
+            <button key={f.v} onClick={() => setModo(f.v)}
+              className={cn('rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                modo === f.v ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:bg-[var(--tab-active,var(--background))] hover:text-[color:var(--tab-active-foreground,var(--foreground))]')}>
               {f.label}
             </button>
           ))}
         </div>
       </div>
+
+      {atual && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <FolderOpen className="h-4 w-4" /> <span className="font-medium text-foreground">{atual.nome}</span> — {simulados.length} simulado(s)
+        </div>
+      )}
+
+      {/* Pastas (só na raiz) + divisória entre pastas e simulados */}
+      {!atual && foldersF.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2"><Folder className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">Pastas</h2><span className="text-sm text-muted-foreground">({foldersF.length})</span></div>
+          <div className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {foldersF.map((f) => <FolderCardSim key={f.id} f={f} onExcluir={() => excluirPasta(f)} onPersonalizar={() => setEditandoPasta(f)} />)}
+          </div>
+          <hr className="mt-2 border-t" />
+        </div>
+      )}
 
       {secoes.map((sec) => {
         const itens = filtrados.filter((s) => s.status === sec.chave)
@@ -345,13 +400,114 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {} }: { simu
             ) : (
               <div className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {itens.map((s) => (
-                  <CardItem key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} />
+                  <CardItem key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} onMover={podeMover ? () => setMovendo(s) : undefined} />
                 ))}
               </div>
             )}
           </div>
         )
       })}
+
+      {movendo && <MoverSimuladoDialog simulado={movendo} destinos={destinos} atualId={atual?.id ?? null} onClose={() => setMovendo(null)} />}
+      {editandoPasta && (
+        <EditarPastaDialog
+          pasta={{ id: editandoPasta.id, nome: editandoPasta.nome, cor: editandoPasta.cor ?? null, icone: editandoPasta.icone ?? null, capa: editandoPasta.capa ?? null }}
+          onClose={() => setEditandoPasta(null)}
+          onSaved={() => router.refresh()}
+        />
+      )}
     </div>
+  )
+}
+
+/** Card de PASTA da Aplicação de Simulado — imagem/cor + nome + nº de simulados. Clicar abre. */
+function FolderCardSim({ f, onExcluir, onPersonalizar }: { f: PastaSim; onExcluir: () => void; onPersonalizar: () => void }) {
+  const c = f.cor ?? '#6d28d9'
+  const Icon = iconeBanco(f.icone)
+  return (
+    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+      {f.capa ? (
+        <img src={f.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+      ) : (
+        <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
+      )}
+      {!f.capa && <Icon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+      <Link href={`/admin/simulados?pasta=${f.id}`} className="absolute inset-0 z-10" aria-label={f.nome} />
+      <div className="pointer-events-none absolute left-3 top-3 z-20">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: c }}><Icon className="h-4 w-4" /></span>
+      </div>
+      <div className="absolute right-2 top-2 z-30">
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 outline-none transition-colors hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Ações da pasta">
+            <MoreHorizontal className="h-4 w-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuItem render={<Link href={`/admin/simulados?pasta=${f.id}`} />}><FolderOpen className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
+            <DropdownMenuItem onClick={onPersonalizar}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onExcluir} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir pasta</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">Pasta</p>
+        <h3 className="mt-0.5 line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{f.nome}</h3>
+        <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur"><Folder className="h-3 w-3" /> {f.count} simulado(s)</span>
+      </div>
+    </div>
+  )
+}
+
+function MoverSimuladoDialog({ simulado, destinos, atualId, onClose }: { simulado: SimuladoCard; destinos: DestinoSim[]; atualId: string | null; onClose: () => void }) {
+  const router = useRouter()
+  const [pending, start] = useTransition()
+  const [sel, setSel] = useState<string | null>(atualId)
+
+  function salvar() {
+    start(async () => {
+      const r = await moverSimuladoParaPasta(simulado.id, sel)
+      if (r.ok) { toast.success(sel ? 'Movido para a pasta' : 'Movido para a raiz'); router.refresh(); onClose() } else toast.error(r.error ?? 'Erro ao mover')
+    })
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+      <div role="dialog" aria-modal="true" className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b px-5 py-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold"><FolderInput className="h-4 w-4" /> Mover “{simulado.titulo}”</h3>
+          <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-1.5 overflow-auto p-4">
+          <OpcaoSim ativo={sel === null} onClick={() => setSel(null)} icon={<Radio className="h-4 w-4 text-muted-foreground" />} label="Raiz (sem pasta)" />
+          {destinos.length === 0 && <p className="px-1 py-2 text-center text-xs text-muted-foreground">Nenhuma pasta criada ainda.</p>}
+          {destinos.map((d) => (
+            <OpcaoSim key={d.id} ativo={sel === d.id} onClick={() => setSel(d.id)} icon={<Folder className="h-4 w-4 text-muted-foreground" />} label={d.nome} />
+          ))}
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t px-5 py-3">
+          <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
+          <button type="button" onClick={salvar} disabled={pending || sel === atualId}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Mover
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function OpcaoSim({ ativo, onClick, icon, label }: { ativo: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={cn('flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', ativo ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
+      <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', ativo ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
+        {ativo && <Check className="h-3 w-3" />}
+      </span>
+      {icon}
+      <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}</span>
+    </button>
   )
 }
