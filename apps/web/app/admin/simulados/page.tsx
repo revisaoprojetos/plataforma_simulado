@@ -30,7 +30,9 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
   // não existirem, não há pastas (a página segue com os simulados normalmente).
   let folders: any[] = []
   {
-    const r = await supabase.from('simulado_pastas').select('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area').eq('deletado', false).eq('tenant_id', tid).order('nome')
+    const selP = (cols: string) => supabase.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid).order('nome')
+    let r: { data: any[] | null; error: { message: string } | null } = await selP('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area')
+    if (r.error) r = await selP('id, nome, cor, icone, capa_url, is_folder, folder_area')
     if (!r.error) folders = (r.data ?? []).filter((p: any) => p.is_folder && p.folder_area === 'simulado')
   }
 

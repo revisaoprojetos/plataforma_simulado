@@ -45,7 +45,9 @@ export default async function CadernosAdminPage({ searchParams }: { searchParams
   // Pastas da área de Cadernos (is_folder + folder_area='caderno'). Tolerante: sem colunas, sem pastas.
   let folders: any[] = []
   {
-    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area').eq('deletado', false).eq('tenant_id', tid).order('nome')
+    const selP = (cols: string) => svc.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid).order('nome')
+    let r: { data: any[] | null; error: { message: string } | null } = await selP('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area')
+    if (r.error) r = await selP('id, nome, cor, icone, capa_url, is_folder, folder_area')
     if (!r.error) folders = (r.data ?? []).filter((p: any) => p.is_folder && p.folder_area === 'caderno')
   }
 
