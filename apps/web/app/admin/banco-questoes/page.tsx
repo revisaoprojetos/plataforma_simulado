@@ -62,7 +62,7 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
             Monte e organize seus simulados: disciplinas/conteúdo, questões, estudantes e cadernos. Depois é só selecionar o banco pronto na Aplicação de Simulado.
           </p>
         </div>
-        <NovoBancoForm />
+        <NovoBancoForm pastaId={current?.id ?? null} />
       </div>
 
       <BancosGrid bancos={bancosOut} folders={foldersOut} destinos={destinos} atual={current ? { id: current.id, nome: current.nome } : null} />

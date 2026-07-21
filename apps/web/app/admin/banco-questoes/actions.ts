@@ -19,8 +19,8 @@ async function guard() {
   return { ok: true as const, tenantId: access.tenantId }
 }
 
-/** Cria um banco (pasta) de questões. */
-export async function criarBanco(nome: string, tipo: string = 'objetiva'): Promise<{ ok: boolean; id?: string; error?: string }> {
+/** Cria um banco (pasta) de questões. `paiId` = pasta (folder) onde ele nasce (null = raiz). */
+export async function criarBanco(nome: string, tipo: string = 'objetiva', paiId?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
   const g = await guard()
   if (!g.ok) return g
   const titulo = nome.trim()
@@ -28,15 +28,14 @@ export async function criarBanco(nome: string, tipo: string = 'objetiva'): Promi
   const tp = tipo === 'discursiva' ? 'discursiva' : 'objetiva'
 
   const svc = createAdminClient()
-  let { data, error } = await svc
-    .from('simulado_pastas')
-    .insert({ tenant_id: g.tenantId, nome: titulo, tipo: tp })
-    .select('id')
-    .single()
-  // Tolerante: se a coluna `tipo` ainda não foi migrada, cria sem ela.
-  if (error && /tipo|column/i.test(error.message)) {
-    ({ data, error } = await svc.from('simulado_pastas').insert({ tenant_id: g.tenantId, nome: titulo }).select('id').single())
-  }
+  // Nasce DENTRO da pasta atual (pai_id) quando aberto de dentro de uma. Tolerante: se `tipo` ou
+  // `pai_id` ainda não foram migrados, remove só a coluna que faltar e tenta de novo.
+  const base: Record<string, unknown> = { tenant_id: g.tenantId, nome: titulo, tipo: tp }
+  if (paiId) base.pai_id = paiId
+  let ins = await svc.from('simulado_pastas').insert(base).select('id').single()
+  if (ins.error && /tipo/i.test(ins.error.message) && 'tipo' in base) { delete base.tipo; ins = await svc.from('simulado_pastas').insert(base).select('id').single() }
+  if (ins.error && /pai_id/i.test(ins.error.message) && 'pai_id' in base) { delete base.pai_id; ins = await svc.from('simulado_pastas').insert(base).select('id').single() }
+  const { data, error } = ins
   if (error || !data) return { ok: false, error: error?.message ?? 'Erro ao criar' }
 
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_pastas', entidadeId: data.id, depois: { nome: titulo, tipo: tp } })

@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { criarBanco } from '@/app/admin/banco-questoes/actions'
 
-export function NovoBancoForm() {
+export function NovoBancoForm({ pastaId = null }: { pastaId?: string | null }) {
   const [open, setOpen] = useState(false)
   const [nome, setNome] = useState('')
   const [tipo, setTipo] = useState<'objetiva' | 'discursiva'>('objetiva')
@@ -34,7 +34,7 @@ export function NovoBancoForm() {
       return
     }
     start(async () => {
-      const r = await criarBanco(nome, tipo)
+      const r = await criarBanco(nome, tipo, pastaId)
       if (r.ok) {
         // Refresh suave (a lista é force-dynamic + criarBanco faz revalidatePath):
         // evita o window.location.reload() que causava a "tela de erro" ao recarregar tudo.
