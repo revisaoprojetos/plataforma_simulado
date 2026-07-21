@@ -142,7 +142,7 @@ export function CadernosClient({ cadernos, folders = [], destinos = [], atual = 
           {/* Cadernos */}
           {cadsF.length > 0 && (
             <div className="space-y-3">
-              {!atual && foldersF.length > 0 && <div className="flex items-center gap-2"><NotebookPen className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">Cadernos</h2><span className="text-sm text-muted-foreground">({cadsF.length})</span></div>}
+              {!atual && <div className="flex items-center gap-2"><NotebookPen className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">Cadernos</h2><span className="text-sm text-muted-foreground">({cadsF.length})</span></div>}
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {cadsF.map((c) => (
                   <CadernoCard key={c.id} c={c} busy={excluindo === c.id || duplicando === c.id}

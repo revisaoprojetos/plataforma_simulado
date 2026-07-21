@@ -109,7 +109,7 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
           {/* Bancos */}
           {bancosF.length > 0 && (
             <div className="space-y-3">
-              {!atual && foldersF.length > 0 && <div className="flex items-center gap-2"><Database className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">Bancos</h2><span className="text-sm text-muted-foreground">({bancosF.length})</span></div>}
+              {!atual && <div className="flex items-center gap-2"><Database className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">Bancos</h2><span className="text-sm text-muted-foreground">({bancosF.length})</span></div>}
               <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {bancosF.map((b) => <BancoCard key={b.id} {...b} onMover={podeMover ? () => setMovendo(b) : undefined} />)}
               </div>
