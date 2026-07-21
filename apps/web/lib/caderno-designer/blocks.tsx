@@ -635,7 +635,10 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
       const bordaDiv = `${a.divisoriaEspessura ?? 1}px solid ${a.divisoriaCor || '#cbb26b'}`
       const val = (tok: string, def: string) => { const r = applyVars(tok, data.vars); return /\{/.test(r) ? def : r }
       const numPct = (chave: string) => { const n = parseFloat(val(`{pct_pilar_${chave}}`, '0').replace(/[^0-9.,-]/g, '').replace(',', '.')); return isNaN(n) ? 0 : n }
-      const faixaInfo = (p: any) => { const n = numPct(p.chave); if (n <= 50) return { label: '0-50', texto: p.f1 || '' }; if (n <= 80) return { label: '51-80', texto: p.f2 || '' }; return { label: '81-100', texto: p.f3 || '' } }
+      // Limites das faixas de desempenho (editáveis). Padrão: baixa 0-49, média 50-80, alta 81-100.
+      const lim1 = Number.isFinite(a.faixaLim1) ? a.faixaLim1 : 49
+      const lim2 = Number.isFinite(a.faixaLim2) ? a.faixaLim2 : 80
+      const faixaInfo = (p: any) => { const n = numPct(p.chave); if (n <= lim1) return { label: `0-${lim1}`, texto: p.f1 || '' }; if (n <= lim2) return { label: `${lim1 + 1}-${lim2}`, texto: p.f2 || '' }; return { label: `${lim2 + 1}-100`, texto: p.f3 || '' } }
       const pad = a.padding ?? 12
       const meia = (a.gap ?? 16) / 2
       return (

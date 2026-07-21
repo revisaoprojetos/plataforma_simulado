@@ -758,15 +758,15 @@ export function CadernoEditorV2({
   return (
     <div className="-m-6 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden bg-background" onDragEnd={() => { setArrastando(false); setOver(null) }}>
       {/* Topo */}
-      <div className="flex items-center justify-between gap-3 border-b bg-card/60 px-4 py-2.5">
-        <div className="flex items-center gap-3">
-          <Link href={pastaId ? `/admin/cadernos?pasta=${pastaId}` : '/admin/cadernos'} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
-          <div>
-            <h1 className="text-lg font-bold leading-tight">{nome}</h1>
-            <p className="text-xs text-muted-foreground">Editor de blocos · {modalidadesVisiveis.length} modalidade(s)</p>
+      <div className="flex min-w-0 items-center justify-between gap-3 border-b bg-card/60 px-4 py-2.5">
+        <div className="flex min-w-0 items-center gap-3">
+          <Link href={pastaId ? `/admin/cadernos?pasta=${pastaId}` : '/admin/cadernos'} className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
+          <div className="min-w-0 max-w-[160px] xl:max-w-[240px]">
+            <h1 className="truncate text-lg font-bold leading-tight" title={nome}>{nome}</h1>
+            <p className="truncate text-xs text-muted-foreground">Editor de blocos · {modalidadesVisiveis.length} modalidade(s)</p>
           </div>
           {/* Vínculo com banco: alimenta as variáveis com os dados reais daquele banco */}
-          <label className="ml-3 flex items-center gap-1.5 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs">
+          <label className="ml-3 flex shrink-0 items-center gap-1.5 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs">
             <Database className="h-3.5 w-3.5 text-primary" />
             <span className="text-muted-foreground">Banco:</span>
             <select value={bancoId ?? ''} onChange={(e) => vincularBanco(e.target.value || null)} className="bg-transparent text-sm font-medium outline-none">
@@ -779,7 +779,7 @@ export function CadernoEditorV2({
             <MonitorPlay className="h-4 w-4" /> HUD de Simulado
           </button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {registros.length > 0 && (
             <div className="flex items-center gap-1 rounded-lg border bg-muted/40 px-1.5 py-1 text-xs">
               <Users className="ml-0.5 h-3.5 w-3.5 text-primary" />

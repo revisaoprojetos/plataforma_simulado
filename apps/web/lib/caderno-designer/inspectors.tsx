@@ -143,6 +143,19 @@ function Faixa({ label, min, max, step = 1, value, onChange }: { label: string; 
   )
 }
 
+/** Limites editáveis das 3 faixas de desempenho do pilar (baixa/média/alta). Padrão 0-49 / 50-80 / 81-100. */
+function LimitesFaixa({ a, set }: { a: any; set: (k: string, v: any) => void }) {
+  const lim1 = Number.isFinite(a.faixaLim1) ? a.faixaLim1 : 49
+  const lim2 = Number.isFinite(a.faixaLim2) ? a.faixaLim2 : 80
+  return (
+    <div className="space-y-2 rounded-md border bg-muted/20 p-2">
+      <p className="text-[11px] text-muted-foreground">Faixas de desempenho (regra do texto): <b>Baixa 0–{lim1}</b> · Média {lim1 + 1}–{lim2} · Alta {lim2 + 1}–100</p>
+      <Faixa label="Fim da faixa baixa (0 até…)" min={1} max={98} value={lim1} onChange={(v) => { const nv = Math.min(v, lim2 - 1); set('faixaLim1', nv) }} />
+      <Faixa label="Fim da faixa média (até…)" min={2} max={99} value={lim2} onChange={(v) => { const nv = Math.max(v, lim1 + 1); set('faixaLim2', nv) }} />
+    </div>
+  )
+}
+
 /** Altura mínima do bloco + alinhamento vertical do conteúdo dentro dela. */
 function AlturaVertical({ a, set }: { a: any; set: (k: string, v: any) => void }) {
   return (
@@ -633,15 +646,16 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco, assunt
           <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Um pilar único (dá pra empilhar vários e montar o layout que quiser). A <b>chave</b> casa com o desempenho do aluno (ex.: <code>lei_seca</code>); o <b>texto de faixa</b> é escolhido pelo % real (0–50 / 51–80 / 81–100).</p>
           <Row label="Nome exibido"><input value={a.nome ?? ''} onChange={(e) => set('nome', e.target.value)} className={inputCls} placeholder="LEI SECA" /></Row>
           <Row label="Chave do pilar"><input value={a.chave ?? ''} onChange={(e) => set('chave', e.target.value.trim())} className={inputCls} placeholder="lei_seca" /></Row>
-          <textarea value={a.f1 ?? ''} onChange={(e) => set('f1', e.target.value)} rows={2} className={inputCls} placeholder="Texto faixa 0–50" />
-          <textarea value={a.f2 ?? ''} onChange={(e) => set('f2', e.target.value)} rows={2} className={inputCls} placeholder="Texto faixa 51–80" />
-          <textarea value={a.f3 ?? ''} onChange={(e) => set('f3', e.target.value)} rows={2} className={inputCls} placeholder="Texto faixa 81–100" />
+          <textarea value={a.f1 ?? ''} onChange={(e) => set('f1', e.target.value)} rows={2} className={inputCls} placeholder={`Texto faixa 0–${a.faixaLim1 ?? 49}`} />
+          <textarea value={a.f2 ?? ''} onChange={(e) => set('f2', e.target.value)} rows={2} className={inputCls} placeholder={`Texto faixa ${(a.faixaLim1 ?? 49) + 1}–${a.faixaLim2 ?? 80}`} />
+          <textarea value={a.f3 ?? ''} onChange={(e) => set('f3', e.target.value)} rows={2} className={inputCls} placeholder={`Texto faixa ${(a.faixaLim2 ?? 80) + 1}–100`} />
+          <LimitesFaixa a={a} set={set} />
           <div className="border-t pt-2" />
           <FonteSelect value={a.fonte ?? ''} onChange={(v) => set('fonte', v)} />
           <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarLinhaInterna !== false} onChange={(e) => set('mostrarLinhaInterna', e.target.checked)} className="h-4 w-4 rounded border" /> Linha interna (antes do texto)</label>
           <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarLabel !== false} onChange={(e) => set('mostrarLabel', e.target.checked)} className="h-4 w-4 rounded border" /> Mostrar rótulo “TEXTO MODULADO”</label>
           {a.mostrarLabel !== false && <Row label="Texto do rótulo"><input value={a.textoLabel ?? ''} onChange={(e) => set('textoLabel', e.target.value)} className={inputCls} placeholder="TEXTO MODULADO" /></Row>}
-          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarFaixa !== false} onChange={(e) => set('mostrarFaixa', e.target.checked)} className="h-4 w-4 rounded border" /> Mostrar rótulo da faixa (0-50 / 51-80 / 81-100)</label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarFaixa !== false} onChange={(e) => set('mostrarFaixa', e.target.checked)} className="h-4 w-4 rounded border" /> Mostrar rótulo da faixa (faixas configuráveis acima)</label>
           <Faixa label="Tamanho do título (px)" min={8} max={24} value={a.tamTitulo ?? 12} onChange={(v) => set('tamTitulo', v)} />
           <Faixa label="Tamanho do % (px)" min={12} max={40} value={a.tamPct ?? 22} onChange={(v) => set('tamPct', v)} />
           <div className="border-t pt-2" />
@@ -670,18 +684,19 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco, assunt
                 <button type="button" onClick={() => rmP(i)} className="rounded p-1 text-muted-foreground hover:text-destructive">✕</button>
               </div>
               <input value={p.chave ?? ''} onChange={(e) => setP(i, 'chave', e.target.value.trim())} className={inputCls} placeholder="chave do pilar (lei_seca)" />
-              <textarea value={p.f1 ?? ''} onChange={(e) => setP(i, 'f1', e.target.value)} rows={2} className={inputCls} placeholder="Texto faixa 0–50" />
-              <textarea value={p.f2 ?? ''} onChange={(e) => setP(i, 'f2', e.target.value)} rows={2} className={inputCls} placeholder="Texto faixa 51–80" />
-              <textarea value={p.f3 ?? ''} onChange={(e) => setP(i, 'f3', e.target.value)} rows={2} className={inputCls} placeholder="Texto faixa 81–100" />
+              <textarea value={p.f1 ?? ''} onChange={(e) => setP(i, 'f1', e.target.value)} rows={2} className={inputCls} placeholder={`Texto faixa 0–${a.faixaLim1 ?? 49}`} />
+              <textarea value={p.f2 ?? ''} onChange={(e) => setP(i, 'f2', e.target.value)} rows={2} className={inputCls} placeholder={`Texto faixa ${(a.faixaLim1 ?? 49) + 1}–${a.faixaLim2 ?? 80}`} />
+              <textarea value={p.f3 ?? ''} onChange={(e) => setP(i, 'f3', e.target.value)} rows={2} className={inputCls} placeholder={`Texto faixa ${(a.faixaLim2 ?? 80) + 1}–100`} />
             </div>
           ))}
           <button type="button" onClick={addP} className="w-full rounded-md border border-dashed py-1.5 text-xs text-muted-foreground hover:border-primary hover:text-primary">+ Adicionar pilar</button>
+          <LimitesFaixa a={a} set={set} />
           <div className="border-t pt-2" />
           <FonteSelect value={a.fonte ?? ''} onChange={(v) => set('fonte', v)} />
           <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarLinhaInterna !== false} onChange={(e) => set('mostrarLinhaInterna', e.target.checked)} className="h-4 w-4 rounded border" /> Linha interna (antes do texto)</label>
           <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarLabel !== false} onChange={(e) => set('mostrarLabel', e.target.checked)} className="h-4 w-4 rounded border" /> Mostrar rótulo “TEXTO MODULADO”</label>
           {a.mostrarLabel !== false && <Row label="Texto do rótulo"><input value={a.textoLabel ?? ''} onChange={(e) => set('textoLabel', e.target.value)} className={inputCls} placeholder="TEXTO MODULADO" /></Row>}
-          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarFaixa !== false} onChange={(e) => set('mostrarFaixa', e.target.checked)} className="h-4 w-4 rounded border" /> Mostrar rótulo da faixa (0-50 / 51-80 / 81-100)</label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={a.mostrarFaixa !== false} onChange={(e) => set('mostrarFaixa', e.target.checked)} className="h-4 w-4 rounded border" /> Mostrar rótulo da faixa (faixas configuráveis acima)</label>
           <Faixa label="Tamanho do título (px)" min={8} max={24} value={a.tamTitulo ?? 12} onChange={(v) => set('tamTitulo', v)} />
           <Faixa label="Tamanho do % (px)" min={12} max={40} value={a.tamPct ?? 22} onChange={(v) => set('tamPct', v)} />
           <div className="border-t pt-2" />
