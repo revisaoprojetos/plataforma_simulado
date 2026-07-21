@@ -51,53 +51,16 @@ export default async function MeusSimuladosPage() {
     return { ...s, concluido, emAndamento, tentativas: finalizadas.length, melhor, notaLiberada, vis: visual.get(s.id) ?? null }
   })
 
-  const disponiveis = itens.filter((i) => !i.concluido)
   const concluidos = itens.filter((i) => i.concluido)
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Meus simulados</h1>
-        <p className="text-muted-foreground">Simulados liberados para você fazer e seus concluídos — com notas e resultados.</p>
+        <p className="text-muted-foreground">Seus simulados concluídos — com notas e resultados. Os liberados para fazer estão em <Link href="/aluno/simulado" className="font-medium text-primary hover:underline">Simulados</Link>.</p>
       </div>
 
-      {/* Disponíveis para fazer */}
-      {disponiveis.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold"><Play className="h-4 w-4 text-primary" /> Para fazer ({disponiveis.length})</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {disponiveis.map((s) => {
-              const cor = s.vis?.cor ?? '#6d28d9'
-              const BancoIcon = iconeBanco(s.vis?.icone)
-              const capa = s.vis?.capa
-              const podeFazer = s.status === 'publicado' && !!s.embed_token
-              return (
-                <div key={s.id} className={cn('group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all', podeFazer && 'hover:-translate-y-1 hover:shadow-lg')}>
-                  {capa
-                    ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                    : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
-                  {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
-                  {podeFazer && <Link href={`/simulado/${s.embed_token}`} className="absolute inset-0 z-10" aria-label={s.titulo} />}
-                  <span className="pointer-events-none absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: cor }}><BancoIcon className="h-4 w-4" /></span>
-                  {s.emAndamento && <span className="pointer-events-none absolute right-3 top-3 z-20 rounded-lg bg-amber-500/90 px-2 py-1 text-[10px] font-semibold uppercase text-white backdrop-blur">Em andamento</span>}
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
-                    <h3 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{s.titulo}</h3>
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">{modoLabel(s.modo_aplicacao)}</span>
-                      {podeFazer
-                        ? <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-white">{s.emAndamento ? 'Continuar' : 'Fazer agora'} <ArrowRight className="h-3 w-3" /></span>
-                        : <span className="rounded-full bg-black/45 px-2 py-0.5 text-[10px] text-white/80 backdrop-blur">Indisponível</span>}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
-
-      {concluidos.length === 0 && disponiveis.length === 0 && (
+      {concluidos.length === 0 && (
         <div className="rounded-2xl border border-dashed p-10 text-center">
           <ClipboardList className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
           <p className="text-muted-foreground">Você ainda não concluiu nenhum simulado. Veja os disponíveis em <Link href="/aluno/simulado" className="font-medium text-primary hover:underline">Simulado</Link>.</p>
