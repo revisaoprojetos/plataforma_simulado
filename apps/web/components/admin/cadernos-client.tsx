@@ -129,13 +129,30 @@ export function CadernosClient({ cadernos, folders = [], destinos = [], atual = 
       ) : cadsF.length === 0 && foldersF.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed py-16 text-center text-muted-foreground"><p className="text-sm">Nada encontrado para “{busca}”.</p></div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {foldersF.map((f) => <FolderCard key={f.id} f={f} onExcluir={() => excluirPasta(f)} onPersonalizar={() => setEditandoPasta(f)} onDuplicar={() => duplicarPasta(f)} />)}
-          {cadsF.map((c) => (
-            <CadernoCard key={c.id} c={c} busy={excluindo === c.id || duplicando === c.id}
-              onExcluir={() => excluir(c.id, c.nome)} onPersonalizar={() => setEditando(c)} onDuplicar={() => duplicar(c.id)}
-              onMover={podeMover ? () => setMovendo(c) : undefined} />
-          ))}
+        <div className="space-y-5">
+          {/* Pastas (só na raiz) + divisória entre pastas e cadernos */}
+          {!atual && foldersF.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2"><Folder className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">Pastas</h2><span className="text-sm text-muted-foreground">({foldersF.length})</span></div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                {foldersF.map((f) => <FolderCard key={f.id} f={f} onExcluir={() => excluirPasta(f)} onPersonalizar={() => setEditandoPasta(f)} onDuplicar={() => duplicarPasta(f)} />)}
+              </div>
+              <hr className="mt-2 border-t" />
+            </div>
+          )}
+          {/* Cadernos */}
+          {cadsF.length > 0 && (
+            <div className="space-y-3">
+              {!atual && foldersF.length > 0 && <div className="flex items-center gap-2"><NotebookPen className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">Cadernos</h2><span className="text-sm text-muted-foreground">({cadsF.length})</span></div>}
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                {cadsF.map((c) => (
+                  <CadernoCard key={c.id} c={c} busy={excluindo === c.id || duplicando === c.id}
+                    onExcluir={() => excluir(c.id, c.nome)} onPersonalizar={() => setEditando(c)} onDuplicar={() => duplicar(c.id)}
+                    onMover={podeMover ? () => setMovendo(c) : undefined} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

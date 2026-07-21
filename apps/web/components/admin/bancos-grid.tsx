@@ -96,9 +96,26 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
           <p className="text-muted-foreground">Nada encontrado para “{busca}”.</p>
         </div>
       ) : (
-        <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {foldersF.map((f) => <FolderCard key={f.id} f={f} onExcluir={() => excluirPasta(f)} onPersonalizar={() => setEditandoPasta(f)} onDuplicar={() => duplicarPasta(f)} />)}
-          {bancosF.map((b) => <BancoCard key={b.id} {...b} onMover={podeMover ? () => setMovendo(b) : undefined} />)}
+        <div className="space-y-5">
+          {/* Pastas (só na raiz) + divisória entre pastas e bancos */}
+          {!atual && foldersF.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2"><Folder className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">Pastas</h2><span className="text-sm text-muted-foreground">({foldersF.length})</span></div>
+              <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                {foldersF.map((f) => <FolderCard key={f.id} f={f} onExcluir={() => excluirPasta(f)} onPersonalizar={() => setEditandoPasta(f)} onDuplicar={() => duplicarPasta(f)} />)}
+              </div>
+              <hr className="mt-2 border-t" />
+            </div>
+          )}
+          {/* Bancos */}
+          {bancosF.length > 0 && (
+            <div className="space-y-3">
+              {!atual && foldersF.length > 0 && <div className="flex items-center gap-2"><Database className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">Bancos</h2><span className="text-sm text-muted-foreground">({bancosF.length})</span></div>}
+              <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                {bancosF.map((b) => <BancoCard key={b.id} {...b} onMover={podeMover ? () => setMovendo(b) : undefined} />)}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
