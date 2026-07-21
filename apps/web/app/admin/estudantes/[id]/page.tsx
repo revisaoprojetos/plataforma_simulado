@@ -149,10 +149,16 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
         const { data: gRows, error: gErr } = await svc.from('simulado_pastas').select('id, grupos').in('id', pastasUsadas)
         if (!gErr) for (const p of gRows ?? []) if (Array.isArray((p as any).grupos)) gruposPorPasta.set((p as any).id, (p as any).grupos)
         // Visual do banco (capa/cor/ícone) — para os cards de simulado feito ficarem iguais ao do banco.
-        try {
-          const { data: vRows } = await svc.from('simulado_pastas').select('id, cor, icone, capa_url').in('id', pastasUsadas)
-          for (const p of vRows ?? []) visualPorPasta.set((p as any).id, { cor: (p as any).cor ?? null, icone: (p as any).icone ?? null, capa: (p as any).capa_url ?? null })
-        } catch { /* colunas de personalização podem não existir */ }
+        // Prefere capa_card_url (pôster 4:5, igual aos cards do Banco de Simulado); fallback p/ capa_url (banner).
+        {
+          let vRows: any[] | null = null
+          const comCard = await svc.from('simulado_pastas').select('id, cor, icone, capa_url, capa_card_url').in('id', pastasUsadas)
+          if (comCard.error && /capa_card_url/i.test(comCard.error.message)) {
+            const semCard = await svc.from('simulado_pastas').select('id, cor, icone, capa_url').in('id', pastasUsadas)
+            vRows = semCard.data ?? null
+          } else vRows = comCard.data ?? null
+          for (const p of vRows ?? []) visualPorPasta.set((p as any).id, { cor: (p as any).cor ?? null, icone: (p as any).icone ?? null, capa: (p as any).capa_card_url ?? (p as any).capa_url ?? null })
+        }
       }
     }
   }
