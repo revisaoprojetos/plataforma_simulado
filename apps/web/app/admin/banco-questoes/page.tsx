@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { NovoBancoForm } from '@/components/admin/novo-banco-form'
 import { BancosGrid } from '@/components/admin/bancos-grid'
 
@@ -19,11 +20,18 @@ export default async function BancoQuestoesPage() {
       bancos = r2.data
     } else bancos = r.data
   }
-  const { data: vinculos } = await svc.from('simulado_questao_pasta').select('pasta_id').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+  const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
+  // Contagem de questões E de estudantes por banco — paginado (fetchAll) para não truncar em
+  // 1000 (teto do PostgREST) e contar errado em bancos/tenants grandes.
+  const [vinculos, estudantes] = await Promise.all([
+    fetchAll<any>(() => svc.from('simulado_questao_pasta').select('pasta_id').eq('tenant_id', tid).order('pasta_id', { ascending: true })),
+    fetchAll<any>(() => svc.from('simulado_pasta_estudantes').select('pasta_id').eq('tenant_id', tid).order('pasta_id', { ascending: true })),
+  ])
 
-  // Contagem de questões por banco.
   const contagem = new Map<string, number>()
-  for (const v of vinculos ?? []) contagem.set((v as any).pasta_id, (contagem.get((v as any).pasta_id) ?? 0) + 1)
+  for (const v of vinculos) contagem.set(v.pasta_id, (contagem.get(v.pasta_id) ?? 0) + 1)
+  const contEstudantes = new Map<string, number>()
+  for (const e of estudantes) contEstudantes.set(e.pasta_id, (contEstudantes.get(e.pasta_id) ?? 0) + 1)
 
   const lista = bancos ?? []
 
@@ -39,7 +47,7 @@ export default async function BancoQuestoesPage() {
         <NovoBancoForm />
       </div>
 
-      <BancosGrid bancos={lista.map((b: any) => ({ id: b.id, nome: b.nome, total: contagem.get(b.id) ?? 0, cor: b.cor ?? null, icone: b.icone ?? null, capa: (b.capa_card_url ?? b.capa_url) ?? null, tipo: b.tipo ?? null }))} />
+      <BancosGrid bancos={lista.map((b: any) => ({ id: b.id, nome: b.nome, total: contagem.get(b.id) ?? 0, estudantes: contEstudantes.get(b.id) ?? 0, cor: b.cor ?? null, icone: b.icone ?? null, capa: (b.capa_card_url ?? b.capa_url) ?? null, tipo: b.tipo ?? null }))} />
     </div>
   )
 }

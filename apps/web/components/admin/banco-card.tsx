@@ -10,13 +10,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Palette, Trash2, Copy, ExternalLink, MoreVertical, Check, Loader2, ListChecks, PenLine } from 'lucide-react'
+import { Palette, Trash2, Copy, ExternalLink, MoreVertical, Check, Loader2, ListChecks, PenLine, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { excluirBanco, duplicarBanco } from '@/app/admin/banco-questoes/actions'
 import { iconeBanco } from '@/lib/banco-visual'
 
-export function BancoCard({ id, nome, total, cor, icone, capa, tipo }: { id: string; nome: string; total: number; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null }) {
+export function BancoCard({ id, nome, total, estudantes = 0, cor, icone, capa, tipo }: { id: string; nome: string; total: number; estudantes?: number; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null }) {
   const [confirmar, setConfirmar] = useState(false)
   const [pending, start] = useTransition()
   const router = useRouter()
@@ -100,15 +100,18 @@ export function BancoCard({ id, nome, total, cor, icone, capa, tipo }: { id: str
       </div>
 
       {/* Título + info básica (rodapé) */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">Banco de questões</p>
-        <h3 className="mt-0.5 line-clamp-2 text-lg font-bold leading-tight text-white drop-shadow-sm">{nome}</h3>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="inline-flex items-center rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-3">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">Banco de questões</p>
+        <h3 className="mt-0.5 line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm">{nome}</h3>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+          <span className="inline-flex items-center rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">
             {total} {total === 1 ? 'questão' : 'questões'}
           </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur">
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">
             {tipo === 'discursiva' ? <><PenLine className="h-3 w-3" /> Discursiva</> : <><ListChecks className="h-3 w-3" /> Objetiva</>}
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur" title={`${estudantes} estudante(s) neste banco`}>
+            <Users className="h-3 w-3" /> {estudantes}
           </span>
         </div>
       </div>

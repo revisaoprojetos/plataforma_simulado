@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { BancoCard } from '@/components/admin/banco-card'
 import { Database, Search } from 'lucide-react'
 
-type Banco = { id: string; nome: string; total: number; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null }
+type Banco = { id: string; nome: string; total: number; estudantes?: number; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null }
 
 export function BancosGrid({ bancos }: { bancos: Banco[] }) {
   const [busca, setBusca] = useState('')
@@ -32,9 +32,9 @@ export function BancosGrid({ bancos }: { bancos: Banco[] }) {
           <p className="text-muted-foreground">Nenhum banco encontrado para “{busca}”.</p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {filtrados.map((b) => (
-            <BancoCard key={b.id} id={b.id} nome={b.nome} total={b.total} cor={b.cor} icone={b.icone} capa={b.capa} tipo={b.tipo} />
+            <BancoCard key={b.id} id={b.id} nome={b.nome} total={b.total} estudantes={b.estudantes} cor={b.cor} icone={b.icone} capa={b.capa} tipo={b.tipo} />
           ))}
         </div>
       )}
