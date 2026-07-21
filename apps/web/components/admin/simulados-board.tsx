@@ -376,7 +376,6 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
           <div className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {foldersF.map((f) => <FolderCardSim key={f.id} f={f} onExcluir={() => excluirPasta(f)} onPersonalizar={() => setEditandoPasta(f)} />)}
           </div>
-          <hr className="mt-2 border-t" />
         </div>
       )}
 

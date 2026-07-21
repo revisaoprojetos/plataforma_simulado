@@ -104,7 +104,6 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
               <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {foldersF.map((f) => <FolderCard key={f.id} f={f} onExcluir={() => excluirPasta(f)} onPersonalizar={() => setEditandoPasta(f)} onDuplicar={() => duplicarPasta(f)} />)}
               </div>
-              <hr className="mt-2 border-t" />
             </div>
           )}
           {/* Bancos */}

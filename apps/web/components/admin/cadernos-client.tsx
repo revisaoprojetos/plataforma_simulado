@@ -137,7 +137,6 @@ export function CadernosClient({ cadernos, folders = [], destinos = [], atual = 
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {foldersF.map((f) => <FolderCard key={f.id} f={f} onExcluir={() => excluirPasta(f)} onPersonalizar={() => setEditandoPasta(f)} onDuplicar={() => duplicarPasta(f)} />)}
               </div>
-              <hr className="mt-2 border-t" />
             </div>
           )}
           {/* Cadernos */}
