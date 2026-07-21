@@ -54,9 +54,9 @@ export function SimuladosLista({ itens }: { itens: ResumoSimulado[] }) {
             <Link key={s.id} href={`/admin/relatorios/simulados?simulado=${s.id}`}
               className="group relative flex flex-col overflow-hidden rounded-2xl border bg-card transition hover:border-primary/50 hover:shadow-md">
               {/* Capa (banner) maior: imagem do banco/logo ou degradê da cor + ícone */}
-              <div className="relative h-36 w-full overflow-hidden" style={s.capa ? undefined : { background: `linear-gradient(135deg, ${cor} 0%, color-mix(in oklab, ${cor} 55%, #0f172a) 130%)` }}>
+              <div className="relative h-44 w-full overflow-hidden" style={s.capa ? undefined : { background: `linear-gradient(135deg, ${cor} 0%, color-mix(in oklab, ${cor} 55%, #0f172a) 130%)` }}>
                 {s.capa
-                  ? <img src={s.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  ? <img src={s.capa} alt="" className="absolute inset-0 h-full w-full object-cover object-[center_30%] transition-transform duration-500 group-hover:scale-105" />
                   : <Icon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                 <span className="absolute left-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white ring-1 ring-white/25 backdrop-blur"><Icon className="h-4 w-4" /></span>
@@ -64,16 +64,16 @@ export function SimuladosLista({ itens }: { itens: ResumoSimulado[] }) {
                 {/* Título sobre a capa (economiza a área de texto abaixo) */}
                 <h3 className="absolute inset-x-3 bottom-2 line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm">{s.titulo}</h3>
               </div>
-              <div className="flex flex-1 flex-col p-3">
+              <div className="flex flex-1 flex-col px-3 pb-2.5 pt-2">
               <div className="grid grid-cols-3 gap-2 text-center">
                 <Metric icon={<Users className="h-3.5 w-3.5" />} valor={s.participantes} rotulo="alunos" />
                 <Metric icon={<CheckCircle2 className="h-3.5 w-3.5" />} valor={s.finalizadas} rotulo="feitos" />
-                <div className="rounded-lg bg-muted/50 py-1.5">
+                <div className="rounded-lg bg-muted/50 py-1">
                   <div className="text-base font-bold tabular-nums">{nota(s.notaMedia)}</div>
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground">nota méd.</div>
                 </div>
               </div>
-              <div className="mt-2.5 flex items-center justify-between border-t pt-2 text-[11px] text-muted-foreground">
+              <div className="mt-2 flex items-center justify-between border-t pt-1.5 text-[11px] text-muted-foreground">
                 <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {fmtData(s.ultimaAtividade)}</span>
                 {s.emAndamento > 0 && <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">{s.emAndamento} em andamento</span>}
               </div>
@@ -88,7 +88,7 @@ export function SimuladosLista({ itens }: { itens: ResumoSimulado[] }) {
 
 function Metric({ icon, valor, rotulo }: { icon: React.ReactNode; valor: number; rotulo: string }) {
   return (
-    <div className="rounded-lg bg-muted/50 py-1.5">
+    <div className="rounded-lg bg-muted/50 py-1">
       <div className="flex items-center justify-center gap-1 text-base font-bold tabular-nums">{valor}</div>
       <div className="flex items-center justify-center gap-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">{icon}{rotulo}</div>
     </div>
