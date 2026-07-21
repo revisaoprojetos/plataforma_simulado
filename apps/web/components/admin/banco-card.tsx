@@ -10,13 +10,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Palette, Trash2, Copy, ExternalLink, MoreVertical, Check, Loader2, ListChecks, PenLine, Users } from 'lucide-react'
+import { Palette, Trash2, Copy, ExternalLink, MoreVertical, Check, Loader2, ListChecks, PenLine, Users, FolderInput } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { excluirBanco, duplicarBanco } from '@/app/admin/banco-questoes/actions'
 import { iconeBanco } from '@/lib/banco-visual'
 
-export function BancoCard({ id, nome, total, estudantes = 0, cor, icone, capa, tipo }: { id: string; nome: string; total: number; estudantes?: number; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null }) {
+export function BancoCard({ id, nome, total, estudantes = 0, cor, icone, capa, tipo, onMover }: { id: string; nome: string; total: number; estudantes?: number; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null; onMover?: () => void }) {
   const [confirmar, setConfirmar] = useState(false)
   const [pending, start] = useTransition()
   const router = useRouter()
@@ -90,6 +90,11 @@ export function BancoCard({ id, nome, total, estudantes = 0, cor, icone, capa, t
               <DropdownMenuItem onClick={copiar}>
                 <Copy className="mr-2 h-4 w-4" /> Duplicar
               </DropdownMenuItem>
+              {onMover && (
+                <DropdownMenuItem onClick={onMover}>
+                  <FolderInput className="mr-2 h-4 w-4" /> Mover para pasta
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setConfirmar(true)} className="text-destructive">
                 <Trash2 className="mr-2 h-4 w-4" /> Excluir

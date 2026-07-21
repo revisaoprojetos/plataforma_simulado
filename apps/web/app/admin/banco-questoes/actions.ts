@@ -52,6 +52,58 @@ export async function criarBanco(nome: string, tipo: string = 'objetiva'): Promi
   return { ok: true, id: data.id }
 }
 
+// ───────────────────────── Pastas (folders) de bancos ─────────────────────────
+
+/** Cria uma PASTA (folder) para organizar bancos no grid. */
+export async function criarPastaFolder(nome: string, paiId?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const titulo = nome.trim()
+  if (!titulo) return { ok: false, error: 'Informe um nome.' }
+  const svc = createAdminClient()
+  const { data, error } = await svc
+    .from('simulado_pastas')
+    .insert({ tenant_id: g.tenantId, nome: titulo, is_folder: true, pai_id: paiId ?? null })
+    .select('id')
+    .single()
+  if (error || !data) {
+    if (error && /is_folder|pai_id|column/i.test(error.message)) return { ok: false, error: 'Recurso de pastas indisponível: rode a migration banco_pastas_folder (pai_id + is_folder) no banco.' }
+    return { ok: false, error: error?.message ?? 'Erro ao criar pasta.' }
+  }
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_pastas', entidadeId: data.id, depois: { nome: titulo, pasta: true } })
+  revalidatePath('/admin/banco-questoes')
+  return { ok: true, id: data.id }
+}
+
+/** Move um banco para dentro de uma pasta (ou para a raiz quando paiId = null). */
+export async function moverBancoParaPasta(bancoId: string, paiId: string | null): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_pastas').update({ pai_id: paiId }).eq('id', bancoId).eq('tenant_id', g.tenantId)
+  if (error) {
+    if (/pai_id|column/i.test(error.message)) return { ok: false, error: 'Recurso de pastas indisponível: rode a migration banco_pastas_folder (pai_id) no banco.' }
+    return { ok: false, error: error.message }
+  }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: bancoId, depois: { pai_id: paiId } })
+  revalidatePath('/admin/banco-questoes')
+  return { ok: true }
+}
+
+/** Exclui uma PASTA (folder): solta os bancos de dentro (voltam à raiz, não são apagados) e remove a pasta. */
+export async function excluirPastaFolder(id: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+  // Solta os filhos antes (para não sumirem junto com a pasta) — tolerante.
+  try { await svc.from('simulado_pastas').update({ pai_id: null }).eq('pai_id', id).eq('tenant_id', g.tenantId) } catch { /* coluna pode não existir */ }
+  const { error } = await softDelete('simulado_pastas', id)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_pastas', entidadeId: id, depois: { deletado: true, pasta: true } })
+  revalidatePath('/admin/banco-questoes')
+  return { ok: true }
+}
+
 /** Renomeia um banco. */
 export async function renomearBanco(id: string, nome: string): Promise<{ ok: boolean; error?: string }> {
   const g = await guard()
