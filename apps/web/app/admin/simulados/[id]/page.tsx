@@ -180,11 +180,11 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
         <div className="flex items-start justify-between">
           <div>
             <Link
-              href="/admin/simulados"
+              href={(simulado as any).pasta_id ? `/admin/simulados?pasta=${(simulado as any).pasta_id}` : '/admin/simulados'}
               className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
               <ChevronLeft className="h-4 w-4" />
-              Voltar para Simulados
+              {(simulado as any).pasta_id ? 'Voltar para a pasta' : 'Voltar para Simulados'}
             </Link>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight">{simulado.titulo}</h1>

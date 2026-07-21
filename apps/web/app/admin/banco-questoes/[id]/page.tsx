@@ -42,8 +42,8 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
   // Banco + personalização (cor/ícone/capa) — tolerante caso a migration ainda não tenha rodado.
   let banco: any = null
   {
-    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, capa_card_url').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
-    if (r.error && /cor|icone|capa_url|capa_card_url|column/i.test(r.error.message)) {
+    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, capa_card_url, pai_id').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
+    if (r.error && /cor|icone|capa_url|capa_card_url|pai_id|column/i.test(r.error.message)) {
       const r2 = await svc.from('simulado_pastas').select('id, nome').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
       banco = r2.data
     } else banco = r.data
@@ -134,8 +134,8 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
 
         <div className="relative flex min-h-[172px] flex-col justify-between gap-4 p-5 sm:p-6">
           <div className="flex items-center justify-between">
-            <Link href="/admin/banco-questoes" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-sm font-medium text-white/90 backdrop-blur transition-colors hover:bg-white/20">
-              <ArrowLeft className="h-4 w-4" /> Bancos
+            <Link href={banco.pai_id ? `/admin/banco-questoes?pasta=${banco.pai_id}` : '/admin/banco-questoes'} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-sm font-medium text-white/90 backdrop-blur transition-colors hover:bg-white/20">
+              <ArrowLeft className="h-4 w-4" /> {banco.pai_id ? 'Pasta' : 'Bancos'}
             </Link>
             <Link href={`/admin/banco-questoes/${id}?tab=personalizar`} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-sm font-medium text-white/90 backdrop-blur transition-colors hover:bg-white/20">
               <Palette className="h-4 w-4" /> Personalizar
