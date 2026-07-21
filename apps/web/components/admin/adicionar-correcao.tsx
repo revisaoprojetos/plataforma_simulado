@@ -40,7 +40,9 @@ export function AdicionarCorrecao({ simuladoId, questoes }: { simuladoId: string
         ? await anularQuestao(simuladoId, qId, motivo, politica)
         : await trocarAlternativa(simuladoId, qId, novaAlt, motivo)
       if (r.ok) {
-        toast.success(`Correção aplicada — ${r.afetados ?? 0} sessão(ões) re-corrigida(s)`)
+        toast.success(r.processando
+          ? `Re-correção em processamento (${r.afetados ?? 0} sessões) — atualize em instantes para ver o impacto.`
+          : `Correção aplicada — ${r.afetados ?? 0} sessão(ões) re-corrigida(s)`)
         reset(); setOpen(false); router.refresh()
       } else {
         toast.error(r.error ?? 'Erro ao aplicar correção.')

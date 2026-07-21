@@ -18,7 +18,9 @@ export function AnularQuestaoButton({ simuladoId, questaoId }: { simuladoId: str
     start(async () => {
       const r = await anularQuestao(simuladoId, questaoId, motivo, politica)
       if (r.ok) {
-        toast.success(`Questão anulada — ${r.afetados ?? 0} sessão(ões) re-corrigida(s)`)
+        toast.success(r.processando
+          ? `Questão anulada — re-correção de ${r.afetados ?? 0} sessões em processamento (atualize em instantes).`
+          : `Questão anulada — ${r.afetados ?? 0} sessão(ões) re-corrigida(s)`)
         setAberto(false)
         router.refresh()
       } else {

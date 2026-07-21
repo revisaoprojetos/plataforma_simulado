@@ -16,7 +16,9 @@ export function RemoverCorrecaoButton({ simuladoId, questaoId }: { simuladoId: s
     start(async () => {
       const r = await removerCorrecao(simuladoId, questaoId)
       if (r.ok) {
-        toast.success(`Correção removida — ${r.afetados ?? 0} sessão(ões) re-corrigida(s)`)
+        toast.success(r.processando
+          ? `Correção removida — re-correção de ${r.afetados ?? 0} sessões em processamento (atualize em instantes).`
+          : `Correção removida — ${r.afetados ?? 0} sessão(ões) re-corrigida(s)`)
         setConfirmando(false)
         router.refresh()
       } else {
