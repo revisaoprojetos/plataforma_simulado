@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { UsersRound, X, Search, Check, Minus, Loader2, Link2, Unlink, Folder } from 'lucide-react'
+import { UsersRound, X, Search, Check, Minus, Loader2, Link2, Unlink, Folder, FolderOpen, ChevronRight, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { vincularGrupoAoBanco, desvincularGrupoDoBanco, contarEstudantesUnicosGrupos, contarOrfaosDesvincular } from '@/app/admin/banco-questoes/estudantes-actions'
 import { confirmar } from '@/components/ui/confirm-dialog'
@@ -38,6 +38,7 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
   const [open, setOpen] = useState(false)
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
+  const [aberto, setAberto] = useState<Set<string>>(new Set()) // pastas recolhidas por padrão; clicar expande
   const [pending, start] = useTransition()
   // Estudantes ÚNICOS (dedup por estudante_id) dos grupos marcados — o real, sem contar
   // o mesmo aluno de vários grupos. Recalculado (debounced) a cada mudança da seleção.
@@ -89,6 +90,7 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
   const q = busca.trim().toLowerCase()
 
   function toggle(id: string) { setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }) }
+  function toggleAberto(id: string) { setAberto((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }) }
   function togglePasta(pastaId: string) {
     const ids = folhasDe(pastaId).map((f) => f.id)
     const todos = ids.length > 0 && ids.every((id) => sel.has(id))
@@ -160,22 +162,29 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
     const marcados = ids.filter((id) => sel.has(id)).length
     const totalMembros = folhas.reduce((s, f) => s + f.membros, 0)
     const filhos = children.get(g.id) ?? []
+    const expandida = aberto.has(g.id)
     return (
       <div key={g.id}>
-        <div role="button" tabIndex={0} onClick={() => togglePasta(g.id)}
-          className="flex w-full cursor-pointer items-center gap-3 rounded-lg bg-muted/50 px-3 py-2 text-left transition-colors hover:bg-muted">
-          <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', marcados === 0 ? 'border-muted-foreground/40' : 'border-primary bg-primary text-primary-foreground')}>
+        <div role="button" tabIndex={0} onClick={() => toggleAberto(g.id)}
+          className="flex w-full cursor-pointer items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-left transition-colors hover:bg-muted"
+          title={expandida ? 'Recolher pasta' : 'Expandir pasta'}>
+          <span className="shrink-0 text-muted-foreground">{expandida ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</span>
+          {/* Checkbox: seleciona/desmarca todos os grupos da pasta (não expande) */}
+          <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); togglePasta(g.id) }} title="Selecionar todos os grupos da pasta"
+            className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', marcados === 0 ? 'border-muted-foreground/40' : 'border-primary bg-primary text-primary-foreground')}>
             {marcados > 0 && (marcados === ids.length ? <Check className="h-3 w-3" /> : <Minus className="h-3 w-3" />)}
           </span>
-          <Folder className="h-4 w-4 shrink-0" style={{ color: g.cor ?? 'var(--muted-foreground)' }} />
+          {expandida ? <FolderOpen className="h-4 w-4 shrink-0" style={{ color: g.cor ?? 'var(--muted-foreground)' }} /> : <Folder className="h-4 w-4 shrink-0" style={{ color: g.cor ?? 'var(--muted-foreground)' }} />}
           <span className="min-w-0 flex-1 truncate text-sm font-semibold">{g.nome}</span>
           <span className="shrink-0 text-[11px] text-muted-foreground">{ids.length} grupo(s) · {totalMembros} membro(s) somados</span>
         </div>
-        <div className="ml-[18px] mt-1.5">
-          {filhos.length === 0
-            ? <TreeBranch isLast><p className="py-1 text-xs text-muted-foreground">Pasta vazia.</p></TreeBranch>
-            : filhos.map((c, i) => <TreeBranch key={c.id} isLast={i === filhos.length - 1}>{renderNo(c)}</TreeBranch>)}
-        </div>
+        {expandida && (
+          <div className="ml-[18px] mt-1.5">
+            {filhos.length === 0
+              ? <TreeBranch isLast><p className="py-1 text-xs text-muted-foreground">Pasta vazia.</p></TreeBranch>
+              : filhos.map((c, i) => <TreeBranch key={c.id} isLast={i === filhos.length - 1}>{renderNo(c)}</TreeBranch>)}
+          </div>
+        )}
       </div>
     )
   }

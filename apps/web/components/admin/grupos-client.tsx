@@ -36,7 +36,7 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
   const [pending, start] = useTransition()
   const [editando, setEditando] = useState<Grupo | null>(null)
   const [movendo, setMovendo] = useState<Grupo | null>(null)
-  const [expandido, setExpandido] = useState<Set<string>>(() => new Set(grupos.filter((g) => g.is_mestre).map((g) => g.id)))
+  const [expandido, setExpandido] = useState<Set<string>>(() => new Set<string>()) // pastas começam recolhidas; clicar expande
   const [arrastando, setArrastando] = useState<Grupo | null>(null)
   const [alvo, setAlvo] = useState<string | null>(null) // pasta.id ou '__solto__'
   const [busca, setBusca] = useState('')
