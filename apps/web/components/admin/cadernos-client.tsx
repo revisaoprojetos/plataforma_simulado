@@ -116,8 +116,8 @@ export function CadernosClient({ cadernos }: { cadernos: CadernoItem[] }) {
                 {/* Link cobre o card */}
                 <Link href={`/admin/cadernos/${c.id}`} className="absolute inset-0 z-10" aria-label={c.nome} />
 
-                {/* Banda de capa/cor no topo */}
-                <div className="relative h-24 overflow-hidden">
+                {/* Banda de capa/cor no topo (mais alta → a capa do banco não fica tão cortada) */}
+                <div className="relative h-40 overflow-hidden">
                   {c.capa ? (
                     <img src={c.capa} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                   ) : (
@@ -155,13 +155,15 @@ export function CadernosClient({ cadernos }: { cadernos: CadernoItem[] }) {
                   </div>
                 </div>
 
-                {/* Corpo compacto */}
-                <div className="p-4">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Caderno de prova</p>
-                  <h3 className="mt-0.5 line-clamp-2 text-base font-bold leading-tight">{c.nome}</h3>
-                  <span className="mt-2.5 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: `${cor}1f`, color: cor }}>
-                    {c.blocos} {c.blocos === 1 ? 'bloco' : 'blocos'}
-                  </span>
+                {/* Corpo compacto: rótulo + nº de blocos na MESMA linha (economiza espaço) */}
+                <div className="p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Caderno de prova</p>
+                    <span className="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${cor}1f`, color: cor }}>
+                      {c.blocos} {c.blocos === 1 ? 'bloco' : 'blocos'}
+                    </span>
+                  </div>
+                  <h3 className="mt-1 line-clamp-2 text-sm font-bold leading-tight">{c.nome}</h3>
                 </div>
               </div>
             )
