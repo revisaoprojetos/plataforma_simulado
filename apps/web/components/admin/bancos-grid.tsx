@@ -10,11 +10,11 @@ import { Input } from '@/components/ui/input'
 import { BancoCard } from '@/components/admin/banco-card'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
 import { pedirTexto, confirmar } from '@/components/ui/confirm-dialog'
-import { criarPastaFolder, moverBancoParaPasta, excluirPastaFolder } from '@/app/admin/banco-questoes/actions'
+import { criarPastaFolder, moverBancoParaPasta, excluirPastaFolder, duplicarPastaFolder } from '@/app/admin/banco-questoes/actions'
 import { iconeBanco } from '@/lib/banco-visual'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { Database, Search, FolderPlus, Folder, FolderOpen, ChevronLeft, MoreVertical, Trash2, X, Check, Loader2, FolderInput, Palette } from 'lucide-react'
+import { Database, Search, FolderPlus, Folder, FolderOpen, ChevronLeft, MoreVertical, Trash2, X, Check, Loader2, FolderInput, Palette, Copy } from 'lucide-react'
 
 type Banco = { id: string; nome: string; total: number; estudantes?: number; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null }
 type Pasta = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; count: number }
@@ -48,6 +48,12 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
     start(async () => {
       const r = await excluirPastaFolder(f.id)
       if (r.ok) { toast.success('Pasta excluída'); router.refresh() } else toast.error(r.error ?? 'Erro')
+    })
+  }
+  function duplicarPasta(f: Pasta) {
+    start(async () => {
+      const r = await duplicarPastaFolder(f.id)
+      if (r.ok) { toast.success('Pasta duplicada'); router.refresh() } else toast.error(r.error ?? 'Erro ao duplicar')
     })
   }
 
@@ -91,7 +97,7 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
         </div>
       ) : (
         <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {foldersF.map((f) => <FolderCard key={f.id} f={f} onExcluir={() => excluirPasta(f)} onPersonalizar={() => setEditandoPasta(f)} />)}
+          {foldersF.map((f) => <FolderCard key={f.id} f={f} onExcluir={() => excluirPasta(f)} onPersonalizar={() => setEditandoPasta(f)} onDuplicar={() => duplicarPasta(f)} />)}
           {bancosF.map((b) => <BancoCard key={b.id} {...b} onMover={podeMover ? () => setMovendo(b) : undefined} />)}
         </div>
       )}
@@ -109,7 +115,7 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
 }
 
 /** Card de PASTA (folder) — imagem/cor + nome + quantos bancos tem dentro. Clicar abre a pasta. */
-function FolderCard({ f, onExcluir, onPersonalizar }: { f: Pasta; onExcluir: () => void; onPersonalizar: () => void }) {
+function FolderCard({ f, onExcluir, onPersonalizar, onDuplicar }: { f: Pasta; onExcluir: () => void; onPersonalizar: () => void; onDuplicar: () => void }) {
   const c = f.cor ?? '#6d28d9'
   const Icon = iconeBanco(f.icone)
   return (
@@ -135,6 +141,7 @@ function FolderCard({ f, onExcluir, onPersonalizar }: { f: Pasta; onExcluir: () 
           <DropdownMenuContent align="end" className="w-40">
             <DropdownMenuItem render={<Link href={`/admin/banco-questoes?pasta=${f.id}`} />}><FolderOpen className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
             <DropdownMenuItem onClick={onPersonalizar}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
+            <DropdownMenuItem onClick={onDuplicar}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onExcluir} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir pasta</DropdownMenuItem>
           </DropdownMenuContent>

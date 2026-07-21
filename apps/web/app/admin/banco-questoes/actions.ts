@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
@@ -154,41 +155,99 @@ export async function atualizarBanco(id: string, nome: string, cor: string | nul
   return { ok: true }
 }
 
-/** Duplica um banco: cria uma cópia com os mesmos vínculos de questões. */
+/**
+ * Cópia LITERAL de um banco: todos os campos (cor/ícone/capa/capa do card/tipo/grupos/ordem…),
+ * as questões, os estudantes vinculados, os grupos vinculados e o caderno associado (cópia
+ * INDEPENDENTE, com config.bancoId apontando pro banco novo). Retorna o id novo (ou null).
+ * `opts.nome`/`opts.paiId` sobrescrevem nome/pasta; senão herdam do original. Reusável.
+ */
+async function copiarBanco(svc: ReturnType<typeof createAdminClient>, tenantId: string, origId: string, opts: { nome?: string; paiId?: string | null } = {}): Promise<string | null> {
+  const { data: orig } = await svc.from('simulado_pastas').select('*').eq('id', origId).eq('tenant_id', tenantId).maybeSingle()
+  if (!orig) return null
+  const o = orig as any
+  // Exclui id, timestamps, flags de exclusão e auditoria (caso existam) e caderno_id (tratado à parte).
+  const { id: _i, created_at: _c, criado_em: _cc, atualizado_em: _a, updated_at: _u, deletado: _d, deletado_em: _de, deletado_por: _dp, criado_por: _cp, atualizado_por: _ap, caderno_id: origCadernoId, ...rest } = o
+  const insBase: Record<string, unknown> = { ...rest }
+  if (opts.nome !== undefined) insBase.nome = opts.nome
+  if (opts.paiId !== undefined) insBase.pai_id = opts.paiId
+  // Insere a cópia; se alguma coluna ainda não existir no banco, remove SÓ ela e tenta de novo.
+  let ins = await svc.from('simulado_pastas').insert(insBase).select('id').single()
+  for (let t = 0; t < 8 && ins.error; t++) {
+    const col = colFaltante(ins.error.message)
+    if (col && col in insBase && col !== 'tenant_id' && col !== 'nome') { delete insBase[col]; ins = await svc.from('simulado_pastas').insert(insBase).select('id').single(); continue }
+    break
+  }
+  const novoId = ins.data?.id as string | undefined
+  if (!novoId) return null
+
+  // Questões (paginado — banco pode ter >1000 vínculos).
+  const qs = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', origId).eq('tenant_id', tenantId).order('questao_id', { ascending: true }))
+  for (let i = 0; i < qs.length; i += 500) await svc.from('simulado_questao_pasta').insert(qs.slice(i, i + 500).map((v) => ({ tenant_id: tenantId, pasta_id: novoId, questao_id: v.questao_id })))
+
+  // Estudantes vinculados (paginado).
+  const es = await fetchAll<{ estudante_id: string }>(() => svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', origId).eq('tenant_id', tenantId).order('estudante_id', { ascending: true }))
+  for (let i = 0; i < es.length; i += 500) await svc.from('simulado_pasta_estudantes').insert(es.slice(i, i + 500).map((v) => ({ tenant_id: tenantId, pasta_id: novoId, estudante_id: v.estudante_id })))
+
+  // Grupos vinculados (herança de acesso) — tolerante.
+  try {
+    const { data: gr } = await svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', origId).eq('tenant_id', tenantId)
+    if (gr?.length) await svc.from('simulado_pasta_grupos').insert(gr.map((x: any) => ({ tenant_id: tenantId, pasta_id: novoId, grupo_id: x.grupo_id })))
+  } catch { /* tabela pode não existir */ }
+
+  // Caderno associado: cópia INDEPENDENTE (config.bancoId → banco novo). Fallback: liga o mesmo.
+  if (origCadernoId) {
+    let novoCadId: string | null = null
+    try {
+      const { data: cad } = await svc.from('simulado_cadernos_designer').select('nome, config').eq('id', origCadernoId).eq('tenant_id', tenantId).maybeSingle()
+      if (cad) {
+        const cfg = { ...(((cad as any).config) ?? {}), bancoId: novoId }
+        const { data: nc } = await svc.from('simulado_cadernos_designer').insert({ tenant_id: tenantId, nome: `${(cad as any).nome} (cópia)`, config: cfg }).select('id').single()
+        novoCadId = nc?.id ?? null
+      }
+    } catch { /* best-effort */ }
+    try { await svc.from('simulado_pastas').update({ caderno_id: novoCadId ?? origCadernoId }).eq('id', novoId).eq('tenant_id', tenantId) } catch { /* coluna pode não existir */ }
+  }
+  return novoId
+}
+
+/** Duplica um banco: CÓPIA LITERAL (campos, questões, estudantes, grupos e caderno) na MESMA pasta. */
 export async function duplicarBanco(id: string): Promise<{ ok: boolean; id?: string; error?: string }> {
   const g = await guard()
   if (!g.ok) return g
-
   const svc = createAdminClient()
-  // Lê nome + pasta (pai_id) do original — a cópia nasce na MESMA pasta. Tolerante à coluna.
-  let orig: any = null
-  {
-    const r = await svc.from('simulado_pastas').select('nome, pai_id').eq('id', id).eq('tenant_id', g.tenantId).maybeSingle()
-    if (r.error && /pai_id|column/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_pastas').select('nome').eq('id', id).eq('tenant_id', g.tenantId).maybeSingle()
-      orig = r2.data
-    } else orig = r.data
-  }
+  const { data: orig } = await svc.from('simulado_pastas').select('nome').eq('id', id).eq('tenant_id', g.tenantId).maybeSingle()
   if (!orig) return { ok: false, error: 'Banco não encontrado.' }
-
-  const insBase: Record<string, unknown> = { tenant_id: g.tenantId, nome: `${orig.nome} (cópia)` }
-  if (orig.pai_id) insBase.pai_id = orig.pai_id
-  let ins = await svc.from('simulado_pastas').insert(insBase).select('id').single()
-  if (ins.error && /pai_id/i.test(ins.error.message) && 'pai_id' in insBase) { delete insBase.pai_id; ins = await svc.from('simulado_pastas').insert(insBase).select('id').single() }
-  const { data: novo, error } = ins
-  if (error) return { ok: false, error: error.message }
-
-  // Copia os vínculos de questões.
-  const { data: vinculos } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', id).eq('tenant_id', g.tenantId)
-  if (vinculos?.length) {
-    await svc.from('simulado_questao_pasta').insert(
-      vinculos.map((v: any) => ({ tenant_id: g.tenantId, pasta_id: novo.id, questao_id: v.questao_id })),
-    )
-  }
-
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_pastas', entidadeId: novo.id, depois: { copia_de: id, questoes: vinculos?.length ?? 0 } })
+  const novoId = await copiarBanco(svc, g.tenantId, id, { nome: `${(orig as any).nome} (cópia)` })
+  if (!novoId) return { ok: false, error: 'Erro ao duplicar.' }
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_pastas', entidadeId: novoId, depois: { copia_de: id } })
   revalidatePath('/admin/banco-questoes')
-  return { ok: true, id: novo.id }
+  return { ok: true, id: novoId }
+}
+
+/** Duplica uma PASTA (folder): copia a pasta (campos/capa) E faz cópia LITERAL de todos os bancos dentro. */
+export async function duplicarPastaFolder(id: string): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+  const { data: orig } = await svc.from('simulado_pastas').select('*').eq('id', id).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!orig) return { ok: false, error: 'Pasta não encontrada.' }
+  const o = orig as any
+  const { id: _i, created_at: _c, criado_em: _cc, atualizado_em: _a, updated_at: _u, deletado: _d, deletado_em: _de, deletado_por: _dp, criado_por: _cp, atualizado_por: _ap, caderno_id: _cad, ...rest } = o
+  const insBase: Record<string, unknown> = { ...rest, nome: `${o.nome} (cópia)` }
+  let ins = await svc.from('simulado_pastas').insert(insBase).select('id').single()
+  for (let t = 0; t < 8 && ins.error; t++) {
+    const col = colFaltante(ins.error.message)
+    if (col && col in insBase && col !== 'tenant_id' && col !== 'nome') { delete insBase[col]; ins = await svc.from('simulado_pastas').insert(insBase).select('id').single(); continue }
+    break
+  }
+  const novoFolderId = ins.data?.id as string | undefined
+  if (!novoFolderId) return { ok: false, error: ins.error?.message ?? 'Erro ao duplicar a pasta.' }
+  // Copia (literal) cada banco de dentro para a nova pasta (nível único → filhos são bancos).
+  const { data: dentro } = await svc.from('simulado_pastas').select('id').eq('pai_id', id).eq('tenant_id', g.tenantId).eq('deletado', false)
+  for (const b of dentro ?? []) await copiarBanco(svc, g.tenantId, (b as any).id, { paiId: novoFolderId })
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_pastas', entidadeId: novoFolderId, depois: { copia_de: id, pasta: true, bancos: (dentro ?? []).length } })
+  revalidatePath('/admin/banco-questoes')
+  return { ok: true, id: novoFolderId }
 }
 
 /** Exclui um banco (e seus vínculos com questões — as questões NÃO são apagadas). */
