@@ -20,7 +20,7 @@ export interface CadernoConfig {
   blocos: CadernoBloco[]
 }
 
-export async function criarCaderno(nome: string): Promise<{ ok: boolean; id?: string; error?: string }> {
+export async function criarCaderno(nome: string, pastaId?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
   if (!(await checkPermission('questoes:create')) && !(await checkPermission('questoes:update'))) {
     return { ok: false, error: 'Sem permissão.' }
   }
@@ -28,17 +28,17 @@ export async function criarCaderno(nome: string): Promise<{ ok: boolean; id?: st
   if (!nome.trim()) return { ok: false, error: 'Informe um nome.' }
 
   const svc = createAdminClient()
-  const { data, error } = await svc
-    .from('simulado_cadernos_designer')
-    .insert({ tenant_id: access.tenantId, nome: nome.trim(), config: { blocos: [] } })
-    .select('id')
-    .single()
-  if (error) return { ok: false, error: error.message }
+  // Nasce DENTRO da pasta atual (pasta_id) quando aberto de dentro de uma. Tolerante à coluna.
+  const base: Record<string, unknown> = { tenant_id: access.tenantId, nome: nome.trim(), config: { blocos: [] } }
+  if (pastaId) base.pasta_id = pastaId
+  let ins = await svc.from('simulado_cadernos_designer').insert(base).select('id').single()
+  if (ins.error && /pasta_id/i.test(ins.error.message) && 'pasta_id' in base) { delete base.pasta_id; ins = await svc.from('simulado_cadernos_designer').insert(base).select('id').single() }
+  if (ins.error || !ins.data) return { ok: false, error: ins.error?.message ?? 'Erro ao criar' }
 
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_cadernos_designer', entidadeId: data.id, depois: { nome } })
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_cadernos_designer', entidadeId: ins.data.id, depois: { nome } })
   // Sem revalidatePath aqui: revalidar a rota atual corre com o redirect do cliente
   // pro editor e cancela a navegação. A lista revalida ao voltar.
-  return { ok: true, id: data.id }
+  return { ok: true, id: ins.data.id }
 }
 
 function contarBlocosConfig(config: any): number {
@@ -50,53 +50,91 @@ function contarBlocosConfig(config: any): number {
   return (config?.blocos ?? []).length
 }
 
-/**
- * Duplica um caderno com TODA a configuração (docsV2/modalidadesV2/cores/material/bancoId…),
- * cor, ícone e capa. As imagens de fundo ficam hospedadas por URL no config → a cópia só
- * referencia as mesmas URLs (não precisa reenviar). Devolve o item já pronto pra lista.
- */
-export async function duplicarCaderno(
-  id: string,
-): Promise<{ ok: boolean; error?: string; caderno?: { id: string; nome: string; blocos: number; cor: string | null; icone: string | null; capa: string | null } }> {
-  if (!(await checkPermission('questoes:create')) && !(await checkPermission('questoes:update'))) {
-    return { ok: false, error: 'Sem permissão.' }
-  }
-  const access = await getCurrentAccess()
-  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
-  const svc = createAdminClient()
+export type CadernoRow = { id: string; nome: string; blocos: number; cor: string | null; icone: string | null; capa: string | null }
 
-  // Lê a origem (tolerante caso as colunas de personalização não existam).
+/**
+ * Cópia LITERAL de um caderno: TODA a config (docsV2/modalidadesV2/cores/material/bancoId…),
+ * cor, ícone, capa E a pasta (pasta_id). `opts.nome`/`opts.pastaId` sobrescrevem; `sufixoCopia`
+ * acrescenta " (cópia)". Retorna o item pronto pra lista (ou null). Reusável.
+ */
+async function copiarCadernoInterno(
+  svc: ReturnType<typeof createAdminClient>, tenantId: string, origId: string,
+  opts: { nome?: string; pastaId?: string | null; sufixoCopia?: boolean } = {},
+): Promise<CadernoRow | null> {
   let origem: any = null
   {
-    const r = await svc.from('simulado_cadernos_designer').select('nome, config, cor, icone, capa_url').eq('id', id).eq('tenant_id', access.tenantId).eq('deletado', false).maybeSingle()
-    if (r.error && /cor|icone|capa_url|column/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_cadernos_designer').select('nome, config').eq('id', id).eq('tenant_id', access.tenantId).eq('deletado', false).maybeSingle()
+    const r = await svc.from('simulado_cadernos_designer').select('nome, config, cor, icone, capa_url, pasta_id').eq('id', origId).eq('tenant_id', tenantId).eq('deletado', false).maybeSingle()
+    if (r.error && /cor|icone|capa_url|pasta_id|column/i.test(r.error.message)) {
+      const r2 = await svc.from('simulado_cadernos_designer').select('nome, config').eq('id', origId).eq('tenant_id', tenantId).eq('deletado', false).maybeSingle()
       origem = r2.data
     } else origem = r.data
   }
-  if (!origem) return { ok: false, error: 'Caderno não encontrado.' }
-
-  const novoNome = `${origem.nome} (cópia)`
-  const payloadFull = { tenant_id: access.tenantId, nome: novoNome, config: origem.config ?? {}, cor: origem.cor ?? null, icone: origem.icone ?? null, capa_url: origem.capa_url ?? null }
-
-  let novo: any = null
-  {
-    const r = await svc.from('simulado_cadernos_designer').insert(payloadFull).select('id').single()
-    if (r.error && /cor|icone|capa_url|column/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_cadernos_designer').insert({ tenant_id: access.tenantId, nome: novoNome, config: origem.config ?? {} }).select('id').single()
-      if (r2.error) return { ok: false, error: r2.error.message }
-      novo = r2.data
-    } else if (r.error) {
-      return { ok: false, error: r.error.message }
-    } else novo = r.data
+  if (!origem) return null
+  const nome = opts.nome ?? (opts.sufixoCopia ? `${origem.nome} (cópia)` : origem.nome)
+  const base: Record<string, unknown> = { tenant_id: tenantId, nome, config: origem.config ?? {}, cor: origem.cor ?? null, icone: origem.icone ?? null, capa_url: origem.capa_url ?? null }
+  const pastaId = opts.pastaId !== undefined ? opts.pastaId : (origem.pasta_id ?? null)
+  if (pastaId) base.pasta_id = pastaId
+  // Insere; se colunas (cor/icone/capa_url/pasta_id) ainda não existirem, remove só a que faltar.
+  let ins = await svc.from('simulado_cadernos_designer').insert(base).select('id').single()
+  for (let t = 0; t < 6 && ins.error; t++) {
+    const col = ins.error.message.match(/'([a-z0-9_]+)' column/i)?.[1] ?? ins.error.message.match(/column "?([a-z0-9_]+)"? does not exist/i)?.[1]
+    if (col && col in base && !['tenant_id', 'nome', 'config'].includes(col)) { delete base[col]; ins = await svc.from('simulado_cadernos_designer').insert(base).select('id').single(); continue }
+    break
   }
+  if (!ins.data) return null
+  return { id: ins.data.id, nome, blocos: contarBlocosConfig(origem.config), cor: origem.cor ?? null, icone: origem.icone ?? null, capa: origem.capa_url ?? null }
+}
 
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_cadernos_designer', entidadeId: novo.id, depois: { nome: novoNome, duplicadoDe: id } })
+/** Duplica um caderno (cópia literal) — mantém a MESMA pasta do original. */
+export async function duplicarCaderno(id: string): Promise<{ ok: boolean; error?: string; caderno?: CadernoRow }> {
+  if (!(await checkPermission('questoes:create')) && !(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const caderno = await copiarCadernoInterno(svc, access.tenantId, id, { sufixoCopia: true })
+  if (!caderno) return { ok: false, error: 'Erro ao duplicar.' }
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_cadernos_designer', entidadeId: caderno.id, depois: { nome: caderno.nome, duplicadoDe: id } })
   revalidatePath('/admin/cadernos')
-  return {
-    ok: true,
-    caderno: { id: novo.id, nome: novoNome, blocos: contarBlocosConfig(origem.config), cor: origem.cor ?? null, icone: origem.icone ?? null, capa: origem.capa_url ?? null },
+  return { ok: true, caderno }
+}
+
+/** Move um caderno para dentro de uma pasta da área de Cadernos (ou raiz quando pastaId=null). */
+export async function moverCadernoParaPasta(cadernoId: string, pastaId: string | null): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_cadernos_designer').update({ pasta_id: pastaId }).eq('id', cadernoId).eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
+  if (error) {
+    if (/pasta_id|column/i.test(error.message)) return { ok: false, error: 'Recurso de pastas indisponível: rode a migration caderno_pasta (simulado_cadernos_designer.pasta_id).' }
+    return { ok: false, error: error.message }
   }
+  revalidatePath('/admin/cadernos')
+  return { ok: true }
+}
+
+/** Duplica uma PASTA (folder) de cadernos: copia a pasta (campos/capa) E cópia literal de todos os cadernos dentro. */
+export async function duplicarPastaCaderno(id: string): Promise<{ ok: boolean; id?: string; error?: string }> {
+  if (!(await checkPermission('questoes:create')) && !(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const { data: orig } = await svc.from('simulado_pastas').select('*').eq('id', id).eq('tenant_id', access.tenantId).maybeSingle()
+  if (!orig) return { ok: false, error: 'Pasta não encontrada.' }
+  const o = orig as any
+  const { id: _i, created_at: _c, criado_em: _cc, atualizado_em: _a, updated_at: _u, deletado: _d, deletado_em: _de, deletado_por: _dp, criado_por: _cp, atualizado_por: _ap, caderno_id: _cad, ...rest } = o
+  const insBase: Record<string, unknown> = { ...rest, nome: `${o.nome} (cópia)` }
+  let ins = await svc.from('simulado_pastas').insert(insBase).select('id').single()
+  for (let t = 0; t < 8 && ins.error; t++) {
+    const col = ins.error.message.match(/'([a-z0-9_]+)' column/i)?.[1] ?? ins.error.message.match(/column "?([a-z0-9_]+)"? does not exist/i)?.[1]
+    if (col && col in insBase && !['tenant_id', 'nome'].includes(col)) { delete insBase[col]; ins = await svc.from('simulado_pastas').insert(insBase).select('id').single(); continue }
+    break
+  }
+  const novoFolderId = ins.data?.id as string | undefined
+  if (!novoFolderId) return { ok: false, error: ins.error?.message ?? 'Erro ao duplicar a pasta.' }
+  const { data: dentro } = await svc.from('simulado_cadernos_designer').select('id').eq('pasta_id', id).eq('tenant_id', access.tenantId).eq('deletado', false)
+  for (const c of dentro ?? []) await copiarCadernoInterno(svc, access.tenantId, (c as any).id, { pastaId: novoFolderId })
+  revalidatePath('/admin/cadernos')
+  return { ok: true, id: novoFolderId }
 }
 
 export async function salvarCadernoConfig(id: string, config: CadernoConfig): Promise<{ ok: boolean; error?: string }> {

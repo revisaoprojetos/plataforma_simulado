@@ -56,7 +56,7 @@ export async function criarBanco(nome: string, tipo: string = 'objetiva', paiId?
 
 /** Cria uma PASTA (folder) para organizar bancos OU simulados. `area` separa onde ela aparece
  * ('banco' = Banco de Simulado, 'simulado' = Aplicação de Simulado). */
-export async function criarPastaFolder(nome: string, paiId?: string | null, area?: 'banco' | 'simulado'): Promise<{ ok: boolean; id?: string; error?: string }> {
+export async function criarPastaFolder(nome: string, paiId?: string | null, area?: 'banco' | 'simulado' | 'caderno'): Promise<{ ok: boolean; id?: string; error?: string }> {
   const g = await guard()
   if (!g.ok) return g
   const titulo = nome.trim()
@@ -101,6 +101,7 @@ export async function excluirPastaFolder(id: string): Promise<{ ok: boolean; err
   const svc = createAdminClient()
   try { await svc.from('simulado_pastas').update({ pai_id: null }).eq('pai_id', id).eq('tenant_id', g.tenantId) } catch { /* coluna pode não existir */ }
   try { await svc.from('simulado_simulados').update({ pasta_id: null }).eq('pasta_id', id).eq('tenant_id', g.tenantId) } catch { /* coluna pode não existir */ }
+  try { await svc.from('simulado_cadernos_designer').update({ pasta_id: null }).eq('pasta_id', id).eq('tenant_id', g.tenantId) } catch { /* coluna pode não existir */ }
   const { error } = await softDelete('simulado_pastas', id)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_pastas', entidadeId: id, depois: { deletado: true, pasta: true } })

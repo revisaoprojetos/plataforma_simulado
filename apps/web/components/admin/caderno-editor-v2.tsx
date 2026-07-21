@@ -361,7 +361,7 @@ function EditorNode({ block, ctx, emColuna, divStyle }: { block: Block; ctx: Nod
 
 // ----------------- Editor -----------------
 export function CadernoEditorV2({
-  cadernoId, nome, inicial, previewData, bancos = [], bancoIdInicial = null, registros = [], branding = null,
+  cadernoId, nome, inicial, previewData, bancos = [], bancoIdInicial = null, registros = [], branding = null, pastaId = null,
 }: {
   cadernoId: string
   nome: string
@@ -371,6 +371,8 @@ export function CadernoEditorV2({
   bancoIdInicial?: string | null
   registros?: { id: string; nome: string; vars: Record<string, string>; respostas?: Record<string, string> }[]
   branding?: { nome?: string; logoUrl?: string | null; logoGrandeUrl?: string | null; logoBg?: string; logoEstilo?: string } | null
+  /** Pasta (folder) organizadora do caderno — o "voltar" retorna a ela. */
+  pastaId?: string | null
 }) {
   const ehDiscursiva = (m: Modalidade) => /discursiv|reda[çc][ãa]o/i.test(`${m.id} ${m.nome}`)
   const mods0 = mesclarModalidades(inicial.modalidadesV2)
@@ -758,7 +760,7 @@ export function CadernoEditorV2({
       {/* Topo */}
       <div className="flex items-center justify-between gap-3 border-b bg-card/60 px-4 py-2.5">
         <div className="flex items-center gap-3">
-          <Link href="/admin/cadernos" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
+          <Link href={pastaId ? `/admin/cadernos?pasta=${pastaId}` : '/admin/cadernos'} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
           <div>
             <h1 className="text-lg font-bold leading-tight">{nome}</h1>
             <p className="text-xs text-muted-foreground">Editor de blocos · {modalidadesVisiveis.length} modalidade(s)</p>

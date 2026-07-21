@@ -14,24 +14,30 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
   const access = await getCurrentAccess()
   const svc = createAdminClient()
 
-  const { data: caderno } = await svc
-    .from('simulado_cadernos_designer')
-    .select('id, nome, config')
-    .eq('id', id)
-    .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
-    .maybeSingle()
+  const tid = access.tenantId ?? '00000000-0000-0000-0000-000000000000'
+  // Tolerante à coluna pasta_id (pode não ter migrado ainda).
+  let caderno: any = null
+  {
+    const r = await svc.from('simulado_cadernos_designer').select('id, nome, config, pasta_id').eq('id', id).eq('tenant_id', tid).maybeSingle()
+    if (r.error && /pasta_id|column/i.test(r.error.message)) {
+      const r2 = await svc.from('simulado_cadernos_designer').select('id, nome, config').eq('id', id).eq('tenant_id', tid).maybeSingle()
+      caderno = r2.data
+    } else caderno = r.data
+  }
   if (!caderno) notFound()
+  const pastaId: string | null = (caderno as any).pasta_id ?? null
 
   const config = (caderno.config ?? {}) as any
   const bancoId: string | null = config.bancoId ?? null
 
-  // Bancos (pastas) do tenant para o seletor do header.
-  const { data: bancos } = await svc
-    .from('simulado_pastas')
-    .select('id, nome')
-    .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
-    .order('nome')
-  const bancoNome = bancoId ? (bancos ?? []).find((b: any) => b.id === bancoId)?.nome ?? null : null
+  // Bancos (pastas is_folder=false) do tenant para o seletor do header — exclui as pastas-folder.
+  let bancos: { id: string; nome: string }[] = []
+  {
+    const r = await svc.from('simulado_pastas').select('id, nome, is_folder').eq('tenant_id', tid).order('nome')
+    if (r.error) bancos = ((await svc.from('simulado_pastas').select('id, nome').eq('tenant_id', tid).order('nome')).data ?? []) as any
+    else bancos = (r.data ?? []).filter((b: any) => !b.is_folder).map((b: any) => ({ id: b.id, nome: b.nome }))
+  }
+  const bancoNome = bancoId ? bancos.find((b) => b.id === bancoId)?.nome ?? null : null
 
   // Questões: do banco vinculado (se houver) ou publicadas do tenant.
   let questoes: any[] | null = null
@@ -110,6 +116,7 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
       bancoIdInicial={bancoId}
       registros={registros}
       branding={branding}
+      pastaId={pastaId}
     />
   )
 }
