@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ConcederAcessoForm } from '@/components/admin/conceder-acesso-form'
 import { RevogarAcessoButton } from '@/components/admin/revogar-acesso-button'
-import { Info } from 'lucide-react'
+import { SimuladoTestadores } from '@/components/admin/simulado-testadores'
+import { listarTestadores } from '@/app/admin/simulados/actions'
+import { Info, FlaskConical } from 'lucide-react'
 
 export async function SimuladoAcessos({ simuladoId, modoAplicacao }: { simuladoId: string; modoAplicacao?: string }) {
   const access = await getCurrentAccess()
@@ -17,9 +19,20 @@ export async function SimuladoAcessos({ simuladoId, modoAplicacao }: { simuladoI
 
   const estMap = new Map((estudantes ?? []).map((e: any) => [e.id, e.nome]))
   const agora = Date.now()
+  const testadores = (await listarTestadores(simuladoId)).testadores ?? []
 
   return (
     <div className="space-y-4">
+      {/* Acesso de teste (admin/testador): fazer o simulado mesmo fora da janela, sem contar em stats */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base"><FlaskConical className="h-4 w-4 text-amber-500" /> Acesso de teste (admin/testador)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SimuladoTestadores simuladoId={simuladoId} estudantes={(estudantes ?? []) as any} testadores={testadores} />
+        </CardContent>
+      </Card>
+
       {modoAplicacao !== 'prazo_relativo' && (
         <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-300">
           <Info className="mt-0.5 h-4 w-4 shrink-0" />

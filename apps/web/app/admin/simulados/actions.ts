@@ -460,6 +460,54 @@ export async function moverSimuladoParaPasta(simuladoId: string, pastaId: string
   return { ok: true }
 }
 
+// ───────────────────────── Acesso de teste (testadores) ─────────────────────────
+export interface Testador { id: string; estudante_id: string; nome: string; email: string | null; criado_em: string }
+
+/** Lista os estudantes com "acesso de teste" neste simulado (podem fazer fora da janela; is_teste). */
+export async function listarTestadores(simuladoId: string): Promise<{ ok?: boolean; error?: string; testadores?: Testador[] }> {
+  if (!(await checkPermission('simulados:view'))) return { error: 'Sem permissão.' }
+  const svc = createAdminClient()
+  const { data, error } = await svc.from('simulado_testadores').select('id, estudante_id, criado_em').eq('simulado_id', simuladoId).order('criado_em', { ascending: false })
+  if (error) { if (/testadores|relation|does not exist/i.test(error.message)) return { ok: true, testadores: [] }; return { error: error.message } }
+  const estIds = [...new Set((data ?? []).map((t: any) => t.estudante_id))]
+  const info = new Map<string, { nome: string; email: string | null }>()
+  if (estIds.length) {
+    const { data: ests } = await svc.from('simulado_estudantes').select('id, nome, email').in('id', estIds)
+    for (const e of ests ?? []) info.set((e as any).id, { nome: (e as any).nome ?? 'Aluno', email: (e as any).email ?? null })
+  }
+  return { ok: true, testadores: (data ?? []).map((t: any) => ({ id: t.id, estudante_id: t.estudante_id, nome: info.get(t.estudante_id)?.nome ?? 'Aluno', email: info.get(t.estudante_id)?.email ?? null, criado_em: t.criado_em })) }
+}
+
+/** Concede acesso de teste a um ou mais estudantes (ignora os que já têm). */
+export async function concederTestadores(simuladoId: string, estudanteIds: string[]): Promise<{ ok: boolean; error?: string; adicionados?: number }> {
+  if (!(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const ids = [...new Set((estudanteIds ?? []).filter(Boolean))]
+  if (!ids.length) return { ok: false, error: 'Selecione ao menos um estudante.' }
+  const svc = createAdminClient()
+  const { data: ja } = await svc.from('simulado_testadores').select('estudante_id').eq('simulado_id', simuladoId).in('estudante_id', ids)
+  const jaSet = new Set((ja ?? []).map((x: any) => x.estudante_id))
+  const novos = ids.filter((i) => !jaSet.has(i))
+  if (!novos.length) return { ok: true, adicionados: 0 }
+  const { error } = await svc.from('simulado_testadores').insert(novos.map((estudante_id) => ({ tenant_id: tenantId, simulado_id: simuladoId, estudante_id })))
+  if (error) { if (/testadores|relation|does not exist/i.test(error.message)) return { ok: false, error: 'Recurso indisponível: rode a migration simulado_testadores no banco.' }; return { ok: false, error: error.message } }
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_testadores', entidadeId: simuladoId, depois: { adicionados: novos.length } })
+  revalidatePath(`/admin/simulados/${simuladoId}`)
+  return { ok: true, adicionados: novos.length }
+}
+
+/** Revoga o acesso de teste de um estudante. */
+export async function revogarTestador(simuladoId: string, estudanteId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_testadores').delete().eq('simulado_id', simuladoId).eq('estudante_id', estudanteId)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_testadores', entidadeId: simuladoId, depois: { estudante_id: estudanteId } })
+  revalidatePath(`/admin/simulados/${simuladoId}`)
+  return { ok: true }
+}
+
 export interface SessaoLinkada {
   id: string
   estudante: string

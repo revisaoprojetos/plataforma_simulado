@@ -96,46 +96,16 @@ export async function POST(request: NextRequest) {
 
   const tenantId = simulado.tenant_id as string
   const tituloSimulado = (simulado.titulo as string) ?? ''
-
-  if (simulado.status !== 'publicado' && simulado.status !== 'ativo') {
-    return bloqueio(tenantId, 'bloqueio_fora_janela', { simulado: tituloSimulado })
-  }
-
-  // Regra: "entrada antecipada" permite o aluno LOGAR antes do início e ficar aguardando
-  // (sem gastar tempo de prova). Sem a regra, o comportamento antigo (bloqueio) permanece.
   const regrasSim = (simulado.regras as Record<string, unknown>) ?? {}
+  // Regra: "entrada antecipada" permite o aluno LOGAR antes do início e ficar aguardando.
   const entradaAntecipada = !!regrasSim.entrada_antecipada
-
-  // Verificar janela temporal se aplicável.
   const agora = new Date()
-
-  // Manutenção: se ativa e dentro da janela, o aluno vê um aviso e NÃO acessa a prova.
-  const manut = (regrasSim.manutencao ?? null) as { ativo?: boolean; inicio?: string | null; fim?: string | null } | null
-  if (manut?.ativo) {
-    const mIni = manut.inicio ? new Date(manut.inicio) : null
-    const mFim = manut.fim ? new Date(manut.fim) : null
-    const emManutencao = (!mIni || agora >= mIni) && (!mFim || agora <= mFim)
-    if (emManutencao) {
-      const fmtM = (d: Date) => d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-      const msg = `Este simulado está em manutenção${mFim ? ` até ${fmtM(mFim)} (horário de Brasília)` : ''}. Tente novamente mais tarde.`
-      return NextResponse.json({ titulo: 'Simulado em manutenção', message: msg, tipo: 'nao_iniciado' }, { status: 403 })
-    }
-  }
-
   const antesDoInicio = !!simulado.data_inicio && new Date(simulado.data_inicio) > agora
-  if (antesDoInicio && !entradaAntecipada) {
-    return bloqueio(tenantId, 'bloqueio_fora_janela', { simulado: tituloSimulado })
-  }
-  if (simulado.data_fim && new Date(simulado.data_fim) < agora) {
-    return bloqueio(tenantId, 'bloqueio_prazo_expirado', { simulado: tituloSimulado })
-  }
 
-  // 2. Buscar estudante por email no tenant do simulado
+  // 2. Identidade: buscar o estudante por e-mail (+ 2º fator) ANTES das checagens de janela/acesso,
+  //    porque um TESTADOR pula essas checagens (mas ainda precisa provar quem é).
   const metodo = (simulado.metodo_identificacao as string) ?? 'email'
-
-  // deletado=false + limit(1): ignora cadastros soft-deletados e tolera duplicata (mesmo e-mail
-  // em 2 registros) — sem isso, o .maybeSingle() LANÇAVA erro com 2 linhas e virava "e-mail não
-  // encontrado" indevido (ex.: aluno com um cadastro apagado + um ativo).
+  // deletado=false + limit(1): ignora cadastros soft-deletados e tolera duplicata (mesmo e-mail).
   const { data: estudantesMatch } = await supabase
     .from('simulado_estudantes')
     .select('id, nome, email, user_id, cpf, telefone, classificacao')
@@ -171,54 +141,75 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 3. Verificar acesso. Modo prazo_relativo usa acesso avulso (simulado_acessos);
-  //    demais modos usam matrícula ativa.
+  // 3. TESTADOR? Se sim, faz o simulado como TESTE: pula status/janela/manutenção/matrícula, sem
+  //    limite de tentativas, e a sessão nasce is_teste=true (fora de estatísticas/ranking/relatórios).
+  const ehTeste = await isTestador(supabase, estudante.id, simulado.id)
+
   let acessoAvulso: { id: string; expira_em: string | null; tentativas_permitidas: number; tentativas_usadas: number } | null = null
-  if (simulado.modo_aplicacao === 'prazo_relativo') {
-    const { data: acesso } = await supabase
-      .from('simulado_acessos')
-      .select('id, expira_em, tentativas_permitidas, tentativas_usadas')
-      .eq('simulado_id', simulado.id)
-      .eq('estudante_id', estudante.id)
-      .order('criado_em', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (!acesso) {
-      // Sem bypass de passaporte: exige acesso avulso (prazo relativo) como qualquer aluno.
-      return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
-    } else {
+  if (!ehTeste) {
+    if (simulado.status !== 'publicado' && simulado.status !== 'ativo') {
+      return bloqueio(tenantId, 'bloqueio_fora_janela', { simulado: tituloSimulado })
+    }
+    // Manutenção: se ativa e dentro da janela, o aluno vê um aviso e NÃO acessa a prova.
+    const manut = (regrasSim.manutencao ?? null) as { ativo?: boolean; inicio?: string | null; fim?: string | null } | null
+    if (manut?.ativo) {
+      const mIni = manut.inicio ? new Date(manut.inicio) : null
+      const mFim = manut.fim ? new Date(manut.fim) : null
+      const emManutencao = (!mIni || agora >= mIni) && (!mFim || agora <= mFim)
+      if (emManutencao) {
+        const fmtM = (d: Date) => d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        const msg = `Este simulado está em manutenção${mFim ? ` até ${fmtM(mFim)} (horário de Brasília)` : ''}. Tente novamente mais tarde.`
+        return NextResponse.json({ titulo: 'Simulado em manutenção', message: msg, tipo: 'nao_iniciado' }, { status: 403 })
+      }
+    }
+    if (antesDoInicio && !entradaAntecipada) {
+      return bloqueio(tenantId, 'bloqueio_fora_janela', { simulado: tituloSimulado })
+    }
+    if (simulado.data_fim && new Date(simulado.data_fim) < agora) {
+      return bloqueio(tenantId, 'bloqueio_prazo_expirado', { simulado: tituloSimulado })
+    }
+
+    // Acesso: modo prazo_relativo usa acesso avulso (simulado_acessos); demais usam matrícula ativa.
+    if (simulado.modo_aplicacao === 'prazo_relativo') {
+      const { data: acesso } = await supabase
+        .from('simulado_acessos')
+        .select('id, expira_em, tentativas_permitidas, tentativas_usadas')
+        .eq('simulado_id', simulado.id)
+        .eq('estudante_id', estudante.id)
+        .order('criado_em', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (!acesso) {
+        return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
+      }
       if (acesso.expira_em && new Date(acesso.expira_em) < new Date()) {
         return bloqueio(tenantId, 'bloqueio_prazo_expirado', { nome: estudante.nome ?? '', simulado: tituloSimulado })
       }
       acessoAvulso = acesso
+    } else {
+      const temAcesso = await verificarAcesso(supabase, estudante.id, simulado.id)
+      if (!temAcesso) {
+        return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
+      }
     }
-  } else {
-    // Acesso SEMPRE por matrícula liberada (o passaporte a recebe via grupo "Passaporte"
-    // vinculado ao banco do simulado — sem bypass global por classificação).
-    const temAcesso = await verificarAcesso(supabase, estudante.id, simulado.id)
-    if (!temAcesso) {
-      return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
+
+    // Entrada antecipada + ainda antes do início: valida tudo mas NÃO cria a sessão (tela de espera).
+    if (entradaAntecipada && antesDoInicio) {
+      return NextResponse.json({ aguardando: true, data_inicio: simulado.data_inicio, estudante_nome: estudante.nome })
     }
   }
 
-  // Entrada antecipada + ainda antes do início: identidade e acesso já foram validados,
-  // mas NÃO criamos a sessão (para não iniciar/gastar o tempo de prova). O aluno fica na
-  // tela de espera com contagem regressiva; ao chegar a hora, o front refaz o identify.
-  if (entradaAntecipada && antesDoInicio) {
-    return NextResponse.json({ aguardando: true, data_inicio: simulado.data_inicio, estudante_nome: estudante.nome })
-  }
-
-  // 4. Abrir ou retomar sessao_prova
+  // 4. Abrir ou retomar sessao_prova (is_teste = ehTeste — teste e prova real não se misturam).
   const { data: sessaoExistente } = await supabase
     .from('simulado_sessoes_prova')
     .select('id, status')
     .eq('simulado_id', simulado.id)
     .eq('estudante_id', estudante.id)
-    .eq('is_teste', false)
+    .eq('is_teste', ehTeste)
     .neq('status', 'finalizada')
     .order('iniciado_em', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   let sessaoId: string
 
@@ -228,7 +219,14 @@ export async function POST(request: NextRequest) {
   } else {
     let tentativaNum: number
 
-    if (acessoAvulso) {
+    if (ehTeste) {
+      // Testador: sem limite de tentativas; numera pelas sessões de teste já finalizadas.
+      const { count } = await supabase
+        .from('simulado_sessoes_prova')
+        .select('*', { count: 'exact', head: true })
+        .eq('simulado_id', simulado.id).eq('estudante_id', estudante.id).eq('is_teste', true).eq('status', 'finalizada')
+      tentativaNum = (count ?? 0) + 1
+    } else if (acessoAvulso) {
       // Modo prazo relativo: limite e contagem vêm do acesso avulso.
       if (acessoAvulso.tentativas_usadas >= acessoAvulso.tentativas_permitidas) {
         return bloqueio(tenantId, 'bloqueio_tentativas', { nome: estudante.nome ?? '', simulado: tituloSimulado, tentativas_restantes: '0' })
@@ -260,7 +258,7 @@ export async function POST(request: NextRequest) {
         tenant_id: simulado.tenant_id,
         simulado_id: simulado.id,
         estudante_id: estudante.id,
-        is_teste: false,
+        is_teste: ehTeste,
         status: 'em_andamento',
         iniciado_em: new Date().toISOString(),
         tentativa_num: tentativaNum,
@@ -275,13 +273,15 @@ export async function POST(request: NextRequest) {
 
     sessaoId = novaSessao.id
 
-    // Notifica sistemas externos (webhooks/n8n): estudante iniciou o simulado.
-    await dispararWebhook(simulado.tenant_id, 'estudante.iniciou', {
-      contact: contatoEstudante(estudante),
-      simulado: { id: simulado.id, name: tituloSimulado },
-      sessao_id: sessaoId,
-      tentativa: tentativaNum,
-    })
+    // Notifica sistemas externos só na prova REAL (não em sessão de teste).
+    if (!ehTeste) {
+      await dispararWebhook(simulado.tenant_id, 'estudante.iniciou', {
+        contact: contatoEstudante(estudante),
+        simulado: { id: simulado.id, name: tituloSimulado },
+        sessao_id: sessaoId,
+        tentativa: tentativaNum,
+      })
+    }
   }
 
   // Auditoria: acesso do aluno ao simulado (entrada na prova).
@@ -314,4 +314,21 @@ async function verificarAcesso(
 
   if (!matriculas || matriculas.length === 0) return false
   return matriculas.some((m) => (!m.status || m.status === 'ativa') && m.liberado !== false)
+}
+
+/** O estudante tem "acesso de teste" neste simulado? (faz como is_teste, fora da janela). */
+async function isTestador(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  estudanteId: string,
+  simuladoId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('simulado_testadores')
+    .select('id')
+    .eq('simulado_id', simuladoId)
+    .eq('estudante_id', estudanteId)
+    .limit(1)
+    .maybeSingle()
+  if (error) return false // tabela pode não existir ainda → ninguém é testador
+  return !!data
 }
