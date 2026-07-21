@@ -30,17 +30,19 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
   const bancosF = useMemo(() => (q ? bancos.filter((b) => b.nome.toLowerCase().includes(q)) : bancos), [bancos, q])
   const foldersF = useMemo(() => (q ? folders.filter((f) => f.nome.toLowerCase().includes(q)) : folders), [folders, q])
 
-  function novaPasta() {
+  // O diálogo abre FORA da transition (pedirTexto/confirmar dependem de um setState que a
+  // transition adiaria → o pop-up não apareceria). Só a action vai para dentro de start().
+  async function novaPasta() {
+    const nome = await pedirTexto({ titulo: 'Nova pasta', label: 'Nome da pasta', placeholder: 'ex.: Semana de Atualização', confirmar: 'Criar pasta' })
+    if (!nome) return
     start(async () => {
-      const nome = await pedirTexto({ titulo: 'Nova pasta', label: 'Nome da pasta', placeholder: 'ex.: Semana de Atualização', confirmar: 'Criar pasta' })
-      if (!nome) return
       const r = await criarPastaFolder(nome)
       if (r.ok) { toast.success('Pasta criada'); router.refresh() } else toast.error(r.error ?? 'Erro ao criar')
     })
   }
-  function excluirPasta(f: Pasta) {
+  async function excluirPasta(f: Pasta) {
+    if (!(await confirmar({ mensagem: `Excluir a pasta "${f.nome}"? Os bancos dentro dela voltam para a raiz (não são apagados).`, destrutivo: true }))) return
     start(async () => {
-      if (!(await confirmar({ mensagem: `Excluir a pasta "${f.nome}"? Os bancos dentro dela voltam para a raiz (não são apagados).`, destrutivo: true }))) return
       const r = await excluirPastaFolder(f.id)
       if (r.ok) { toast.success('Pasta excluída'); router.refresh() } else toast.error(r.error ?? 'Erro')
     })
