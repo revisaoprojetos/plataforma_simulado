@@ -532,19 +532,16 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco, assunt
       const grupos = gruposBanco ?? []
       const slugify = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
       const humano = (s: string) => s.replace(/_/g, ' ').replace(/^./, (ch) => ch.toUpperCase())
-      const escolher = (nome: string) => {
-        const gr = grupos.find((x) => x.nome === nome)
-        if (!gr) { onChange({ grupo: nome }); return }
-        onChange({ grupo: gr.nome, chaves: gr.disciplinas.map(slugify) })
-      }
       return (
         <div className="space-y-3">
-          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Selecione um <b>grupo do simulado</b> — o nome e as disciplinas (e o “Acertos X/N” somado) vêm dele automaticamente.</p>
-          <Row label="Grupo do simulado">
-            <select value={a.grupo ?? ''} onChange={(e) => escolher(e.target.value)} className={inputCls}>
-              <option value="">— escolher grupo —</option>
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Selecione um <b>grupo do simulado</b> — as disciplinas (e o “Acertos X/N” somado) vêm dele. O <b>nome exibido</b> no card você edita abaixo.</p>
+          <Row label="Nome exibido no card">
+            <input value={a.grupo ?? ''} onChange={(e) => set('grupo', e.target.value)} className={inputCls} placeholder="Grupo I" />
+          </Row>
+          <Row label="Puxar disciplinas de um grupo">
+            <select value="" onChange={(e) => { const gr = grupos.find((x) => x.nome === e.target.value); if (gr) { set('chaves', gr.disciplinas.map(slugify)); if (!a.grupo) set('grupo', gr.nome) } }} className={inputCls}>
+              <option value="">— escolher grupo do banco —</option>
               {grupos.map((gr) => <option key={gr.id} value={gr.nome}>{gr.nome} ({gr.disciplinas.length} disc.)</option>)}
-              {a.grupo && !grupos.some((gr) => gr.nome === a.grupo) && <option value={a.grupo}>{a.grupo} (atual)</option>}
             </select>
           </Row>
           {grupos.length === 0 && <p className="text-[11px] text-amber-600 dark:text-amber-400">Nenhum grupo definido no banco. Defina os grupos em Banco de Simulado → Grupos, e recarregue.</p>}
