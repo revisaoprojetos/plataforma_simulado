@@ -119,7 +119,7 @@ export function CadernosClient({ cadernos }: { cadernos: CadernoItem[] }) {
                 {/* Banda de capa/cor no topo (mais alta → a capa do banco não fica tão cortada) */}
                 <div className="relative h-40 overflow-hidden">
                   {c.capa ? (
-                    <img src={c.capa} alt="" className="h-full w-full object-cover object-[center_35%] transition-transform duration-500 group-hover:scale-105" />
+                    <img src={c.capa} alt="" className="h-full w-full object-cover object-[center_30%] transition-transform duration-500 group-hover:scale-105" />
                   ) : (
                     <div className="h-full w-full" style={{ background: `linear-gradient(150deg, ${cor}, ${cor}bb)` }} />
                   )}
