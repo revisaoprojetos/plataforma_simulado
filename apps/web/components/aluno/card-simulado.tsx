@@ -1,10 +1,11 @@
 import Link from 'next/link'
-import { Radio, Play, RotateCcw, Clock, CalendarClock, Hourglass, Infinity as InfinityIcon } from 'lucide-react'
+import { Radio, Play, RotateCcw, Clock, CalendarClock, Hourglass, CircleCheck, Infinity as InfinityIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import type { ItemSimulado } from '@/lib/aluno/simulado-item'
 
-const ICON: Record<string, any> = { emerald: Radio, amber: Hourglass, sky: InfinityIcon, slate: CalendarClock, rose: Clock }
+// "emerald" = simulado disponível para o aluno (dentro da janela). Ícone neutro (não "ao vivo").
+const ICON: Record<string, any> = { emerald: CircleCheck, amber: Hourglass, sky: InfinityIcon, slate: CalendarClock, rose: Clock }
 
 /** Fitinha "novo" — banner de 2 pontas (fishtail) no canto superior direito. */
 function FitaNovo() {
@@ -27,7 +28,7 @@ export function CardSimulado({ s }: { s: ItemSimulado }) {
   const BancoIcon = iconeBanco(s.vis?.icone)
   const capa = s.vis?.capa
   return (
-    <div className={cn('group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all', s.podeFazer && 'hover:-translate-y-1 hover:shadow-lg', s.aoVivo && 'ring-2 ring-emerald-500/50')}>
+    <div className={cn('group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all', s.podeFazer && 'hover:-translate-y-1 hover:shadow-lg')}>
       {capa
         ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
@@ -38,10 +39,8 @@ export function CardSimulado({ s }: { s: ItemSimulado }) {
       {(s.podeFazer || s.podeAguardar) && <Link href={`/simulado/${s.embed_token}`} className="absolute inset-0 z-10" aria-label={s.titulo} />}
 
       <span className="pointer-events-none absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: cor }}><BancoIcon className="h-4 w-4" /></span>
-      <span className={cn('pointer-events-none absolute right-3 z-20 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur', s.novo ? 'top-11' : 'top-3', s.aoVivo ? 'bg-emerald-500/90' : 'bg-black/45')}>
-        {s.aoVivo
-          ? <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-white" /></span>
-          : <StatusIcon className="h-3.5 w-3.5" />}
+      <span className={cn('pointer-events-none absolute right-3 z-20 inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur', s.novo ? 'top-11' : 'top-3')}>
+        <StatusIcon className="h-3.5 w-3.5" />
         {s.statusLabel}
       </span>
 

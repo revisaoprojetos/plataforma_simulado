@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { SimuladosBoard, type SimuladoCard } from '@/components/admin/simulados-board'
+import { onlinePorSimulado } from '@/app/admin/simulados/actions'
 import { tiposDeSimulados } from '@/lib/simulado/tipo'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
@@ -25,6 +26,9 @@ export default async function SimuladosPage() {
   const comTipo = (simulados ?? []).map((s: any) => ({ ...s, tipo: tipos.get(s.id) ?? null, vis: visual.get(s.id) ?? null }))
     .filter((s: any) => !OCULTAR_DISCURSIVA || s.tipo !== 'discursiva')
 
+  // "Fazendo agora" inicial por simulado (o board atualiza sozinho via polling depois).
+  const online = await onlinePorSimulado(comTipo.map((s: any) => s.id))
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
   return (
@@ -40,7 +44,7 @@ export default async function SimuladosPage() {
         </Link>
       </div>
 
-      <SimuladosBoard simulados={comTipo as SimuladoCard[]} appUrl={appUrl} />
+      <SimuladosBoard simulados={comTipo as SimuladoCard[]} appUrl={appUrl} onlineInicial={online} />
     </div>
   )
 }

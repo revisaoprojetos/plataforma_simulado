@@ -403,6 +403,49 @@ export async function resumoAoVivoSimulado(simuladoId: string): Promise<{ ok?: b
   return { ok: true, resumo: { total, online, finalizados, naoIniciaram } }
 }
 
+/**
+ * "Fazendo agora" por simulado (para os cards do board): alunos DISTINTOS com uma sessão
+ * NÃO finalizada (em andamento/aguardando), válida (sem testador/deletada). Uma query só
+ * para todos os simulados informados — leve o suficiente para polling no board.
+ */
+export async function onlinePorSimulado(simuladoIds: string[]): Promise<Record<string, number>> {
+  if (!(await checkPermission('simulados:view'))) return {}
+  const ids = [...new Set((simuladoIds ?? []).filter(Boolean))]
+  if (!ids.length) return {}
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return {}
+  const svc = createAdminClient()
+  // Sessões ativas (não finalizadas), válidas — normalmente poucas.
+  const sess = await fetchAllByIn<any>(ids, (chunk) =>
+    svc.from('simulado_sessoes_prova')
+      .select('simulado_id, estudante_id, status')
+      .eq('tenant_id', tenantId)
+      .in('simulado_id', chunk).eq('is_teste', false).eq('deletado', false).neq('status', 'finalizada')
+      .order('simulado_id'))
+  const pares = [...new Set((sess as any[])
+    .filter((s) => s.simulado_id && s.estudante_id)
+    .map((s) => `${s.simulado_id}::${s.estudante_id}`))]
+  if (!pares.length) return {}
+  // Conta só MATRICULADOS — igual ao painel "Ao vivo" (resumoAoVivoSimulado). Candidatos são
+  // poucos (só sessões ativas), então a checagem de matrícula é barata.
+  const simCand = [...new Set(pares.map((p) => p.split('::')[0]))]
+  const estCand = [...new Set(pares.map((p) => p.split('::')[1]))]
+  const mats = await fetchAllByIn<any>(estCand, (chunk) =>
+    svc.from('simulado_matriculas').select('simulado_id, estudante_id').in('simulado_id', simCand).in('estudante_id', chunk))
+  const matSet = new Set((mats as any[]).map((m) => `${m.simulado_id}::${m.estudante_id}`))
+  const porSim = new Map<string, Set<string>>()
+  for (const p of pares) {
+    if (!matSet.has(p)) continue
+    const [sid, eid] = p.split('::')
+    let set = porSim.get(sid)
+    if (!set) { set = new Set(); porSim.set(sid, set) }
+    set.add(eid)
+  }
+  const out: Record<string, number> = {}
+  for (const [k, set] of porSim) out[k] = set.size
+  return out
+}
+
 export interface SessaoLinkada {
   id: string
   estudante: string

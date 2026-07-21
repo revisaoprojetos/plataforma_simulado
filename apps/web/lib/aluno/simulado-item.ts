@@ -30,7 +30,6 @@ export type ItemSimulado = {
   restantes: number
   emAndamento: boolean
   statusLabel: string
-  aoVivo: boolean
   windowOk: boolean
   quando: string | null
   tom: string
@@ -62,7 +61,7 @@ export function montarItensSimulado(
     const max = Number(regras.max_tentativas ?? regras.retentativas ?? 0)
     const ilimitado = s.modo_aplicacao === 'aberto' || !(max > 0)
     const restantes = ilimitado ? Infinity : Math.max(0, max - finalizadas)
-    let statusLabel = 'Aberto', aoVivo = false, windowOk = true, quando: string | null = 'Sempre disponível', tom = 'sky'
+    let statusLabel = 'Aberto', windowOk = true, quando: string | null = 'Sempre disponível', tom = 'sky'
     const modo = s.modo_aplicacao
     if (modo === 'janela_fixa') {
       const ini = s.data_inicio ? new Date(s.data_inicio).getTime() : null
@@ -71,7 +70,9 @@ export function montarItensSimulado(
       quando = janelaTexto(s.data_inicio, s.data_fim)
       if (ini && now < ini) { statusLabel = 'Agendado'; windowOk = false; tom = 'slate' }
       else if (fim && now > fim) { statusLabel = 'Encerrado'; windowOk = false; tom = 'rose' }
-      else { statusLabel = 'Ao vivo'; aoVivo = true; tom = 'emerald' }
+      // Dentro da janela: o aluno vê "Disponível" (status neutro). NÃO expomos o indicador
+      // de "ao vivo" pulsante para o aluno — quem está fazendo agora é visão do admin.
+      else { statusLabel = 'Disponível'; tom = 'emerald' }
     } else if (modo === 'prazo_relativo') {
       const exp = expiraPorSim.get(s.id)
       if (exp && now > new Date(exp).getTime()) { statusLabel = 'Prazo expirado'; windowOk = false; quando = `Expirou ${fmt(exp)}`; tom = 'rose' }
@@ -83,7 +84,7 @@ export function montarItensSimulado(
       const mi = mnt.inicio ? new Date(mnt.inicio).getTime() : null
       const mf = mnt.fim ? new Date(mnt.fim).getTime() : null
       if ((!mi || now >= mi) && (!mf || now <= mf)) {
-        statusLabel = 'Em manutenção'; windowOk = false; aoVivo = false; tom = 'amber'
+        statusLabel = 'Em manutenção'; windowOk = false; tom = 'amber'
         quando = mf ? `Manutenção até ${fmt(mnt.fim)}` : 'Em manutenção'
       }
     }
@@ -95,6 +96,6 @@ export function montarItensSimulado(
     // "Novo" = aberto há < 1 dia: prioriza quando foi publicado; cai no created_at.
     const abertoEm = regras.publicado_em ?? s.created_at
     const novo = !!abertoEm && now - new Date(abertoEm).getTime() < UM_DIA_MS
-    return { ...s, finalizadas, restantes, emAndamento, statusLabel, aoVivo, windowOk, quando, tom, podeFazer, podeAguardar, refazer, novo, vis: visual.get(s.id) ?? null }
+    return { ...s, finalizadas, restantes, emAndamento, statusLabel, windowOk, quando, tom, podeFazer, podeAguardar, refazer, novo, vis: visual.get(s.id) ?? null }
   })
 }

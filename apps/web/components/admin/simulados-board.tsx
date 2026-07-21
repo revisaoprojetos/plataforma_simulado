@@ -1,7 +1,7 @@
 'use client'
 import { confirmar } from '@/components/ui/confirm-dialog'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useTransition, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
@@ -44,6 +44,7 @@ import {
   publishSimuladoAction,
   deleteSimuladoAction,
   liberarItemAction,
+  onlinePorSimulado,
 } from '@/app/admin/simulados/actions'
 
 export interface SimuladoCard {
@@ -121,7 +122,7 @@ function SeloLib({ label }: { label: string }) {
   )
 }
 
-function CardItem({ s, appUrl }: { s: SimuladoCard; appUrl: string }) {
+function CardItem({ s, appUrl, online }: { s: SimuladoCard; appUrl: string; online: number }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   // Estado efetivo (modo configurado + override manual do admin).
@@ -228,9 +229,18 @@ function CardItem({ s, appUrl }: { s: SimuladoCard; appUrl: string }) {
 
       {/* Rodapé */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
-        <span className="mb-1 inline-flex items-center gap-1 rounded-md bg-black/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/85 backdrop-blur">
-          <span className={cn('h-1.5 w-1.5 rounded-full', dotClass[s.status])} /> {statusLabel[s.status]}
-        </span>
+        <div className="mb-1 flex flex-wrap items-center gap-1">
+          <span className="inline-flex items-center gap-1 rounded-md bg-black/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/85 backdrop-blur">
+            <span className={cn('h-1.5 w-1.5 rounded-full', dotClass[s.status])} /> {statusLabel[s.status]}
+          </span>
+          {/* "Fazendo agora" ao vivo — só na visão do admin (o aluno não vê isto). */}
+          {online > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white backdrop-blur" title={`${online} aluno(s) fazendo agora`}>
+              <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-white" /></span>
+              {online} fazendo agora
+            </span>
+          )}
+        </div>
         <h3 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{s.titulo}</h3>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">{tipoLabel(s.tipo)}</span>
@@ -261,9 +271,19 @@ function CardItem({ s, appUrl }: { s: SimuladoCard; appUrl: string }) {
   )
 }
 
-export function SimuladosBoard({ simulados, appUrl }: { simulados: SimuladoCard[]; appUrl: string }) {
+export function SimuladosBoard({ simulados, appUrl, onlineInicial = {} }: { simulados: SimuladoCard[]; appUrl: string; onlineInicial?: Record<string, number> }) {
   const [busca, setBusca] = useState('')
   const [modo, setModo] = useState<string>('todos')
+  // "Fazendo agora" por simulado, atualizado sozinho (polling) — igual ao painel "Ao vivo".
+  const [online, setOnline] = useState<Record<string, number>>(onlineInicial)
+  useEffect(() => {
+    const ids = simulados.map((s) => s.id)
+    if (!ids.length) return
+    let vivo = true
+    const tick = async () => { try { const r = await onlinePorSimulado(ids); if (vivo) setOnline(r) } catch { /* silencioso */ } }
+    const t = setInterval(tick, 12_000)
+    return () => { vivo = false; clearInterval(t) }
+  }, [simulados])
 
   const filtrados = useMemo(() => {
     return simulados.filter((s) => {
@@ -325,7 +345,7 @@ export function SimuladosBoard({ simulados, appUrl }: { simulados: SimuladoCard[
             ) : (
               <div className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {itens.map((s) => (
-                  <CardItem key={s.id} s={s} appUrl={appUrl} />
+                  <CardItem key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} />
                 ))}
               </div>
             )}

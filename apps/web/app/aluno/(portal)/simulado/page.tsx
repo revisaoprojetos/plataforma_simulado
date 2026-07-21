@@ -46,7 +46,6 @@ export default async function SimuladoDisponivelPage() {
       : i.refazer ? 'refazer' : (i.modo_aplicacao === 'janela_fixa' ? 'agendados' : 'disponiveis')
     buckets[b].push(i)
   }
-  buckets.agendados.sort((a, b) => Number(b.aoVivo) - Number(a.aoVivo))
   const SECOES = [
     { chave: 'agendados', titulo: 'Agendados', cor: 'bg-amber-500', vazio: 'Nenhum simulado agendado' },
     { chave: 'disponiveis', titulo: 'Disponíveis', cor: 'bg-emerald-500', vazio: 'Nenhum simulado disponível no momento' },
@@ -57,7 +56,7 @@ export default async function SimuladoDisponivelPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Simulados</h1>
-        <p className="text-muted-foreground">Simulados liberados para você fazer agora — ao vivo, com prazo ou abertos.</p>
+        <p className="text-muted-foreground">Simulados liberados para você — disponíveis agora, agendados, com prazo ou abertos.</p>
       </div>
 
       {itens.length === 0 ? (
