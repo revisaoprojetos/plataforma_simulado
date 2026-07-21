@@ -1,6 +1,6 @@
 'use client'
 
-import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
+import { confirmar } from '@/components/ui/confirm-dialog'
 import { useMemo, useState, useTransition } from 'react'
 import type React from 'react'
 import { createPortal } from 'react-dom'
@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { criarCaderno, excluirCaderno, duplicarCaderno, moverCadernoParaPasta, duplicarPastaCaderno } from '@/app/admin/cadernos/actions'
-import { criarPastaFolder, excluirPastaFolder } from '@/app/admin/banco-questoes/actions'
+import { excluirPastaFolder } from '@/app/admin/banco-questoes/actions'
 import { iconeBanco } from '@/lib/banco-visual'
 import { EditarCadernoDialog } from '@/components/admin/editar-caderno-dialog'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
@@ -36,6 +36,7 @@ export function CadernosClient({ cadernos, folders = [], destinos = [], atual = 
   const [editando, setEditando] = useState<CadernoItem | null>(null)
   const [movendo, setMovendo] = useState<CadernoItem | null>(null)
   const [editandoPasta, setEditandoPasta] = useState<Pasta | null>(null)
+  const [criandoPasta, setCriandoPasta] = useState(false)
 
   const q = busca.toLowerCase().trim()
   const cadsF = useMemo(() => (q ? cadernos.filter((c) => c.nome.toLowerCase().includes(q)) : cadernos), [q, cadernos])
@@ -67,12 +68,7 @@ export function CadernosClient({ cadernos, folders = [], destinos = [], atual = 
       setDuplicando(null)
     })
   }
-  // Diálogos abrem FORA da transition (senão o setState do pop-up é adiado).
-  async function novaPasta() {
-    const nm = await pedirTexto({ titulo: 'Nova pasta', label: 'Nome da pasta', placeholder: 'ex.: Semana de Atualização', confirmar: 'Criar pasta' })
-    if (!nm) return
-    start(async () => { const r = await criarPastaFolder(nm, null, 'caderno'); if (r.ok) { toast.success('Pasta criada'); router.refresh() } else toast.error(r.error ?? 'Erro ao criar') })
-  }
+  // O diálogo de confirmação/exclusão abre FORA da transition (senão o setState do pop-up é adiado).
   async function excluirPasta(f: Pasta) {
     if (!(await confirmar({ mensagem: `Excluir a pasta "${f.nome}"? Os cadernos dentro dela voltam para a raiz (não são apagados).`, destrutivo: true }))) return
     start(async () => { const r = await excluirPastaFolder(f.id); if (r.ok) { toast.success('Pasta excluída'); router.refresh() } else toast.error(r.error ?? 'Erro') })
@@ -91,7 +87,7 @@ export function CadernosClient({ cadernos, folders = [], destinos = [], atual = 
         {atual ? (
           <Link href="/admin/cadernos" className="inline-flex items-center gap-1 rounded-lg border bg-card px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-muted"><ChevronLeft className="h-4 w-4" /> Todas as pastas</Link>
         ) : (
-          <button type="button" onClick={novaPasta} disabled={pending} className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted disabled:opacity-50"><FolderPlus className="h-4 w-4" /> Nova pasta</button>
+          <button type="button" onClick={() => setCriandoPasta(true)} className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"><FolderPlus className="h-4 w-4" /> Nova pasta</button>
         )}
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -164,6 +160,9 @@ export function CadernosClient({ cadernos, folders = [], destinos = [], atual = 
         <EditarPastaDialog
           pasta={{ id: editandoPasta.id, nome: editandoPasta.nome, cor: editandoPasta.cor ?? null, icone: editandoPasta.icone ?? null, capa: editandoPasta.capa ?? null }}
           onClose={() => setEditandoPasta(null)} onSaved={() => router.refresh()} />
+      )}
+      {criandoPasta && (
+        <EditarPastaDialog area="caderno" onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
       )}
       {movendo && <MoverCadernoDialog caderno={movendo} destinos={destinos} atualId={atual?.id ?? null} onClose={() => setMovendo(null)} />}
     </div>

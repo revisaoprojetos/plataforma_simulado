@@ -1,5 +1,5 @@
 'use client'
-import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
+import { confirmar } from '@/components/ui/confirm-dialog'
 
 import { useState, useTransition, useMemo, useEffect } from 'react'
 import type React from 'react'
@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
-import { criarPastaFolder, excluirPastaFolder } from '@/app/admin/banco-questoes/actions'
+import { excluirPastaFolder } from '@/app/admin/banco-questoes/actions'
 import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
 import type { TipoSimulado } from '@/lib/simulado/tipo'
 import {
@@ -299,6 +299,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   const [modo, setModo] = useState<string>('todos')
   const [movendo, setMovendo] = useState<SimuladoCard | null>(null)
   const [editandoPasta, setEditandoPasta] = useState<PastaSim | null>(null)
+  const [criandoPasta, setCriandoPasta] = useState(false)
   // "Fazendo agora" por simulado, atualizado sozinho (polling) — igual ao painel "Ao vivo".
   const [online, setOnline] = useState<Record<string, number>>(onlineInicial)
   useEffect(() => {
@@ -330,11 +331,6 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   ]
 
   // O diálogo abre FORA da transition (senão o setState que mostra o pop-up é adiado).
-  async function novaPasta() {
-    const nome = await pedirTexto({ titulo: 'Nova pasta', label: 'Nome da pasta', placeholder: 'ex.: Semana de Atualização', confirmar: 'Criar pasta' })
-    if (!nome) return
-    start(async () => { const r = await criarPastaFolder(nome, null, 'simulado'); if (r.ok) { toast.success('Pasta criada'); router.refresh() } else toast.error(r.error ?? 'Erro ao criar') })
-  }
   async function excluirPasta(f: PastaSim) {
     if (!(await confirmar({ mensagem: `Excluir a pasta "${f.nome}"? Os simulados dentro dela voltam para a raiz (não são apagados).`, destrutivo: true }))) return
     start(async () => { const r = await excluirPastaFolder(f.id); if (r.ok) { toast.success('Pasta excluída'); router.refresh() } else toast.error(r.error ?? 'Erro') })
@@ -348,7 +344,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
           {atual ? (
             <Link href="/admin/simulados" className="inline-flex items-center gap-1 rounded-lg border bg-card px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-muted"><ChevronLeft className="h-4 w-4" /> Todas as pastas</Link>
           ) : (
-            <button type="button" onClick={novaPasta} disabled={pending} className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted disabled:opacity-50"><FolderPlus className="h-4 w-4" /> Nova pasta</button>
+            <button type="button" onClick={() => setCriandoPasta(true)} className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"><FolderPlus className="h-4 w-4" /> Nova pasta</button>
           )}
           <Input placeholder={atual ? `Buscar em “${atual.nome}”…` : 'Buscar simulado…'} value={busca} onChange={(e) => setBusca(e.target.value)} className="min-w-[180px] flex-1 lg:max-w-md" />
         </div>
@@ -414,6 +410,9 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
           onClose={() => setEditandoPasta(null)}
           onSaved={() => router.refresh()}
         />
+      )}
+      {criandoPasta && (
+        <EditarPastaDialog area="simulado" onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
       )}
     </div>
   )

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { atualizarBanco } from '@/app/admin/banco-questoes/actions'
+import { atualizarBanco, criarPastaFolder } from '@/app/admin/banco-questoes/actions'
 import { BANCO_CORES, BANCO_ICONES, iconeBanco } from '@/lib/banco-visual'
 import { Loader2, X, Check, Palette, ImagePlus, Trash2, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -26,16 +26,19 @@ export type PastaPatch = { nome: string; cor: string | null; icone: string | nul
 
 /** Personaliza uma PASTA (folder) de bancos: nome, cor, ícone e foto de capa. Reusa `atualizarBanco`
  * (pasta é um `simulado_pastas`); a capa vai para capa_url E capa_card_url — o card lê `capa_card_url ?? capa_url`. */
-export function EditarPastaDialog({ pasta, onClose, onSaved }: {
-  pasta: { id: string; nome: string; cor: string | null; icone: string | null; capa: string | null }
+export function EditarPastaDialog({ pasta, area, onClose, onSaved }: {
+  pasta?: { id?: string; nome?: string; cor?: string | null; icone?: string | null; capa?: string | null } | null
+  /** Presente = modo CRIAR: cria a pasta nesta área e já aplica a personalização. */
+  area?: 'banco' | 'simulado' | 'caderno'
   onClose: () => void
-  onSaved: (patch: PastaPatch) => void
+  onSaved: (patch?: PastaPatch) => void
 }) {
+  const criar = !pasta?.id
   const inputRef = useRef<HTMLInputElement>(null)
-  const [nome, setNome] = useState(pasta.nome)
-  const [cor, setCor] = useState<string | null>(pasta.cor)
-  const [icone, setIcone] = useState<string>(pasta.icone && BANCO_ICONES[pasta.icone] ? pasta.icone : 'folder')
-  const [capa, setCapa] = useState<string | null>(pasta.capa)
+  const [nome, setNome] = useState(pasta?.nome ?? '')
+  const [cor, setCor] = useState<string | null>(pasta?.cor ?? null)
+  const [icone, setIcone] = useState<string>(pasta?.icone && BANCO_ICONES[pasta.icone] ? pasta.icone : 'folder')
+  const [capa, setCapa] = useState<string | null>(pasta?.capa ?? null)
   const [salvando, setSalvando] = useState(false)
   const [processando, setProcessando] = useState(false)
 
@@ -55,14 +58,22 @@ export function EditarPastaDialog({ pasta, onClose, onSaved }: {
     try { setCapa(await redimensionar(f)) } catch { toast.error('Falha ao processar a imagem.') } finally { setProcessando(false) }
   }
 
+  // capaUrl = capaCardUrl = capa → o card da pasta usa capa_card_url (com fallback pra capa_url).
   async function salvar() {
     if (!nome.trim()) { toast.error('Informe um nome.'); return }
     setSalvando(true)
-    // capaUrl = capaCardUrl = capa → o card da pasta usa capa_card_url (com fallback pra capa_url).
-    const r = await atualizarBanco(pasta.id, nome, cor, icone, capa, capa)
-    setSalvando(false)
-    if (r.ok) { toast.success('Pasta atualizada'); onSaved({ nome: nome.trim(), cor, icone, capa }); onClose() }
-    else toast.error(r.error ?? 'Erro ao salvar')
+    if (criar) {
+      const r = await criarPastaFolder(nome.trim(), null, area)
+      if (!r.ok || !r.id) { setSalvando(false); toast.error(r.error ?? 'Erro ao criar'); return }
+      await atualizarBanco(r.id, nome.trim(), cor, icone, capa, capa) // aplica a personalização já na criação
+      setSalvando(false)
+      toast.success('Pasta criada'); onSaved(); onClose()
+    } else {
+      const r = await atualizarBanco(pasta!.id!, nome.trim(), cor, icone, capa, capa)
+      setSalvando(false)
+      if (r.ok) { toast.success('Pasta atualizada'); onSaved({ nome: nome.trim(), cor, icone, capa }); onClose() }
+      else toast.error(r.error ?? 'Erro ao salvar')
+    }
   }
 
   return createPortal(
@@ -72,7 +83,7 @@ export function EditarPastaDialog({ pasta, onClose, onSaved }: {
         {/* Form */}
         <div className="min-w-0 overflow-auto">
           <div className="flex items-center justify-between border-b px-5 py-3">
-            <h3 className="flex items-center gap-2 text-sm font-semibold"><Palette className="h-4 w-4" /> Personalizar pasta</h3>
+            <h3 className="flex items-center gap-2 text-sm font-semibold"><Palette className="h-4 w-4" /> {criar ? 'Nova pasta' : 'Personalizar pasta'}</h3>
             <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"><X className="h-4 w-4" /></button>
           </div>
           <div className="space-y-5 p-5">
@@ -138,7 +149,7 @@ export function EditarPastaDialog({ pasta, onClose, onSaved }: {
             <div className="flex justify-end gap-2">
               <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
               <button type="button" onClick={salvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
-                {salvando && <Loader2 className="h-4 w-4 animate-spin" />} Salvar
+                {salvando && <Loader2 className="h-4 w-4 animate-spin" />} {criar ? 'Criar pasta' : 'Salvar'}
               </button>
             </div>
           </div>

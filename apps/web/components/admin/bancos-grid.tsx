@@ -9,8 +9,8 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { BancoCard } from '@/components/admin/banco-card'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
-import { pedirTexto, confirmar } from '@/components/ui/confirm-dialog'
-import { criarPastaFolder, moverBancoParaPasta, excluirPastaFolder, duplicarPastaFolder } from '@/app/admin/banco-questoes/actions'
+import { confirmar } from '@/components/ui/confirm-dialog'
+import { moverBancoParaPasta, excluirPastaFolder, duplicarPastaFolder } from '@/app/admin/banco-questoes/actions'
 import { iconeBanco } from '@/lib/banco-visual'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
@@ -28,21 +28,13 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
   const [busca, setBusca] = useState('')
   const [movendo, setMovendo] = useState<Banco | null>(null)
   const [editandoPasta, setEditandoPasta] = useState<Pasta | null>(null)
+  const [criandoPasta, setCriandoPasta] = useState(false)
 
   const q = busca.trim().toLowerCase()
   const bancosF = useMemo(() => (q ? bancos.filter((b) => b.nome.toLowerCase().includes(q)) : bancos), [bancos, q])
   const foldersF = useMemo(() => (q ? folders.filter((f) => f.nome.toLowerCase().includes(q)) : folders), [folders, q])
 
-  // O diálogo abre FORA da transition (pedirTexto/confirmar dependem de um setState que a
-  // transition adiaria → o pop-up não apareceria). Só a action vai para dentro de start().
-  async function novaPasta() {
-    const nome = await pedirTexto({ titulo: 'Nova pasta', label: 'Nome da pasta', placeholder: 'ex.: Semana de Atualização', confirmar: 'Criar pasta' })
-    if (!nome) return
-    start(async () => {
-      const r = await criarPastaFolder(nome)
-      if (r.ok) { toast.success('Pasta criada'); router.refresh() } else toast.error(r.error ?? 'Erro ao criar')
-    })
-  }
+  // O diálogo de confirmação abre FORA da transition (senão o setState do pop-up é adiado).
   async function excluirPasta(f: Pasta) {
     if (!(await confirmar({ mensagem: `Excluir a pasta "${f.nome}"? Os bancos dentro dela voltam para a raiz (não são apagados).`, destrutivo: true }))) return
     start(async () => {
@@ -69,8 +61,8 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
             <ChevronLeft className="h-4 w-4" /> Todas as pastas
           </Link>
         ) : (
-          <button type="button" onClick={novaPasta} disabled={pending}
-            className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted disabled:opacity-50">
+          <button type="button" onClick={() => setCriandoPasta(true)}
+            className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted">
             <FolderPlus className="h-4 w-4" /> Nova pasta
           </button>
         )}
@@ -125,6 +117,9 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
           onClose={() => setEditandoPasta(null)}
           onSaved={() => router.refresh()}
         />
+      )}
+      {criandoPasta && (
+        <EditarPastaDialog area="banco" onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
       )}
     </div>
   )
