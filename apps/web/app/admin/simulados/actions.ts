@@ -273,8 +273,6 @@ export async function removerPassaportesIndevidos(simuladoId: string): Promise<{
   return { ok: true, removidos: remover.length }
 }
 
-export type { ResumoAoVivo } // re-exporta para o client (importa daqui)
-
 export interface ProgressoEstudante {
   id: string
   nome: string

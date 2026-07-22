@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2, Radio, CheckCircle2, Circle, Users, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { resumoAoVivoSimulado, type ResumoAoVivo } from '@/app/admin/simulados/actions'
+import { resumoAoVivoSimulado } from '@/app/admin/simulados/actions'
+import type { ResumoAoVivo } from '@/lib/simulado/ao-vivo'
 
 const INTERVALO_MS = 10_000 // atualiza sozinho a cada 10s
 
