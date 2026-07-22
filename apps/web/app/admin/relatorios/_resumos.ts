@@ -6,6 +6,7 @@ import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { resumosSimuladosRows } from '@/lib/data/relatorios.repo'
+import { resumosRowsViaApi } from '@/lib/data/relatorios-api'
 
 const TENANT_FALLBACK = '00000000-0000-0000-0000-000000000000'
 
@@ -60,10 +61,16 @@ function compararResumos(sql: ResumoSimulado[], pg: ResumoSimulado[]): void {
   console.log(`[shadow resumos] ${sql.length} simulados, ${diffs} divergência(s)`)
 }
 
-/** Caminho SQL direto: 1 query agregada + resolução visual (que segue em PostgREST). */
+/**
+ * Caminho SQL: as linhas vêm da API dedicada (se RELATORIOS_API_URL setado — Fase 3) ou do
+ * SQL direto local (Fase 1); depois a resolução visual segue em PostgREST. Se nada disso
+ * responder, devolve null e o chamador cai no PostgREST completo.
+ */
 async function resumosViaSql(svc: SupabaseClient, tenantId: string | null): Promise<ResumoSimulado[] | null> {
-  const rows = await resumosSimuladosRows(tenantId ?? TENANT_FALLBACK)
-  if (!rows) return null // SQL indisponível → deixa o chamador usar PostgREST
+  const tid = tenantId ?? TENANT_FALLBACK
+  // Strangler: tenta a API dedicada primeiro; se ela não responder, o SQL direto local.
+  const rows = (await resumosRowsViaApi(tid)) ?? (await resumosSimuladosRows(tid))
+  if (!rows) return null // API e SQL indisponíveis → deixa o chamador usar PostgREST
   if (!rows.length) return []
   const visual = await resolverVisualSimulados(svc, rows.map((r) => ({ id: r.id, regras: r.regras })))
   return rows.map((r) => {

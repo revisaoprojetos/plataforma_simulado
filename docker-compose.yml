@@ -25,6 +25,9 @@ services:
       # Postgres direto p/ hotspots de relatório (Fase 1). Vazio = tudo segue em PostgREST.
       - DATABASE_URL=${DATABASE_URL}
       - REPORT_SQL=${REPORT_SQL}
+      # Strangler Fase 3: se setado, o web busca relatórios na API dedicada (senão SQL/PostgREST local).
+      - RELATORIOS_API_URL=${RELATORIOS_API_URL}
+      - API_INTERNAL_SECRET=${API_INTERNAL_SECRET}
       - PDF_RENDER_SECRET=${PDF_RENDER_SECRET}
       - WEB_INTERNAL_URL=http://web:3000
       - CRON_SECRET=${CRON_SECRET}
@@ -42,6 +45,22 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # API dedicada (Fase 3). Serve relatórios extraídos reusando o pacote `data`. O web só a
+  # usa quando RELATORIOS_API_URL aponta pra cá. Build workspace-aware (context = raiz).
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      - NODE_ENV=production
+      - API_PORT=3001
+      - DATABASE_URL=${DATABASE_URL}
+      - REPORT_SQL=${REPORT_SQL}
+      - API_INTERNAL_SECRET=${API_INTERNAL_SECRET}
+    expose:
+      - "3001"
+    restart: unless-stopped
 
   worker:
     build:
