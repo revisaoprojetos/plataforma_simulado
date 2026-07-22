@@ -3,7 +3,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { DadosRelatorioDisciplina } from './relatorio-disciplina-view'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
+import { relatorioDisciplinaSql, type DiscData } from '@/lib/data/relatorios.repo'
 
+const TENANT_FALLBACK = '00000000-0000-0000-0000-000000000000'
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
 
 /** Monta o relatório completo de uma disciplina (KPIs, por assunto, por simulado, evolução). Cacheado por tenant. */
@@ -12,6 +14,50 @@ export async function montarRelatorioDisciplina(svc: SupabaseClient, discId: str
 }
 
 async function _montarRelatorioDisciplina(svc: SupabaseClient, discId: string, tenantId: string | null): Promise<DadosRelatorioDisciplina | null> {
+  if (process.env.REPORT_SQL === 'shadow') {
+    const [sql, pg] = await Promise.all([disciplinaViaSql(discId, tenantId), _disciplinaViaPostgrest(svc, discId, tenantId)])
+    if (sql.modo === 'sql') compararDisciplina(sql.dados, pg, discId)
+    return pg
+  }
+  const r = await disciplinaViaSql(discId, tenantId)
+  if (r.modo === 'sql') return r.dados
+  return _disciplinaViaPostgrest(svc, discId, tenantId)
+}
+
+/** Caminho SQL direto: 4 queries agregadas (totais+estudantes, por-simulado, por-assunto, por-mês). */
+async function disciplinaViaSql(discId: string, tenantId: string | null): Promise<{ modo: 'sql'; dados: DadosRelatorioDisciplina | null } | { modo: 'fallback' }> {
+  const d = await relatorioDisciplinaSql(discId, tenantId ?? TENANT_FALLBACK)
+  if (d === null) return { modo: 'fallback' }
+  if (!d.found) return { modo: 'sql', dados: null }
+  return { modo: 'sql', dados: montarDisciplina(d) }
+}
+
+function montarDisciplina(d: DiscData): DadosRelatorioDisciplina {
+  const t = d.totals!
+  const pct = (ac: number, tt: number) => (tt ? Math.round((ac / tt) * 100) : 0)
+  const porSimulado = (d.porSim ?? []).map((x) => ({ titulo: x.titulo ?? '—', pct: pct(x.ac, x.tt), ac: x.ac, tt: x.tt })).sort((a, b) => b.tt - a.tt)
+  const porAssunto = (d.porAssunto ?? []).map((x) => ({ nome: x.assunto_id == null ? 'Sem assunto' : (x.assunto_nome ?? 'Sem assunto'), pct: pct(x.ac, x.tt), ac: x.ac, tt: x.tt })).sort((a, b) => b.tt - a.tt).slice(0, 20)
+  const evolucao = (d.porMes ?? []).slice().sort((a, b) => a.y - b.y || a.m0 - b.m0).map((x) => ({ mes: `${MESES[x.m0]}/${String(x.y).slice(2)}`, pct: pct(x.ac, x.tt) }))
+  return {
+    nome: d.nome ?? 'Disciplina',
+    totalQuestoes: t.totalq, respostas: t.tt, acertoPct: t.tt ? Math.round((t.ac / t.tt) * 100) : null,
+    numSimulados: (d.porSim ?? []).length, numEstudantes: t.est, porSimulado, porAssunto, evolucao,
+  }
+}
+
+/** Loga divergências SQL × PostgREST (modo shadow). */
+function compararDisciplina(sql: DadosRelatorioDisciplina | null, pg: DadosRelatorioDisciplina | null, discId: string): void {
+  if (!sql || !pg) { if (!!sql !== !!pg) console.warn(`[shadow disciplina] existência difere ${discId.slice(0, 8)}`); return }
+  const probs: string[] = []
+  for (const k of ['totalQuestoes', 'respostas', 'acertoPct', 'numSimulados', 'numEstudantes'] as const) if (sql[k] !== pg[k]) probs.push(`${k} ${sql[k]}≠${pg[k]}`)
+  if (sql.porAssunto.length !== pg.porAssunto.length) probs.push(`nAss ${sql.porAssunto.length}≠${pg.porAssunto.length}`)
+  if (sql.porSimulado.length !== pg.porSimulado.length) probs.push(`nSim ${sql.porSimulado.length}≠${pg.porSimulado.length}`)
+  if (sql.evolucao.length !== pg.evolucao.length) probs.push(`nMes ${sql.evolucao.length}≠${pg.evolucao.length}`)
+  console.log(`[shadow disciplina] ${discId.slice(0, 8)}: ${probs.length ? 'DIFF ' + probs.join(', ') : 'ok'}`)
+}
+
+/** Caminho PostgREST original (fallback). */
+async function _disciplinaViaPostgrest(svc: SupabaseClient, discId: string, tenantId: string | null): Promise<DadosRelatorioDisciplina | null> {
   const { data: alvo } = await svc.from('simulado_disciplinas').select('id, nome').eq('id', discId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
   if (!alvo) return null
 
