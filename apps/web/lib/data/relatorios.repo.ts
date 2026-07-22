@@ -77,3 +77,78 @@ ORDER BY s.created_at DESC
 export async function resumosSimuladosRows(tenantId: string): Promise<ResumoRow[] | null> {
   return sqlQuery<ResumoRow>(RESUMOS_SQL, [tenantId])
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Relatório por ESTUDANTE (o mais pesado: aluno × turma). Substitui a cascata de
+// fetchAllByIn de estudantes/_dados.ts por 2 queries: sessões (com acertos) + disciplina.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type EstSessaoRow = {
+  id: string; simulado_id: string | null; status: string | null; nota: string | number | null
+  iniciado_em: string | Date | null; finalizado_em: string | Date | null; titulo: string | null
+  ac: number; tt: number
+}
+export type EstDiscRow = { disc: string; aluno_ac: number; aluno_tt: number; turma_ac: number; turma_tt: number }
+export type EstData = { found: boolean; nome?: string; sessoes?: EstSessaoRow[]; disciplinas?: EstDiscRow[] }
+
+// Sessões (reais) do aluno + acertos/total por sessão + título do simulado.
+const EST_SESSOES_SQL = `
+SELECT s.id, s.simulado_id, s.status, s.nota, s.iniciado_em, s.finalizado_em, sim.titulo,
+       COUNT(r.*)::int AS tt,
+       COUNT(r.*) FILTER (WHERE r.correta)::int AS ac
+FROM simulado_sessoes_prova s
+LEFT JOIN simulado_simulados sim ON sim.id = s.simulado_id
+LEFT JOIN simulado_respostas_objetivas r ON r.sessao_id = s.id
+WHERE s.estudante_id = $1 AND s.is_teste = false AND s.deletado = false
+GROUP BY s.id, sim.titulo
+ORDER BY s.iniciado_em
+`
+
+// Acerto por disciplina: do ALUNO e da TURMA (todos, sessões reais) nas MESMAS questões que o aluno respondeu.
+const EST_DISC_SQL = `
+WITH sess AS (
+  SELECT id FROM simulado_sessoes_prova WHERE estudante_id = $1 AND is_teste = false AND deletado = false
+),
+qids AS (
+  SELECT DISTINCT r.questao_id FROM simulado_respostas_objetivas r JOIN sess ON sess.id = r.sessao_id
+),
+aluno AS (
+  SELECT COALESCE(d.nome, 'Sem disciplina') AS disc, COUNT(*)::int AS tt, COUNT(*) FILTER (WHERE r.correta)::int AS ac
+  FROM simulado_respostas_objetivas r
+  JOIN sess ON sess.id = r.sessao_id
+  LEFT JOIN simulado_questoes q ON q.id = r.questao_id
+  LEFT JOIN simulado_disciplinas d ON d.id = q.disciplina_id
+  GROUP BY 1
+),
+turma AS (
+  SELECT COALESCE(d.nome, 'Sem disciplina') AS disc, COUNT(*)::int AS tt, COUNT(*) FILTER (WHERE r.correta)::int AS ac
+  FROM simulado_respostas_objetivas r
+  JOIN simulado_sessoes_prova s ON s.id = r.sessao_id AND s.is_teste = false AND s.deletado = false
+  LEFT JOIN simulado_questoes q ON q.id = r.questao_id
+  LEFT JOIN simulado_disciplinas d ON d.id = q.disciplina_id
+  WHERE r.questao_id IN (SELECT questao_id FROM qids)
+  GROUP BY 1
+)
+SELECT a.disc, a.ac AS aluno_ac, a.tt AS aluno_tt, COALESCE(t.ac, 0) AS turma_ac, COALESCE(t.tt, 0) AS turma_tt
+FROM aluno a LEFT JOIN turma t ON a.disc = t.disc
+`
+
+/**
+ * Dados do relatório de um estudante via SQL direto.
+ * Retorna `null` se o SQL indisponível/erro (→ loader usa PostgREST); `{found:false}` se o
+ * aluno não existe; `{found:true, ...}` com sessões + disciplinas.
+ */
+export async function relatorioEstudanteSql(estId: string, tenantId: string): Promise<EstData | null> {
+  const alvo = await sqlQuery<{ nome: string }>(
+    'SELECT nome FROM simulado_estudantes WHERE id = $1 AND tenant_id = $2',
+    [estId, tenantId],
+  )
+  if (alvo === null) return null // SQL indisponível → fallback
+  if (!alvo.length) return { found: false }
+  const [sessoes, disciplinas] = await Promise.all([
+    sqlQuery<EstSessaoRow>(EST_SESSOES_SQL, [estId]),
+    sqlQuery<EstDiscRow>(EST_DISC_SQL, [estId]),
+  ])
+  if (sessoes === null || disciplinas === null) return null // erro no meio → fallback
+  return { found: true, nome: alvo[0].nome, sessoes, disciplinas }
+}
