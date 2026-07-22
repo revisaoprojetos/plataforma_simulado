@@ -4,6 +4,7 @@ import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { DadosRelatorioDisciplina } from './relatorio-disciplina-view'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { relatorioDisciplinaSql, type DiscData } from '@/lib/data/relatorios.repo'
+import { disciplinaViaApi } from '@/lib/data/relatorios-api'
 
 const TENANT_FALLBACK = '00000000-0000-0000-0000-000000000000'
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
@@ -26,7 +27,8 @@ async function _montarRelatorioDisciplina(svc: SupabaseClient, discId: string, t
 
 /** Caminho SQL direto: 4 queries agregadas (totais+estudantes, por-simulado, por-assunto, por-mês). */
 async function disciplinaViaSql(discId: string, tenantId: string | null): Promise<{ modo: 'sql'; dados: DadosRelatorioDisciplina | null } | { modo: 'fallback' }> {
-  const d = await relatorioDisciplinaSql(discId, tenantId ?? TENANT_FALLBACK)
+  const tid = tenantId ?? TENANT_FALLBACK
+  const d = (await disciplinaViaApi(discId, tid)) ?? (await relatorioDisciplinaSql(discId, tid)) // API → SQL local
   if (d === null) return { modo: 'fallback' }
   if (!d.found) return { modo: 'sql', dados: null }
   return { modo: 'sql', dados: montarDisciplina(d) }

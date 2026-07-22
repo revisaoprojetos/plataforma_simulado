@@ -4,6 +4,7 @@ import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { DadosRelatorioGrafico } from './relatorio-grafico-view'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { relatorioGraficoSql, type GraficoData } from '@/lib/data/relatorios.repo'
+import { graficoViaApi } from '@/lib/data/relatorios-api'
 
 const TENANT_FALLBACK = '00000000-0000-0000-0000-000000000000'
 const STATUS_LABEL: Record<string, string> = { finalizada: 'Finalizadas', em_andamento: 'Em andamento', aguardando: 'Aguardando' }
@@ -26,7 +27,8 @@ async function _montarRelatorioGrafico(svc: SupabaseClient, tenantId: string | n
 
 /** Caminho SQL direto: counts + por-sessão + por-disciplina agregados no banco. */
 async function graficoViaSql(tenantId: string | null): Promise<DadosRelatorioGrafico | null> {
-  const d = await relatorioGraficoSql(tenantId ?? TENANT_FALLBACK)
+  const tid = tenantId ?? TENANT_FALLBACK
+  const d = (await graficoViaApi(tid)) ?? (await relatorioGraficoSql(tid)) // API → SQL local
   if (!d) return null
   return montarGrafico(d)
 }

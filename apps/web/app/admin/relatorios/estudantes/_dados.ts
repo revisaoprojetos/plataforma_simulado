@@ -4,6 +4,7 @@ import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { DadosRelatorioEstudante } from './relatorio-estudante-view'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { relatorioEstudanteSql, type EstSessaoRow, type EstDiscRow } from '@/lib/data/relatorios.repo'
+import { estudanteViaApi } from '@/lib/data/relatorios-api'
 
 const TENANT_FALLBACK = '00000000-0000-0000-0000-000000000000'
 
@@ -29,8 +30,10 @@ async function _montarRelatorioEstudante(svc: SupabaseClient, estId: string, ten
 
 /** Caminho SQL direto: 2 queries (sessões + disciplina aluno×turma) + montagem em memória. */
 async function estudanteViaSql(estId: string, tenantId: string | null): Promise<{ modo: 'sql'; dados: DadosRelatorioEstudante | null } | { modo: 'fallback' }> {
-  const d = await relatorioEstudanteSql(estId, tenantId ?? TENANT_FALLBACK)
-  if (d === null) return { modo: 'fallback' } // SQL indisponível/erro → PostgREST
+  const tid = tenantId ?? TENANT_FALLBACK
+  // Strangler: API dedicada primeiro (se RELATORIOS_API_URL setado) → SQL direto local.
+  const d = (await estudanteViaApi(estId, tid)) ?? (await relatorioEstudanteSql(estId, tid))
+  if (d === null) return { modo: 'fallback' } // API e SQL indisponíveis → PostgREST
   if (!d.found) return { modo: 'sql', dados: null } // aluno não existe
   return { modo: 'sql', dados: montarEstudante(d.nome ?? 'Estudante', d.sessoes ?? [], d.disciplinas ?? []) }
 }
