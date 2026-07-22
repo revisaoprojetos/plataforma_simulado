@@ -67,7 +67,9 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   // Self-healing do elo grupo→banco: destrava alunos que entraram no grupo mas ficaram sem
   // pasta/matrícula (lag de deploy, banco vinculado depois, erro transitório). Idempotente.
   setInterval(() => { void chamarCron('/api/cron/sincronizar-grupos-bancos', 'cron sync grupos→bancos', (j) => !!(j.pastaInseridos || j.matriculasInseridas)) }, 180_000)
-  console.log('[cron] agendado: encerramento + import + sync Curseduca + eventos Integrações (60s); sync grupos→bancos (180s)')
+  // Warm-up de cache de relatórios (Fase 4): mantém o cache quente p/ a manhã da janela fixa.
+  setInterval(() => { void chamarCron('/api/cron/warm-cache', 'cron warm-cache', (j) => !!j.aquecidos) }, 300_000)
+  console.log('[cron] agendado: encerramento + import + sync Curseduca + eventos Integrações (60s); sync grupos→bancos (180s); warm-cache (300s)')
 } else {
   console.warn('[cron] DESATIVADO — defina WEB_INTERNAL_URL e CRON_SECRET')
 }

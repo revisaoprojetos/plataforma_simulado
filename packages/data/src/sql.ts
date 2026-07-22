@@ -12,7 +12,9 @@ import { Pool } from 'pg'
  * `tenant_id` explicitamente. Nunca uma query sem ele.
  */
 const DESLIGADO = process.env.REPORT_SQL === 'off'
-const URL = process.env.DATABASE_URL
+// Fase 4: se houver read-replica (DATABASE_URL_REPLICA), lê dela — os relatórios são só leitura.
+// Cai para DATABASE_URL (pooler primário) quando não há réplica.
+const URL = process.env.DATABASE_URL_REPLICA || process.env.DATABASE_URL
 
 let pool: Pool | null = null
 
@@ -32,6 +34,12 @@ function getPool(): Pool | null {
   })
   pool.on('error', () => {})
   return pool
+}
+
+/** Métricas do pool de conexões (observabilidade — Fase 4). */
+export function poolStats(): { total: number; idle: number; waiting: number; replica: boolean } | null {
+  if (!pool) return { total: 0, idle: 0, waiting: 0, replica: !!process.env.DATABASE_URL_REPLICA }
+  return { total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount, replica: !!process.env.DATABASE_URL_REPLICA }
 }
 
 /**

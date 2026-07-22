@@ -24,6 +24,7 @@ services:
       - REDIS_URL=redis://redis:6379
       # Postgres direto p/ hotspots de relatório (Fase 1). Vazio = tudo segue em PostgREST.
       - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL_REPLICA=${DATABASE_URL_REPLICA}
       - REPORT_SQL=${REPORT_SQL}
       # Strangler Fase 3: se setado, o web busca relatórios na API dedicada (senão SQL/PostgREST local).
       - RELATORIOS_API_URL=${RELATORIOS_API_URL}
@@ -56,6 +57,7 @@ services:
       - NODE_ENV=production
       - API_PORT=3001
       - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL_REPLICA=${DATABASE_URL_REPLICA}
       - REPORT_SQL=${REPORT_SQL}
       - API_INTERNAL_SECRET=${API_INTERNAL_SECRET}
     expose:

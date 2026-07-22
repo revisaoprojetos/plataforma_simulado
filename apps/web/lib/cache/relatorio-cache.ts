@@ -60,7 +60,10 @@ export async function remember<T>(chave: string, ttlSeg: number, calcular: () =>
       if (hit != null) return JSON.parse(hit) as T
     } catch { /* miss silencioso → computa */ }
   }
+  const t0 = Date.now()
   const valor = await calcular()
+  const ms = Date.now() - t0
+  if (ms > 3000) console.warn(`[relatorio lento] ${chave} computou em ${ms}ms (cache-miss)`) // observabilidade (Fase 4)
   if (r && valor !== undefined) {
     try { await r.set(chave, JSON.stringify(valor), 'EX', ttlSeg) } catch { /* best-effort */ }
   }
