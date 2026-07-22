@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { resolverProviderCfg } from '@/lib/integracoes/config'
-import { resolverCfg, executarImport } from '@/lib/curseduca/import-core'
+import { executarImport } from '@/lib/curseduca/import-core'
+import { resolverCfgCurseduca } from '@/lib/curseduca/cfg'
 import { dentroDoLimite } from '@/lib/integracoes/ratelimit'
 import { registrarInbox } from '@/lib/integracoes/inbox'
-import type { CurseducaCfg } from '@/lib/curseduca/client'
 
 /**
  * Webhook de SINCRONIZAÇÃO da Curseduca por TENANT (igual ao padrão da Guru):
@@ -20,14 +19,6 @@ async function resolverTenant(token: string) {
   const svc = createAdminClient()
   const { data } = await svc.from('simulado_integracao_config').select('tenant_id, ativo').eq('provider', 'curseduca').eq('webhook_token', token).maybeSingle()
   return { tenantId: (data as any)?.tenant_id ?? null, ativo: (data as any)?.ativo ?? false }
-}
-
-/** Monta o CurseducaCfg a partir do sistema novo (integracao_config) ou legado (resolverCfg+env). */
-async function cfgDoTenant(tenantId: string): Promise<CurseducaCfg | null> {
-  const pcfg = await resolverProviderCfg(tenantId, 'curseduca', { ignorarAtivo: true })
-  const c = pcfg?.credenciais
-  if (c?.api_key && c?.usuario && c?.senha) return { base: pcfg!.baseUrl, apiKey: c.api_key, user: c.usuario, pass: c.senha }
-  return resolverCfg(tenantId) // fallback: simulado_curseduca_config (legado) → .env designado
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
@@ -67,13 +58,45 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const grupos = Array.isArray(body?.grupos) ? body.grupos.map(Number).filter((n: number) => Number.isFinite(n)) : []
   if (!grupos.length) return finish(400, { ok: false, message: 'Informe grupos[] (ids dos grupos Curseduca a sincronizar).' }, 'sem grupos[] no corpo')
 
-  const cfg = await cfgDoTenant(tid)
+  const cfg = await resolverCfgCurseduca(tid)
   if (!cfg) return finish(400, { ok: false, message: 'Credenciais Curseduca não configuradas (Integrações → Curseduca).' }, 'credenciais Curseduca ausentes')
 
+  const svc = createAdminClient()
+  const destino = body?.destino ?? { tipo: 'nenhum' }
+  const sincronizar = !!body?.sincronizar
+
+  // ENFILEIRA em vez de processar inline: um sync grande travaria/estouraria o timeout do
+  // webhook, e o provedor re-entregaria → processamento duplicado. O cron /api/cron/curseduca-jobs
+  // processa em background (sem limite de detalhe). Dedup: se já há um job pendente que cobre
+  // estes grupos, reaproveita (evita pile-up de webhooks repetidos do mesmo membro/grupo).
   try {
-    const resultado = await executarImport({ tenantId: tid, cfg }, grupos, body?.destino ?? { tipo: 'nenhum' }, !!body?.sincronizar, Number.MAX_SAFE_INTEGER)
-    return finish(200, { ok: true, resultado }, `sincronizado: ${grupos.length} grupo(s)`)
+    const { data: pend } = await svc
+      .from('simulado_curseduca_jobs')
+      .select('id')
+      .eq('tenant_id', tid)
+      .eq('status', 'pendente')
+      .contains('grupos', grupos)
+      .limit(1)
+      .maybeSingle()
+    if (pend?.id) return finish(202, { ok: true, agendado: true, jobId: (pend as any).id, dedup: true }, `já agendado (${grupos.length} grupo(s))`)
+
+    const { data, error } = await svc
+      .from('simulado_curseduca_jobs')
+      .insert({ tenant_id: tid, status: 'pendente', grupos, destino, sincronizar, criado_por: null })
+      .select('id')
+      .single()
+    if (error) throw error
+    return finish(202, { ok: true, agendado: true, jobId: (data as any).id }, `agendado: ${grupos.length} grupo(s) — processa em background`)
   } catch (e: any) {
-    return finish(500, { ok: false, message: e?.message ?? 'Falha na importação.' }, `erro: ${e?.message ?? 'import'}`)
+    // Sem a tabela de jobs (migration não rodada) → processa inline COM limite p/ não estourar timeout.
+    if (/relation|does not exist|schema cache|column/i.test(e?.message ?? '')) {
+      try {
+        const resultado = await executarImport({ tenantId: tid, cfg }, grupos, destino, sincronizar, 400)
+        return finish(200, { ok: true, resultado }, `sincronizado inline (sem fila): ${grupos.length} grupo(s)`)
+      } catch (e2: any) {
+        return finish(500, { ok: false, message: e2?.message ?? 'Falha na importação.' }, `erro: ${e2?.message ?? 'import'}`)
+      }
+    }
+    return finish(500, { ok: false, message: e?.message ?? 'Falha ao agendar.' }, `erro: ${e?.message ?? 'agendar'}`)
   }
 }

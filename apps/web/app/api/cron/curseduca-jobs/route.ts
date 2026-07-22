@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { resolverCfg, executarImport } from '@/lib/curseduca/import-core'
+import { executarImport } from '@/lib/curseduca/import-core'
+import { resolverCfgCurseduca } from '@/lib/curseduca/cfg'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
     if (!lock?.length) continue
 
     try {
-      const cfg = await resolverCfg(job.tenant_id)
+      const cfg = await resolverCfgCurseduca(job.tenant_id)
       if (!cfg) {
         await svc.from('simulado_curseduca_jobs').update({ status: 'erro', erro: 'Credenciais Curseduca não configuradas para este tenant.' }).eq('id', job.id)
         continue
