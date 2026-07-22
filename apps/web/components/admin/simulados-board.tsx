@@ -306,9 +306,20 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
     const ids = simulados.map((s) => s.id)
     if (!ids.length) return
     let vivo = true
+    let es: EventSource | null = null
+    let poll: ReturnType<typeof setInterval> | null = null
     const tick = async () => { try { const r = await onlinePorSimulado(ids); if (vivo) setOnline(r) } catch { /* silencioso */ } }
-    const t = setInterval(tick, 12_000)
-    return () => { vivo = false; clearInterval(t) }
+    const iniciarPolling = () => { if (!poll) { void tick(); poll = setInterval(tick, 12_000) } }
+
+    // Realtime via SSE (Fase 2, follow-up); em erro (proxy sem SSE / Redis fora) cai no polling.
+    try {
+      es = new EventSource(`/api/stream/online?ids=${encodeURIComponent(ids.join(','))}`)
+      es.onmessage = (ev) => { try { const r = JSON.parse(ev.data) as Record<string, number>; if (vivo) setOnline(r) } catch { /* frame inválido */ } }
+      es.onerror = () => { try { es?.close() } catch { /* */ } es = null; iniciarPolling() }
+    } catch {
+      iniciarPolling()
+    }
+    return () => { vivo = false; try { es?.close() } catch { /* */ } if (poll) clearInterval(poll) }
   }, [simulados])
 
   const filtrados = useMemo(() => {
