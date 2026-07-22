@@ -5,6 +5,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { registrarAudit } from '@/lib/audit'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { contatoEstudante } from '@/lib/webhooks/payload'
+import { publicarAoVivo } from '@/lib/realtime/pubsub'
 
 interface RequestBody {
   embed_token?: string
@@ -275,6 +276,7 @@ export async function POST(request: NextRequest) {
 
     // Notifica sistemas externos só na prova REAL (não em sessão de teste).
     if (!ehTeste) {
+      void publicarAoVivo(simulado.id) // realtime: painel "Ao Vivo" (Fase 2)
       await dispararWebhook(simulado.tenant_id, 'estudante.iniciou', {
         contact: contatoEstudante(estudante),
         simulado: { id: simulado.id, name: tituloSimulado },

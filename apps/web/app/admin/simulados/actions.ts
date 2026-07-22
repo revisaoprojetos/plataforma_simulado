@@ -9,6 +9,7 @@ import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
 import { brtLocalParaIso } from '@/lib/brt'
+import { computarResumoAoVivo, type ResumoAoVivo } from '@/lib/simulado/ao-vivo'
 
 interface SimuladoData {
   titulo: string
@@ -272,12 +273,7 @@ export async function removerPassaportesIndevidos(simuladoId: string): Promise<{
   return { ok: true, removidos: remover.length }
 }
 
-export interface ResumoAoVivo {
-  total: number        // estudantes matriculados (linkados)
-  online: number       // com sessão EM ANDAMENTO (fazendo agora)
-  finalizados: number  // já concluíram
-  naoIniciaram: number // matriculados que nunca abriram
-}
+export type { ResumoAoVivo } // re-exporta para o client (importa daqui)
 
 export interface ProgressoEstudante {
   id: string
@@ -371,36 +367,7 @@ export async function resumoAoVivoSimulado(simuladoId: string): Promise<{ ok?: b
   if (!sim) return { error: 'Simulado não encontrado.' }
   if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
 
-  const [matriculas, sessoes] = await Promise.all([
-    fetchAll<any>(() => svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simuladoId).order('estudante_id')),
-    fetchAll<any>(() => svc.from('simulado_sessoes_prova').select('estudante_id, status').eq('simulado_id', simuladoId).eq('is_teste', false).eq('deletado', false).order('estudante_id')),
-  ])
-
-  const matSet = new Set<string>(matriculas.map((m: any) => m.estudante_id).filter(Boolean))
-  const total = matSet.size
-
-  // Por estudante: tem alguma finalizada? tem alguma em andamento (não finalizada)?
-  const porEst = new Map<string, { fin: boolean; and: boolean }>()
-  for (const s of sessoes) {
-    const eid = (s as any).estudante_id
-    if (!eid) continue
-    const e = porEst.get(eid) ?? { fin: false, and: false }
-    if ((s as any).status === 'finalizada') e.fin = true
-    else e.and = true // em_andamento / aguardando = está fazendo/online
-    porEst.set(eid, e)
-  }
-
-  let online = 0, finalizados = 0
-  const comSessao = new Set<string>()
-  for (const [eid, st] of porEst) {
-    if (!matSet.has(eid)) continue // conta só matriculados
-    comSessao.add(eid)
-    if (st.and) online++
-    else if (st.fin) finalizados++
-  }
-  const naoIniciaram = Math.max(0, total - comSessao.size)
-
-  return { ok: true, resumo: { total, online, finalizados, naoIniciaram } }
+  return { ok: true, resumo: await computarResumoAoVivo(svc, simuladoId) }
 }
 
 /**

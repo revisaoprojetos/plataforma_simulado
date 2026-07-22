@@ -5,6 +5,7 @@ import { rankearSimulado } from '@/lib/ranking'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
 import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
+import { publicarAoVivo } from '@/lib/realtime/pubsub'
 
 export const dynamic = 'force-dynamic'
 
@@ -146,6 +147,7 @@ async function processar() {
   // Recalcula o ranking de cada simulado afetado + invalida o cache de relatórios (1x por tenant).
   for (const id of afetados) await rankearSimulado(svc, id)
   for (const t of tenantsAfetados) await invalidarRelatorios(t)
+  for (const id of afetados) void publicarAoVivo(id) // realtime: painel "Ao Vivo" (Fase 2)
 
   return { ok: true, simuladosEncerrados, sessoesEncerradas, simuladosAfetados: afetados.size }
 }

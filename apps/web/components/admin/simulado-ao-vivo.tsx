@@ -23,10 +23,30 @@ export function AoVivoPainel({ simuladoId }: { simuladoId: string }) {
     setCarregando(false)
   }
 
+  const [tempoReal, setTempoReal] = useState(false)
+
   useEffect(() => {
-    carregar()
-    timer.current = setInterval(() => carregar(true), INTERVALO_MS)
-    return () => { if (timer.current) clearInterval(timer.current) }
+    carregar() // snapshot imediato
+    let es: EventSource | null = null
+    const iniciarPolling = () => { if (!timer.current) timer.current = setInterval(() => carregar(true), INTERVALO_MS) }
+
+    // Realtime via SSE (Fase 2). onmessage traz o resumo atualizado; em erro (proxy sem SSE,
+    // Redis fora) cai no polling de 10s — a UI continua funcionando.
+    try {
+      es = new EventSource(`/api/stream/ao-vivo/${simuladoId}`)
+      es.onmessage = (ev) => {
+        try {
+          const r = JSON.parse(ev.data) as ResumoAoVivo
+          setResumo(r); setErro(null); setCarregando(false); setTempoReal(true)
+          setAtualizadoEm(new Date().toLocaleTimeString('pt-BR'))
+        } catch { /* ignora frame inválido */ }
+      }
+      es.onerror = () => { try { es?.close() } catch { /* */ } es = null; setTempoReal(false); iniciarPolling() }
+    } catch {
+      iniciarPolling()
+    }
+
+    return () => { try { es?.close() } catch { /* */ } if (timer.current) { clearInterval(timer.current); timer.current = null } }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simuladoId])
 
@@ -86,7 +106,7 @@ export function AoVivoPainel({ simuladoId }: { simuladoId: string }) {
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" /></span>
-          Ao vivo · atualiza a cada 10s{atualizadoEm && ` · última: ${atualizadoEm}`}
+          Ao vivo · {tempoReal ? 'tempo real' : 'atualiza a cada 10s'}{atualizadoEm && ` · última: ${atualizadoEm}`}
         </span>
         <button type="button" onClick={() => carregar()} className="inline-flex items-center gap-1 rounded-md px-2 py-1 hover:bg-muted hover:text-foreground">
           <RefreshCw className={cn('h-3 w-3', carregando && 'animate-spin')} /> Atualizar

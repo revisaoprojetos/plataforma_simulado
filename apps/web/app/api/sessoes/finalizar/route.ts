@@ -4,6 +4,7 @@ import { rankearSimulado } from '@/lib/ranking'
 import { contextoNota, calcularNota } from '@/lib/simulado/nota'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
+import { publicarAoVivo } from '@/lib/realtime/pubsub'
 
 // POST /api/sessoes/finalizar — finaliza a sessão e calcula a nota.
 export async function POST(request: NextRequest) {
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
     })
 
     await rankearSimulado(supabase, sessao.simulado_id)
+    void publicarAoVivo(sessao.simulado_id) // realtime: painel "Ao Vivo" (Fase 2)
 
     // Notifica sistemas externos (webhooks/n8n): estudante finalizou.
     await dispararWebhook(sessao.tenant_id, 'estudante.finalizou',
