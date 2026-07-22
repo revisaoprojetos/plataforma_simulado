@@ -5,6 +5,9 @@ import { tipoDoSimulado, type TipoSimulado } from '@/lib/simulado/tipo'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
+import { resumosSimuladosRows } from '@/lib/data/relatorios.repo'
+
+const TENANT_FALLBACK = '00000000-0000-0000-0000-000000000000'
 
 export type ResumoSimulado = {
   id: string
@@ -28,6 +31,63 @@ export async function resumosSimulados(svc: SupabaseClient, tenantId: string | n
 }
 
 async function _resumosSimulados(svc: SupabaseClient, tenantId: string | null): Promise<ResumoSimulado[]> {
+  // REPORT_SQL=shadow: roda os DOIS caminhos, loga divergências e SERVE o PostgREST (rollout seguro).
+  if (process.env.REPORT_SQL === 'shadow') {
+    const [sql, pg] = await Promise.all([resumosViaSql(svc, tenantId), resumosViaPostgrest(svc, tenantId)])
+    if (sql) compararResumos(sql, pg)
+    return pg
+  }
+  // Padrão: tenta a agregação por SQL direto (1 query). Se indisponível/erro → PostgREST (fallback).
+  const viaSql = await resumosViaSql(svc, tenantId)
+  if (viaSql) return viaSql
+  return resumosViaPostgrest(svc, tenantId)
+}
+
+/** Loga divergências entre o caminho SQL e o PostgREST (usado no modo shadow p/ validar a Fase 1). */
+function compararResumos(sql: ResumoSimulado[], pg: ResumoSimulado[]): void {
+  const idx = new Map(pg.map((r) => [r.id, r]))
+  let diffs = 0
+  for (const s of sql) {
+    const p = idx.get(s.id)
+    if (!p) { diffs++; console.warn(`[shadow resumos] só no SQL: ${s.id}`); continue }
+    const nmOk = (s.notaMedia == null && p.notaMedia == null) || (s.notaMedia != null && p.notaMedia != null && Math.abs(s.notaMedia - p.notaMedia) < 0.01)
+    if (s.participantes !== p.participantes || s.finalizadas !== p.finalizadas || s.emAndamento !== p.emAndamento || !nmOk) {
+      diffs++
+      console.warn(`[shadow resumos] DIFF ${s.id.slice(0, 8)} sql=`, { p: s.participantes, f: s.finalizadas, e: s.emAndamento, nm: s.notaMedia }, 'pg=', { p: p.participantes, f: p.finalizadas, e: p.emAndamento, nm: p.notaMedia })
+    }
+  }
+  if (sql.length !== pg.length) { diffs++; console.warn(`[shadow resumos] contagem difere: sql=${sql.length} pg=${pg.length}`) }
+  console.log(`[shadow resumos] ${sql.length} simulados, ${diffs} divergência(s)`)
+}
+
+/** Caminho SQL direto: 1 query agregada + resolução visual (que segue em PostgREST). */
+async function resumosViaSql(svc: SupabaseClient, tenantId: string | null): Promise<ResumoSimulado[] | null> {
+  const rows = await resumosSimuladosRows(tenantId ?? TENANT_FALLBACK)
+  if (!rows) return null // SQL indisponível → deixa o chamador usar PostgREST
+  if (!rows.length) return []
+  const visual = await resolverVisualSimulados(svc, rows.map((r) => ({ id: r.id, regras: r.regras })))
+  return rows.map((r) => {
+    const vis = visual.get(r.id)
+    return {
+      id: r.id,
+      titulo: r.titulo ?? 'Simulado',
+      status: r.status ?? null,
+      criadoEm: r.created_at ? new Date(r.created_at).toISOString() : null,
+      tipo: tipoDoSimulado((r.tipos ?? []) as (string | null)[]),
+      participantes: Number(r.participantes) || 0,
+      finalizadas: Number(r.finalizadas) || 0,
+      emAndamento: Number(r.em_andamento) || 0,
+      notaMedia: r.nota_media != null ? Number(r.nota_media) : null,
+      ultimaAtividade: r.ultima ? new Date(r.ultima).toISOString() : null,
+      cor: vis?.cor ?? null,
+      icone: vis?.icone ?? null,
+      capa: vis?.capa ?? null,
+    }
+  }).filter((r) => !OCULTAR_DISCURSIVA || r.tipo !== 'discursiva')
+}
+
+/** Caminho PostgREST original (fallback): 4 fetchAllByIn + agregação em memória. */
+async function resumosViaPostgrest(svc: SupabaseClient, tenantId: string | null): Promise<ResumoSimulado[]> {
   const { data: sims } = await svc
     .from('simulado_simulados')
     .select('id, titulo, status, created_at, regras')

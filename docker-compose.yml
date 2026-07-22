@@ -22,6 +22,9 @@ services:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - REDIS_URL=redis://redis:6379
+      # Postgres direto p/ hotspots de relatório (Fase 1). Vazio = tudo segue em PostgREST.
+      - DATABASE_URL=${DATABASE_URL}
+      - REPORT_SQL=${REPORT_SQL}
       - PDF_RENDER_SECRET=${PDF_RENDER_SECRET}
       - WEB_INTERNAL_URL=http://web:3000
       - CRON_SECRET=${CRON_SECRET}
