@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { BookOpen, Star, NotebookPen, ArrowRight, Sparkles, Trophy, Play, ListChecks } from 'lucide-react'
+import { BookOpen, Star, NotebookPen, ArrowRight, Sparkles, Trophy, Play, ListChecks, Radio, ClipboardList } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
@@ -69,6 +69,8 @@ export default async function AlunoHome() {
 
   const atalhos = [
     { href: '/aluno/recomendado', icon: Sparkles, titulo: 'Recomendado', desc: 'Questões focadas nos seus pontos fracos' },
+    { href: '/aluno/simulado', icon: Radio, titulo: 'Simulados', desc: 'Faça os simulados liberados para você' },
+    { href: '/aluno/simulados', icon: ClipboardList, titulo: 'Meus Simulados', desc: 'Seus resultados e simulados concluídos' },
     { href: '/aluno/questoes', icon: BookOpen, titulo: 'Banco de questões', desc: 'Pratique questões avulsas com filtros' },
     { href: '/aluno/favoritos', icon: Star, titulo: 'Favoritos', desc: 'Questões que você marcou' },
     { href: '/aluno/cadernos', icon: NotebookPen, titulo: 'Cadernos', desc: 'Organize seus estudos' },
@@ -105,7 +107,7 @@ export default async function AlunoHome() {
       </div>
 
       {/* Atalhos */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {atalhos.map((a) => (
           <Link key={a.href} href={a.href}>
             <div className="group h-full rounded-2xl border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
