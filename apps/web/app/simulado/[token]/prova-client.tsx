@@ -467,13 +467,16 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
     )
   }
 
+  // Vars do HUD da prova. Também aplicadas nos DialogContent abaixo porque o Dialog porta o
+  // conteúdo para fora deste wrapper (document.body) — sem isto, os modais caem no tema padrão.
+  const provaVars = hudCssVars(efetivarHud(sessao.hudCores, sessao.hudPorPagina, 'prova'), dark) as React.CSSProperties
   return (
-    <div style={hudCssVars(efetivarHud(sessao.hudCores, sessao.hudPorPagina, 'prova'), dark) as React.CSSProperties}>
+    <div style={provaVars}>
       {provaHudEl}
 
       {/* Modal de Revisão */}
       <Dialog open={showRevisao} onOpenChange={setShowRevisao}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" style={provaVars}>
           <DialogHeader>
             <DialogTitle>Revisão do Simulado</DialogTitle>
             <DialogDescription>
@@ -539,6 +542,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
                 setShowRevisao(false)
                 setShowConfirmacao(true)
               }}
+              style={{ background: 'var(--prova-finalizar, var(--primary))', color: '#fff' }}
             >
               <Send className="mr-2 h-4 w-4" />
               Enviar simulado
@@ -549,7 +553,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
 
       {/* Modal de Confirmação Final */}
       <Dialog open={showConfirmacao} onOpenChange={setShowConfirmacao}>
-        <DialogContent>
+        <DialogContent style={provaVars}>
           <DialogHeader>
             <DialogTitle>Confirmar envio do simulado</DialogTitle>
             <DialogDescription>
@@ -573,7 +577,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
             >
               Voltar
             </Button>
-            <Button onClick={handleFinalizar} disabled={isFinalizando}>
+            <Button onClick={handleFinalizar} disabled={isFinalizando} style={{ background: 'var(--prova-finalizar, var(--primary))', color: '#fff' }}>
               {isFinalizando ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

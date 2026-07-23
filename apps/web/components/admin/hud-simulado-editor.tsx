@@ -88,7 +88,7 @@ const GRUPOS: { titulo: string; pages: ScreenKey[] | 'all'; desc?: string; campo
     campos: [
       { k: 'card', label: 'Fundo do card da questão', desc: 'Enunciado da questão' },
       { k: 'primaria', label: 'Questão atual / progresso', desc: 'Destaque da questão atual e barra de progresso' },
-      { k: 'finalizar', label: 'Botão Finalizar', desc: 'Cor do botão de finalizar a prova' },
+      { k: 'finalizar', label: 'Botão Finalizar', desc: 'Botão de finalizar + "Enviar simulado" / "Confirmar envio" da revisão' },
       { k: 'selecionada', label: 'Alternativa marcada', desc: 'Borda, letra e fundo (versão clara) da selecionada' },
       { k: 'altFundo', label: 'Alternativa — fundo', desc: 'Fundo das alternativas (normal)' },
       { k: 'altHover', label: 'Alternativa — mouse por cima', desc: 'Fundo ao passar o mouse' },
@@ -98,7 +98,7 @@ const GRUPOS: { titulo: string; pages: ScreenKey[] | 'all'; desc?: string; campo
     titulo: 'Navegador de questões',
     pages: ['prova'],
     campos: [
-      { k: 'respondida', label: 'Marcadas (respondidas)', desc: 'Questões já respondidas' },
+      { k: 'respondida', label: 'Marcadas (respondidas)', desc: 'Questões já respondidas (navegador e revisão do simulado)' },
       { k: 'revisar', label: 'Revisar (marcar)', desc: 'Botão Revisar + flag no navegador' },
     ],
   },
