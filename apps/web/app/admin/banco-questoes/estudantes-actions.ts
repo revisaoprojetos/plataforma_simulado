@@ -131,8 +131,9 @@ async function orfaosRemoviveis(svc: any, tenantId: string, bancoId: string, gru
   // Exclui quem JÁ INICIOU algum simulado que herda o banco (não remover quem está fazendo/fez).
   const sims = ((await svc.from('simulado_simulados').select('id').eq('tenant_id', tenantId).filter('regras->>banco_base_id', 'eq', bancoId)).data ?? []).map((s: any) => s.id)
   const started = new Set<string>()
-  for (const sid of sims) {
-    const ss = await fetchAllByIn<any>(cand, (chunk) => svc.from('simulado_sessoes_prova').select('estudante_id').eq('simulado_id', sid).eq('deletado', false).in('estudante_id', chunk))
+  if (sims.length) {
+    // Uma leitura por chunk de candidatos, com TODOS os simulados de uma vez (antes: 1 por simulado → N+1).
+    const ss = await fetchAllByIn<any>(cand, (chunk) => svc.from('simulado_sessoes_prova').select('estudante_id').in('simulado_id', sims).eq('deletado', false).in('estudante_id', chunk))
     for (const x of ss) started.add(x.estudante_id)
   }
   return cand.filter((e) => !started.has(e))
@@ -166,10 +167,15 @@ export async function desvincularGrupoDoBanco(bancoId: string, grupoId: string):
   let removidos = 0
   if (orfaos.length) {
     const sims = ((await svc.from('simulado_simulados').select('id').eq('tenant_id', g.tenantId).filter('regras->>banco_base_id', 'eq', bancoId)).data ?? []).map((s: any) => s.id)
-    for (let i = 0; i < orfaos.length; i += 80) {
-      const c = orfaos.slice(i, i + 80)
-      await svc.from('simulado_pasta_estudantes').delete().eq('pasta_id', bancoId).in('estudante_id', c)
-      for (const sid of sims) await svc.from('simulado_matriculas').delete().eq('simulado_id', sid).in('estudante_id', c)
+    // Chunks maiores + delete de matrículas de TODOS os simulados numa query (antes: 1 por simulado
+    // × chunk → centenas de requisições sequenciais que travavam a UI). Chunks em paralelo (lotes de 4).
+    const chunks: string[][] = []
+    for (let i = 0; i < orfaos.length; i += 150) chunks.push(orfaos.slice(i, i + 150))
+    for (let i = 0; i < chunks.length; i += 4) {
+      await Promise.all(chunks.slice(i, i + 4).map(async (c) => {
+        await svc.from('simulado_pasta_estudantes').delete().eq('pasta_id', bancoId).in('estudante_id', c)
+        if (sims.length) await svc.from('simulado_matriculas').delete().in('simulado_id', sims).in('estudante_id', c)
+      }))
     }
     removidos = orfaos.length
   }
@@ -301,6 +307,32 @@ export async function desvincularEstudante(bancoId: string, estudanteId: string)
   if (error) return { ok: false, error: error.message }
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return { ok: true }
+}
+
+/**
+ * Desvincula VÁRIOS alunos do banco de uma vez (e tira as matrículas dos simulados que herdam o
+ * banco). Deleta em chunks paralelos — não trava com milhares de alunos (antes o client fazia
+ * um await por aluno → 3000 round-trips sequenciais).
+ */
+export async function desvincularEstudantesEmMassa(bancoId: string, estudanteIds: string[]): Promise<{ ok: boolean; removidos?: number; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+  const ids = [...new Set((estudanteIds ?? []).filter(Boolean))]
+  if (!ids.length) return { ok: true, removidos: 0 }
+
+  const sims = ((await svc.from('simulado_simulados').select('id').eq('tenant_id', g.tenantId).filter('regras->>banco_base_id', 'eq', bancoId)).data ?? []).map((s: any) => s.id)
+  const chunks: string[][] = []
+  for (let i = 0; i < ids.length; i += 150) chunks.push(ids.slice(i, i + 150))
+  for (let i = 0; i < chunks.length; i += 4) {
+    await Promise.all(chunks.slice(i, i + 4).map(async (c) => {
+      await svc.from('simulado_pasta_estudantes').delete().eq('pasta_id', bancoId).eq('tenant_id', g.tenantId).in('estudante_id', c)
+      if (sims.length) await svc.from('simulado_matriculas').delete().in('simulado_id', sims).in('estudante_id', c)
+    }))
+  }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_pasta_estudantes', entidadeId: bancoId, depois: { banco: bancoId, removidos: ids.length } })
+  revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  return { ok: true, removidos: ids.length }
 }
 
 /** Associa (ou remove) um caderno-designer como moldura do banco. */

@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, Check, Eye, Trash2, Loader2, Users, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { desvincularEstudante } from '@/app/admin/banco-questoes/estudantes-actions'
+import { desvincularEstudantesEmMassa } from '@/app/admin/banco-questoes/estudantes-actions'
 import { AdicionarEstudantesDialog } from '@/components/admin/adicionar-estudantes-dialog'
 import { AdicionarGrupoBancoDialog, type GrupoOpc } from '@/components/admin/adicionar-grupo-banco-dialog'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
@@ -82,8 +82,11 @@ export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = []
   function desvincular() {
     if (sel.size === 0) return
     start(async () => {
-      for (const id of sel) await desvincularEstudante(bancoId, id)
-      toast.success(`${sel.size} aluno(s) desvinculado(s)`)
+      // Uma única chamada em lote (chunks paralelos no servidor) — antes era 1 await por aluno,
+      // o que travava a UI com milhares de selecionados.
+      const r = await desvincularEstudantesEmMassa(bancoId, [...sel])
+      if (!r.ok) { toast.error(r.error ?? 'Erro ao desvincular'); return }
+      toast.success(`${r.removidos ?? sel.size} aluno(s) desvinculado(s)`)
       setSel(new Set())
       router.refresh()
     })
