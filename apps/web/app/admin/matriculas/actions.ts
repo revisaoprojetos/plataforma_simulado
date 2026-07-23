@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
 import { revalidatePath } from 'next/cache'
 
 export async function criarMatricula(data: {
@@ -26,6 +27,7 @@ export async function criarMatricula(data: {
 
     if (error) return { ok: false, error: error.message }
     await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_matriculas', entidadeId: data.estudante_id, depois: { estudante_id: data.estudante_id, simulado_id: data.simulado_id } })
+    await invalidarRelatorios(tenantId) // participantes mudaram → relatórios não podem servir valor velho
     revalidatePath('/admin/matriculas')
     return { ok: true }
   } catch (err) {
@@ -51,6 +53,7 @@ export async function toggleMatriculaAcesso(
 
     if (error) return { ok: false, error: error.message }
     await registrarAudit({ operacao: liberado ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_matriculas', entidadeId: matriculaId, depois: { liberado } })
+    await invalidarRelatorios(tenantId)
     revalidatePath('/admin/matriculas')
     return { ok: true }
   } catch (err) {
@@ -75,6 +78,7 @@ export async function excluirMatricula(
 
     if (error) return { ok: false, error: error.message }
     await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_matriculas', entidadeId: matriculaId })
+    await invalidarRelatorios(tenantId)
     revalidatePath('/admin/matriculas')
     return { ok: true }
   } catch (err) {

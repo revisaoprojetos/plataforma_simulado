@@ -16,13 +16,15 @@ UPDATE public.simulado_matriculas
  WHERE status IS NULL AND liberado = true;
 
 -- ---------------------------------------------------------------------
--- 2) [SEGURO/ADITIVO] tenant_id em api_keys (isolamento multi-tenant).
---    Chaves antigas ficam com tenant_id NULL (somem da listagem por
---    tenant) — recrie-as se ainda estiverem em uso. O código já grava
---    tenant_id nas novas chaves e filtra a listagem/revogação por ele.
+-- 2) [SEGURO/ADITIVO] Completa a tabela simulado_api_keys.
+--    A tabela real é `simulado_api_keys` (o código antigo usava `api_keys`,
+--    que NÃO existe — feature quebrada). Ela já tem `tenant_id`; faltam só
+--    as colunas que a UI usa. Tabela está vazia → aditivo e seguro.
 -- ---------------------------------------------------------------------
-ALTER TABLE public.api_keys ADD COLUMN IF NOT EXISTS tenant_id uuid;
-CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON public.api_keys(tenant_id);
+ALTER TABLE public.simulado_api_keys ADD COLUMN IF NOT EXISTS key_prefix text;
+ALTER TABLE public.simulado_api_keys ADD COLUMN IF NOT EXISTS criado_por uuid;
+ALTER TABLE public.simulado_api_keys ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+CREATE INDEX IF NOT EXISTS idx_simulado_api_keys_tenant ON public.simulado_api_keys(tenant_id);
 
 -- ---------------------------------------------------------------------
 -- 3) [SEGURO] Matrículas órfãs (apontam para estudante já deletado) — ~32.

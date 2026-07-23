@@ -6,6 +6,19 @@ import { registrarAudit } from '@/lib/audit'
 import { createHash, randomBytes } from 'crypto'
 import { revalidatePath } from 'next/cache'
 
+// A tabela real é `simulado_api_keys` (prefixada). Já tem `tenant_id`.
+const TABELA = 'simulado_api_keys'
+const OBRIGATORIAS = new Set(['tenant_id', 'nome', 'key_hash', 'escopos'])
+
+function colunaFaltante(msg: string): string | null {
+  return (
+    msg.match(/find the '([a-z_]+)' column/i)?.[1] ??
+    msg.match(/'([a-z_]+)' column/i)?.[1] ??
+    msg.match(/column "?([a-z_]+)"? .* does not exist/i)?.[1] ??
+    null
+  )
+}
+
 export async function criarApiKey(data: {
   nome: string
   escopos: string[]
@@ -18,27 +31,29 @@ export async function criarApiKey(data: {
     if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
 
     const supabase = await createServiceClient()
-
     const rawKey = randomBytes(32).toString('hex')
     const keyHash = createHash('sha256').update(rawKey).digest('hex')
-    const keyPrefix = rawKey.slice(0, 8)
 
-    const base = {
+    const base: Record<string, unknown> = {
+      tenant_id: tenantId,
       nome: data.nome,
       key_hash: keyHash,
-      key_prefix: keyPrefix,
+      key_prefix: rawKey.slice(0, 8),
       escopos: data.escopos,
       expira_em: data.expira_em ?? null,
       criado_por: access.userId,
     }
-    // Escopa por tenant; tolera bancos onde a coluna `tenant_id` ainda não foi migrada.
-    let ins = await supabase.from('api_keys').insert({ ...base, tenant_id: tenantId }).select('id').single()
-    if (ins.error && /tenant_id|column/i.test(ins.error.message)) {
-      ins = await supabase.from('api_keys').insert(base).select('id').single()
+    // Tolerante: se colunas opcionais (key_prefix/criado_por) ainda não foram migradas,
+    // remove só a que faltar e reinsere.
+    let ins = await supabase.from(TABELA).insert(base).select('id').single()
+    for (let t = 0; t < 4 && ins.error; t++) {
+      const col = colunaFaltante(ins.error.message)
+      if (col && col in base && !OBRIGATORIAS.has(col)) { delete base[col]; ins = await supabase.from(TABELA).insert(base).select('id').single(); continue }
+      break
     }
     if (ins.error) return { ok: false, error: ins.error.message }
 
-    await registrarAudit({ operacao: 'INSERT', entidade: 'api_keys', entidadeId: ins.data.id, depois: { nome: data.nome, escopos: data.escopos } })
+    await registrarAudit({ operacao: 'INSERT', entidade: TABELA, entidadeId: ins.data.id, depois: { nome: data.nome, escopos: data.escopos } })
     revalidatePath('/admin/api-keys')
     return { ok: true, id: ins.data.id, key_completa: rawKey }
   } catch (err) {
@@ -56,13 +71,10 @@ export async function revogarApiKey(
     if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
 
     const supabase = await createServiceClient()
-    // Só revoga chave DO PRÓPRIO tenant; tolera coluna ausente (fallback por id).
-    let upd = await supabase.from('api_keys').update({ revogada: true }).eq('id', id).eq('tenant_id', tenantId).select('id')
-    if (upd.error && /tenant_id|column/i.test(upd.error.message)) {
-      upd = await supabase.from('api_keys').update({ revogada: true }).eq('id', id).select('id')
-    }
-    if (upd.error) return { ok: false, error: upd.error.message }
-    await registrarAudit({ operacao: 'UPDATE', entidade: 'api_keys', entidadeId: id, depois: { revogada: true } })
+    // Só revoga chave DO próprio tenant (a coluna tenant_id existe na tabela).
+    const { error } = await supabase.from(TABELA).update({ revogada: true }).eq('id', id).eq('tenant_id', tenantId)
+    if (error) return { ok: false, error: error.message }
+    await registrarAudit({ operacao: 'UPDATE', entidade: TABELA, entidadeId: id, depois: { revogada: true } })
     revalidatePath('/admin/api-keys')
     return { ok: true }
   } catch (err) {

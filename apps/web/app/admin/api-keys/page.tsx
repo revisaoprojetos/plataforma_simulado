@@ -8,13 +8,15 @@ export const dynamic = 'force-dynamic'
 async function getApiKeys(tenantId: string) {
   try {
     const supabase = await createServiceClient()
-    // Só as chaves DO tenant; tolera bancos onde `tenant_id` ainda não existe na tabela.
-    const sel = 'id, nome, key_prefix, escopos, ultimo_uso, expira_em, revogada, created_at'
-    let r = await supabase.from('api_keys').select(sel).eq('tenant_id', tenantId).order('created_at', { ascending: false })
-    if (r.error && /tenant_id|column/i.test(r.error.message)) {
-      r = await supabase.from('api_keys').select(sel).order('created_at', { ascending: false })
+    // Tabela real: simulado_api_keys (com tenant_id). Select tolerante às colunas ainda
+    // não migradas (key_prefix/created_at).
+    const full = 'id, nome, key_prefix, escopos, ultimo_uso, expira_em, revogada, created_at'
+    const base = 'id, nome, escopos, ultimo_uso, expira_em, revogada'
+    let res: { data: any[] | null; error: unknown } = await supabase.from('simulado_api_keys').select(full).eq('tenant_id', tenantId).order('created_at', { ascending: false })
+    if (res.error) {
+      res = await supabase.from('simulado_api_keys').select(base).eq('tenant_id', tenantId)
     }
-    return r.data ?? []
+    return res.data ?? []
   } catch {
     return []
   }
