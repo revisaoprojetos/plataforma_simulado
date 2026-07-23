@@ -526,16 +526,22 @@ export async function addQuestaoToSimulado(simuladoId: string, questaoId: string
   if (!tenantId) return { error: 'Tenant não resolvido.' }
 
   const supabase = await createClient()
-  const { count } = await supabase
+  // Próxima ordem = MAX(ordem)+1 (não `count`) — evita reusar `ordem` após remoções e
+  // colidir com uma linha existente.
+  const { data: maxRow } = await supabase
     .from('simulado_prova_questoes')
-    .select('*', { count: 'exact', head: true })
+    .select('ordem')
     .eq('simulado_id', simuladoId)
+    .order('ordem', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const proximaOrdem = (((maxRow?.ordem as number) ?? -1) + 1)
 
   const { error } = await supabase.from('simulado_prova_questoes').insert({
     tenant_id: tenantId,
     simulado_id: simuladoId,
     questao_id: questaoId,
-    ordem: count ?? 0,
+    ordem: proximaOrdem,
   })
 
   if (error) return { error: error.message }
@@ -571,11 +577,33 @@ async function patchPublicar(supabase: any, id: string): Promise<Record<string, 
 export async function publishSimuladoAction(id: string) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const supabase = await createClient()
+
+  // Coerência antes de publicar (evita prova vazia/quebrada no ar): ≥1 questão e,
+  // no modo janela fixa, datas válidas (fim depois do início).
+  const { data: sim } = await supabase
+    .from('simulado_simulados')
+    .select('modo_aplicacao, data_inicio, data_fim')
+    .eq('id', id)
+    .maybeSingle()
+  const { count: nQuestoes } = await supabase
+    .from('simulado_prova_questoes')
+    .select('*', { count: 'exact', head: true })
+    .eq('simulado_id', id)
+  if (!nQuestoes || nQuestoes < 1) return { error: 'Adicione ao menos 1 questão antes de publicar.' }
+  if (sim?.modo_aplicacao === 'janela_fixa') {
+    if (!sim.data_inicio || !sim.data_fim) return { error: 'Para janela fixa, defina data de início e de fim.' }
+    if (new Date(sim.data_fim).getTime() <= new Date(sim.data_inicio).getTime()) {
+      return { error: 'A data de fim deve ser depois da data de início.' }
+    }
+  }
+
   const patch = await patchPublicar(supabase, id)
-  await supabase.from('simulado_simulados').update(patch).eq('id', id)
+  const { error } = await supabase.from('simulado_simulados').update(patch).eq('id', id)
+  if (error) return { error: error.message }
   await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'publicado' } })
   revalidatePath(`/admin/simulados/${id}`)
   revalidatePath('/admin/simulados')
+  return { ok: true }
 }
 
 export async function encerrarSimuladoAction(id: string) {

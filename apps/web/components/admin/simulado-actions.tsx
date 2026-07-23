@@ -17,7 +17,8 @@ export function SimuladoActions({ simuladoId, status }: SimuladoActionsProps) {
   async function handlePublish() {
     setIsLoading(true)
     try {
-      await publishSimuladoAction(simuladoId)
+      const r = await publishSimuladoAction(simuladoId)
+      if (r?.error) { toast.error(r.error); return }
       toast.success('Simulado publicado com sucesso!')
     } catch {
       toast.error('Erro ao publicar simulado')

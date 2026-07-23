@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { sessaoExpirada } from '@/lib/simulado/sessao-expiry'
 
 // POST /api/sessoes/resposta — auto-save idempotente de uma resposta.
 export async function POST(request: NextRequest) {
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
 
   const { data: sessao } = await supabase
     .from('simulado_sessoes_prova')
-    .select('id, status, tenant_id')
+    .select('id, status, tenant_id, simulado_id, iniciado_em')
     .eq('id', sessao_id)
     .maybeSingle()
 
@@ -28,6 +29,18 @@ export async function POST(request: NextRequest) {
   }
   if (sessao.status === 'finalizada') {
     return NextResponse.json({ message: 'Sessão já finalizada.' }, { status: 400 })
+  }
+
+  // Autoridade do servidor sobre tempo/janela: recusa a resposta se o limite individual
+  // (início + tempo_limite) ou o data_fim do simulado já passou. O timer do cliente é só UX;
+  // o auto-encerramento (cron) finaliza a sessão logo em seguida.
+  const { data: sim } = await supabase
+    .from('simulado_simulados')
+    .select('tempo_limite_min, data_fim')
+    .eq('id', sessao.simulado_id)
+    .maybeSingle()
+  if (sessaoExpirada(sessao.iniciado_em, sim?.tempo_limite_min, sim?.data_fim)) {
+    return NextResponse.json({ message: 'Tempo esgotado — a prova não aceita mais respostas.', expirado: true }, { status: 409 })
   }
 
   // Valida a alternativa e já resolve a LETRA (por ordem) para armazenar — assim a

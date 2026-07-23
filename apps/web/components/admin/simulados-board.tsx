@@ -164,7 +164,8 @@ function CardItem({ s, appUrl, online, onMover }: { s: SimuladoCard; appUrl: str
 
   function acao(fn: (id: string) => Promise<unknown>, msg: string) {
     startTransition(async () => {
-      await fn(s.id)
+      const r = (await fn(s.id)) as { error?: string } | null | undefined
+      if (r && typeof r === 'object' && r.error) { toast.error(r.error); return }
       toast.success(msg)
       router.refresh()
     })
