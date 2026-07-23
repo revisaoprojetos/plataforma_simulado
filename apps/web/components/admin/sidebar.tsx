@@ -11,7 +11,6 @@ import {
   UsersRound,
   BarChart3,
   Database,
-  ShieldCheck,
   ClipboardCheck,
   CreditCard,
   MessageSquare,
@@ -37,6 +36,7 @@ import {
   Zap,
   Palette,
   ServerCog,
+  UserCog,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -144,7 +144,7 @@ const navGroups: NavGroup[] = [
     icon: SlidersHorizontal,
     items: [
       { label: 'Plataformas', href: '/admin/tenants', icon: Building2, perm: 'tenants:manage' },
-      { label: 'Permissões (RBAC)', href: '/admin/rbac', icon: ShieldCheck, perm: 'rbac:view' },
+      { label: 'Administradores', href: '/admin/administradores', icon: UserCog, perm: 'rbac:view' },
       { label: 'API Keys', href: '/admin/api-keys', icon: KeyRound, perm: 'api_keys:manage' },
       { label: 'Aparência', href: '/admin/configuracoes', icon: Palette, exact: true, perm: 'configuracoes:view' },
       { label: 'Sistema', href: '/admin/sistema', icon: ServerCog, perm: 'configuracoes:view' },

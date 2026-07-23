@@ -6,6 +6,7 @@ import { GraduationCap, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { cn } from '@/lib/utils'
+import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
 
 const NAV = [
   { href: '/aluno', label: 'Início', exact: true },
@@ -13,7 +14,7 @@ const NAV = [
   { href: '/aluno/recomendado', label: 'Recomendado' },
   { href: '/aluno/favoritos', label: 'Favoritos' },
   { href: '/aluno/cadernos', label: 'Cadernos' },
-]
+].filter((n) => !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(n.href)))
 
 export function AlunoHeader({ nome, plataforma }: { nome: string; plataforma: string }) {
   const router = useRouter()

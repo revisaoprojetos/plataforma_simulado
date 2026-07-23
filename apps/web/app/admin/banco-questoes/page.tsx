@@ -37,8 +37,10 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
   const contEstudantes = new Map<string, number>()
   for (const e of estudantes) contEstudantes.set(e.pasta_id, (contEstudantes.get(e.pasta_id) ?? 0) + 1)
 
-  // Só pastas do CONTEXTO banco (exclui as pastas da Aplicação de Simulado, folder_area='simulado').
-  const folders = pastas.filter((p) => p.is_folder && p.folder_area !== 'simulado')
+  // Só pastas do CONTEXTO banco (exclui as pastas da Aplicação de Simulado, folder_area='simulado',
+  // e as de Cadernos de Prova, folder_area='caderno'). Pastas legadas (folder_area null) permanecem
+  // no Banco por compatibilidade.
+  const folders = pastas.filter((p) => p.is_folder && p.folder_area !== 'simulado' && p.folder_area !== 'caderno')
   const bancosAll = pastas.filter((p) => !p.is_folder)
   const bancosPorPasta = new Map<string, number>()
   for (const b of bancosAll) if (b.pai_id) bancosPorPasta.set(b.pai_id, (bancosPorPasta.get(b.pai_id) ?? 0) + 1)

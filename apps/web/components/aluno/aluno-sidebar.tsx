@@ -8,6 +8,7 @@ import {
   SidebarMenu, SidebarMenuItem, SidebarMenuButton,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
+import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
 
 // Mesmas cores de estado do admin (hover = ativo; ícone segue --sidebar-icon).
 const NAV_STATES =
@@ -27,6 +28,7 @@ const NAV = [
 export function AlunoSidebar({ logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff' }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string }) {
   const pathname = usePathname()
   const ativo = (n: (typeof NAV)[number]) => (n.exact ? pathname === n.href : pathname.startsWith(n.href))
+  const nav = NAV.filter((n) => !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(n.href)))
 
   return (
     <Sidebar className="border-sidebar-border">
@@ -51,7 +53,7 @@ export function AlunoSidebar({ logo, nome = 'Área do Aluno', subtitulo, logoBg 
         <SidebarGroup className="px-3">
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
-              {NAV.map((n) => (
+              {nav.map((n) => (
                 <SidebarMenuItem key={n.href}>
                   <SidebarMenuButton className={NAV_STATES} render={<Link href={n.href} />} isActive={ativo(n)}>
                     <n.icon className="h-4 w-4" />

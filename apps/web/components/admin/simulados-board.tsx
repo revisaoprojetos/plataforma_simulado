@@ -37,6 +37,7 @@ import {
   Folder,
   FolderOpen,
   ChevronLeft,
+  ChevronDown,
   FolderInput,
   Palette,
   X,
@@ -300,6 +301,10 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   const [movendo, setMovendo] = useState<SimuladoCard | null>(null)
   const [editandoPasta, setEditandoPasta] = useState<PastaSim | null>(null)
   const [criandoPasta, setCriandoPasta] = useState(false)
+  // Seções (Rascunho/Em andamento/Encerrado) recolhidas — começa tudo expandido.
+  const [recolhidas, setRecolhidas] = useState<Set<string>>(new Set())
+  const toggleSecao = (chave: string) =>
+    setRecolhidas((prev) => { const n = new Set(prev); if (n.has(chave)) n.delete(chave); else n.add(chave); return n })
   // "Fazendo agora" por simulado, atualizado sozinho (polling) — igual ao painel "Ao vivo".
   const [online, setOnline] = useState<Record<string, number>>(onlineInicial)
   useEffect(() => {
@@ -388,14 +393,21 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
 
       {secoes.map((sec) => {
         const itens = filtrados.filter((s) => s.status === sec.chave)
+        const aberto = !recolhidas.has(sec.chave)
         return (
           <div key={sec.chave} className="space-y-3">
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => toggleSecao(sec.chave)}
+              aria-expanded={aberto}
+              className="group flex w-full items-center gap-2 rounded-lg py-0.5 text-left transition-colors"
+            >
+              <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:text-foreground', aberto && 'rotate-180')} />
               <span className={cn('h-2.5 w-2.5 rounded-full', sec.cor)} />
-              <h2 className="font-semibold">{sec.titulo}</h2>
+              <span className="font-semibold">{sec.titulo}</span>
               <span className="text-sm text-muted-foreground">({itens.length})</span>
-            </div>
-            {itens.length === 0 ? (
+            </button>
+            {aberto && (itens.length === 0 ? (
               <p className="text-sm text-muted-foreground italic">
                 {sec.chave === 'rascunho'
                   ? 'Nenhum simulado aguardando início'
@@ -404,12 +416,12 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
                   : 'Nenhum simulado encerrado'}
               </p>
             ) : (
-              <div className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid items-stretch gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {itens.map((s) => (
                   <CardItem key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} onMover={podeMover ? () => setMovendo(s) : undefined} />
                 ))}
               </div>
-            )}
+            ))}
           </div>
         )
       })}

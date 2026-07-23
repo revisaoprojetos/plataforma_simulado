@@ -78,7 +78,7 @@ export default async function SimuladoDisponivelPage() {
                 {arr.length === 0 ? (
                   <p className="text-sm italic text-muted-foreground">{sec.vazio}</p>
                 ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                     {arr.map((s) => <CardSimulado key={s.id} s={s} />)}
                   </div>
                 )}

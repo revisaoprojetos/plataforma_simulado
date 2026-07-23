@@ -24,7 +24,7 @@ export async function createRoleAction(
 
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_roles', depois: { nome: slug, descricao } })
-  revalidatePath('/admin/rbac')
+  revalidatePath('/admin/administradores/permissoes')
   return { ok: true }
 }
 
@@ -40,7 +40,7 @@ export async function deleteRoleAction(roleId: string): Promise<{ ok: boolean; e
   const { error } = await supabase.from('simulado_roles').delete().eq('id', roleId).eq('tenant_id', tenantId)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_roles', entidadeId: roleId, antes: role ?? undefined })
-  revalidatePath('/admin/rbac')
+  revalidatePath('/admin/administradores/permissoes')
   return { ok: true }
 }
 
@@ -135,7 +135,7 @@ export async function atribuirPerfil(roleId: string, userId: string): Promise<{ 
   const { error } = await svc.from('simulado_tenant_acessos').update({ role: role.nome }).eq('user_id', userId).eq('tenant_id', tenantId)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenant_acessos', entidadeId: userId, depois: { role: role.nome } })
-  revalidatePath(`/admin/rbac/${roleId}`); revalidatePath('/admin/rbac')
+  revalidatePath(`/admin/administradores/permissoes/${roleId}`); revalidatePath('/admin/administradores/permissoes')
   return { ok: true }
 }
 
@@ -150,6 +150,6 @@ export async function removerDoPerfil(roleId: string, userId: string): Promise<{
   const { error } = await svc.from('simulado_tenant_acessos').update({ role: 'estudante' }).eq('user_id', userId).eq('tenant_id', tenantId).eq('role', role.nome)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenant_acessos', entidadeId: userId, depois: { role: 'estudante', removido_de: role.nome } })
-  revalidatePath(`/admin/rbac/${roleId}`); revalidatePath('/admin/rbac')
+  revalidatePath(`/admin/administradores/permissoes/${roleId}`); revalidatePath('/admin/administradores/permissoes')
   return { ok: true }
 }

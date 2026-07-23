@@ -17,24 +17,25 @@ export default async function MeusSimuladosPage() {
 
   // Simulados atribuídos: matrícula (liberada) + acesso avulso. O passaporte NÃO enxerga
   // tudo automaticamente — recebe matrícula via grupo "Passaporte" vinculado ao banco.
-  const [{ data: mats }, { data: acs }] = await Promise.all([
+  const [{ data: mats }, { data: acs }, { data: sessAll }] = await Promise.all([
     svc.from('simulado_matriculas').select('simulado_id, liberado').eq('estudante_id', estId),
     svc.from('simulado_acessos').select('simulado_id').eq('estudante_id', estId),
+    // Sessões dela (independem do acesso ATUAL): garantem que os simulados JÁ FEITOS apareçam
+    // em "Concluídos" mesmo se a matrícula/acesso mudou depois de concluir (histórico não some).
+    svc.from('simulado_sessoes_prova').select('id, simulado_id, status, nota, finalizado_em, tentativa_num').eq('estudante_id', estId).eq('is_teste', false).eq('deletado', false),
   ])
   const ids = [...new Set([
     ...(mats ?? []).filter((m: any) => m.liberado !== false).map((m: any) => m.simulado_id),
     ...(acs ?? []).map((a: any) => a.simulado_id),
+    ...(sessAll ?? []).map((s: any) => s.simulado_id),
   ].filter(Boolean))]
 
   let simulados: any[] = []
   const sessoesPorSim = new Map<string, any[]>()
   if (ids.length) {
-    const [{ data: sims }, { data: sess }] = await Promise.all([
-      svc.from('simulado_simulados').select('id, titulo, modo_aplicacao, status, data_inicio, data_fim, embed_token, regras').in('id', ids).eq('deletado', false),
-      svc.from('simulado_sessoes_prova').select('id, simulado_id, status, nota, finalizado_em, tentativa_num').eq('estudante_id', estId).in('simulado_id', ids).eq('is_teste', false).eq('deletado', false),
-    ])
+    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, modo_aplicacao, status, data_inicio, data_fim, embed_token, regras').in('id', ids).eq('deletado', false)
     simulados = sims ?? []
-    for (const s of (sess ?? []) as any[]) { const arr = sessoesPorSim.get(s.simulado_id) ?? []; arr.push(s); sessoesPorSim.set(s.simulado_id, arr) }
+    for (const s of (sessAll ?? []) as any[]) { const arr = sessoesPorSim.get(s.simulado_id) ?? []; arr.push(s); sessoesPorSim.set(s.simulado_id, arr) }
   }
 
   const visual = await resolverVisualSimulados(svc, simulados.map((s: any) => ({ id: s.id, regras: s.regras })))
@@ -71,7 +72,7 @@ export default async function MeusSimuladosPage() {
       {concluidos.length > 0 && (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Concluídos ({concluidos.length})</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {concluidos.map((s) => {
               const cor = s.vis?.cor ?? '#6d28d9'
               const BancoIcon = iconeBanco(s.vis?.icone)

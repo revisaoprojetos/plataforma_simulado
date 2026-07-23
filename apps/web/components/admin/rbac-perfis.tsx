@@ -23,7 +23,7 @@ function meta(nome: string) {
   return META[nome] ?? { label: nome.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()), icon: UserCog, tom: 'from-primary/20 text-primary' }
 }
 
-export function RbacPerfis({ perfis, destaqueId }: { perfis: PerfilCard[]; destaqueId?: string | null }) {
+export function RbacPerfis({ perfis, destaqueId, basePath = '/admin/administradores/permissoes' }: { perfis: PerfilCard[]; destaqueId?: string | null; basePath?: string }) {
   const [q, setQ] = useState('')
   const [destaque, setDestaque] = useState<string | null>(destaqueId ?? null)
 
@@ -62,7 +62,7 @@ export function RbacPerfis({ perfis, destaqueId }: { perfis: PerfilCard[]; desta
             const Icon = m.icon
             const pulsando = p.id === pulseId
             return (
-              <Link key={p.id} href={`/admin/rbac/${p.id}`}
+              <Link key={p.id} href={`${basePath}/${p.id}`}
                 className={cn('group relative flex flex-col gap-3 overflow-hidden rounded-2xl border bg-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-md',
                   pulsando && 'animate-pulse ring-2 ring-primary')}>
                 <div className={cn('absolute inset-x-0 top-0 h-1 bg-gradient-to-r to-transparent', m.tom)} />

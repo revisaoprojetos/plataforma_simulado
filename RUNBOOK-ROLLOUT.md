@@ -5,7 +5,9 @@ tudo é reversível por env/flag.** Sem os envs abaixo, o sistema funciona exata
 (PostgREST + polling). Ative uma coisa por vez, verifique, siga.
 
 Ambiente: **Portainer** (serviços `web`, `worker`, e o novo `api`). Produção = tenant `twdr`
-(Supabase). Imagens em `ghcr.io/revisaoprojetos/plataforma_simulado:<SHA>` (web) e `:<SHA>-worker`.
+(Supabase). Imagens:
+- web: `ghcr.io/revisaoprojetos/plataforma_simulado:<SHA>`
+- worker: `ghcr.io/revisaoprojetos/plataforma_simulado-worker:<SHA>` (o `-worker` faz parte do **nome**, antes do `:`, não é sufixo do tag)
 
 ---
 
@@ -15,7 +17,7 @@ Ambiente: **Portainer** (serviços `web`, `worker`, e o novo `api`). Produção 
 |---|---|---|
 | **Redis** | Já está no `docker-compose` (serviço `redis`). Nada a fazer. | `redis-cli ping` → PONG |
 | **Índices SQL** (Fase 0.2) | Rodar `apps/web/prisma/migrations/20260721120000_relatorio_indices.sql` no SQL Editor (fora de janela). | `SELECT indexname FROM pg_indexes WHERE tablename='simulado_respostas_objetivas'` mostra `idx_simulado_respostas_questao*` |
-| **Deploy web + worker** | Subir a imagem `web:<SHA>` e `worker:<SHA>-worker` mais recentes. | `/api/health` → 200; logs do worker mostram `[cron] agendado: ... warm-cache (300s)` |
+| **Deploy web + worker** | Subir `plataforma_simulado:<SHA>` (serviço web) e `plataforma_simulado-worker:<SHA>` (serviço worker) mais recentes. | `/api/health` → 200; logs do worker mostram `[cron] agendado: ... warm-cache (300s)` |
 
 > Sem mais nenhum env, você já ganha: **cache de relatórios (Redis), re-correção assíncrona,
 > auto-encerramento em lote, webhook Curseduca enfileirado, SSE do "Ao Vivo" e do board**.
