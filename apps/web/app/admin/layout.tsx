@@ -50,6 +50,13 @@ export default async function AdminLayout({
   // Resolve permissões do usuário no tenant atual (para esconder UI por papel).
   const access = await getCurrentAccess()
 
+  // Gate de papel (defesa em profundidade): só a EQUIPE entra no /admin. Um usuário
+  // autenticado sem papel de staff (ou papel "estudante") é mandado para a área do aluno —
+  // impede que qualquer conta logada alcance server actions do admin. As actions também checam.
+  if (access.tenantId && (!access.role || access.role === 'estudante')) {
+    redirect('/aluno')
+  }
+
   // Config da tela de imersão (mostrada uma vez ao acessar o sistema).
   const { tema, tenantNome } = await getTenantTheme()
   const ti = (tema ?? {}) as any

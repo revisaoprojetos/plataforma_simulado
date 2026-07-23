@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { headers } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/server'
 
@@ -19,7 +20,9 @@ export interface Tenant {
  * contexto de RLS, e alguns bancos (ex.: migrados) têm RLS incompleto que bloquearia
  * a leitura do tenant se rodasse como o usuário autenticado.
  */
-export async function getCurrentTenant(): Promise<Tenant | null> {
+// Memoizado por request (React cache): o layout + a página + várias libs chamam isto no mesmo
+// render — sem cache seriam N leituras idênticas de `simulado_tenants`. Host é constante no request.
+export const getCurrentTenant = cache(async (): Promise<Tenant | null> => {
   const h = await headers()
   const host = (h.get('host') ?? '').split(':')[0]
   const parts = host.split('.')
@@ -47,7 +50,7 @@ export async function getCurrentTenant(): Promise<Tenant | null> {
   }
 
   return (data as Tenant | null) ?? null
-}
+})
 
 export async function getCurrentTenantId(): Promise<string | null> {
   const tenant = await getCurrentTenant()

@@ -38,13 +38,19 @@ export async function toggleMatriculaAcesso(
   liberado: boolean,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
+    if (!(await checkPermission('matriculas:update'))) return { ok: false, error: 'Você não tem permissão para alterar matrículas.' }
+    const tenantId = await getCurrentTenantId()
+    if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+
     const supabase = await createServiceClient()
     const { error } = await supabase
       .from('simulado_matriculas')
       .update({ liberado })
       .eq('id', matriculaId)
+      .eq('tenant_id', tenantId)
 
     if (error) return { ok: false, error: error.message }
+    await registrarAudit({ operacao: liberado ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_matriculas', entidadeId: matriculaId, depois: { liberado } })
     revalidatePath('/admin/matriculas')
     return { ok: true }
   } catch (err) {
@@ -56,13 +62,19 @@ export async function excluirMatricula(
   matriculaId: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
+    if (!(await checkPermission('matriculas:delete'))) return { ok: false, error: 'Você não tem permissão para excluir matrículas.' }
+    const tenantId = await getCurrentTenantId()
+    if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+
     const supabase = await createServiceClient()
     const { error } = await supabase
       .from('simulado_matriculas')
       .delete()
       .eq('id', matriculaId)
+      .eq('tenant_id', tenantId)
 
     if (error) return { ok: false, error: error.message }
+    await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_matriculas', entidadeId: matriculaId })
     revalidatePath('/admin/matriculas')
     return { ok: true }
   } catch (err) {

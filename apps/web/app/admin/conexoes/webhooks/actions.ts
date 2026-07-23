@@ -2,10 +2,16 @@
 
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
 
 type WebhookInput = { nome: string; url: string; eventos: string[]; secret?: string; ativo?: boolean; enviosSimultaneos?: number; filtroSimulados?: string[] }
+
+/** Webhooks carregam segredo HMAC e apontam para URLs externas → exigem permissão de configuração. */
+async function podeGerenciar(): Promise<boolean> {
+  return checkPermission('configuracoes:manage')
+}
 
 function valida(data: WebhookInput): string | null {
   if (!data.nome?.trim()) return 'Informe um nome.'
@@ -15,6 +21,7 @@ function valida(data: WebhookInput): string | null {
 }
 
 export async function criarWebhook(data: WebhookInput): Promise<{ ok: boolean; id?: string; error?: string }> {
+  if (!(await podeGerenciar())) return { ok: false, error: 'Sem permissão.' }
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const err = valida(data)
@@ -42,6 +49,7 @@ export async function criarWebhook(data: WebhookInput): Promise<{ ok: boolean; i
 }
 
 export async function atualizarWebhook(id: string, data: WebhookInput): Promise<{ ok: boolean; error?: string }> {
+  if (!(await podeGerenciar())) return { ok: false, error: 'Sem permissão.' }
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const err = valida(data)
@@ -68,6 +76,7 @@ export async function atualizarWebhook(id: string, data: WebhookInput): Promise<
 }
 
 export async function toggleWebhook(id: string, ativo: boolean): Promise<{ ok: boolean; error?: string }> {
+  if (!(await podeGerenciar())) return { ok: false, error: 'Sem permissão.' }
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = await createServiceClient()
@@ -78,6 +87,7 @@ export async function toggleWebhook(id: string, ativo: boolean): Promise<{ ok: b
 }
 
 export async function excluirWebhook(id: string): Promise<{ ok: boolean; error?: string }> {
+  if (!(await podeGerenciar())) return { ok: false, error: 'Sem permissão.' }
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = await createServiceClient()

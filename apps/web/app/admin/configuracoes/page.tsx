@@ -16,7 +16,7 @@ export async function salvarTema(tema: Record<string, unknown>) {
   // Escrita em tenants exige service-role real (createServiceClient é
   // bloqueado por RLS e o UPDATE não afeta nenhuma linha — o save "falha em silêncio").
   const access = await getCurrentAccess()
-  if (!(access.isAdmin || access.permissions.includes('configuracoes:view'))) {
+  if (!(access.isAdmin || access.permissions.includes('configuracoes:manage'))) {
     throw new Error('Sem permissão para alterar a identidade visual.')
   }
 

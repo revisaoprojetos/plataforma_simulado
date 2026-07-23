@@ -3,9 +3,12 @@
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { checkPermission } from '@/lib/auth/permissions'
 
 export async function salvarContatos(formData: FormData) {
+  if (!(await checkPermission('configuracoes:manage'))) throw new Error('Sem permissão para alterar contatos.')
   const tenantId = await getCurrentTenantId()
+  if (!tenantId) throw new Error('Tenant não resolvido.')
   const payload = {
     tenant_id:           tenantId,
     whatsapp:            (formData.get('whatsapp') as string | null) ?? null,
@@ -46,7 +49,9 @@ export async function salvarContatos(formData: FormData) {
 export async function salvarMensagens(
   items: Array<{ id: string; titulo: string; corpo: string; ativo: boolean }>,
 ) {
+  if (!(await checkPermission('configuracoes:manage'))) throw new Error('Sem permissão para alterar mensagens.')
   const tenantId = await getCurrentTenantId()
+  if (!tenantId) throw new Error('Tenant não resolvido.')
   const supabase = await createServiceClient()
 
   for (const item of items) {
@@ -61,10 +66,12 @@ export async function salvarMensagens(
     const isRealId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id)
 
     if (isRealId) {
+      // Filtra por tenant para não editar mensagem de outro tenant por id arbitrário.
       const { error } = await supabase
         .from('simulado_tenant_mensagens')
         .update(payload)
         .eq('id', item.id)
+        .eq('tenant_id', tenantId)
 
       if (error) throw new Error(`Erro ao salvar mensagem ${item.id}: ${error.message}`)
     } else {

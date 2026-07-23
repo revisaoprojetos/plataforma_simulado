@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 
@@ -15,7 +16,7 @@ const EMPTY: Access = { userId: null, tenantId: null, role: null, isAdmin: false
  * Resolve o acesso do usuário atual: papel (de tenant_acessos) + permissões
  * (roles → role_permissions → permissions). Papel "admin" tem acesso total.
  */
-export async function getCurrentAccess(): Promise<Access> {
+export const getCurrentAccess = cache(async (): Promise<Access> => {
   const supabase = await createClient()
   const {
     data: { user },
@@ -64,7 +65,7 @@ export async function getCurrentAccess(): Promise<Access> {
   }
 
   return { userId: user.id, tenantId, role, isAdmin: false, permissions }
-}
+})
 
 /** Verifica uma permissão sobre um Access já resolvido. */
 export function accessCan(access: Access, permission: string): boolean {

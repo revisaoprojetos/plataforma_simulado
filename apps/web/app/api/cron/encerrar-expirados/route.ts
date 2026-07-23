@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { rankearSimulado } from '@/lib/ranking'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
@@ -50,7 +50,7 @@ async function processar() {
   // ── Coleta as sessões a finalizar (dois critérios), sem duplicar ──
   const paraFinalizar = new Map<string, SessaoMin>()
 
-  // 1) Janela fixa expirada → todas as sessões em andamento + encerra o simulado depois.
+  // Simulados de JANELA FIXA cujo `data_fim` já passou (para encerrar depois + finalizar suas sessões).
   const { data: sims } = await svc
     .from('simulado_simulados')
     .select('id, tenant_id')
@@ -59,31 +59,30 @@ async function processar() {
     .not('data_fim', 'is', null)
     .lt('data_fim', agora)
   const simsJanela = (sims ?? []) as any[]
-  for (const sim of simsJanela) {
-    const { data: sess } = await svc
-      .from('simulado_sessoes_prova')
-      .select('id, simulado_id, tenant_id, estudante_id')
-      .eq('simulado_id', sim.id)
+  const janelaSet = new Set(simsJanela.map((s) => s.id as string))
+
+  // TODAS as sessões em andamento numa ÚNICA leitura PAGINADA — elimina o N+1 (antes: 1 query por
+  // simulado de janela fixa) e o teto de 5000 (o cenário-alvo é 1000+ simultâneos em vários simulados).
+  const emAndamento = await fetchAll<SessaoMin>(() =>
+    svc.from('simulado_sessoes_prova')
+      .select('id, simulado_id, tenant_id, estudante_id, iniciado_em')
       .eq('status', 'em_andamento')
       .eq('deletado', false)
-    for (const s of (sess ?? []) as SessaoMin[]) paraFinalizar.set(s.id, s)
-  }
+      .order('id'))
 
-  // 2) Sessões em andamento (qualquer modo) cujo tempo individual (ou data_fim) estourou.
-  const { data: emAndamento } = await svc
-    .from('simulado_sessoes_prova')
-    .select('id, simulado_id, tenant_id, estudante_id, iniciado_em')
-    .eq('status', 'em_andamento')
-    .eq('deletado', false)
-    .limit(5000)
-  const simIds = [...new Set((emAndamento ?? []).map((s: any) => s.simulado_id))]
+  // 1) Sessão cujo simulado é de janela fixa já expirada → finaliza direto (sem checar tempo).
+  for (const s of emAndamento) if (janelaSet.has(s.simulado_id)) paraFinalizar.set(s.id, s)
+
+  // 2) Sessão cujo tempo individual (ou o `data_fim` do simulado) estourou.
+  const simIds = [...new Set(emAndamento.map((s) => s.simulado_id))]
   const info = new Map<string, { tempo: number | null; dataFim: string | null }>()
   if (simIds.length) {
-    const { data: si } = await svc.from('simulado_simulados').select('id, tempo_limite_min, data_fim').in('id', simIds)
-    for (const x of (si ?? []) as any[]) info.set(x.id, { tempo: x.tempo_limite_min ?? null, dataFim: x.data_fim ?? null })
+    const si = await fetchAllByIn<any>(simIds, (chunk) =>
+      svc.from('simulado_simulados').select('id, tempo_limite_min, data_fim').in('id', chunk).order('id'))
+    for (const x of si) info.set(x.id, { tempo: x.tempo_limite_min ?? null, dataFim: x.data_fim ?? null })
   }
   const nowMs = Date.now()
-  for (const s of (emAndamento ?? []) as SessaoMin[]) {
+  for (const s of emAndamento) {
     const meta = info.get(s.simulado_id)
     if (!meta) continue
     let expira: number | null = null

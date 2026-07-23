@@ -2,13 +2,17 @@
 
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
 
 type Passo = { id: string; tipo: string; nome: string; config: Record<string, unknown> }
 type AutomacaoInput = { nome: string; gatilho: string | null; passos: Passo[]; ativo?: boolean }
 
+const podeGerenciar = () => checkPermission('configuracoes:manage')
+
 export async function salvarAutomacao(id: string | null, data: AutomacaoInput): Promise<{ ok: boolean; id?: string; error?: string }> {
+  if (!(await podeGerenciar())) return { ok: false, error: 'Sem permissão.' }
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   if (!data.nome?.trim()) return { ok: false, error: 'Informe um nome.' }
@@ -32,6 +36,7 @@ export async function salvarAutomacao(id: string | null, data: AutomacaoInput): 
 }
 
 export async function toggleAutomacao(id: string, ativo: boolean): Promise<{ ok: boolean; error?: string }> {
+  if (!(await podeGerenciar())) return { ok: false, error: 'Sem permissão.' }
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = await createServiceClient()
@@ -42,6 +47,7 @@ export async function toggleAutomacao(id: string, ativo: boolean): Promise<{ ok:
 }
 
 export async function excluirAutomacao(id: string): Promise<{ ok: boolean; error?: string }> {
+  if (!(await podeGerenciar())) return { ok: false, error: 'Sem permissão.' }
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = await createServiceClient()
