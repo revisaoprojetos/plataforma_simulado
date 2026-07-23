@@ -77,9 +77,9 @@ export function QuestaoDiscursiva({ questao, numero }: { questao: QuestaoDiscurs
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         ) : corrigida ? (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 rounded-md bg-green-50 p-3 text-sm dark:bg-green-900/20">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <span className="font-medium text-green-700 dark:text-green-400">Corrigida — nota {Number(resposta!.nota ?? 0).toFixed(1)}</span>
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-50 p-3 text-sm dark:bg-emerald-950/30">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="font-semibold text-emerald-700 dark:text-emerald-400">Corrigida — nota {Number(resposta!.nota ?? 0).toFixed(1)}</span>
             </div>
             <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">{resposta!.texto}</div>
             {comps.length > 0 && (

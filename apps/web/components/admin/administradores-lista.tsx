@@ -163,7 +163,7 @@ export function AdministradoresLista({ membros, cargos }: { membros: AdminMembro
 
       {/* Modal: redefinir senha (digitar ou gerar) */}
       {resetAlvo && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => { if (!pending) { setResetAlvo(null); setResetSenha('') } }}>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" onClick={() => { if (!pending) { setResetAlvo(null); setResetSenha('') } }}>
           <div className="w-full max-w-md rounded-2xl border bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 flex items-center gap-2">
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><KeyRound className="h-4 w-4" /></span>

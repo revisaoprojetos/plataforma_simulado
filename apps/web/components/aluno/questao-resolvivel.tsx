@@ -60,14 +60,14 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
   }
 
   return (
-    <Card>
+    <Card className="overflow-hidden transition-shadow hover:shadow-md">
       <CardContent className="space-y-4 p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {numero != null && <span className="font-mono">#{numero}</span>}
-            {questao.disciplina && <span className="rounded bg-muted px-2 py-0.5">{questao.disciplina}</span>}
-            {questao.banca && <span className="rounded bg-muted px-2 py-0.5">{questao.banca}</span>}
-            {questao.ano && <span className="rounded bg-muted px-2 py-0.5">{questao.ano}</span>}
+            {numero != null && <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono font-semibold text-primary">#{numero}</span>}
+            {questao.disciplina && <span className="rounded-full bg-muted px-2 py-0.5 font-medium">{questao.disciplina}</span>}
+            {questao.banca && <span className="rounded-full bg-muted px-2 py-0.5">{questao.banca}</span>}
+            {questao.ano && <span className="rounded-full bg-muted px-2 py-0.5">{questao.ano}</span>}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <AddToCaderno questaoId={questao.id} />
@@ -98,22 +98,22 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
                   'flex w-full items-start gap-3 rounded-lg border p-3 text-left text-sm transition-colors',
                   !revelado && escolha && 'border-primary bg-primary/5',
                   !revelado && !escolha && 'hover:bg-muted',
-                  mostrarCerta && 'border-green-500 bg-green-50 dark:bg-green-900/20',
-                  mostrarErrada && 'border-red-500 bg-red-50 dark:bg-red-900/20',
+                  mostrarCerta && 'border-emerald-500 bg-emerald-50 dark:border-emerald-500/60 dark:bg-emerald-950/30',
+                  mostrarErrada && 'border-rose-500 bg-rose-50 dark:border-rose-500/60 dark:bg-rose-950/30',
                 )}
               >
                 <span className={cn(
                   'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold',
-                  mostrarCerta && 'border-green-500 bg-green-500 text-white',
-                  mostrarErrada && 'border-red-500 bg-red-500 text-white',
+                  mostrarCerta && 'border-emerald-500 bg-emerald-500 text-white',
+                  mostrarErrada && 'border-rose-500 bg-rose-500 text-white',
                   !mostrarCerta && !mostrarErrada && escolha && 'border-primary bg-primary text-primary-foreground',
                   !mostrarCerta && !mostrarErrada && !escolha && 'border-muted-foreground/30 text-muted-foreground',
                 )}>
                   {LETRA[i] ?? i + 1}
                 </span>
                 <span className="flex-1">{alt.texto}</span>
-                {mostrarCerta && <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />}
-                {mostrarErrada && <XCircle className="h-4 w-4 shrink-0 text-red-600" />}
+                {mostrarCerta && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />}
+                {mostrarErrada && <XCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />}
               </button>
             )
           })}
@@ -129,10 +129,15 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
           </button>
         ) : (
           <div className="space-y-3">
-            <div className={cn('flex items-center gap-2 text-sm font-medium', acertou ? 'text-green-600' : 'text-red-600')}>
+            <div className={cn(
+              'flex items-center gap-2 rounded-lg border p-3 text-sm font-semibold',
+              acertou
+                ? 'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400'
+                : 'border-rose-500/40 bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400',
+            )}>
               {acertou ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
               {acertou ? 'Você acertou!' : 'Resposta incorreta.'}
-              <button onClick={resetar} className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+              <button onClick={resetar} className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-background/60 hover:text-foreground">
                 <RotateCcw className="h-3.5 w-3.5" /> Refazer
               </button>
             </div>
