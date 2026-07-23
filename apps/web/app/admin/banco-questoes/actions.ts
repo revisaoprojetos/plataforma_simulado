@@ -7,8 +7,6 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
 import { tipoEhCertoErrado, alternativasSaoCertoErrado } from '@/lib/simulado/formato'
-import { garantirGrupoPassaporte } from '@/lib/estudante/grupo-passaporte'
-import { vincularGrupoAoBanco } from './estudantes-actions'
 import type { AnaliseImport, QuestaoImport, AltImport, ResultadoImport } from './import-types'
 
 async function guard() {
@@ -41,12 +39,8 @@ export async function criarBanco(nome: string, tipo: string = 'objetiva', paiId?
 
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_pastas', entidadeId: data.id, depois: { nome: titulo, tipo: tp } })
 
-  // Regra passaporte: todo banco novo já nasce com o grupo "Passaporte" vinculado — assim os
-  // passaportes têm acesso por padrão (e o admin pode DESVINCULAR para tirar o acesso deste banco).
-  try {
-    const gid = await garantirGrupoPassaporte(svc, g.tenantId)
-    if (gid) await vincularGrupoAoBanco(data.id, gid)
-  } catch { /* auto-vínculo é best-effort; não bloqueia a criação do banco */ }
+  // (Removido a pedido) o banco NÃO vincula mais o grupo "Passaporte" automaticamente na criação.
+  // Se quiser dar acesso aos passaportes, vincule o grupo manualmente pelo banco.
 
   revalidatePath('/admin/banco-questoes')
   return { ok: true, id: data.id }
