@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -73,8 +74,10 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
   const totais = new Map<string, number>()
   let respAll: { sessao_id: string; questao_id: string; correta: boolean }[] = []
   if (sessIds.length) {
-    const { data: resp } = await svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', sessIds)
-    respAll = (resp ?? []) as any
+    // fetchAllByIn: um aluno com muito histórico passa de 1000 respostas → `.in()` cortaria
+    // em 1000 e subestimaria acertos/totais dos KPIs. Pagina por lista de sessões.
+    respAll = await fetchAllByIn<{ sessao_id: string; questao_id: string; correta: boolean }>(sessIds, (chunk) =>
+      svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).order('sessao_id'))
     for (const r of respAll) {
       totais.set(r.sessao_id, (totais.get(r.sessao_id) ?? 0) + 1)
       if (r.correta) acertos.set(r.sessao_id, (acertos.get(r.sessao_id) ?? 0) + 1)

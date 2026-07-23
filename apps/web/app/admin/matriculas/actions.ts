@@ -18,6 +18,14 @@ export async function criarMatricula(data: {
 
     const supabase = await createServiceClient()
 
+    // Confirma que estudante e simulado são DO tenant (não cruzar ids de outra plataforma).
+    const [{ data: est }, { data: sim }] = await Promise.all([
+      supabase.from('simulado_estudantes').select('id').eq('id', data.estudante_id).eq('tenant_id', tenantId).maybeSingle(),
+      supabase.from('simulado_simulados').select('id').eq('id', data.simulado_id).eq('tenant_id', tenantId).maybeSingle(),
+    ])
+    if (!est) return { ok: false, error: 'Estudante não pertence a esta plataforma.' }
+    if (!sim) return { ok: false, error: 'Simulado não pertence a esta plataforma.' }
+
     const { error } = await supabase.from('simulado_matriculas').insert({
       tenant_id: tenantId,
       estudante_id: data.estudante_id,

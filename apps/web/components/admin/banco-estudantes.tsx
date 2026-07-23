@@ -51,6 +51,8 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
       .from('simulado_sessoes_prova')
       .select('estudante_id, iniciado_em')
       .in('estudante_id', chunk)
+      .eq('deletado', false)
+      .eq('is_teste', false)
       .order('iniciado_em', { ascending: false }))
     for (const s of sess) if (!ultimoPorAluno.has(s.estudante_id)) ultimoPorAluno.set(s.estudante_id, s.iniciado_em)
   }
