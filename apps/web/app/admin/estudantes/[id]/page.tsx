@@ -12,6 +12,7 @@ import { type SessaoRow } from '@/components/admin/historico-estudante'
 import { SimuladosFeitosCards } from '@/components/admin/simulados-feitos-cards'
 import { HistoricoSimples } from '@/components/admin/historico-simples'
 import { BancosVinculadosPopup } from '@/components/admin/bancos-vinculados-popup'
+import { SimuladosPendentesCard } from '@/components/admin/simulados-pendentes-card'
 import { EditarEstudanteButton } from '@/components/admin/editar-estudante-button'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
@@ -298,30 +299,8 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
         </div>
       </div>
 
-      {/* SIMULADOS PENDENTES (atribuídos por matrícula/acesso, ainda não concluídos) */}
-      {pendentes.length > 0 && (
-        <Card className="overflow-hidden border-amber-500/30">
-          <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b border-amber-500/20 bg-amber-500/5">
-            <CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4 text-amber-500" /> Simulados pendentes ({pendentes.length})</CardTitle>
-            <span className="hidden text-xs text-muted-foreground sm:block">Atribuídos por matrícula/acesso e ainda não concluídos</span>
-          </CardHeader>
-          <CardContent className="grid gap-2 pt-4 sm:grid-cols-2">
-            {pendentes.map((p) => (
-              <Link key={p.id} href={`/admin/simulados/${p.id}`} className="flex items-center gap-3 rounded-xl border p-3 transition hover:border-primary hover:bg-primary/5">
-                <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', p.iniciado ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-muted text-muted-foreground')}>
-                  <ClipboardList className="h-4 w-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{p.titulo}</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {p.iniciado ? 'Em andamento' : 'Não iniciado'}{p.expira ? ` · expira ${fmtData(p.expira)}` : ''}
-                  </span>
-                </span>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+      {/* SIMULADOS PENDENTES: cartão clicável → abre pop-up com a lista (não polui o perfil) */}
+      <SimuladosPendentesCard pendentes={pendentes} />
 
       {/* Conteúdo: esquerda (Informações + Simulados feitos) | direita (Bancos + Histórico) */}
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
