@@ -62,6 +62,9 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build e push (API NestJS — apps/api)
+        # A API é Fase 3 (skeleton, ainda NÃO deployada). Se o build dela falhar, NÃO pode
+        # bloquear as imagens web/worker (que são o que roda em produção). Sobe quando der.
+        continue-on-error: true
         uses: docker/build-push-action@v6
         with:
           # context = raiz do monorepo (o Dockerfile copia packages/data + apps/api).

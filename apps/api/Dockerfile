@@ -2,17 +2,16 @@
 # (o tsup embute o `data` no bundle → a imagem final não precisa do monorepo).
 # ⚠️ docker-compose deve usar context: . (raiz do monorepo) e dockerfile: apps/api/Dockerfile.
 
+# IMPORTANTE: o context de build é a RAIZ do monorepo. Copiamos o repo inteiro e
+# instalamos com o MESMO pnpm do lockfile (11.9.0) — o frozen-lockfile exige TODOS os
+# manifests do workspace presentes e a mesma versão do pnpm que gerou o lock. Copiar só
+# api+data (ou usar pnpm@9) quebrava o build. Espelha o Dockerfile do web, que funciona.
 FROM node:22-alpine AS builder
-RUN npm i -g pnpm@9
+RUN apk add --no-cache libc6-compat && npm i -g pnpm@11.9.0
 WORKDIR /repo
-# Manifests primeiro (cache de layer de instalação)
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
-COPY packages/data/package.json packages/data/package.json
-COPY apps/api/package.json apps/api/package.json
-RUN pnpm install --filter api --filter data --frozen-lockfile
-# Fontes + build (tsup bundla `data` em dist/main.js)
-COPY packages/data packages/data
-COPY apps/api apps/api
+COPY . .
+RUN pnpm install --frozen-lockfile
+# tsup bundla o pacote `data` dentro de dist/main.js
 RUN pnpm --filter api build
 
 FROM node:22-alpine AS runner
