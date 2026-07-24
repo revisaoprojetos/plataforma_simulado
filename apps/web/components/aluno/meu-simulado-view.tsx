@@ -1,9 +1,12 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, ClipboardCheck, Users, BarChart3, Target, Clock, Crown, BookOpen, Lock, Check, MessageSquare, ListChecks, FileText, ScrollText, Award, TrendingUp, MoreVertical, Download, Loader2 } from 'lucide-react'
+import { LayoutDashboard, ClipboardCheck, Users, BarChart3, Target, Clock, Crown, BookOpen, Lock, Check, MessageSquare, ListChecks, FileText, ScrollText, Award, TrendingUp, MoreVertical, Download, Loader2, Trash2 } from 'lucide-react'
+import { confirmar } from '@/components/ui/confirm-dialog'
+import { excluirSessaoAction } from '@/app/admin/estudantes/actions'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { ComparativoTurma } from '@/components/simulado/comparativo-turma'
@@ -18,7 +21,7 @@ const fmtData = (d?: string | null) => (d ? new Date(d).toLocaleDateString('pt-B
 const nota = (n: number | null) => (n == null ? '—' : Number(n).toFixed(1).replace('.', ','))
 
 export function MeuSimuladoView({
-  tentativas, questoes, comparativo, desempenho, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo,
+  tentativas, questoes, comparativo, desempenho, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false,
 }: {
   tentativas: TentativaResumo[]
   questoes: QuestaoAgregada[]
@@ -32,8 +35,30 @@ export function MeuSimuladoView({
   estId: string
   simuladoId: string
   simuladoTitulo: string
+  /** Admin: habilita apagar cada tentativa (o aluno NUNCA vê isso). */
+  adminMode?: boolean
 }) {
+  const router = useRouter()
   const ordenadas = useMemo(() => [...tentativas].sort((a, b) => (a.n ?? 0) - (b.n ?? 0)), [tentativas])
+
+  // Admin: apagar UMA tentativa. Deixa de contar (sai do histórico/resultados/ranking) e o aluno
+  // pode refazer; se for a única, o simulado volta a aparecer como "não feito" para ele. Vai p/ a Lixeira.
+  const [apagando, setApagando] = useState<string | null>(null)
+  async function apagarTentativa(sessaoId: string, n: number) {
+    if (apagando) return
+    const ok = await confirmar({
+      titulo: 'Apagar tentativa',
+      mensagem: `Apagar a tentativa #${n}?\n\nEla deixa de contar (sai do histórico, resultados e ranking) e o aluno poderá refazer — se for a única, o simulado volta a aparecer como "não feito" para ele. Vai para a Lixeira (pode ser restaurada).`,
+      confirmar: 'Apagar tentativa',
+      destrutivo: true,
+    })
+    if (!ok) return
+    setApagando(sessaoId)
+    const r = await excluirSessaoAction(sessaoId, simuladoId, estId)
+    setApagando(null)
+    if (r?.error) toast.error(r.error)
+    else { toast.success('Tentativa apagada (aluno pode refazer)'); router.refresh() }
+  }
 
   // Multi-seleção de tentativas DESTE simulado (padrão: todas marcadas).
   const [selTents, setSelTents] = useState<Set<string>>(() => new Set(tentativas.map((t) => t.id)))
@@ -250,6 +275,12 @@ export function MeuSimuladoView({
                             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground">
                             <MoreVertical className="h-4 w-4" />
                           </button>
+                          {adminMode && (
+                            <button type="button" onClick={() => apagarTentativa(t.id, t.n ?? 0)} disabled={apagando === t.id} title="Apagar tentativa"
+                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50">
+                              {apagando === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                            </button>
+                          )}
                         </div>
                       )
                     })}

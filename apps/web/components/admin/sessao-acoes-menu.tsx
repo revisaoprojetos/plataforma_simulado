@@ -1,11 +1,10 @@
 'use client'
-import { confirmar } from '@/components/ui/confirm-dialog'
 
-import { useTransition, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { usePdfDownloads } from '@/components/pdf-downloads-provider'
-import { MoreHorizontal, Trash2, ListChecks, ClipboardList, FileText, FileCheck2, Loader2, FileSpreadsheet } from 'lucide-react'
+import { MoreHorizontal, ListChecks, ClipboardList, FileText, FileCheck2, Loader2, FileSpreadsheet } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { excluirSessaoAction } from '@/app/admin/estudantes/actions'
 
 type Mod = { id: string; nome: string; pdfUrl?: string }
 
@@ -26,7 +24,7 @@ function IconeMod({ nome }: { nome: string }) {
 }
 
 export function SessaoAcoesMenu({
-  cadId, mods, estudanteId, sessaoId, simuladoId, temResultado, estudanteNome, simuladoTitulo,
+  cadId, mods, estudanteId, sessaoId, temResultado, estudanteNome, simuladoTitulo,
 }: {
   cadId: string | null
   mods: Mod[]
@@ -38,7 +36,6 @@ export function SessaoAcoesMenu({
   simuladoTitulo?: string
 }) {
   const router = useRouter()
-  const [pending, start] = useTransition()
   // O acompanhamento/baixa fica no provider global (continua mesmo trocando de página).
   const { registrar } = usePdfDownloads()
   // Estado local só durante o POST de enfileiramento (evita clique-duplo na MESMA modalidade).
@@ -80,29 +77,15 @@ export function SessaoAcoesMenu({
     finally { marcarEnviando(m.id, false) }
   }
 
-  async function excluir() {
-    if (!(await confirmar({
-      titulo: 'Apagar tentativa',
-      mensagem: 'Apagar esta tentativa?\n\nEla deixa de contar: sai do histórico, dos resultados e do ranking (recalculado), e o aluno poderá refazer — se foi a única, o simulado volta a aparecer como "não feito" para ele. Vai para a Lixeira (pode ser restaurada).',
-      confirmar: 'Apagar tentativa',
-      destrutivo: true,
-    }))) return
-    start(async () => {
-      const r = await excluirSessaoAction(sessaoId, simuladoId, estudanteId)
-      if (r?.error) toast.error(r.error)
-      else { toast.success('Tentativa apagada (aluno pode refazer)'); router.refresh() }
-    })
-  }
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-        title="Ações" disabled={pending}>
-        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+        title="Ações">
+        <MoreHorizontal className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
-        {temResultado && (
+        {temResultado ? (
           <>
             <DropdownMenuGroup>
               <DropdownMenuLabel>Material para download</DropdownMenuLabel>
@@ -123,12 +106,10 @@ export function SessaoAcoesMenu({
             <DropdownMenuItem onClick={() => baixar(`/api/admin/relatorio-sessao/${sessaoId}`)}>
               <FileSpreadsheet className="mr-2 h-4 w-4" /> Baixar relatório (Excel)
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
           </>
+        ) : (
+          <DropdownMenuItem disabled>Nenhuma ação disponível</DropdownMenuItem>
         )}
-        <DropdownMenuItem onClick={excluir} className="text-destructive focus:text-destructive">
-          <Trash2 className="mr-2 h-4 w-4" /> Apagar tentativa
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

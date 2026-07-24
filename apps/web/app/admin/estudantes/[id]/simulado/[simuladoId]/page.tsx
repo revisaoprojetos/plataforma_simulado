@@ -132,6 +132,7 @@ export default async function EstudanteSimuladoPage({ params }: { params: Promis
         estId={id}
         simuladoId={simuladoId}
         simuladoTitulo={sim.titulo}
+        adminMode
       />
     </div>
   )
