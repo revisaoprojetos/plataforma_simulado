@@ -53,6 +53,87 @@ async function vincularBancos(tenantId: string, questaoId: string, bancoIds: str
 }
 
 /**
+ * Reconcilia as alternativas da questão SEM apagar tudo.
+ *
+ * O bug original: o update fazia `delete-all + insert`. Só que as alternativas
+ * têm respostas de aluno apontando p/ elas (FK), então o DELETE falhava (por RLS
+ * e/ou pela FK) e o INSERT rodava mesmo assim → as alternativas ACUMULAVAM
+ * (multiplicavam a cada save).
+ *
+ * Aqui, em vez de apagar, casamos por `ordem` (posição) e:
+ *  - atualizamos a alternativa existente no lugar (reusa o id → não quebra a FK);
+ *  - se houver duplicadas na mesma ordem (legado do bug), re-apontamos as respostas
+ *    p/ a que fica e removemos as sobrando;
+ *  - inserimos quando a questão ganha alternativas; removemos com re-aponte quando encolhe.
+ * Roda via service-role (a RLS de simulado_alternativas não libera DELETE/UPDATE ao aluno/admin).
+ */
+async function sincronizarAlternativas(
+  admin: SupabaseClient,
+  tenantId: string,
+  questaoId: string,
+  novas: AlternativaData[],
+) {
+  const { data: existentes } = await admin
+    .from('simulado_alternativas')
+    .select('id, ordem')
+    .eq('questao_id', questaoId)
+    .eq('tenant_id', tenantId)
+    .order('id')
+
+  // Agrupa as existentes por ordem (pode haver >1 na mesma ordem — resíduo do bug de acúmulo).
+  const porOrdem = new Map<number, string[]>()
+  for (const e of existentes ?? []) {
+    const arr = porOrdem.get(e.ordem as number) ?? []
+    arr.push(e.id as string)
+    porOrdem.set(e.ordem as number, arr)
+  }
+
+  const remover: string[] = []
+  let primeiraMantida: string | null = null
+
+  for (let i = 0; i < novas.length; i++) {
+    const alt = novas[i]
+    const daOrdem = porOrdem.get(i) ?? []
+    if (daOrdem.length) {
+      const keep = daOrdem[0]
+      primeiraMantida = primeiraMantida ?? keep
+      await admin
+        .from('simulado_alternativas')
+        .update({ texto: alt.texto, correta: alt.correta, ordem: i })
+        .eq('id', keep)
+      // Duplicadas dessa ordem: re-aponta as respostas p/ a que fica e agenda remoção.
+      for (const extra of daOrdem.slice(1)) {
+        await admin.from('simulado_respostas_objetivas').update({ alternativa_id: keep }).eq('alternativa_id', extra)
+        remover.push(extra)
+      }
+      porOrdem.delete(i)
+    } else {
+      const { data: ins } = await admin
+        .from('simulado_alternativas')
+        .insert({ tenant_id: tenantId, questao_id: questaoId, texto: alt.texto, correta: alt.correta, ordem: i })
+        .select('id')
+        .single()
+      if (ins?.id) primeiraMantida = primeiraMantida ?? (ins.id as string)
+    }
+  }
+
+  // Sobras: ordens existentes sem correspondente nas novas (questão encolheu) →
+  // re-aponta eventuais respostas p/ a 1ª mantida (preserva a FK) e remove.
+  const sobras: string[] = []
+  for (const ids of porOrdem.values()) sobras.push(...ids)
+  for (const s of sobras) {
+    if (primeiraMantida) {
+      await admin.from('simulado_respostas_objetivas').update({ alternativa_id: primeiraMantida }).eq('alternativa_id', s)
+    }
+    remover.push(s)
+  }
+
+  if (remover.length) {
+    await admin.from('simulado_alternativas').delete().in('id', remover)
+  }
+}
+
+/**
  * Resolve uma entrada de taxonomia por NOME, criando-a se ainda não existir.
  * A taxonomia nasce conforme o conteúdo é cadastrado — sem base pré-pronta.
  * Tolerante a corrida: se o insert colidir no unique, relê o registro existente.
@@ -255,20 +336,9 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_questoes', entidadeId: id, antes, depois: { ...antes, ...fields } })
 
   if (data.tipo === 'objetiva' && data.alternativas) {
-    // Service-role: a RLS de simulado_alternativas NÃO permite DELETE ao usuário autenticado →
-    // o delete via createClient falhava em silêncio e as alternativas ACUMULAVAM a cada save
-    // (multiplicavam). O insert também vai por admin para simetria.
-    const admin = createAdminClient()
-    await admin.from('simulado_alternativas').delete().eq('questao_id', id).eq('tenant_id', tenantId)
-    await admin.from('simulado_alternativas').insert(
-      data.alternativas.map((alt) => ({
-        tenant_id: tenantId,
-        questao_id: id,
-        texto: alt.texto,
-        correta: alt.correta,
-        ordem: alt.ordem,
-      }))
-    )
+    // Reconcilia no lugar (reusa ids, não apaga tudo). Evita o acúmulo de alternativas:
+    // apagar-tudo batia na FK das respostas e o insert multiplicava. Ver sincronizarAlternativas.
+    await sincronizarAlternativas(createAdminClient(), tenantId, id, data.alternativas)
   }
 
   if (data.tipo === 'discursiva' && data.competencias) {
