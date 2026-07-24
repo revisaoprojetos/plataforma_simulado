@@ -391,7 +391,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
               {([['quadro', 'Quadro', LayoutGrid], ['catalogo', 'Catálogo', Rows3]] as const).map(([v, label, Icon]) => (
                 <button key={v} type="button" onClick={() => setVista(v)} aria-pressed={vista === v}
                   className={cn('inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors',
-                    vista === v ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                    vista === v ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
                   <Icon className="h-4 w-4" /> {label}
                 </button>
               ))}

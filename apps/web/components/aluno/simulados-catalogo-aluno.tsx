@@ -45,21 +45,26 @@ export function SimuladosCatalogoAluno({ itens, grupos }: { itens: ItemSimuladoC
   const catalogo = vista === 'catalogo' && temCatalogo
 
   return (
-    <div className="space-y-6">
-      {temCatalogo && (
-        <div className="flex justify-end">
-          <div className="flex gap-1 rounded-lg bg-muted p-1">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Simulados</h1>
+          <p className="text-muted-foreground">Simulados liberados para você — disponíveis agora, agendados, com prazo ou abertos.</p>
+        </div>
+        {temCatalogo && (
+          <div className="flex shrink-0 gap-1 rounded-lg bg-muted p-1">
             {([['quadro', 'Quadro', LayoutGrid], ['catalogo', 'Catálogo', Rows3]] as const).map(([v, label, Icon]) => (
               <button key={v} type="button" onClick={() => setVista(v)} aria-pressed={vista === v}
                 className={cn('inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors',
-                  vista === v ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                  vista === v ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
                 <Icon className="h-4 w-4" /> {label}
               </button>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
+      <div className="space-y-6">
       {SECOES.map((sec) => {
         const arr = buckets[sec.chave]
         // No catálogo: uma fileira por grupo (com itens neste bucket) + grid para os sem grupo.
@@ -91,6 +96,7 @@ export function SimuladosCatalogoAluno({ itens, grupos }: { itens: ItemSimuladoC
           </section>
         )
       })}
+      </div>
     </div>
   )
 }

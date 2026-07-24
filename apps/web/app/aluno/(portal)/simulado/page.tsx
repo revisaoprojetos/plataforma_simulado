@@ -68,21 +68,20 @@ export default async function SimuladoDisponivelPage() {
 
   const itensCat = itens.map((i) => ({ ...i, grupoId: grupoPorSim.get(i.id) ?? null }))
 
-  return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Simulados</h1>
-        <p className="text-muted-foreground">Simulados liberados para você — disponíveis agora, agendados, com prazo ou abertos.</p>
-      </div>
-
-      {itens.length === 0 ? (
+  if (itens.length === 0) {
+    return (
+      <div className="space-y-5">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Simulados</h1>
+          <p className="text-muted-foreground">Simulados liberados para você — disponíveis agora, agendados, com prazo ou abertos.</p>
+        </div>
         <div className="rounded-2xl border border-dashed p-10 text-center">
           <Radio className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
           <p className="text-muted-foreground">Nenhum simulado liberado no momento. Quando um for aberto (ou agendado), ele aparece aqui.</p>
         </div>
-      ) : (
-        <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} />
-      )}
-    </div>
-  )
+      </div>
+    )
+  }
+
+  return <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} />
 }
