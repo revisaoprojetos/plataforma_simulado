@@ -1,0 +1,118 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { Trophy, CheckCircle2, ArrowRight, Lock, LayoutGrid, Rows3 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { iconeBanco } from '@/lib/banco-visual'
+import { FileiraHorizontal } from '@/components/fileira-horizontal'
+import type { VisualSim } from '@/lib/aluno/simulado-visual'
+
+export type MeuSimuladoItem = {
+  id: string
+  titulo: string
+  modo_aplicacao: string
+  tentativas: number
+  melhor: number | null
+  notaLiberada: boolean
+  vis: VisualSim | null
+  grupoId: string | null
+}
+type Grupo = { id: string; nome: string }
+
+const notaTone = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
+const modoLabel = (m: string) => (m === 'janela_fixa' ? 'Agendado' : m === 'prazo_relativo' ? 'Prazo' : 'Aberto')
+
+// Cards um pouco mais estreitos para espiar um pedaço do próximo na fileira do catálogo.
+const BASIS = 'shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-3rem)/4.3)] xl:basis-[calc((100%-4rem)/5.3)]'
+
+/** Card (pôster) de um simulado concluído — nota, tentativas e link para o resultado. */
+function CardConcluido({ s }: { s: MeuSimuladoItem }) {
+  const cor = s.vis?.cor ?? '#6d28d9'
+  const BancoIcon = iconeBanco(s.vis?.icone)
+  const capa = s.vis?.capa
+  return (
+    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+      {capa
+        ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+
+      <Link href={`/aluno/simulados/${s.id}`} className="absolute inset-0 z-10" aria-label={s.titulo} />
+
+      <span className="pointer-events-none absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: cor }}><BancoIcon className="h-4 w-4" /></span>
+      {s.notaLiberada ? (
+        <span className="pointer-events-none absolute right-3 top-3 z-20 rounded-lg bg-black/45 px-2 py-1 text-right backdrop-blur">
+          <span className={cn('block text-lg font-bold leading-none tabular-nums text-white', s.melhor != null && notaTone(s.melhor))}>{s.melhor != null ? s.melhor.toFixed(1).replace('.', ',') : '—'}</span>
+          <span className="block text-[9px] uppercase tracking-wide text-white/70">nota</span>
+        </span>
+      ) : (
+        <span className="pointer-events-none absolute right-3 top-3 z-20 inline-flex items-center gap-1 rounded-lg bg-black/45 px-2 py-1 text-[10px] font-medium text-white/80 backdrop-blur" title="A nota será liberada pelo professor"><Lock className="h-3 w-3" /> Nota</span>
+      )}
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
+        <span className="mb-1 inline-flex items-center gap-1 rounded-md bg-black/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/85 backdrop-blur"><CheckCircle2 className="h-3 w-3" /> Concluído</span>
+        <h3 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{s.titulo}</h3>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur"><Trophy className="h-3 w-3" /> {s.tentativas}x</span>
+          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">{modoLabel(s.modo_aplicacao)}</span>
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-white">Ver resultado <ArrowRight className="h-3 w-3" /></span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * "Meus simulados" (concluídos) com dois modos: "Quadro" (grade) e "Catálogo" (fileiras horizontais
+ * por grupo/pasta do banco, estilo Netflix). Catálogo é o padrão quando há grupos.
+ */
+export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoItem[]; grupos: Grupo[] }) {
+  const temCatalogo = grupos.length > 0
+  const [vista, setVista] = useState<'quadro' | 'catalogo'>('catalogo')
+  useEffect(() => { const v = localStorage.getItem('aluno-meus-simulados-vista'); if (v === 'catalogo' || v === 'quadro') setVista(v) }, [])
+  useEffect(() => { localStorage.setItem('aluno-meus-simulados-vista', vista) }, [vista])
+
+  const catalogo = vista === 'catalogo' && temCatalogo
+  const fileiras = catalogo ? grupos.map((g) => ({ g, its: itens.filter((s) => s.grupoId === g.id) })).filter((x) => x.its.length > 0) : []
+  const avulsos = catalogo ? itens.filter((s) => !s.grupoId) : itens
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Meus simulados</h1>
+          <p className="text-muted-foreground">Seus simulados concluídos — com notas e resultados. Os liberados para fazer estão em <Link href="/aluno/simulado" className="font-medium text-primary hover:underline">Simulados</Link>.</p>
+        </div>
+        {temCatalogo && (
+          <div className="flex shrink-0 gap-1 rounded-lg bg-muted p-1">
+            {([['quadro', 'Quadro', LayoutGrid], ['catalogo', 'Catálogo', Rows3]] as const).map(([v, label, Icon]) => (
+              <button key={v} type="button" onClick={() => setVista(v)} aria-pressed={vista === v}
+                className={cn('inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                  vista === v ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                <Icon className="h-4 w-4" /> {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Concluídos ({itens.length})</h2>
+        <div className="space-y-4">
+          {fileiras.map(({ g, its }) => (
+            <FileiraHorizontal key={g.id} titulo={g.nome} count={its.length}>
+              {its.map((s) => <div key={s.id} className={BASIS}><CardConcluido s={s} /></div>)}
+            </FileiraHorizontal>
+          ))}
+          {avulsos.length > 0 && (
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {avulsos.map((s) => <CardConcluido key={s.id} s={s} />)}
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  )
+}

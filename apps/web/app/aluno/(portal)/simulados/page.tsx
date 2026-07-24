@@ -1,14 +1,11 @@
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { ClipboardList, Trophy, CheckCircle2, ArrowRight, Lock, Play } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { iconeBanco } from '@/lib/banco-visual'
+import { ClipboardList } from 'lucide-react'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
-
-const notaTone = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
-const modoLabel = (m: string) => (m === 'janela_fixa' ? 'Agendado' : m === 'prazo_relativo' ? 'Prazo' : 'Aberto')
+import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
+import { MeusSimuladosCatalogo } from '@/components/aluno/meus-simulados-catalogo'
 
 export default async function MeusSimuladosPage() {
   const sessao = await getSessaoAluno()
@@ -33,7 +30,7 @@ export default async function MeusSimuladosPage() {
   let simulados: any[] = []
   const sessoesPorSim = new Map<string, any[]>()
   if (ids.length) {
-    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, modo_aplicacao, status, data_inicio, data_fim, embed_token, regras').in('id', ids).eq('deletado', false)
+    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, modo_aplicacao, status, data_inicio, data_fim, embed_token, regras, created_at').in('id', ids).eq('deletado', false)
     simulados = sims ?? []
     for (const s of (sessAll ?? []) as any[]) { const arr = sessoesPorSim.get(s.simulado_id) ?? []; arr.push(s); sessoesPorSim.set(s.simulado_id, arr) }
   }
@@ -52,66 +49,32 @@ export default async function MeusSimuladosPage() {
     return { ...s, concluido, emAndamento, tentativas: finalizadas.length, melhor, notaLiberada, vis: visual.get(s.id) ?? null }
   })
 
-  const concluidos = itens.filter((i) => i.concluido)
+  const concluidos = itens
+    .filter((i) => i.concluido)
+    // Mais recente → mais antigo (mesma antiguidade do catálogo).
+    .sort((a: any, b: any) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Meus simulados</h1>
-        <p className="text-muted-foreground">Seus simulados concluídos — com notas e resultados. Os liberados para fazer estão em <Link href="/aluno/simulado" className="font-medium text-primary hover:underline">Simulados</Link>.</p>
-      </div>
-
-      {concluidos.length === 0 && (
+  if (concluidos.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Meus simulados</h1>
+          <p className="text-muted-foreground">Seus simulados concluídos — com notas e resultados. Os liberados para fazer estão em <Link href="/aluno/simulado" className="font-medium text-primary hover:underline">Simulados</Link>.</p>
+        </div>
         <div className="rounded-2xl border border-dashed p-10 text-center">
           <ClipboardList className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
           <p className="text-muted-foreground">Você ainda não concluiu nenhum simulado. Veja os disponíveis em <Link href="/aluno/simulado" className="font-medium text-primary hover:underline">Simulado</Link>.</p>
         </div>
-      )}
+      </div>
+    )
+  }
 
-      {/* Concluídos */}
-      {concluidos.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Concluídos ({concluidos.length})</h2>
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {concluidos.map((s) => {
-              const cor = s.vis?.cor ?? '#6d28d9'
-              const BancoIcon = iconeBanco(s.vis?.icone)
-              const capa = s.vis?.capa
-              return (
-                <div key={s.id} className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
-                  {capa
-                    ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                    : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
-                  {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+  // Grupo (pasta is_folder do banco) de cada concluído → fileiras do catálogo.
+  const { grupoPorSim, grupos } = await resolverGruposCatalogo(svc, concluidos.map((s: any) => ({ id: s.id, regras: s.regras })))
+  const concluidosCat = concluidos.map((s: any) => ({
+    id: s.id, titulo: s.titulo, modo_aplicacao: s.modo_aplicacao, tentativas: s.tentativas,
+    melhor: s.melhor, notaLiberada: s.notaLiberada, vis: s.vis, grupoId: grupoPorSim.get(s.id) ?? null,
+  }))
 
-                  <Link href={`/aluno/simulados/${s.id}`} className="absolute inset-0 z-10" aria-label={s.titulo} />
-
-                  <span className="pointer-events-none absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: cor }}><BancoIcon className="h-4 w-4" /></span>
-                  {s.notaLiberada ? (
-                    <span className="pointer-events-none absolute right-3 top-3 z-20 rounded-lg bg-black/45 px-2 py-1 text-right backdrop-blur">
-                      <span className={cn('block text-lg font-bold leading-none tabular-nums text-white', s.melhor != null && notaTone(s.melhor))}>{s.melhor != null ? s.melhor.toFixed(1).replace('.', ',') : '—'}</span>
-                      <span className="block text-[9px] uppercase tracking-wide text-white/70">nota</span>
-                    </span>
-                  ) : (
-                    <span className="pointer-events-none absolute right-3 top-3 z-20 inline-flex items-center gap-1 rounded-lg bg-black/45 px-2 py-1 text-[10px] font-medium text-white/80 backdrop-blur" title="A nota será liberada pelo professor"><Lock className="h-3 w-3" /> Nota</span>
-                  )}
-
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
-                    <span className="mb-1 inline-flex items-center gap-1 rounded-md bg-black/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/85 backdrop-blur"><CheckCircle2 className="h-3 w-3" /> Concluído</span>
-                    <h3 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{s.titulo}</h3>
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur"><Trophy className="h-3 w-3" /> {s.tentativas}x</span>
-                      <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">{modoLabel(s.modo_aplicacao)}</span>
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-white">Ver resultado <ArrowRight className="h-3 w-3" /></span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
-    </div>
-  )
+  return <MeusSimuladosCatalogo itens={concluidosCat} grupos={grupos} />
 }
