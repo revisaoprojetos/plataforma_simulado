@@ -307,9 +307,10 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   const [movendo, setMovendo] = useState<SimuladoCard | null>(null)
   const [editandoPasta, setEditandoPasta] = useState<PastaSim | null>(null)
   const [criandoPasta, setCriandoPasta] = useState(false)
-  // View: "quadro" (por status, atual) ou "catálogo" (fileiras por pasta, estilo Netflix). Persiste a escolha.
+  // View: "quadro" (por status, atual) ou "catálogo" (fileiras por pasta, estilo Netflix). Catálogo é o
+  // padrão; a escolha do usuário persiste no localStorage. Sem catálogo disponível, cai no Quadro (render abaixo).
   const temCatalogo = !!catalogo && catalogo.sims.length > 0
-  const [vista, setVista] = useState<'quadro' | 'catalogo'>('quadro')
+  const [vista, setVista] = useState<'quadro' | 'catalogo'>('catalogo')
   useEffect(() => { const v = localStorage.getItem('simulados-vista'); if ((v === 'catalogo' || v === 'quadro')) setVista(v) }, [])
   useEffect(() => { localStorage.setItem('simulados-vista', vista) }, [vista])
   // Seções (Rascunho/Em andamento/Encerrado) recolhidas — começa tudo expandido.
