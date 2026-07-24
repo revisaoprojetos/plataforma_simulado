@@ -54,7 +54,11 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
   const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), count: contPasta.get(f.id) ?? 0 }))
   const destinos = folders.map((f) => ({ id: f.id, nome: f.nome }))
 
-  const online = await onlinePorSimulado(simsNivel.map((s) => s.id))
+  // Catálogo (view horizontal estilo Netflix): TODOS os simulados + TODAS as pastas da Aplicação,
+  // agrupados por pasta e ordenados do mais recente ao mais antigo (created_at DESC — já vem assim).
+  const catalogoPastas = folders.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), count: contPasta.get(f.id) ?? 0 }))
+
+  const online = await onlinePorSimulado(comTipo.map((s) => s.id))
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
   return (
@@ -77,6 +81,7 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
         folders={foldersOut}
         destinos={destinos}
         atual={current ? { id: current.id, nome: current.nome } : null}
+        catalogo={{ sims: comTipo as (SimuladoCard & { pasta_id: string | null })[], pastas: catalogoPastas }}
       />
     </div>
   )

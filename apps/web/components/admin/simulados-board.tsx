@@ -1,7 +1,7 @@
 'use client'
 import { confirmar } from '@/components/ui/confirm-dialog'
 
-import { useState, useTransition, useMemo, useEffect } from 'react'
+import { useState, useTransition, useMemo, useEffect, useRef } from 'react'
 import type React from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
@@ -37,12 +37,15 @@ import {
   Folder,
   FolderOpen,
   ChevronLeft,
+  ChevronRight,
   ChevronDown,
   FolderInput,
   Palette,
   X,
   Check,
   Loader2,
+  LayoutGrid,
+  Rows3,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
@@ -290,10 +293,12 @@ function CardItem({ s, appUrl, online, onMover }: { s: SimuladoCard; appUrl: str
 
 type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; count: number }
 type DestinoSim = { id: string; nome: string }
+export type SimuladoCatalogo = SimuladoCard & { pasta_id: string | null }
 
-export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null }: {
+export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo }: {
   simulados: SimuladoCard[]; appUrl: string; onlineInicial?: Record<string, number>
   folders?: PastaSim[]; destinos?: DestinoSim[]; atual?: { id: string; nome: string } | null
+  catalogo?: { sims: SimuladoCatalogo[]; pastas: PastaSim[] }
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -302,14 +307,23 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   const [movendo, setMovendo] = useState<SimuladoCard | null>(null)
   const [editandoPasta, setEditandoPasta] = useState<PastaSim | null>(null)
   const [criandoPasta, setCriandoPasta] = useState(false)
+  // View: "quadro" (por status, atual) ou "catálogo" (fileiras por pasta, estilo Netflix). Persiste a escolha.
+  const temCatalogo = !!catalogo && catalogo.sims.length > 0
+  const [vista, setVista] = useState<'quadro' | 'catalogo'>('quadro')
+  useEffect(() => { const v = localStorage.getItem('simulados-vista'); if ((v === 'catalogo' || v === 'quadro')) setVista(v) }, [])
+  useEffect(() => { localStorage.setItem('simulados-vista', vista) }, [vista])
   // Seções (Rascunho/Em andamento/Encerrado) recolhidas — começa tudo expandido.
   const [recolhidas, setRecolhidas] = useState<Set<string>>(new Set())
   const toggleSecao = (chave: string) =>
     setRecolhidas((prev) => { const n = new Set(prev); if (n.has(chave)) n.delete(chave); else n.add(chave); return n })
   // "Fazendo agora" por simulado, atualizado sozinho (polling) — igual ao painel "Ao vivo".
   const [online, setOnline] = useState<Record<string, number>>(onlineInicial)
+  const idsMonitor = useMemo(
+    () => (vista === 'catalogo' && catalogo ? catalogo.sims : simulados).map((s) => s.id),
+    [vista, catalogo, simulados],
+  )
   useEffect(() => {
-    const ids = simulados.map((s) => s.id)
+    const ids = idsMonitor
     if (!ids.length) return
     let vivo = true
     let es: EventSource | null = null
@@ -326,7 +340,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
       iniciarPolling()
     }
     return () => { vivo = false; try { es?.close() } catch { /* */ } if (poll) clearInterval(poll) }
-  }, [simulados])
+  }, [idsMonitor])
 
   const filtrados = useMemo(() => {
     return simulados.filter((s) => {
@@ -339,6 +353,11 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
     const q = busca.trim().toLowerCase()
     return q ? folders.filter((f) => f.nome.toLowerCase().includes(q)) : folders
   }, [folders, busca])
+  // Catálogo: mesmos filtros (busca + modo) aplicados a TODOS os simulados. Ordem já é created_at DESC.
+  const catalogoFiltrado = useMemo(() => {
+    const sims = catalogo?.sims ?? []
+    return sims.filter((s) => s.titulo.toLowerCase().includes(busca.toLowerCase()) && (modo === 'todos' || s.modo_aplicacao === modo))
+  }, [catalogo, busca, modo])
 
   const filtros = [
     { v: 'todos', label: 'Todos' },
@@ -365,17 +384,34 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
           )}
           <Input placeholder={atual ? `Buscar em “${atual.nome}”…` : 'Buscar simulado…'} value={busca} onChange={(e) => setBusca(e.target.value)} className="min-w-[180px] flex-1 lg:max-w-md" />
         </div>
-        <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
-          {filtros.map((f) => (
-            <button key={f.v} onClick={() => setModo(f.v)}
-              className={cn('rounded-md px-3 py-1 text-sm font-medium transition-colors',
-                modo === f.v ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:bg-[var(--tab-active,var(--background))] hover:text-[color:var(--tab-active-foreground,var(--foreground))]')}>
-              {f.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          {temCatalogo && (
+            <div className="flex gap-1 rounded-lg bg-muted p-1">
+              {([['quadro', 'Quadro', LayoutGrid], ['catalogo', 'Catálogo', Rows3]] as const).map(([v, label, Icon]) => (
+                <button key={v} type="button" onClick={() => setVista(v)} aria-pressed={vista === v}
+                  className={cn('inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                    vista === v ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                  <Icon className="h-4 w-4" /> {label}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
+            {filtros.map((f) => (
+              <button key={f.v} onClick={() => setModo(f.v)}
+                className={cn('rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                  modo === f.v ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:bg-[var(--tab-active,var(--background))] hover:text-[color:var(--tab-active-foreground,var(--foreground))]')}>
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
+      {vista === 'catalogo' && temCatalogo ? (
+        <CatalogoSimulados sims={catalogoFiltrado} pastas={catalogo!.pastas} appUrl={appUrl} online={online} onMover={podeMover ? (s) => setMovendo(s) : undefined} />
+      ) : (
+      <>
       {atual && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <FolderOpen className="h-4 w-4" /> <span className="font-medium text-foreground">{atual.nome}</span> — {simulados.length} simulado(s)
@@ -426,6 +462,8 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
           </div>
         )
       })}
+      </>
+      )}
 
       {movendo && <MoverSimuladoDialog simulado={movendo} destinos={destinos} atualId={atual?.id ?? null} onClose={() => setMovendo(null)} />}
       {editandoPasta && (
@@ -477,6 +515,86 @@ function FolderCardSim({ f, onExcluir, onPersonalizar }: { f: PastaSim; onExclui
         <h3 className="mt-0.5 line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{f.nome}</h3>
         <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur"><Folder className="h-3 w-3" /> {f.count} simulado(s)</span>
       </div>
+    </div>
+  )
+}
+
+/** Uma fileira do catálogo (uma pasta): cards em rolagem horizontal com setas estilo Netflix. */
+function FileiraCatalogo({ titulo, icone, cor, sims, appUrl, online, onMover }: {
+  titulo: string; icone?: string | null; cor?: string | null; sims: SimuladoCatalogo[]
+  appUrl: string; online: Record<string, number>; onMover?: (s: SimuladoCard) => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [canL, setCanL] = useState(false)
+  const [canR, setCanR] = useState(false)
+  const atualiza = () => {
+    const el = ref.current
+    if (!el) return
+    setCanL(el.scrollLeft > 4)
+    setCanR(Math.ceil(el.scrollLeft + el.clientWidth) < el.scrollWidth - 4)
+  }
+  useEffect(() => {
+    atualiza()
+    const el = ref.current
+    if (!el) return
+    el.addEventListener('scroll', atualiza, { passive: true })
+    window.addEventListener('resize', atualiza)
+    return () => { el.removeEventListener('scroll', atualiza); window.removeEventListener('resize', atualiza) }
+  }, [sims.length])
+  const rolar = (dir: -1 | 1) => { const el = ref.current; if (el) el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: 'smooth' }) }
+  const Icon = iconeBanco(icone)
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-md text-white ring-1 ring-white/20" style={{ background: cor || 'var(--primary)' }}><Icon className="h-3.5 w-3.5" /></span>
+        <h3 className="text-sm font-semibold">{titulo}</h3>
+        <span className="text-xs text-muted-foreground">({sims.length})</span>
+      </div>
+      <div className="group relative -mx-1">
+        {canL && (
+          <button type="button" aria-label="Ver anteriores" onClick={() => rolar(-1)}
+            className="absolute inset-y-0 left-0 z-10 flex w-12 items-center justify-start bg-gradient-to-r from-background via-background/70 to-transparent pl-1 opacity-0 transition-opacity group-hover:opacity-100">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full border bg-card shadow-md transition-colors hover:bg-muted"><ChevronLeft className="h-5 w-5" /></span>
+          </button>
+        )}
+        <div ref={ref} className="flex gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {sims.map((s) => (
+            <div key={s.id} className="w-40 shrink-0 sm:w-44">
+              <CardItem s={s} appUrl={appUrl} online={online[s.id] ?? 0} onMover={onMover ? () => onMover(s) : undefined} />
+            </div>
+          ))}
+        </div>
+        {canR && (
+          <button type="button" aria-label="Ver próximos" onClick={() => rolar(1)}
+            className="absolute inset-y-0 right-0 z-10 flex w-12 items-center justify-end bg-gradient-to-l from-background via-background/70 to-transparent pr-1 opacity-0 transition-opacity group-hover:opacity-100">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full border bg-card shadow-md transition-colors hover:bg-muted"><ChevronRight className="h-5 w-5" /></span>
+          </button>
+        )}
+      </div>
+    </section>
+  )
+}
+
+/** Catálogo (Netflix): uma fileira por pasta (+ "Sem pasta"), simulados do mais recente ao mais antigo. */
+function CatalogoSimulados({ sims, pastas, appUrl, online, onMover }: {
+  sims: SimuladoCatalogo[]; pastas: PastaSim[]; appUrl: string; online: Record<string, number>; onMover?: (s: SimuladoCard) => void
+}) {
+  const fileiras = useMemo(() => {
+    const porPasta = new Map<string, SimuladoCatalogo[]>()
+    for (const s of sims) { const k = s.pasta_id ?? '__sem__'; const arr = porPasta.get(k); if (arr) arr.push(s); else porPasta.set(k, [s]) }
+    const out: { chave: string; titulo: string; icone: string | null; cor: string | null; sims: SimuladoCatalogo[] }[] = []
+    for (const p of pastas) { const arr = porPasta.get(p.id); if (arr?.length) out.push({ chave: p.id, titulo: p.nome, icone: p.icone ?? null, cor: p.cor ?? null, sims: arr }) }
+    const sem = porPasta.get('__sem__')
+    if (sem?.length) out.push({ chave: '__sem__', titulo: 'Sem pasta', icone: null, cor: null, sims: sem })
+    return out
+  }, [sims, pastas])
+
+  if (!fileiras.length) return <p className="rounded-lg border bg-muted/30 px-4 py-8 text-center text-sm italic text-muted-foreground">Nenhum simulado para exibir.</p>
+  return (
+    <div className="space-y-6">
+      {fileiras.map((f) => (
+        <FileiraCatalogo key={f.chave} titulo={f.titulo} icone={f.icone} cor={f.cor} sims={f.sims} appUrl={appUrl} online={online} onMover={onMover} />
+      ))}
     </div>
   )
 }
