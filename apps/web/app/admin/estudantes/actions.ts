@@ -9,6 +9,7 @@ import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
 import { rankearSimulado } from '@/lib/ranking'
 import { sincronizarGrupoPassaporte } from '@/lib/estudante/grupo-passaporte'
+import { sincronizarGrupoVitalicio } from '@/lib/estudante/grupo-vitalicio'
 
 interface NovoEstudanteData {
   nome: string
@@ -101,9 +102,11 @@ export async function editarEstudanteAction(id: string, data: EditarEstudanteDat
   const { error } = await svc.from('simulado_estudantes').update(update).eq('id', id).eq('tenant_id', tenantId)
   if (error) return { error: error.message }
 
-  // Reconhecimento de mudança de categoria: passaporte entra no grupo "Passaporte";
-  // ao sair de passaporte, é removido. (não bloqueia o salvamento se falhar)
+  // Reconhecimento de mudança de categoria: passaporte/vitalício entram no grupo "Passaporte";
+  // ao sair, é removido. (não bloqueia o salvamento se falhar)
   await sincronizarGrupoPassaporte(svc, tenantId, id, data.classificacao || null)
+  // Vitalício também entra no grupo "Passaporte Vitalício" (premium). Não remove de outros grupos.
+  await sincronizarGrupoVitalicio(svc, tenantId, id, data.classificacao || null)
 
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_estudantes', entidadeId: id, antes, depois: update })
   revalidatePath(`/admin/estudantes/${id}`)

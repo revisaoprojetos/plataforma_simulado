@@ -50,7 +50,9 @@ export async function sincronizarGrupoPassaporte(
   classificacao: string | null | undefined,
 ): Promise<void> {
   try {
-    const ehPassaporte = (classificacao ?? null) === 'passaporte'
+    // Vitalício é passaporte premium → também conta como passaporte (mantém o grupo/acesso).
+    const c = classificacao ?? null
+    const ehPassaporte = c === 'passaporte' || c === 'vitalicio'
 
     let gid: string | null = null
     if (ehPassaporte) {

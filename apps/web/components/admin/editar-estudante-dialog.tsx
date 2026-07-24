@@ -47,7 +47,9 @@ export function EditarEstudanteDialog({ estudante, onClose }: { estudante: Estud
   const [nascimento, setNascimento] = useState(paraDataInput(estudante.data_nascimento))
   const [matricula, setMatricula] = useState(estudante.matricula_externa ?? '')
   const [cadastro, setCadastro] = useState(paraDataInput(estudante.created_at))
-  const [classificacao, setClassificacao] = useState(estudante.classificacao === 'passaporte' ? 'passaporte' : 'normal')
+  const [classificacao, setClassificacao] = useState(
+    estudante.classificacao === 'passaporte' ? 'passaporte' : estudante.classificacao === 'vitalicio' ? 'vitalicio' : 'normal',
+  )
   const [salvando, setSalvando] = useState(false)
 
   useEffect(() => {
@@ -92,12 +94,12 @@ export function EditarEstudanteDialog({ estudante, onClose }: { estudante: Estud
           <Campo label="Matrícula externa"><input value={matricula} onChange={(e) => setMatricula(e.target.value)} className={inputCls} /></Campo>
           <Campo label="Cadastrado em"><input type="date" value={cadastro} onChange={(e) => setCadastro(e.target.value)} className={inputCls} /></Campo>
           <Campo label="Classificação">
-            <div className="grid grid-cols-2 gap-2">
-              {[{ v: 'normal', l: 'Estudante' }, { v: 'passaporte', l: 'Passaporte' }].map((o) => (
+            <div className="grid grid-cols-3 gap-2">
+              {[{ v: 'normal', l: 'Estudante' }, { v: 'passaporte', l: 'Passaporte' }, { v: 'vitalicio', l: 'Vitalício' }].map((o) => (
                 <button key={o.v} type="button" onClick={() => setClassificacao(o.v)}
                   className={cn('rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
                     classificacao === o.v
-                      ? (o.v === 'passaporte' ? 'border-purple-500 bg-purple-500 text-white' : 'border-slate-400 bg-slate-400 text-white dark:border-slate-500 dark:bg-slate-500')
+                      ? (o.v === 'vitalicio' ? 'border-amber-500 bg-amber-500 text-white' : o.v === 'passaporte' ? 'border-purple-500 bg-purple-500 text-white' : 'border-slate-400 bg-slate-400 text-white dark:border-slate-500 dark:bg-slate-500')
                       : 'hover:bg-muted')}>
                   {o.l}
                 </button>

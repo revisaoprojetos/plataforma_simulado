@@ -2,7 +2,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
-import { ehProdutoPassaporte } from '@/lib/integracoes/normalizar-mapa'
+import { ehProdutoPassaporte, ehProdutoVitalicio } from '@/lib/integracoes/normalizar-mapa'
 import type { Provider, PessoaNormalizada, Entitlement, Mapeamento, ResultadoEntitlement } from '@/lib/integracoes/tipos'
 
 /**
@@ -34,6 +34,14 @@ async function resolverMapeamento(svc: any, tenantId: string, provider: Provider
 async function grupoPassaporte(svc: any, tenantId: string): Promise<string | null> {
   try {
     const { data } = await svc.from('simulado_grupos').select('id').eq('tenant_id', tenantId).eq('deletado', false).eq('is_mestre', false).ilike('nome', 'passaporte').limit(1).maybeSingle()
+    return (data as any)?.id ?? null
+  } catch { return null }
+}
+
+/** Grupo "Passaporte Vitalício" (não-mestre) — destino EXTRA do aluno vitalício. Match EXATO (sem curinga). */
+async function grupoVitalicio(svc: any, tenantId: string): Promise<string | null> {
+  try {
+    const { data } = await svc.from('simulado_grupos').select('id').eq('tenant_id', tenantId).eq('deletado', false).eq('is_mestre', false).ilike('nome', 'Passaporte Vitalício').limit(1).maybeSingle()
     return (data as any)?.id ?? null
   } catch { return null }
 }
@@ -125,7 +133,7 @@ async function outraAtivaConcede(svc: any, tenantId: string, estudanteId: string
       if (alvo.grupoId && m.grupoId === alvo.grupoId) return true
       if (alvo.pastaId && m.pastaId === alvo.pastaId) return true
       if (alvo.simuladoId && m.simuladoId === alvo.simuladoId) return true
-      if (alvo.passaporte && m.classificacao === 'passaporte') return true
+      if (alvo.passaporte && (m.classificacao === 'passaporte' || m.classificacao === 'vitalicio')) return true
     }
   } catch { /* ignora */ }
   return false
@@ -169,10 +177,15 @@ async function conceder(svc: any, tenantId: string, estudanteId: string, m: Mape
   if (m.classificacao) {
     try { await svc.from('simulado_estudantes').update({ classificacao: m.classificacao }).eq('id', estudanteId).eq('tenant_id', tenantId) } catch { /* ignora */ }
   }
-  // Passaporte entra TAMBÉM no grupo "Passaporte" (além do grupo do produto).
-  if (m.classificacao === 'passaporte') {
+  // Passaporte E vitalício entram TAMBÉM no grupo "Passaporte" (vitalício = passaporte premium).
+  if (m.classificacao === 'passaporte' || m.classificacao === 'vitalicio') {
     const gp = await grupoPassaporte(svc, tenantId)
     if (gp) await entrarGrupo(svc, tenantId, gp, estudanteId)
+  }
+  // Vitalício entra TAMBÉM no grupo "Passaporte Vitalício".
+  if (m.classificacao === 'vitalicio') {
+    const gv = await grupoVitalicio(svc, tenantId)
+    if (gv) await entrarGrupo(svc, tenantId, gv, estudanteId)
   }
   // Grupo do produto: entra no grupo E herda os simulados dos bancos vinculados a ele.
   if (m.grupoId) await entrarGrupo(svc, tenantId, m.grupoId, estudanteId)
@@ -205,11 +218,13 @@ async function revogar(svc: any, tenantId: string, estudanteId: string, excetoEx
   if (m.simuladoId && !(await outraAtivaConcede(svc, tenantId, estudanteId, excetoExternalId, { simuladoId: m.simuladoId }))) {
     try { await svc.from('simulado_matriculas').delete().eq('tenant_id', tenantId).eq('simulado_id', m.simuladoId).eq('estudante_id', estudanteId) } catch { /* ignora */ }
   }
-  // Rebaixa classificação e sai do grupo "Passaporte" só se nenhuma outra assinatura ativa concede passaporte.
-  if (m.classificacao === 'passaporte' && !(await outraAtivaConcede(svc, tenantId, estudanteId, excetoExternalId, { passaporte: true }))) {
+  // Rebaixa classificação e sai dos grupos Passaporte/Vitalício só se nenhuma outra assinatura ativa concede.
+  if ((m.classificacao === 'passaporte' || m.classificacao === 'vitalicio') && !(await outraAtivaConcede(svc, tenantId, estudanteId, excetoExternalId, { passaporte: true }))) {
     try { await svc.from('simulado_estudantes').update({ classificacao: 'normal' }).eq('id', estudanteId).eq('tenant_id', tenantId) } catch { /* ignora */ }
     const gp = await grupoPassaporte(svc, tenantId)
     if (gp) { try { await svc.from('simulado_grupo_membros').delete().eq('tenant_id', tenantId).eq('grupo_id', gp).eq('estudante_id', estudanteId) } catch { /* ignora */ } }
+    const gv = await grupoVitalicio(svc, tenantId)
+    if (gv) { try { await svc.from('simulado_grupo_membros').delete().eq('tenant_id', tenantId).eq('grupo_id', gv).eq('estudante_id', estudanteId) } catch { /* ignora */ } }
   }
 }
 
@@ -272,9 +287,12 @@ export async function aplicarEntitlement(params: {
     return { ok: true, estudanteId, acao: 'ignorado', motivo: 'produto/grupo sem mapeamento' }
   }
 
-  // Regra automática: produto "passaporte" pelo NOME (exceto amostra) força a classificação
-  // passaporte quando o mapeamento ainda não define uma explícita. Persiste p/ ficar visível.
-  if (!m.classificacao && ehProdutoPassaporte(entitlement.produtoNome)) {
+  // Regra automática pelo NOME (exceto amostra), quando o mapeamento não define classificação.
+  // Vitalício tem PRIORIDADE (o nome do vitalício também contém "passaporte"). Persiste p/ ficar visível.
+  if (!m.classificacao && ehProdutoVitalicio(entitlement.produtoNome)) {
+    m = { ...m, classificacao: 'vitalicio' }
+    try { await svc.from('simulado_integracao_mapeamentos').update({ classificacao: 'vitalicio' }).eq('tenant_id', tenantId).eq('provider', provider).eq('fonte_ref', entitlement.produtoRef) } catch { /* ignora */ }
+  } else if (!m.classificacao && ehProdutoPassaporte(entitlement.produtoNome)) {
     m = { ...m, classificacao: 'passaporte' }
     try { await svc.from('simulado_integracao_mapeamentos').update({ classificacao: 'passaporte' }).eq('tenant_id', tenantId).eq('provider', provider).eq('fonte_ref', entitlement.produtoRef) } catch { /* ignora */ }
   }

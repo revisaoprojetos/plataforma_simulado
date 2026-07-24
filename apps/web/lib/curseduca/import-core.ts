@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { registrarAudit } from '@/lib/audit'
 import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
-import { ehProdutoPassaporte } from '@/lib/integracoes/normalizar-mapa'
+import { ehProdutoPassaporte, ehProdutoVitalicio } from '@/lib/integracoes/normalizar-mapa'
 import { propagarGrupoAosBancos } from '@/lib/simulado/propagar-grupo'
 import { configDoEnv, listarMembrosDoGrupo, detalheMembro, type CurseducaCfg, type MembroCurseduca, type DetalheMembro } from '@/lib/curseduca/client'
 import type { DestinoImport, ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
@@ -98,9 +98,12 @@ export async function executarImport(
     const acharExistente = (m: MembroCurseduca) =>
       porExt.get(String(m.id)) || (m.email ? porEmail.get(m.email) : null) || (m.cpf ? porCpf.get(m.cpf) : null) || null
 
-    // Classificação: se o aluno está em algum grupo de "Passaporte/Passe" → passaporte; senão normal (assinatura).
-    // Passaporte se estiver em ALGUM grupo passaporte real (exclui amostra/grátis) — mesma regra da Guru.
-    const classificar = (nomes: string[]): string => (nomes.some((n) => ehProdutoPassaporte(n)) ? 'passaporte' : 'normal')
+    // Classificação pelos grupos (exclui amostra/grátis) — mesma regra da Guru, com PRIORIDADE:
+    // grupo "Passaporte Vitalício"/"Mais que Vitalício" → vitalicio; senão "Passaporte/Passe" → passaporte; senão normal.
+    const classificar = (nomes: string[]): string =>
+      nomes.some((n) => ehProdutoVitalicio(n)) ? 'vitalicio'
+        : nomes.some((n) => ehProdutoPassaporte(n)) ? 'passaporte'
+          : 'normal'
 
     // 3) Separa novos × existentes. Já existentes SEM CPF/telefone entram no backfill.
     const idsResolvidos: string[] = []
@@ -230,25 +233,29 @@ export async function executarImport(
       }
     }
 
-    // 6) Passaporte também entra no grupo "Passaporte" (consistência com a Guru).
+    // 6) Passaporte E vitalício entram no grupo "Passaporte"; vitalício entra TAMBÉM no "Passaporte Vitalício".
     if (idsResolvidos.length) {
-      const { data: gp } = await svc.from('simulado_grupos').select('id').eq('tenant_id', g.tenantId).eq('deletado', false).eq('is_mestre', false).ilike('nome', 'passaporte').limit(1).maybeSingle()
-      const gpId = (gp as any)?.id
-      if (gpId) {
-        const unicos = [...new Set(idsResolvidos)]
-        const passas = await fetchAllByIn<{ id: string }>(unicos, (chunk) =>
-          svc.from('simulado_estudantes').select('id').in('id', chunk).eq('tenant_id', g.tenantId).eq('classificacao', 'passaporte').order('id', { ascending: true }))
-        const passIds = passas.map((p) => p.id)
-        if (passIds.length) {
-          const jaGp = new Set((await fetchAll<{ estudante_id: string }>(() =>
-            svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', gpId).order('estudante_id', { ascending: true }))).map((r) => r.estudante_id))
-          const novosGp = passIds.filter((id) => !jaGp.has(id))
-          for (let i = 0; i < novosGp.length; i += 200) {
-            await svc.from('simulado_grupo_membros').insert(novosGp.slice(i, i + 200).map((estudante_id) => ({ tenant_id: g.tenantId, grupo_id: gpId, estudante_id })))
-          }
-          if (novosGp.length) await propagarGrupoAosBancos(svc, g.tenantId, gpId, novosGp)
+      const unicos = [...new Set(idsResolvidos)]
+      const classDe = await fetchAllByIn<{ id: string; classificacao: string | null }>(unicos, (chunk) =>
+        svc.from('simulado_estudantes').select('id, classificacao').in('id', chunk).eq('tenant_id', g.tenantId).order('id', { ascending: true }))
+      const passIds = classDe.filter((p) => p.classificacao === 'passaporte' || p.classificacao === 'vitalicio').map((p) => p.id)
+      const vitIds = classDe.filter((p) => p.classificacao === 'vitalicio').map((p) => p.id)
+
+      const entrarNoGrupo = async (nome: string, ids: string[]) => {
+        if (!ids.length) return
+        const { data: gr } = await svc.from('simulado_grupos').select('id').eq('tenant_id', g.tenantId).eq('deletado', false).eq('is_mestre', false).ilike('nome', nome).limit(1).maybeSingle()
+        const grId = (gr as any)?.id
+        if (!grId) return
+        const jaNo = new Set((await fetchAll<{ estudante_id: string }>(() =>
+          svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grId).order('estudante_id', { ascending: true }))).map((r) => r.estudante_id))
+        const novos = ids.filter((id) => !jaNo.has(id))
+        for (let i = 0; i < novos.length; i += 200) {
+          await svc.from('simulado_grupo_membros').insert(novos.slice(i, i + 200).map((estudante_id) => ({ tenant_id: g.tenantId, grupo_id: grId, estudante_id })))
         }
+        if (novos.length) await propagarGrupoAosBancos(svc, g.tenantId, grId, novos)
       }
+      await entrarNoGrupo('passaporte', passIds)             // Passaporte (comum a passaporte+vitalício)
+      await entrarNoGrupo('Passaporte Vitalício', vitIds)    // grupo Vitalício (só os vitalícios)
     }
 
     await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_estudantes', entidadeId: grupoDestinoId ?? 'curseduca', tenantId: g.tenantId, depois: { curseduca_grupos: ids, total, novos, jaExistiam, atualizados, vinculados, removidos, semDetalhe, restante } })
