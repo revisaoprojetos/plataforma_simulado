@@ -255,8 +255,12 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_questoes', entidadeId: id, antes, depois: { ...antes, ...fields } })
 
   if (data.tipo === 'objetiva' && data.alternativas) {
-    await supabase.from('simulado_alternativas').delete().eq('questao_id', id)
-    await supabase.from('simulado_alternativas').insert(
+    // Service-role: a RLS de simulado_alternativas NÃO permite DELETE ao usuário autenticado →
+    // o delete via createClient falhava em silêncio e as alternativas ACUMULAVAM a cada save
+    // (multiplicavam). O insert também vai por admin para simetria.
+    const admin = createAdminClient()
+    await admin.from('simulado_alternativas').delete().eq('questao_id', id).eq('tenant_id', tenantId)
+    await admin.from('simulado_alternativas').insert(
       data.alternativas.map((alt) => ({
         tenant_id: tenantId,
         questao_id: id,
