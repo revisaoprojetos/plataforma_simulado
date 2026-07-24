@@ -557,7 +557,7 @@ function FileiraCatalogo({ titulo, sims, appUrl, online, onMover }: {
       <div className="relative">
         {canL && (
           <button type="button" aria-label="Ver anteriores" onClick={() => rolar(-1)}
-            className="absolute left-0 top-1/2 z-20 flex h-28 w-14 -translate-y-1/2 items-center justify-start rounded-r-xl bg-gradient-to-r from-neutral-700/95 via-neutral-700/75 to-transparent pl-2 text-white shadow-lg transition hover:from-neutral-600 hover:via-neutral-600/80">
+            className="absolute left-0 top-1/2 z-20 flex h-28 w-14 origin-left -translate-y-1/2 items-center justify-start rounded-r-xl bg-gradient-to-r from-neutral-700/95 via-neutral-700/75 to-transparent pl-2 text-white shadow-lg transition duration-200 ease-out hover:scale-x-125 hover:scale-y-110 hover:from-neutral-600 hover:via-neutral-600/80">
             <ChevronLeft className="h-7 w-7" />
           </button>
         )}
@@ -571,7 +571,7 @@ function FileiraCatalogo({ titulo, sims, appUrl, online, onMover }: {
         </div>
         {canR && (
           <button type="button" aria-label="Ver próximos" onClick={() => rolar(1)}
-            className="absolute right-0 top-1/2 z-20 flex h-28 w-14 -translate-y-1/2 items-center justify-end rounded-l-xl bg-gradient-to-l from-neutral-700/95 via-neutral-700/75 to-transparent pr-2 text-white shadow-lg transition hover:from-neutral-600 hover:via-neutral-600/80">
+            className="absolute right-0 top-1/2 z-20 flex h-28 w-14 origin-right -translate-y-1/2 items-center justify-end rounded-l-xl bg-gradient-to-l from-neutral-700/95 via-neutral-700/75 to-transparent pr-2 text-white shadow-lg transition duration-200 ease-out hover:scale-x-125 hover:scale-y-110 hover:from-neutral-600 hover:via-neutral-600/80">
             <ChevronRight className="h-7 w-7" />
           </button>
         )}
