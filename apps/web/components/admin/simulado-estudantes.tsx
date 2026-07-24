@@ -179,8 +179,8 @@ export function SimuladoEstudantes({ simuladoId }: { simuladoId: string }) {
                   <TableCell className="truncate text-muted-foreground" title={e.cpf ?? undefined}>{e.cpf ?? '—'}</TableCell>
                   <TableCell className="truncate text-muted-foreground" title={e.telefone ?? undefined}>{e.telefone ?? '—'}</TableCell>
                   <TableCell className="truncate">
-                    <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', e.classificacao === 'passaporte' ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' : 'bg-muted text-muted-foreground')}>
-                      {e.classificacao === 'passaporte' ? 'Passaporte' : 'Normal'}
+                    <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', e.classificacao === 'vitalicio' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : e.classificacao === 'passaporte' ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' : 'bg-muted text-muted-foreground')}>
+                      {e.classificacao === 'vitalicio' ? 'Vitalício' : e.classificacao === 'passaporte' ? 'Passaporte' : 'Normal'}
                     </span>
                   </TableCell>
                   <TableCell className="truncate"><span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', sit.cls)}>{sit.label}</span></TableCell>

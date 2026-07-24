@@ -93,7 +93,7 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
     bancos = (data ?? []) as any
   }
 
-  const classLabel = est.classificacao === 'passaporte' ? 'Passaporte' : est.classificacao === 'normal' ? 'Normal' : (est.classificacao ?? '—')
+  const classLabel = est.classificacao === 'vitalicio' ? 'Vitalício' : est.classificacao === 'passaporte' ? 'Passaporte' : est.classificacao === 'normal' ? 'Normal' : (est.classificacao ?? '—')
   const reais = (sessoes ?? []).filter((s: any) => !s.is_teste)
 
   // Caderno (modelo) vinculado ao banco de cada simulado → para a coluna Ação.

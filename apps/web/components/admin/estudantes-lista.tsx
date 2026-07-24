@@ -83,7 +83,7 @@ export function EstudantesLista({ estudantes }: { estudantes: EstudanteRow[] }) 
     { titulo: 'E-mail', valor: (e) => e.email, largura: 30 },
     { titulo: 'CPF', valor: (e) => e.cpf },
     { titulo: 'Telefone', valor: (e) => e.telefone },
-    { titulo: 'Plano', valor: (e) => (e.classificacao === 'passaporte' ? 'Passaporte' : 'Padrão') },
+    { titulo: 'Plano', valor: (e) => (e.classificacao === 'vitalicio' ? 'Vitalício' : e.classificacao === 'passaporte' ? 'Passaporte' : 'Padrão') },
     { titulo: 'Simulados feitos', valor: (e) => e.feitos },
     { titulo: 'Média', valor: (e) => (e.media != null ? e.media.toFixed(1).replace('.', ',') : '') },
     { titulo: 'Cadastrado em', valor: (e) => fmtData(e.created_at) },

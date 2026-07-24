@@ -4,10 +4,11 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
 import type { DadosRelatorioSimulado, LinhaExportSimulado } from './relatorio-simulado-view'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
+import { rotuloClassificacao } from '@/lib/estudante/classificacao'
 
 const fmtDur = (min: number) => { const h = Math.floor(min / 60), m = Math.round(min % 60); return h > 0 ? `${h}h ${String(m).padStart(2, '0')}min` : `${m}min` }
 const fmtSeg = (seg: number) => { const s = Math.round(seg); const m = Math.floor(s / 60), r = s % 60; return m > 0 ? `${m}min ${String(r).padStart(2, '0')}s` : `${r}s` }
-const labelClass = (c?: string | null) => (c === 'passaporte' ? 'Passaporte' : c === 'normal' ? 'Normal' : (c ?? '—'))
+const labelClass = (c?: string | null) => rotuloClassificacao(c)
 
 /** Monta o relatório completo de um simulado (KPIs, gráficos, ranking e linhas do export). Cacheado por tenant. */
 export async function montarRelatorioSimulado(svc: SupabaseClient, simId: string, tenantId: string | null): Promise<DadosRelatorioSimulado | null> {
@@ -229,7 +230,7 @@ async function _montarRelatorioSimulado(svc: SupabaseClient, simId: string, tena
     clsAgg.set(cls, g)
   }
   const ordemCls: Record<string, number> = { passaporte: 0, normal: 1, outro: 2 }
-  const labelCls = (c: string) => (c === 'passaporte' ? 'Passaporte' : c === 'normal' ? 'Normal' : 'Outros')
+  const labelCls = (c: string) => (c === 'outro' ? 'Outros' : rotuloClassificacao(c))
   const porClassificacao = [...clsAgg.entries()].map(([chave, g]) => ({
     chave, label: labelCls(chave), alunos: g.n,
     notaMedia: g.notas.length ? Math.round((g.notas.reduce((a, b) => a + b, 0) / g.notas.length) * 10) / 10 : null,

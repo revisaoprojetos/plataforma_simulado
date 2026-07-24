@@ -9,6 +9,7 @@ import { usePdfDownloads } from '@/components/pdf-downloads-provider'
 import { CriteriosForm } from './criterios-form'
 import { salvarCriteriosRanking } from './actions'
 import { ordenarRanking, rotuloCriterio, type CriteriosRanking, type EntradaRanking } from '@/lib/simulado/ranking'
+import { rotuloClassificacao } from '@/lib/estudante/classificacao'
 
 type Grupo = { id: string; nome: string; count: number }
 
@@ -55,7 +56,7 @@ export function RankingView({ simuladoId, titulo, grupos, totalQuestoes, entrada
     const linhas: (string | number | null)[][] = [
       ['Ranking', titulo], comRecorrecao ? ['Considerando anulações e trocas'] : ['Sem anulações/trocas'], [],
       cab,
-      ...visivel.map((r) => [r.pos, r.nome, r.email ?? '', fmtDataHora(r.data), nota(r.pontuacao), `${r.acertos}/${r.total}`, r.total ? Math.round((r.acertos / r.total) * 100) : 0, ...gruposUsados.map((g) => r.porGrupo[g] ?? 0), r.classificacao ?? '', r.idade ?? '—']),
+      ...visivel.map((r) => [r.pos, r.nome, r.email ?? '', fmtDataHora(r.data), nota(r.pontuacao), `${r.acertos}/${r.total}`, r.total ? Math.round((r.acertos / r.total) * 100) : 0, ...gruposUsados.map((g) => r.porGrupo[g] ?? 0), r.classificacao ? rotuloClassificacao(r.classificacao) : '', r.idade ?? '—']),
     ]
     baixarCsv(`${titulo}_ranking`, linhas)
   }
@@ -230,11 +231,12 @@ function Posicao({ pos }: { pos: number }) {
 }
 
 function BadgeClass({ texto }: { texto: string }) {
-  const passa = texto.toLowerCase() === 'passaporte'
-  const rotulo = texto.charAt(0).toUpperCase() + texto.slice(1)
+  const t = texto.toLowerCase()
+  const vit = t === 'vitalicio', passa = t === 'passaporte'
+  const rotulo = rotuloClassificacao(texto)
   return (
-    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${passa ? 'bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300' : 'bg-muted text-muted-foreground'}`}>
-      {passa && <Shield className="h-3 w-3" />}{rotulo}
+    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${vit ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' : passa ? 'bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300' : 'bg-muted text-muted-foreground'}`}>
+      {(vit || passa) && <Shield className="h-3 w-3" />}{rotulo}
     </span>
   )
 }

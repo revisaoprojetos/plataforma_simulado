@@ -111,7 +111,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ sessao:
   rTitulo.font = { bold: true, size: 15 }; rTitulo.height = 24
   ws.addRow([])
 
-  const categoria = est?.classificacao === 'passaporte' ? 'Passaporte' : 'Estudante'
+  const categoria = est?.classificacao === 'vitalicio' ? 'Vitalício' : est?.classificacao === 'passaporte' ? 'Passaporte' : 'Estudante'
   secao('Aluno', () => {
     par('Nome', est?.nome ?? '—'); par('E-mail', est?.email ?? '—'); par('Telefone', est?.telefone ?? '—'); par('Categoria', categoria)
   })
