@@ -557,21 +557,21 @@ function FileiraCatalogo({ titulo, sims, appUrl, online, onMover }: {
       <div className="relative">
         {canL && (
           <button type="button" aria-label="Ver anteriores" onClick={() => rolar(-1)}
-            className="absolute left-1 top-1/2 z-20 flex h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full bg-black/70 text-white shadow-xl ring-1 ring-white/25 backdrop-blur transition hover:scale-105 hover:bg-black/90">
+            className="absolute left-0 top-1/2 z-20 flex h-28 w-14 -translate-y-1/2 items-center justify-start rounded-r-xl bg-gradient-to-r from-neutral-700/95 via-neutral-700/75 to-transparent pl-2 text-white shadow-lg transition hover:from-neutral-600 hover:via-neutral-600/80">
             <ChevronLeft className="h-7 w-7" />
           </button>
         )}
         <div ref={ref} className="flex gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {sims.map((s) => (
-            // 5 cards visíveis (igual xl:grid-cols-5); o resto rola com as setas. Card completo (com infos).
-            <div key={s.id} className="shrink-0 basis-[calc((100%-1rem)/2)] sm:basis-[calc((100%-2rem)/3)] lg:basis-[calc((100%-3rem)/4)] xl:basis-[calc((100%-4rem)/5)]">
+            // ~5 cards por vez, mas um pouco mais estreitos para espiar um PEDAÇO do próximo (indica que há mais).
+            <div key={s.id} className="shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-3rem)/4.3)] xl:basis-[calc((100%-4rem)/5.3)]">
               <CardItem s={s} appUrl={appUrl} online={online[s.id] ?? 0} onMover={onMover ? () => onMover(s) : undefined} />
             </div>
           ))}
         </div>
         {canR && (
           <button type="button" aria-label="Ver próximos" onClick={() => rolar(1)}
-            className="absolute right-1 top-1/2 z-20 flex h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full bg-black/70 text-white shadow-xl ring-1 ring-white/25 backdrop-blur transition hover:scale-105 hover:bg-black/90">
+            className="absolute right-0 top-1/2 z-20 flex h-28 w-14 -translate-y-1/2 items-center justify-end rounded-l-xl bg-gradient-to-l from-neutral-700/95 via-neutral-700/75 to-transparent pr-2 text-white shadow-lg transition hover:from-neutral-600 hover:via-neutral-600/80">
             <ChevronRight className="h-7 w-7" />
           </button>
         )}
