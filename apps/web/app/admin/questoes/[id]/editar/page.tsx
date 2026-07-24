@@ -58,6 +58,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
     gabarito_tipo: (questao.gabarito_tipo ?? undefined) as 'oficial' | 'extraoficial' | undefined,
     comentario_professor: questao.comentario_professor ?? undefined,
     status: (questao.status ?? 'rascunho') as 'rascunho' | 'publicada' | 'arquivada',
+    imagem_url: (questao.imagem_url as string | null) ?? undefined,
     alternativas: alternativas?.map((a) => ({
       texto: a.texto,
       correta: a.correta,

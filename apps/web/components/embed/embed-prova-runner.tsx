@@ -31,6 +31,7 @@ interface Questao {
   id: string
   tipo?: string
   enunciado: string
+  imagem_url?: string | null
   alternativas: Alternativa[]
 }
 
@@ -344,6 +345,12 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
         <Card>
           <CardContent className="pt-5">
             <p className="leading-relaxed text-sm">{questaoAtual.enunciado}</p>
+            {questaoAtual.imagem_url && (
+              <div className="mt-4 overflow-hidden rounded-lg border bg-muted/30 p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={questaoAtual.imagem_url} alt="Imagem da questão" className="mx-auto max-h-[60vh] w-auto object-contain" />
+              </div>
+            )}
           </CardContent>
         </Card>
 

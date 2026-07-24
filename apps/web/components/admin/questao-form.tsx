@@ -3,7 +3,7 @@
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,9 +17,24 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Trash2, ImagePlus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
+import { hospedarImagemQuestaoAction } from '@/app/admin/questoes/actions'
+
+/** Redimensiona a imagem no cliente (máx. 1600px) e devolve um data URL JPEG leve. */
+async function redimensionarImagem(file: File, max = 1600): Promise<string> {
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
+  const w = Math.round(bitmap.width * scale)
+  const h = Math.round(bitmap.height * scale)
+  const canvas = document.createElement('canvas')
+  canvas.width = w; canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('canvas')
+  ctx.drawImage(bitmap, 0, 0, w, h)
+  return canvas.toDataURL('image/jpeg', 0.9)
+}
 
 const alternativaSchema = z.object({
   texto: z.string(),
@@ -46,6 +61,7 @@ const questaoSchema = z
     gabarito_tipo: z.enum(['oficial', 'extraoficial']).optional(),
     comentario_professor: z.string().optional(),
     status: z.enum(['rascunho', 'publicada', 'arquivada']),
+    imagem_url: z.string().optional(),
     alternativas: z.array(alternativaSchema).optional(),
     competencias: z.array(competenciaSchema).optional(),
     bancoIds: z.array(z.string()).optional(),
@@ -119,6 +135,25 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
 
   const tipo = watch('tipo')
   const alternativas = watch('alternativas')
+  const imagemUrl = watch('imagem_url')
+  const imgInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingImg, setUploadingImg] = useState(false)
+
+  async function onImagemFile(file: File | null) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
+    setUploadingImg(true)
+    try {
+      const dataUri = await redimensionarImagem(file)
+      const r = await hospedarImagemQuestaoAction(dataUri)
+      if (!r.ok || !r.url) { toast.error(r.error ?? 'Falha ao enviar a imagem.'); return }
+      setValue('imagem_url', r.url, { shouldDirty: true })
+    } catch {
+      toast.error('Falha ao processar a imagem.')
+    } finally {
+      setUploadingImg(false)
+    }
+  }
 
   function setCorreta(index: number) {
     fields.forEach((_, i) => {
@@ -197,6 +232,35 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
             />
             {errors.enunciado && (
               <p className="text-sm text-destructive">{errors.enunciado.message}</p>
+            )}
+          </div>
+
+          {/* Imagem da questão (opcional) — exibida na prova entre o enunciado e as alternativas. */}
+          <div className="space-y-2">
+            <Label>Imagem (opcional)</Label>
+            <p className="text-xs text-muted-foreground">Aparece na prova <strong>entre o enunciado e as alternativas</strong>. Só é exibida nas questões que têm imagem.</p>
+            <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onImagemFile(e.target.files?.[0] ?? null)} />
+            {imagemUrl ? (
+              <div className="space-y-2">
+                <div className="overflow-hidden rounded-lg border bg-muted/30 p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={imagemUrl} alt="Imagem da questão" className="mx-auto max-h-80 w-auto object-contain" />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => imgInputRef.current?.click()} disabled={uploadingImg}>
+                    {uploadingImg ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />} Trocar
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setValue('imagem_url', '', { shouldDirty: true })}>
+                    <Trash2 className="mr-2 h-4 w-4" /> Remover
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => imgInputRef.current?.click()} disabled={uploadingImg}
+                className="flex h-36 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:opacity-60">
+                {uploadingImg ? <Loader2 className="h-6 w-6 animate-spin" /> : <ImagePlus className="h-6 w-6" />}
+                <span className="text-sm font-medium">{uploadingImg ? 'Enviando…' : 'Adicionar imagem'}</span>
+              </button>
             )}
           </div>
         </CardContent>

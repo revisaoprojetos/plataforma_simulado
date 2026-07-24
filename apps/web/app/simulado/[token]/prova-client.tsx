@@ -26,6 +26,7 @@ interface Alternativa {
 interface Questao {
   id: string
   enunciado: string
+  imagem_url?: string | null
   alternativas: Alternativa[]
 }
 

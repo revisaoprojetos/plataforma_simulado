@@ -1,5 +1,6 @@
 'use server'
 
+import { createHash } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
@@ -26,6 +27,8 @@ interface QuestaoData {
   gabarito_tipo?: string
   comentario_professor?: string
   status: string
+  /** URL da imagem da questão (opcional) — exibida entre o enunciado e as alternativas. */
+  imagem_url?: string | null
   alternativas?: AlternativaData[]
   competencias?: { nome: string; pontos: number; ordem: number }[]
   /** Bancos (pastas) de destino — a questão é vinculada a estes ao salvar. */
@@ -133,7 +136,33 @@ async function buildQuestaoFields(supabase: SupabaseClient, tenantId: string, da
     gabarito_tipo: data.gabarito_tipo || 'oficial',
     comentario_professor: data.comentario_professor || null,
     status: data.status,
+    imagem_url: data.imagem_url || null,
   }
+}
+
+/**
+ * Sobe uma imagem (data URI base64) da questão para o storage e devolve a URL pública.
+ * Dedupe por hash do conteúdo (não reenvia a mesma imagem). Reusa o bucket público `pdfs`.
+ */
+export async function hospedarImagemQuestaoAction(dataUri: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  if (!(await checkPermission('questoes:create')) && !(await checkPermission('questoes:update'))) {
+    return { ok: false, error: 'Sem permissão.' }
+  }
+  const m = /^data:image\/([a-z0-9.+-]+);base64,(.+)$/i.exec(dataUri || '')
+  if (!m) return { ok: false, error: 'Imagem inválida.' }
+  const tipo = m[1].toLowerCase()
+  const ext = tipo === 'jpeg' ? 'jpg' : tipo
+  let buf: Buffer
+  try { buf = Buffer.from(m[2], 'base64') } catch { return { ok: false, error: 'Imagem inválida.' } }
+  if (!buf.length) return { ok: false, error: 'Imagem vazia.' }
+  const svc = createAdminClient()
+  const hash = createHash('sha1').update(buf).digest('hex').slice(0, 24)
+  const path = `assets/${hash}.${ext}`
+  try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
+  const { error } = await svc.storage.from('pdfs').upload(path, buf, { contentType: `image/${tipo}`, upsert: true })
+  if (error && !/exists/i.test(error.message)) return { ok: false, error: error.message }
+  const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
+  return { ok: true, url }
 }
 
 export async function createQuestaoAction(data: QuestaoData) {
@@ -144,11 +173,17 @@ export async function createQuestaoAction(data: QuestaoData) {
   const supabase = await createClient()
   const fields = await buildQuestaoFields(supabase, tenantId, data)
 
-  const { data: questao, error } = await supabase
+  let { data: questao, error } = await supabase
     .from('simulado_questoes')
     .insert(fields)
     .select()
     .single()
+
+  // Tolerante: se a coluna imagem_url ainda não foi migrada no banco, reinsere sem ela.
+  if (error && /imagem_url|column/i.test(error.message) && 'imagem_url' in fields) {
+    const { imagem_url: _img, ...semImg } = fields
+    ;({ data: questao, error } = await supabase.from('simulado_questoes').insert(semImg).select().single())
+  }
 
   if (error) {
     return { error: error.message }
@@ -202,10 +237,16 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
   const { data: antes } = await supabase.from('simulado_questoes').select('*').eq('id', id).maybeSingle()
   if (!antes) return { error: 'Questão não encontrada.' }
 
-  const { error } = await supabase
+  let { error } = await supabase
     .from('simulado_questoes')
     .update(fields)
     .eq('id', id)
+
+  // Tolerante: coluna imagem_url ainda não migrada → atualiza sem ela.
+  if (error && /imagem_url|column/i.test(error.message) && 'imagem_url' in fields) {
+    const { imagem_url: _img, ...semImg } = fields
+    ;({ error } = await supabase.from('simulado_questoes').update(semImg).eq('id', id))
+  }
 
   if (error) {
     return { error: error.message }

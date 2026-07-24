@@ -56,13 +56,19 @@ export default async function RecomendadoPage() {
   let recomendadas: QuestaoAluno[] = []
 
   if (fracas.length) {
-    const { data: cand } = await svc
+    const selCand = (cols: string) => svc
       .from('simulado_questoes')
-      .select('id, tipo, enunciado, disciplina_id, ano, comentario_professor')
+      .select(cols)
       .eq('tenant_id', sessao!.tenantId)
       .eq('status', 'publicada')
       .in('disciplina_id', fracas)
       .limit(50)
+    // Tolerante à coluna imagem_url ainda não migrada.
+    let candR: { data: any[] | null; error: unknown } = await selCand('id, tipo, enunciado, imagem_url, disciplina_id, ano, comentario_professor')
+    if ((candR as any).error && /imagem_url|column/i.test(String((candR as any).error?.message))) {
+      candR = await selCand('id, tipo, enunciado, disciplina_id, ano, comentario_professor')
+    }
+    const cand = candR.data
 
     // Prioriza: erradas antes, depois nunca respondidas. Exclui dominadas.
     const naoDominadas = (cand ?? []).filter((q: any) => !dominadas.has(q.id))
@@ -82,6 +88,7 @@ export default async function RecomendadoPage() {
       id: q.id,
       tipo: q.tipo,
       enunciado: q.enunciado ?? '',
+      imagem_url: q.imagem_url ?? null,
       disciplina: discNomeMap.get(q.disciplina_id) ?? null,
       ano: q.ano ?? null,
       comentario_professor: q.comentario_professor ?? null,

@@ -19,6 +19,7 @@ export interface QuestaoAluno {
   id: string
   tipo?: string
   enunciado: string
+  imagem_url?: string | null
   disciplina?: string | null
   banca?: string | null
   ano?: number | null
@@ -83,6 +84,13 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
         </div>
 
         <p className="text-sm leading-relaxed">{questao.enunciado}</p>
+
+        {questao.imagem_url && (
+          <div className="overflow-hidden rounded-lg border bg-muted/30 p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={questao.imagem_url} alt="Imagem da questão" className="mx-auto max-h-[60vh] w-auto object-contain" />
+          </div>
+        )}
 
         <div className="space-y-2">
           {alts.map((alt, i) => {
