@@ -662,12 +662,25 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco, assunt
         </div>
       )
     }
-    case 'diag-pilar':
+    case 'diag-pilar': {
+      const humano = (s: string) => s.replace(/_/g, ' ').replace(/^./, (ch) => ch.toUpperCase())
+      // Chaves de pilar disponíveis NESTE simulado (mesma origem do painel de Variáveis).
+      const slugsPilar = [...new Set((varsExtra ?? []).filter((g) => /Pilar/i.test(g.grupo)).flatMap((g) => g.itens.map((v) => v.token.match(/\{pct_pilar_(.+)\}/)?.[1]).filter(Boolean)))] as string[]
       return (
         <div className="space-y-3">
           <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Um pilar único (dá pra empilhar vários e montar o layout que quiser). A <b>chave</b> casa com o desempenho do aluno (ex.: <code>lei_seca</code>); o <b>texto de faixa</b> é escolhido pelo % real (0–50 / 51–80 / 81–100).</p>
           <Row label="Nome exibido"><input value={a.nome ?? ''} onChange={(e) => set('nome', e.target.value)} className={inputCls} placeholder="LEI SECA" /></Row>
-          <Row label="Chave do pilar"><input value={a.chave ?? ''} onChange={(e) => set('chave', e.target.value.trim())} className={inputCls} placeholder="lei_seca" /></Row>
+          <Row label="Chave do pilar">
+            {slugsPilar.length ? (
+              <select value={a.chave ?? ''} onChange={(e) => { const s = e.target.value; if (s) onChange(a.nome ? { chave: s } : { chave: s, nome: humano(s).toUpperCase() }) }} className={inputCls}>
+                <option value="">— escolher pilar —</option>
+                {slugsPilar.map((s) => <option key={s} value={s}>{humano(s)}</option>)}
+                {a.chave && !slugsPilar.includes(a.chave) && <option value={a.chave}>{a.nome || humano(a.chave)} (atual)</option>}
+              </select>
+            ) : (
+              <input value={a.chave ?? ''} onChange={(e) => set('chave', e.target.value.trim())} className={inputCls} placeholder="lei_seca" />
+            )}
+          </Row>
           <textarea value={a.f1 ?? ''} onChange={(e) => set('f1', e.target.value)} rows={2} className={inputCls} placeholder={`Texto faixa 0–${a.faixaLim1 ?? 49}`} />
           <textarea value={a.f2 ?? ''} onChange={(e) => set('f2', e.target.value)} rows={2} className={inputCls} placeholder={`Texto faixa ${(a.faixaLim1 ?? 49) + 1}–${a.faixaLim2 ?? 80}`} />
           <textarea value={a.f3 ?? ''} onChange={(e) => set('f3', e.target.value)} rows={2} className={inputCls} placeholder={`Texto faixa ${(a.faixaLim2 ?? 80) + 1}–100`} />
@@ -691,21 +704,40 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco, assunt
           <Cor label="Cor do texto modulado" value={a.corTexto} onChange={(v) => set('corTexto', v)} />
         </div>
       )
+    }
     case 'diag-pilares': {
       const pilares: any[] = Array.isArray(a.pilares) ? a.pilares : []
       const setP = (i: number, k: string, v: string) => set('pilares', pilares.map((p, idx) => idx === i ? { ...p, [k]: v } : p))
       const addP = () => set('pilares', [...pilares, { chave: '', nome: 'NOVO PILAR', f1: '', f2: '', f3: '' }])
       const rmP = (i: number) => set('pilares', pilares.filter((_, idx) => idx !== i))
+      const humano = (s: string) => s.replace(/_/g, ' ').replace(/^./, (ch) => ch.toUpperCase())
+      const slugsPilar = [...new Set((varsExtra ?? []).filter((g) => /Pilar/i.test(g.grupo)).flatMap((g) => g.itens.map((v) => v.token.match(/\{pct_pilar_(.+)\}/)?.[1]).filter(Boolean)))] as string[]
+      const addPilar = (chave: string) => set('pilares', [...pilares, { chave, nome: humano(chave).toUpperCase(), f1: '', f2: '', f3: '' }])
       return (
         <div className="space-y-3">
-          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Os 3 pilares aparecem colados com % real do aluno. O <b>texto de faixa</b> é escolhido automaticamente pelo desempenho (0–50 / 51–80 / 81–100). A <b>chave</b> deve casar com o pilar da importação (ex.: <code>lei_seca</code>).</p>
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Os pilares aparecem colados com % real do aluno. O <b>texto de faixa</b> é escolhido automaticamente pelo desempenho (0–50 / 51–80 / 81–100). A <b>chave</b> deve casar com o pilar do simulado — escolha na lista abaixo.</p>
+          {slugsPilar.length > 0 && (
+            <Grupo label="Pilares deste simulado — clique para adicionar">
+              <div className="flex flex-wrap gap-1">{slugsPilar.map((s) => (
+                <button key={s} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => addPilar(s)} className="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:border-primary hover:bg-primary/5 hover:text-primary">+ {humano(s)}</button>
+              ))}</div>
+            </Grupo>
+          )}
           {pilares.map((p, i) => (
             <div key={i} className="space-y-1.5 rounded-lg border p-2">
               <div className="flex items-center gap-1.5">
                 <input value={p.nome ?? ''} onChange={(e) => setP(i, 'nome', e.target.value)} className={inputCls} placeholder="Nome exibido (LEI SECA)" />
                 <button type="button" onClick={() => rmP(i)} className="rounded p-1 text-muted-foreground hover:text-destructive">✕</button>
               </div>
-              <input value={p.chave ?? ''} onChange={(e) => setP(i, 'chave', e.target.value.trim())} className={inputCls} placeholder="chave do pilar (lei_seca)" />
+              {slugsPilar.length ? (
+                <select value={p.chave ?? ''} onChange={(e) => setP(i, 'chave', e.target.value)} className={inputCls}>
+                  <option value="">— chave do pilar —</option>
+                  {slugsPilar.map((s) => <option key={s} value={s}>{humano(s)}</option>)}
+                  {p.chave && !slugsPilar.includes(p.chave) && <option value={p.chave}>{humano(p.chave)} (atual)</option>}
+                </select>
+              ) : (
+                <input value={p.chave ?? ''} onChange={(e) => setP(i, 'chave', e.target.value.trim())} className={inputCls} placeholder="chave do pilar (lei_seca)" />
+              )}
               <textarea value={p.f1 ?? ''} onChange={(e) => setP(i, 'f1', e.target.value)} rows={2} className={inputCls} placeholder={`Texto faixa 0–${a.faixaLim1 ?? 49}`} />
               <textarea value={p.f2 ?? ''} onChange={(e) => setP(i, 'f2', e.target.value)} rows={2} className={inputCls} placeholder={`Texto faixa ${(a.faixaLim1 ?? 49) + 1}–${a.faixaLim2 ?? 80}`} />
               <textarea value={p.f3 ?? ''} onChange={(e) => setP(i, 'f3', e.target.value)} rows={2} className={inputCls} placeholder={`Texto faixa ${(a.faixaLim2 ?? 80) + 1}–100`} />
