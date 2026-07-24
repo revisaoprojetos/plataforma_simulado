@@ -543,15 +543,22 @@ function FileiraCatalogo({ titulo, sims, appUrl, online, onMover }: {
     window.addEventListener('resize', atualiza)
     return () => { el.removeEventListener('scroll', atualiza); window.removeEventListener('resize', atualiza) }
   }, [sims.length])
-  const rolar = (dir: -1 | 1) => { const el = ref.current; if (el) el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: 'smooth' }) }
+  // Rola exatamente UM card por vez (largura do 1º card + gap de 1rem).
+  const rolar = (dir: -1 | 1) => {
+    const el = ref.current
+    if (!el) return
+    const primeiro = el.firstElementChild as HTMLElement | null
+    const passo = primeiro ? primeiro.offsetWidth + 16 : el.clientWidth
+    el.scrollBy({ left: dir * passo, behavior: 'smooth' })
+  }
   return (
     <section className="space-y-2">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold">{titulo}<span className="text-xs font-normal text-muted-foreground">({sims.length})</span></h3>
       <div className="relative">
         {canL && (
           <button type="button" aria-label="Ver anteriores" onClick={() => rolar(-1)}
-            className="absolute left-0 top-1/2 z-20 flex h-24 w-11 -translate-y-1/2 items-center justify-center rounded-r-2xl bg-black/55 text-white shadow-lg backdrop-blur transition hover:bg-black/75">
-            <ChevronLeft className="h-6 w-6" />
+            className="absolute left-1 top-1/2 z-20 flex h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full bg-black/70 text-white shadow-xl ring-1 ring-white/25 backdrop-blur transition hover:scale-105 hover:bg-black/90">
+            <ChevronLeft className="h-7 w-7" />
           </button>
         )}
         <div ref={ref} className="flex gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -564,8 +571,8 @@ function FileiraCatalogo({ titulo, sims, appUrl, online, onMover }: {
         </div>
         {canR && (
           <button type="button" aria-label="Ver próximos" onClick={() => rolar(1)}
-            className="absolute right-0 top-1/2 z-20 flex h-24 w-11 -translate-y-1/2 items-center justify-center rounded-l-2xl bg-black/55 text-white shadow-lg backdrop-blur transition hover:bg-black/75">
-            <ChevronRight className="h-6 w-6" />
+            className="absolute right-1 top-1/2 z-20 flex h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full bg-black/70 text-white shadow-xl ring-1 ring-white/25 backdrop-blur transition hover:scale-105 hover:bg-black/90">
+            <ChevronRight className="h-7 w-7" />
           </button>
         )}
       </div>
