@@ -409,14 +409,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
       </div>
 
       {vista === 'catalogo' && temCatalogo ? (
-        <div className="space-y-8">
-          <CatalogoSimulados sims={catalogoFiltrado} grupos={catalogo!.grupos} appUrl={appUrl} online={online} onMover={podeMover ? (s) => setMovendo(s) : undefined} />
-          {catalogoFiltrado.some((s) => !s.grupoId) && (
-            <div className="space-y-4 border-t pt-6">
-              <SecoesStatus sims={catalogoFiltrado.filter((s) => !s.grupoId)} online={online} appUrl={appUrl} onMover={podeMover ? (s) => setMovendo(s) : undefined} recolhidas={recolhidas} toggleSecao={toggleSecao} />
-            </div>
-          )}
-        </div>
+        <CatalogoSimulados sims={catalogoFiltrado} grupos={catalogo!.grupos} appUrl={appUrl} online={online} onMover={podeMover ? (s) => setMovendo(s) : undefined} recolhidas={recolhidas} toggleSecao={toggleSecao} />
       ) : (
       <>
       {atual && (
@@ -529,8 +522,8 @@ function SecoesStatus({ sims, online, appUrl, onMover, recolhidas, toggleSecao }
 }
 
 /** Uma fileira do catálogo (um grupo): cards completos em rolagem horizontal com seta estilo Netflix. */
-function FileiraCatalogo({ titulo, icone, cor, sims, appUrl, online, onMover }: {
-  titulo: string; icone?: string | null; cor?: string | null; sims: SimuladoCatalogo[]
+function FileiraCatalogo({ titulo, sims, appUrl, online, onMover }: {
+  titulo: string; sims: SimuladoCatalogo[]
   appUrl: string; online: Record<string, number>; onMover?: (s: SimuladoCard) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -551,14 +544,9 @@ function FileiraCatalogo({ titulo, icone, cor, sims, appUrl, online, onMover }: 
     return () => { el.removeEventListener('scroll', atualiza); window.removeEventListener('resize', atualiza) }
   }, [sims.length])
   const rolar = (dir: -1 | 1) => { const el = ref.current; if (el) el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: 'smooth' }) }
-  const Icon = iconeBanco(icone)
   return (
     <section className="space-y-2">
-      <div className="flex items-center gap-2">
-        <span className="flex h-6 w-6 items-center justify-center rounded-md text-white ring-1 ring-white/20" style={{ background: cor || 'var(--primary)' }}><Icon className="h-3.5 w-3.5" /></span>
-        <h3 className="text-sm font-semibold">{titulo}</h3>
-        <span className="text-xs text-muted-foreground">({sims.length})</span>
-      </div>
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold">{titulo}<span className="text-xs font-normal text-muted-foreground">({sims.length})</span></h3>
       <div className="relative">
         {canL && (
           <button type="button" aria-label="Ver anteriores" onClick={() => rolar(-1)}
@@ -585,22 +573,51 @@ function FileiraCatalogo({ titulo, icone, cor, sims, appUrl, online, onMover }: 
   )
 }
 
-/** Catálogo (Netflix): uma fileira por GRUPO (pasta do banco), recente→antigo. Avulsos ficam no grid normal. */
-function CatalogoSimulados({ sims, grupos, appUrl, online, onMover }: {
-  sims: SimuladoCatalogo[]; grupos: PastaSim[]; appUrl: string; online: Record<string, number>; onMover?: (s: SimuladoCard) => void
+/** Catálogo: agrupa por STATUS (Em andamento / A iniciar / Encerrado). Dentro de cada status, os simulados
+ *  de um mesmo GRUPO (pasta do banco) viram uma fileira horizontal; os sem grupo ficam no grid normal. */
+function CatalogoSimulados({ sims, grupos, appUrl, online, onMover, recolhidas, toggleSecao }: {
+  sims: SimuladoCatalogo[]; grupos: PastaSim[]; appUrl: string; online: Record<string, number>
+  onMover?: (s: SimuladoCard) => void; recolhidas: Set<string>; toggleSecao: (chave: string) => void
 }) {
-  const fileiras = useMemo(() => {
-    const porGrupo = new Map<string, SimuladoCatalogo[]>()
-    for (const s of sims) { if (!s.grupoId) continue; const arr = porGrupo.get(s.grupoId); if (arr) arr.push(s); else porGrupo.set(s.grupoId, [s]) }
-    const out: { chave: string; titulo: string; icone: string | null; cor: string | null; sims: SimuladoCatalogo[] }[] = []
-    for (const g of grupos) { const arr = porGrupo.get(g.id); if (arr?.length) out.push({ chave: g.id, titulo: g.nome, icone: g.icone ?? null, cor: g.cor ?? null, sims: arr }) }
-    return out
-  }, [sims, grupos])
-
-  if (!fileiras.length) return null
   return (
     <div className="space-y-6">
-      {fileiras.map((f) => <FileiraCatalogo key={f.chave} titulo={f.titulo} icone={f.icone} cor={f.cor} sims={f.sims} appUrl={appUrl} online={online} onMover={onMover} />)}
+      {secoes.map((sec) => {
+        const doStatus = sims.filter((s) => s.status === sec.chave)
+        const aberto = !recolhidas.has(sec.chave)
+        const fileiras = grupos
+          .map((g) => ({ g, itens: doStatus.filter((s) => s.grupoId === g.id) }))
+          .filter((x) => x.itens.length > 0)
+        const avulsos = doStatus.filter((s) => !s.grupoId)
+        return (
+          <div key={sec.chave} className="space-y-4">
+            <button type="button" onClick={() => toggleSecao(sec.chave)} aria-expanded={aberto}
+              className="group flex w-full items-center gap-2 rounded-lg py-0.5 text-left transition-colors">
+              <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:text-foreground', aberto && 'rotate-180')} />
+              <span className={cn('h-2.5 w-2.5 rounded-full', sec.cor)} />
+              <span className="font-semibold">{sec.titulo}</span>
+              <span className="text-sm text-muted-foreground">({doStatus.length})</span>
+            </button>
+            {aberto && (doStatus.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">
+                {sec.chave === 'rascunho' ? 'Nenhum simulado aguardando início' : sec.chave === 'publicado' ? 'Nenhum simulado em andamento' : 'Nenhum simulado encerrado'}
+              </p>
+            ) : (
+              <div className="space-y-5">
+                {/* Grupos deste status → fileiras horizontais */}
+                {fileiras.map(({ g, itens }) => (
+                  <FileiraCatalogo key={g.id} titulo={g.nome} sims={itens} appUrl={appUrl} online={online} onMover={onMover} />
+                ))}
+                {/* Sem grupo → grid normal (mesmo modelo do Quadro) */}
+                {avulsos.length > 0 && (
+                  <div className="grid items-stretch gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    {avulsos.map((s) => <CardItem key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} onMover={onMover ? () => onMover(s) : undefined} />)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )
+      })}
     </div>
   )
 }
