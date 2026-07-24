@@ -46,10 +46,12 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
         const set = assuntosTodosPorDisc.get(d) ?? new Set<string>(); set.add(as); assuntosTodosPorDisc.set(d, set)
       }
       // Normaliza a `categoria` (bagunçada/combinada) em UM pilar canônico. "Legislação" = Lei seca.
-      // PRIORIDADE (cada questão conta em um só pilar → soma = total do simulado): Lei seca > Jurisprudência > Doutrina.
+      // Língua Portuguesa é pilar à parte, pela DISCIPLINA — não entra em Doutrina (card separado).
+      // PRIORIDADE (cada questão conta em um só pilar → soma = total): Língua Portuguesa > Lei seca > Jurisprudência > Doutrina.
       const catTxt = [(q as any).categoria, (q as any).pilar_1, (q as any).pilar_2].map((x) => (x ?? '').toString()).join(' ').toLowerCase()
       let pilar = ''
-      if (catTxt.includes('lei seca') || catTxt.includes('legisla')) pilar = 'Lei seca'
+      if (/portugu|l[ií]ngua/i.test(catTxt) || /portugu|l[ií]ngua/i.test(d)) pilar = 'Língua Portuguesa'
+      else if (catTxt.includes('lei seca') || catTxt.includes('legisla')) pilar = 'Lei seca'
       else if (catTxt.includes('jurisprud')) pilar = 'Jurisprudência'
       else if (catTxt.includes('doutrina')) pilar = 'Doutrina'
       const unicos = pilar ? [pilar] : []
