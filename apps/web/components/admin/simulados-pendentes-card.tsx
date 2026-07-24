@@ -57,7 +57,7 @@ export function SimuladosPendentesCard({ pendentes }: { pendentes: PendenteItem[
       {open && createPortal(
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="animate-page absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => setOpen(false)} />
-          <div role="dialog" aria-modal="true" className="animate-pop relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+          <div role="dialog" aria-modal="true" className="animate-pop relative flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
             <div className="flex items-center justify-between border-b border-amber-500/20 bg-amber-500/5 px-5 py-3">
               <h3 className="flex items-center gap-2 text-sm font-semibold">
                 <ClipboardList className="h-4 w-4 text-amber-500" /> Simulados pendentes ({pendentes.length})
@@ -69,7 +69,7 @@ export function SimuladosPendentesCard({ pendentes }: { pendentes: PendenteItem[
 
             <p className="px-5 pt-3 text-xs text-muted-foreground">Atribuídos por matrícula/acesso e ainda não concluídos.</p>
 
-            <div className="scroll-claro mt-2 grid min-h-0 flex-1 gap-2 overflow-auto px-5 pb-5 sm:grid-cols-2">
+            <div className="scroll-claro mt-2 grid min-h-0 flex-1 gap-2 overflow-auto px-5 pb-5 sm:grid-cols-2 lg:grid-cols-3">
               {pendentes.map((p) => (
                 <Link key={p.id} href={`/admin/simulados/${p.id}`} className="flex items-center gap-3 rounded-xl border p-3 transition hover:border-primary hover:bg-primary/5">
                   <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', p.iniciado ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-muted text-muted-foreground')}>
