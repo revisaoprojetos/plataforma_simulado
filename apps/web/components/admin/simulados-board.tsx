@@ -293,12 +293,12 @@ function CardItem({ s, appUrl, online, onMover }: { s: SimuladoCard; appUrl: str
 
 type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; count: number }
 type DestinoSim = { id: string; nome: string }
-export type SimuladoCatalogo = SimuladoCard & { pasta_id: string | null }
+export type SimuladoCatalogo = SimuladoCard & { grupoId: string | null }
 
 export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo }: {
   simulados: SimuladoCard[]; appUrl: string; onlineInicial?: Record<string, number>
   folders?: PastaSim[]; destinos?: DestinoSim[]; atual?: { id: string; nome: string } | null
-  catalogo?: { sims: SimuladoCatalogo[]; pastas: PastaSim[] }
+  catalogo?: { sims: SimuladoCatalogo[]; grupos: PastaSim[] }
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -409,7 +409,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
       </div>
 
       {vista === 'catalogo' && temCatalogo ? (
-        <CatalogoSimulados sims={catalogoFiltrado} pastas={catalogo!.pastas} appUrl={appUrl} online={online} onMover={podeMover ? (s) => setMovendo(s) : undefined} />
+        <CatalogoSimulados sims={catalogoFiltrado} grupos={catalogo!.grupos} appUrl={appUrl} online={online} onMover={podeMover ? (s) => setMovendo(s) : undefined} />
       ) : (
       <>
       {atual && (
@@ -575,19 +575,19 @@ function FileiraCatalogo({ titulo, icone, cor, sims, appUrl, online, onMover }: 
   )
 }
 
-/** Catálogo (Netflix): uma fileira por pasta (+ "Sem pasta"), simulados do mais recente ao mais antigo. */
-function CatalogoSimulados({ sims, pastas, appUrl, online, onMover }: {
-  sims: SimuladoCatalogo[]; pastas: PastaSim[]; appUrl: string; online: Record<string, number>; onMover?: (s: SimuladoCard) => void
+/** Catálogo (Netflix): uma fileira por GRUPO (pasta do banco) + fileira "Avulsos", recente→antigo. */
+function CatalogoSimulados({ sims, grupos, appUrl, online, onMover }: {
+  sims: SimuladoCatalogo[]; grupos: PastaSim[]; appUrl: string; online: Record<string, number>; onMover?: (s: SimuladoCard) => void
 }) {
   const fileiras = useMemo(() => {
-    const porPasta = new Map<string, SimuladoCatalogo[]>()
-    for (const s of sims) { const k = s.pasta_id ?? '__sem__'; const arr = porPasta.get(k); if (arr) arr.push(s); else porPasta.set(k, [s]) }
+    const porGrupo = new Map<string, SimuladoCatalogo[]>()
+    for (const s of sims) { const k = s.grupoId ?? '__avulso__'; const arr = porGrupo.get(k); if (arr) arr.push(s); else porGrupo.set(k, [s]) }
     const out: { chave: string; titulo: string; icone: string | null; cor: string | null; sims: SimuladoCatalogo[] }[] = []
-    for (const p of pastas) { const arr = porPasta.get(p.id); if (arr?.length) out.push({ chave: p.id, titulo: p.nome, icone: p.icone ?? null, cor: p.cor ?? null, sims: arr }) }
-    const sem = porPasta.get('__sem__')
-    if (sem?.length) out.push({ chave: '__sem__', titulo: 'Sem pasta', icone: null, cor: null, sims: sem })
+    for (const g of grupos) { const arr = porGrupo.get(g.id); if (arr?.length) out.push({ chave: g.id, titulo: g.nome, icone: g.icone ?? null, cor: g.cor ?? null, sims: arr }) }
+    const avulsos = porGrupo.get('__avulso__')
+    if (avulsos?.length) out.push({ chave: '__avulso__', titulo: 'Avulsos (sem grupo)', icone: null, cor: null, sims: avulsos })
     return out
-  }, [sims, pastas])
+  }, [sims, grupos])
 
   if (!fileiras.length) return <p className="rounded-lg border bg-muted/30 px-4 py-8 text-center text-sm italic text-muted-foreground">Nenhum simulado para exibir.</p>
   return (

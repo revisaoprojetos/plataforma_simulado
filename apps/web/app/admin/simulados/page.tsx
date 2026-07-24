@@ -36,6 +36,24 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
     if (!r.error) folders = (r.data ?? []).filter((p: any) => p.is_folder && p.folder_area === 'simulado')
   }
 
+  // Bancos (Banco de Simulado): usados para agrupar o CATÁLOGO. Cada simulado vem de um banco
+  // (regras.banco_base_id); o banco pode estar dentro de uma PASTA/grupo (is_folder) — essa pasta é a fileira.
+  let bancos: any[] = []
+  {
+    const selB = (cols: string) => supabase.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid)
+    let r: { data: any[] | null; error: { message: string } | null } = await selB('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area, pai_id')
+    if (r.error) r = await selB('id, nome, cor, icone, is_folder, pai_id')
+    bancos = (r.data ?? []).filter((p: any) => p.folder_area !== 'simulado' && p.folder_area !== 'caderno')
+  }
+  const bancoById = new Map<string, any>(bancos.map((b) => [b.id, b]))
+  // Pasta (is_folder) que contém o banco do simulado — é a fileira do catálogo (null = avulso).
+  const grupoDoBanco = (bancoId: string | null | undefined): any | null => {
+    if (!bancoId) return null
+    const b = bancoById.get(bancoId)
+    const pai = b?.pai_id ? bancoById.get(b.pai_id) : null
+    return pai?.is_folder ? pai : null
+  }
+
   const tipos = await tiposDeSimulados(supabase, simulados.map((s) => s.id))
   const visual = await resolverVisualSimulados(supabase, simulados.map((s) => ({ id: s.id, regras: s.regras })))
   const comTipo = simulados.map((s) => ({ ...s, tipo: tipos.get(s.id) ?? null, vis: visual.get(s.id) ?? null }))
@@ -54,9 +72,15 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
   const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), count: contPasta.get(f.id) ?? 0 }))
   const destinos = folders.map((f) => ({ id: f.id, nome: f.nome }))
 
-  // Catálogo (view horizontal estilo Netflix): TODOS os simulados + TODAS as pastas da Aplicação,
-  // agrupados por pasta e ordenados do mais recente ao mais antigo (created_at DESC — já vem assim).
-  const catalogoPastas = folders.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), count: contPasta.get(f.id) ?? 0 }))
+  // Catálogo (view horizontal estilo Netflix): simulados agrupados pela PASTA DO BANCO de simulado
+  // (o "grupo" no Banco de Simulado). Só entram no catálogo os que têm grupo; os avulsos ficam à parte.
+  // Ordem: mais recente → mais antigo (created_at DESC — já vem assim da query).
+  const catalogoSims = comTipo.map((s) => ({ ...s, grupoId: grupoDoBanco((s.regras as any)?.banco_base_id)?.id ?? null }))
+  const contGrupo = new Map<string, number>()
+  for (const s of catalogoSims) if (s.grupoId) contGrupo.set(s.grupoId, (contGrupo.get(s.grupoId) ?? 0) + 1)
+  const catalogoGrupos = bancos
+    .filter((b) => b.is_folder && contGrupo.has(b.id))
+    .map((b) => ({ id: b.id, nome: b.nome, cor: b.cor ?? null, icone: b.icone ?? null, capa: (b.capa_card_url ?? b.capa_url) ?? null, count: contGrupo.get(b.id) ?? 0 }))
 
   const online = await onlinePorSimulado(comTipo.map((s) => s.id))
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
@@ -81,7 +105,7 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
         folders={foldersOut}
         destinos={destinos}
         atual={current ? { id: current.id, nome: current.nome } : null}
-        catalogo={{ sims: comTipo as (SimuladoCard & { pasta_id: string | null })[], pastas: catalogoPastas }}
+        catalogo={{ sims: catalogoSims as (SimuladoCard & { grupoId: string | null })[], grupos: catalogoGrupos }}
       />
     </div>
   )
