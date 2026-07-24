@@ -410,7 +410,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
 
       {vista === 'catalogo' && temCatalogo ? (
         <div className="space-y-8">
-          <CatalogoSimulados sims={catalogoFiltrado} grupos={catalogo!.grupos} />
+          <CatalogoSimulados sims={catalogoFiltrado} grupos={catalogo!.grupos} appUrl={appUrl} online={online} onMover={podeMover ? (s) => setMovendo(s) : undefined} />
           {catalogoFiltrado.some((s) => !s.grupoId) && (
             <div className="space-y-4 border-t pt-6">
               <SecoesStatus sims={catalogoFiltrado.filter((s) => !s.grupoId)} online={online} appUrl={appUrl} onMover={podeMover ? (s) => setMovendo(s) : undefined} recolhidas={recolhidas} toggleSecao={toggleSecao} />
@@ -528,33 +528,10 @@ function SecoesStatus({ sims, online, appUrl, onMover, recolhidas, toggleSecao }
   )
 }
 
-/** Pôster LIMPO de simulado para as fileiras do catálogo (só capa + status + título, clicável). */
-function PosterCatalogo({ s }: { s: SimuladoCard }) {
-  const cor = s.vis?.cor ?? '#6d28d9'
-  const BancoIcon = iconeBanco(s.vis?.icone)
-  const capa = s.vis?.capa
-  return (
-    <Link href={`/admin/simulados/${s.id}`} aria-label={s.titulo}
-      className="group relative block aspect-[3/4] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-      {capa
-        ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
-      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-      <span className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-sm ring-1 ring-white/20" style={{ background: cor }}><BancoIcon className="h-4 w-4" /></span>
-      <div className="absolute inset-x-0 bottom-0 p-3">
-        <span className="mb-1 inline-flex items-center gap-1 rounded-md bg-black/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/85 backdrop-blur">
-          <span className={cn('h-1.5 w-1.5 rounded-full', dotClass[s.status])} /> {statusLabel[s.status]}
-        </span>
-        <h3 className="line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm">{s.titulo}</h3>
-      </div>
-    </Link>
-  )
-}
-
-/** Uma fileira do catálogo (um grupo): pôsteres em rolagem horizontal com seta estilo Netflix. */
-function FileiraCatalogo({ titulo, icone, cor, sims }: {
+/** Uma fileira do catálogo (um grupo): cards completos em rolagem horizontal com seta estilo Netflix. */
+function FileiraCatalogo({ titulo, icone, cor, sims, appUrl, online, onMover }: {
   titulo: string; icone?: string | null; cor?: string | null; sims: SimuladoCatalogo[]
+  appUrl: string; online: Record<string, number>; onMover?: (s: SimuladoCard) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [canL, setCanL] = useState(false)
@@ -591,9 +568,9 @@ function FileiraCatalogo({ titulo, icone, cor, sims }: {
         )}
         <div ref={ref} className="flex gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {sims.map((s) => (
-            // 5 pôsteres visíveis (igual xl:grid-cols-5); o resto rola com as setas.
+            // 5 cards visíveis (igual xl:grid-cols-5); o resto rola com as setas. Card completo (com infos).
             <div key={s.id} className="shrink-0 basis-[calc((100%-1rem)/2)] sm:basis-[calc((100%-2rem)/3)] lg:basis-[calc((100%-3rem)/4)] xl:basis-[calc((100%-4rem)/5)]">
-              <PosterCatalogo s={s} />
+              <CardItem s={s} appUrl={appUrl} online={online[s.id] ?? 0} onMover={onMover ? () => onMover(s) : undefined} />
             </div>
           ))}
         </div>
@@ -609,7 +586,9 @@ function FileiraCatalogo({ titulo, icone, cor, sims }: {
 }
 
 /** Catálogo (Netflix): uma fileira por GRUPO (pasta do banco), recente→antigo. Avulsos ficam no grid normal. */
-function CatalogoSimulados({ sims, grupos }: { sims: SimuladoCatalogo[]; grupos: PastaSim[] }) {
+function CatalogoSimulados({ sims, grupos, appUrl, online, onMover }: {
+  sims: SimuladoCatalogo[]; grupos: PastaSim[]; appUrl: string; online: Record<string, number>; onMover?: (s: SimuladoCard) => void
+}) {
   const fileiras = useMemo(() => {
     const porGrupo = new Map<string, SimuladoCatalogo[]>()
     for (const s of sims) { if (!s.grupoId) continue; const arr = porGrupo.get(s.grupoId); if (arr) arr.push(s); else porGrupo.set(s.grupoId, [s]) }
@@ -621,7 +600,7 @@ function CatalogoSimulados({ sims, grupos }: { sims: SimuladoCatalogo[]; grupos:
   if (!fileiras.length) return null
   return (
     <div className="space-y-6">
-      {fileiras.map((f) => <FileiraCatalogo key={f.chave} titulo={f.titulo} icone={f.icone} cor={f.cor} sims={f.sims} />)}
+      {fileiras.map((f) => <FileiraCatalogo key={f.chave} titulo={f.titulo} icone={f.icone} cor={f.cor} sims={f.sims} appUrl={appUrl} online={online} onMover={onMover} />)}
     </div>
   )
 }
