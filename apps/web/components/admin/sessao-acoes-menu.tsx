@@ -81,11 +81,16 @@ export function SessaoAcoesMenu({
   }
 
   async function excluir() {
-    if (!(await confirmar({ mensagem: 'Excluir esta tentativa?\n\nEla sai do histórico, dos resultados e do ranking (recalculado), e vai para a Lixeira — pode ser restaurada.', destrutivo: true }))) return
+    if (!(await confirmar({
+      titulo: 'Apagar tentativa',
+      mensagem: 'Apagar esta tentativa?\n\nEla deixa de contar: sai do histórico, dos resultados e do ranking (recalculado), e o aluno poderá refazer — se foi a única, o simulado volta a aparecer como "não feito" para ele. Vai para a Lixeira (pode ser restaurada).',
+      confirmar: 'Apagar tentativa',
+      destrutivo: true,
+    }))) return
     start(async () => {
       const r = await excluirSessaoAction(sessaoId, simuladoId, estudanteId)
       if (r?.error) toast.error(r.error)
-      else { toast.success('Tentativa enviada para a Lixeira'); router.refresh() }
+      else { toast.success('Tentativa apagada (aluno pode refazer)'); router.refresh() }
     })
   }
 
@@ -122,7 +127,7 @@ export function SessaoAcoesMenu({
           </>
         )}
         <DropdownMenuItem onClick={excluir} className="text-destructive focus:text-destructive">
-          <Trash2 className="mr-2 h-4 w-4" /> Excluir tentativa
+          <Trash2 className="mr-2 h-4 w-4" /> Apagar tentativa
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

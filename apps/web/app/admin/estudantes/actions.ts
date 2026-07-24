@@ -8,6 +8,7 @@ import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
 import { rankearSimulado } from '@/lib/ranking'
+import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
 import { sincronizarGrupoPassaporte } from '@/lib/estudante/grupo-passaporte'
 import { sincronizarGrupoVitalicio } from '@/lib/estudante/grupo-vitalicio'
 
@@ -124,13 +125,38 @@ export async function deleteEstudanteAction(id: string) {
   return { ok: true }
 }
 
-/** Soft delete de UMA sessão (tentativa) → sai do histórico/resultados/ranking; recalcula o ranking. */
+/**
+ * Apaga UMA tentativa (sessão) do estudante. Soft-delete → sai do histórico, dos resultados, do
+ * ranking (recalculado) e da visão do ALUNO (todas as queries do aluno filtram deletado=false),
+ * então NÃO conta mais como tentativa. Além disso DEVOLVE a vaga no acesso avulso
+ * (tentativas_usadas--) para o aluno poder refazer — se foi a única tentativa, o simulado volta a
+ * aparecer como "não feito" para ele. Vai para a Lixeira (recuperável). Invalida os relatórios.
+ */
 export async function excluirSessaoAction(sessaoId: string, simuladoId: string, estudanteId: string) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Você não tem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  const svc = createAdminClient()
   const { error } = await softDelete('simulado_sessoes_prova', sessaoId)
   if (error) return { error: error.message }
-  // A sessão excluída sai do cálculo: recalcula o ranking do simulado.
-  if (simuladoId) { try { await rankearSimulado(createAdminClient(), simuladoId) } catch { /* ranking best-effort */ } }
+
+  // Devolve a tentativa no acesso avulso (tentativas_usadas--), para o aluno poder refazer.
+  // Sem acesso avulso (simulado aberto / por matrícula) não há contador — nada a devolver.
+  if (simuladoId && estudanteId) {
+    try {
+      const { data: ac } = await svc.from('simulado_acessos')
+        .select('id, tentativas_usadas')
+        .eq('simulado_id', simuladoId).eq('estudante_id', estudanteId)
+        .order('criado_em', { ascending: false }).limit(1).maybeSingle()
+      if (ac && (ac.tentativas_usadas ?? 0) > 0) {
+        await svc.from('simulado_acessos').update({ tentativas_usadas: Math.max(0, (ac.tentativas_usadas ?? 0) - 1) }).eq('id', (ac as any).id)
+      }
+    } catch { /* ignora — acesso avulso pode não existir */ }
+  }
+
+  // A sessão excluída sai do cálculo: recalcula o ranking do simulado + invalida cache de relatórios.
+  if (simuladoId) { try { await rankearSimulado(svc, simuladoId) } catch { /* ranking best-effort */ } }
+  await invalidarRelatorios(tenantId)
+
   await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_sessoes_prova', entidadeId: sessaoId, depois: { deletado: true } })
   revalidatePath(`/admin/estudantes/${estudanteId}`)
   if (simuladoId) revalidatePath(`/admin/simulados/${simuladoId}`)
