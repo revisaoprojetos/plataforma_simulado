@@ -1,7 +1,7 @@
 'use client'
 import { confirmar } from '@/components/ui/confirm-dialog'
 
-import { useState, useTransition, useMemo, useEffect, useRef } from 'react'
+import { useState, useTransition, useMemo, useEffect } from 'react'
 import type React from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
 import { excluirPastaFolder } from '@/app/admin/banco-questoes/actions'
 import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
+import { FileiraHorizontal } from '@/components/fileira-horizontal'
 import type { TipoSimulado } from '@/lib/simulado/tipo'
 import {
   DropdownMenu,
@@ -37,7 +38,6 @@ import {
   Folder,
   FolderOpen,
   ChevronLeft,
-  ChevronRight,
   ChevronDown,
   FolderInput,
   Palette,
@@ -527,57 +527,15 @@ function FileiraCatalogo({ titulo, sims, appUrl, online, onMover }: {
   titulo: string; sims: SimuladoCatalogo[]
   appUrl: string; online: Record<string, number>; onMover?: (s: SimuladoCard) => void
 }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [canL, setCanL] = useState(false)
-  const [canR, setCanR] = useState(false)
-  const atualiza = () => {
-    const el = ref.current
-    if (!el) return
-    setCanL(el.scrollLeft > 4)
-    setCanR(Math.ceil(el.scrollLeft + el.clientWidth) < el.scrollWidth - 4)
-  }
-  useEffect(() => {
-    atualiza()
-    const el = ref.current
-    if (!el) return
-    el.addEventListener('scroll', atualiza, { passive: true })
-    window.addEventListener('resize', atualiza)
-    return () => { el.removeEventListener('scroll', atualiza); window.removeEventListener('resize', atualiza) }
-  }, [sims.length])
-  // Rola exatamente UM card por vez (largura do 1º card + gap de 1rem).
-  const rolar = (dir: -1 | 1) => {
-    const el = ref.current
-    if (!el) return
-    const primeiro = el.firstElementChild as HTMLElement | null
-    const passo = primeiro ? primeiro.offsetWidth + 16 : el.clientWidth
-    el.scrollBy({ left: dir * passo, behavior: 'smooth' })
-  }
   return (
-    <section className="space-y-2">
-      <h3 className="flex items-center gap-1.5 text-sm font-semibold">{titulo}<span className="text-xs font-normal text-muted-foreground">({sims.length})</span></h3>
-      <div className="relative">
-        {canL && (
-          <button type="button" aria-label="Ver anteriores" onClick={() => rolar(-1)}
-            className="absolute left-0 top-1/2 z-20 flex h-28 w-14 origin-left -translate-y-1/2 items-center justify-start rounded-r-xl bg-gradient-to-r from-neutral-700/95 via-neutral-700/75 to-transparent pl-2 text-white shadow-lg transition duration-200 ease-out hover:scale-x-125 hover:scale-y-110 hover:from-neutral-600 hover:via-neutral-600/80">
-            <ChevronLeft className="h-7 w-7" />
-          </button>
-        )}
-        <div ref={ref} className="flex gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {sims.map((s) => (
-            // ~5 cards por vez, mas um pouco mais estreitos para espiar um PEDAÇO do próximo (indica que há mais).
-            <div key={s.id} className="shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-3rem)/4.3)] xl:basis-[calc((100%-4rem)/5.3)]">
-              <CardItem s={s} appUrl={appUrl} online={online[s.id] ?? 0} onMover={onMover ? () => onMover(s) : undefined} />
-            </div>
-          ))}
+    <FileiraHorizontal titulo={titulo} count={sims.length}>
+      {sims.map((s) => (
+        // ~5 cards por vez, mas um pouco mais estreitos para espiar um PEDAÇO do próximo (indica que há mais).
+        <div key={s.id} className="shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-3rem)/4.3)] xl:basis-[calc((100%-4rem)/5.3)]">
+          <CardItem s={s} appUrl={appUrl} online={online[s.id] ?? 0} onMover={onMover ? () => onMover(s) : undefined} />
         </div>
-        {canR && (
-          <button type="button" aria-label="Ver próximos" onClick={() => rolar(1)}
-            className="absolute right-0 top-1/2 z-20 flex h-28 w-14 origin-right -translate-y-1/2 items-center justify-end rounded-l-xl bg-gradient-to-l from-neutral-700/95 via-neutral-700/75 to-transparent pr-2 text-white shadow-lg transition duration-200 ease-out hover:scale-x-125 hover:scale-y-110 hover:from-neutral-600 hover:via-neutral-600/80">
-            <ChevronRight className="h-7 w-7" />
-          </button>
-        )}
-      </div>
-    </section>
+      ))}
+    </FileiraHorizontal>
   )
 }
 
