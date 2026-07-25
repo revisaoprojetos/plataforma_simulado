@@ -9,6 +9,73 @@ import type { TipoSimulado } from '@/lib/simulado/tipo'
 import { cn } from '@/lib/utils'
 import { Users, CheckCircle2, Target, Trophy, Clock, Crown, Medal, ClipboardList, BookOpen, BarChart3, ListChecks, FileSpreadsheet, FileText, Loader2, LayoutDashboard, Search, ChevronDown, Check, X, LogIn, Eye, Download, Activity, AlertTriangle, Timer, Gauge, Repeat, Lock, TrendingUp, TrendingDown, Minus, Shield } from 'lucide-react'
 
+// ── Helpers de gráfico p/ o Excel: renderiza em canvas e devolve PNG base64 (sem prefixo) p/ addImage ──
+function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2))
+  ctx.beginPath()
+  ctx.moveTo(x + rr, y); ctx.arcTo(x + w, y, x + w, y + h, rr); ctx.arcTo(x + w, y + h, x, y + h, rr)
+  ctx.arcTo(x, y + h, x, y, rr); ctx.arcTo(x, y, x + w, y, rr); ctx.closePath()
+}
+const truncTxt = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s)
+
+/** Gráfico de barras (vertical/horizontal) → PNG base64 (sem prefixo). */
+function graficoBarrasPng(o: { titulo: string; labels: string[]; valores: number[]; cor?: string; horizontal?: boolean; sufixo?: string; larg?: number; alt?: number }): string {
+  const { titulo, labels, valores, cor = '#5b21b6', horizontal = false, sufixo = '', larg = 480, alt = 240 } = o
+  const S = 2
+  const cv = document.createElement('canvas'); cv.width = larg * S; cv.height = alt * S
+  const ctx = cv.getContext('2d')!; ctx.scale(S, S)
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, larg, alt)
+  ctx.fillStyle = '#5b21b6'; ctx.font = 'bold 15px Arial'; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(titulo, 16, 12)
+  const n = Math.max(1, labels.length), max = Math.max(1, ...valores)
+  const padL = horizontal ? 150 : 44, padR = 18, padT = 46, padB = horizontal ? 18 : 52
+  const w = larg - padL - padR, h = alt - padT - padB
+  if (horizontal) {
+    const bh = h / n
+    for (let i = 0; i < n; i++) {
+      const v = valores[i] ?? 0, bw = Math.max(2, (v / max) * w), y = padT + i * bh + bh * 0.18, bar = bh * 0.64
+      ctx.fillStyle = cor; roundRectPath(ctx, padL, y, bw, bar, 3); ctx.fill()
+      ctx.fillStyle = '#374151'; ctx.font = '11px Arial'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(truncTxt(labels[i] ?? '', 24), padL - 8, y + bar / 2)
+      ctx.textAlign = 'left'; ctx.font = 'bold 11px Arial'; ctx.fillText(`${v}${sufixo}`, padL + bw + 6, y + bar / 2)
+    }
+  } else {
+    ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(padL, padT + h); ctx.lineTo(padL + w, padT + h); ctx.stroke()
+    const bw = w / n
+    for (let i = 0; i < n; i++) {
+      const v = valores[i] ?? 0, barH = (v / max) * h, x = padL + i * bw + bw * 0.2, bar = bw * 0.6
+      ctx.fillStyle = cor; roundRectPath(ctx, x, padT + h - barH, bar, Math.max(1, barH), 3); ctx.fill()
+      ctx.fillStyle = '#374151'; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(`${v}${sufixo}`, x + bar / 2, padT + h - barH - 3)
+      ctx.font = '10px Arial'; ctx.textBaseline = 'top'; ctx.fillText(truncTxt(labels[i] ?? '', 12), x + bar / 2, padT + h + 5)
+    }
+  }
+  return cv.toDataURL('image/png').split(',')[1]
+}
+
+/** Gráfico de rosca (donut) com legenda → PNG base64 (sem prefixo). */
+function graficoRoscaPng(o: { titulo: string; labels: string[]; valores: number[]; cores: string[]; larg?: number; alt?: number }): string {
+  const { titulo, labels, valores, cores, larg = 420, alt = 240 } = o
+  const S = 2
+  const cv = document.createElement('canvas'); cv.width = larg * S; cv.height = alt * S
+  const ctx = cv.getContext('2d')!; ctx.scale(S, S)
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, larg, alt)
+  ctx.fillStyle = '#5b21b6'; ctx.font = 'bold 15px Arial'; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(titulo, 16, 12)
+  const total = valores.reduce((a, b) => a + b, 0) || 1
+  const cx = 90, cy = alt / 2 + 14, rOut = 68, rIn = 40
+  let ang = -Math.PI / 2
+  valores.forEach((v, i) => {
+    const a2 = ang + (v / total) * Math.PI * 2
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, rOut, ang, a2); ctx.closePath(); ctx.fillStyle = cores[i % cores.length]; ctx.fill(); ang = a2
+  })
+  ctx.beginPath(); ctx.arc(cx, cy, rIn, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill()
+  const lx = 178
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
+  labels.forEach((lb, i) => {
+    const y = 56 + i * 24
+    ctx.fillStyle = cores[i % cores.length]; roundRectPath(ctx, lx, y - 6, 12, 12, 3); ctx.fill()
+    ctx.fillStyle = '#374151'; ctx.font = '11px Arial'; ctx.fillText(`${truncTxt(lb, 16)}  ${valores[i]} (${Math.round((valores[i] / total) * 100)}%)`, lx + 18, y)
+  })
+  return cv.toDataURL('image/png').split(',')[1]
+}
+
 export type LinhaExportSimulado = {
   posicao: number
   nome: string
@@ -152,6 +219,20 @@ export function RelatorioSimuladoView({ d, print }: { d: DadosRelatorioSimulado;
       const tSub = wsD.addRow([`Relatório do simulado — ${tipoLabel}`]); tSub.getCell(1).font = { italic: true, color: { argb: 'FF777777' } }; wsD.mergeCells(tSub.number, 1, tSub.number, 5)
       const tDt = wsD.addRow([`Exportado em ${new Date().toLocaleString('pt-BR')}`]); tDt.getCell(1).font = { italic: true, size: 9, color: { argb: 'FF999999' } }; wsD.mergeCells(tDt.number, 1, tDt.number, 5)
 
+      // Faixa de KPIs (cartões coloridos) — visão rápida no topo.
+      wsD.addRow([])
+      const kpis = [
+        { v: d.totalSessoes, l: 'Estudantes', c: 'FFEDE9FE' },
+        { v: d.finalizadas, l: 'Finalizaram', c: 'FFDCFCE7' },
+        { v: nnum(d.notaMedia), l: 'Nota média', c: 'FFEDE9FE' },
+        { v: d.acertoMedio != null ? `${d.acertoMedio}%` : '—', l: 'Acerto médio', c: 'FFFEF3C7' },
+        { v: d.tempoMedioMin != null ? `${d.tempoMedioMin} min` : '—', l: 'Tempo médio', c: 'FFDBEAFE' },
+      ]
+      const rKv = wsD.addRow(kpis.map((k) => k.v)); rKv.height = 30
+      const rKl = wsD.addRow(kpis.map((k) => k.l)); rKl.height = 15
+      rKv.eachCell((c, col) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kpis[col - 1].c } }; c.font = { bold: true, size: 16, color: { argb: PURPLE } }; c.alignment = { horizontal: 'center', vertical: 'middle' }; c.border = { top: { style: 'thin', color: { argb: 'FFFFFFFF' } }, left: { style: 'thin', color: { argb: 'FFFFFFFF' } }, right: { style: 'thin', color: { argb: 'FFFFFFFF' } } } })
+      rKl.eachCell((c, col) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kpis[col - 1].c } }; c.font = { size: 9, color: { argb: GRAY } }; c.alignment = { horizontal: 'center', vertical: 'top' }; c.border = { bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } }, left: { style: 'thin', color: { argb: 'FFFFFFFF' } }, right: { style: 'thin', color: { argb: 'FFFFFFFF' } } } })
+
       secao('Resumo')
       thead(['Indicador', 'Valor'])
       linha(['Estudantes', d.totalSessoes])
@@ -204,6 +285,21 @@ export function RelatorioSimuladoView({ d, print }: { d: DadosRelatorioSimulado;
       secao('Ranking (Top 10)')
       thead(['Posição', 'Estudante', 'Nota', 'Acerto (%)', 'Tempo'])
       for (const rk of d.ranking.slice(0, 10)) linha([rk.pos, rk.nome, nnum(rk.nota), rk.acerto, rk.tempo], 4)
+
+      // ── Gráficos (imagens) na área à direita (coluna G+) — não sobrepõem as tabelas (A–E) ──
+      try {
+        const addImg = (b64: string, row: number, wpx: number, hpx: number, col = 6) => {
+          const id = wb.addImage({ base64: b64, extension: 'png' })
+          wsD.addImage(id, { tl: { col, row }, ext: { width: wpx, height: hpx } })
+        }
+        if (d.distribuicao.length) addImg(graficoBarrasPng({ titulo: 'Distribuição de notas', labels: d.distribuicao.map((x) => x.faixa), valores: d.distribuicao.map((x) => x.alunos), cor: '#7c3aed' }), 4, 480, 230)
+        if (d.porDisciplina.length) {
+          const hDisc = Math.min(320, 60 + d.porDisciplina.length * 24)
+          addImg(graficoBarrasPng({ titulo: 'Acerto por disciplina (%)', labels: d.porDisciplina.map((x) => x.nome), valores: d.porDisciplina.map((x) => x.pct), horizontal: true, sufixo: '%', cor: '#2563eb', alt: hDisc }), 21, 480, hDisc)
+        }
+        if (d.porClassificacao.length) addImg(graficoRoscaPng({ titulo: 'Por classificação', labels: d.porClassificacao.map((x) => x.label), valores: d.porClassificacao.map((x) => x.alunos), cores: ['#7c3aed', '#22c55e', '#f59e0b', '#38bdf8', '#f87171'] }), 43, 420, 240)
+        addImg(graficoBarrasPng({ titulo: 'Engajamento (alunos)', labels: ['Atribuídos', 'Acessaram', 'Finalizaram', 'Viram relat.', 'Baixaram'], valores: [eg.atribuidos, eg.acessaram, eg.finalizaram, eg.visualizaramRelatorio, eg.baixaramRelatorio], horizontal: true, cor: '#10b981' }), 61, 480, 220)
+      } catch { /* gráficos são um plus — se o canvas falhar, o Excel sai sem eles */ }
 
       // ── Aba 2: Análise por questão (base para a mentoria) ──
       const maxAlts = d.questoes.reduce((m, q) => Math.max(m, q.alternativas.length), 0)
