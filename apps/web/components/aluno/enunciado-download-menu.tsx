@@ -33,7 +33,7 @@ export function EnunciadoDownloadMenu({ url }: { url: string }) {
       >
         <MoreVertical className="h-4 w-4" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52">
+      <DropdownMenuContent align="start" className="w-52">
         <DropdownMenuItem onClick={baixar}>
           <FileDown className="mr-2 h-4 w-4" /> Baixar enunciado
         </DropdownMenuItem>
