@@ -295,8 +295,9 @@ async function _montarRelatorioSimulado(svc: SupabaseClient, simId: string, tena
     }
   }).sort((a, b) => a.ordem - b.ordem)
 
-  const faixas = [[0, 2], [2, 4], [4, 6], [6, 8], [8, 10.0001]]
-  const distribuicao = faixas.map(([lo, hi]) => ({ faixa: `${lo}–${hi === 10.0001 ? 10 : hi}`, alunos: notas.filter((n) => n >= lo && n < hi).length }))
+  // Histograma de notas na escala 0–100 (dezenas): 0–10, 10–20, …, 90–100.
+  const faixas: [number, number][] = Array.from({ length: 10 }, (_, i) => [i * 10, i === 9 ? 100.0001 : (i + 1) * 10])
+  const distribuicao = faixas.map(([lo, hi]) => ({ faixa: `${lo}–${hi === 100.0001 ? 100 : hi}`, alunos: notas.filter((n) => n >= lo && n < hi).length }))
 
   // Linhas por estudante (ordenadas por classificação).
   const finRows = finalizadas.map((s) => {

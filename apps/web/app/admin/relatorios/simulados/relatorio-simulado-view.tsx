@@ -245,6 +245,10 @@ export function RelatorioSimuladoView({ d, print }: { d: DadosRelatorioSimulado;
       linha(['Desvio-padrão', d.dispersao.desvio ?? '—'])
       linha(['Menor / maior nota', `${nnum(d.dispersao.min)} / ${nnum(d.dispersao.max)}`])
 
+      secao('Ranking (Top 10)')
+      thead(['Posição', 'Estudante', 'Nota', 'Acerto (%)', 'Tempo'])
+      for (const rk of d.ranking.slice(0, 10)) linha([rk.pos, rk.nome, nnum(rk.nota), rk.acerto, rk.tempo], 4)
+
       secao('Configuração de aplicação')
       thead(['Item', 'Valor'])
       linha(['Modo', d.config.modoLabel])
@@ -279,12 +283,9 @@ export function RelatorioSimuladoView({ d, print }: { d: DadosRelatorioSimulado;
       for (const x of d.porDisciplina) linha([x.nome, x.ac, x.tt, x.pct], 4)
 
       secao('Questões mais difíceis')
-      thead(['Questão', 'Taxa de acerto (%)'])
-      for (const x of [...d.porQuestao].sort((a, b) => a.pct - b.pct)) linha([x.rotulo, x.pct], 2)
-
-      secao('Ranking (Top 10)')
-      thead(['Posição', 'Estudante', 'Nota', 'Acerto (%)', 'Tempo'])
-      for (const rk of d.ranking.slice(0, 10)) linha([rk.pos, rk.nome, nnum(rk.nota), rk.acerto, rk.tempo], 4)
+      thead(['Questão', 'Disciplina', 'Taxa de acerto (%)'])
+      const discPorRotulo = new Map(d.questoes.map((q) => [`Q${q.ordem}`, q.disciplina]))
+      for (const x of [...d.porQuestao].sort((a, b) => a.pct - b.pct)) linha([x.rotulo, discPorRotulo.get(x.rotulo) ?? '—', x.pct], 3)
 
       // ── Gráficos (imagens) na área à direita (coluna G+) — não sobrepõem as tabelas (A–E) ──
       try {
