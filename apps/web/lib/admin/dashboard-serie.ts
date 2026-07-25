@@ -22,9 +22,12 @@ function intervalo(modo: 'semana' | 'mes', mes?: string) {
 }
 
 /**
- * Série diária para o dashboard: simulados INICIADOS (created_at) e FEITOS (finalizado_em, status
+ * Série diária para o dashboard: simulados INICIADOS (iniciado_em) e FEITOS (finalizado_em, status
  * finalizada) por dia, + ESTUDANTES ATIVOS (distintos que iniciaram algo no dia = "acessos"). Exclui
  * teste/deletado. Paginado (fetchAll). Dias sem atividade entram com zero (série sempre completa).
+ *
+ * ⚠️ Usa `iniciado_em` (data real do início), NÃO `created_at`: em sessões migradas/importadas o
+ * created_at é nulo ou a data da importação, então não reflete quando o aluno fez a prova.
  */
 export async function montarDashboardSerie(svc: any, tenantId: string, modo: 'semana' | 'mes', mes?: string): Promise<DashboardSerie> {
   const { inicio, fim, rotuloFmt, titulo } = intervalo(modo, mes)
@@ -32,9 +35,9 @@ export async function montarDashboardSerie(svc: any, tenantId: string, modo: 'se
   const inicioIso = inicio.toISOString(), fimIso = fim.toISOString()
 
   const [iniciadas, finalizadas] = await Promise.all([
-    fetchAll<{ estudante_id: string; created_at: string }>(() => svc.from('simulado_sessoes_prova')
-      .select('estudante_id, created_at').match(t).eq('deletado', false).eq('is_teste', false)
-      .gte('created_at', inicioIso).lt('created_at', fimIso).order('created_at', { ascending: true })),
+    fetchAll<{ estudante_id: string; iniciado_em: string }>(() => svc.from('simulado_sessoes_prova')
+      .select('estudante_id, iniciado_em').match(t).eq('deletado', false).eq('is_teste', false)
+      .gte('iniciado_em', inicioIso).lt('iniciado_em', fimIso).order('iniciado_em', { ascending: true })),
     fetchAll<{ finalizado_em: string }>(() => svc.from('simulado_sessoes_prova')
       .select('finalizado_em').match(t).eq('deletado', false).eq('is_teste', false).eq('status', 'finalizada')
       .gte('finalizado_em', inicioIso).lt('finalizado_em', fimIso).order('finalizado_em', { ascending: true })),
@@ -42,7 +45,7 @@ export async function montarDashboardSerie(svc: any, tenantId: string, modo: 'se
 
   const ini = new Map<string, number>(), ativos = new Map<string, Set<string>>(), feitos = new Map<string, number>()
   for (const s of iniciadas) {
-    const k = (s.created_at ?? '').slice(0, 10); if (!k) continue
+    const k = (s.iniciado_em ?? '').slice(0, 10); if (!k) continue
     ini.set(k, (ini.get(k) ?? 0) + 1)
     if (s.estudante_id) { const set = ativos.get(k) ?? new Set<string>(); set.add(s.estudante_id); ativos.set(k, set) }
   }

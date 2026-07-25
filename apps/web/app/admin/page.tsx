@@ -25,7 +25,7 @@ async function getDados(tenantId: string) {
     svc.from('simulado_questoes').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false),
     svc.from('simulado_simulados').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('status', 'publicado'),
     svc.from('simulado_estudantes').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false),
-    svc.from('simulado_sessoes_prova').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('is_teste', false).gte('created_at', hojeIso),
+    svc.from('simulado_sessoes_prova').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('is_teste', false).gte('iniciado_em', hojeIso),
     montarDashboardSerie(svc, tenantId, 'semana'),
     svc.from('simulado_simulados').select('id, titulo, status, modo_aplicacao, created_at').match(t).eq('deletado', false).order('created_at', { ascending: false }).limit(5),
     svc.from('simulado_sessoes_prova').select('nota').match(t).eq('deletado', false).eq('is_teste', false).eq('status', 'finalizada').not('nota', 'is', null).limit(20000),
