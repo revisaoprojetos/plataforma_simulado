@@ -11,14 +11,17 @@ export type DashboardSerie = {
   resumo: { iniciados: number; feitos: number; ativos: number }
 }
 
-/** Intervalo [inicio, fim) + rótulo do eixo conforme o modo. */
+/** Intervalo [inicio, fim) + rótulo do eixo conforme o modo. Nunca passa do dia de hoje (evita
+ *  cauda achatada de dias futuros no mês corrente). */
 function intervalo(modo: 'semana' | 'mes', mes?: string) {
+  const amanha = startOfDay(addDays(new Date(), 1)) // fim exclusivo = início de amanhã → inclui hoje
   if (modo === 'mes') {
     const base = mes ? parseISO(`${mes}-01T00:00:00`) : new Date()
     const inicio = startOfMonth(base)
-    return { inicio, fim: startOfMonth(addMonths(inicio, 1)), rotuloFmt: 'd', titulo: format(inicio, "MMMM 'de' yyyy", { locale: ptBR }) }
+    const fimMes = startOfMonth(addMonths(inicio, 1))
+    return { inicio, fim: fimMes < amanha ? fimMes : amanha, rotuloFmt: 'd', titulo: format(inicio, "MMMM 'de' yyyy", { locale: ptBR }) }
   }
-  return { inicio: startOfDay(subDays(new Date(), 6)), fim: startOfDay(addDays(new Date(), 1)), rotuloFmt: 'EEE', titulo: 'Últimos 7 dias' }
+  return { inicio: startOfDay(subDays(new Date(), 6)), fim: amanha, rotuloFmt: 'EEE', titulo: 'Últimos 7 dias' }
 }
 
 /**
