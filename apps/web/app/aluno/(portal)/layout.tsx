@@ -34,7 +34,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       <MonitorManutencao inicial={{ inicio: manut.inicio, avisos: manut.avisos }} />
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
-          <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} />
+          <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} logoEstilo={t.logo_estilo ?? 'arredondado'} logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'} />
           <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
             <AlunoTopbar nome={sessao.nome} email={sessao.email} />
             <Suspense fallback={null}><NavProgress /></Suspense>

@@ -25,7 +25,20 @@ const NAV = [
   { href: '/aluno/cadernos', label: 'Cadernos', icon: NotebookPen },
 ]
 
-export function AlunoSidebar({ logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff' }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string }) {
+/** Filtro CSS que força a logo a branco/preto — mesmo tratamento da sidebar do admin. */
+function filtroLogo(f?: string): string | undefined {
+  if (f === 'branco') return 'brightness(0) invert(1)'
+  if (f === 'preto') return 'brightness(0)'
+  return undefined
+}
+/** Moldura do quadro da logo conforme o estilo — igual ao admin. */
+function frameLogo(estilo?: string): string {
+  if (estilo === 'quadrado') return 'rounded-none'
+  if (estilo === 'borda') return 'rounded-lg border'
+  return 'rounded-lg'
+}
+
+export function AlunoSidebar({ logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none' }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string }) {
   const pathname = usePathname()
   const ativo = (n: (typeof NAV)[number]) => (n.exact ? pathname === n.href : pathname.startsWith(n.href))
   const nav = NAV.filter((n) => !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(n.href)))
@@ -34,10 +47,10 @@ export function AlunoSidebar({ logo, nome = 'Área do Aluno', subtitulo, logoBg 
     <Sidebar className="border-sidebar-border">
       <SidebarHeader className="flex h-14 flex-row items-center border-b border-sidebar-border px-4">
         <Link href="/aluno" className="flex min-w-0 items-center gap-2">
-          <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg', !logo && 'bg-primary text-primary-foreground')} style={logo ? { background: logoBg } : undefined}>
+          <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden', frameLogo(logoEstilo), !logo && 'bg-primary text-primary-foreground')} style={logo ? { background: logoBg } : undefined}>
             {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logo} alt={nome} className="h-full w-full object-contain" />
+              <img src={logo} alt={nome} className="h-full w-full object-contain" style={{ filter: filtroLogo(logoFiltro) }} />
             ) : (
               <GraduationCap className="h-4 w-4" />
             )}
