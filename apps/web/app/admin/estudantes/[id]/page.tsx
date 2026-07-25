@@ -12,6 +12,7 @@ import { type SessaoRow } from '@/components/admin/historico-estudante'
 import { SimuladosFeitosCards } from '@/components/admin/simulados-feitos-cards'
 import { HistoricoSimples } from '@/components/admin/historico-simples'
 import { BancosVinculadosPopup } from '@/components/admin/bancos-vinculados-popup'
+import { GruposVinculadosPopup } from '@/components/admin/grupos-vinculados-popup'
 import { SimuladosPendentesCard } from '@/components/admin/simulados-pendentes-card'
 import { EditarEstudanteButton } from '@/components/admin/editar-estudante-button'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
@@ -92,6 +93,22 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
     const ids = pe.map((p: any) => p.pasta_id)
     const { data } = await svc.from('simulado_pastas').select('id, nome').in('id', ids)
     bancos = (data ?? []) as any
+  }
+
+  // Grupos vinculados (de que o aluno é membro) — grupos comuns, sem pastas mestres. Tolerante ao schema.
+  let grupos: { id: string; nome: string; cor: string | null }[] = []
+  {
+    const { data: gm, error: gmErr } = await svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', id)
+    if (!gmErr && gm?.length) {
+      const gids = [...new Set(gm.map((r: any) => r.grupo_id).filter(Boolean))]
+      const sel = (cols: string) => svc.from('simulado_grupos').select(cols).in('id', gids).eq('deletado', false)
+      let r = await sel('id, nome, cor, is_mestre')
+      if (r.error) r = await sel('id, nome')
+      grupos = (r.data ?? [])
+        .filter((g: any) => !g.is_mestre)
+        .map((g: any) => ({ id: g.id, nome: g.nome, cor: g.cor ?? null }))
+        .sort((a: any, b: any) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    }
   }
 
   const classLabel = est.classificacao === 'vitalicio' ? 'Vitalício' : est.classificacao === 'passaporte' ? 'Passaporte' : est.classificacao === 'normal' ? 'Normal' : (est.classificacao ?? '—')
@@ -325,6 +342,7 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
         </div>
         <div className="space-y-4">
           <BancosVinculadosPopup bancos={bancos} />
+          <GruposVinculadosPopup grupos={grupos} />
           <HistoricoSimples rows={rows} estudanteId={id} />
         </div>
       </div>

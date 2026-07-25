@@ -77,5 +77,28 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
   }
   const grupos = gruposRaw.map((x) => ({ id: x.id, nome: x.nome, cor: x.cor, membros: contMembros.get(x.id) ?? 0, vinculado: vinculadosSet.has(x.id), pai_id: x.pai_id, is_mestre: x.is_mestre }))
 
-  return <BancoEstudantesClient bancoId={bancoId} vinculados={vinculados as any} alunos={alunos as any} grupos={grupos} cor={cor} />
+  // Grupo(s) pelo(s) qual(is) cada aluno chegou a este banco: grupos vinculados ao banco
+  // (simulado_pasta_grupos) de que o aluno é membro (simulado_grupo_membros). Sem grupo = vínculo direto.
+  const linkedGroupIds = [...vinculadosSet]
+  const infoGrupo = new Map<string, { id: string; nome: string; cor: string | null }>(
+    gruposRaw.map((x) => [x.id, { id: x.id, nome: x.nome, cor: x.cor ?? null }]),
+  )
+  const gruposPorEstudante: Record<string, { id: string; nome: string; cor: string | null }[]> = {}
+  if (linkedGroupIds.length) {
+    const gm2 = await fetchAll<{ grupo_id: string; estudante_id: string }>(() =>
+      svc.from('simulado_grupo_membros').select('grupo_id, estudante_id').in('grupo_id', linkedGroupIds).order('id', { ascending: true }))
+    const jaTem: Record<string, Set<string>> = {}
+    for (const m of gm2) {
+      if (!vincSet.has(m.estudante_id)) continue
+      const g = infoGrupo.get(m.grupo_id)
+      if (!g) continue
+      const seen = (jaTem[m.estudante_id] ??= new Set())
+      if (seen.has(g.id)) continue
+      seen.add(g.id)
+      ;(gruposPorEstudante[m.estudante_id] ??= []).push(g)
+    }
+    for (const k of Object.keys(gruposPorEstudante)) gruposPorEstudante[k].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }
+
+  return <BancoEstudantesClient bancoId={bancoId} vinculados={vinculados as any} alunos={alunos as any} grupos={grupos} gruposPorEstudante={gruposPorEstudante} cor={cor} />
 }

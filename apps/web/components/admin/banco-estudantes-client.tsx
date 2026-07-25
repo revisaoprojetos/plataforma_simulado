@@ -45,7 +45,8 @@ function fmtAcesso(d?: string | null) {
   return `${dt.toLocaleDateString('pt-BR')} ${dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = [], cor = '#6d28d9' }: { bancoId: string; vinculados: Aluno[]; alunos: AlunoSel[]; grupos?: GrupoOpc[]; cor?: string }) {
+type GrupoVinc = { id: string; nome: string; cor: string | null }
+export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = [], gruposPorEstudante = {}, cor = '#6d28d9' }: { bancoId: string; vinculados: Aluno[]; alunos: AlunoSel[]; grupos?: GrupoOpc[]; gruposPorEstudante?: Record<string, GrupoVinc[]>; cor?: string }) {
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
@@ -133,13 +134,14 @@ export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = []
                 <SortHead label="Nome" campo="nome" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenar} />
                 <SortHead label="E-mail" campo="email" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenar} />
                 <SortHead label="Documento" campo="cpf" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenar} />
+                <TableHead>Grupo</TableHead>
                 <SortHead label="Último acesso" campo="ultimo_acesso" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenar} />
                 <TableHead className="w-16 text-center">Perfil</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtrados.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Nenhum aluno vinculado. Clique em “Adicionar estudantes”.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">Nenhum aluno vinculado. Clique em “Adicionar estudantes”.</TableCell></TableRow>
               ) : (
                 filtrados.map((a) => {
                   const on = sel.has(a.id)
@@ -163,6 +165,21 @@ export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = []
                       </TableCell>
                       <TableCell className="text-muted-foreground">{a.email ?? '—'}</TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">{a.cpf ?? '—'}</TableCell>
+                      <TableCell>
+                        {(gruposPorEstudante[a.id] ?? []).length ? (
+                          <div className="flex flex-wrap gap-1">
+                            {(gruposPorEstudante[a.id] ?? []).map((g) => (
+                              <Link key={g.id} href={`/admin/grupos/${g.id}`} title={g.nome}
+                                className="inline-flex max-w-[160px] items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors hover:border-primary hover:bg-primary/5">
+                                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: g.cor ?? 'var(--muted-foreground)' }} />
+                                <span className="truncate">{g.nome}</span>
+                              </Link>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground" title="Adicionado diretamente ao banco (sem grupo)">Direto</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{fmtAcesso(a.ultimo_acesso)}</TableCell>
                       <TableCell className="text-center">
                         <Link href={`/admin/estudantes/${a.id}`} className="inline-flex text-muted-foreground hover:text-primary" title="Ver perfil">
