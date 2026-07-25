@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Radio, Play, RotateCcw, Clock, CalendarClock, Hourglass, CircleCheck, Infinity as InfinityIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
+import { EnunciadoDownloadMenu } from '@/components/aluno/enunciado-download-menu'
 import type { ItemSimulado } from '@/lib/aluno/simulado-item'
 
 // "emerald" = simulado disponível para o aluno (dentro da janela). Ícone neutro (não "ao vivo").
@@ -38,7 +39,13 @@ export function CardSimulado({ s }: { s: ItemSimulado }) {
       {s.novo && <FitaNovo />}
       {(s.podeFazer || s.podeAguardar) && <Link href={`/simulado/${s.embed_token}`} className="absolute inset-0 z-10" aria-label={s.titulo} />}
 
-      <span className="pointer-events-none absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: cor }}><BancoIcon className="h-4 w-4" /></span>
+      {/* Canto superior esquerdo: menu de 3 pontos (baixar enunciado) no lugar do antigo ícone.
+          Só aparece quando há Enunciado de Questões (PDF importado) para baixar. */}
+      {s.enunciadoUrl && (
+        <div className="absolute left-3 top-3 z-30">
+          <EnunciadoDownloadMenu url={s.enunciadoUrl} />
+        </div>
+      )}
       <span className={cn('pointer-events-none absolute right-3 z-20 inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur', s.novo ? 'top-11' : 'top-3')}>
         <StatusIcon className="h-3.5 w-3.5" />
         {s.statusLabel}

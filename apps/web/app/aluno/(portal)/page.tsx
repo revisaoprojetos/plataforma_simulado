@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
+import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
 import { CardSimulado } from '@/components/aluno/card-simulado'
 import { FileiraHorizontal } from '@/components/fileira-horizontal'
 import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
@@ -73,6 +74,10 @@ export default async function AlunoHome() {
     // Ordem de lançamento: mais recente → mais antigo.
     .sort((a, b) => dataLancamento(b) - dataLancamento(a))
 
+  // Enunciado de Questões (PDF importado) por simulado → botão de 3 pontos no card baixa antes de iniciar.
+  const enunUrls = await resolverEnunciadoUrls(svc, disponiveis.map((i) => ({ id: i.id, regras: i.regras })))
+  const disponiveisCom = disponiveis.map((i) => ({ ...i, enunciadoUrl: enunUrls.get(i.id) ?? null }))
+
   const atalhos = [
     { href: '/aluno/recomendado', icon: Sparkles, titulo: 'Recomendado', desc: 'Questões focadas nos seus pontos fracos' },
     { href: '/aluno/simulado', icon: Radio, titulo: 'Simulados', desc: 'Faça os simulados liberados para você' },
@@ -138,7 +143,7 @@ export default async function AlunoHome() {
             <Link href="/aluno/simulado" className="text-xs font-medium text-primary hover:underline">Ver todos</Link>
           </div>
           <FileiraHorizontal>
-            {disponiveis.map((s) => (
+            {disponiveisCom.map((s) => (
               <div key={s.id} className={FILEIRA_BASIS}><CardSimulado s={s} /></div>
             ))}
           </FileiraHorizontal>

@@ -25,6 +25,9 @@ export async function POST(req: NextRequest) {
   const file = form.get('file')
   const cadernoId = String(form.get('cadernoId') ?? '')
   const bancoId = String(form.get('bancoId') ?? '')
+  // slot: 'material' = Gabarito Comentado (padrão) | 'enunciado' = Enunciado de Questões (2º PDF).
+  const slot = String(form.get('slot') ?? 'material') === 'enunciado' ? 'enunciado' : 'material'
+  const configKey = slot === 'enunciado' ? 'material_enunciado' : 'material'
   if (!(file instanceof File) || !cadernoId) return NextResponse.json({ ok: false, error: 'Dados incompletos.' }, { status: 400 })
   if (file.size > 8 * 1024 * 1024) return NextResponse.json({ ok: false, error: 'PDF muito grande (máx. ~8 MB).' }, { status: 400 })
 
@@ -38,7 +41,8 @@ export async function POST(req: NextRequest) {
   if (!cad) return NextResponse.json({ ok: false, error: 'Caderno não encontrado.' }, { status: 404 })
 
   const hash = createHash('sha1').update(buf).digest('hex').slice(0, 10)
-  const path = `materiais/${access.tenantId}/${cadernoId}-${hash}.pdf`
+  const suf = slot === 'enunciado' ? 'enunciado-' : ''
+  const path = `materiais/${access.tenantId}/${cadernoId}-${suf}${hash}.pdf`
   try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
   let { error: upErr } = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true })
   if (upErr && /bucket.*not.*found/i.test(upErr.message)) {
@@ -48,13 +52,14 @@ export async function POST(req: NextRequest) {
   if (upErr) return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 })
   const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
 
-  const nome = ((file.name || 'Material completo').replace(/\.pdf$/i, '').trim()) || 'Material completo'
+  const padrao = slot === 'enunciado' ? 'Enunciado de Questões' : 'Material completo'
+  const nome = ((file.name || padrao).replace(/\.pdf$/i, '').trim()) || padrao
   const config = (cad.config ?? {}) as Record<string, unknown>
   const material = { fonte: 'pdf', pdfUrl: url, pdfNome: nome }
-  const { error } = await svc.from('simulado_cadernos_designer').update({ config: { ...config, material } }).eq('id', cadernoId).eq('tenant_id', access.tenantId)
+  const { error } = await svc.from('simulado_cadernos_designer').update({ config: { ...config, [configKey]: material } }).eq('id', cadernoId).eq('tenant_id', access.tenantId)
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 
-  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: cadernoId, depois: { material_pdf: nome } })
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: cadernoId, depois: { [`${configKey}_pdf`]: nome } })
   if (bancoId) revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return NextResponse.json({ ok: true, url, nome })
 }

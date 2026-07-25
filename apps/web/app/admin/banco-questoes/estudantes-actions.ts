@@ -396,16 +396,17 @@ export async function subirMaterialPdf(cadernoId: string, bancoId: string, dataU
 }
 
 /** Remove o PDF importado e volta a mostrar o caderno gerado pelo sistema. */
-export async function removerMaterialPdf(cadernoId: string, bancoId: string): Promise<{ ok: boolean; error?: string }> {
+export async function removerMaterialPdf(cadernoId: string, bancoId: string, slot: 'material' | 'enunciado' = 'material'): Promise<{ ok: boolean; error?: string }> {
   const g = await guard()
   if (!g.ok) return g
   const svc = createAdminClient()
   const { config, existe } = await lerConfigCaderno(svc, cadernoId, g.tenantId)
   if (!existe) return { ok: false, error: 'Caderno não encontrado.' }
+  const configKey = slot === 'enunciado' ? 'material_enunciado' : 'material'
   const material = { fonte: 'sistema', pdfUrl: '', pdfNome: '' }
-  const { error } = await svc.from('simulado_cadernos_designer').update({ config: { ...config, material } }).eq('id', cadernoId).eq('tenant_id', g.tenantId)
+  const { error } = await svc.from('simulado_cadernos_designer').update({ config: { ...config, [configKey]: material } }).eq('id', cadernoId).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
-  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: cadernoId, depois: { material_pdf: null } })
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: cadernoId, depois: { [`${configKey}_pdf`]: null } })
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return { ok: true }
 }

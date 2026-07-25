@@ -4,6 +4,7 @@ import { Radio } from 'lucide-react'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
 import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
+import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
 import { SimuladosCatalogoAluno } from '@/components/aluno/simulados-catalogo-aluno'
 
 export default async function SimuladoDisponivelPage() {
@@ -42,7 +43,9 @@ export default async function SimuladoDisponivelPage() {
 
   // Grupo (pasta is_folder do banco) de cada simulado → fileiras do catálogo.
   const { grupoPorSim, grupos } = await resolverGruposCatalogo(svc, itens.map((i) => ({ id: i.id, regras: i.regras })))
-  const itensCat = itens.map((i) => ({ ...i, grupoId: grupoPorSim.get(i.id) ?? null }))
+  // Enunciado de Questões (PDF importado) → botão de 3 pontos no card baixa antes de iniciar.
+  const enunUrls = await resolverEnunciadoUrls(svc, itens.map((i) => ({ id: i.id, regras: i.regras })))
+  const itensCat = itens.map((i) => ({ ...i, grupoId: grupoPorSim.get(i.id) ?? null, enunciadoUrl: enunUrls.get(i.id) ?? null }))
 
   if (itens.length === 0) {
     return (

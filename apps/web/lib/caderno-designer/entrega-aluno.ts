@@ -1,5 +1,5 @@
 import { mesclarModalidades } from './types'
-import { enunciadoPdf } from './material'
+import { enunciadoPdf, enunciadoQuestoesPdf } from './material'
 import { filtrarModsPorTipo, type TipoSimulado } from '@/lib/simulado/tipo'
 
 export interface ModalidadeAluno {
@@ -29,6 +29,9 @@ const temConteudo = (d: any) =>
 export function modalidadesDoAluno(config: unknown, tipo: TipoSimulado | null): ModalidadeAluno[] {
   const cfg = (config ?? {}) as any
   const docs = (cfg.docsV2 ?? {}) as Record<string, unknown>
+  // Enunciado de Questões importado: quando existe, SUBSTITUI o "Caderno de Questões" gerado
+  // (o aluno baixa este PDF direto — antes de iniciar e na lista de materiais).
+  const enun = enunciadoQuestoesPdf(cfg)
 
   const sistema = filtrarModsPorTipo(mesclarModalidades(cfg.modalidadesV2), tipo)
     // "Caderno Completo" (id caderno_completo) foi descontinuado para o aluno.
@@ -36,12 +39,17 @@ export function modalidadesDoAluno(config: unknown, tipo: TipoSimulado | null): 
     // "Caderno de questões" (caderno_perguntas) é entrega-padrão mesmo sem doc próprio;
     // as demais só aparecem se tiverem conteúdo desenhado.
     .filter((m) => temConteudo(docs[m.id]) || m.id === 'caderno_perguntas')
-    .map((m): ModalidadeAluno => ({
-      id: m.id,
-      nome: m.nome,
-      semGab: m.id !== 'diagnostico',       // diagnóstico depende do resultado → só ao liberar
-      comGab: m.id !== 'caderno_perguntas', // caderno de questões não tem versão com gabarito
-    }))
+    .map((m): ModalidadeAluno => {
+      const base: ModalidadeAluno = {
+        id: m.id,
+        nome: m.nome,
+        semGab: m.id !== 'diagnostico',       // diagnóstico depende do resultado → só ao liberar
+        comGab: m.id !== 'caderno_perguntas', // caderno de questões não tem versão com gabarito
+      }
+      // Caderno de Questões + Enunciado importado → entrega o PDF importado no lugar do gerado.
+      if (m.id === 'caderno_perguntas' && enun) return { ...base, nome: enun.nome, pdfUrl: enun.url }
+      return base
+    })
 
   const pdf = enunciadoPdf(cfg)
   const enunciado: ModalidadeAluno[] = pdf

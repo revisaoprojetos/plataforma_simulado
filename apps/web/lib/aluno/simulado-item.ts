@@ -40,6 +40,8 @@ export type ItemSimulado = {
   /** aberto (criado) há menos de 1 dia → mostra a fita "novo". */
   novo: boolean
   vis: VisualSim | null
+  /** URL de download do "Enunciado de Questões" (2º PDF importado), se houver. Resolvido à parte. */
+  enunciadoUrl?: string | null
 }
 
 /**

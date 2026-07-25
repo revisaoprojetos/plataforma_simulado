@@ -1,0 +1,43 @@
+'use client'
+
+import { MoreVertical, FileDown } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+
+/**
+ * Menu de 3 pontos no card do simulado — permite ao aluno baixar o "Enunciado de Questões"
+ * (PDF importado) ANTES de iniciar. Só é renderizado quando há URL (o card gate isso).
+ * Fica ACIMA do link do card (z-20 + pointer-events-auto) para não navegar ao clicar.
+ */
+export function EnunciadoDownloadMenu({ url }: { url: string }) {
+  function baixar() {
+    // A URL já vem com ?download=<nome>.pdf → o navegador baixa direto (sem abrir inline).
+    const a = document.createElement('a')
+    a.href = url
+    a.rel = 'noopener'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  }
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        onClick={(e) => e.stopPropagation()}
+        title="Mais opções"
+        aria-label="Mais opções"
+        className="pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black/45 text-white shadow-sm ring-1 ring-white/20 outline-none backdrop-blur transition-colors hover:bg-black/65 focus-visible:ring-2 focus-visible:ring-white/60"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuItem onClick={baixar}>
+          <FileDown className="mr-2 h-4 w-4" /> Baixar enunciado
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}

@@ -42,3 +42,27 @@ export function enunciadoPdf(config: unknown): { url: string; nome: string } | n
   const sep = m.pdfUrl.includes('?') ? '&' : '?'
   return { url: `${m.pdfUrl}${sep}download=${encodeURIComponent(arq)}.pdf`, nome: 'Gabarito Comentado' }
 }
+
+/** Lê `config.material_enunciado` — 2º PDF importado = "Enunciado de Questões" (só as questões). */
+export function materialEnunciadoDoConfig(config: unknown): MaterialCaderno {
+  const m = (config as any)?.material_enunciado
+  if (!m || typeof m !== 'object') return { ...MATERIAL_PADRAO }
+  return {
+    fonte: m.fonte === 'pdf' ? 'pdf' : 'sistema',
+    pdfUrl: typeof m.pdfUrl === 'string' ? m.pdfUrl : '',
+    pdfNome: typeof m.pdfNome === 'string' ? m.pdfNome : '',
+  }
+}
+
+/**
+ * "Enunciado de Questões" do aluno = 2º PDF importado (só as questões, SEM gabarito). Diferente do
+ * Gabarito Comentado, fica disponível ANTES de iniciar (download no card do simulado). O `url` já
+ * vem com `?download=<nome>.pdf` (mesmo padrão do Gabarito Comentado). Some quando não há PDF.
+ */
+export function enunciadoQuestoesPdf(config: unknown): { url: string; nome: string } | null {
+  const m = materialEnunciadoDoConfig(config)
+  if (!m.pdfUrl) return null
+  const arq = (m.pdfNome || 'Enunciado de Questões').replace(/\.pdf$/i, '').trim() || 'Enunciado de Questões'
+  const sep = m.pdfUrl.includes('?') ? '&' : '?'
+  return { url: `${m.pdfUrl}${sep}download=${encodeURIComponent(arq)}.pdf`, nome: 'Enunciado de Questões' }
+}
