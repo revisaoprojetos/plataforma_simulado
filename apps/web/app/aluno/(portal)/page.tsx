@@ -7,9 +7,12 @@ import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
 import { CardSimulado } from '@/components/aluno/card-simulado'
+import { FileiraHorizontal } from '@/components/fileira-horizontal'
 import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
 
 const notaTone = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
+// Largura de cada card na fileira do catálogo (deixa espiar um pedaço do próximo).
+const FILEIRA_BASIS = 'shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-3rem)/4.3)] xl:basis-[calc((100%-4rem)/5.3)]'
 
 export default async function AlunoHome() {
   const sessao = await getSessaoAluno()
@@ -63,9 +66,12 @@ export default async function AlunoHome() {
   // os já feitos — mesmo que permitam retentativa — ficam em "Ver todos".
   const feitosSet = new Set(simuladosFeitos)
   const visual = await resolverVisualSimulados(svc, sims.map((s: any) => ({ id: s.id, regras: s.regras })))
+  const dataLancamento = (i: any) => new Date(i.regras?.publicado_em ?? i.created_at ?? 0).getTime()
   const disponiveis = montarItensSimulado(sims, sessoesPorSim, expiraPorSim, visual)
     .filter((i) => i.podeFazer || i.emAndamento || i.statusLabel === 'Agendado')
     .filter((i) => !feitosSet.has(i.id))
+    // Ordem de lançamento: mais recente → mais antigo.
+    .sort((a, b) => dataLancamento(b) - dataLancamento(a))
 
   const atalhos = [
     { href: '/aluno/recomendado', icon: Sparkles, titulo: 'Recomendado', desc: 'Questões focadas nos seus pontos fracos' },
@@ -131,9 +137,11 @@ export default async function AlunoHome() {
             <h2 className="flex items-center gap-2 text-sm font-semibold"><Play className="h-4 w-4 text-primary" /> Simulados disponíveis</h2>
             <Link href="/aluno/simulado" className="text-xs font-medium text-primary hover:underline">Ver todos</Link>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {disponiveis.slice(0, 10).map((s) => <CardSimulado key={s.id} s={s} />)}
-          </div>
+          <FileiraHorizontal>
+            {disponiveis.map((s) => (
+              <div key={s.id} className={FILEIRA_BASIS}><CardSimulado s={s} /></div>
+            ))}
+          </FileiraHorizontal>
         </section>
       )}
     </div>
