@@ -26,7 +26,7 @@ export default async function LoginPage() {
     loginLayout: (t.tema?.login_layout === 'centralizado' ? 'centralizado' : 'painel') as 'painel' | 'centralizado',
     logoBg: (t.tema?.logo_png_bg as string) ?? '#ffffff',
     logoEstilo: (t.tema?.logo_estilo as string) ?? 'arredondado',
-    logoFiltro: (t.tema?.logo_filtro as string) ?? 'none',
+    logoFiltro: (t.tema?.logo_filtro_login as string) ?? (t.tema?.logo_filtro as string) ?? 'none',
     selecao: t.tema?.login_selecao !== false,
     cor: t.tema?.cor_primaria ?? null,
     modoPadrao: t.tema?.modo_padrao === 'dark' ? 'dark' : 'light',

@@ -90,7 +90,7 @@ function derivarEscuro(c: Cores): Cores {
 interface Tema {
   nome_site: string; subtitulo_site: string; titulo_pagina: string
   logo_url: string | null; logo_grande_url: string | null; logo_selecao_url: string | null
-  logo_png_bg: string; logo_estilo: LogoEstilo; logo_filtro: LogoFiltro; logo_selecao_estilo: SelecaoEstilo
+  logo_png_bg: string; logo_estilo: LogoEstilo; logo_filtro_login: LogoFiltro; logo_filtro_sistema: LogoFiltro; logo_selecao_estilo: SelecaoEstilo
   login_layout: LoginLayout   // layout da tela de login da plataforma
   login_selecao: boolean      // mostrar a tela de seleção de plataforma antes do login
   cores: Cores        // paleta do modo CLARO
@@ -136,7 +136,8 @@ const DEFAULT: Tema = {
   logo_selecao_url: null,
   logo_png_bg: '#ffffff',
   logo_estilo: 'arredondado',
-  logo_filtro: 'none',
+  logo_filtro_login: 'none',
+  logo_filtro_sistema: 'none',
   logo_selecao_estilo: 'redonda',
   login_layout: 'painel',
   login_selecao: true,
@@ -291,7 +292,8 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
     logo_selecao_url: tema?.logo_selecao_url ?? null,
     logo_png_bg: tema?.logo_png_bg ?? DEFAULT.logo_png_bg,
     logo_estilo: (tema?.logo_estilo as LogoEstilo) ?? DEFAULT.logo_estilo,
-    logo_filtro: (tema?.logo_filtro as LogoFiltro) ?? DEFAULT.logo_filtro,
+    logo_filtro_login: (tema?.logo_filtro_login as LogoFiltro) ?? (tema?.logo_filtro as LogoFiltro) ?? DEFAULT.logo_filtro_login,
+    logo_filtro_sistema: (tema?.logo_filtro_sistema as LogoFiltro) ?? (tema?.logo_filtro as LogoFiltro) ?? DEFAULT.logo_filtro_sistema,
     logo_selecao_estilo: (tema?.logo_selecao_estilo as SelecaoEstilo) ?? DEFAULT.logo_selecao_estilo,
     login_layout: (tema?.login_layout === 'centralizado' ? 'centralizado' : 'painel'),
     login_selecao: tema?.login_selecao !== false,
@@ -525,9 +527,9 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
                 <div className="space-y-1.5"><span className="text-xs text-muted-foreground">Borda</span>
                   <div className="flex gap-1.5">{LOGO_ESTILOS.map((e) => (<button key={e.id} type="button" onClick={() => setT((p) => ({ ...p, logo_estilo: e.id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_estilo === e.id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{e.nome}</button>))}</div>
                 </div>
-                <div className="space-y-1.5"><span className="text-xs text-muted-foreground">Gama (recolorir a logo)</span>
-                  <div className="flex gap-1.5">{(([['none', 'Normal'], ['branco', 'Branca'], ['preto', 'Preta']]) as [LogoFiltro, string][]).map(([id, nome]) => (<button key={id} type="button" onClick={() => setT((p) => ({ ...p, logo_filtro: id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_filtro === id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{nome}</button>))}</div>
-                  <p className="text-[10px] text-muted-foreground">Força a logo a branco/preto — útil quando ela some na sidebar escura/clara.</p>
+                <div className="space-y-1.5"><span className="text-xs text-muted-foreground">Gama da logo no login</span>
+                  <div className="flex gap-1.5">{(([['none', 'Normal'], ['branco', 'Branca'], ['preto', 'Preta']]) as [LogoFiltro, string][]).map(([id, nome]) => (<button key={id} type="button" onClick={() => setT((p) => ({ ...p, logo_filtro_login: id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_filtro_login === id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{nome}</button>))}</div>
+                  <p className="text-[10px] text-muted-foreground">Recolore a logo só na tela de login — independente da logo dentro do sistema.</p>
                 </div>
               </div>
             )}
@@ -570,9 +572,9 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
             <div className="space-y-2.5">
               {SIDEBAR_CAMPOS.map(([k, label]) => (<Field key={k} label={label}><ColorControl value={c[k]} onChange={(v) => setCor(k, v)} /></Field>))}
             </div>
-            <div className="space-y-1.5 border-t pt-3"><span className="text-xs text-muted-foreground">Gama do ícone (logo)</span>
-              <div className="flex gap-1.5">{(([['none', 'Normal'], ['branco', 'Branca'], ['preto', 'Preta']]) as [LogoFiltro, string][]).map(([id, nome]) => (<button key={id} type="button" onClick={() => setT((p) => ({ ...p, logo_filtro: id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_filtro === id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{nome}</button>))}</div>
-              <p className="text-[10px] text-muted-foreground">A topbar usa o “Fundo da topbar” acima; os ícones dela seguem a cor dos ícones da sidebar.</p>
+            <div className="space-y-1.5 border-t pt-3"><span className="text-xs text-muted-foreground">Gama da logo no sistema (sidebar/topo)</span>
+              <div className="flex gap-1.5">{(([['none', 'Normal'], ['branco', 'Branca'], ['preto', 'Preta']]) as [LogoFiltro, string][]).map(([id, nome]) => (<button key={id} type="button" onClick={() => setT((p) => ({ ...p, logo_filtro_sistema: id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_filtro_sistema === id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{nome}</button>))}</div>
+              <p className="text-[10px] text-muted-foreground">Recolore a logo só dentro do sistema (sidebar e topo) — independente da tela de login.</p>
             </div>
           </Secao>
 
@@ -703,7 +705,7 @@ function PreviewLogin({ t, cores, dark }: { t: Tema; cores: Cores; dark: boolean
         <div className="w-[248px] rounded-2xl border p-6 shadow-xl" style={{ background: dark ? '#15151c' : '#ffffff', borderColor: border }}>
           <div className="mb-4 flex flex-col items-center gap-2 text-center">
             <span className={`flex h-16 w-16 items-center justify-center overflow-hidden text-2xl font-bold ${semFundo ? '' : frameLogo(t.logo_estilo)}`} style={{ background: semFundo ? 'transparent' : t.logo_png_bg, color: contraste(c.btn) }}>
-              {smallLogo ? <img src={smallLogo} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogoCss(t.logo_filtro) }} /> : (t.nome_site[0] ?? 'P').toUpperCase()}
+              {smallLogo ? <img src={smallLogo} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogoCss(t.logo_filtro_login) }} /> : (t.nome_site[0] ?? 'P').toUpperCase()}
             </span>
             <p className="text-[13px] font-semibold">{t.nome_site}</p>
           </div>
@@ -773,7 +775,7 @@ function Preview({ t, cores }: { t: Tema; cores: Cores }) {
       <div className="flex w-[180px] shrink-0 flex-col" style={{ background: c.sidebar, borderRight: `1px solid ${c.sborder}` }}>
         <div className="flex items-center gap-2 px-3 py-3" style={{ borderBottom: `1px solid ${c.sborder}` }}>
           <span className={`flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden text-[11px] font-bold ${frameLogo(t.logo_estilo)}`} style={{ background: t.logo_url ? t.logo_png_bg : c.btn, color: contraste(t.logo_url ? t.logo_png_bg : c.btn), borderColor: c.cborder }}>
-            {t.logo_url ? <img src={t.logo_url} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogoCss(t.logo_filtro) }} /> : (t.nome_site[0] ?? 'P').toUpperCase()}
+            {t.logo_url ? <img src={t.logo_url} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogoCss(t.logo_filtro_sistema) }} /> : (t.nome_site[0] ?? 'P').toUpperCase()}
           </span>
           <span className="flex min-w-0 flex-col leading-tight">
             <span className="truncate font-semibold" style={{ color: c.sidetext }}>{t.nome_site}</span>
