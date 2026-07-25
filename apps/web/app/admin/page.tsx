@@ -1,25 +1,24 @@
 import Link from 'next/link'
-import { subDays, format, startOfDay } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { startOfDay } from 'date-fns'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { Card, CardContent } from '@/components/ui/card'
 import { BookOpen, ClipboardList, Users, Activity, Trophy, ArrowRight, Plus } from 'lucide-react'
-import { Colunas } from '@/components/admin/relatorios/viz'
 import { SecaoHeader } from '@/components/admin/secao-header'
+import { montarDashboardSerie } from '@/lib/admin/dashboard-serie'
+import { DashboardCharts } from '@/components/admin/dashboard-charts'
 
 async function getDados(tenantId: string) {
   const svc = await createServiceClient()
   const t = { tenant_id: tenantId }
   const hojeIso = startOfDay(new Date()).toISOString()
-  const inicio7 = startOfDay(subDays(new Date(), 6)).toISOString()
 
   const [
     { count: totalQuestoes },
     { count: totalSimulados },
     { count: totalEstudantes },
     { count: sessoesHoje },
-    { data: sess7 },
+    serieInicial,
     { data: recentes },
     { data: notasData },
   ] = await Promise.all([
@@ -27,21 +26,10 @@ async function getDados(tenantId: string) {
     svc.from('simulado_simulados').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('status', 'publicado'),
     svc.from('simulado_estudantes').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false),
     svc.from('simulado_sessoes_prova').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('is_teste', false).gte('created_at', hojeIso),
-    svc.from('simulado_sessoes_prova').select('created_at').match(t).eq('deletado', false).eq('is_teste', false).gte('created_at', inicio7).limit(10000),
+    montarDashboardSerie(svc, tenantId, 'semana'),
     svc.from('simulado_simulados').select('id, titulo, status, modo_aplicacao, created_at').match(t).eq('deletado', false).order('created_at', { ascending: false }).limit(5),
     svc.from('simulado_sessoes_prova').select('nota').match(t).eq('deletado', false).eq('is_teste', false).eq('status', 'finalizada').not('nota', 'is', null).limit(20000),
   ])
-
-  // Série real de sessões por dia (últimos 7 dias, inclusive dias sem sessão).
-  const buckets = new Map<string, number>()
-  for (const s of (sess7 ?? []) as any[]) {
-    const k = (s.created_at ?? '').slice(0, 10)
-    if (k) buckets.set(k, (buckets.get(k) ?? 0) + 1)
-  }
-  const serie = Array.from({ length: 7 }, (_, i) => {
-    const d = subDays(new Date(), 6 - i)
-    return { rotulo: format(d, 'EEE', { locale: ptBR }), valor: buckets.get(format(d, 'yyyy-MM-dd')) ?? 0 }
-  })
 
   const notas = (notasData ?? []).map((n: any) => Number(n.nota)).filter((n) => !Number.isNaN(n))
   const notaMedia = notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : null
@@ -51,10 +39,10 @@ async function getDados(tenantId: string) {
     totalSimulados: totalSimulados ?? 0,
     totalEstudantes: totalEstudantes ?? 0,
     sessoesHoje: sessoesHoje ?? 0,
-    serie,
+    serieInicial,
     recentes: recentes ?? [],
     notaMedia,
-    provas7: (sess7 ?? []).length,
+    provas7: serieInicial.resumo.iniciados,
   }
 }
 
@@ -113,15 +101,10 @@ export default async function AdminDashboard() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Chart (dados reais) */}
-        <Card className="overflow-hidden lg:col-span-2" style={{ ['--card-spacing' as string]: '0px' }}>
-          <SecaoHeader icon={Activity} titulo="Sessões nos últimos 7 dias" subtitulo="Sessões de prova iniciadas por dia" />
-          <CardContent className="px-4 py-5">
-            <Colunas itens={d.serie} tom="primary" altura={210} />
-          </CardContent>
-        </Card>
+      {/* Gráficos interativos: filtro Semana/Mês + simulados (iniciados/feitos) e acessos de estudantes */}
+      <DashboardCharts inicial={d.serieInicial} />
 
+      <div className="grid gap-6 lg:grid-cols-3">
         {/* Destaque: nota média */}
         <Card className="overflow-hidden" style={{ ['--card-spacing' as string]: '0px' }}>
           <SecaoHeader icon={Trophy} titulo="Desempenho" subtitulo="Sessões finalizadas" />
@@ -133,35 +116,35 @@ export default async function AdminDashboard() {
             </Link>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Recent Simulados */}
-      <Card className="overflow-hidden" style={{ ['--card-spacing' as string]: '0px' }}>
-        <SecaoHeader icon={ClipboardList} titulo="Últimos simulados" subtitulo="Os 5 mais recentes" />
-        <CardContent className="px-4 py-4">
-          {d.recentes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum simulado criado ainda.</p>
-          ) : (
-            <div className="space-y-2">
-              {d.recentes.map((s: any) => {
-                const st = statusLabels[s.status] ?? statusLabels.rascunho
-                return (
-                  <Link key={s.id} href={`/admin/simulados/${s.id}`}
-                    className="flex items-center justify-between gap-3 rounded-xl border p-3 transition hover:border-primary/40 hover:bg-muted/40">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{s.titulo}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {modeLabels[s.modo_aplicacao] ?? '—'}{s.created_at ? ` · criado em ${new Date(s.created_at).toLocaleDateString('pt-BR')}` : ''}
-                      </p>
-                    </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${st.class}`}>{st.label}</span>
-                  </Link>
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {/* Últimos simulados */}
+        <Card className="overflow-hidden lg:col-span-2" style={{ ['--card-spacing' as string]: '0px' }}>
+          <SecaoHeader icon={ClipboardList} titulo="Últimos simulados" subtitulo="Os 5 mais recentes" />
+          <CardContent className="px-4 py-4">
+            {d.recentes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum simulado criado ainda.</p>
+            ) : (
+              <div className="space-y-2">
+                {d.recentes.map((s: any) => {
+                  const st = statusLabels[s.status] ?? statusLabels.rascunho
+                  return (
+                    <Link key={s.id} href={`/admin/simulados/${s.id}`}
+                      className="flex items-center justify-between gap-3 rounded-xl border p-3 transition hover:border-primary/40 hover:bg-muted/40">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{s.titulo}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {modeLabels[s.modo_aplicacao] ?? '—'}{s.created_at ? ` · criado em ${new Date(s.created_at).toLocaleDateString('pt-BR')}` : ''}
+                        </p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${st.class}`}>{st.label}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
