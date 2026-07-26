@@ -14,8 +14,8 @@ function hrefSeguro(url: string): string | null {
   return /^(https?:\/\/|mailto:)/i.test(u) ? u : null
 }
 
-// Inline: **negrito** / __negrito__, *itálico*, `código`, [texto](url). Recursivo p/ aninhar.
-const RE_INLINE = /(\*\*|__)([\s\S]+?)\1|\*([\s\S]+?)\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\)/g
+// Inline: ***negrito+itálico***, **negrito** / __negrito__, *itálico*, `código`, [texto](url). Recursivo.
+const RE_INLINE = /\*\*\*([\s\S]+?)\*\*\*|(\*\*|__)([\s\S]+?)\2|\*([\s\S]+?)\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\)/g
 function renderInline(texto: string, keyBase = ''): ReactNode[] {
   const out: ReactNode[] = []
   let last = 0, m: RegExpExecArray | null, i = 0
@@ -23,12 +23,13 @@ function renderInline(texto: string, keyBase = ''): ReactNode[] {
   while ((m = RE_INLINE.exec(texto))) {
     if (m.index > last) out.push(texto.slice(last, m.index))
     const k = `${keyBase}-${i++}`
-    if (m[1]) out.push(<strong key={k} className="font-semibold">{renderInline(m[2], k)}</strong>)
-    else if (m[3] !== undefined) out.push(<em key={k}>{renderInline(m[3], k)}</em>)
-    else if (m[4] !== undefined) out.push(<code key={k} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]">{m[4]}</code>)
-    else if (m[5] !== undefined) {
-      const href = hrefSeguro(m[6] ?? '')
-      out.push(href ? <a key={k} href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline">{m[5]}</a> : <Fragment key={k}>{m[5]}</Fragment>)
+    if (m[1] !== undefined) out.push(<strong key={k} className="font-semibold"><em>{renderInline(m[1], k)}</em></strong>)
+    else if (m[2]) out.push(<strong key={k} className="font-semibold">{renderInline(m[3], k)}</strong>)
+    else if (m[4] !== undefined) out.push(<em key={k}>{renderInline(m[4], k)}</em>)
+    else if (m[5] !== undefined) out.push(<code key={k} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]">{m[5]}</code>)
+    else if (m[6] !== undefined) {
+      const href = hrefSeguro(m[7] ?? '')
+      out.push(href ? <a key={k} href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline">{m[6]}</a> : <Fragment key={k}>{m[6]}</Fragment>)
     }
     last = RE_INLINE.lastIndex
   }

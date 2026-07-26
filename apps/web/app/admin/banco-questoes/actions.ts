@@ -426,6 +426,19 @@ async function lerTextoCsv(arquivo: File): Promise<string> {
 }
 
 /** Constrói as questões a partir das linhas da planilha (1ª linha = cabeçalho). */
+/**
+ * Converte a convenção de formatação do curso (ex.: PGE/RS) para markdown padrão:
+ *  `#texto#` → **negrito**, `_texto_` → *itálico*, `_#texto#_` → ***negrito+itálico***.
+ * Ordem importa: o combinado primeiro. Lacunas `____` e `#`/`_` soltos são preservados.
+ */
+export function converterMarcacao(s: string): string {
+  if (!s) return s
+  return s
+    .replace(/_#([^#]+?)#_/g, '***$1***')          // negrito + itálico
+    .replace(/#([^#\n]+?)#/g, '**$1**')             // negrito
+    .replace(/(?<!_)_(?!_)([^_\n]+?)_(?!_)/g, '*$1*') // itálico (ignora lacunas ____ )
+}
+
 function montarQuestoes(linhas: string[][]): QuestaoImport[] {
   if (linhas.length < 2) return []
   const header = linhas[0].map(mapHeader)
@@ -436,7 +449,7 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
     if (!row.some((c) => c && c.trim())) continue
     const get = (campo: string) => { const idx = header.indexOf(campo); return idx >= 0 ? (row[idx] ?? '').trim() : '' }
 
-    const enunciado = get('enunciado')
+    const enunciado = converterMarcacao(get('enunciado'))
     const tipoCell = get('tipo')
     const tipoRaw = norm(tipoCell)
     // Certo/Errado é uma OBJETIVA de 2 opções, marcada por formato — não é um tipo separado.
@@ -454,7 +467,7 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
       const t = get('alt_' + L)
       if (!t) return
       const correta = corretaCE ? norm(t) === corretaCE : L === corretaLetra
-      alternativas.push({ texto: t, correta, ordem: i, lei: get('lei_' + L) || null, comentario: get('com_' + L) || null })
+      alternativas.push({ texto: converterMarcacao(t), correta, ordem: i, lei: converterMarcacao(get('lei_' + L)) || null, comentario: converterMarcacao(get('com_' + L)) || null })
     })
 
     // Formato: explícito (Tipo = Certo/Errado) ou deduzido (2 alternativas Certo/Errado).
@@ -484,7 +497,7 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
       pilar_1: get('pilar_1') || null, pilar_2: get('pilar_2') || null,
       banca: get('banca') || null, orgao: get('orgao') || null, cargo: get('cargo') || null,
       ano: Number.isFinite(anoNum) ? anoNum : null, nivel_dificuldade: dif,
-      comentario_professor: get('comentario') || null, alternativas, erro,
+      comentario_professor: converterMarcacao(get('comentario')) || null, alternativas, erro,
     })
   }
   return out
