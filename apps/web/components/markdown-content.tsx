@@ -27,8 +27,8 @@ function renderInline(texto: string, keyBase = ''): ReactNode[] {
     if (m.index === re.lastIndex) { re.lastIndex++; continue }
     if (m.index > last) out.push(texto.slice(last, m.index))
     const k = `${keyBase}-${i++}`
-    if (m[1] !== undefined) out.push(<strong key={k} className="font-semibold"><em>{renderInline(m[1], k)}</em></strong>)
-    else if (m[2]) out.push(<strong key={k} className="font-semibold">{renderInline(m[3], k)}</strong>)
+    if (m[1] !== undefined) out.push(<strong key={k} className="font-bold"><em>{renderInline(m[1], k)}</em></strong>)
+    else if (m[2]) out.push(<strong key={k} className="font-bold">{renderInline(m[3], k)}</strong>)
     else if (m[4] !== undefined) out.push(<em key={k}>{renderInline(m[4], k)}</em>)
     else if (m[5] !== undefined) out.push(<code key={k} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]">{m[5]}</code>)
     else if (m[6] !== undefined) {
