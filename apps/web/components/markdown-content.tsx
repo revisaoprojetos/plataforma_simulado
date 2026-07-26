@@ -18,9 +18,13 @@ function hrefSeguro(url: string): string | null {
 const RE_INLINE = /\*\*\*([\s\S]+?)\*\*\*|(\*\*|__)([\s\S]+?)\2|\*([\s\S]+?)\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\)/g
 function renderInline(texto: string, keyBase = ''): ReactNode[] {
   const out: ReactNode[] = []
+  // Regex NOVO por chamada: RE_INLINE é global e stateful; como renderInline é recursivo,
+  // reutilizar o mesmo objeto corromperia o lastIndex do loop externo (→ loop infinito/trava).
+  const re = new RegExp(RE_INLINE.source, RE_INLINE.flags)
   let last = 0, m: RegExpExecArray | null, i = 0
-  RE_INLINE.lastIndex = 0
-  while ((m = RE_INLINE.exec(texto))) {
+  while ((m = re.exec(texto))) {
+    // Proteção contra match de largura zero (evita loop infinito por segurança).
+    if (m.index === re.lastIndex) { re.lastIndex++; continue }
     if (m.index > last) out.push(texto.slice(last, m.index))
     const k = `${keyBase}-${i++}`
     if (m[1] !== undefined) out.push(<strong key={k} className="font-semibold"><em>{renderInline(m[1], k)}</em></strong>)
@@ -31,7 +35,7 @@ function renderInline(texto: string, keyBase = ''): ReactNode[] {
       const href = hrefSeguro(m[7] ?? '')
       out.push(href ? <a key={k} href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline">{m[6]}</a> : <Fragment key={k}>{m[6]}</Fragment>)
     }
-    last = RE_INLINE.lastIndex
+    last = re.lastIndex
   }
   if (last < texto.length) out.push(texto.slice(last))
   return out
