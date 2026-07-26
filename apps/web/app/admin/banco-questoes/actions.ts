@@ -431,7 +431,7 @@ async function lerTextoCsv(arquivo: File): Promise<string> {
  *  `#texto#` → **negrito**, `_texto_` → *itálico*, `_#texto#_` → ***negrito+itálico***.
  * Ordem importa: o combinado primeiro. Lacunas `____` e `#`/`_` soltos são preservados.
  */
-export function converterMarcacao(s: string): string {
+function converterMarcacao(s: string): string {
   if (!s) return s
   return s
     .replace(/_#([^#]+?)#_/g, '***$1***')          // negrito + itálico
