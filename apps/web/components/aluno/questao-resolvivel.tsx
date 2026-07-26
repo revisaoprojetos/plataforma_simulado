@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { Star, CheckCircle2, XCircle, RotateCcw } from 'lucide-react'
 import { ComentariosQuestao } from '@/components/aluno/comentarios-questao'
 import { AddToCaderno } from '@/components/aluno/add-to-caderno'
+import { MarkdownContent } from '@/components/markdown-content'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 
@@ -83,7 +84,7 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
           </div>
         </div>
 
-        <p className="text-sm leading-relaxed">{questao.enunciado}</p>
+        <MarkdownContent className="text-sm leading-relaxed">{questao.enunciado}</MarkdownContent>
 
         {questao.imagem_url && (
           <div className="overflow-hidden rounded-lg border bg-muted/30 p-2">
@@ -119,7 +120,7 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
                 )}>
                   {LETRA[i] ?? i + 1}
                 </span>
-                <span className="flex-1">{alt.texto}</span>
+                <MarkdownContent inline className="flex-1">{alt.texto}</MarkdownContent>
                 {mostrarCerta && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />}
                 {mostrarErrada && <XCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />}
               </button>
@@ -152,7 +153,7 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
             {questao.comentario_professor && (
               <div className="rounded-md border bg-muted/40 p-3 text-sm">
                 <p className="mb-1 text-xs font-semibold text-muted-foreground">Comentário do professor</p>
-                {questao.comentario_professor}
+                <MarkdownContent>{questao.comentario_professor}</MarkdownContent>
               </div>
             )}
           </div>

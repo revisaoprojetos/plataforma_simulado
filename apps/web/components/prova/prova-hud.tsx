@@ -5,6 +5,7 @@ import { Progress } from '@/components/ui/progress'
 import { Card, CardContent } from '@/components/ui/card'
 import { ChevronLeft, ChevronRight, Clock, BookOpen, Send, Loader2, Flag, Eye, EyeOff, Scissors } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { MarkdownContent } from '@/components/markdown-content'
 import { FitaTopo, FITA_GRADIENT } from '@/components/prova/fita-topo'
 import { ThemeToggle } from '@/components/prova/theme-toggle'
 
@@ -136,7 +137,7 @@ export function ProvaHud(p: ProvaHudProps) {
                 <div className="h-1.5 flex-1" style={{ background: FITA_GRADIENT }} />
               </div>
               <CardContent className="pt-10">
-                <p className="leading-relaxed">{q.enunciado}</p>
+                <MarkdownContent className="leading-relaxed">{q.enunciado}</MarkdownContent>
                 {q.imagem_url && (
                   <div className="mt-4 overflow-hidden rounded-lg border bg-muted/30 p-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -173,7 +174,7 @@ export function ProvaHud(p: ProvaHudProps) {
                           style={isSelected ? { background: SEL, borderColor: SEL, color: '#fff' } : undefined}>
                           {LETRA[i] ?? i + 1}
                         </span>
-                        <span className={cn('text-sm leading-relaxed', isSelected && 'font-medium', eliminada && 'text-muted-foreground line-through')}>{alt.texto}</span>
+                        <MarkdownContent inline className={cn('text-sm leading-relaxed', isSelected && 'font-medium', eliminada && 'text-muted-foreground line-through')}>{alt.texto}</MarkdownContent>
                       </div>
                     </button>
                   </div>

@@ -7,7 +7,7 @@ import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import { MarkdownTextarea } from '@/components/admin/markdown-textarea'
 import {
   Select,
   SelectContent,
@@ -223,9 +223,9 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
 
           <div className="space-y-2">
             <Label htmlFor="enunciado">Enunciado *</Label>
-            <Textarea
+            <MarkdownTextarea
               id="enunciado"
-              placeholder="Digite o enunciado da questão..."
+              placeholder="Digite o enunciado da questão... (selecione um trecho e use a barra para negrito, itálico, etc.)"
               rows={5}
               {...register('enunciado')}
               aria-invalid={!!errors.enunciado}
@@ -405,7 +405,8 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                 >
                   {LETRA[index] ?? index + 1}
                 </button>
-                <Textarea
+                <MarkdownTextarea
+                  previewInline
                   placeholder={`Alternativa ${LETRA[index] ?? index + 1}`}
                   rows={2}
                   className="flex-1"
@@ -498,7 +499,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
           <CardTitle>Comentário do Professor</CardTitle>
         </CardHeader>
         <CardContent>
-          <Textarea
+          <MarkdownTextarea
             placeholder="Adicione um comentário ou resolução para esta questão..."
             rows={4}
             {...register('comentario_professor')}

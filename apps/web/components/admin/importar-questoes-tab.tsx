@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { FileUp, Download, Loader2, Check, AlertTriangle, RefreshCw, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { MarkdownContent } from '@/components/markdown-content'
 import { analisarQuestoesImport, confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 
@@ -248,7 +249,7 @@ export function ImportarQuestoesTab({ bancoId = null, onDone }: { bancoId?: stri
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{q.numero || traco}</td>
                         <td className="min-w-[260px] max-w-[380px] px-3 py-2 leading-relaxed">
-                          {enun || <span className="text-muted-foreground">(sem enunciado)</span>}
+                          {enun ? <MarkdownContent inline>{enun}</MarkdownContent> : <span className="text-muted-foreground">(sem enunciado)</span>}
                           {q.erro && <span className="mt-0.5 block text-xs text-rose-600 dark:text-rose-400">{q.erro}</span>}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-xs capitalize text-muted-foreground">{q.tipo}</td>
@@ -287,16 +288,16 @@ export function ImportarQuestoesTab({ bancoId = null, onDone }: { bancoId?: stri
                               {q.alternativas.map((a) => (
                                 <div key={a.ordem} className="rounded-md border bg-background p-2">
                                   <p className={cn('font-semibold', a.correta && 'text-emerald-600 dark:text-emerald-400')}>
-                                    {LETRAS[a.ordem] ?? '?'}){a.correta ? ' ✓ correta' : ''} <span className="font-normal text-foreground">{a.texto}</span>
+                                    {LETRAS[a.ordem] ?? '?'}){a.correta ? ' ✓ correta' : ''} <MarkdownContent inline className="font-normal text-foreground">{a.texto}</MarkdownContent>
                                   </p>
                                   {a.lei && <p className="mt-1 text-muted-foreground"><span className="font-semibold text-foreground">Lei:</span> {a.lei}</p>}
-                                  {a.comentario && <p className="mt-0.5 whitespace-pre-line text-muted-foreground"><span className="font-semibold text-foreground">Comentário:</span> {a.comentario}</p>}
+                                  {a.comentario && <div className="mt-0.5 text-muted-foreground"><span className="font-semibold text-foreground">Comentário:</span> <MarkdownContent inline>{a.comentario}</MarkdownContent></div>}
                                 </div>
                               ))}
                               {q.comentario_professor && (
                                 <div className="rounded-md border bg-background p-2">
                                   <span className="font-semibold">Comentário do professor:</span>{' '}
-                                  <span className="whitespace-pre-line text-muted-foreground">{q.comentario_professor}</span>
+                                  <MarkdownContent inline className="text-muted-foreground">{q.comentario_professor}</MarkdownContent>
                                 </div>
                               )}
                               {nComent === 0 && <p className="text-muted-foreground">Esta questão não tem leis nem comentários.</p>}

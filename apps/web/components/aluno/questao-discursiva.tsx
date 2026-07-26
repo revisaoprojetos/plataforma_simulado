@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { Star, Send, Loader2, Clock, CheckCircle2 } from 'lucide-react'
 import { ComentariosQuestao } from '@/components/aluno/comentarios-questao'
+import { MarkdownContent } from '@/components/markdown-content'
 
 interface CompCorrecao { nome: string; pontos: number; nota: number; comentario?: string }
 interface Resposta { id: string; texto: string; status: string; nota: number | null; feedback: string | null }
@@ -71,7 +72,7 @@ export function QuestaoDiscursiva({ questao, numero }: { questao: QuestaoDiscurs
           </button>
         </div>
 
-        <p className="text-sm leading-relaxed">{questao.enunciado}</p>
+        <MarkdownContent className="text-sm leading-relaxed">{questao.enunciado}</MarkdownContent>
 
         {carregando ? (
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -128,7 +129,7 @@ export function QuestaoDiscursiva({ questao, numero }: { questao: QuestaoDiscurs
         {questao.comentario_professor && corrigida && (
           <div className="rounded-md border bg-muted/40 p-3 text-sm">
             <p className="mb-1 text-xs font-semibold text-muted-foreground">Comentário do professor</p>
-            {questao.comentario_professor}
+            <MarkdownContent>{questao.comentario_professor}</MarkdownContent>
           </div>
         )}
 

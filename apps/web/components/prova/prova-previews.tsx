@@ -2,6 +2,7 @@
 
 import { BookOpen, CheckCircle2, XCircle, Circle, Home, Clock, FileText, FileStack, Trophy, Calendar, Moon, RefreshCw, ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { MarkdownContent } from '@/components/markdown-content'
 import { FitaTopo } from '@/components/prova/fita-topo'
 
 function frameLogo(estilo?: string): string {
@@ -337,7 +338,7 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
                           !correta && !erradaMarcada && !antesCorreta && 'border-muted-foreground/30 text-muted-foreground',
                         )}
                         style={letraStyle}>{alt.l}</span>
-                        <span className="flex-1">{alt.texto}</span>
+                        <MarkdownContent inline className="flex-1">{alt.texto}</MarkdownContent>
                         <div className="flex shrink-0 items-center gap-1.5">
                           {alt.marcada && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Sua resposta</span>}
                           {antesCorreta && <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-white" style={{ background: COR_ALT }}>Correta antes</span>}
