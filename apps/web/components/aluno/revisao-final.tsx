@@ -6,6 +6,7 @@ import { usePdfDownloads } from '@/components/pdf-downloads-provider'
 import { Card, CardContent } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { MarkdownContent } from '@/components/markdown-content'
 import { ReportarErroButton } from '@/components/aluno/reportar-erro-button'
 import {
   CheckCircle2,
@@ -517,7 +518,7 @@ export function RevisaoFinal({
                     )}
                   </div>
 
-                  <p className="text-sm leading-relaxed">{q.enunciado}</p>
+                  <MarkdownContent className="text-sm leading-relaxed">{q.enunciado}</MarkdownContent>
 
                   {/* Gabarito alterado após a resposta — texto neutro, sem "perdeu ponto" */}
                   {liberado && q.alt_trocada && (() => {
@@ -608,7 +609,7 @@ export function RevisaoFinal({
                           >
                             {LETRA[i] ?? i + 1}
                           </span>
-                          <span className="flex-1">{alt.texto}</span>
+                          <MarkdownContent inline className="flex-1">{alt.texto}</MarkdownContent>
                           <div className="flex shrink-0 items-center gap-1.5">
                             {marcada && (
                               <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
@@ -633,7 +634,7 @@ export function RevisaoFinal({
                   {liberado && q.tipo !== 'discursiva' && q.justificativa && (
                     <div className="rounded-md border p-3 text-sm" style={justStyle(acertouEff)}>
                       <p className="mb-1 text-xs font-semibold" style={{ color: justCor(acertouEff) }}>Justificativa</p>
-                      <p className="whitespace-pre-wrap leading-relaxed">{q.justificativa}</p>
+                      <MarkdownContent className="leading-relaxed">{q.justificativa}</MarkdownContent>
                     </div>
                   )}
 

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { startOfDay } from 'date-fns'
 import { createServiceClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { Card, CardContent } from '@/components/ui/card'
 import { BookOpen, ClipboardList, Users, Activity, Trophy, ArrowRight, Plus } from 'lucide-react'
@@ -20,7 +21,7 @@ async function getDados(tenantId: string) {
     { count: sessoesHoje },
     serieInicial,
     { data: recentes },
-    { data: notasData },
+    notasData,
   ] = await Promise.all([
     svc.from('simulado_questoes').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false),
     svc.from('simulado_simulados').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('status', 'publicado'),
@@ -28,7 +29,8 @@ async function getDados(tenantId: string) {
     svc.from('simulado_sessoes_prova').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('is_teste', false).gte('iniciado_em', hojeIso),
     montarDashboardSerie(svc, tenantId, 'semana'),
     svc.from('simulado_simulados').select('id, titulo, status, modo_aplicacao, created_at').match(t).eq('deletado', false).order('created_at', { ascending: false }).limit(5),
-    svc.from('simulado_sessoes_prova').select('nota').match(t).eq('deletado', false).eq('is_teste', false).eq('status', 'finalizada').not('nota', 'is', null).limit(20000),
+    // fetchAll: nota média precisa de TODAS as notas (o .limit não burla o teto de 1000 do PostgREST).
+    fetchAll<{ nota: number | null }>(() => svc.from('simulado_sessoes_prova').select('nota').match(t).eq('deletado', false).eq('is_teste', false).eq('status', 'finalizada').not('nota', 'is', null).order('id', { ascending: true })),
   ])
 
   const notas = (notasData ?? []).map((n: any) => Number(n.nota)).filter((n) => !Number.isNaN(n))

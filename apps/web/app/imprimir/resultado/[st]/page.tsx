@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import { PrintButton } from '@/components/aluno/print-button'
+import { MarkdownContent } from '@/components/markdown-content'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 
@@ -115,7 +116,7 @@ export default async function ResultadoImprimirPage({ params, searchParams }: { 
             const d = q?.tipo === 'discursiva' ? discMap.get(q?.id) : null
             return (
               <div key={q?.id} className="qa text-[15px] leading-relaxed">
-                <p className="mb-1"><strong>{idx + 1}.</strong> {q?.enunciado}</p>
+                <p className="mb-1"><strong>{idx + 1}.</strong> <MarkdownContent inline>{q?.enunciado}</MarkdownContent></p>
                 {q?.tipo === 'discursiva' ? (
                   <div className="ml-4 space-y-1">
                     <p className="text-xs uppercase tracking-wide text-black/50">Resposta discursiva</p>
@@ -133,7 +134,7 @@ export default async function ResultadoImprimirPage({ params, searchParams }: { 
                       const correta = gabaritoLiberado && a.correta
                       return (
                         <p key={a.id} className={correta ? 'font-semibold' : ''}>
-                          {marcou ? '●' : '○'} {gabaritoLiberado && a.correta ? '✓ ' : ''}{LETRA[i] ?? i + 1}) {a.texto}
+                          {marcou ? '●' : '○'} {gabaritoLiberado && a.correta ? '✓ ' : ''}{LETRA[i] ?? i + 1}) <MarkdownContent inline>{a.texto}</MarkdownContent>
                           {marcou && ' — (sua resposta)'}
                         </p>
                       )
@@ -143,7 +144,7 @@ export default async function ResultadoImprimirPage({ params, searchParams }: { 
                 {completo && gabaritoLiberado && q?.comentario_professor && (
                   <div className="ml-4 mt-1 rounded border border-black/10 bg-black/[0.03] p-2 text-sm">
                     <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-black/50">Comentário</p>
-                    <p className="whitespace-pre-wrap">{q.comentario_professor}</p>
+                    <MarkdownContent>{q.comentario_professor}</MarkdownContent>
                   </div>
                 )}
               </div>

@@ -5,6 +5,7 @@ import { verificarRenderToken } from '@/lib/pdf/render-token'
 import { CadernoPrintControls } from '@/components/admin/caderno-print-controls'
 import { PaginadorCaderno } from '@/components/caderno/paginador-caderno'
 import { BlockRender, dataComQuestao } from '@/lib/caderno-designer/blocks'
+import { MarkdownContent } from '@/components/markdown-content'
 import { resolveTheme } from '@/lib/caderno-designer/theme'
 import { carregarRegistros } from '@/lib/caderno-designer/merge'
 import { hospedarImagensDoc } from '@/lib/caderno-designer/hospedar-imagens'
@@ -377,10 +378,10 @@ export default async function CadernoImprimirPage({
             const qAlts = (altMap.get(q.id) ?? []).slice().sort((a, b2) => a.ordem - b2.ordem)
             return (
               <div key={i} className="text-[15px] leading-relaxed" style={{ breakInside: 'avoid' }}>
-                <p className="mb-1"><strong>{numero}.</strong> {q.enunciado}</p>
+                <p className="mb-1"><strong>{numero}.</strong> <MarkdownContent inline>{q.enunciado}</MarkdownContent></p>
                 {q.tipo === 'discursiva'
                   ? <div className="mt-2 space-y-4">{[0, 1, 2, 3, 4, 5].map((n) => <div key={n} className="border-b border-black/30" style={{ height: '1.4em' }} />)}</div>
-                  : <div className="ml-4 space-y-1">{qAlts.map((a, idx) => <p key={a.id} className={gabarito && a.correta ? 'font-semibold' : ''}>{gabarito && a.correta ? '☑' : '○'} {LETRA[idx] ?? idx + 1}) {a.texto}</p>)}</div>}
+                  : <div className="ml-4 space-y-1">{qAlts.map((a, idx) => <p key={a.id} className={gabarito && a.correta ? 'font-semibold' : ''}>{gabarito && a.correta ? '☑' : '○'} {LETRA[idx] ?? idx + 1}) <MarkdownContent inline>{a.texto}</MarkdownContent></p>)}</div>}
               </div>
             )
           })}

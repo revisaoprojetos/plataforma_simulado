@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { MarkdownContent } from '@/components/markdown-content'
 import { LayoutDashboard, ClipboardCheck, Users, BarChart3, Target, Clock, Crown, BookOpen, Lock, Check, MessageSquare, ListChecks, FileText, ScrollText, Award, TrendingUp, MoreVertical, Download, Loader2, Trash2 } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { excluirSessaoAction } from '@/app/admin/estudantes/actions'
@@ -423,7 +424,7 @@ function QuestoesAgregadas({ questoes, totalTentativas, revelou }: { questoes: Q
                     <span className="rounded-md bg-rose-500/15 px-2 py-0.5 text-[11px] font-semibold text-rose-600 dark:text-rose-400">Errou {q.errou}x</span></>}
                   {q.branco > 0 && <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">Em branco {q.branco}x</span>}
                 </div>
-                <p className="text-sm text-foreground/90">{q.enunciado}</p>
+                <MarkdownContent className="text-sm text-foreground/90">{q.enunciado}</MarkdownContent>
               </div>
             </div>
 
@@ -431,7 +432,7 @@ function QuestoesAgregadas({ questoes, totalTentativas, revelou }: { questoes: Q
               {q.alternativas.map((a) => (
                 <div key={a.letra} className={cn('flex items-center gap-2.5 rounded-lg border px-2 py-1.5 text-sm', a.correta ? 'border-emerald-500/40 bg-emerald-500/10' : a.escolhas > 0 ? 'border-primary/30 bg-primary/5' : 'border-transparent')}>
                   <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-bold', a.correta ? 'bg-emerald-500 text-white' : a.escolhas > 0 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>{a.letra}</span>
-                  <span className={cn('min-w-0 flex-1 truncate', (a.correta || a.escolhas > 0) && 'font-medium')} title={a.texto}>{a.texto || '—'}</span>
+                  {a.texto ? <MarkdownContent inline className={cn('min-w-0 flex-1 truncate', (a.correta || a.escolhas > 0) && 'font-medium')}>{a.texto}</MarkdownContent> : <span className="min-w-0 flex-1 truncate">—</span>}
                   {a.escolhas > 0 && <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground" title="Vezes que você marcou">{a.escolhas}x</span>}
                   {a.correta && <Check className="h-4 w-4 shrink-0 text-emerald-500" />}
                 </div>
@@ -441,7 +442,7 @@ function QuestoesAgregadas({ questoes, totalTentativas, revelou }: { questoes: Q
             {q.comentario && (
               <div className="mt-3 flex gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
                 <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <div><p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Comentário do professor</p><p className="mt-0.5 text-foreground/90">{q.comentario}</p></div>
+                <div><p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Comentário do professor</p><MarkdownContent className="mt-0.5 text-foreground/90">{q.comentario}</MarkdownContent></div>
               </div>
             )}
           </div>

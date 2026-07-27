@@ -5,6 +5,7 @@ import { getCurrentTenantId } from '@/lib/tenant'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { ArrowLeft, Check, X } from 'lucide-react'
+import { MarkdownContent } from '@/components/markdown-content'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -90,7 +91,7 @@ export default async function GabaritoEstudantePage({ params }: { params: Promis
             return (
               <div key={qid} className="rounded-lg border p-3">
                 <div className="mb-2 flex items-start justify-between gap-3">
-                  <p className="text-sm font-medium"><span className="text-primary">{i + 1}.</span> {q?.enunciado ?? '(questão removida)'}</p>
+                  <p className="text-sm font-medium"><span className="text-primary">{i + 1}.</span> {q?.enunciado ? <MarkdownContent inline>{q.enunciado}</MarkdownContent> : '(questão removida)'}</p>
                   {respondeu ? (
                     <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${ok ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>
                       {ok ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />} {ok ? 'Acertou' : 'Errou'}{letraMarc ? ` · marcou ${letraMarc}` : ''}
@@ -104,7 +105,7 @@ export default async function GabaritoEstudantePage({ params }: { params: Promis
                     return (
                       <div key={a.id} className={`flex items-center gap-2 rounded px-2 py-1 text-sm ${ehMarcada ? (ok ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20') : ehCorreta ? 'bg-emerald-50/60 dark:bg-emerald-900/10' : ''}`}>
                         <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${ehMarcada ? (ok ? 'border-green-500 bg-green-500 text-white' : 'border-red-500 bg-red-500 text-white') : 'border-muted-foreground/30'}`}>{LETRA[j] ?? j + 1}</span>
-                        <span className={ehMarcada ? 'font-medium' : ''}>{a.texto}</span>
+                        <MarkdownContent inline className={ehMarcada ? 'font-medium' : ''}>{a.texto}</MarkdownContent>
                         {ehMarcada && <span className="text-xs text-muted-foreground">(marcada)</span>}
                         {ehCorreta && !ehMarcada && <span className="text-xs font-medium text-emerald-600">✓ correta</span>}
                       </div>
