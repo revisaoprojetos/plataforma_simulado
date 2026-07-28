@@ -11,6 +11,11 @@ import { softDelete } from '@/lib/soft-delete'
 import { brtLocalParaIso } from '@/lib/brt'
 import { computarResumoAoVivo, computarOnlinePorSimulado, type ResumoAoVivo } from '@/lib/simulado/ao-vivo'
 
+// Sentinela p/ escopo de tenant: com tenantId null, o filtro vira um uuid impossível →
+// 0 linhas (fail-closed). Toda query por id/simulado_id filtra .eq('tenant_id', tenantId ?? SEM_TENANT)
+// para o BANCO garantir o isolamento cross-tenant (não confiar em check pós-fetch nem no RLS incompleto).
+const SEM_TENANT = '00000000-0000-0000-0000-000000000000'
+
 interface SimuladoData {
   titulo: string
   descricao?: string
@@ -108,9 +113,8 @@ export async function updateSimuladoAction(id: string, data: SimuladoData) {
   // silenciosamente pela RLS (0 linhas, sem erro) e permite validar/auditar de verdade.
   const svc = createAdminClient()
 
-  const { data: antes } = await svc.from('simulado_simulados').select('*').eq('id', id).maybeSingle()
+  const { data: antes } = await svc.from('simulado_simulados').select('*').eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT).maybeSingle()
   if (!antes) return { error: 'Simulado não encontrado.' }
-  if (tenantId && (antes as any).tenant_id && (antes as any).tenant_id !== tenantId) return { error: 'Você não tem acesso a este simulado.' }
 
   // MERGE das regras: o form envia só as chaves do schema; preserva as demais já salvas
   // (banco_base_id, caderno_id, liberações manuais de nota/gabarito/caderno etc.).
@@ -134,7 +138,7 @@ export async function updateSimuladoAction(id: string, data: SimuladoData) {
     regras: regrasMescladas,
   }
 
-  const { data: upd, error } = await svc.from('simulado_simulados').update(patch).eq('id', id).select('id')
+  const { data: upd, error } = await svc.from('simulado_simulados').update(patch).eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT).select('id')
   if (error) return { error: error.message }
   if (!upd?.length) return { error: 'Nada foi salvo — verifique seu acesso a este simulado.' }
 
@@ -168,7 +172,7 @@ export async function listarEstudantesSimulado(simuladoId: string): Promise<{ ok
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
-  const { data: sim } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simuladoId).maybeSingle()
+  const { data: sim } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simuladoId).eq('tenant_id', tenantId ?? SEM_TENANT).maybeSingle()
   if (!sim) return { error: 'Simulado não encontrado.' }
   if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
   const tid = tenantId ?? (sim as any).tenant_id
@@ -228,7 +232,7 @@ export async function removerPassaportesIndevidos(simuladoId: string): Promise<{
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
-  const { data: sim } = await svc.from('simulado_simulados').select('id, tenant_id, regras').eq('id', simuladoId).maybeSingle()
+  const { data: sim } = await svc.from('simulado_simulados').select('id, tenant_id, regras').eq('id', simuladoId).eq('tenant_id', tenantId ?? SEM_TENANT).maybeSingle()
   if (!sim) return { error: 'Simulado não encontrado.' }
   if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
   const tid = tenantId ?? (sim as any).tenant_id
@@ -294,7 +298,7 @@ export async function progressoEstudantesSimulado(simuladoId: string): Promise<{
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
-  const { data: sim } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simuladoId).maybeSingle()
+  const { data: sim } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simuladoId).eq('tenant_id', tenantId ?? SEM_TENANT).maybeSingle()
   if (!sim) return { error: 'Simulado não encontrado.' }
   if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
   const tid = tenantId ?? (sim as any).tenant_id
@@ -361,7 +365,7 @@ export async function resumoAoVivoSimulado(simuladoId: string): Promise<{ ok?: b
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
-  const { data: sim } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simuladoId).maybeSingle()
+  const { data: sim } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simuladoId).eq('tenant_id', tenantId ?? SEM_TENANT).maybeSingle()
   if (!sim) return { error: 'Simulado não encontrado.' }
   if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
 
@@ -400,13 +404,14 @@ export interface Testador { id: string; estudante_id: string; nome: string; emai
 /** Lista os estudantes com "acesso de teste" neste simulado (podem fazer fora da janela; is_teste). */
 export async function listarTestadores(simuladoId: string): Promise<{ ok?: boolean; error?: string; testadores?: Testador[] }> {
   if (!(await checkPermission('simulados:view'))) return { error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
-  const { data, error } = await svc.from('simulado_testadores').select('id, estudante_id, criado_em').eq('simulado_id', simuladoId).order('criado_em', { ascending: false })
+  const { data, error } = await svc.from('simulado_testadores').select('id, estudante_id, criado_em').eq('simulado_id', simuladoId).eq('tenant_id', tenantId ?? SEM_TENANT).order('criado_em', { ascending: false })
   if (error) { if (/testadores|relation|does not exist/i.test(error.message)) return { ok: true, testadores: [] }; return { error: error.message } }
   const estIds = [...new Set((data ?? []).map((t: any) => t.estudante_id))]
   const info = new Map<string, { nome: string; email: string | null }>()
   if (estIds.length) {
-    const { data: ests } = await svc.from('simulado_estudantes').select('id, nome, email').in('id', estIds)
+    const { data: ests } = await svc.from('simulado_estudantes').select('id, nome, email').in('id', estIds).eq('tenant_id', tenantId ?? SEM_TENANT)
     for (const e of ests ?? []) info.set((e as any).id, { nome: (e as any).nome ?? 'Aluno', email: (e as any).email ?? null })
   }
   return { ok: true, testadores: (data ?? []).map((t: any) => ({ id: t.id, estudante_id: t.estudante_id, nome: info.get(t.estudante_id)?.nome ?? 'Aluno', email: info.get(t.estudante_id)?.email ?? null, criado_em: t.criado_em })) }
@@ -420,7 +425,10 @@ export async function concederTestadores(simuladoId: string, estudanteIds: strin
   const ids = [...new Set((estudanteIds ?? []).filter(Boolean))]
   if (!ids.length) return { ok: false, error: 'Selecione ao menos um estudante.' }
   const svc = createAdminClient()
-  const { data: ja } = await svc.from('simulado_testadores').select('estudante_id').eq('simulado_id', simuladoId).in('estudante_id', ids)
+  // Só concede testador em simulado DO tenant (senão criaria testador cross-tenant).
+  const { data: simDono } = await svc.from('simulado_simulados').select('id').eq('id', simuladoId).eq('tenant_id', tenantId).maybeSingle()
+  if (!simDono) return { ok: false, error: 'Simulado não encontrado.' }
+  const { data: ja } = await svc.from('simulado_testadores').select('estudante_id').eq('simulado_id', simuladoId).eq('tenant_id', tenantId).in('estudante_id', ids)
   const jaSet = new Set((ja ?? []).map((x: any) => x.estudante_id))
   const novos = ids.filter((i) => !jaSet.has(i))
   if (!novos.length) return { ok: true, adicionados: 0 }
@@ -434,8 +442,9 @@ export async function concederTestadores(simuladoId: string, estudanteIds: strin
 /** Revoga o acesso de teste de um estudante. */
 export async function revogarTestador(simuladoId: string, estudanteId: string): Promise<{ ok: boolean; error?: string }> {
   if (!(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
-  const { error } = await svc.from('simulado_testadores').delete().eq('simulado_id', simuladoId).eq('estudante_id', estudanteId)
+  const { error } = await svc.from('simulado_testadores').delete().eq('simulado_id', simuladoId).eq('estudante_id', estudanteId).eq('tenant_id', tenantId ?? SEM_TENANT)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_testadores', entidadeId: simuladoId, depois: { estudante_id: estudanteId } })
   revalidatePath(`/admin/simulados/${simuladoId}`)
@@ -461,7 +470,7 @@ export async function listarSessoesSimulado(simuladoId: string): Promise<{ ok?: 
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
-  const { data: sim } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simuladoId).maybeSingle()
+  const { data: sim } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simuladoId).eq('tenant_id', tenantId ?? SEM_TENANT).maybeSingle()
   if (!sim) return { error: 'Simulado não encontrado.' }
   if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
   const tid = tenantId ?? (sim as any).tenant_id
@@ -492,12 +501,11 @@ export async function salvarManutencaoSimulado(simuladoId: string, dados: { ativ
   if (!(await checkPermission('simulados:update'))) return { error: 'Você não tem permissão para editar simulados.' }
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
-  const { data: antes } = await svc.from('simulado_simulados').select('regras, tenant_id').eq('id', simuladoId).maybeSingle()
+  const { data: antes } = await svc.from('simulado_simulados').select('regras, tenant_id').eq('id', simuladoId).eq('tenant_id', tenantId ?? SEM_TENANT).maybeSingle()
   if (!antes) return { error: 'Simulado não encontrado.' }
-  if (tenantId && (antes as any).tenant_id && (antes as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
   const manutencao = { ativo: !!dados.ativo, inicio: brtLocalParaIso(dados.inicio), fim: brtLocalParaIso(dados.fim) }
   const regras = { ...(((antes as any).regras as Record<string, unknown>) ?? {}), manutencao }
-  const { error } = await svc.from('simulado_simulados').update({ regras }).eq('id', simuladoId)
+  const { error } = await svc.from('simulado_simulados').update({ regras }).eq('id', simuladoId).eq('tenant_id', tenantId ?? SEM_TENANT)
   if (error) return { error: error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_simulados', entidadeId: simuladoId, depois: { manutencao } })
   revalidatePath('/admin/simulados')
@@ -508,12 +516,14 @@ export async function salvarManutencaoSimulado(simuladoId: string, dados: { ativ
 /** Vincula (ou desvincula) explicitamente um caderno de design ao simulado — define o tema/HUD aplicado. */
 export async function vincularCadernoSimulado(simuladoId: string, cadernoId: string | null) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
   const supabase = await createClient()
-  const { data: sim } = await supabase.from('simulado_simulados').select('regras').eq('id', simuladoId).maybeSingle()
+  const { data: sim } = await supabase.from('simulado_simulados').select('regras').eq('id', simuladoId).eq('tenant_id', tenantId ?? SEM_TENANT).maybeSingle()
+  if (!sim) return { error: 'Simulado não encontrado.' }
   const regras: Record<string, unknown> = { ...((sim?.regras as Record<string, unknown>) ?? {}) }
   if (cadernoId) regras.caderno_id = cadernoId
   else delete regras.caderno_id
-  const { error } = await supabase.from('simulado_simulados').update({ regras }).eq('id', simuladoId)
+  const { error } = await supabase.from('simulado_simulados').update({ regras }).eq('id', simuladoId).eq('tenant_id', tenantId ?? SEM_TENANT)
   if (error) return { error: error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_simulados', entidadeId: simuladoId, depois: { caderno_id: cadernoId } })
   revalidatePath(`/admin/simulados/${simuladoId}`)
@@ -526,12 +536,20 @@ export async function addQuestaoToSimulado(simuladoId: string, questaoId: string
   if (!tenantId) return { error: 'Tenant não resolvido.' }
 
   const supabase = await createClient()
+  // Só adiciona questão DO tenant a simulado DO tenant (evita vínculo cross-tenant).
+  const [{ data: simOk }, { data: qOk }] = await Promise.all([
+    supabase.from('simulado_simulados').select('id').eq('id', simuladoId).eq('tenant_id', tenantId).maybeSingle(),
+    supabase.from('simulado_questoes').select('id').eq('id', questaoId).eq('tenant_id', tenantId).maybeSingle(),
+  ])
+  if (!simOk) return { error: 'Simulado não encontrado.' }
+  if (!qOk) return { error: 'Questão não encontrada.' }
   // Próxima ordem = MAX(ordem)+1 (não `count`) — evita reusar `ordem` após remoções e
   // colidir com uma linha existente.
   const { data: maxRow } = await supabase
     .from('simulado_prova_questoes')
     .select('ordem')
     .eq('simulado_id', simuladoId)
+    .eq('tenant_id', tenantId)
     .order('ordem', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -551,11 +569,13 @@ export async function addQuestaoToSimulado(simuladoId: string, questaoId: string
 
 export async function removeQuestaoFromSimulado(simuladoQuestaoId: string, simuladoId: string) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
   const supabase = await createClient()
   const { error } = await supabase
     .from('simulado_prova_questoes')
     .delete()
     .eq('id', simuladoQuestaoId)
+    .eq('tenant_id', tenantId ?? SEM_TENANT)
 
   if (error) return { error: error.message }
   revalidatePath(`/admin/simulados/${simuladoId}`)
@@ -566,8 +586,8 @@ export async function removeQuestaoFromSimulado(simuladoQuestaoId: string, simul
  * Monta o patch de publicação: gera embed_token se faltar (sem ele o aluno não abre a prova)
  * e carimba `regras.publicado_em` = agora (usado pela fita "novo" no portal do aluno).
  */
-async function patchPublicar(supabase: any, id: string): Promise<Record<string, unknown>> {
-  const { data } = await supabase.from('simulado_simulados').select('embed_token, regras').eq('id', id).maybeSingle()
+async function patchPublicar(supabase: any, id: string, tenantId: string | null): Promise<Record<string, unknown>> {
+  const { data } = await supabase.from('simulado_simulados').select('embed_token, regras').eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT).maybeSingle()
   const regras = { ...((data?.regras as Record<string, unknown>) ?? {}), publicado_em: new Date().toISOString() }
   const patch: Record<string, unknown> = { status: 'publicado', regras }
   if (!data?.embed_token) patch.embed_token = crypto.randomUUID()
@@ -576,6 +596,7 @@ async function patchPublicar(supabase: any, id: string): Promise<Record<string, 
 
 export async function publishSimuladoAction(id: string) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
   const supabase = await createClient()
 
   // Coerência antes de publicar (evita prova vazia/quebrada no ar): ≥1 questão e,
@@ -584,11 +605,14 @@ export async function publishSimuladoAction(id: string) {
     .from('simulado_simulados')
     .select('modo_aplicacao, data_inicio, data_fim')
     .eq('id', id)
+    .eq('tenant_id', tenantId ?? SEM_TENANT)
     .maybeSingle()
+  if (!sim) return { error: 'Simulado não encontrado.' }
   const { count: nQuestoes } = await supabase
     .from('simulado_prova_questoes')
     .select('*', { count: 'exact', head: true })
     .eq('simulado_id', id)
+    .eq('tenant_id', tenantId ?? SEM_TENANT)
   if (!nQuestoes || nQuestoes < 1) return { error: 'Adicione ao menos 1 questão antes de publicar.' }
   if (sim?.modo_aplicacao === 'janela_fixa') {
     if (!sim.data_inicio || !sim.data_fim) return { error: 'Para janela fixa, defina data de início e de fim.' }
@@ -597,8 +621,8 @@ export async function publishSimuladoAction(id: string) {
     }
   }
 
-  const patch = await patchPublicar(supabase, id)
-  const { error } = await supabase.from('simulado_simulados').update(patch).eq('id', id)
+  const patch = await patchPublicar(supabase, id, tenantId)
+  const { error } = await supabase.from('simulado_simulados').update(patch).eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT)
   if (error) return { error: error.message }
   await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'publicado' } })
   revalidatePath(`/admin/simulados/${id}`)
@@ -608,8 +632,9 @@ export async function publishSimuladoAction(id: string) {
 
 export async function encerrarSimuladoAction(id: string) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
   const supabase = await createClient()
-  await supabase.from('simulado_simulados').update({ status: 'encerrado' }).eq('id', id)
+  await supabase.from('simulado_simulados').update({ status: 'encerrado' }).eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT)
   await registrarAudit({ operacao: 'BLOQUEAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'encerrado' } })
   revalidatePath(`/admin/simulados/${id}`)
   revalidatePath('/admin/simulados')
@@ -617,9 +642,10 @@ export async function encerrarSimuladoAction(id: string) {
 
 export async function reabrirSimuladoAction(id: string) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
   const supabase = await createClient()
-  const patch = await patchPublicar(supabase, id)
-  await supabase.from('simulado_simulados').update(patch).eq('id', id)
+  const patch = await patchPublicar(supabase, id, tenantId)
+  await supabase.from('simulado_simulados').update(patch).eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT)
   await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'publicado', reaberto: true } })
   revalidatePath(`/admin/simulados/${id}`)
   revalidatePath('/admin/simulados')
@@ -629,10 +655,12 @@ export async function reabrirSimuladoAction(id: string) {
 export async function liberarItemAction(id: string, item: 'nota' | 'gabarito' | 'caderno', liberado: boolean) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const flag = { nota: 'nota_liberada', gabarito: 'gabarito_liberado', caderno: 'caderno_liberado' }[item]
+  const tenantId = await getCurrentTenantId()
   const supabase = await createClient()
-  const { data: s } = await supabase.from('simulado_simulados').select('regras').eq('id', id).maybeSingle()
+  const { data: s } = await supabase.from('simulado_simulados').select('regras').eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT).maybeSingle()
+  if (!s) return
   const regras = { ...(((s?.regras as Record<string, unknown>) ?? {})), [flag]: liberado }
-  await supabase.from('simulado_simulados').update({ regras }).eq('id', id)
+  await supabase.from('simulado_simulados').update({ regras }).eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT)
   await registrarAudit({ operacao: liberado ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_simulados', entidadeId: id, depois: { [flag]: liberado } })
   revalidatePath('/admin/simulados')
   revalidatePath(`/admin/simulados/${id}`)

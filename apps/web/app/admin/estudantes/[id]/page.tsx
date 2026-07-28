@@ -197,15 +197,15 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
   const emAndamentoSimIds = new Set((sessoes ?? []).filter((s: any) => s.status === 'em_andamento').map((s: any) => s.simulado_id).filter(Boolean))
   const atribuidos = new Map<string, string | null>() // simulado_id → expira_em (acesso avulso)
   const [{ data: mats }, { data: aces }] = await Promise.all([
-    svc.from('simulado_matriculas').select('simulado_id').eq('estudante_id', id),
-    svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', id),
+    svc.from('simulado_matriculas').select('simulado_id').eq('estudante_id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000'),
+    svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000'),
   ])
   for (const m of mats ?? []) if ((m as any).simulado_id) atribuidos.set((m as any).simulado_id, atribuidos.get((m as any).simulado_id) ?? null)
   for (const a of aces ?? []) if ((a as any).simulado_id) atribuidos.set((a as any).simulado_id, (a as any).expira_em ?? null)
   const pendentesIds = [...atribuidos.keys()].filter((sid) => !feitosSimIds.has(sid))
   let pendentes: { id: string; titulo: string; status: string; expira: string | null; iniciado: boolean }[] = []
   if (pendentesIds.length) {
-    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, status').in('id', pendentesIds).eq('deletado', false)
+    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, status').in('id', pendentesIds).eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     pendentes = (sims ?? []).map((s: any) => ({ id: s.id, titulo: s.titulo, status: s.status, expira: atribuidos.get(s.id) ?? null, iniciado: emAndamentoSimIds.has(s.id) }))
       .sort((a, b) => Number(b.iniciado) - Number(a.iniciado))
   }

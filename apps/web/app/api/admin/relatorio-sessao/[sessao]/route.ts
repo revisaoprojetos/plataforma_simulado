@@ -66,7 +66,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ sessao:
     for (const r of qp ?? []) cont.set((r as any).pasta_id, (cont.get((r as any).pasta_id) ?? 0) + 1)
     const melhor = [...cont.entries()].sort((a, b) => b[1] - a[1])[0]
     if (melhor) {
-      const { data: pasta, error } = await svc.from('simulado_pastas').select('grupos').eq('id', melhor[0]).maybeSingle()
+      const { data: pasta, error } = await svc.from('simulado_pastas').select('grupos').eq('id', melhor[0]).eq('tenant_id', access.tenantId).maybeSingle()
       const grupos: Grupo[] = !error && Array.isArray((pasta as any)?.grupos) ? (pasta as any).grupos : []
       porGrupo = grupos.map((g) => {
         let ac = 0, tt = 0

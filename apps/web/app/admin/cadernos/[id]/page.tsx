@@ -42,10 +42,10 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
   // Questões: do banco vinculado (se houver) ou publicadas do tenant.
   let questoes: any[] | null = null
   if (bancoId) {
-    const { data: vinc } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId)
+    const { data: vinc } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', tid)
     const ids = (vinc ?? []).map((v: any) => v.questao_id)
     questoes = ids.length
-      ? (await svc.from('simulado_questoes').select('id, enunciado, tipo, comentario_professor').in('id', ids).limit(1000)).data
+      ? (await svc.from('simulado_questoes').select('id, enunciado, tipo, comentario_professor').in('id', ids).eq('tenant_id', tid).limit(1000)).data
       : []
   } else {
     questoes = (await svc
@@ -60,7 +60,7 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
   // Alternativas de TODAS as questões do preview (para navegar por elas no repetidor).
   const amostraIds = (questoes ?? []).map((q: any) => q.id)
   const { data: alts } = amostraIds.length
-    ? await svc.from('simulado_alternativas').select('questao_id, texto, ordem, correta, comentario, lei').in('questao_id', amostraIds)
+    ? await svc.from('simulado_alternativas').select('questao_id, texto, ordem, correta, comentario, lei').in('questao_id', amostraIds).eq('tenant_id', tid)
     : { data: [] as any[] }
   const altMap = new Map<string, any[]>()
   for (const a of alts ?? []) { const arr = altMap.get(a.questao_id) ?? []; arr.push(a); altMap.set(a.questao_id, arr) }

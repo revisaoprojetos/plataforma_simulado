@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ChevronLeft, Radio } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AoVivoPainel } from '@/components/admin/simulado-ao-vivo'
@@ -9,7 +10,8 @@ import { SimuladoProgresso } from '@/components/admin/simulado-progresso'
 export default async function AoVivoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: sim } = await supabase.from('simulado_simulados').select('titulo').eq('id', id).maybeSingle()
+  const tenantId = await getCurrentTenantId()
+  const { data: sim } = await supabase.from('simulado_simulados').select('titulo').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
 
   return (
     <div className="space-y-5">

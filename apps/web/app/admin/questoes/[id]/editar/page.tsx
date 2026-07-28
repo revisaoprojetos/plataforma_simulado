@@ -28,13 +28,15 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
       .from('simulado_questoes')
       .select('*, bancas:simulado_bancas(nome), disciplinas:simulado_disciplinas(nome)')
       .eq('id', id)
-      .single(),
+      .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+      .maybeSingle(),
     supabase.from('simulado_bancas').select('nome').order('nome'),
     supabase.from('simulado_disciplinas').select('nome').order('nome'),
     supabase
       .from('simulado_alternativas')
       .select('*')
       .eq('questao_id', id)
+      .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
       .order('ordem'),
     admin.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome'),
     admin.from('simulado_questao_pasta').select('pasta_id').eq('questao_id', id),

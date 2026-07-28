@@ -63,6 +63,7 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
       .from('simulado_questoes')
       .select('id, enunciado, tipo, nivel_dificuldade, status, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
       .in('id', ids)
+      .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
       // Ordem de leitura (a 1ª questão importada aparece primeiro). Import insere 1→100
       // com created_at crescente; ASC preserva a ordem do CSV. `ordem_questoes` (abaixo)
       // ainda sobrepõe quando o admin reordena manualmente.
@@ -73,7 +74,7 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
   // Ordem manual das questões no banco (tolerante: coluna pode não existir até a migration).
   let ordemQuestoes: string[] = []
   {
-    const { data: oRow, error: oErr } = await svc.from('simulado_pastas').select('ordem_questoes').eq('id', id).maybeSingle()
+    const { data: oRow, error: oErr } = await svc.from('simulado_pastas').select('ordem_questoes').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
     if (!oErr && Array.isArray((oRow as any)?.ordem_questoes)) ordemQuestoes = (oRow as any).ordem_questoes
   }
   if (ordemQuestoes.length && questoes.length) {

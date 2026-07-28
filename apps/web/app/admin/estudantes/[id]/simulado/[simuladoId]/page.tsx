@@ -22,7 +22,7 @@ export default async function EstudanteSimuladoPage({ params }: { params: Promis
 
   const [{ data: est }, { data: sim }] = await Promise.all([
     svc.from('simulado_estudantes').select('id, nome').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle(),
-    svc.from('simulado_simulados').select('id, titulo, status, regras').eq('id', simuladoId).maybeSingle(),
+    svc.from('simulado_simulados').select('id, titulo, status, regras').eq('id', simuladoId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle(),
   ])
   if (!est || !sim) notFound()
 

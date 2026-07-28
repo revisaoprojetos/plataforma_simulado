@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { SimuladoForm } from '@/components/admin/simulado-form'
@@ -34,12 +35,14 @@ const statusConfig: Record<string, { label: string; class: string }> = {
 export default async function SimuladoDetailPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
 
   const { data: simulado } = await supabase
     .from('simulado_simulados')
     .select('*')
     .eq('id', id)
-    .single()
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+    .maybeSingle()
 
   if (!simulado) {
     return (
