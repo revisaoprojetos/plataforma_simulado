@@ -308,17 +308,9 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
     setShowConfirmacao(false)
     setShowRevisao(false)
 
-    // FLUSH: reenvia TODAS as respostas marcadas ANTES de corrigir. Isso garante que nada se perca
-    // caso algum auto-save tenha falhado no meio da prova (rede instável) — o servidor corrige com
-    // base nas respostas gravadas, então elas precisam estar todas lá antes de finalizar.
-    try {
-      const pares = Object.entries(respostas)
-      if (pares.length) {
-        const faltaram = (await Promise.all(pares.map(([q, a]) => enviarResposta(q, a)))).filter((ok) => !ok).length
-        if (faltaram) { await new Promise((r) => setTimeout(r, 500)); await Promise.all(pares.map(([q, a]) => enviarResposta(q, a))) }
-      }
-    } catch { /* best-effort — segue para finalizar mesmo assim */ }
-
+    // RECONCILIAÇÃO NO ENVIO: manda o mapa COMPLETO do que o aluno marcou. O servidor compara
+    // com o que está gravado e preenche o que faltou/divergiu ANTES de corrigir — assim nenhuma
+    // questão marcada fica de fora se algum auto-save falhou no meio da prova (rede instável).
     let sucesso = false
     try {
       const res = await fetch('/api/sessoes/finalizar', {
@@ -327,6 +319,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
         body: JSON.stringify({
           sessao_id: sessao?.id,
           session_token: sessionToken,
+          respostas, // { questao_id: alternativa_id } — fonte do que foi marcado no cliente
         }),
       })
 
