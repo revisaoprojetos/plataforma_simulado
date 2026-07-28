@@ -3,6 +3,19 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
 /**
+ * Domínio do cookie de sessão. Quando definido (ex.: ".revisaopge.com.br"), a
+ * sessão passa a valer em TODOS os subdomínios (login compartilhado entre
+ * plataformas). Se vazio (dev/localhost), mantém o comportamento por-host —
+ * nada muda. Precisa ser NEXT_PUBLIC_ porque o cliente do navegador também usa.
+ */
+const COOKIE_DOMAIN = process.env.NEXT_PUBLIC_COOKIE_DOMAIN?.trim() || undefined
+
+/** Injeta o domínio nas opções do cookie (set E delete usam o mesmo escopo). */
+function comDominio(options?: Record<string, unknown>) {
+  return COOKIE_DOMAIN ? { ...(options ?? {}), domain: COOKIE_DOMAIN } : options
+}
+
+/**
  * Cliente service-role REAL (sem sessão de usuário) — bypassa RLS de fato.
  * Use APENAS em operações administrativas confiáveis (gestão de tenants,
  * onboarding, seeds). O createServiceClient abaixo herda a sessão dos cookies
@@ -30,7 +43,7 @@ export async function createClient() {
         setAll(cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options as Parameters<typeof cookieStore.set>[2])
+              cookieStore.set(name, value, comDominio(options) as Parameters<typeof cookieStore.set>[2])
             )
           } catch {}
         },
@@ -53,7 +66,7 @@ export async function createServiceClient() {
         setAll(cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options as Parameters<typeof cookieStore.set>[2])
+              cookieStore.set(name, value, comDominio(options) as Parameters<typeof cookieStore.set>[2])
             )
           } catch {}
         },
