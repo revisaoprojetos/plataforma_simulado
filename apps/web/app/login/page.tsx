@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { LoginEpic, type Plataforma } from '@/components/auth/login-epic'
+import { getConfigGlobal } from '@/lib/config-global'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,18 +33,22 @@ export default async function LoginPage() {
     modoPadrao: t.tema?.modo_padrao === 'dark' ? 'dark' : 'light',
   }))
 
+  // Marca NEUTRA da entrada: vem da config GLOBAL (não de um tenant). Fallback ao
+  // comportamento antigo (plataformas[0]) enquanto a config global não estiver preenchida,
+  // para não mudar a aparência atual antes do super-admin configurar a entrada neutra.
+  const cfg = await getConfigGlobal()
   const marca = {
-    nome: plataformas[0]?.nome ?? 'Plataforma de Simulados',
-    logo: plataformas[0]?.logo ?? null,
-    logoGrande: plataformas[0]?.logoGrande ?? null,
-    cor: plataformas[0]?.cor ?? null,
-    modoPadrao: plataformas[0]?.modoPadrao ?? 'light',
-    loginLayout: plataformas[0]?.loginLayout ?? 'painel',
+    nome: cfg?.entrada_nome || plataformas[0]?.nome || 'Plataforma de Simulados',
+    logo: cfg?.entrada_logo_url ?? plataformas[0]?.logo ?? null,
+    logoGrande: cfg?.entrada_logo_url ?? plataformas[0]?.logoGrande ?? null,
+    cor: cfg?.entrada_cor ?? plataformas[0]?.cor ?? null,
+    modoPadrao: cfg?.entrada_modo ?? plataformas[0]?.modoPadrao ?? 'light',
+    loginLayout: cfg?.login_layout ?? plataformas[0]?.loginLayout ?? 'painel',
     logoBg: plataformas[0]?.logoBg ?? '#ffffff',
     logoEstilo: plataformas[0]?.logoEstilo ?? 'arredondado',
-    logoFiltro: plataformas[0]?.logoFiltro ?? 'none',
+    logoFiltro: cfg?.logo_filtro_login ?? plataformas[0]?.logoFiltro ?? 'none',
     // Só faz sentido pular a seleção com uma plataforma; com várias, mantém a escolha.
-    mostrarSelecao: plataformas.length > 1 ? true : (plataformas[0]?.selecao ?? true),
+    mostrarSelecao: plataformas.length > 1 ? true : (cfg?.login_selecao ?? plataformas[0]?.selecao ?? true),
   }
 
   return (
