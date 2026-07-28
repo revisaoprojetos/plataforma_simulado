@@ -13,6 +13,20 @@ export interface Access {
 const EMPTY: Access = { userId: null, tenantId: null, role: null, isAdmin: false, permissions: [] }
 
 /**
+ * Consulta a tabela simulado_super_admins via service role (bypassa RLS). Tolerante:
+ * tabela ausente/erro → false. `function` (não arrow) para poder ser usada em
+ * getCurrentAccess mesmo estando declarada depois (hoisting).
+ */
+async function consultarSuperAdmin(svc: ReturnType<typeof createAdminClient>, userId: string): Promise<boolean> {
+  try {
+    const { data } = await svc.from('simulado_super_admins').select('user_id').eq('user_id', userId).maybeSingle()
+    return !!data
+  } catch {
+    return false
+  }
+}
+
+/**
  * Resolve o acesso do usuário atual: papel (de tenant_acessos) + permissões
  * (roles → role_permissions → permissions). Papel "admin" tem acesso total.
  */
@@ -29,6 +43,12 @@ export const getCurrentAccess = cache(async (): Promise<Access> => {
   // pode depender do RLS do banco — em bancos com RLS incompleto (migrados), createServiceClient
   // rodaria como o usuário e falharia, zerando o acesso do admin.
   const svc = createAdminClient()
+
+  // Super-admin GLOBAL: acesso TOTAL a qualquer plataforma (acima dos tenants), mesmo sem
+  // papel no tenant atual. Checado ANTES do papel por-tenant — é o topo da hierarquia.
+  if (await consultarSuperAdmin(svc, user.id)) {
+    return { userId: user.id, tenantId, role: 'super_admin', isAdmin: true, permissions: ['*'] }
+  }
 
   const { data: acesso } = await svc
     .from('simulado_tenant_acessos')
@@ -80,17 +100,7 @@ export const isSuperAdmin = cache(async (): Promise<boolean> => {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return false
-  try {
-    const svc = createAdminClient()
-    const { data } = await svc
-      .from('simulado_super_admins')
-      .select('user_id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-    return !!data
-  } catch {
-    return false
-  }
+  return consultarSuperAdmin(createAdminClient(), user.id)
 })
 
 /** Verifica uma permissão sobre um Access já resolvido. */
