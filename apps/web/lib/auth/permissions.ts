@@ -67,6 +67,32 @@ export const getCurrentAccess = cache(async (): Promise<Access> => {
   return { userId: user.id, tenantId, role, isAdmin: false, permissions }
 })
 
+/**
+ * Super-admin GLOBAL (tabela simulado_super_admins, sem tenant) — acima de todas as
+ * plataformas. Controla gestão de plataformas, entrada neutra e compartilhamento.
+ * Ortogonal ao papel por-tenant: não depende do subdomínio atual. Resolvido via service
+ * role real (nunca confia no cliente). Tolerante: se a tabela ainda não foi aplicada,
+ * retorna false (ninguém é super-admin) — seguro por padrão.
+ */
+export const isSuperAdmin = cache(async (): Promise<boolean> => {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return false
+  try {
+    const svc = createAdminClient()
+    const { data } = await svc
+      .from('simulado_super_admins')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    return !!data
+  } catch {
+    return false
+  }
+})
+
 /** Verifica uma permissão sobre um Access já resolvido. */
 export function accessCan(access: Access, permission: string): boolean {
   if (access.isAdmin) return true
