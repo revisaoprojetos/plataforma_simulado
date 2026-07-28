@@ -258,26 +258,31 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segundosRestantes])
 
-  // Auto-save
+  // Envia UMA resposta ao servidor; retorna se gravou (true) ou não (false). Reutilizado pelo flush.
+  const enviarResposta = useCallback(async (questaoId: string, alternativaId: string): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/sessoes/resposta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessao_id: sessao?.id, questao_id: questaoId, alternativa_id: alternativaId, session_token: sessionToken }),
+      })
+      return res.ok // ⚠️ checar res.ok: um 4xx/5xx NÃO lança, mas a resposta não foi gravada.
+    } catch {
+      return false
+    }
+  }, [sessao?.id, sessionToken])
+
+  // Auto-save: grava a marcação; se falhar (rede/erro), tenta de novo uma vez. Se ainda falhar,
+  // a resposta continua no localStorage e é reenviada no reload E no flush ao finalizar.
   const autoSave = useCallback(async (questaoId: string, alternativaId: string) => {
     setSalvando(questaoId)
     try {
-      await fetch('/api/sessoes/resposta', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessao_id: sessao?.id,
-          questao_id: questaoId,
-          alternativa_id: alternativaId,
-          session_token: sessionToken,
-        }),
-      })
-    } catch {
-      // Silently fail - will retry on next interaction
+      let ok = await enviarResposta(questaoId, alternativaId)
+      if (!ok) { await new Promise((r) => setTimeout(r, 600)); ok = await enviarResposta(questaoId, alternativaId) }
     } finally {
       setSalvando(null)
     }
-  }, [sessao?.id, sessionToken])
+  }, [enviarResposta])
 
   function handleResponder(questaoId: string, alternativaId: string) {
     setRespostas((prev) => {
@@ -303,6 +308,18 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
     setShowConfirmacao(false)
     setShowRevisao(false)
 
+    // FLUSH: reenvia TODAS as respostas marcadas ANTES de corrigir. Isso garante que nada se perca
+    // caso algum auto-save tenha falhado no meio da prova (rede instável) — o servidor corrige com
+    // base nas respostas gravadas, então elas precisam estar todas lá antes de finalizar.
+    try {
+      const pares = Object.entries(respostas)
+      if (pares.length) {
+        const faltaram = (await Promise.all(pares.map(([q, a]) => enviarResposta(q, a)))).filter((ok) => !ok).length
+        if (faltaram) { await new Promise((r) => setTimeout(r, 500)); await Promise.all(pares.map(([q, a]) => enviarResposta(q, a))) }
+      }
+    } catch { /* best-effort — segue para finalizar mesmo assim */ }
+
+    let sucesso = false
     try {
       const res = await fetch('/api/sessoes/finalizar', {
         method: 'POST',
@@ -316,6 +333,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
       if (res.ok) {
         const data = await res.json()
         setResultado(data)
+        sucesso = true
       } else {
         // Mock resultado
         const total = sessao?.questoes.length ?? 0
@@ -335,14 +353,17 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
       setStatus('finalizada')
     } finally {
       setIsFinalizando(false)
-      // Simulado enviado: limpa o backup local para não "retomar" uma sessão já finalizada.
-      try {
-        if (sessao?.id) {
-          localStorage.removeItem('prog_' + sessao.id)
-          localStorage.removeItem('resp_' + sessao.id)
-          localStorage.removeItem('elim_' + sessao.id)
-        }
-      } catch {}
+      // Só limpa o backup local se a finalização REALMENTE deu certo. Se falhou, mantém o backup
+      // para o re-sync do próximo load recuperar as respostas (senão perderíamos as marcações).
+      if (sucesso) {
+        try {
+          if (sessao?.id) {
+            localStorage.removeItem('prog_' + sessao.id)
+            localStorage.removeItem('resp_' + sessao.id)
+            localStorage.removeItem('elim_' + sessao.id)
+          }
+        } catch {}
+      }
     }
   }
 
