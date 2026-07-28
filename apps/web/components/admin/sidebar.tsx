@@ -63,6 +63,7 @@ interface NavItem {
   icon: IconType
   exact?: boolean
   perm?: string // permissão necessária para ver o item
+  superOnly?: boolean // só aparece para super-admin GLOBAL (não por-tenant)
 }
 
 interface NavGroup {
@@ -143,7 +144,7 @@ const navGroups: NavGroup[] = [
     label: 'Configuração',
     icon: SlidersHorizontal,
     items: [
-      { label: 'Plataformas', href: '/admin/tenants', icon: Building2, perm: 'tenants:manage' },
+      { label: 'Plataformas', href: '/admin/tenants', icon: Building2, superOnly: true },
       { label: 'Administradores', href: '/admin/administradores', icon: UserCog, perm: 'rbac:view' },
       { label: 'API Keys', href: '/admin/api-keys', icon: KeyRound, perm: 'api_keys:manage' },
       { label: 'Aparência', href: '/admin/configuracoes', icon: Palette, exact: true, perm: 'configuracoes:view' },
@@ -181,14 +182,14 @@ function filtroLogo(f?: string): string | undefined {
   return undefined
 }
 
-export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none' }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string }) {
+export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', isSuperAdmin = false }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; isSuperAdmin?: boolean }) {
   const pathname = usePathname()
   const search = useSearchParams()
   const can = useCan()
 
-  // Filtra itens/grupos por permissão do usuário (e oculta a parte discursiva quando a flag está ligada).
+  // Filtra itens/grupos por permissão do usuário (super-admin gate + flag discursiva).
   const gruposVisiveis = navGroups
-    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !(OCULTAR_DISCURSIVA && i.href === '/admin/correcao')) }))
+    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !(i.superOnly && !isSuperAdmin) && !(OCULTAR_DISCURSIVA && i.href === '/admin/correcao')) }))
     .filter((g) => g.items.length > 0)
 
   const grupoAtivo = (group: NavGroup) => group.items.some((i) => itemAtivo(i, pathname, search))

@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { getCurrentAccess } from '@/lib/auth/permissions'
+import { isSuperAdmin } from '@/lib/auth/permissions'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -11,14 +11,13 @@ import { Building2, Plus } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
 
 export default async function TenantsPage() {
-  const access = await getCurrentAccess()
-  const podeGerenciar = access.isAdmin || access.permissions.includes('tenants:manage')
-
-  if (!podeGerenciar) {
+  // Gestão de plataformas é EXCLUSIVA do super-admin GLOBAL — nenhum admin de tenant
+  // (nem mesmo isAdmin) alcança outras plataformas. Isolamento por design.
+  if (!(await isSuperAdmin())) {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-bold tracking-tight">Plataformas</h1>
-        <SemPermissao>Você não tem permissão para gerenciar plataformas.</SemPermissao>
+        <SemPermissao>Área exclusiva do super-administrador global.</SemPermissao>
       </div>
     )
   }

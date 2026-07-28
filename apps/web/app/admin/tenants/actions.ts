@@ -1,7 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/server'
-import { checkPermission } from '@/lib/auth/permissions'
+import { isSuperAdmin } from '@/lib/auth/permissions'
 import { seedTenantDefaults } from '@/lib/auth/onboard-tenant'
 import { registrarAudit } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
@@ -15,7 +15,7 @@ interface NovoTenant {
 }
 
 export async function createTenantAction(data: NovoTenant): Promise<{ ok: boolean; error?: string; senha?: string }> {
-  if (!(await checkPermission('tenants:manage'))) return { ok: false, error: 'Você não tem permissão para gerenciar plataformas.' }
+  if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
 
   const nome = data.nome.trim()
   const slug = data.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '')
@@ -74,7 +74,7 @@ export async function createTenantAction(data: NovoTenant): Promise<{ ok: boolea
 }
 
 export async function toggleTenantAtivoAction(id: string, ativo: boolean): Promise<{ ok: boolean; error?: string }> {
-  if (!(await checkPermission('tenants:manage'))) return { ok: false, error: 'Sem permissão.' }
+  if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
   const svc = createAdminClient()
   const { error } = await svc.from('simulado_tenants').update({ ativo }).eq('id', id)
   if (error) return { ok: false, error: error.message }

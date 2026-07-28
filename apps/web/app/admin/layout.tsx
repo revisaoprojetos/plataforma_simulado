@@ -4,7 +4,7 @@ import { AdminSidebar } from '@/components/admin/sidebar'
 import { AdminHeader } from '@/components/admin/header'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { CanProvider } from '@/components/auth/can-provider'
-import { getCurrentAccess } from '@/lib/auth/permissions'
+import { getCurrentAccess, isSuperAdmin } from '@/lib/auth/permissions'
 import { getTenantTheme } from '@/lib/tenant-theme'
 import { SplashSistema } from '@/components/admin/splash-sistema'
 import { TourProvider } from '@/components/admin/tour-guiado'
@@ -49,11 +49,14 @@ export default async function AdminLayout({
 
   // Resolve permissões do usuário no tenant atual (para esconder UI por papel).
   const access = await getCurrentAccess()
+  // Super-admin GLOBAL (acima das plataformas) — ortogonal ao papel por-tenant.
+  const superAdmin = await isSuperAdmin()
 
   // Gate de papel (defesa em profundidade): só a EQUIPE entra no /admin. Um usuário
   // autenticado sem papel de staff (ou papel "estudante") é mandado para a área do aluno —
   // impede que qualquer conta logada alcance server actions do admin. As actions também checam.
-  if (access.tenantId && (!access.role || access.role === 'estudante')) {
+  // Exceção: super-admin global entra mesmo sem papel no tenant atual.
+  if (access.tenantId && (!access.role || access.role === 'estudante') && !superAdmin) {
     redirect('/aluno')
   }
 
@@ -71,7 +74,7 @@ export default async function AdminLayout({
       />
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
-          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none'} />
+          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none'} isSuperAdmin={superAdmin} />
           <TourProvider>
             <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
               <AdminHeader userName={userName} userEmail={userEmail} />
