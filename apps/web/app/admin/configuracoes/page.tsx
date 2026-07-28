@@ -22,13 +22,10 @@ export async function salvarTema(tema: Record<string, unknown>) {
 
   const svc = createAdminClient()
 
-  // Mira o tenant atual (resolvido pela sessão/subdomínio); fallback p/ o 1º ativo.
-  let tenantId = access.tenantId
-  if (!tenantId) {
-    const { data: tenant } = await svc.from('simulado_tenants').select('id').eq('ativo', true).limit(1).single()
-    tenantId = tenant?.id ?? null
-  }
-  if (!tenantId) throw new Error('Tenant não encontrado')
+  // Mira SEMPRE o tenant atual (subdomínio). SEM fallback p/ "1º ativo": num ambiente
+  // multi-plataforma isso poderia gravar no tenant ERRADO. Sem tenant resolvido → aborta.
+  const tenantId = access.tenantId
+  if (!tenantId) throw new Error('Tenant não resolvido — recarregue a página.')
 
   const { data: anterior } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
 

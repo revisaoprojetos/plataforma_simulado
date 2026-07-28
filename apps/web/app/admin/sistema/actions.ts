@@ -9,17 +9,14 @@ import { normalizarManutencao, type ManutencaoSistema } from '@/lib/sistema/manu
 /** Salva a manutenção da plataforma em tenants.tema.manutencao_sistema (merge, sem apagar o tema). */
 export async function salvarManutencaoSistema(input: ManutencaoSistema) {
   const access = await getCurrentAccess()
-  if (!(access.isAdmin || access.permissions.includes('configuracoes:view'))) {
+  if (!(access.isAdmin || access.permissions.includes('configuracoes:manage'))) {
     return { error: 'Sem permissão para alterar a manutenção do sistema.' }
   }
 
   const svc = createAdminClient()
-  let tenantId = access.tenantId
-  if (!tenantId) {
-    const { data } = await svc.from('simulado_tenants').select('id').eq('ativo', true).limit(1).single()
-    tenantId = data?.id ?? null
-  }
-  if (!tenantId) return { error: 'Tenant não encontrado.' }
+  // SEM fallback p/ "1º ativo" — poderia gravar no tenant errado. Sem tenant → aborta.
+  const tenantId = access.tenantId
+  if (!tenantId) return { error: 'Tenant não resolvido — recarregue a página.' }
 
   const { data: anterior } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
   const temaAnterior = (anterior?.tema as Record<string, unknown>) ?? {}

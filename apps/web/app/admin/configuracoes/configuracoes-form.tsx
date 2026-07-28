@@ -68,10 +68,6 @@ function cssVarsFromCores(c: Cores): string {
 type LogoEstilo = 'quadrado' | 'arredondado' | 'borda'
 type SelecaoEstilo = 'quadrada' | 'redonda' | 'borda'
 type LoginLayout = 'painel' | 'centralizado'
-const LOGIN_LAYOUTS: { id: LoginLayout; nome: string; desc: string }[] = [
-  { id: 'painel', nome: 'Painel', desc: 'Imagem grande ao lado do formulário' },
-  { id: 'centralizado', nome: 'Simples', desc: 'Card único no centro da tela' },
-]
 type LogoFiltro = 'none' | 'branco' | 'preto'
 type PresetCor = { id: string; nome: string; cores: Cores; coresDark: Cores }
 
@@ -91,8 +87,9 @@ interface Tema {
   nome_site: string; subtitulo_site: string; titulo_pagina: string
   logo_url: string | null; logo_grande_url: string | null; logo_selecao_url: string | null
   logo_png_bg: string; logo_estilo: LogoEstilo; logo_filtro_login: LogoFiltro; logo_filtro_sistema: LogoFiltro; logo_selecao_estilo: SelecaoEstilo
-  login_layout: LoginLayout   // layout da tela de login da plataforma
-  login_selecao: boolean      // mostrar a tela de seleção de plataforma antes do login
+  // Entrada é GLOBAL (/admin/entrada): estes 3 ficam só para a PRÉVIA do login e NÃO são salvos (ver aplicarNoSistema).
+  login_layout: LoginLayout
+  login_selecao: boolean
   cores: Cores        // paleta do modo CLARO
   coresDark: Cores    // paleta do modo ESCURO
 }
@@ -408,8 +405,14 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
   function aplicarNoSistema() {
     start(async () => {
       const { coresDark, ...restoT } = t
+      // Entrada é GLOBAL (/admin/entrada): NÃO persistir login_layout/login_selecao/logo_filtro_login
+      // — eles existem no estado só para a prévia. Removê-los evita sobrescrever a config global no save.
+      const semEntrada: Record<string, unknown> = { ...restoT }
+      delete semEntrada.login_layout
+      delete semEntrada.login_selecao
+      delete semEntrada.logo_filtro_login
       const payload = {
-        ...restoT,
+        ...semEntrada,
         cores_dark: coresDark,
         presets_cor: presetsCustom,
         cor_primaria: t.cores.btn, cor_secundaria: t.cores.card, cor_accent: t.cores.accent, logo_url: t.logo_url ?? undefined,
@@ -527,35 +530,15 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
                 <div className="space-y-1.5"><span className="text-xs text-muted-foreground">Borda</span>
                   <div className="flex gap-1.5">{LOGO_ESTILOS.map((e) => (<button key={e.id} type="button" onClick={() => setT((p) => ({ ...p, logo_estilo: e.id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_estilo === e.id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{e.nome}</button>))}</div>
                 </div>
-                <div className="space-y-1.5"><span className="text-xs text-muted-foreground">Gama da logo no login</span>
-                  <div className="flex gap-1.5">{(([['none', 'Normal'], ['branco', 'Branca'], ['preto', 'Preta']]) as [LogoFiltro, string][]).map(([id, nome]) => (<button key={id} type="button" onClick={() => setT((p) => ({ ...p, logo_filtro_login: id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_filtro_login === id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{nome}</button>))}</div>
-                  <p className="text-[10px] text-muted-foreground">Recolore a logo só na tela de login — independente da logo dentro do sistema.</p>
-                </div>
               </div>
             )}
             <div className="space-y-1.5"><span className="text-xs text-muted-foreground">Formato da imagem de seleção</span>
               <div className="flex gap-1.5">{SELECAO_ESTILOS.map((e) => (<button key={e.id} type="button" onClick={() => setT((p) => ({ ...p, logo_selecao_estilo: e.id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_selecao_estilo === e.id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{e.nome}</button>))}</div>
             </div>
-            <div className="space-y-1.5"><span className="text-xs text-muted-foreground">Layout da tela de login</span>
-              <div className="grid grid-cols-2 gap-1.5">{LOGIN_LAYOUTS.map((e) => (
-                <button key={e.id} type="button" onClick={() => setT((p) => ({ ...p, login_layout: e.id }))}
-                  className={`rounded-md border px-2 py-1.5 text-left transition-colors ${t.login_layout === e.id ? 'border-primary bg-primary/10' : 'hover:border-primary/50'}`}>
-                  <span className="block text-[11px] font-semibold">{e.nome}</span>
-                  <span className="block text-[10px] leading-tight text-muted-foreground">{e.desc}</span>
-                </button>))}
-              </div>
-              <p className="text-[10px] text-muted-foreground">O "Simples" deixa tudo centralizado no meio da tela — mais fácil para o aluno.</p>
-            </div>
-            <div className="space-y-1.5"><span className="text-xs text-muted-foreground">Tela de seleção de plataforma</span>
-              <div className="grid grid-cols-2 gap-1.5">
-                {([[true, 'Ativada', 'Escolhe a plataforma antes de entrar'], [false, 'Direto no login', 'Pula a seleção e vai direto ao login']] as const).map(([val, lbl, desc]) => (
-                  <button key={String(val)} type="button" onClick={() => setT((p) => ({ ...p, login_selecao: val }))}
-                    className={`rounded-md border px-2 py-1.5 text-left transition-colors ${t.login_selecao === val ? 'border-primary bg-primary/10' : 'hover:border-primary/50'}`}>
-                    <span className="block text-[11px] font-semibold">{lbl}</span>
-                    <span className="block text-[10px] leading-tight text-muted-foreground">{desc}</span>
-                  </button>))}
-              </div>
-              <p className="text-[10px] text-muted-foreground">"Direto no login" remove a etapa de escolher plataforma e o botão "Trocar plataforma" — mais direto, menos cliques.</p>
+            <div className="rounded-lg border border-dashed bg-muted/20 p-3 text-[11px] text-muted-foreground">
+              O layout da tela de login e a tela de seleção de plataforma agora são definidos de forma
+              global em <span className="font-medium text-foreground">Configuração → Entrada</span> (super-admin),
+              iguais para todas as plataformas.
             </div>
             <div className="space-y-2.5 border-t pt-3">
               <div className="space-y-1.5"><label className="text-xs text-muted-foreground">Nome do site</label>

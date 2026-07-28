@@ -1,4 +1,5 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { getCurrentAccess } from '@/lib/auth/permissions'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Code, ExternalLink } from 'lucide-react'
@@ -13,13 +14,16 @@ interface PageProps {
 
 export default async function SimuladoEmbedPage({ params }: PageProps) {
   const { id } = await params
-  const supabase = await createServiceClient()
+  // Isolamento de tenant: só o tenant DONO do simulado vê o embed dele.
+  const access = await getCurrentAccess()
+  const supabase = createAdminClient()
 
   const { data: simulado } = await supabase
     .from('simulado_simulados')
     .select('id, titulo, status, embed_token, embed_ativo, metodo_identificacao')
     .eq('id', id)
-    .single()
+    .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
+    .maybeSingle()
 
   if (!simulado) {
     notFound()
