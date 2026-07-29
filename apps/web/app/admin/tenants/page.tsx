@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/auth/permissions'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { TenantToggle } from '@/components/admin/tenant-toggle'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
@@ -80,11 +80,7 @@ export default async function TenantsPage() {
                     <TableCell className="text-sm capitalize">{t.plano}</TableCell>
                     <TableCell className="text-sm">{contagem[t.id] ?? 0}</TableCell>
                     <TableCell>
-                      {t.ativo ? (
-                        <Badge variant="default">Ativa</Badge>
-                      ) : (
-                        <Badge variant="secondary">Inativa</Badge>
-                      )}
+                      <TenantToggle id={t.id} nome={t.nome} ativo={t.ativo} />
                     </TableCell>
                   </TableRow>
                 ))

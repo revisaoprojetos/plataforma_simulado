@@ -78,6 +78,7 @@ export async function toggleTenantAtivoAction(id: string, ativo: boolean): Promi
   const svc = createAdminClient()
   const { error } = await svc.from('simulado_tenants').update({ ativo }).eq('id', id)
   if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: ativo ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_tenants', entidadeId: id, tenantId: id, depois: { ativo } })
   revalidatePath('/admin/tenants')
   return { ok: true }
 }
