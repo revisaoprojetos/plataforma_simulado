@@ -29,9 +29,21 @@ const KEYFRAMES = `
 @keyframes floatBadge { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
 @keyframes gridPan { from { background-position: 0 0 } to { background-position: 44px 44px } }
 @keyframes ringSpin { to { transform: rotate(360deg) } }
-@keyframes shimmer { to { background-position: 200% center } }
+@keyframes shimmer { to { background-position: -200% center } }
+@keyframes floatUp { 0% { transform: translateY(10px); opacity: 0 } 12%,88% { opacity: .5 } 100% { transform: translateY(-130px); opacity: 0 } }
 @media (prefers-reduced-motion: reduce) { .lg-anim { animation: none !important } }
 `
+
+// Partículas flutuantes (posições/tempos FIXOS p/ não quebrar a hidratação SSR).
+const PARTICULAS = [
+  { l: '8%', t: '78%', s: 3, d: 0, dur: 11 }, { l: '18%', t: '60%', s: 2, d: 2.4, dur: 14 },
+  { l: '27%', t: '85%', s: 4, d: 1.1, dur: 12 }, { l: '38%', t: '70%', s: 2, d: 3.6, dur: 15 },
+  { l: '49%', t: '88%', s: 3, d: .6, dur: 10 }, { l: '58%', t: '64%', s: 2, d: 2.8, dur: 13 },
+  { l: '67%', t: '82%', s: 4, d: 1.7, dur: 12 }, { l: '76%', t: '58%', s: 2, d: 4.2, dur: 16 },
+  { l: '85%', t: '80%', s: 3, d: .3, dur: 11 }, { l: '92%', t: '66%', s: 2, d: 3.1, dur: 14 },
+  { l: '13%', t: '92%', s: 2, d: 5, dur: 13 }, { l: '44%', t: '55%', s: 3, d: 2, dur: 15 },
+  { l: '62%', t: '90%', s: 2, d: .9, dur: 12 }, { l: '81%', t: '52%', s: 3, d: 3.9, dur: 16 },
+]
 
 /** Fundo aurora neutro (compartilhado por todos os modos). */
 function Aurora() {
@@ -48,6 +60,10 @@ function Aurora() {
       <div className="lg-anim absolute -left-1/4 -top-1/3 h-[46rem] w-[46rem] rounded-full blur-[130px]" style={{ background: 'radial-gradient(circle, rgba(99,102,241,.55), transparent 65%)', animation: 'auroraA 20s ease-in-out infinite' }} />
       <div className="lg-anim absolute -bottom-1/3 -right-1/4 h-[42rem] w-[42rem] rounded-full blur-[130px]" style={{ background: 'radial-gradient(circle, rgba(139,92,246,.5), transparent 65%)', animation: 'auroraB 24s ease-in-out infinite' }} />
       <div className="lg-anim absolute left-1/3 top-1/4 h-[34rem] w-[34rem] rounded-full blur-[130px]" style={{ background: 'radial-gradient(circle, rgba(56,189,248,.4), transparent 65%)', animation: 'auroraC 26s ease-in-out infinite' }} />
+      {/* partículas flutuantes */}
+      {PARTICULAS.map((p, i) => (
+        <span key={i} className="lg-anim absolute rounded-full bg-indigo-200/70" style={{ left: p.l, top: p.t, height: p.s, width: p.s, animation: `floatUp ${p.dur}s ease-in-out ${p.d}s infinite`, boxShadow: '0 0 6px rgba(165,180,252,.8)' }} />
+      ))}
       {/* vinheta */}
       <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, transparent 30%, rgba(2,6,23,.7) 100%)' }} />
     </div>
@@ -218,7 +234,7 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
       <div className="mb-6 flex flex-col items-center gap-3 text-center">
         {Emblema}
         <div>
-          <h1 className="bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-2xl font-bold tracking-tight text-transparent">{nome}</h1>
+          <h1 className="lg-anim bg-clip-text text-2xl font-bold tracking-tight text-transparent" style={{ backgroundImage: 'linear-gradient(110deg, #f8fafc 35%, #a5b4fc 50%, #f8fafc 65%)', backgroundSize: '200% auto', animation: 'shimmer 6s linear infinite' }}>{nome}</h1>
           <p className="mt-1 text-sm text-slate-400">{ehAdmin ? 'Acesso administrativo' : 'Sua plataforma de simulados'}</p>
         </div>
       </div>
