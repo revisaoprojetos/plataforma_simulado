@@ -1,8 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { Card, CardContent } from '@/components/ui/card'
-import { TenantToggle } from '@/components/admin/tenant-toggle'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { NovoTenantForm } from '@/components/admin/novo-tenant-form'
+import { PlataformaAcoes } from '@/components/super/plataforma-acoes'
 import { SecaoHeader } from '@/components/admin/secao-header'
 import { Building2, Plus } from 'lucide-react'
 
@@ -51,12 +51,13 @@ export default async function SuperPlataformasPage() {
                 <TableHead>Plano</TableHead>
                 <TableHead>Usuários</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="w-10 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {!tenants || tenants.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Nenhuma plataforma cadastrada.</TableCell>
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma plataforma cadastrada.</TableCell>
                 </TableRow>
               ) : (
                 tenants.map((t) => (
@@ -65,7 +66,14 @@ export default async function SuperPlataformasPage() {
                     <TableCell className="font-mono text-sm text-muted-foreground">{t.slug}</TableCell>
                     <TableCell className="text-sm capitalize">{t.plano}</TableCell>
                     <TableCell className="text-sm">{contagem[t.id] ?? 0}</TableCell>
-                    <TableCell><TenantToggle id={t.id} nome={t.nome} ativo={t.ativo} /></TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${t.ativo ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
+                        {t.ativo ? 'Ativa' : 'Oculta'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <PlataformaAcoes id={t.id} nome={t.nome} ativo={t.ativo} />
+                    </TableCell>
                   </TableRow>
                 ))
               )}
