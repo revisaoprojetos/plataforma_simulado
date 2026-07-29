@@ -24,16 +24,26 @@ const KEYFRAMES = `
 @keyframes loginUp { from { opacity: 0; transform: translateY(16px) } to { opacity: 1; transform: none } }
 @keyframes loginFade { from { opacity: 0 } to { opacity: 1 } }
 @keyframes floatBadge { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-5px) } }
-@keyframes breathe { 0%,100% { opacity: .55; transform: translate(-50%,-50%) scale(1) } 50% { opacity: 1; transform: translate(-50%,-50%) scale(1.08) } }
+@keyframes breathe { 0%,100% { opacity: .5; transform: scale(1) } 50% { opacity: 1; transform: scale(1.1) } }
+@keyframes driftA { 0%,100% { transform: translate(0,0) scale(1); opacity: .65 } 50% { transform: translate(8%,-6%) scale(1.14); opacity: 1 } }
+@keyframes driftB { 0%,100% { transform: translate(0,0) scale(1.08); opacity: .65 } 50% { transform: translate(-8%,6%) scale(1); opacity: 1 } }
 @media (prefers-reduced-motion: reduce) { .lg-anim { animation: none !important } }
 `
 
-/** Fundo claro e calmo: um véu suave que respira devagar sobre o branco. */
+/** Fundo claro e calmo: um véu central que respira + dois véus suaves que derivam e pulsam. */
 function Aurora() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="lg-anim absolute left-1/2 top-[38%] h-[52rem] w-[52rem] rounded-full blur-[150px]"
-        style={{ background: 'radial-gradient(circle, rgba(99,102,241,.10), rgba(148,163,184,.10) 45%, transparent 70%)', animation: 'breathe 16s ease-in-out infinite' }} />
+      {/* véu central que respira (wrapper centraliza; o filho anima só escala/opacidade) */}
+      <div className="absolute left-1/2 top-[40%] -translate-x-1/2 -translate-y-1/2">
+        <div className="lg-anim h-[48rem] w-[48rem] rounded-full blur-[150px]"
+          style={{ background: 'radial-gradient(circle, rgba(99,102,241,.12), rgba(148,163,184,.07) 45%, transparent 70%)', animation: 'breathe 15s ease-in-out infinite' }} />
+      </div>
+      {/* dois véus suaves derivando + pulsando devagar */}
+      <div className="lg-anim absolute left-[12%] top-[16%] h-[26rem] w-[26rem] rounded-full blur-[130px]"
+        style={{ background: 'radial-gradient(circle, rgba(129,140,248,.16), transparent 70%)', animation: 'driftA 18s ease-in-out infinite' }} />
+      <div className="lg-anim absolute bottom-[12%] right-[10%] h-[24rem] w-[24rem] rounded-full blur-[130px]"
+        style={{ background: 'radial-gradient(circle, rgba(125,211,252,.16), transparent 70%)', animation: 'driftB 22s ease-in-out infinite' }} />
     </div>
   )
 }
