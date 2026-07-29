@@ -47,11 +47,12 @@ export async function compartilharBancos(origem: string, destino: string, bancoI
 
   const svc = createAdminClient()
   let bancos = 0, questoes = 0
+  const itens: { origem: string; destino: string; questoes: number }[] = []
   for (const id of ids) {
     const r = await copiarBanco(svc, origem, destino, id)
-    if (r.destinoId) { bancos++; questoes += r.questoes }
+    if (r.destinoId) { bancos++; questoes += r.questoes; itens.push({ origem: id, destino: r.destinoId, questoes: r.questoes }) }
   }
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_compartilhamentos', tenantId: destino, depois: { origem, tipo: 'banco', bancos, questoes } })
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_compartilhamentos', tenantId: destino, depois: { origem, tipo: 'banco', bancos, questoes, itens } })
   return { ok: true, bancos, questoes }
 }
 
@@ -63,8 +64,12 @@ export async function compartilharEstudantes(origem: string, destino: string): P
   const ests = await fetchAll<{ id: string }>(() =>
     svc.from('simulado_estudantes').select('id').eq('tenant_id', origem).eq('deletado', false).order('id'))
   let copiados = 0
-  for (const e of ests) { if (await copiarEstudante(svc, origem, destino, e.id)) copiados++ }
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_compartilhamentos', tenantId: destino, depois: { origem, tipo: 'estudante', copiados } })
+  const itens: { origem: string; destino: string }[] = []
+  for (const e of ests) {
+    const d = await copiarEstudante(svc, origem, destino, e.id)
+    if (d) { copiados++; if (itens.length < 100) itens.push({ origem: e.id, destino: d }) } // amostra (cópia em massa); pares completos ficam em simulado_compartilhamentos
+  }
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_compartilhamentos', tenantId: destino, depois: { origem, tipo: 'estudante', copiados, itens, itens_total: copiados } })
   return { ok: true, copiados }
 }
 
@@ -76,7 +81,8 @@ export async function compartilharCadernos(origem: string, destino: string, cade
   if (!ids.length) return { error: 'Selecione ao menos um caderno.' }
   const svc = createAdminClient()
   let cadernos = 0
-  for (const id of ids) { if (await copiarCaderno(svc, origem, destino, id)) cadernos++ }
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_compartilhamentos', tenantId: destino, depois: { origem, tipo: 'caderno', cadernos } })
+  const itens: { origem: string; destino: string }[] = []
+  for (const id of ids) { const d = await copiarCaderno(svc, origem, destino, id); if (d) { cadernos++; itens.push({ origem: id, destino: d }) } }
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_compartilhamentos', tenantId: destino, depois: { origem, tipo: 'caderno', cadernos, itens } })
   return { ok: true, cadernos }
 }
