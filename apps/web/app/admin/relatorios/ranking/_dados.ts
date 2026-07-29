@@ -16,15 +16,17 @@ export type DadosRanking = {
 
 /** Monta o ranking de um simulado (classificação + grupos + critérios + impactos).
  * Cacheado por tenant; a chave inclui o DIA — o desempate por idade muda no máx. 1x/ano. */
-export async function montarRankingSimulado(svc: SupabaseClient, simId: string, agoraIso: string): Promise<DadosRanking | null> {
+export async function montarRankingSimulado(svc: SupabaseClient, simId: string, tenantId: string | null, agoraIso: string): Promise<DadosRanking | null> {
   const dia = agoraIso.slice(0, 10)
-  const { data: t } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simId).maybeSingle()
-  const tenantId = (t as any)?.tenant_id ?? null
-  return remember(chaveRelatorio(tenantId, 'ranking', simId, dia), TTL_RELATORIO, () => _montarRankingSimulado(svc, simId, agoraIso))
+  const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
+  // Confere que o simulado é DO tenant (evita ranking cross-tenant por simId de outra plataforma).
+  const { data: t } = await svc.from('simulado_simulados').select('tenant_id').eq('id', simId).eq('tenant_id', tid).maybeSingle()
+  if (!t) return null
+  return remember(chaveRelatorio(tenantId, 'ranking', simId, dia), TTL_RELATORIO, () => _montarRankingSimulado(svc, simId, tid, agoraIso))
 }
 
-async function _montarRankingSimulado(svc: SupabaseClient, simId: string, agoraIso: string): Promise<DadosRanking | null> {
-  const { data: sim } = await svc.from('simulado_simulados').select('titulo, regras').eq('id', simId).maybeSingle()
+async function _montarRankingSimulado(svc: SupabaseClient, simId: string, tid: string, agoraIso: string): Promise<DadosRanking | null> {
+  const { data: sim } = await svc.from('simulado_simulados').select('titulo, regras').eq('id', simId).eq('tenant_id', tid).maybeSingle()
   if (!sim) return null
   const criterios: CriteriosRanking = normalizarCriterios((sim as any)?.regras?.ranking)
 

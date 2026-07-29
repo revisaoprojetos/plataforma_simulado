@@ -11,7 +11,7 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
   const svc = await createServiceClient()
   const tenantId = await getCurrentTenantId()
 
-  const dados = simId ? await montarRankingSimulado(svc, simId, new Date().toISOString()) : null
+  const dados = simId ? await montarRankingSimulado(svc, simId, tenantId, new Date().toISOString()) : null
   const resumos = simId ? [] : await resumosSimulados(svc, tenantId)
 
   return (

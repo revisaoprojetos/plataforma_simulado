@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
 import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
@@ -16,11 +17,15 @@ export async function GET(request: NextRequest) {
   if (!st) return NextResponse.json({ message: 'Sessão ausente.' }, { status: 400 })
 
   const supabase = await createServiceClient()
+  // Escopo por tenant do subdomínio: impede ver resultado de sessão de OUTRA plataforma
+  // passando um st qualquer. O aluno acessa pelo próprio subdomínio, então não quebra.
+  const tenantId = await getCurrentTenantId()
 
   const { data: sessao } = await supabase
     .from('simulado_sessoes_prova')
     .select('id, tenant_id, simulado_id, status, nota, posicao_ranking, iniciado_em, finalizado_em, estudante_id')
     .eq('id', st)
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .maybeSingle()
   if (!sessao) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
 

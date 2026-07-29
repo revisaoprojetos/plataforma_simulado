@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
 import { PrintButton } from '@/components/aluno/print-button'
 import { MarkdownContent } from '@/components/markdown-content'
 
@@ -9,11 +10,14 @@ export default async function ResultadoImprimirPage({ params, searchParams }: { 
   const { st } = await params
   const { sem, mod } = await searchParams
   const svc = await createServiceClient()
+  // Escopo por tenant do subdomínio (página de impressão client-side do aluno, sem pdftoken).
+  const tenantId = await getCurrentTenantId()
 
   const { data: sessao } = await svc
     .from('simulado_sessoes_prova')
     .select('id, simulado_id, estudante_id, status, nota, posicao_ranking')
     .eq('id', st)
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .maybeSingle()
   if (!sessao || sessao.status !== 'finalizada') notFound()
 

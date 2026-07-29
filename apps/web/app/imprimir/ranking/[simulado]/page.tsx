@@ -40,7 +40,7 @@ export default async function ImprimirRankingPage({
   const cor = tema.cores?.primaria || tema.cor_primaria || '#6d28d9'
   const logo = tema.logo_url || null
 
-  const dados = await montarRankingSimulado(svc, simId, new Date().toISOString())
+  const dados = await montarRankingSimulado(svc, simId, access.tenantId ?? '00000000-0000-0000-0000-000000000000', new Date().toISOString())
   if (!dados) notFound()
 
   const limite = Math.max(1, Number(ate) || dados.entradas.length)
