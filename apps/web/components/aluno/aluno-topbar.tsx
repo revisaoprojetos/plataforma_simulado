@@ -1,12 +1,14 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { LogOut } from 'lucide-react'
+import { LogOut, Building2 } from 'lucide-react'
+import { TrocarPlataformaAlunoModal } from '@/components/aluno/trocar-plataforma-aluno'
 
 function iniciais(nome: string) {
   return nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
@@ -14,6 +16,7 @@ function iniciais(nome: string) {
 
 export function AlunoTopbar({ nome, email }: { nome: string; email?: string }) {
   const router = useRouter()
+  const [trocarOpen, setTrocarOpen] = useState(false)
   async function sair() {
     toast.success('Saindo… logout realizado.')
     await fetch('/api/aluno/logout', { method: 'POST' }).catch(() => {})
@@ -46,9 +49,11 @@ export function AlunoTopbar({ nome, email }: { nome: string; email?: string }) {
             </div>
           </div>
           <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setTrocarOpen(true)}><Building2 className="mr-2 h-4 w-4" /> Trocar de plataforma</DropdownMenuItem>
           <DropdownMenuItem onClick={sair}><LogOut className="mr-2 h-4 w-4" /> Sair</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <TrocarPlataformaAlunoModal open={trocarOpen} onClose={() => setTrocarOpen(false)} />
     </header>
   )
 }
