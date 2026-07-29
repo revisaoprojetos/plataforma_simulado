@@ -146,6 +146,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Plataformas', href: '/admin/tenants', icon: Building2, superOnly: true },
       { label: 'Entrada', href: '/admin/entrada', icon: LogIn, superOnly: true },
+      { label: 'Compartilhar', href: '/admin/compartilhar', icon: Share2, superOnly: true },
       { label: 'Administradores', href: '/admin/administradores', icon: UserCog, perm: 'rbac:view' },
       { label: 'API Keys', href: '/admin/api-keys', icon: KeyRound, perm: 'api_keys:manage' },
       { label: 'Aparência', href: '/admin/configuracoes', icon: Palette, exact: true, perm: 'configuracoes:view' },
