@@ -173,3 +173,38 @@ export async function copiarEstudante(svc: SupabaseClient, origem: string, desti
   await registrar(svc, origem, destino, 'estudante', estudanteId, destinoId!, por)
   return destinoId
 }
+
+// ─── Caderno (bank-based: remapeia config.bancoId p/ a cópia do banco no destino) ────
+export async function copiarCaderno(svc: SupabaseClient, origem: string, destino: string, cadernoId: string, por?: string | null): Promise<string | null> {
+  if (origem === destino) return null
+  const existente = await jaCopiado(svc, destino, 'caderno', cadernoId)
+  if (existente) return existente
+
+  const { data: c } = await svc.from('simulado_cadernos_designer').select('*').eq('id', cadernoId).eq('tenant_id', origem).maybeSingle()
+  if (!c) return null
+
+  const config: Record<string, unknown> = { ...(((c as any).config as Record<string, unknown>) ?? {}) }
+  // O caderno RENDERIZA as questões do banco em config.bancoId — precisa copiar esse banco
+  // (idempotente) e apontar a cópia. docsV2/blocos são genéricos (não embutem id de questão).
+  const bancoOrigem = (config.bancoId as string) ?? null
+  if (bancoOrigem) {
+    const r = await copiarBanco(svc, origem, destino, bancoOrigem, por)
+    if (r.destinoId) {
+      config.bancoId = r.destinoId
+      if (config.pastaId === bancoOrigem) config.pastaId = r.destinoId
+    }
+  }
+
+  // pasta_id (pasta ORGANIZACIONAL do caderno) não existe no destino → raiz (null).
+  const base: Record<string, unknown> = { tenant_id: destino, nome: (c as any).nome, config, pasta_id: null, created_at: nowIso() }
+  for (const k of ['cor', 'icone', 'capa_url']) if ((c as any)[k] != null) base[k] = (c as any)[k]
+
+  let ins = await svc.from('simulado_cadernos_designer').insert(base).select('id').single()
+  if (ins.error) { // repete sem os campos tolerantes (migração destino pode não ter cor/icone/capa)
+    ins = await svc.from('simulado_cadernos_designer').insert({ tenant_id: destino, nome: (c as any).nome, config, created_at: nowIso() }).select('id').single()
+  }
+  if (ins.error || !ins.data) return null
+  const novoId = (ins.data as any).id
+  await registrar(svc, origem, destino, 'caderno', cadernoId, novoId, por)
+  return novoId
+}

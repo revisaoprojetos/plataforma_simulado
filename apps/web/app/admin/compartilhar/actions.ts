@@ -2,7 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/auth/permissions'
-import { copiarBanco, copiarEstudante } from '@/lib/compartilhamento/copiar'
+import { copiarBanco, copiarEstudante, copiarCaderno } from '@/lib/compartilhamento/copiar'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 
@@ -15,7 +15,7 @@ export async function listarPlataformas(): Promise<{ ok?: boolean; error?: strin
 }
 
 /** Bancos (pastas) de uma plataforma de origem, com a contagem de questões. */
-export async function listarBancosPlataforma(origem: string): Promise<{ ok?: boolean; error?: string; bancos?: { id: string; nome: string; questoes: number }[]; estudantes?: number }> {
+export async function listarBancosPlataforma(origem: string): Promise<{ ok?: boolean; error?: string; bancos?: { id: string; nome: string; questoes: number }[]; estudantes?: number; cadernos?: { id: string; nome: string }[] }> {
   if (!(await isSuperAdmin())) return { error: 'Área exclusiva do super-administrador global.' }
   if (!origem) return { error: 'Origem ausente.' }
   const svc = createAdminClient()
@@ -32,7 +32,10 @@ export async function listarBancosPlataforma(origem: string): Promise<{ ok?: boo
 
   const { count } = await svc.from('simulado_estudantes').select('*', { count: 'exact', head: true }).eq('tenant_id', origem).eq('deletado', false)
 
-  return { ok: true, bancos: bancos.map((b) => ({ id: b.id, nome: b.nome, questoes: cont[b.id] ?? 0 })), estudantes: count ?? 0 }
+  const cadernos = await fetchAll<{ id: string; nome: string }>(() =>
+    svc.from('simulado_cadernos_designer').select('id, nome').eq('tenant_id', origem).eq('deletado', false).order('nome'))
+
+  return { ok: true, bancos: bancos.map((b) => ({ id: b.id, nome: b.nome, questoes: cont[b.id] ?? 0 })), estudantes: count ?? 0, cadernos: cadernos.map((c) => ({ id: c.id, nome: c.nome })) }
 }
 
 /** Copia bancos selecionados (com suas questões) da origem para o destino. Idempotente. */
@@ -63,4 +66,17 @@ export async function compartilharEstudantes(origem: string, destino: string): P
   for (const e of ests) { if (await copiarEstudante(svc, origem, destino, e.id)) copiados++ }
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_compartilhamentos', tenantId: destino, depois: { origem, tipo: 'estudante', copiados } })
   return { ok: true, copiados }
+}
+
+/** Copia cadernos selecionados (com o banco de questões vinculado) da origem para o destino. Idempotente. */
+export async function compartilharCadernos(origem: string, destino: string, cadernoIds: string[]): Promise<{ ok?: boolean; error?: string; cadernos?: number }> {
+  if (!(await isSuperAdmin())) return { error: 'Área exclusiva do super-administrador global.' }
+  if (!origem || !destino || origem === destino) return { error: 'Escolha plataformas de origem e destino DIFERENTES.' }
+  const ids = [...new Set((cadernoIds ?? []).filter(Boolean))]
+  if (!ids.length) return { error: 'Selecione ao menos um caderno.' }
+  const svc = createAdminClient()
+  let cadernos = 0
+  for (const id of ids) { if (await copiarCaderno(svc, origem, destino, id)) cadernos++ }
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_compartilhamentos', tenantId: destino, depois: { origem, tipo: 'caderno', cadernos } })
+  return { ok: true, cadernos }
 }

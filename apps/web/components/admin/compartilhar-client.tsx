@@ -4,32 +4,35 @@ import { useEffect, useState, useTransition } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { Loader2, Copy, Database, Users, ArrowRight } from 'lucide-react'
+import { Loader2, Copy, Database, Users, ArrowRight, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { listarPlataformas, listarBancosPlataforma, compartilharBancos, compartilharEstudantes } from '@/app/admin/compartilhar/actions'
+import { listarPlataformas, listarBancosPlataforma, compartilharBancos, compartilharEstudantes, compartilharCadernos } from '@/app/admin/compartilhar/actions'
 
 type Plat = { id: string; nome: string; slug: string }
 type Banco = { id: string; nome: string; questoes: number }
+type Caderno = { id: string; nome: string }
 
 export function CompartilharClient() {
   const [plats, setPlats] = useState<Plat[]>([])
   const [origem, setOrigem] = useState('')
   const [destino, setDestino] = useState('')
   const [bancos, setBancos] = useState<Banco[]>([])
+  const [cadernos, setCadernos] = useState<Caderno[]>([])
   const [estudantes, setEstudantes] = useState<number>(0)
   const [sel, setSel] = useState<Set<string>>(new Set())
+  const [selCad, setSelCad] = useState<Set<string>>(new Set())
   const [carregando, setCarregando] = useState(false)
   const [pending, start] = useTransition()
 
   useEffect(() => { listarPlataformas().then((r) => setPlats(r.plataformas ?? [])) }, [])
 
   useEffect(() => {
-    if (!origem) { setBancos([]); setEstudantes(0); setSel(new Set()); return }
-    setCarregando(true); setSel(new Set())
+    if (!origem) { setBancos([]); setCadernos([]); setEstudantes(0); setSel(new Set()); setSelCad(new Set()); return }
+    setCarregando(true); setSel(new Set()); setSelCad(new Set())
     listarBancosPlataforma(origem)
-      .then((r) => { setBancos(r.bancos ?? []); setEstudantes(r.estudantes ?? 0) })
-      .catch(() => { setBancos([]); setEstudantes(0) })
+      .then((r) => { setBancos(r.bancos ?? []); setCadernos(r.cadernos ?? []); setEstudantes(r.estudantes ?? 0) })
+      .catch(() => { setBancos([]); setCadernos([]); setEstudantes(0) })
       .finally(() => setCarregando(false))
   }, [origem])
 
@@ -58,6 +61,21 @@ export function CompartilharClient() {
     start(async () => {
       const r = await compartilharEstudantes(origem, destino)
       if (r.ok) toast.success(`Copiados: ${r.copiados} estudante(s).`)
+      else toast.error(r.error ?? 'Erro ao copiar.')
+    })
+  }
+
+  function toggleCad(id: string) {
+    setSelCad((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  async function copiarCadernos() {
+    if (!podeCopiar || selCad.size === 0) return
+    const ok = await confirmar({ titulo: 'Copiar cadernos', mensagem: `Copiar ${selCad.size} caderno(s) de "${nomeDe(origem)}" para "${nomeDe(destino)}"? O banco de questões vinculado a cada caderno vai junto (cópia independente).`, confirmar: 'Copiar' })
+    if (!ok) return
+    start(async () => {
+      const r = await compartilharCadernos(origem, destino, [...selCad])
+      if (r.ok) { toast.success(`Copiado: ${r.cadernos} caderno(s).`); setSelCad(new Set()) }
       else toast.error(r.error ?? 'Erro ao copiar.')
     })
   }
@@ -110,6 +128,31 @@ export function CompartilharClient() {
                 <Button onClick={copiarBancos} disabled={pending || sel.size === 0}>
                   {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Copy className="mr-2 h-4 w-4" />}
                   Copiar {sel.size > 0 ? `${sel.size} banco(s)` : 'bancos'} para {nomeDe(destino)}
+                </Button>
+              </>
+            )}
+          </CardContent></Card>
+
+          {/* Cadernos */}
+          <Card><CardContent className="space-y-3 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold"><FileText className="h-4 w-4" /> Cadernos (com o banco vinculado)</div>
+            {carregando ? (
+              <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
+            ) : cadernos.length === 0 ? (
+              <p className="py-4 text-sm text-muted-foreground">Nenhum caderno nesta plataforma.</p>
+            ) : (
+              <>
+                <div className="max-h-72 space-y-1 overflow-y-auto rounded-lg border p-1">
+                  {cadernos.map((c) => (
+                    <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50">
+                      <input type="checkbox" checked={selCad.has(c.id)} onChange={() => toggleCad(c.id)} className="h-4 w-4" />
+                      <span className="min-w-0 flex-1 truncate">{c.nome}</span>
+                    </label>
+                  ))}
+                </div>
+                <Button onClick={copiarCadernos} disabled={pending || selCad.size === 0}>
+                  {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Copy className="mr-2 h-4 w-4" />}
+                  Copiar {selCad.size > 0 ? `${selCad.size} caderno(s)` : 'cadernos'} para {nomeDe(destino)}
                 </Button>
               </>
             )}
