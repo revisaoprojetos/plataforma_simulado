@@ -1,12 +1,13 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Fingerprint, Palette, LoaderCircle, Settings2, PanelTop, MonitorPlay } from 'lucide-react'
+import { Fingerprint, Palette, LoaderCircle, Settings2, PanelTop, MonitorPlay, LayoutGrid } from 'lucide-react'
 import { ConfiguracoesForm } from './configuracoes-form'
 import { CarregamentoForm } from './carregamento-form'
 import { ImersaoForm } from './imersao-form'
 import { AvancadoForm } from './avancado-form'
 import { TemaSistemaForm } from './tema-sistema-form'
+import { SelecaoForm } from './selecao-form'
 import type { EstiloLoader } from '@/components/admin/loaders'
 
 export function ConfiguracoesTabs({ tema, salvarTema }: { tema: any; salvarTema: (t: Record<string, unknown>) => Promise<{ ok?: boolean } | void> }) {
@@ -15,6 +16,7 @@ export function ConfiguracoesTabs({ tema, salvarTema }: { tema: any; salvarTema:
     <Tabs defaultValue="identidade">
       <TabsList className="flex-wrap">
         <TabsTrigger value="identidade"><Fingerprint /> Identidade</TabsTrigger>
+        <TabsTrigger value="selecao"><LayoutGrid /> Seleção</TabsTrigger>
         <TabsTrigger value="tema"><Palette /> Cores &amp; Tema</TabsTrigger>
         <TabsTrigger value="carregamento"><LoaderCircle /> Carregamento</TabsTrigger>
         <TabsTrigger value="avancado"><Settings2 /> Avançado</TabsTrigger>
@@ -22,6 +24,10 @@ export function ConfiguracoesTabs({ tema, salvarTema }: { tema: any; salvarTema:
 
       <TabsContent value="identidade">
         <ConfiguracoesForm tema={tema} salvarTema={salvarTema} />
+      </TabsContent>
+
+      <TabsContent value="selecao">
+        <SelecaoForm tema={tema} salvarTema={salvarTema} />
       </TabsContent>
 
       <TabsContent value="tema">

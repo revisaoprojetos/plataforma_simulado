@@ -35,7 +35,7 @@ export async function GET() {
     nome: (t.tema as any)?.nome_site || t.nome,
     slug: t.slug,
     dominio: t.dominio ?? null,
-    logo: comoLogo((t.tema as any)?.logo_dark_url) ?? comoLogo((t.tema as any)?.logo_url),
+    logo: comoLogo((t.tema as any)?.logo_selecao_url) ?? comoLogo((t.tema as any)?.logo_dark_url) ?? comoLogo((t.tema as any)?.logo_url),
     cor: (t.tema as any)?.cor_primaria ?? (t.tema as any)?.cores?.primaria ?? null,
   }))
 
