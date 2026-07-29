@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Building2, Loader2, X, Check } from 'lucide-react'
+import { molduraSelecao } from '@/lib/selecao-moldura'
 
-type Plat = { id: string; nome: string; slug: string; dominio: string | null; logo: string | null; cor: string | null; atual?: boolean }
+type Plat = { id: string; nome: string; slug: string; dominio: string | null; logo: string | null; cor: string | null; estilo?: string | null; semFundo?: boolean; atual?: boolean }
 
 /** URL da plataforma destino, na página de identificação do aluno. A sessão do aluno é
  * POR-TENANT (não compartilhada entre subdomínios), então trocar = re-identificar no destino. */
@@ -65,10 +66,10 @@ export function TrocarPlataformaAlunoModal({ open, onClose }: { open: boolean; o
                   onClick={() => { window.location.href = urlDaPlataforma(p) }}
                   className="flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition-colors hover:border-primary/50 hover:bg-muted/50"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-background" style={p.cor ? { borderColor: p.cor } : undefined}>
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden ${molduraSelecao(p.estilo)} ${p.semFundo ? '' : 'border bg-background'}`} style={!p.semFundo && p.cor ? { borderColor: p.cor } : undefined}>
                     {p.logo ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.logo} alt="" className="h-full w-full object-contain" />
+                      <img src={p.logo} alt="" className={p.semFundo ? 'h-full w-full object-contain' : 'h-full w-full object-cover'} />
                     ) : (
                       <Building2 className="h-4 w-4 text-muted-foreground" />
                     )}

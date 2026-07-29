@@ -3,35 +3,47 @@
 import { useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Upload, X, Loader2, Save, Building2, ArrowRight, GraduationCap, Monitor } from 'lucide-react'
+import { molduraSelecao } from '@/lib/selecao-moldura'
+
+type Estilo = 'redonda' | 'arredondada' | 'quadrada'
+const ESTILOS: { v: Estilo; label: string }[] = [
+  { v: 'redonda', label: 'Redonda' },
+  { v: 'arredondada', label: 'Arredondada' },
+  { v: 'quadrada', label: 'Quadrada' },
+]
 
 /**
- * Aparência desta plataforma na tela "Escolha a plataforma" (o seletor pós-login,
- * onde quem tem acesso a mais de uma plataforma escolhe qual abrir).
- * Configura a logo do card + prévia FIEL ao seletor real, e é REALMENTE conectada:
- * o seletor (/api/auth/minhas-plataformas e /api/aluno/minhas-plataformas) lê
- * logo_selecao_url ?? logo_dark_url ?? logo_url.
+ * Aparência desta plataforma na tela "Escolha a plataforma" (o seletor pós-login).
+ * Configura a logo do card + moldura (redonda/arredondada/quadrada) + com/sem fundo,
+ * com prévia FIEL ao seletor real. É REALMENTE conectada: o seletor
+ * (/api/auth/minhas-plataformas e /api/aluno/minhas-plataformas) lê estes campos.
  */
 export function SelecaoForm({ tema, salvarTema }: { tema: any; salvarTema: (t: Record<string, unknown>) => Promise<{ ok?: boolean } | void> }) {
   const nome = (tema?.nome_site as string) || 'Minha plataforma'
   const fallback = (typeof tema?.logo_dark_url === 'string' && tema.logo_dark_url) || (typeof tema?.logo_url === 'string' && tema.logo_url) || null
   const [logo, setLogo] = useState<string | null>(tema?.logo_selecao_url ?? null)
+  const [estilo, setEstilo] = useState<Estilo>((['redonda', 'arredondada', 'quadrada'].includes(tema?.logo_selecao_estilo) ? tema.logo_selecao_estilo : 'redonda') as Estilo)
+  const [semFundo, setSemFundo] = useState<boolean>(!!tema?.logo_selecao_sem_fundo)
   const [dirty, setDirty] = useState(false)
   const [pending, start] = useTransition()
   const ref = useRef<HTMLInputElement>(null)
 
   const imgPreview = logo ?? fallback
+  const marcar = (fn: () => void) => { fn(); setDirty(true) }
 
   function pick(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
-    const r = new FileReader(); r.onload = () => { setLogo(String(r.result)); setDirty(true) }; r.readAsDataURL(f)
+    const r = new FileReader(); r.onload = () => marcar(() => setLogo(String(r.result))); r.readAsDataURL(f)
   }
-  function remover() { setLogo(null); setDirty(true) }
   function salvar() {
     start(async () => {
-      try { await salvarTema({ logo_selecao_url: logo }); setDirty(false); toast.success('Aparência da seleção salva!') }
+      try { await salvarTema({ logo_selecao_url: logo, logo_selecao_estilo: estilo, logo_selecao_sem_fundo: semFundo }); setDirty(false); toast.success('Aparência da seleção salva!') }
       catch (err) { toast.error(err instanceof Error ? err.message : 'Erro ao salvar') }
     })
   }
+
+  // Classe do "quadro" da logo (usada na config e na prévia). Sem fundo = transparente, sem borda.
+  const quadro = `${molduraSelecao(estilo)} ${semFundo ? '' : 'border'}`
 
   return (
     <div className="grid gap-4 lg:grid-cols-[380px_1fr]">
@@ -47,7 +59,7 @@ export function SelecaoForm({ tema, salvarTema }: { tema: any; salvarTema: (t: R
           <input ref={ref} type="file" accept="image/*" className="hidden" onChange={pick} />
           <div className="flex items-center gap-3 rounded-lg border bg-background p-3">
             <button type="button" onClick={() => ref.current?.click()} title={logo ? 'Trocar imagem' : 'Enviar imagem'}
-              className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-muted">
+              className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden border-slate-200 ${quadro} ${semFundo ? '' : 'bg-slate-100'}`}>
               {imgPreview ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={imgPreview} alt="" className="h-full w-full object-cover" />
@@ -55,15 +67,35 @@ export function SelecaoForm({ tema, salvarTema }: { tema: any; salvarTema: (t: R
             </button>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-medium">{logo ? 'Logo personalizada' : fallback ? 'Usando a logo do sistema' : 'Sem logo'}</p>
-              <p className="truncate text-[10px] text-muted-foreground">PNG/JPG · aparece redonda no card</p>
+              <p className="truncate text-[10px] text-muted-foreground">PNG/JPG · aparece no card do seletor</p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
               <button type="button" onClick={() => ref.current?.click()} title={logo ? 'Trocar' : 'Enviar'}
                 className="flex h-7 w-7 items-center justify-center rounded-md border text-muted-foreground hover:border-primary hover:text-primary"><Upload className="h-3.5 w-3.5" /></button>
               {logo && (
-                <button type="button" onClick={remover} title="Usar a logo do sistema"
+                <button type="button" onClick={() => marcar(() => setLogo(null))} title="Usar a logo do sistema"
                   className="flex h-7 w-7 items-center justify-center rounded-md border text-muted-foreground hover:border-destructive hover:text-destructive"><X className="h-3.5 w-3.5" /></button>
               )}
+            </div>
+          </div>
+
+          {/* Moldura + fundo */}
+          <div className="mt-3 space-y-2.5 rounded-lg border bg-muted/20 p-3">
+            <div className="space-y-1.5">
+              <span className="text-xs text-muted-foreground">Moldura</span>
+              <div className="flex gap-1.5">
+                {ESTILOS.map((e) => (
+                  <button key={e.v} type="button" onClick={() => marcar(() => setEstilo(e.v))}
+                    className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${estilo === e.v ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{e.label}</button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Sem fundo (logo transparente)</span>
+              <button type="button" onClick={() => marcar(() => setSemFundo((s) => !s))}
+                className={`relative h-5 w-9 rounded-full transition-colors ${semFundo ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
+                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${semFundo ? 'left-[1.15rem]' : 'left-0.5'}`} />
+              </button>
             </div>
           </div>
 
@@ -95,7 +127,7 @@ export function SelecaoForm({ tema, salvarTema }: { tema: any; salvarTema: (t: R
                   </div>
                 </div>
                 <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100">
+                  <span className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden border-slate-200 ${quadro} ${semFundo ? '' : 'bg-slate-100'}`}>
                     {imgPreview ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={imgPreview} alt="" className="h-full w-full object-cover" />

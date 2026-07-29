@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Loader2, GraduationCap, Mail, Lock, LogOut, ArrowRight, Building2, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { molduraSelecao } from '@/lib/selecao-moldura'
 
 // ENTRADA NEUTRA: o login é brand-agnostic — MESMA identidade em toda plataforma (não puxa
 // o tema de nenhum tenant). Tema CLARO/branco, neutro e sóbrio. A marca é só o nome/logo do
@@ -15,7 +16,7 @@ export type Marca = { nome: string; logo: string | null }
 // AUTENTICAR-FIRST: o formulário vem primeiro; o seletor de plataformas aparece SÓ depois de
 // autenticar (ou se já logado pelo cookie compartilhado). Aluno mantém o fluxo por-subdomínio.
 type Modo = 'aluno' | 'admin' | 'selecionar'
-type PlatSimples = { id: string; nome: string; slug: string; dominio: string | null; logo: string | null; cor: string | null }
+type PlatSimples = { id: string; nome: string; slug: string; dominio: string | null; logo: string | null; cor: string | null; estilo?: string | null; semFundo?: boolean }
 
 // Compat: a página ainda pode passar campos antigos; só usamos nome/logo.
 export type Plataforma = { id: string; nome: string; [k: string]: unknown }
@@ -180,7 +181,7 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
             {minhasPlats.map((p) => (
               <button key={p.id} onClick={() => irParaPlataforma(p)} title={`Entrar — ${p.nome}`}
                 className={cn('group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md', minhasPlats.length === 1 ? 'flex-row' : 'flex-col text-center')}>
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 transition-transform group-hover:scale-105">
+                <span className={cn('flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden border-slate-200 transition-transform group-hover:scale-105', molduraSelecao(p.estilo), p.semFundo ? '' : 'border bg-slate-100')}>
                   {p.logo ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={p.logo} alt={p.nome} className="h-full w-full object-cover" />

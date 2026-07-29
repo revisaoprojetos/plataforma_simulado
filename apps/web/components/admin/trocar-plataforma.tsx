@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Building2, Loader2, X, Check } from 'lucide-react'
+import { molduraSelecao } from '@/lib/selecao-moldura'
 
-type Plat = { id: string; nome: string; slug: string; dominio: string | null; logo: string | null; cor: string | null }
+type Plat = { id: string; nome: string; slug: string; dominio: string | null; logo: string | null; cor: string | null; estilo?: string | null; semFundo?: boolean }
 
 /** URL da plataforma destino (mesma área /admin). Com o cookie compartilhado (Fase 0),
  * ir para o subdomínio da outra plataforma NÃO exige relogar. */
@@ -66,10 +67,10 @@ export function TrocarPlataformaModal({ open, onClose, tenantAtualId }: { open: 
                   onClick={() => { if (!atual) window.location.href = urlDaPlataforma(p) }}
                   className={`flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition-colors ${atual ? 'cursor-default opacity-60' : 'hover:border-primary/50 hover:bg-muted/50'}`}
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-background" style={p.cor ? { borderColor: p.cor } : undefined}>
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden ${molduraSelecao(p.estilo)} ${p.semFundo ? '' : 'border bg-background'}`} style={!p.semFundo && p.cor ? { borderColor: p.cor } : undefined}>
                     {p.logo ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.logo} alt="" className="h-full w-full object-contain" />
+                      <img src={p.logo} alt="" className={p.semFundo ? 'h-full w-full object-contain' : 'h-full w-full object-cover'} />
                     ) : (
                       <Building2 className="h-4 w-4 text-muted-foreground" />
                     )}

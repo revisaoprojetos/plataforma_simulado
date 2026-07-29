@@ -34,6 +34,8 @@ export async function GET() {
     slug: t.slug,
     dominio: t.dominio ?? null,
     logo: comoLogo((t.tema as any)?.logo_selecao_url) ?? comoLogo((t.tema as any)?.logo_dark_url) ?? comoLogo((t.tema as any)?.logo_url),
+    estilo: (t.tema as any)?.logo_selecao_estilo ?? 'redonda',
+    semFundo: !!(t.tema as any)?.logo_selecao_sem_fundo,
     cor: (t.tema as any)?.cor_primaria ?? (t.tema as any)?.cores?.primaria ?? null,
     atual: t.id === sessao.tenantId,
   }))
