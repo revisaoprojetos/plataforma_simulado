@@ -37,6 +37,7 @@ import {
   Palette,
   ServerCog,
   UserCog,
+  ShieldCheck,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -152,6 +153,7 @@ const navGroups: NavGroup[] = [
       { label: 'Aparência', href: '/admin/configuracoes', icon: Palette, exact: true, perm: 'configuracoes:view' },
       { label: 'Sistema', href: '/admin/sistema', icon: ServerCog, perm: 'configuracoes:view' },
       { label: 'Mensagens', href: '/admin/configuracoes/mensagens', icon: MessageSquare, perm: 'configuracoes:view' },
+      { label: 'LGPD', href: '/admin/lgpd', icon: ShieldCheck, perm: 'estudantes:view' },
       { label: 'Lixeira', href: '/admin/lixeira', icon: Trash2, perm: 'questoes:view' },
       { label: 'Ajuda', href: '/admin/ajuda', icon: HelpCircle },
     ],

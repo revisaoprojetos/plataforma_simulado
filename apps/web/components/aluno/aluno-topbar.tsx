@@ -7,7 +7,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { LogOut, Building2 } from 'lucide-react'
+import { LogOut, Building2, ShieldCheck } from 'lucide-react'
 import { TrocarPlataformaAlunoModal } from '@/components/aluno/trocar-plataforma-aluno'
 
 function iniciais(nome: string) {
@@ -50,6 +50,7 @@ export function AlunoTopbar({ nome, email }: { nome: string; email?: string }) {
           </div>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setTrocarOpen(true)}><Building2 className="mr-2 h-4 w-4" /> Trocar de plataforma</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push('/aluno/privacidade')}><ShieldCheck className="mr-2 h-4 w-4" /> Privacidade e dados</DropdownMenuItem>
           <DropdownMenuItem onClick={sair}><LogOut className="mr-2 h-4 w-4" /> Sair</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
