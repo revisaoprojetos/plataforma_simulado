@@ -7,22 +7,18 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { LogOut, Building2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useState } from 'react'
 import { NotificationBell } from '@/components/admin/notification-bell'
 import { AjudaButton } from '@/components/admin/ajuda-center'
-import { TrocarPlataformaModal } from '@/components/admin/trocar-plataforma'
 
 interface AdminHeaderProps {
   userName: string
   userEmail: string
-  tenantAtualId?: string | null
 }
 
 function getInitials(name: string) {
@@ -34,8 +30,7 @@ function getInitials(name: string) {
     .toUpperCase()
 }
 
-export function AdminHeader({ userName, userEmail, tenantAtualId }: AdminHeaderProps) {
-  const [trocarAberto, setTrocarAberto] = useState(false)
+export function AdminHeader({ userName, userEmail }: AdminHeaderProps) {
   return (
     <header
       className={
@@ -71,7 +66,9 @@ export function AdminHeader({ userName, userEmail, tenantAtualId }: AdminHeaderP
             </div>
           </div>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="cursor-pointer" onClick={() => setTrocarAberto(true)}>
+          {/* Volta à TELA DE SELEÇÃO neutra (a mesma do pós-login). Com o cookie de sessão
+              compartilhado, o admin continua logado e só escolhe outra plataforma — sem relogar. */}
+          <DropdownMenuItem className="cursor-pointer" onClick={() => { window.location.href = '/login' }}>
             <Building2 className="mr-2 h-4 w-4" />
             Trocar de plataforma
           </DropdownMenuItem>
@@ -84,7 +81,6 @@ export function AdminHeader({ userName, userEmail, tenantAtualId }: AdminHeaderP
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <TrocarPlataformaModal open={trocarAberto} onClose={() => setTrocarAberto(false)} tenantAtualId={tenantAtualId} />
     </header>
   )
 }
