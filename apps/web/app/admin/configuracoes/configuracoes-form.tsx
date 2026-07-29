@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { Save, RotateCcw, ImageIcon, Loader2, Bell, Moon, Sun, Menu, ArrowLeft, Upload, X, Copy, Check, ClipboardPaste, Palette, ChevronDown, PanelLeft, LayoutGrid, Sparkles, Trash2, Monitor, BookOpen, ClipboardList, Users, Activity, GraduationCap, BarChart3, Database, PenLine, LayoutDashboard, ClipboardCheck, MessagesSquare, SlidersHorizontal, FileText } from 'lucide-react'
+import { Save, RotateCcw, ImageIcon, Loader2, Bell, Moon, Sun, Menu, Upload, X, Copy, Check, ClipboardPaste, Palette, ChevronDown, PanelLeft, LayoutGrid, Sparkles, Trash2, Monitor, BookOpen, ClipboardList, Users, Activity, GraduationCap, BarChart3, Database, PenLine, LayoutDashboard, ClipboardCheck, MessagesSquare, SlidersHorizontal, FileText } from 'lucide-react'
 
 /**
  * Lê uma variável CSS do sistema e converte para hex. Renderiza a cor (lab,
@@ -66,8 +66,6 @@ function cssVarsFromCores(c: Cores): string {
   ].join(';')
 }
 type LogoEstilo = 'quadrado' | 'arredondado' | 'borda'
-type SelecaoEstilo = 'quadrada' | 'redonda' | 'borda'
-type LoginLayout = 'painel' | 'centralizado'
 type LogoFiltro = 'none' | 'branco' | 'preto'
 type PresetCor = { id: string; nome: string; cores: Cores; coresDark: Cores }
 
@@ -85,11 +83,8 @@ function derivarEscuro(c: Cores): Cores {
 }
 interface Tema {
   nome_site: string; subtitulo_site: string; titulo_pagina: string
-  logo_url: string | null; logo_grande_url: string | null; logo_selecao_url: string | null
-  logo_png_bg: string; logo_estilo: LogoEstilo; logo_filtro_login: LogoFiltro; logo_filtro_sistema: LogoFiltro; logo_selecao_estilo: SelecaoEstilo
-  // Entrada é GLOBAL (/admin/entrada): estes 3 ficam só para a PRÉVIA do login e NÃO são salvos (ver aplicarNoSistema).
-  login_layout: LoginLayout
-  login_selecao: boolean
+  logo_url: string | null; logo_grande_url: string | null
+  logo_png_bg: string; logo_estilo: LogoEstilo; logo_filtro_sistema: LogoFiltro
   cores: Cores        // paleta do modo CLARO
   coresDark: Cores    // paleta do modo ESCURO
 }
@@ -106,22 +101,11 @@ const LOGO_ESTILOS: { id: LogoEstilo; nome: string }[] = [
   { id: 'arredondado', nome: 'Arredondado' },
   { id: 'borda', nome: 'Borda' },
 ]
-const SELECAO_ESTILOS: { id: SelecaoEstilo; nome: string }[] = [
-  { id: 'quadrada', nome: 'Quadrada' },
-  { id: 'redonda', nome: 'Redonda' },
-  { id: 'borda', nome: 'Com borda' },
-]
 /** Classes do quadro do logo conforme o estilo. */
 export function frameLogo(estilo?: string): string {
   if (estilo === 'quadrado') return 'rounded-none'
   if (estilo === 'borda') return 'rounded-lg border'
   return 'rounded-lg'
-}
-/** Classes do quadro da imagem de seleção (tiles do login). */
-export function frameSelecao(estilo?: string): string {
-  if (estilo === 'quadrada') return 'rounded-xl'
-  if (estilo === 'borda') return 'rounded-full border-2'
-  return 'rounded-full'
 }
 
 const DEFAULT: Tema = {
@@ -130,14 +114,9 @@ const DEFAULT: Tema = {
   titulo_pagina: 'Banco de Questões',
   logo_url: null,
   logo_grande_url: null,
-  logo_selecao_url: null,
   logo_png_bg: '#ffffff',
   logo_estilo: 'arredondado',
-  logo_filtro_login: 'none',
   logo_filtro_sistema: 'none',
-  logo_selecao_estilo: 'redonda',
-  login_layout: 'painel',
-  login_selecao: true,
   cores: { sidebar: '#0f0f13', sidetext: '#c8c8d0', sidetextHover: '#ffffff', sidetextActive: '#ffffff', icon: '#c8c8d0', iconHover: '#ffffff', iconAtivo: '#ffffff', active: '#7f77dd', topbar: '#111118', sborder: '#35353f', bg: '#18181f', text: '#e8e8ee', titulo: '#e8e8ee', card: '#26262f', cborder: '#35353f', inputBg: '#1f1f28', btn: '#7f77dd', accent: '#7f77dd', tabBg: '#26262f', tabAtivo: '#3a3a48', tabTexto: '#ffffff' },
   // Paleta escura padrão (roxo escuro) — base do modo escuro.
   coresDark: { sidebar: '#161421', sidetext: '#c8c8d0', sidetextHover: '#ffffff', sidetextActive: '#ffffff', icon: '#c8c8d0', iconHover: '#ffffff', iconAtivo: '#ffffff', active: '#7f77dd', topbar: '#161421', sborder: '#2b2838', bg: '#0f0e16', text: '#e8e8ee', titulo: '#e8e8ee', card: '#1b1926', cborder: '#2b2838', inputBg: '#14121d', btn: '#7f77dd', accent: '#7f77dd', tabBg: '#1b1926', tabAtivo: '#2b2838', tabTexto: '#ffffff' },
@@ -286,14 +265,9 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
     titulo_pagina: tema?.titulo_pagina ?? DEFAULT.titulo_pagina,
     logo_url: tema?.logo_url ?? null,
     logo_grande_url: tema?.logo_grande_url ?? null,
-    logo_selecao_url: tema?.logo_selecao_url ?? null,
     logo_png_bg: tema?.logo_png_bg ?? DEFAULT.logo_png_bg,
     logo_estilo: (tema?.logo_estilo as LogoEstilo) ?? DEFAULT.logo_estilo,
-    logo_filtro_login: (tema?.logo_filtro_login as LogoFiltro) ?? (tema?.logo_filtro as LogoFiltro) ?? DEFAULT.logo_filtro_login,
     logo_filtro_sistema: (tema?.logo_filtro_sistema as LogoFiltro) ?? (tema?.logo_filtro as LogoFiltro) ?? DEFAULT.logo_filtro_sistema,
-    logo_selecao_estilo: (tema?.logo_selecao_estilo as SelecaoEstilo) ?? DEFAULT.logo_selecao_estilo,
-    login_layout: (tema?.login_layout === 'centralizado' ? 'centralizado' : 'painel'),
-    login_selecao: tema?.login_selecao !== false,
     cores: { ...DEFAULT.cores, ...(tema?.cores ?? {}) },
     coresDark: { ...DEFAULT.coresDark, ...(tema?.cores_dark ?? {}) },
   }
@@ -307,7 +281,6 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
   )
   const [nomePreset, setNomePreset] = useState('')
   const [presetSelId, setPresetSelId] = useState<string | null>(null) // preset em edição (embutido ou salvo)
-  const [previewModo, setPreviewModo] = useState<'painel' | 'login' | 'selecao'>('painel')
   const [pending, start] = useTransition()
   const editou = useRef(false)
   const { setTheme, resolvedTheme } = useTheme()
@@ -405,14 +378,8 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
   function aplicarNoSistema() {
     start(async () => {
       const { coresDark, ...restoT } = t
-      // Entrada é GLOBAL (/admin/entrada): NÃO persistir login_layout/login_selecao/logo_filtro_login
-      // — eles existem no estado só para a prévia. Removê-los evita sobrescrever a config global no save.
-      const semEntrada: Record<string, unknown> = { ...restoT }
-      delete semEntrada.login_layout
-      delete semEntrada.login_selecao
-      delete semEntrada.logo_filtro_login
       const payload = {
-        ...semEntrada,
+        ...restoT,
         cores_dark: coresDark,
         presets_cor: presetsCustom,
         cor_primaria: t.cores.btn, cor_secundaria: t.cores.card, cor_accent: t.cores.accent, logo_url: t.logo_url ?? undefined,
@@ -510,13 +477,11 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
           {/* Marca & Logo */}
           <Secao titulo="Marca & Logo" desc="Logos, nome do site e ícone" icon={ImageIcon} defaultOpen>
             <div className="space-y-2.5">
-              <LogoRow label="Logo (pequena)" desc="Sidebar, topo e ícones"
+              <LogoRow label="Logo — sidebar e sistema" desc="Sidebar, topo e ícones"
                 value={t.logo_url} onChange={(v) => setT((p) => ({ ...p, logo_url: v }))} onRemove={() => setT((p) => ({ ...p, logo_url: null }))}
                 frame={frameLogo(t.logo_estilo)} bg={t.logo_png_bg} inicial={(t.nome_site[0] ?? 'P').toUpperCase()} inicialBg={c.btn} />
-              <LogoRow label="Logo grande (login)" desc="Painel da esquerda do login"
+              <LogoRow label="Logo grande — prova, embed e entrada do aluno" desc="Onde o aluno resolve a prova"
                 value={t.logo_grande_url} onChange={(v) => setT((p) => ({ ...p, logo_grande_url: v }))} onRemove={() => setT((p) => ({ ...p, logo_grande_url: null }))} />
-              <LogoRow label="Imagem da seleção" desc="Bloco de seleção (início)"
-                value={t.logo_selecao_url} onChange={(v) => setT((p) => ({ ...p, logo_selecao_url: v }))} onRemove={() => setT((p) => ({ ...p, logo_selecao_url: null }))} />
             </div>
             {t.logo_url && (
               <div className="space-y-2.5 rounded-lg border bg-muted/20 p-3">
@@ -532,13 +497,8 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
                 </div>
               </div>
             )}
-            <div className="space-y-1.5"><span className="text-xs text-muted-foreground">Formato da imagem de seleção</span>
-              <div className="flex gap-1.5">{SELECAO_ESTILOS.map((e) => (<button key={e.id} type="button" onClick={() => setT((p) => ({ ...p, logo_selecao_estilo: e.id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_selecao_estilo === e.id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{e.nome}</button>))}</div>
-            </div>
             <div className="rounded-lg border border-dashed bg-muted/20 p-3 text-[11px] text-muted-foreground">
-              O layout da tela de login e a tela de seleção de plataforma agora são definidos de forma
-              global em <span className="font-medium text-foreground">Configuração → Entrada</span> (super-admin),
-              iguais para todas as plataformas.
+              A tela de <span className="font-medium text-foreground">login/entrada</span> é neutra e igual para todas as plataformas — configurada em <span className="font-medium text-foreground">Configuração → Entrada</span> (super-admin). Aqui você define a identidade que aparece <span className="font-medium text-foreground">dentro</span> da plataforma (sidebar, prova, relatórios).
             </div>
             <div className="space-y-2.5 border-t pt-3">
               <div className="space-y-1.5"><label className="text-xs text-muted-foreground">Nome do site</label>
@@ -573,7 +533,7 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
         <div className="lg:sticky lg:top-4 lg:self-start">
           <div className="rounded-xl border bg-card p-4 shadow-sm">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <Seg value={previewModo} onChange={setPreviewModo} options={[{ v: 'painel', label: 'Painel', icon: Monitor }, { v: 'login', label: 'Login' }, { v: 'selecao', label: 'Seleção' }]} />
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold"><Monitor className="h-4 w-4 text-primary" /> Prévia do sistema</span>
               <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                 {modoEdicao === 'dark' ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />} prévia {modoEdicao === 'dark' ? 'escura' : 'clara'}
               </span>
@@ -581,10 +541,10 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
             <div className="overflow-hidden rounded-lg border shadow-sm">
               <div className="flex items-center gap-2 border-b bg-background px-3 py-2">
                 <span className="h-3 w-3 rounded-full bg-red-400" /><span className="h-3 w-3 rounded-full bg-yellow-400" /><span className="h-3 w-3 rounded-full bg-green-400" />
-                <span className="ml-2 flex-1 truncate rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{t.nome_site.toLowerCase().replace(/\s+/g, '')}.app/{previewModo !== 'painel' ? 'login' : 'admin/banco-questoes'}</span>
+                <span className="ml-2 flex-1 truncate rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{t.nome_site.toLowerCase().replace(/\s+/g, '')}.app/admin/banco-questoes</span>
               </div>
-              <div key={`${previewModo}-${modoEdicao}`} className="animate-pop">
-                {previewModo === 'painel' ? <Preview t={t} cores={c} /> : previewModo === 'login' ? <PreviewLogin t={t} cores={c} dark={modoEdicao === 'dark'} /> : <PreviewSelecao t={t} cores={c} dark={modoEdicao === 'dark'} />}
+              <div key={modoEdicao} className="animate-pop">
+                <Preview t={t} cores={c} />
               </div>
             </div>
           </div>
@@ -636,96 +596,6 @@ function LogoRow({ label, desc, value, onChange, onRemove, frame, bg, inicial, i
             <X className="h-3.5 w-3.5" />
           </button>
         )}
-      </div>
-    </div>
-  )
-}
-
-/** Prévia do bloco de seleção de plataforma (tela inicial do login). */
-function PreviewSelecao({ t, cores, dark }: { t: Tema; cores: Cores; dark: boolean }) {
-  const c = cores
-  const bg = dark ? '#0d0d11' : '#f6f7f9'
-  const text = dark ? '#e8e8ee' : '#1a1d24'
-  const muted = dark ? '#8a8a99' : '#6b7280'
-  const cardBg = dark ? '#15151c' : '#ffffff'
-  const border = dark ? '#2a2a35' : '#e5e7eb'
-  const tileBg = dark ? '#1c1c25' : '#f7f7fa'
-  const img = t.logo_selecao_url ?? t.logo_url
-  return (
-    <div className="flex h-[420px] items-center justify-center" style={{ background: bg, color: text }}>
-      <div className="w-72 rounded-2xl border p-6 text-center shadow-sm" style={{ background: cardBg, borderColor: border }}>
-        <p className="text-base font-bold">Entrar</p>
-        <p className="mb-5 text-[11px]" style={{ color: muted }}>Escolha sua plataforma para acessar.</p>
-        <button className="mx-auto flex aspect-[5/4] w-40 flex-col items-center justify-center gap-2.5 rounded-xl border p-3" style={{ borderColor: border, background: tileBg }}>
-          <span className={`flex h-16 w-16 items-center justify-center overflow-hidden ${frameSelecao(t.logo_selecao_estilo)}`} style={{ background: dark ? '#26262f' : '#e7e7ee', borderColor: c.btn }}>
-            {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : <span className="text-lg font-bold" style={{ color: c.btn }}>{(t.nome_site[0] ?? 'P').toUpperCase()}</span>}
-          </span>
-          <span className="text-xs font-semibold">{t.nome_site}</span>
-        </button>
-      </div>
-    </div>
-  )
-}
-
-/** Prévia da tela de login (estilo Instagram) com logo, cor da marca e modo claro/escuro. */
-function PreviewLogin({ t, cores, dark }: { t: Tema; cores: Cores; dark: boolean }) {
-  const c = cores
-  const bg = dark ? '#0d0d11' : '#ffffff'
-  const panel = dark ? '#15151c' : '#f4f4f7'
-  const text = dark ? '#e8e8ee' : '#1a1d24'
-  const muted = dark ? '#8a8a99' : '#6b7280'
-  const inputBg = dark ? '#1c1c25' : '#f1f1f4'
-  const border = dark ? '#2a2a35' : '#e5e7eb'
-  // No login usa a logo GRANDE; cai na pequena se não houver.
-  const bigLogo = t.logo_grande_url ?? t.logo_url
-  const smallLogo = t.logo_url ?? t.logo_grande_url
-
-  // Layout centralizado (simples): card único no meio da tela.
-  if (t.login_layout === 'centralizado') {
-    const semFundo = !t.logo_png_bg || t.logo_png_bg === 'transparent'
-    return (
-      <div className="relative flex h-[420px] items-center justify-center px-4 text-[12px]" style={{ background: bg, color: text, fontFamily: 'system-ui, sans-serif' }}>
-        <div className="w-[248px] rounded-2xl border p-6 shadow-xl" style={{ background: dark ? '#15151c' : '#ffffff', borderColor: border }}>
-          <div className="mb-4 flex flex-col items-center gap-2 text-center">
-            <span className={`flex h-16 w-16 items-center justify-center overflow-hidden text-2xl font-bold ${semFundo ? '' : frameLogo(t.logo_estilo)}`} style={{ background: semFundo ? 'transparent' : t.logo_png_bg, color: contraste(c.btn) }}>
-              {smallLogo ? <img src={smallLogo} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogoCss(t.logo_filtro_login) }} /> : (t.nome_site[0] ?? 'P').toUpperCase()}
-            </span>
-            <p className="text-[13px] font-semibold">{t.nome_site}</p>
-          </div>
-          {t.login_selecao && <span className="mb-3 flex items-center gap-1 text-[11px]" style={{ color: muted }}><ArrowLeft className="h-3 w-3" /> Trocar plataforma</span>}
-          <p className="mb-3 text-sm font-bold">Acesso administrativo</p>
-          <div className="mb-2 flex h-9 items-center rounded-md px-2.5 text-[11px]" style={{ background: inputBg, border: `1px solid ${border}`, color: muted }}>Endereço de e-mail</div>
-          <div className="mb-2 flex h-9 items-center rounded-md px-2.5 text-[11px]" style={{ background: inputBg, border: `1px solid ${border}`, color: muted }}>Senha</div>
-          <div className="flex h-9 items-center justify-center rounded-md text-[11px] font-semibold" style={{ background: c.btn, color: contraste(c.btn) }}>Entrar no painel</div>
-        </div>
-        {/* Botão admin/aluno no canto inferior (mesmo esquema do layout painel). */}
-        <span className="absolute bottom-3 right-3 rounded-full border px-3 py-1 text-[10px] font-medium" style={{ borderColor: border, color: muted, background: dark ? '#15151c' : '#ffffff' }}>Área do aluno</span>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex h-[420px] text-[12px]" style={{ background: bg, color: text, fontFamily: 'system-ui, sans-serif' }}>
-      {/* esquerda — logo grande da plataforma */}
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden" style={{ background: panel, borderRight: `1px solid ${border}` }}>
-        <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 35% 35%, ${c.accent}26, transparent 60%)` }} />
-        {bigLogo ? (
-          <img src={bigLogo} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        ) : (
-          <span className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl text-3xl font-bold" style={{ background: c.btn, color: contraste(c.btn) }}>
-            {(t.nome_site[0] ?? 'P').toUpperCase()}
-          </span>
-        )}
-      </div>
-
-      {/* direita — credenciais */}
-      <div className="flex w-[48%] shrink-0 flex-col justify-center gap-3 px-6">
-        {t.login_selecao && <span className="flex items-center gap-1 text-[11px]" style={{ color: muted }}><ArrowLeft className="h-3 w-3" /> Trocar plataforma</span>}
-        <p className="text-sm font-bold">Acesso administrativo</p>
-        <div className="flex h-9 items-center rounded-md px-2.5 text-[11px]" style={{ background: inputBg, border: `1px solid ${border}`, color: muted }}>Endereço de e-mail</div>
-        <div className="flex h-9 items-center rounded-md px-2.5 text-[11px]" style={{ background: inputBg, border: `1px solid ${border}`, color: muted }}>Senha</div>
-        <div className="flex h-9 items-center justify-center rounded-md text-[11px] font-semibold" style={{ background: c.btn, color: contraste(c.btn) }}>Entrar no painel</div>
-        <span className="rounded-full border px-3 py-1 text-[10px] font-medium" style={{ alignSelf: 'flex-end', borderColor: border, color: muted }}>Área do aluno</span>
       </div>
     </div>
   )

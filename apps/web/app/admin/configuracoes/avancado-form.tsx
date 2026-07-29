@@ -5,7 +5,6 @@ import { toast } from 'sonner'
 import { Save, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const FONTES = [
@@ -18,18 +17,14 @@ const GOOGLE_FONTS_URL = 'https://fonts.googleapis.com/css2?' + FONTES.map((f) =
 
 export function AvancadoForm({ tema, salvarTema }: { tema: any; salvarTema: (t: Record<string, unknown>) => Promise<{ ok?: boolean } | void> }) {
   const [fonte, setFonte] = useState<string>(tema?.fonte ?? '')
-  const [usarFonteCor, setUsarFonteCor] = useState<boolean>(typeof tema?.fonte_cor === 'string')
-  const [fonteCor, setFonteCor] = useState<string>(tema?.fonte_cor ?? '#111111')
   const [favicon, setFavicon] = useState<string>(tema?.favicon ?? '')
-  const [logoClaro, setLogoClaro] = useState<string>(tema?.logo_url ?? '')
-  const [logoEscuro, setLogoEscuro] = useState<string>(tema?.logo_dark_url ?? '')
   const [pending, start] = useTransition()
   const fonteItems = { [SEM]: 'Padrão (sistema)', ...Object.fromEntries(FONTES.map((f) => [f, f])) }
 
   function salvar() {
     start(async () => {
       try {
-        await salvarTema({ fonte: fonte || null, fonte_cor: usarFonteCor ? fonteCor : null, favicon: favicon || null, logo_url: logoClaro || null, logo_dark_url: logoEscuro || null })
+        await salvarTema({ fonte: fonte || null, favicon: favicon || null })
         toast.success('Configurações avançadas salvas!')
       } catch (err) { toast.error(err instanceof Error ? err.message : 'Erro ao salvar') }
     })
@@ -54,36 +49,10 @@ export function AvancadoForm({ tema, salvarTema }: { tema: any; salvarTema: (t: 
         <p className="text-xs text-muted-foreground">Cada opção é exibida na própria fonte. “Padrão” usa a fonte do sistema.</p>
       </div>
 
-      <div className="space-y-2 rounded-lg border p-3">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="usar-fonte-cor" className="cursor-pointer">Cor da fonte do sistema</Label>
-          <Switch id="usar-fonte-cor" checked={usarFonteCor} onCheckedChange={setUsarFonteCor} />
-        </div>
-        {usarFonteCor ? (
-          <div className="flex items-center gap-3">
-            <span className="relative inline-flex h-8 w-10 shrink-0 overflow-hidden rounded-md border">
-              <span className="absolute inset-0" style={{ background: fonteCor }} />
-              <input type="color" value={fonteCor} onChange={(e) => setFonteCor(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
-            </span>
-            <Input value={fonteCor} onChange={(e) => setFonteCor(e.target.value)} placeholder="#111111" className="w-36" />
-            <span className="text-sm" style={{ color: fonteCor }}>Prévia do texto</span>
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">Usa a cor de texto padrão do sistema (varia conforme claro/escuro). Ative para definir uma cor fixa.</p>
-        )}
-      </div>
-
       <div className="space-y-2">
         <Label htmlFor="favicon">URL do Favicon</Label>
         <Input id="favicon" type="url" value={favicon} onChange={(e) => setFavicon(e.target.value)} placeholder="https://cdn.exemplo.com/favicon.ico" />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="logo-claro">URL do Logotipo (tema claro)</Label>
-        <Input id="logo-claro" type="url" value={logoClaro} onChange={(e) => setLogoClaro(e.target.value)} placeholder="https://cdn.exemplo.com/logo.png" />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="logo-escuro">URL do Logotipo (tema escuro)</Label>
-        <Input id="logo-escuro" type="url" value={logoEscuro} onChange={(e) => setLogoEscuro(e.target.value)} placeholder="https://cdn.exemplo.com/logo-dark.png" />
+        <p className="text-xs text-muted-foreground">Ícone da aba do navegador. A logo do sistema é definida em <span className="font-medium text-foreground">Identidade</span>.</p>
       </div>
 
       <button type="button" onClick={salvar} disabled={pending}
