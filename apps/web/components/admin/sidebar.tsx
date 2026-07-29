@@ -17,7 +17,6 @@ import {
   KeyRound,
   GraduationCap,
   SlidersHorizontal,
-  Building2,
   Flag,
   PenLine,
   FileText,
@@ -145,9 +144,8 @@ const navGroups: NavGroup[] = [
     label: 'Configuração',
     icon: SlidersHorizontal,
     items: [
-      { label: 'Plataformas', href: '/admin/tenants', icon: Building2, superOnly: true },
-      { label: 'Entrada', href: '/admin/entrada', icon: LogIn, superOnly: true },
-      { label: 'Compartilhar', href: '/admin/compartilhar', icon: Share2, superOnly: true },
+      // Plataformas / Entrada / Compartilhar migraram para o CONSOLE isolado do super-admin
+      // (/super) — gestão cross-tenant fica fora de qualquer plataforma.
       { label: 'Administradores', href: '/admin/administradores', icon: UserCog, perm: 'rbac:view' },
       { label: 'API Keys', href: '/admin/api-keys', icon: KeyRound, perm: 'api_keys:manage' },
       { label: 'Aparência', href: '/admin/configuracoes', icon: Palette, exact: true, perm: 'configuracoes:view' },

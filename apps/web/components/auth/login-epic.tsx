@@ -8,12 +8,12 @@ import { Loader2, GraduationCap, Mail, Lock, LogOut, ArrowRight, Building2, Shie
 import { cn } from '@/lib/utils'
 import { molduraSelecao } from '@/lib/selecao-moldura'
 
-// Atalhos globais do super-admin (renderizados no seletor, abaixo das plataformas).
+// Atalhos globais do super-admin → console ISOLADO /super (fora de qualquer plataforma).
 const ADMIN_ATALHOS: { href: string; label: string; desc: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { href: '/admin/tenants', label: 'Plataformas', desc: 'Criar e gerenciar tenants', icon: Building2 },
-  { href: '/admin/entrada', label: 'Entrada', desc: 'Tela de login neutra', icon: LogIn },
-  { href: '/admin/compartilhar', label: 'Compartilhar', desc: 'Copiar dados entre plataformas', icon: Share2 },
-  { href: '/admin/sistema', label: 'Sistema', desc: 'Manutenção e saúde', icon: ServerCog },
+  { href: '/super/plataformas', label: 'Plataformas', desc: 'Criar e gerenciar tenants', icon: Building2 },
+  { href: '/super/entrada', label: 'Entrada', desc: 'Tela de login neutra', icon: LogIn },
+  { href: '/super/compartilhar', label: 'Compartilhar', desc: 'Copiar dados entre plataformas', icon: Share2 },
+  { href: '/super/sistema', label: 'Sistema', desc: 'Prontidão e saúde', icon: ServerCog },
 ]
 
 // ENTRADA NEUTRA: o login é brand-agnostic — MESMA identidade em toda plataforma (não puxa
@@ -104,15 +104,10 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
     window.location.href = origemPlataforma(p) + '/admin'
   }
 
-  // Atalho de super-admin: as páginas globais (/admin/tenants…) vivem no /admin de QUALQUER
-  // tenant. Se já estamos numa origem de tenant (tenantAtualId), navega no SPA; senão, abre
-  // no /admin da plataforma atual (ou a 1ª) — origem válida para o layout admin resolver o tenant.
+  // O console do super-admin (/super) é ISOLADO e independe de tenant — navega SEMPRE na
+  // origem ATUAL (a entrada neutra), sem pular para o subdomínio de nenhuma plataforma.
   function irParaConfig(path: string) {
-    if (typeof window === 'undefined') return
-    if (tenantAtualId) { router.push(path); return }
-    const base = minhasPlats?.find((p) => p.id === tenantAtualId) ?? minhasPlats?.[0]
-    if (!base) { router.push(path); return }
-    window.location.href = origemPlataforma(base) + path
+    router.push(path)
   }
 
   // Busca as plataformas do admin ao entrar no seletor. NÃO auto-navega mesmo com 1 só —
@@ -243,9 +238,9 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
                     </button>
                   ))}
                 </div>
-                <button type="button" onClick={() => irParaConfig('/admin')}
+                <button type="button" onClick={() => irParaConfig('/super')}
                   className="group flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100">
-                  <LayoutDashboard className="h-3.5 w-3.5" /> Abrir painel administrativo completo
+                  <LayoutDashboard className="h-3.5 w-3.5" /> Abrir console de administração
                   <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                 </button>
               </div>
