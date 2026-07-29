@@ -44,6 +44,7 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState<string | null>(search.get('error'))
   const [minhasPlats, setMinhasPlats] = useState<PlatSimples[] | null>(null)
+  const [erroCarregar, setErroCarregar] = useState(false)
 
   const brand = marca
   const cor = brand.cor ?? '#6d28d9'
@@ -62,18 +63,22 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
   }
 
   // Busca as plataformas do admin ao entrar no seletor (pós-login ou já logado). Uma só → entra direto.
+  // Timeout evita spinner infinito; erroCarregar mostra "Tentar novamente" (não trava sem feedback).
   useEffect(() => {
-    if (modo !== 'selecionar' || minhasPlats !== null) return
+    if (modo !== 'selecionar' || minhasPlats !== null || erroCarregar) return
     let vivo = true
-    fetch('/api/auth/minhas-plataformas').then((r) => r.json()).then((d) => {
-      if (!vivo) return
-      const plats: PlatSimples[] = d.plataformas ?? []
-      setMinhasPlats(plats)
-      if (plats.length === 1) irParaPlataforma(plats[0])
-    }).catch(() => { if (vivo) setMinhasPlats([]) })
+    fetch('/api/auth/minhas-plataformas', { signal: AbortSignal.timeout(8000) })
+      .then((r) => { if (!r.ok) throw new Error('http ' + r.status); return r.json() })
+      .then((d) => {
+        if (!vivo) return
+        const plats: PlatSimples[] = Array.isArray(d?.plataformas) ? d.plataformas : []
+        setMinhasPlats(plats)
+        if (plats.length === 1) irParaPlataforma(plats[0])
+      })
+      .catch(() => { if (vivo) { setErroCarregar(true); toast.error('Não foi possível carregar suas plataformas.') } })
     return () => { vivo = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modo])
+  }, [modo, minhasPlats, erroCarregar])
 
   async function entrarAluno(e: React.FormEvent) {
     e.preventDefault(); setErro(null); setLoading(true)
@@ -129,7 +134,13 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
             <p className="text-sm text-muted-foreground">Você tem acesso a estas plataformas.</p>
           </div>
 
-          {minhasPlats === null ? (
+          {erroCarregar ? (
+            <div className="py-8 text-center">
+              <p className="mb-3 text-sm text-muted-foreground">Não foi possível carregar suas plataformas.</p>
+              <button type="button" onClick={() => { setErroCarregar(false); setMinhasPlats(null) }}
+                className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:border-primary/60 hover:text-foreground">Tentar novamente</button>
+            </div>
+          ) : minhasPlats === null ? (
             <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
           ) : minhasPlats.length === 0 ? (
             <p className="rounded-lg bg-muted/50 p-4 text-center text-sm text-muted-foreground">Nenhuma plataforma disponível para esta conta.</p>
@@ -150,7 +161,7 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
             </div>
           )}
 
-          <button type="button" onClick={() => { setModo('aluno'); setMinhasPlats(null); setEmail(''); setSenha(''); setLoading(false); setErro(null) }}
+          <button type="button" onClick={() => { setModo('aluno'); setMinhasPlats(null); setErroCarregar(false); setEmail(''); setSenha(''); setLoading(false); setErro(null) }}
             className="mt-6 inline-flex w-full items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground">
             <LogOut className="h-3.5 w-3.5" /> Entrar com outra conta
           </button>
