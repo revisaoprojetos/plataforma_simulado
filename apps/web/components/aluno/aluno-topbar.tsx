@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { LogOut, Building2, ShieldCheck } from 'lucide-react'
 import { TrocarPlataformaAlunoModal } from '@/components/aluno/trocar-plataforma-aluno'
+import { NotificacaoBellAluno } from '@/components/aluno/notificacao-bell-aluno'
 
 function iniciais(nome: string) {
   return nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
@@ -36,6 +37,7 @@ export function AlunoTopbar({ nome, email }: { nome: string; email?: string }) {
     >
       <SidebarTrigger />
       <div className="flex-1" />
+      <NotificacaoBellAluno />
       <ThemeToggle />
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2 rounded-full outline-none hover:bg-transparent! aria-expanded:bg-transparent! focus-visible:ring-2 focus-visible:ring-ring">

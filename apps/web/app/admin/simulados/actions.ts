@@ -10,6 +10,7 @@ import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
 import { brtLocalParaIso } from '@/lib/brt'
 import { computarResumoAoVivo, computarOnlinePorSimulado, type ResumoAoVivo } from '@/lib/simulado/ao-vivo'
+import { criarNotificacoesEmMassa } from '@/lib/notificacoes/criar'
 
 // Sentinela p/ escopo de tenant: com tenantId null, o filtro vira um uuid impossível →
 // 0 linhas (fail-closed). Toda query por id/simulado_id filtra .eq('tenant_id', tenantId ?? SEM_TENANT)
@@ -657,13 +658,35 @@ export async function liberarItemAction(id: string, item: 'nota' | 'gabarito' | 
   const flag = { nota: 'nota_liberada', gabarito: 'gabarito_liberado', caderno: 'caderno_liberado' }[item]
   const tenantId = await getCurrentTenantId()
   const supabase = await createClient()
-  const { data: s } = await supabase.from('simulado_simulados').select('regras').eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT).maybeSingle()
+  const { data: s } = await supabase.from('simulado_simulados').select('regras, titulo').eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT).maybeSingle()
   if (!s) return
   const regras = { ...(((s?.regras as Record<string, unknown>) ?? {})), [flag]: liberado }
   await supabase.from('simulado_simulados').update({ regras }).eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT)
   await registrarAudit({ operacao: liberado ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_simulados', entidadeId: id, depois: { [flag]: liberado } })
+
+  // Notifica os alunos que fizeram a prova quando LIBERA nota/gabarito (resultado disponível).
+  if (liberado && (item === 'nota' || item === 'gabarito')) {
+    await notificarLiberacao(id, item, (s as any).titulo ?? 'Simulado', tenantId)
+  }
+
   revalidatePath('/admin/simulados')
   revalidatePath(`/admin/simulados/${id}`)
+}
+
+/** Cria notificações in-app p/ quem finalizou o simulado quando a nota/gabarito é liberado. */
+async function notificarLiberacao(simuladoId: string, item: 'nota' | 'gabarito', titulo: string, tenantId: string | null) {
+  const svc = createAdminClient()
+  const sess = await fetchAll<{ estudante_id: string }>(() =>
+    svc.from('simulado_sessoes_prova').select('estudante_id')
+      .eq('simulado_id', simuladoId).eq('tenant_id', tenantId ?? SEM_TENANT)
+      .eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada').order('estudante_id'))
+  const ids = [...new Set(sess.map((r) => r.estudante_id).filter(Boolean))]
+  await criarNotificacoesEmMassa(svc, tenantId, ids, {
+    tipo: 'liberacao',
+    titulo: item === 'gabarito' ? 'Gabarito liberado' : 'Resultado liberado',
+    mensagem: `O ${item === 'gabarito' ? 'gabarito' : 'resultado'} do simulado "${titulo}" já está disponível.`,
+    link: `/aluno/simulados/${simuladoId}`,
+  })
 }
 
 /** Libera (ou bloqueia) manualmente o gabarito do simulado — grava regras.gabarito_liberado. */
