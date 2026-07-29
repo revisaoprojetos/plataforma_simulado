@@ -21,65 +21,35 @@ type PlatSimples = { id: string; nome: string; slug: string; dominio: string | n
 export type Plataforma = { id: string; nome: string; [k: string]: unknown }
 
 const KEYFRAMES = `
-@keyframes auroraA { 0%,100% { transform: translate(-8%,-6%) scale(1) } 50% { transform: translate(10%,8%) scale(1.18) } }
-@keyframes auroraB { 0%,100% { transform: translate(8%,10%) scale(1.12) } 50% { transform: translate(-10%,-8%) scale(1) } }
-@keyframes auroraC { 0%,100% { transform: translate(0,0) scale(1) } 50% { transform: translate(8%,-10%) scale(1.22) } }
-@keyframes loginUp { from { opacity: 0; transform: translateY(18px) } to { opacity: 1; transform: none } }
+@keyframes loginUp { from { opacity: 0; transform: translateY(16px) } to { opacity: 1; transform: none } }
 @keyframes loginFade { from { opacity: 0 } to { opacity: 1 } }
-@keyframes floatBadge { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
-@keyframes gridPan { from { background-position: 0 0 } to { background-position: 44px 44px } }
-@keyframes ringSpin { to { transform: rotate(360deg) } }
-@keyframes shimmer { to { background-position: -200% center } }
-@keyframes floatUp { 0% { transform: translateY(10px); opacity: 0 } 12%,88% { opacity: .5 } 100% { transform: translateY(-130px); opacity: 0 } }
+@keyframes floatBadge { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-5px) } }
+@keyframes breathe { 0%,100% { opacity: .65; transform: translate(-50%,-50%) scale(1) } 50% { opacity: 1; transform: translate(-50%,-50%) scale(1.08) } }
 @media (prefers-reduced-motion: reduce) { .lg-anim { animation: none !important } }
 `
 
-// Partículas flutuantes (posições/tempos FIXOS p/ não quebrar a hidratação SSR).
-const PARTICULAS = [
-  { l: '8%', t: '78%', s: 3, d: 0, dur: 11 }, { l: '18%', t: '60%', s: 2, d: 2.4, dur: 14 },
-  { l: '27%', t: '85%', s: 4, d: 1.1, dur: 12 }, { l: '38%', t: '70%', s: 2, d: 3.6, dur: 15 },
-  { l: '49%', t: '88%', s: 3, d: .6, dur: 10 }, { l: '58%', t: '64%', s: 2, d: 2.8, dur: 13 },
-  { l: '67%', t: '82%', s: 4, d: 1.7, dur: 12 }, { l: '76%', t: '58%', s: 2, d: 4.2, dur: 16 },
-  { l: '85%', t: '80%', s: 3, d: .3, dur: 11 }, { l: '92%', t: '66%', s: 2, d: 3.1, dur: 14 },
-  { l: '13%', t: '92%', s: 2, d: 5, dur: 13 }, { l: '44%', t: '55%', s: 3, d: 2, dur: 15 },
-  { l: '62%', t: '90%', s: 2, d: .9, dur: 12 }, { l: '81%', t: '52%', s: 3, d: 3.9, dur: 16 },
-]
-
-/** Fundo aurora neutro (compartilhado por todos os modos). */
+/** Fundo neutro e calmo: um único glow suave que respira devagar + leve tom no topo. */
 function Aurora() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      {/* grid sutil animado */}
-      <div className="lg-anim absolute inset-0 opacity-[0.15]" style={{
-        backgroundImage: 'linear-gradient(rgba(148,163,184,.35) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,.35) 1px, transparent 1px)',
-        backgroundSize: '44px 44px', animation: 'gridPan 22s linear infinite',
-        maskImage: 'radial-gradient(ellipse at center, black 20%, transparent 75%)',
-        WebkitMaskImage: 'radial-gradient(ellipse at center, black 20%, transparent 75%)',
-      }} />
-      {/* blobs aurora */}
-      <div className="lg-anim absolute -left-1/4 -top-1/3 h-[46rem] w-[46rem] rounded-full blur-[130px]" style={{ background: 'radial-gradient(circle, rgba(99,102,241,.55), transparent 65%)', animation: 'auroraA 20s ease-in-out infinite' }} />
-      <div className="lg-anim absolute -bottom-1/3 -right-1/4 h-[42rem] w-[42rem] rounded-full blur-[130px]" style={{ background: 'radial-gradient(circle, rgba(139,92,246,.5), transparent 65%)', animation: 'auroraB 24s ease-in-out infinite' }} />
-      <div className="lg-anim absolute left-1/3 top-1/4 h-[34rem] w-[34rem] rounded-full blur-[130px]" style={{ background: 'radial-gradient(circle, rgba(56,189,248,.4), transparent 65%)', animation: 'auroraC 26s ease-in-out infinite' }} />
-      {/* partículas flutuantes */}
-      {PARTICULAS.map((p, i) => (
-        <span key={i} className="lg-anim absolute rounded-full bg-indigo-200/70" style={{ left: p.l, top: p.t, height: p.s, width: p.s, animation: `floatUp ${p.dur}s ease-in-out ${p.d}s infinite`, boxShadow: '0 0 6px rgba(165,180,252,.8)' }} />
-      ))}
-      {/* vinheta */}
-      <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, transparent 30%, rgba(2,6,23,.7) 100%)' }} />
+      <div className="lg-anim absolute left-1/2 top-1/2 h-[54rem] w-[54rem] rounded-full blur-[150px]"
+        style={{ background: 'radial-gradient(circle, rgba(99,102,241,.22), rgba(139,92,246,.10) 45%, transparent 70%)', animation: 'breathe 15s ease-in-out infinite' }} />
+      <div className="absolute inset-x-0 top-0 h-1/2" style={{ background: 'linear-gradient(to bottom, rgba(99,102,241,.07), transparent)' }} />
     </div>
   )
 }
 
-/** Casca do login: fundo escuro fixo + aurora + card de vidro com anel de brilho girando. */
+/** Casca do login: fundo escuro fixo + glow calmo + card de vidro limpo com acento no topo. */
 function Shell({ children, wide }: { children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 p-4 text-slate-100">
       <style>{KEYFRAMES}</style>
       <Aurora />
-      <div className={cn('relative w-full', wide ? 'max-w-md' : 'max-w-sm')} style={{ animation: 'loginUp .55s cubic-bezier(.2,.7,.2,1)' }}>
-        {/* anel de brilho girando atrás do card */}
-        <div aria-hidden className="lg-anim absolute -inset-px rounded-[1.6rem] opacity-60 blur-md" style={{ background: 'conic-gradient(from 0deg, rgba(99,102,241,.6), rgba(139,92,246,.6), rgba(56,189,248,.6), rgba(99,102,241,.6))', animation: 'ringSpin 8s linear infinite' }} />
-        <div className="relative overflow-hidden rounded-[1.55rem] border border-white/10 bg-white/[0.04] p-8 shadow-2xl backdrop-blur-2xl">
+      <div className={cn('relative w-full', wide ? 'max-w-md' : 'max-w-sm')} style={{ animation: 'loginUp .5s cubic-bezier(.2,.7,.2,1)' }}>
+        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] p-8 backdrop-blur-2xl"
+          style={{ boxShadow: '0 24px 70px -24px rgba(79,70,229,.4)' }}>
+          {/* linha de acento gradiente no topo — sutil, estática */}
+          <div aria-hidden className="absolute inset-x-6 top-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(139,92,246,.8), transparent)' }} />
           {children}
         </div>
       </div>
@@ -110,17 +80,14 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
     window.location.href = url
   }
 
+  // Busca as plataformas do admin ao entrar no seletor. NÃO auto-navega mesmo com 1 só —
+  // o admin sempre escolhe explicitamente (nunca é encaminhado direto).
   useEffect(() => {
     if (modo !== 'selecionar' || minhasPlats !== null || erroCarregar) return
     let vivo = true
     fetch('/api/auth/minhas-plataformas', { signal: AbortSignal.timeout(8000) })
       .then((r) => { if (!r.ok) throw new Error('http ' + r.status); return r.json() })
-      .then((d) => {
-        if (!vivo) return
-        const plats: PlatSimples[] = Array.isArray(d?.plataformas) ? d.plataformas : []
-        setMinhasPlats(plats)
-        if (plats.length === 1) irParaPlataforma(plats[0])
-      })
+      .then((d) => { if (vivo) setMinhasPlats(Array.isArray(d?.plataformas) ? d.plataformas : []) })
       .catch(() => { if (vivo) { setErroCarregar(true); toast.error('Não foi possível carregar suas plataformas.') } })
     return () => { vivo = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -155,15 +122,18 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
 
   // Identidade neutra do produto (logo da config global OU emblema em gradiente).
   const Emblema = (
-    <div className="lg-anim relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg" style={{ animation: 'floatBadge 4.5s ease-in-out infinite', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
-      <div aria-hidden className="absolute inset-0 rounded-2xl opacity-60 blur-lg" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }} />
+    <div className="lg-anim relative mx-auto flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg" style={{ animation: 'floatBadge 5s ease-in-out infinite', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
       {marca?.logo ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={marca.logo} alt={nome} className="relative h-full w-full rounded-2xl object-contain" />
+        <img src={marca.logo} alt={nome} className="h-full w-full rounded-2xl object-contain" />
       ) : (
-        <GraduationCap className="relative h-8 w-8 text-white" />
+        <GraduationCap className="h-7 w-7 text-white" />
       )}
     </div>
+  )
+
+  const Titulo = ({ children }: { children: React.ReactNode }) => (
+    <h1 className="bg-gradient-to-b from-white to-slate-300 bg-clip-text text-2xl font-bold tracking-tight text-transparent">{children}</h1>
   )
 
   // ---------- SELETOR DE PLATAFORMA (pós-login) ----------
@@ -173,8 +143,8 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
           {Emblema}
           <div>
-            <h1 className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-xl font-bold tracking-tight text-transparent">Escolha a plataforma</h1>
-            <p className="mt-1 text-sm text-slate-400">Você tem acesso a estas plataformas.</p>
+            <Titulo>Escolha a plataforma</Titulo>
+            <p className="mt-1 text-sm text-slate-400">Selecione onde deseja entrar.</p>
           </div>
         </div>
 
@@ -188,17 +158,21 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
         ) : minhasPlats.length === 0 ? (
           <p className="rounded-lg border border-white/10 bg-white/5 p-4 text-center text-sm text-slate-400">Nenhuma plataforma disponível para esta conta.</p>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className={cn('grid gap-3', minhasPlats.length === 1 ? 'grid-cols-1' : 'grid-cols-2')}>
             {minhasPlats.map((p) => (
               <button key={p.id} onClick={() => irParaPlataforma(p)} title={`Entrar — ${p.nome}`}
-                className="group flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center transition-all hover:-translate-y-0.5 hover:border-indigo-400/50 hover:bg-white/[0.07]">
-                <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/5 transition-transform group-hover:scale-105">
+                className={cn('group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left transition-all hover:-translate-y-0.5 hover:border-indigo-400/50 hover:bg-white/[0.07]', minhasPlats.length === 1 ? 'flex-row' : 'flex-col text-center')}>
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/5 transition-transform group-hover:scale-105">
                   {p.logo ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={p.logo} alt={p.nome} className="h-full w-full object-cover" />
-                  ) : <Building2 className="h-7 w-7 text-slate-300" />}
+                  ) : <Building2 className="h-6 w-6 text-slate-300" />}
                 </span>
-                <span className="line-clamp-2 text-sm font-semibold leading-tight text-slate-100">{p.nome}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold leading-tight text-slate-100">{p.nome}</span>
+                  {minhasPlats.length === 1 && <span className="block text-xs text-slate-400">Clique para entrar</span>}
+                </span>
+                {minhasPlats.length === 1 && <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" />}
               </button>
             ))}
           </div>
@@ -234,7 +208,7 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
       <div className="mb-6 flex flex-col items-center gap-3 text-center">
         {Emblema}
         <div>
-          <h1 className="lg-anim bg-clip-text text-2xl font-bold tracking-tight text-transparent" style={{ backgroundImage: 'linear-gradient(110deg, #f8fafc 35%, #a5b4fc 50%, #f8fafc 65%)', backgroundSize: '200% auto', animation: 'shimmer 6s linear infinite' }}>{nome}</h1>
+          <Titulo>{nome}</Titulo>
           <p className="mt-1 text-sm text-slate-400">{ehAdmin ? 'Acesso administrativo' : 'Sua plataforma de simulados'}</p>
         </div>
       </div>
