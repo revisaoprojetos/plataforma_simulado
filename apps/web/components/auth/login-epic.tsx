@@ -4,40 +4,76 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Loader2, GraduationCap, Mail, Lock, LogOut } from 'lucide-react'
+import { Loader2, GraduationCap, Mail, Lock, LogOut, ArrowRight, Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type LoginLayout = 'painel' | 'centralizado'
-export type Plataforma = { id: string; nome: string; dominio: string | null; logo: string | null; logoGrande: string | null; logoSelecao: string | null; selecaoEstilo: 'quadrada' | 'redonda' | 'borda'; loginLayout: LoginLayout; logoBg: string; logoEstilo: string; logoFiltro: string; selecao: boolean; cor: string | null; modoPadrao: 'light' | 'dark' }
+// ENTRADA NEUTRA: o login é brand-agnostic — MESMA identidade em toda plataforma (não puxa
+// o tema de nenhum tenant). Cores fixas neutras (indigo/violeta) são intencionais aqui.
+// A marca é só o nome/logo do PRODUTO (config global), não de um tenant.
+export type Marca = { nome: string; logo: string | null }
 
-/** Moldura do quadro da logo conforme o estilo configurado. */
-function frameLogo(estilo?: string): string {
-  if (estilo === 'quadrado') return 'rounded-none'
-  if (estilo === 'borda') return 'rounded-lg border'
-  return 'rounded-xl'
-}
-/** Filtro CSS que força a logo a branco/preto (gama), igual à sidebar. */
-function filtroLogo(f?: string): string | undefined {
-  if (f === 'branco') return 'brightness(0) invert(1)'
-  if (f === 'preto') return 'brightness(0)'
-  return undefined
-}
-type Marca = { nome: string; logo: string | null; logoGrande: string | null; cor: string | null; modoPadrao: 'light' | 'dark'; loginLayout: LoginLayout; logoBg: string; logoEstilo: string; logoFiltro: string; mostrarSelecao: boolean }
-// AUTENTICAR-FIRST: o formulário vem primeiro; o seletor de plataformas aparece SÓ depois
-// de autenticar (ou se já logado pelo cookie compartilhado). Aluno mantém o fluxo por-subdomínio.
+// AUTENTICAR-FIRST: o formulário vem primeiro; o seletor de plataformas aparece SÓ depois de
+// autenticar (ou se já logado pelo cookie compartilhado). Aluno mantém o fluxo por-subdomínio.
 type Modo = 'aluno' | 'admin' | 'selecionar'
 type PlatSimples = { id: string; nome: string; slug: string; dominio: string | null; logo: string | null; cor: string | null }
 
+// Compat: a página ainda pode passar campos antigos; só usamos nome/logo.
+export type Plataforma = { id: string; nome: string; [k: string]: unknown }
+
 const KEYFRAMES = `
-@keyframes loginPop { from { opacity: 0; transform: scale(.96) translateY(8px) } to { opacity: 1; transform: none } }
-@keyframes loginLeft { from { opacity: 0; transform: translateX(-32px) } to { opacity: 1; transform: none } }
-@keyframes loginRight { from { opacity: 0; transform: translateX(32px) } to { opacity: 1; transform: none } }
+@keyframes auroraA { 0%,100% { transform: translate(-8%,-6%) scale(1) } 50% { transform: translate(10%,8%) scale(1.18) } }
+@keyframes auroraB { 0%,100% { transform: translate(8%,10%) scale(1.12) } 50% { transform: translate(-10%,-8%) scale(1) } }
+@keyframes auroraC { 0%,100% { transform: translate(0,0) scale(1) } 50% { transform: translate(8%,-10%) scale(1.22) } }
+@keyframes loginUp { from { opacity: 0; transform: translateY(18px) } to { opacity: 1; transform: none } }
+@keyframes loginFade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes floatBadge { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
+@keyframes gridPan { from { background-position: 0 0 } to { background-position: 44px 44px } }
+@keyframes ringSpin { to { transform: rotate(360deg) } }
+@keyframes shimmer { to { background-position: 200% center } }
+@media (prefers-reduced-motion: reduce) { .lg-anim { animation: none !important } }
 `
+
+/** Fundo aurora neutro (compartilhado por todos os modos). */
+function Aurora() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      {/* grid sutil animado */}
+      <div className="lg-anim absolute inset-0 opacity-[0.15]" style={{
+        backgroundImage: 'linear-gradient(rgba(148,163,184,.35) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,.35) 1px, transparent 1px)',
+        backgroundSize: '44px 44px', animation: 'gridPan 22s linear infinite',
+        maskImage: 'radial-gradient(ellipse at center, black 20%, transparent 75%)',
+        WebkitMaskImage: 'radial-gradient(ellipse at center, black 20%, transparent 75%)',
+      }} />
+      {/* blobs aurora */}
+      <div className="lg-anim absolute -left-1/4 -top-1/3 h-[46rem] w-[46rem] rounded-full blur-[130px]" style={{ background: 'radial-gradient(circle, rgba(99,102,241,.55), transparent 65%)', animation: 'auroraA 20s ease-in-out infinite' }} />
+      <div className="lg-anim absolute -bottom-1/3 -right-1/4 h-[42rem] w-[42rem] rounded-full blur-[130px]" style={{ background: 'radial-gradient(circle, rgba(139,92,246,.5), transparent 65%)', animation: 'auroraB 24s ease-in-out infinite' }} />
+      <div className="lg-anim absolute left-1/3 top-1/4 h-[34rem] w-[34rem] rounded-full blur-[130px]" style={{ background: 'radial-gradient(circle, rgba(56,189,248,.4), transparent 65%)', animation: 'auroraC 26s ease-in-out infinite' }} />
+      {/* vinheta */}
+      <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, transparent 30%, rgba(2,6,23,.7) 100%)' }} />
+    </div>
+  )
+}
+
+/** Casca do login: fundo escuro fixo + aurora + card de vidro com anel de brilho girando. */
+function Shell({ children, wide }: { children: React.ReactNode; wide?: boolean }) {
+  return (
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 p-4 text-slate-100">
+      <style>{KEYFRAMES}</style>
+      <Aurora />
+      <div className={cn('relative w-full', wide ? 'max-w-md' : 'max-w-sm')} style={{ animation: 'loginUp .55s cubic-bezier(.2,.7,.2,1)' }}>
+        {/* anel de brilho girando atrás do card */}
+        <div aria-hidden className="lg-anim absolute -inset-px rounded-[1.6rem] opacity-60 blur-md" style={{ background: 'conic-gradient(from 0deg, rgba(99,102,241,.6), rgba(139,92,246,.6), rgba(56,189,248,.6), rgba(99,102,241,.6))', animation: 'ringSpin 8s linear infinite' }} />
+        <div className="relative overflow-hidden rounded-[1.55rem] border border-white/10 bg-white/[0.04] p-8 shadow-2xl backdrop-blur-2xl">
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; jaLogado?: boolean; tenantAtualId?: string | null }) {
   const router = useRouter()
   const search = useSearchParams()
-  // Já logado (sessão Supabase, cookie do domínio) → pula direto pro seletor das plataformas.
   const [modo, setModo] = useState<Modo>(jaLogado ? 'selecionar' : 'aluno')
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
@@ -46,24 +82,18 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
   const [minhasPlats, setMinhasPlats] = useState<PlatSimples[] | null>(null)
   const [erroCarregar, setErroCarregar] = useState(false)
 
-  const brand = marca
-  const cor = brand.cor ?? '#6d28d9'
-  const layout: LoginLayout = brand.loginLayout ?? 'painel'
-  const logoLogin = brand.logoGrande ?? brand.logo // grande no painel da esquerda
-  const temaPlataforma = modo === 'selecionar' ? 'theme-light' : (brand.modoPadrao === 'dark' ? 'theme-dark' : 'theme-light')
+  const nome = marca?.nome || 'Simulados'
 
   function irParaPlataforma(p: PlatSimples) {
     if (typeof window === 'undefined') return
-    if (p.id === tenantAtualId) { router.push('/admin'); return } // já é o subdomínio atual
+    if (p.id === tenantAtualId) { router.push('/admin'); return }
     const { protocol, host } = window.location
     let url: string
     if (p.dominio) url = `${protocol}//${p.dominio}/admin`
     else { const partes = host.split('.'); const base = partes.length > 1 ? partes.slice(1).join('.') : host; url = `${protocol}//${p.slug}.${base}/admin` }
-    window.location.href = url // cookie compartilhado (Fase 0) → entra já autenticado
+    window.location.href = url
   }
 
-  // Busca as plataformas do admin ao entrar no seletor (pós-login ou já logado). Uma só → entra direto.
-  // Timeout evita spinner infinito; erroCarregar mostra "Tentar novamente" (não trava sem feedback).
   useEffect(() => {
     if (modo !== 'selecionar' || minhasPlats !== null || erroCarregar) return
     let vivo = true
@@ -104,170 +134,113 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
     }
     void fetch('/api/audit/login', { method: 'POST' }).catch(() => {})
     toast.success('Login realizado com sucesso!')
-    // Autenticado (sessão global). Mostra as plataformas do admin (o useEffect busca).
     setLoading(false); setMinhasPlats(null); setModo('selecionar')
   }
 
-  const adminBtn = (
-    <button
-      onClick={() => { setErro(null); setSenha(''); setModo(modo === 'admin' ? 'aluno' : 'admin') }}
-      className={cn(
-        'fixed bottom-5 right-5 z-20 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium shadow-lg backdrop-blur transition-colors',
-        modo === 'admin' ? 'border-primary/60 bg-primary/15 text-primary hover:bg-primary/25' : 'border-border bg-card text-muted-foreground hover:border-primary/60 hover:text-foreground',
-      )}>
-      {modo === 'admin' ? <GraduationCap className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-      {modo === 'admin' ? 'Área do aluno' : 'Admin'}
-    </button>
+  // Identidade neutra do produto (logo da config global OU emblema em gradiente).
+  const Emblema = (
+    <div className="lg-anim relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg" style={{ animation: 'floatBadge 4.5s ease-in-out infinite', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+      <div aria-hidden className="absolute inset-0 rounded-2xl opacity-60 blur-lg" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }} />
+      {marca?.logo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={marca.logo} alt={nome} className="relative h-full w-full rounded-2xl object-contain" />
+      ) : (
+        <GraduationCap className="relative h-8 w-8 text-white" />
+      )}
+    </div>
   )
 
-  // ---------- SELETOR DE PLATAFORMA (pós-login / já logado) ----------
+  // ---------- SELETOR DE PLATAFORMA (pós-login) ----------
   if (modo === 'selecionar') {
     return (
-      <div className="theme-light relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4 text-foreground">
-        <style>{KEYFRAMES}</style>
-        <div aria-hidden className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-40 left-1/2 h-[36rem] w-[36rem] -translate-x-1/2 rounded-full blur-[120px]" style={{ background: `${cor}1f` }} />
-        </div>
-        <div className="relative w-full max-w-md rounded-2xl border bg-card p-8 shadow-2xl" style={{ animation: 'loginPop .4s ease' }}>
-          <div className="mb-7 flex flex-col items-center gap-2 text-center">
-            <h1 className="text-xl font-bold tracking-tight">Escolha a plataforma</h1>
-            <p className="text-sm text-muted-foreground">Você tem acesso a estas plataformas.</p>
+      <Shell wide>
+        <div className="mb-7 flex flex-col items-center gap-3 text-center">
+          {Emblema}
+          <div>
+            <h1 className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-xl font-bold tracking-tight text-transparent">Escolha a plataforma</h1>
+            <p className="mt-1 text-sm text-slate-400">Você tem acesso a estas plataformas.</p>
           </div>
-
-          {erroCarregar ? (
-            <div className="py-8 text-center">
-              <p className="mb-3 text-sm text-muted-foreground">Não foi possível carregar suas plataformas.</p>
-              <button type="button" onClick={() => { setErroCarregar(false); setMinhasPlats(null) }}
-                className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:border-primary/60 hover:text-foreground">Tentar novamente</button>
-            </div>
-          ) : minhasPlats === null ? (
-            <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
-          ) : minhasPlats.length === 0 ? (
-            <p className="rounded-lg bg-muted/50 p-4 text-center text-sm text-muted-foreground">Nenhuma plataforma disponível para esta conta.</p>
-          ) : (
-            <div className="flex flex-wrap justify-center gap-3">
-              {minhasPlats.map((p) => (
-                <button key={p.id} onClick={() => irParaPlataforma(p)} title={`Entrar — ${p.nome}`}
-                  className="group flex aspect-[5/4] w-40 flex-col items-center justify-center gap-3 rounded-2xl border bg-muted/40 p-4 text-center transition-colors hover:border-primary/60 hover:bg-primary/10">
-                  <span className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-muted transition-transform group-hover:scale-105" style={{ borderColor: p.cor ?? cor }}>
-                    {p.logo ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.logo} alt={p.nome} className="h-full w-full object-cover" />
-                    ) : <GraduationCap className="h-9 w-9" style={{ color: p.cor ?? cor }} />}
-                  </span>
-                  <span className="line-clamp-2 text-sm font-semibold leading-tight">{p.nome}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          <button type="button" onClick={() => { setModo('aluno'); setMinhasPlats(null); setErroCarregar(false); setEmail(''); setSenha(''); setLoading(false); setErro(null) }}
-            className="mt-6 inline-flex w-full items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-            <LogOut className="h-3.5 w-3.5" /> Entrar com outra conta
-          </button>
         </div>
-      </div>
+
+        {erroCarregar ? (
+          <div className="py-8 text-center">
+            <p className="mb-3 text-sm text-slate-400">Não foi possível carregar suas plataformas.</p>
+            <button type="button" onClick={() => { setErroCarregar(false); setMinhasPlats(null) }} className="rounded-lg border border-white/15 px-4 py-2 text-sm font-medium text-slate-200 transition-colors hover:border-indigo-400/60 hover:bg-white/5">Tentar novamente</button>
+          </div>
+        ) : minhasPlats === null ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-400"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
+        ) : minhasPlats.length === 0 ? (
+          <p className="rounded-lg border border-white/10 bg-white/5 p-4 text-center text-sm text-slate-400">Nenhuma plataforma disponível para esta conta.</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {minhasPlats.map((p) => (
+              <button key={p.id} onClick={() => irParaPlataforma(p)} title={`Entrar — ${p.nome}`}
+                className="group flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center transition-all hover:-translate-y-0.5 hover:border-indigo-400/50 hover:bg-white/[0.07]">
+                <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/5 transition-transform group-hover:scale-105">
+                  {p.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.logo} alt={p.nome} className="h-full w-full object-cover" />
+                  ) : <Building2 className="h-7 w-7 text-slate-300" />}
+                </span>
+                <span className="line-clamp-2 text-sm font-semibold leading-tight text-slate-100">{p.nome}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <button type="button" onClick={() => { setModo('aluno'); setMinhasPlats(null); setErroCarregar(false); setEmail(''); setSenha(''); setLoading(false); setErro(null) }}
+          className="mt-6 inline-flex w-full items-center justify-center gap-1.5 text-xs text-slate-400 transition-colors hover:text-slate-200">
+          <LogOut className="h-3.5 w-3.5" /> Entrar com outra conta
+        </button>
+      </Shell>
     )
   }
 
   // ---------- LOGIN (form aluno/admin) ----------
-  const titulo = modo === 'admin' ? 'Acesso administrativo' : 'Login'
-
-  // Formulário de credenciais — reutilizado nos dois layouts (painel e centralizado).
-  const formLogin = modo === 'aluno' ? (
-    <form onSubmit={entrarAluno} className="space-y-4">
-      <Campo icon={Mail} type="email" placeholder="Endereço de e-mail" value={email} onChange={setEmail} autoComplete="email" />
-      <Submit loading={loading} disabled={!email}>Continuar</Submit>
-      <p className="text-center text-xs text-muted-foreground">Use o mesmo e-mail de aluno utilizado na plataforma <a href="https://revisaopge.curseduca.pro/login" target="_blank" rel="noopener noreferrer" className="font-semibold text-foreground underline underline-offset-2 hover:text-primary">revisaopge.curseduca.pro</a>. Como aluno, você só precisa do e-mail para acessar.</p>
-    </form>
-  ) : (
-    <form onSubmit={entrarAdmin} className="space-y-4">
-      <Campo icon={Mail} type="email" placeholder="Endereço de e-mail" value={email} onChange={setEmail} autoComplete="email" />
-      <Campo icon={Lock} type="password" placeholder="Senha" value={senha} onChange={setSenha} autoComplete="current-password" />
-      <Submit loading={loading} disabled={!email || !senha}>Entrar no painel</Submit>
-    </form>
-  )
-
-  // LAYOUT CENTRALIZADO (simples): logo + título + formulário num único card no meio da tela.
-  if (layout === 'centralizado') {
-    return (
-      <div className={cn('relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4 text-foreground', temaPlataforma)}>
-        <style>{KEYFRAMES}</style>
-        <div aria-hidden className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-40 left-1/2 h-[36rem] w-[36rem] -translate-x-1/2 rounded-full blur-[120px]" style={{ background: `${cor}1f` }} />
-        </div>
-        <div className="relative w-full max-w-sm rounded-2xl border bg-card p-8 shadow-2xl" style={{ animation: 'loginPop .4s ease' }}>
-          <div className="mb-6 flex flex-col items-center gap-3 text-center">
-            {(() => {
-              const semFundo = !brand.logoBg || brand.logoBg === 'transparent'
-              return (
-                <div className={cn('flex h-20 w-20 items-center justify-center overflow-hidden', !semFundo && cn('ring-1 ring-border', frameLogo(brand.logoEstilo)))}
-                  style={!semFundo ? { background: brand.logoBg } : undefined}>
-                  {(brand.logo ?? brand.logoGrande) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={(brand.logo ?? brand.logoGrande)!} alt={brand.nome} className="h-full w-full object-contain" style={{ filter: filtroLogo(brand.logoFiltro) }} />
-                  ) : <GraduationCap className="h-10 w-10" style={{ color: cor }} />}
-                </div>
-              )
-            })()}
-            <p className="text-lg font-semibold">{brand.nome}</p>
-          </div>
-          <h1 className="mb-5 text-center text-xl font-bold tracking-tight">{titulo}</h1>
-          {erro && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{erro}</div>}
-          {formLogin}
-        </div>
-        {adminBtn}
-      </div>
-    )
-  }
+  const ehAdmin = modo === 'admin'
 
   return (
-    <div className={cn('flex min-h-screen overflow-hidden bg-background text-foreground', temaPlataforma)}>
-      <style>{KEYFRAMES}</style>
-
-      {/* ESQUERDA — logo da plataforma (configurada em Configurações do sistema) */}
-      <div className="relative hidden flex-1 items-center justify-center overflow-hidden border-r bg-muted/30 lg:flex" style={{ animation: 'loginLeft .5s ease' }}>
-        <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(circle at 35% 35%, ${cor}26, transparent 60%)` }} />
-        <div aria-hidden className="pointer-events-none absolute -bottom-32 -left-24 h-96 w-96 rounded-full blur-[120px]" style={{ background: `${cor}1f` }} />
-        {logoLogin ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={logoLogin} alt={brand.nome} className="absolute inset-0 h-full w-full object-cover" />
-        ) : (
-          <div className="relative flex flex-col items-center gap-6 text-center">
-            <div className="flex h-32 w-32 items-center justify-center rounded-[2rem] bg-muted ring-1 ring-border">
-              <GraduationCap className="h-16 w-16" style={{ color: cor }} />
-            </div>
-            <div>
-              <p className="text-4xl font-bold tracking-tight">{brand.nome}</p>
-              <p className="mt-2 text-muted-foreground">Sua plataforma de simulados</p>
-            </div>
-          </div>
-        )}
+    <Shell>
+      {/* segmentado aluno / admin */}
+      <div className="mb-7 flex rounded-xl border border-white/10 bg-white/[0.03] p-1 text-sm">
+        {(['aluno', 'admin'] as const).map((m) => (
+          <button key={m} onClick={() => { setErro(null); setSenha(''); setModo(m) }}
+            className={cn('relative flex-1 rounded-lg py-2 font-medium transition-colors', modo === m ? 'text-white' : 'text-slate-400 hover:text-slate-200')}>
+            {modo === m && <span className="lg-anim absolute inset-0 rounded-lg" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,.9), rgba(139,92,246,.9))', animation: 'loginFade .3s ease' }} />}
+            <span className="relative inline-flex items-center justify-center gap-1.5">
+              {m === 'aluno' ? <GraduationCap className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+              {m === 'aluno' ? 'Aluno' : 'Admin'}
+            </span>
+          </button>
+        ))}
       </div>
 
-      {/* DIREITA — credenciais */}
-      <div className="flex w-full flex-col items-center justify-center px-6 py-10 lg:w-[480px] lg:shrink-0" style={{ animation: 'loginRight .5s ease' }}>
-        <div className="w-full max-w-sm">
-          <div className="mb-8 flex flex-col items-center gap-3 text-center lg:hidden">
-            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
-              {brand.logo ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={brand.logo} alt={brand.nome} className="h-full w-full object-contain" />
-              ) : <GraduationCap className="h-8 w-8" style={{ color: cor }} />}
-            </div>
-            <p className="text-lg font-semibold">{brand.nome}</p>
-          </div>
-
-          <h1 className="mb-6 text-center text-2xl font-bold tracking-tight">{titulo}</h1>
-
-          {erro && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{erro}</div>}
-
-          {formLogin}
+      <div className="mb-6 flex flex-col items-center gap-3 text-center">
+        {Emblema}
+        <div>
+          <h1 className="bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-2xl font-bold tracking-tight text-transparent">{nome}</h1>
+          <p className="mt-1 text-sm text-slate-400">{ehAdmin ? 'Acesso administrativo' : 'Sua plataforma de simulados'}</p>
         </div>
       </div>
 
-      {adminBtn}
-    </div>
+      {erro && <div className="mb-4 rounded-lg border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-300" style={{ animation: 'loginFade .3s ease' }}>{erro}</div>}
+
+      {ehAdmin ? (
+        <form onSubmit={entrarAdmin} className="space-y-3.5">
+          <Campo icon={Mail} type="email" placeholder="Endereço de e-mail" value={email} onChange={setEmail} autoComplete="email" />
+          <Campo icon={Lock} type="password" placeholder="Senha" value={senha} onChange={setSenha} autoComplete="current-password" />
+          <Submit loading={loading} disabled={!email || !senha}>Entrar no painel</Submit>
+        </form>
+      ) : (
+        <form onSubmit={entrarAluno} className="space-y-3.5">
+          <Campo icon={Mail} type="email" placeholder="Endereço de e-mail" value={email} onChange={setEmail} autoComplete="email" />
+          <Submit loading={loading} disabled={!email}>Continuar</Submit>
+          <p className="text-center text-xs leading-relaxed text-slate-400">
+            Use o mesmo e-mail cadastrado na plataforma onde você estuda. Como aluno, basta o e-mail — sem senha.
+          </p>
+        </form>
+      )}
+    </Shell>
   )
 }
 
@@ -275,10 +248,10 @@ function Campo({ icon: Icon, type, placeholder, value, onChange, autoComplete }:
   icon: React.ComponentType<{ className?: string }>; type: string; placeholder: string; value: string; onChange: (v: string) => void; autoComplete?: string
 }) {
   return (
-    <div className="relative">
-      <Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    <div className="group relative">
+      <Icon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-indigo-400" />
       <input type={type} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} autoComplete={autoComplete} required
-        className="w-full rounded-lg border bg-muted/40 py-3 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-primary focus:bg-muted" />
+        className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 pl-11 pr-3.5 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition-all focus:border-indigo-400/60 focus:bg-white/[0.07] focus:ring-2 focus:ring-indigo-500/20" />
     </div>
   )
 }
@@ -286,9 +259,11 @@ function Campo({ icon: Icon, type, placeholder, value, onChange, autoComplete }:
 function Submit({ loading, disabled, children }: { loading: boolean; disabled?: boolean; children: React.ReactNode }) {
   return (
     <button type="submit" disabled={loading || disabled}
-      className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
-      {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+      className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl py-3 text-sm font-semibold text-white shadow-lg transition-all hover:brightness-110 disabled:opacity-50"
+      style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
       {children}
+      {!loading && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />}
     </button>
   )
 }
