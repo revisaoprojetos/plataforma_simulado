@@ -56,43 +56,54 @@ async function resolveAssunto(svc: SupabaseClient, tenantId: string, nome?: stri
 
 // ─── Questão (com taxonomia + alternativas) ─────────────────────────────────
 export async function copiarQuestao(svc: SupabaseClient, origem: string, destino: string, questaoId: string, por?: string | null): Promise<string | null> {
-  const existente = await jaCopiado(svc, destino, 'questao', questaoId)
-  if (existente) return existente
+  if (origem === destino) return null
+  // Chave ESTÁVEL de dedup NO DESTINO (external_id). Mais robusta que só a procedência:
+  // sobrevive a falha parcial (questão criada mas alternativas/procedência não gravaram) e à
+  // concorrência (unique(tenant_id,external_id)) — re-executar recupera a cópia em vez de duplicar.
+  const externalId = `cp:${origem}:${questaoId}`
+  const acharCopia = async (): Promise<string | null> => {
+    const { data } = await svc.from('simulado_questoes').select('id').eq('tenant_id', destino).eq('external_id', externalId).maybeSingle()
+    return (data as any)?.id ?? (await jaCopiado(svc, destino, 'questao', questaoId))
+  }
+  let novaId = await acharCopia()
 
   const { data: q } = await svc
     .from('simulado_questoes')
     .select('*, bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome), disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
-    .eq('id', questaoId).eq('tenant_id', origem).maybeSingle()
-  if (!q) return null
+    .eq('id', questaoId).eq('tenant_id', origem).eq('deletado', false).maybeSingle()
+  if (!q) return novaId // origem sumiu/está na lixeira — devolve a cópia que já houver
 
-  const banca_id = await resolveByName(svc, 'simulado_bancas', destino, (q as any).bancas?.nome)
-  const orgao_id = await resolveByName(svc, 'simulado_orgaos', destino, (q as any).orgaos?.nome)
-  const disciplina_id = await resolveByName(svc, 'simulado_disciplinas', destino, (q as any).disciplinas?.nome)
-  const assunto_id = await resolveAssunto(svc, destino, (q as any).assuntos?.nome, disciplina_id)
+  if (!novaId) {
+    const banca_id = await resolveByName(svc, 'simulado_bancas', destino, (q as any).bancas?.nome)
+    const orgao_id = await resolveByName(svc, 'simulado_orgaos', destino, (q as any).orgaos?.nome)
+    const disciplina_id = await resolveByName(svc, 'simulado_disciplinas', destino, (q as any).disciplinas?.nome)
+    const assunto_id = await resolveAssunto(svc, destino, (q as any).assuntos?.nome, disciplina_id)
+    const { data: nova, error } = await svc.from('simulado_questoes').insert({
+      tenant_id: destino,
+      tipo: (q as any).tipo, enunciado: (q as any).enunciado,
+      banca_id, orgao_id, disciplina_id, assunto_id,
+      ano: (q as any).ano ?? null, nivel_dificuldade: (q as any).nivel_dificuldade ?? null,
+      gabarito_tipo: (q as any).gabarito_tipo ?? 'oficial', comentario_professor: (q as any).comentario_professor ?? null,
+      status: (q as any).status ?? 'publicada', imagem_url: (q as any).imagem_url ?? null,
+      external_id: externalId, created_at: nowIso(),
+    }).select('id').single()
+    if (error || !nova) { novaId = await acharCopia(); if (!novaId) return null } // corrida no unique → relê
+    else novaId = (nova as any).id
+  }
+  if (!novaId) return null
 
-  const { data: nova, error } = await svc.from('simulado_questoes').insert({
-    tenant_id: destino,
-    tipo: (q as any).tipo,
-    enunciado: (q as any).enunciado,
-    banca_id, orgao_id, disciplina_id, assunto_id,
-    ano: (q as any).ano ?? null,
-    nivel_dificuldade: (q as any).nivel_dificuldade ?? null,
-    gabarito_tipo: (q as any).gabarito_tipo ?? 'oficial',
-    comentario_professor: (q as any).comentario_professor ?? null,
-    status: (q as any).status ?? 'publicada',
-    imagem_url: (q as any).imagem_url ?? null,
-    external_id: null, // cópia não herda external_id (o dedup é pela procedência)
-    created_at: nowIso(),
-  }).select('id').single()
-  if (error || !nova) return null
-  const novaId = (nova as any).id
-
-  const { data: alts } = await svc.from('simulado_alternativas').select('texto, ordem, correta, comentario, lei').eq('questao_id', questaoId).eq('tenant_id', origem).order('ordem')
-  if (alts && alts.length) {
-    await svc.from('simulado_alternativas').insert((alts as any[]).map((a) => ({
-      tenant_id: destino, questao_id: novaId,
-      texto: a.texto, ordem: a.ordem, correta: a.correta, comentario: a.comentario ?? null, lei: a.lei ?? null,
-    })))
+  // Alternativas: só insere se FALTAREM (self-heal p/ falha parcial anterior). Erro → não registra
+  // procedência: a próxima execução acha a questão (external_id), vê count=0 e completa.
+  const { count } = await svc.from('simulado_alternativas').select('*', { count: 'exact', head: true }).eq('questao_id', novaId).eq('tenant_id', destino)
+  if (!count) {
+    const { data: alts } = await svc.from('simulado_alternativas').select('texto, ordem, correta, comentario, lei').eq('questao_id', questaoId).eq('tenant_id', origem).order('ordem')
+    if (alts && alts.length) {
+      const { error: eAlt } = await svc.from('simulado_alternativas').insert((alts as any[]).map((a) => ({
+        tenant_id: destino, questao_id: novaId,
+        texto: a.texto, ordem: a.ordem, correta: a.correta, comentario: a.comentario ?? null, lei: a.lei ?? null,
+      })))
+      if (eAlt) return novaId
+    }
   }
 
   await registrar(svc, origem, destino, 'questao', questaoId, novaId, por)
@@ -101,6 +112,7 @@ export async function copiarQuestao(svc: SupabaseClient, origem: string, destino
 
 // ─── Banco (pasta) com as questões dele ─────────────────────────────────────
 export async function copiarBanco(svc: SupabaseClient, origem: string, destino: string, pastaId: string, por?: string | null): Promise<{ destinoId: string | null; questoes: number }> {
+  if (origem === destino) return { destinoId: null, questoes: 0 }
   const existente = await jaCopiado(svc, destino, 'banco', pastaId)
   const { data: p } = await svc.from('simulado_pastas').select('*').eq('id', pastaId).eq('tenant_id', origem).maybeSingle()
   if (!p) return { destinoId: existente, questoes: 0 }
@@ -134,6 +146,7 @@ export async function copiarBanco(svc: SupabaseClient, origem: string, destino: 
 
 // ─── Estudante (dedup por e-mail no destino) ────────────────────────────────
 export async function copiarEstudante(svc: SupabaseClient, origem: string, destino: string, estudanteId: string, por?: string | null): Promise<string | null> {
+  if (origem === destino) return null
   const existente = await jaCopiado(svc, destino, 'estudante', estudanteId)
   if (existente) return existente
 
