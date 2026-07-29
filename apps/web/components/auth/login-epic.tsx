@@ -1,20 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Loader2, ArrowLeft, ShieldCheck, GraduationCap, Mail, Lock } from 'lucide-react'
+import { Loader2, GraduationCap, Mail, Lock, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type LoginLayout = 'painel' | 'centralizado'
 export type Plataforma = { id: string; nome: string; dominio: string | null; logo: string | null; logoGrande: string | null; logoSelecao: string | null; selecaoEstilo: 'quadrada' | 'redonda' | 'borda'; loginLayout: LoginLayout; logoBg: string; logoEstilo: string; logoFiltro: string; selecao: boolean; cor: string | null; modoPadrao: 'light' | 'dark' }
 
-function frameSelecao(estilo?: string): string {
-  if (estilo === 'quadrada') return 'rounded-xl'
-  if (estilo === 'borda') return 'rounded-full border-2'
-  return 'rounded-full'
-}
 /** Moldura do quadro da logo conforme o estilo configurado. */
 function frameLogo(estilo?: string): string {
   if (estilo === 'quadrado') return 'rounded-none'
@@ -28,7 +23,10 @@ function filtroLogo(f?: string): string | undefined {
   return undefined
 }
 type Marca = { nome: string; logo: string | null; logoGrande: string | null; cor: string | null; modoPadrao: 'light' | 'dark'; loginLayout: LoginLayout; logoBg: string; logoEstilo: string; logoFiltro: string; mostrarSelecao: boolean }
-type Modo = 'select' | 'aluno' | 'admin'
+// AUTENTICAR-FIRST: o formulário vem primeiro; o seletor de plataformas aparece SÓ depois
+// de autenticar (ou se já logado pelo cookie compartilhado). Aluno mantém o fluxo por-subdomínio.
+type Modo = 'aluno' | 'admin' | 'selecionar'
+type PlatSimples = { id: string; nome: string; slug: string; dominio: string | null; logo: string | null; cor: string | null }
 
 const KEYFRAMES = `
 @keyframes loginPop { from { opacity: 0; transform: scale(.96) translateY(8px) } to { opacity: 1; transform: none } }
@@ -36,35 +34,46 @@ const KEYFRAMES = `
 @keyframes loginRight { from { opacity: 0; transform: translateX(32px) } to { opacity: 1; transform: none } }
 `
 
-export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; marca: Marca }) {
+export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; jaLogado?: boolean; tenantAtualId?: string | null }) {
   const router = useRouter()
   const search = useSearchParams()
-  // Seleção desativada (uma plataforma) → já entra direto no login do aluno.
-  const pularSelecao = !marca.mostrarSelecao && plataformas.length > 0
-  const [modo, setModo] = useState<Modo>(pularSelecao ? 'aluno' : 'select')
-  const [sel, setSel] = useState<Plataforma | null>(plataformas[0] ?? null)
+  // Já logado (sessão Supabase, cookie do domínio) → pula direto pro seletor das plataformas.
+  const [modo, setModo] = useState<Modo>(jaLogado ? 'selecionar' : 'aluno')
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState<string | null>(search.get('error'))
+  const [minhasPlats, setMinhasPlats] = useState<PlatSimples[] | null>(null)
 
-  const brand: Marca = modo === 'admin'
-    ? marca
-    : { nome: sel?.nome ?? marca.nome, logo: sel?.logo ?? marca.logo, logoGrande: sel?.logoGrande ?? marca.logoGrande, cor: sel?.cor ?? marca.cor, modoPadrao: sel?.modoPadrao ?? marca.modoPadrao, loginLayout: sel?.loginLayout ?? marca.loginLayout, logoBg: sel?.logoBg ?? marca.logoBg, logoEstilo: sel?.logoEstilo ?? marca.logoEstilo, logoFiltro: sel?.logoFiltro ?? marca.logoFiltro, mostrarSelecao: marca.mostrarSelecao }
+  const brand = marca
   const cor = brand.cor ?? '#6d28d9'
   const layout: LoginLayout = brand.loginLayout ?? 'painel'
   const logoLogin = brand.logoGrande ?? brand.logo // grande no painel da esquerda
-  // Tema escopado: a plataforma escolhida define claro/escuro do login/admin;
-  // a tela de seleção fica sempre neutra (clara), sem herdar o tema de uma plataforma.
-  const temaPlataforma = brand.modoPadrao === 'dark' ? 'theme-dark' : 'theme-light'
+  const temaPlataforma = modo === 'selecionar' ? 'theme-light' : (brand.modoPadrao === 'dark' ? 'theme-dark' : 'theme-light')
 
-  function escolher(p: Plataforma) {
-    if (p.dominio && typeof window !== 'undefined' && !window.location.host.includes(p.dominio)) {
-      window.location.href = `https://${p.dominio}/login`
-      return
-    }
-    setSel(p); setErro(null); setModo('aluno')
+  function irParaPlataforma(p: PlatSimples) {
+    if (typeof window === 'undefined') return
+    if (p.id === tenantAtualId) { router.push('/admin'); return } // já é o subdomínio atual
+    const { protocol, host } = window.location
+    let url: string
+    if (p.dominio) url = `${protocol}//${p.dominio}/admin`
+    else { const partes = host.split('.'); const base = partes.length > 1 ? partes.slice(1).join('.') : host; url = `${protocol}//${p.slug}.${base}/admin` }
+    window.location.href = url // cookie compartilhado (Fase 0) → entra já autenticado
   }
+
+  // Busca as plataformas do admin ao entrar no seletor (pós-login ou já logado). Uma só → entra direto.
+  useEffect(() => {
+    if (modo !== 'selecionar' || minhasPlats !== null) return
+    let vivo = true
+    fetch('/api/auth/minhas-plataformas').then((r) => r.json()).then((d) => {
+      if (!vivo) return
+      const plats: PlatSimples[] = d.plataformas ?? []
+      setMinhasPlats(plats)
+      if (plats.length === 1) irParaPlataforma(plats[0])
+    }).catch(() => { if (vivo) setMinhasPlats([]) })
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modo])
 
   async function entrarAluno(e: React.FormEvent) {
     e.preventDefault(); setErro(null); setLoading(true)
@@ -90,7 +99,8 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
     }
     void fetch('/api/audit/login', { method: 'POST' }).catch(() => {})
     toast.success('Login realizado com sucesso!')
-    router.push('/admin')
+    // Autenticado (sessão global). Mostra as plataformas do admin (o useEffect busca).
+    setMinhasPlats(null); setModo('selecionar')
   }
 
   const adminBtn = (
@@ -100,13 +110,13 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
         'fixed bottom-5 right-5 z-20 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium shadow-lg backdrop-blur transition-colors',
         modo === 'admin' ? 'border-primary/60 bg-primary/15 text-primary hover:bg-primary/25' : 'border-border bg-card text-muted-foreground hover:border-primary/60 hover:text-foreground',
       )}>
-      {modo === 'admin' ? <GraduationCap className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+      {modo === 'admin' ? <GraduationCap className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
       {modo === 'admin' ? 'Área do aluno' : 'Admin'}
     </button>
   )
 
-  // ---------- TELA DE SELEÇÃO (blocos) ----------
-  if (modo === 'select') {
+  // ---------- SELETOR DE PLATAFORMA (pós-login / já logado) ----------
+  if (modo === 'selecionar') {
     return (
       <div className="theme-light relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4 text-foreground">
         <style>{KEYFRAMES}</style>
@@ -115,24 +125,23 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
         </div>
         <div className="relative w-full max-w-md rounded-2xl border bg-card p-8 shadow-2xl" style={{ animation: 'loginPop .4s ease' }}>
           <div className="mb-7 flex flex-col items-center gap-2 text-center">
-            <h1 className="text-xl font-bold tracking-tight">Entrar</h1>
-            <p className="text-sm text-muted-foreground">Escolha sua plataforma para acessar.</p>
+            <h1 className="text-xl font-bold tracking-tight">Escolha a plataforma</h1>
+            <p className="text-sm text-muted-foreground">Você tem acesso a estas plataformas.</p>
           </div>
 
-          {erro && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{erro}</div>}
-
-          {plataformas.length === 0 ? (
-            <p className="rounded-lg bg-muted/50 p-4 text-center text-sm text-muted-foreground">Nenhuma plataforma disponível.</p>
+          {minhasPlats === null ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
+          ) : minhasPlats.length === 0 ? (
+            <p className="rounded-lg bg-muted/50 p-4 text-center text-sm text-muted-foreground">Nenhuma plataforma disponível para esta conta.</p>
           ) : (
             <div className="flex flex-wrap justify-center gap-3">
-              {plataformas.map((p) => (
-                <button key={p.id} onClick={() => escolher(p)} title={`Entrar — ${p.nome}`}
+              {minhasPlats.map((p) => (
+                <button key={p.id} onClick={() => irParaPlataforma(p)} title={`Entrar — ${p.nome}`}
                   className="group flex aspect-[5/4] w-40 flex-col items-center justify-center gap-3 rounded-2xl border bg-muted/40 p-4 text-center transition-colors hover:border-primary/60 hover:bg-primary/10">
-                  <span className={`flex h-20 w-20 items-center justify-center overflow-hidden bg-muted transition-transform group-hover:scale-105 ${frameSelecao(p.selecaoEstilo)}`}
-                    style={{ borderColor: p.cor ?? cor }}>
-                    {(p.logoSelecao ?? p.logo) ? (
+                  <span className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-muted transition-transform group-hover:scale-105" style={{ borderColor: p.cor ?? cor }}>
+                    {p.logo ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.logoSelecao ?? p.logo!} alt={p.nome} className="h-full w-full object-cover" />
+                      <img src={p.logo} alt={p.nome} className="h-full w-full object-cover" />
                     ) : <GraduationCap className="h-9 w-9" style={{ color: p.cor ?? cor }} />}
                   </span>
                   <span className="line-clamp-2 text-sm font-semibold leading-tight">{p.nome}</span>
@@ -140,13 +149,17 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
               ))}
             </div>
           )}
+
+          <button type="button" onClick={() => { setModo('aluno'); setMinhasPlats(null); setEmail(''); setSenha('') }}
+            className="mt-6 inline-flex w-full items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <LogOut className="h-3.5 w-3.5" /> Entrar com outra conta
+          </button>
         </div>
-        {adminBtn}
       </div>
     )
   }
 
-  // ---------- LOGIN (após escolher plataforma / admin) ----------
+  // ---------- LOGIN (form aluno/admin) ----------
   const titulo = modo === 'admin' ? 'Acesso administrativo' : 'Login'
 
   // Formulário de credenciais — reutilizado nos dois layouts (painel e centralizado).
@@ -188,11 +201,6 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
             })()}
             <p className="text-lg font-semibold">{brand.nome}</p>
           </div>
-          {!pularSelecao && (
-            <button type="button" onClick={() => { setModo('select'); setErro(null); setSenha('') }} className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" /> Trocar plataforma
-            </button>
-          )}
           <h1 className="mb-5 text-center text-xl font-bold tracking-tight">{titulo}</h1>
           {erro && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{erro}</div>}
           {formLogin}
@@ -239,11 +247,6 @@ export function LoginEpic({ plataformas, marca }: { plataformas: Plataforma[]; m
             <p className="text-lg font-semibold">{brand.nome}</p>
           </div>
 
-          {!pularSelecao && (
-            <button type="button" onClick={() => { setModo('select'); setErro(null); setSenha('') }} className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" /> Trocar plataforma
-            </button>
-          )}
           <h1 className="mb-6 text-center text-2xl font-bold tracking-tight">{titulo}</h1>
 
           {erro && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{erro}</div>}

@@ -1,12 +1,18 @@
 import { Suspense } from 'react'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { LoginEpic, type Plataforma } from '@/components/auth/login-epic'
 import { getConfigGlobal } from '@/lib/config-global'
+import { getCurrentTenantId } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 
 export default async function LoginPage() {
   const svc = createAdminClient()
+  // Autenticar-first: se já há sessão (cookie do domínio), o LoginEpic pula pro seletor.
+  const auth = await createClient()
+  const { data: { user } } = await auth.auth.getUser()
+  const jaLogado = !!user
+  const tenantAtualId = await getCurrentTenantId()
   const { data: tenants } = await svc
     .from('simulado_tenants')
     .select('id, nome, dominio, tema')
@@ -53,7 +59,7 @@ export default async function LoginPage() {
 
   return (
     <Suspense fallback={null}>
-      <LoginEpic plataformas={plataformas} marca={marca} />
+      <LoginEpic marca={marca} jaLogado={jaLogado} tenantAtualId={tenantAtualId} />
     </Suspense>
   )
 }
