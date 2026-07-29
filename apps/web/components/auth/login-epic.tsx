@@ -100,7 +100,7 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
     void fetch('/api/audit/login', { method: 'POST' }).catch(() => {})
     toast.success('Login realizado com sucesso!')
     // Autenticado (sessão global). Mostra as plataformas do admin (o useEffect busca).
-    setMinhasPlats(null); setModo('selecionar')
+    setLoading(false); setMinhasPlats(null); setModo('selecionar')
   }
 
   const adminBtn = (
@@ -150,7 +150,7 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
             </div>
           )}
 
-          <button type="button" onClick={() => { setModo('aluno'); setMinhasPlats(null); setEmail(''); setSenha('') }}
+          <button type="button" onClick={() => { setModo('aluno'); setMinhasPlats(null); setEmail(''); setSenha(''); setLoading(false); setErro(null) }}
             className="mt-6 inline-flex w-full items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground">
             <LogOut className="h-3.5 w-3.5" /> Entrar com outra conta
           </button>
