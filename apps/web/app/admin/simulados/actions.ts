@@ -182,11 +182,11 @@ export async function listarEstudantesSimulado(simuladoId: string): Promise<{ ok
   // paginados (poucas páginas) e cruzamos em memória com as matrículas — bem mais rápido.
   const [matriculas, estRows, sessRows] = await Promise.all([
     fetchAll<{ estudante_id: string; liberado: boolean }>(() =>
-      svc.from('simulado_matriculas').select('estudante_id, liberado').eq('simulado_id', simuladoId).order('estudante_id')),
+      svc.from('simulado_matriculas').select('estudante_id, liberado').eq('simulado_id', simuladoId).eq('tenant_id', tid).order('estudante_id')),
     fetchAll<any>(() =>
       svc.from('simulado_estudantes').select('id, nome, email, cpf, telefone, classificacao').eq('tenant_id', tid).eq('deletado', false).order('id')),
     fetchAll<any>(() =>
-      svc.from('simulado_sessoes_prova').select('estudante_id, status, nota').eq('simulado_id', simuladoId).eq('deletado', false).order('estudante_id')),
+      svc.from('simulado_sessoes_prova').select('estudante_id, status, nota').eq('simulado_id', simuladoId).eq('tenant_id', tid).eq('deletado', false).order('estudante_id')),
   ])
   const estIds = [...new Set(matriculas.map((m) => m.estudante_id).filter(Boolean))]
   if (!estIds.length) return { ok: true, estudantes: [] }
@@ -239,13 +239,13 @@ export async function removerPassaportesIndevidos(simuladoId: string): Promise<{
   const bancoId = ((sim as any).regras as any)?.banco_base_id as string | undefined
 
   const mats = await fetchAll<{ estudante_id: string }>(() =>
-    svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simuladoId).order('estudante_id'))
+    svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simuladoId).eq('tenant_id', tid).order('estudante_id'))
   const matIds = [...new Set(mats.map((m) => m.estudante_id).filter(Boolean))]
   if (!matIds.length) return { ok: true, removidos: 0 }
 
   // Passaportes entre os matriculados.
   const ests = await fetchAllByIn<{ id: string; classificacao: string | null }>(matIds, (chunk) =>
-    svc.from('simulado_estudantes').select('id, classificacao').in('id', chunk).order('id'))
+    svc.from('simulado_estudantes').select('id, classificacao').in('id', chunk).eq('tenant_id', tid).order('id'))
   const passaportes = new Set(ests.filter((e) => e.classificacao === 'passaporte').map((e) => e.id))
   if (!passaportes.size) return { ok: true, removidos: 0 }
 
@@ -253,14 +253,14 @@ export async function removerPassaportesIndevidos(simuladoId: string): Promise<{
   const bancoMembros = new Set<string>()
   if (bancoId) {
     const bm = await fetchAll<{ estudante_id: string }>(() =>
-      svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).order('estudante_id'))
+      svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).eq('tenant_id', tid).order('estudante_id'))
     for (const r of bm) if (r.estudante_id) bancoMembros.add(r.estudante_id)
   }
   const sess = await fetchAll<{ estudante_id: string }>(() =>
-    svc.from('simulado_sessoes_prova').select('estudante_id').eq('simulado_id', simuladoId).order('estudante_id'))
+    svc.from('simulado_sessoes_prova').select('estudante_id').eq('simulado_id', simuladoId).eq('tenant_id', tid).order('estudante_id'))
   const iniciou = new Set(sess.map((s) => s.estudante_id).filter(Boolean))
   const acs = await fetchAll<{ estudante_id: string }>(() =>
-    svc.from('simulado_acessos').select('estudante_id').eq('simulado_id', simuladoId).order('estudante_id'))
+    svc.from('simulado_acessos').select('estudante_id').eq('simulado_id', simuladoId).eq('tenant_id', tid).order('estudante_id'))
   const comAcesso = new Set(acs.map((a) => a.estudante_id).filter(Boolean))
 
   const remover = [...passaportes].filter((id) => !bancoMembros.has(id) && !iniciou.has(id) && !comAcesso.has(id))
@@ -268,7 +268,7 @@ export async function removerPassaportesIndevidos(simuladoId: string): Promise<{
 
   for (let i = 0; i < remover.length; i += 300) {
     const lote = remover.slice(i, i + 300)
-    const { error } = await svc.from('simulado_matriculas').delete().eq('simulado_id', simuladoId).in('estudante_id', lote)
+    const { error } = await svc.from('simulado_matriculas').delete().eq('simulado_id', simuladoId).eq('tenant_id', tid).in('estudante_id', lote)
     if (error) return { error: error.message }
   }
 
@@ -303,13 +303,13 @@ export async function progressoEstudantesSimulado(simuladoId: string): Promise<{
   if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
   const tid = tenantId ?? (sim as any).tenant_id
 
-  const provaQ = await fetchAll<any>(() => svc.from('simulado_prova_questoes').select('questao_id, anulada').eq('simulado_id', simuladoId).order('questao_id'))
+  const provaQ = await fetchAll<any>(() => svc.from('simulado_prova_questoes').select('questao_id, anulada').eq('simulado_id', simuladoId).eq('tenant_id', tid).order('questao_id'))
   const total = provaQ.filter((q: any) => q.anulada !== true).length
 
   const [matriculas, estRows, sessRows] = await Promise.all([
     fetchAll<any>(() => svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simuladoId).order('estudante_id')),
     fetchAll<any>(() => svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tid).eq('deletado', false).order('id')),
-    fetchAll<any>(() => svc.from('simulado_sessoes_prova').select('id, estudante_id, iniciado_em').eq('simulado_id', simuladoId).eq('is_teste', false).eq('deletado', false).order('estudante_id')),
+    fetchAll<any>(() => svc.from('simulado_sessoes_prova').select('id, estudante_id, iniciado_em').eq('simulado_id', simuladoId).eq('tenant_id', tid).eq('is_teste', false).eq('deletado', false).order('estudante_id')),
   ])
   const estMap = new Map(estRows.map((e: any) => [e.id, e]))
 
@@ -321,7 +321,7 @@ export async function progressoEstudantesSimulado(simuladoId: string): Promise<{
   }
   const chosenIds = [...sessByEst.values()].map((s: any) => s.id)
   const resp = chosenIds.length
-    ? await fetchAllByIn<any>(chosenIds, (chunk) => svc.from('simulado_respostas_objetivas').select('sessao_id, correta').in('sessao_id', chunk).order('id'))
+    ? await fetchAllByIn<any>(chosenIds, (chunk) => svc.from('simulado_respostas_objetivas').select('sessao_id, correta').in('sessao_id', chunk).eq('tenant_id', tid).order('id'))
     : []
   const bySess = new Map<string, { resp: number; ok: number }>()
   for (const r of resp) {
@@ -477,7 +477,7 @@ export async function listarSessoesSimulado(simuladoId: string): Promise<{ ok?: 
 
   const [sessRows, estRows] = await Promise.all([
     fetchAll<any>(() =>
-      svc.from('simulado_sessoes_prova').select('id, estudante_id, status, nota, iniciado_em, finalizado_em, is_teste').eq('simulado_id', simuladoId).eq('deletado', false).order('iniciado_em', { ascending: false })),
+      svc.from('simulado_sessoes_prova').select('id, estudante_id, status, nota, iniciado_em, finalizado_em, is_teste').eq('simulado_id', simuladoId).eq('tenant_id', tid).eq('deletado', false).order('iniciado_em', { ascending: false })),
     fetchAll<any>(() =>
       svc.from('simulado_estudantes').select('id, nome').eq('tenant_id', tid).order('id')),
   ])

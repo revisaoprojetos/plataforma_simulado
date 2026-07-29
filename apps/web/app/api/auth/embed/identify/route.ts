@@ -233,7 +233,7 @@ export async function POST(request: NextRequest) {
         return bloqueio(tenantId, 'bloqueio_tentativas', { nome: estudante.nome ?? '', simulado: tituloSimulado, tentativas_restantes: '0' })
       }
       tentativaNum = acessoAvulso.tentativas_usadas + 1
-      await supabase.from('simulado_acessos').update({ tentativas_usadas: tentativaNum }).eq('id', acessoAvulso.id).eq('tenant_id', tenantId)
+      await supabase.from('simulado_acessos').update({ tentativas_usadas: tentativaNum }).eq('id', acessoAvulso.id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     } else {
       // Demais modos — limite de retentativas pela regra (sem config = ilimitado).
       const regras = (simulado.regras as Record<string, unknown>) ?? {}

@@ -32,7 +32,7 @@ async function _montarRankingSimulado(svc: SupabaseClient, simId: string, tid: s
 
   // Questões do simulado + disciplina.
   const { data: pq } = await svc.from('simulado_prova_questoes')
-    .select('questao_id, questoes:simulado_questoes(id, disciplinas:simulado_disciplinas(nome))').eq('simulado_id', simId)
+    .select('questao_id, questoes:simulado_questoes(id, disciplinas:simulado_disciplinas(nome))').eq('simulado_id', simId).eq('tenant_id', tid)
   const discDeQ = new Map<string, string>()
   const qIds: string[] = []
   for (const r of (pq ?? []) as any[]) { const qid = r.questoes?.id ?? r.questao_id; qIds.push(qid); discDeQ.set(qid, r.questoes?.disciplinas?.nome ?? 'Sem disciplina') }
@@ -40,12 +40,12 @@ async function _montarRankingSimulado(svc: SupabaseClient, simId: string, tid: s
   // Banco (pasta) que cobre o simulado → grupos de disciplinas.
   let grupos: GrupoBanco[] = []
   if (qIds.length) {
-    const { data: qp } = await svc.from('simulado_questao_pasta').select('questao_id, pasta_id').in('questao_id', qIds)
+    const { data: qp } = await svc.from('simulado_questao_pasta').select('questao_id, pasta_id').in('questao_id', qIds).eq('tenant_id', tid)
     const cont = new Map<string, number>()
     for (const r of (qp ?? []) as any[]) cont.set(r.pasta_id, (cont.get(r.pasta_id) ?? 0) + 1)
     const pastaIds = [...cont.keys()]
     if (pastaIds.length) {
-      const { data: pastas } = await svc.from('simulado_pastas').select('id, grupos').in('id', pastaIds)
+      const { data: pastas } = await svc.from('simulado_pastas').select('id, grupos').in('id', pastaIds).eq('tenant_id', tid)
       const comGrupos = (pastas ?? []).filter((p: any) => Array.isArray(p.grupos) && p.grupos.length)
       const melhor = comGrupos.sort((a: any, b: any) => (cont.get(b.id) ?? 0) - (cont.get(a.id) ?? 0))[0]
       if (melhor) grupos = (melhor as any).grupos as GrupoBanco[]
@@ -60,7 +60,7 @@ async function _montarRankingSimulado(svc: SupabaseClient, simId: string, tid: s
   // 1000+ finalizadas truncariam o ranking (teto de ~1000 do PostgREST).
   const sess = await fetchAll<any>(() => svc.from('simulado_sessoes_prova')
     .select('id, estudante_id, nota, status, iniciado_em, finalizado_em')
-    .eq('simulado_id', simId).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada').order('id'))
+    .eq('simulado_id', simId).eq('tenant_id', tid).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada').order('id'))
   const melhorSess = new Map<string, any>()
   for (const s of sess) {
     const cur = melhorSess.get(s.estudante_id)
@@ -74,7 +74,7 @@ async function _montarRankingSimulado(svc: SupabaseClient, simId: string, tid: s
   const acGrupo = new Map<string, Record<string, number>>()
   if (sessIds.length) {
     const resp = await fetchAllByIn<any>(sessIds, (chunk) =>
-      svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).order('id'))
+      svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).eq('tenant_id', tid).order('id'))
     const estDaSess = new Map<string, string>(sessEscolhidas.map((s) => [s.id, s.estudante_id]))
     for (const r of resp as any[]) {
       const est = estDaSess.get(r.sessao_id); if (!est) continue
@@ -91,17 +91,17 @@ async function _montarRankingSimulado(svc: SupabaseClient, simId: string, tid: s
   const estIds = sessEscolhidas.map((s) => s.estudante_id)
   const infoEst = new Map<string, { nome: string; email: string | null; classificacao: string | null; passaporte: boolean; nasc: string | null }>()
   if (estIds.length) {
-    const ests = await fetchAllByIn<any>(estIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, classificacao, data_nascimento').in('id', chunk))
+    const ests = await fetchAllByIn<any>(estIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, classificacao, data_nascimento').in('id', chunk).eq('tenant_id', tid))
     for (const e of ests) infoEst.set(e.id, { nome: e.nome ?? 'Estudante', email: e.email ?? null, classificacao: e.classificacao ?? null, passaporte: e.classificacao === 'passaporte', nasc: e.data_nascimento ?? null })
   }
 
   // Impactos de anulação/troca (re-correção): nota_antes por estudante. Tabelas podem estar vazias.
   const impacto = new Map<string, number>()
   let afetados = 0
-  const { data: recs } = await svc.from('simulado_recorrecoes').select('id').eq('simulado_id', simId)
+  const { data: recs } = await svc.from('simulado_recorrecoes').select('id').eq('simulado_id', simId).eq('tenant_id', tid)
   const recIds = (recs ?? []).map((r: any) => r.id)
   if (recIds.length) {
-    const { data: imps } = await svc.from('simulado_recorrecao_impactos').select('estudante_id, nota_antes').in('recorrecao_id', recIds)
+    const { data: imps } = await svc.from('simulado_recorrecao_impactos').select('estudante_id, nota_antes').in('recorrecao_id', recIds).eq('tenant_id', tid)
     for (const im of (imps ?? []) as any[]) { if (im.nota_antes != null && !impacto.has(im.estudante_id)) { impacto.set(im.estudante_id, Number(im.nota_antes)); afetados++ } }
   }
 
