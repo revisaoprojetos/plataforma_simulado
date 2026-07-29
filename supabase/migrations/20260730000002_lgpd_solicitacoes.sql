@@ -5,7 +5,13 @@
 -- para o admin do tenant processar (anonimização controlada). Auditado.
 -- RLS habilitado sem policy: só service role (as actions usam createAdminClient e
 -- filtram por tenant_id no código) — mesmo padrão de simulado_compartilhamentos.
+--
+-- ⚠️ Havia um ESQUELETO antigo desta tabela (schema global: user_id, SEM tenant_id),
+-- vazio e sem uso no código. Dropamos e recriamos com o schema correto (por tenant/
+-- estudante). Seguro: 0 linhas. Se sua base não tiver o esqueleto, o DROP IF EXISTS é no-op.
 -- ============================================================================
+
+DROP TABLE IF EXISTS public.simulado_lgpd_solicitacoes;
 
 CREATE TABLE IF NOT EXISTS public.simulado_lgpd_solicitacoes (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),

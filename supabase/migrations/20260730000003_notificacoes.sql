@@ -3,7 +3,13 @@
 -- gabarito/nota liberados, resultado disponível, avisos de prazo etc. Aparecem no
 -- sino do portal do aluno. RLS habilitado sem policy (service-role; actions/rotas
 -- filtram por tenant_id + estudante_id no código) — mesmo padrão das demais.
+--
+-- ⚠️ Havia um ESQUELETO antigo/parcial desta tabela (faltavam colunas lida/link),
+-- vazio e sem uso no código. Dropamos e recriamos com o schema completo. Seguro:
+-- 0 linhas. Se sua base não tiver o esqueleto, o DROP IF EXISTS é no-op.
 -- ============================================================================
+
+DROP TABLE IF EXISTS public.simulado_notificacoes;
 
 CREATE TABLE IF NOT EXISTS public.simulado_notificacoes (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
