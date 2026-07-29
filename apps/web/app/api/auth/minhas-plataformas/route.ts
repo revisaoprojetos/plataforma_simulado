@@ -15,8 +15,9 @@ export async function GET() {
   const svc = createAdminClient()
 
   // Quais tenants? Super-admin = todos os ativos; senão, os do próprio tenant_acessos.
+  const superAdmin = await isSuperAdmin()
   let tenantIds: string[] | null = null
-  if (!(await isSuperAdmin())) {
+  if (!superAdmin) {
     const { data: aces } = await svc
       .from('simulado_tenant_acessos')
       .select('tenant_id')
@@ -41,5 +42,5 @@ export async function GET() {
     cor: (t.tema as any)?.cor_primaria ?? (t.tema as any)?.cores?.primaria ?? null,
   }))
 
-  return NextResponse.json({ plataformas })
+  return NextResponse.json({ plataformas, superAdmin })
 }
