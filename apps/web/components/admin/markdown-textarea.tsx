@@ -2,7 +2,7 @@
 
 import { forwardRef, useRef, useState } from 'react'
 import type React from 'react'
-import { Bold, Italic, Code, List, ListOrdered, Link2, Eye, Pencil } from 'lucide-react'
+import { Bold, Italic, Underline, Code, List, ListOrdered, Link2, Eye, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
 
@@ -39,7 +39,7 @@ export const MarkdownTextarea = forwardRef<HTMLTextAreaElement, Props>(function 
     else if (ref) (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = el
   }
 
-  function aplicar(tipo: 'bold' | 'italic' | 'code' | 'ul' | 'ol' | 'link') {
+  function aplicar(tipo: 'bold' | 'italic' | 'underline' | 'code' | 'ul' | 'ol' | 'link') {
     const ta = innerRef.current
     if (!ta) return
     const start = ta.selectionStart ?? 0, end = ta.selectionEnd ?? 0
@@ -53,6 +53,12 @@ export const MarkdownTextarea = forwardRef<HTMLTextAreaElement, Props>(function 
     }
     if (tipo === 'bold') envolver('**', 'negrito')
     else if (tipo === 'italic') envolver('*', 'itálico')
+    else if (tipo === 'underline') {
+      // Sublinhado usa <u>…</u> (abre ≠ fecha) — não colide com "____" de preencher lacunas.
+      const txt = sel || 'sublinhado'
+      novo = val.slice(0, start) + `<u>${txt}</u>` + val.slice(end)
+      ini = start + 3; fim = ini + txt.length
+    }
     else if (tipo === 'code') envolver('`', 'código')
     else if (tipo === 'link') {
       const txt = sel || 'texto'
@@ -82,6 +88,7 @@ export const MarkdownTextarea = forwardRef<HTMLTextAreaElement, Props>(function 
       <div className="flex flex-wrap items-center gap-0.5 border-b bg-muted/30 px-1.5 py-1">
         <BtnFmt onClick={() => aplicar('bold')} title="Negrito"><Bold className="h-3.5 w-3.5" /></BtnFmt>
         <BtnFmt onClick={() => aplicar('italic')} title="Itálico"><Italic className="h-3.5 w-3.5" /></BtnFmt>
+        <BtnFmt onClick={() => aplicar('underline')} title="Sublinhado"><Underline className="h-3.5 w-3.5" /></BtnFmt>
         <BtnFmt onClick={() => aplicar('code')} title="Código"><Code className="h-3.5 w-3.5" /></BtnFmt>
         <span className="mx-1 h-4 w-px bg-border" />
         <BtnFmt onClick={() => aplicar('ul')} title="Lista com marcadores"><List className="h-3.5 w-3.5" /></BtnFmt>

@@ -14,8 +14,9 @@ function hrefSeguro(url: string): string | null {
   return /^(https?:\/\/|mailto:)/i.test(u) ? u : null
 }
 
-// Inline: ***negrito+itálico***, **negrito** / __negrito__, *itálico*, `código`, [texto](url). Recursivo.
-const RE_INLINE = /\*\*\*([\s\S]+?)\*\*\*|(\*\*|__)([\s\S]+?)\2|\*([\s\S]+?)\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\)/g
+// Inline: <u>sublinhado</u>, ***negrito+itálico***, **negrito** / __negrito__, *itálico*, `código`, [texto](url).
+// `<u>…</u>` é a marcação de SUBLINHADO (não colide com lacunas "____" de preencher). Recursivo.
+const RE_INLINE = /<u>([\s\S]+?)<\/u>|\*\*\*([\s\S]+?)\*\*\*|(\*\*|__)([\s\S]+?)\3|\*([\s\S]+?)\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\)/g
 function renderInline(texto: string, keyBase = ''): ReactNode[] {
   const out: ReactNode[] = []
   // Regex NOVO por chamada: RE_INLINE é global e stateful; como renderInline é recursivo,
@@ -27,13 +28,14 @@ function renderInline(texto: string, keyBase = ''): ReactNode[] {
     if (m.index === re.lastIndex) { re.lastIndex++; continue }
     if (m.index > last) out.push(texto.slice(last, m.index))
     const k = `${keyBase}-${i++}`
-    if (m[1] !== undefined) out.push(<strong key={k} className="font-bold"><em>{renderInline(m[1], k)}</em></strong>)
-    else if (m[2]) out.push(<strong key={k} className="font-bold">{renderInline(m[3], k)}</strong>)
-    else if (m[4] !== undefined) out.push(<em key={k}>{renderInline(m[4], k)}</em>)
-    else if (m[5] !== undefined) out.push(<code key={k} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]">{m[5]}</code>)
-    else if (m[6] !== undefined) {
-      const href = hrefSeguro(m[7] ?? '')
-      out.push(href ? <a key={k} href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline">{m[6]}</a> : <Fragment key={k}>{m[6]}</Fragment>)
+    if (m[1] !== undefined) out.push(<u key={k} className="underline underline-offset-2 decoration-1">{renderInline(m[1], k)}</u>)
+    else if (m[2] !== undefined) out.push(<strong key={k} className="font-bold"><em>{renderInline(m[2], k)}</em></strong>)
+    else if (m[3]) out.push(<strong key={k} className="font-bold">{renderInline(m[4], k)}</strong>)
+    else if (m[5] !== undefined) out.push(<em key={k}>{renderInline(m[5], k)}</em>)
+    else if (m[6] !== undefined) out.push(<code key={k} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]">{m[6]}</code>)
+    else if (m[7] !== undefined) {
+      const href = hrefSeguro(m[8] ?? '')
+      out.push(href ? <a key={k} href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline">{m[7]}</a> : <Fragment key={k}>{m[7]}</Fragment>)
     }
     last = re.lastIndex
   }
