@@ -8,6 +8,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { NovoAdministradorForm } from '@/components/admin/novo-administrador-form'
 import { AdministradoresLista } from '@/components/admin/administradores-lista'
+import { GerenciarAcessosModal } from '@/components/super/gerenciar-acessos-modal'
 import type { AdminMembro, CargoOpcao } from '@/app/admin/administradores/actions'
 
 /** Aba "Acessos" da plataforma (console super): toolbar com "Adicionar administrador" (modal)
@@ -28,6 +29,7 @@ export function PlataformaAcessos({ tenantId, membros, cargos }: {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => setNovoAberto(true)}><UserPlus className="mr-2 h-4 w-4" /> Adicionar administrador</Button>
+          <GerenciarAcessosModal membros={membros} cargos={cargos} tenantId={tenantId} />
           <Link href={`/super/plataformas/${tenantId}/rbac`} className={cn(buttonVariants({ variant: 'outline' }))}>
             <ShieldCheck className="mr-2 h-4 w-4" /> Configurar RBAC
           </Link>

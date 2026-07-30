@@ -162,6 +162,13 @@ export async function criarAdministradorAction(
   }
   if (!userId) return { ok: false, error: 'Não foi possível criar ou localizar o usuário.' }
 
+  // Conta reaproveitada (já existia): o createUser NÃO atualiza o metadata, então o nome digitado
+  // não era gravado e o admin aparecia SEM NOME (a lista lê o nome do auth.user_metadata.full_name).
+  // Garante o nome (e sincroniza se mudou).
+  if (jaExistia && nome) {
+    try { await svc.auth.admin.updateUserById(userId, { user_metadata: { full_name: nome } }) } catch { /* best-effort */ }
+  }
+
   // 2) Espelha o perfil (best-effort — a lista lê do auth, isto é só conveniência).
   try {
     await svc.from('simulado_users').upsert({ id: userId, email, nome }, { onConflict: 'id' })
@@ -210,6 +217,24 @@ export async function toggleAtivoAdminAction(userId: string, ativo: boolean, ten
   const { error } = await svc.from('simulado_tenant_acessos').update({ ativo }).eq('user_id', userId).eq('tenant_id', tenantId)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: ativo ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_tenant_acessos', entidadeId: userId, tenantId, depois: { ativo } })
+  revalidarRbac(tenantId, ctx.ehSuper)
+  return { ok: true }
+}
+
+/**
+ * REMOVE o acesso do membro à plataforma (apaga a linha em tenant_acessos — a conta global
+ * permanece). Bloqueia remover a si mesmo (anti-lockout). Diferente de "desativar" (que preserva).
+ */
+export async function removerAcessoAdminAction(userId: string, tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await resolverContexto(tenantIdAlvo)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+  const { tenantId } = ctx
+  if (userId === ctx.userId) return { ok: false, error: 'Você não pode remover o seu próprio acesso.' }
+  const svc = createAdminClient()
+  const { data: antes } = await svc.from('simulado_tenant_acessos').select('role').eq('user_id', userId).eq('tenant_id', tenantId).maybeSingle()
+  const { error } = await svc.from('simulado_tenant_acessos').delete().eq('user_id', userId).eq('tenant_id', tenantId)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_tenant_acessos', entidadeId: userId, tenantId, antes: antes ?? undefined, depois: { removido: true } })
   revalidarRbac(tenantId, ctx.ehSuper)
   return { ok: true }
 }
