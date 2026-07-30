@@ -1,6 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { fetchAll } from '@/lib/supabase/fetch-all'
 import { selecionarGrupos } from '@/lib/simulado/grupos'
 import { GruposClient } from '@/components/admin/grupos-client'
 
@@ -14,16 +13,14 @@ export default async function GruposPage() {
   // Grupos (tolerante a cor/pai_id/is_mestre ausentes) já ordenados por nome.
   const grupos = await selecionarGrupos(svc, tenantId, { comData: true })
 
-  // Contagem de membros por grupo. IMPORTANTE: pagina com fetchAll — há mais de 1000
-  // vínculos no total e o PostgREST corta em ~1000 por resposta (senão grupos "somem"
-  // da contagem, aparecendo com 0 membros mesmo tendo alunos vinculados).
+  // Contagem de membros por grupo — count exato por grupo, em paralelo (HEAD, sem trazer linhas).
+  // Evita paginar todos os vínculos (simulado_grupo_membros pode ter dezenas de milhares de linhas).
   const ids = grupos.map((g) => g.id)
   const membros = new Map<string, number>()
-  if (ids.length) {
-    const gm = await fetchAll<{ grupo_id: string }>(() =>
-      svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', ids).order('id', { ascending: true }))
-    for (const m of gm) membros.set(m.grupo_id, (membros.get(m.grupo_id) ?? 0) + 1)
-  }
+  await Promise.all(ids.map(async (id) => {
+    const { count } = await svc.from('simulado_grupo_membros').select('*', { count: 'exact', head: true }).eq('grupo_id', id)
+    membros.set(id, count ?? 0)
+  }))
 
   const rows = grupos.map((g) => ({
     id: g.id,

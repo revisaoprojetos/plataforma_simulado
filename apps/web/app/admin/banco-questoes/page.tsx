@@ -1,6 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { fetchAll } from '@/lib/supabase/fetch-all'
 import { NovoBancoForm } from '@/components/admin/novo-banco-form'
 import { BancosGrid } from '@/components/admin/bancos-grid'
 
@@ -26,17 +25,6 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
     pastas = (r.data ?? []).map((b: any) => ({ ...b, pai_id: b.pai_id ?? null, is_folder: b.is_folder ?? false, folder_area: b.folder_area ?? null }))
   }
 
-  // Contagem de questões E de estudantes por banco — paginado (fetchAll) para não truncar em
-  // 1000 (teto do PostgREST) e contar errado em bancos/tenants grandes.
-  const [vinculos, estudantes] = await Promise.all([
-    fetchAll<any>(() => svc.from('simulado_questao_pasta').select('pasta_id').eq('tenant_id', tid).order('pasta_id', { ascending: true })),
-    fetchAll<any>(() => svc.from('simulado_pasta_estudantes').select('pasta_id').eq('tenant_id', tid).order('pasta_id', { ascending: true })),
-  ])
-  const contagem = new Map<string, number>()
-  for (const v of vinculos) contagem.set(v.pasta_id, (contagem.get(v.pasta_id) ?? 0) + 1)
-  const contEstudantes = new Map<string, number>()
-  for (const e of estudantes) contEstudantes.set(e.pasta_id, (contEstudantes.get(e.pasta_id) ?? 0) + 1)
-
   // Só pastas do CONTEXTO banco (exclui as pastas da Aplicação de Simulado, folder_area='simulado',
   // e as de Cadernos de Prova, folder_area='caderno'). Pastas legadas (folder_area null) permanecem
   // no Banco por compatibilidade.
@@ -49,6 +37,23 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
   const current = pastaParam ? folders.find((f) => f.id === pastaParam) ?? null : null
   const bancosNivel = current ? bancosAll.filter((b) => b.pai_id === current.id) : bancosAll.filter((b) => !b.pai_id)
   const foldersNivel = current ? [] : folders.filter((f) => !f.pai_id)
+
+  // Contagem de questões E de estudantes SÓ dos bancos deste nível (count exato por banco, em
+  // paralelo). Evita paginar `simulado_pasta_estudantes` inteiro — pode ter centenas de milhares de
+  // linhas em tenants com muitos alunos por banco.
+  const idsNivel = bancosNivel.map((b) => b.id)
+  const contarPorBanco = async (tabela: string) => {
+    const m = new Map<string, number>()
+    await Promise.all(idsNivel.map(async (id) => {
+      const { count } = await svc.from(tabela).select('*', { count: 'exact', head: true }).eq('tenant_id', tid).eq('pasta_id', id)
+      m.set(id, count ?? 0)
+    }))
+    return m
+  }
+  const [contagem, contEstudantes] = await Promise.all([
+    contarPorBanco('simulado_questao_pasta'),
+    contarPorBanco('simulado_pasta_estudantes'),
+  ])
 
   const capa = (b: any) => (b.capa_card_url ?? b.capa_url) ?? null
   const bancosOut = bancosNivel.map((b) => ({ id: b.id, nome: b.nome, total: contagem.get(b.id) ?? 0, estudantes: contEstudantes.get(b.id) ?? 0, cor: b.cor ?? null, icone: b.icone ?? null, capa: capa(b), tipo: b.tipo ?? null }))
