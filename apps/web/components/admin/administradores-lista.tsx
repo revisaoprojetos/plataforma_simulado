@@ -162,7 +162,7 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
       {/* Modal de configuração INDIVIDUAL */}
       {config && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" onClick={() => { if (!pending) setConfigId(null) }}>
-          <div className="w-full max-w-md rounded-2xl border bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-lg rounded-2xl border bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">{iniciais(config.nome, config.email)}</span>
               <div className="min-w-0 flex-1">
@@ -186,10 +186,6 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
                     className="h-9 w-full rounded-lg border bg-transparent px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
                 </div>
               </div>
-              <button type="button" onClick={() => salvarDados(config)} disabled={pending || (nomeEdit.trim() === (config.nome ?? '') && emailEdit.trim().toLowerCase() === (config.email ?? '').toLowerCase())}
-                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition hover:bg-muted disabled:opacity-50">
-                {pending && alvo === config.userId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Salvar dados
-              </button>
             </div>
 
             {/* Cargo */}
@@ -219,7 +215,7 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
               <p className="text-[11px] text-muted-foreground">O login é global (vale em todas as plataformas do usuário).</p>
             </div>
 
-            {/* Ações: ativar/desativar + remover */}
+            {/* Rodapé: Desativar (esq) · Remover + Salvar (dir) — todos na mesma linha */}
             <div className="mt-5 flex flex-wrap items-center gap-2 border-t pt-4">
               <button type="button" disabled={pending || (config.ehVoce && config.ativo)} onClick={() => toggleAtivo(config)}
                 className={cn('inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition disabled:opacity-50',
@@ -228,11 +224,17 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
                 {config.ativo ? <ShieldOff className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
                 {config.ativo ? 'Desativar' : 'Reativar'}
               </button>
-              <button type="button" disabled={pending || config.ehVoce} onClick={() => remover(config)}
-                className="ml-auto inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 disabled:opacity-50 dark:text-rose-400"
-                title={config.ehVoce ? 'Você não pode remover o seu acesso' : undefined}>
-                {pending && alvo === config.userId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Remover acesso
-              </button>
+              <div className="ml-auto flex items-center gap-2">
+                <button type="button" disabled={pending || config.ehVoce} onClick={() => remover(config)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 disabled:opacity-50 dark:text-rose-400"
+                  title={config.ehVoce ? 'Você não pode remover o seu acesso' : undefined}>
+                  {pending && alvo === config.userId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Remover acesso
+                </button>
+                <button type="button" onClick={() => salvarDados(config)} disabled={pending || (nomeEdit.trim() === (config.nome ?? '') && emailEdit.trim().toLowerCase() === (config.email ?? '').toLowerCase())}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
+                  {pending && alvo === config.userId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar dados
+                </button>
+              </div>
             </div>
           </div>
         </div>,
