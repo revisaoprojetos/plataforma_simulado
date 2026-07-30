@@ -78,6 +78,7 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
   const [minhasPlats, setMinhasPlats] = useState<PlatSimples[] | null>(null)
   const [erroCarregar, setErroCarregar] = useState(false)
   const [superAdmin, setSuperAdmin] = useState(false)
+  const [semAcesso, setSemAcesso] = useState(false)
 
   const nome = marca?.nome || 'Simulados'
 
@@ -108,7 +109,20 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
     let vivo = true
     fetch('/api/auth/minhas-plataformas', { signal: AbortSignal.timeout(8000) })
       .then((r) => { if (!r.ok) throw new Error('http ' + r.status); return r.json() })
-      .then((d) => { if (vivo) { setMinhasPlats(Array.isArray(d?.plataformas) ? d.plataformas : []); setSuperAdmin(!!d?.superAdmin) } })
+      .then((d) => {
+        if (!vivo) return
+        const plats: PlatSimples[] = Array.isArray(d?.plataformas) ? d.plataformas : []
+        const sup = !!d?.superAdmin
+        setMinhasPlats(plats)
+        setSuperAdmin(sup)
+        // LOGIN POR-URL: cada plataforma tem sua própria URL. O admin comum entra DIRETO na
+        // plataforma desta URL (sem seletor). Super-admin vê a opção de console. Sem acesso a esta
+        // plataforma = bloqueado. Em dev (sem tenant resolvido) mantém a lista como fallback.
+        if (!sup && tenantAtualId) {
+          if (plats.some((p) => p.id === tenantAtualId)) router.replace('/admin')
+          else setSemAcesso(true)
+        }
+      })
       .catch(() => { if (vivo) { setErroCarregar(true); toast.error('Não foi possível carregar suas plataformas.') } })
     return () => { vivo = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -166,25 +180,50 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
     </button>
   )
 
-  // ---------- SELETOR DE PLATAFORMA (pós-login) ----------
+  // ---------- PÓS-LOGIN (login por-URL) ----------
+  // Cada plataforma tem sua própria URL: o admin comum entra DIRETO nela (efeito acima faz o
+  // redirect). Aqui só renderizamos: o CONSOLE do super-admin, o "sem acesso", ou a lista
+  // (fallback de dev quando não há tenant resolvido).
+  const resetConta = () => { setSemAcesso(false); setModo('aluno'); setMinhasPlats(null); setErroCarregar(false); setEmail(''); setSenha(''); setLoading(false); setErro(null); setSuperAdmin(false) }
   if (modo === 'selecionar') {
+    // Conta sem acesso a ESTA plataforma → bloqueado.
+    if (semAcesso) {
+      return (
+        <Shell wide>
+          <div className="flex flex-col items-center gap-3 text-center">
+            {Emblema}
+            <Titulo>Sem acesso</Titulo>
+            <p className="max-w-xs text-sm text-slate-500">Sua conta não tem acesso a esta plataforma. Confira se está no endereço correto ou fale com o suporte.</p>
+            <button type="button" onClick={resetConta}
+              className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50">
+              <LogOut className="h-3.5 w-3.5" /> Entrar com outra conta
+            </button>
+          </div>
+        </Shell>
+      )
+    }
+
+    // Super-admin escolhe (console + plataformas). Em dev sem tenant, mostra a lista como fallback.
+    const mostrarLista = superAdmin || !tenantAtualId
     return (
       <Shell wide>
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
           {Emblema}
           <div>
-            <Titulo>Escolha a plataforma</Titulo>
-            <p className="mt-1 text-sm text-slate-500">Selecione onde deseja entrar.</p>
+            <Titulo>{superAdmin ? 'Bem-vindo, administrador' : 'Entrando…'}</Titulo>
+            <p className="mt-1 text-sm text-slate-500">{superAdmin ? 'Abra o console de administração ou entre em uma plataforma.' : 'Levando você para a plataforma…'}</p>
           </div>
         </div>
 
         {erroCarregar ? (
           <div className="py-8 text-center">
-            <p className="mb-3 text-sm text-slate-500">Não foi possível carregar suas plataformas.</p>
+            <p className="mb-3 text-sm text-slate-500">Não foi possível carregar seu acesso.</p>
             <button type="button" onClick={() => { setErroCarregar(false); setMinhasPlats(null) }} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50">Tentar novamente</button>
           </div>
         ) : minhasPlats === null ? (
           <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
+        ) : !mostrarLista ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Entrando na plataforma…</div>
         ) : minhasPlats.length === 0 ? (
           <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">Nenhuma plataforma disponível para esta conta.</p>
         ) : (
@@ -218,10 +257,12 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
           </div>
         )}
 
-        <button type="button" onClick={() => { setModo('aluno'); setMinhasPlats(null); setErroCarregar(false); setEmail(''); setSenha(''); setLoading(false); setErro(null); setSuperAdmin(false) }}
-          className="mt-6 inline-flex w-full items-center justify-center gap-1.5 text-xs text-slate-500 transition-colors hover:text-slate-800">
-          <LogOut className="h-3.5 w-3.5" /> Entrar com outra conta
-        </button>
+        {mostrarLista && (
+          <button type="button" onClick={resetConta}
+            className="mt-6 inline-flex w-full items-center justify-center gap-1.5 text-xs text-slate-500 transition-colors hover:text-slate-800">
+            <LogOut className="h-3.5 w-3.5" /> Entrar com outra conta
+          </button>
+        )}
       </Shell>
     )
   }
