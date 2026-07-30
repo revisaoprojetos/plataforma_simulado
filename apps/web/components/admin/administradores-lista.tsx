@@ -4,12 +4,12 @@ import { useMemo, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Search, X, Mail, Loader2, KeyRound, ShieldCheck, ShieldOff, Copy, Check, Dices } from 'lucide-react'
+import { Search, X, Mail, Loader2, KeyRound, ShieldCheck, ShieldOff, Copy, Check, Dices, Settings2, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { rotuloCargo, CARGOS_ACESSO_TOTAL } from '@/lib/rbac-cargos'
 import {
-  trocarCargoAction, toggleAtivoAdminAction, resetarSenhaAdminAction,
+  trocarCargoAction, toggleAtivoAdminAction, resetarSenhaAdminAction, removerAcessoAdminAction,
   type AdminMembro, type CargoOpcao,
 } from '@/app/admin/administradores/actions'
 
@@ -22,11 +22,11 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
   const router = useRouter()
   const [pending, start] = useTransition()
   const [q, setQ] = useState('')
-  const [alvo, setAlvo] = useState<string | null>(null) // userId em ação (spinner)
+  const [alvo, setAlvo] = useState<string | null>(null)
   const [cred, setCred] = useState<{ email: string | null; senha: string } | null>(null)
   const [copiado, setCopiado] = useState(false)
-  const [resetAlvo, setResetAlvo] = useState<AdminMembro | null>(null) // membro no modal de redefinir senha
-  const [resetSenha, setResetSenha] = useState('')
+  const [configId, setConfigId] = useState<string | null>(null) // userId em configuração (modal)
+  const [novaSenha, setNovaSenha] = useState('')
 
   const lista = useMemo(() => {
     const t = q.trim().toLowerCase()
@@ -36,6 +36,9 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
       (m.email ?? '').toLowerCase().includes(t) ||
       rotuloCargo(m.cargo).toLowerCase().includes(t))
   }, [membros, q])
+
+  // Membro atual do modal — derivado de `membros` para refletir mudanças após refresh.
+  const config = configId ? membros.find((m) => m.userId === configId) ?? null : null
 
   function agir(userId: string, fn: () => Promise<{ ok: boolean; error?: string }>, sucesso: string) {
     setAlvo(userId)
@@ -48,6 +51,8 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
     })
   }
 
+  function abrirConfig(m: AdminMembro) { setConfigId(m.userId); setNovaSenha('') }
+
   function trocarCargo(m: AdminMembro, cargo: string) {
     if (cargo === m.cargo) return
     agir(m.userId, () => trocarCargoAction(m.userId, cargo, tenantId), 'Cargo atualizado.')
@@ -56,24 +61,36 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
   async function toggleAtivo(m: AdminMembro) {
     if (m.ativo && !(await confirmar({
       titulo: 'Desativar acesso',
-      mensagem: `Desativar o acesso de ${m.nome || m.email || 'este administrador'}? Ele deixa de conseguir entrar no painel (o cadastro é preservado).`,
+      mensagem: `Desativar o acesso de ${m.nome || m.email || 'este administrador'}? Ele deixa de entrar no painel (o cadastro é preservado).`,
       confirmar: 'Desativar', destrutivo: true,
     }))) return
     agir(m.userId, () => toggleAtivoAdminAction(m.userId, !m.ativo, tenantId), m.ativo ? 'Acesso desativado.' : 'Acesso reativado.')
   }
 
-  function confirmarReset() {
-    const m = resetAlvo
-    if (!m) return
-    const digitada = resetSenha.trim()
+  async function remover(m: AdminMembro) {
+    if (!(await confirmar({
+      titulo: 'Remover acesso',
+      mensagem: `Remover o acesso de ${m.nome || m.email || 'este administrador'} a esta plataforma? A conta global (login) permanece — só o vínculo com esta plataforma é apagado.`,
+      confirmar: 'Remover acesso', destrutivo: true,
+    }))) return
+    setAlvo(m.userId)
+    start(async () => {
+      const r = await removerAcessoAdminAction(m.userId, tenantId)
+      setAlvo(null)
+      if (!r.ok) { toast.error(r.error ?? 'Falha.'); return }
+      toast.success('Acesso removido.'); setConfigId(null); router.refresh()
+    })
+  }
+
+  function redefinirSenha(m: AdminMembro) {
+    const digitada = novaSenha.trim()
     if (digitada && digitada.length < 6) { toast.error('A senha deve ter ao menos 6 caracteres.'); return }
     setAlvo(m.userId)
     start(async () => {
       const r = await resetarSenhaAdminAction(m.userId, digitada || undefined, tenantId)
       setAlvo(null)
       if (!r.ok || !r.senha) { toast.error(r.error ?? 'Falha ao redefinir.'); return }
-      setResetAlvo(null); setResetSenha('')
-      // Mostra a senha uma vez quando foi gerada; se o admin digitou, ele já a conhece.
+      setNovaSenha('')
       if (r.gerada) setCred({ email: m.email, senha: r.senha })
       toast.success('Senha redefinida.')
     })
@@ -107,97 +124,85 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
           <p className="py-12 text-center text-sm text-muted-foreground">Nenhum administrador encontrado.</p>
         ) : (
           <div className="divide-y">
-            {lista.map((m) => {
-              const emAcao = alvo === m.userId && pending
-              return (
-                <div key={m.userId} className={cn('flex flex-wrap items-center gap-3 p-3 sm:flex-nowrap', !m.ativo && 'opacity-60')}>
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{iniciais(m.nome, m.email)}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-2 truncate text-sm font-medium">
-                      {m.nome || '—'}
-                      {m.ehVoce && <span className="rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">você</span>}
-                      {!m.ativo && <span className="rounded-full border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">inativo</span>}
-                    </p>
-                    <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><Mail className="h-3 w-3" /> {m.email ?? 'sem e-mail'}</p>
-                  </div>
-
-                  {/* Cargo */}
-                  <select
-                    value={m.cargo}
-                    disabled={emAcao}
-                    onChange={(e) => trocarCargo(m, e.target.value)}
-                    className="h-9 rounded-lg border bg-transparent px-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                    aria-label={`Cargo de ${m.nome || m.email || 'administrador'}`}
-                  >
-                    {/* Garante o cargo atual na lista mesmo se não estiver entre os perfis conhecidos */}
-                    {!cargos.some((c) => c.nome === m.cargo) && <option value={m.cargo}>{rotuloCargo(m.cargo)}</option>}
-                    {cargos.map((c) => (
-                      <option key={c.nome} value={c.nome}>{rotuloCargo(c.nome)}</option>
-                    ))}
-                  </select>
-
-                  {/* Redefinir senha */}
-                  <button type="button" disabled={emAcao} onClick={() => { setResetAlvo(m); setResetSenha('') }}
-                    className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition hover:bg-muted disabled:opacity-50"
-                    title="Redefinir senha">
-                    {emAcao ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />} Senha
-                  </button>
-
-                  {/* Ativar / desativar */}
-                  <button type="button" disabled={emAcao || (m.ehVoce && m.ativo)} onClick={() => toggleAtivo(m)}
-                    className={cn('inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition disabled:opacity-50',
-                      m.ativo ? 'text-rose-600 hover:bg-rose-500/10 dark:text-rose-400' : 'border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400')}
-                    title={m.ehVoce && m.ativo ? 'Você não pode desativar o seu próprio acesso' : (m.ativo ? 'Desativar acesso' : 'Reativar acesso')}>
-                    {m.ativo ? <ShieldOff className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-                    {m.ativo ? 'Desativar' : 'Reativar'}
-                  </button>
+            {lista.map((m) => (
+              <div key={m.userId} className={cn('flex items-center gap-3 p-3', !m.ativo && 'opacity-60')}>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{iniciais(m.nome, m.email)}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-2 truncate text-sm font-medium">
+                    {m.nome || '—'}
+                    {m.ehVoce && <span className="rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">você</span>}
+                    {!m.ativo && <span className="rounded-full border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">inativo</span>}
+                  </p>
+                  <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><Mail className="h-3 w-3" /> {m.email ?? 'sem e-mail'}</p>
                 </div>
-              )
-            })}
+                <span className="hidden shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground sm:inline">{rotuloCargo(m.cargo)}</span>
+                {/* Engrenagem: configuração INDIVIDUAL deste acesso */}
+                <button type="button" onClick={() => abrirConfig(m)} title="Configurar este acesso"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                  <Settings2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Cargos com <b>acesso total</b> ({[...CARGOS_ACESSO_TOTAL].map(rotuloCargo).join(', ')}) ignoram a matriz de permissões. Os demais seguem exatamente as liberações definidas em <b>Permissões (RBAC)</b>.
+        Cargos com <b>acesso total</b> ({[...CARGOS_ACESSO_TOTAL].map(rotuloCargo).join(', ')}) ignoram a matriz de permissões. Os demais seguem as liberações em <b>Permissões (RBAC)</b>.
       </p>
 
-      {/* Modal: redefinir senha (digitar ou gerar) */}
-      {resetAlvo && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" onClick={() => { if (!pending) { setResetAlvo(null); setResetSenha('') } }}>
+      {/* Modal de configuração INDIVIDUAL */}
+      {config && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" onClick={() => { if (!pending) setConfigId(null) }}>
           <div className="w-full max-w-md rounded-2xl border bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-1 flex items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><KeyRound className="h-4 w-4" /></span>
-              <h3 className="text-sm font-semibold">Redefinir senha</h3>
-              <button type="button" onClick={() => { setResetAlvo(null); setResetSenha('') }} className="ml-auto rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+            <div className="mb-4 flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">{iniciais(config.nome, config.email)}</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">{config.nome || '—'}</p>
+                <p className="truncate text-xs text-muted-foreground">{config.email ?? 'sem e-mail'}</p>
+              </div>
+              <button type="button" onClick={() => setConfigId(null)} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
-            <p className="mb-3 text-xs text-muted-foreground">
-              {resetAlvo.nome || resetAlvo.email || 'Administrador'} · <b>Digite uma nova senha</b> ou deixe em branco para gerar automaticamente.
-            </p>
-            <div className="flex gap-2">
-              <input
-                autoFocus
-                value={resetSenha}
-                onChange={(e) => setResetSenha(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmarReset() } }}
-                placeholder="Deixe em branco para gerar"
-                className="h-9 flex-1 rounded-lg border bg-transparent px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                autoComplete="new-password"
-              />
-              <button type="button" onClick={() => setResetSenha(gerarSenhaCliente())}
-                className="inline-flex h-9 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium transition hover:bg-muted" title="Preencher com uma senha forte">
-                <Dices className="h-3.5 w-3.5" /> Sugerir
+
+            {/* Cargo */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Cargo</label>
+              <select value={config.cargo} disabled={pending}
+                onChange={(e) => trocarCargo(config, e.target.value)}
+                className="h-9 w-full rounded-lg border bg-transparent px-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-50">
+                {!cargos.some((c) => c.nome === config.cargo) && <option value={config.cargo}>{rotuloCargo(config.cargo)}</option>}
+                {cargos.map((c) => <option key={c.nome} value={c.nome}>{rotuloCargo(c.nome)}</option>)}
+              </select>
+            </div>
+
+            {/* Redefinir senha */}
+            <div className="mt-4 space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Redefinir senha</label>
+              <div className="flex gap-2">
+                <input value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} autoComplete="new-password"
+                  placeholder="Deixe em branco para gerar" className="h-9 flex-1 rounded-lg border bg-transparent px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+                <button type="button" onClick={() => setNovaSenha(gerarSenhaCliente())} title="Sugerir senha forte"
+                  className="inline-flex h-9 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium transition hover:bg-muted"><Dices className="h-3.5 w-3.5" /></button>
+                <button type="button" onClick={() => redefinirSenha(config)} disabled={pending || (!!novaSenha.trim() && novaSenha.trim().length < 6)}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition hover:bg-muted disabled:opacity-50">
+                  {pending && alvo === config.userId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />} Redefinir
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">O login é global (vale em todas as plataformas do usuário).</p>
+            </div>
+
+            {/* Ações: ativar/desativar + remover */}
+            <div className="mt-5 flex flex-wrap items-center gap-2 border-t pt-4">
+              <button type="button" disabled={pending || (config.ehVoce && config.ativo)} onClick={() => toggleAtivo(config)}
+                className={cn('inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition disabled:opacity-50',
+                  config.ativo ? 'text-rose-600 hover:bg-rose-500/10 dark:text-rose-400' : 'border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400')}
+                title={config.ehVoce && config.ativo ? 'Você não pode desativar o seu acesso' : undefined}>
+                {config.ativo ? <ShieldOff className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                {config.ativo ? 'Desativar' : 'Reativar'}
               </button>
-            </div>
-            {resetSenha.trim() && resetSenha.trim().length < 6 && (
-              <p className="mt-1.5 text-[11px] text-rose-600 dark:text-rose-400">Mínimo de 6 caracteres.</p>
-            )}
-            <p className="mt-3 text-[11px] text-muted-foreground">A senha atual deixa de funcionar. O login é global (vale em todas as plataformas do usuário).</p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => { setResetAlvo(null); setResetSenha('') }}
-                className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
-              <button type="button" onClick={confirmarReset} disabled={pending || (!!resetSenha.trim() && resetSenha.trim().length < 6)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
-                {pending && alvo === resetAlvo.userId ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />} Redefinir
+              <button type="button" disabled={pending || config.ehVoce} onClick={() => remover(config)}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10 disabled:opacity-50 dark:text-rose-400"
+                title={config.ehVoce ? 'Você não pode remover o seu acesso' : undefined}>
+                {pending && alvo === config.userId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Remover acesso
               </button>
             </div>
           </div>
@@ -208,8 +213,7 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
   )
 }
 
-// Sugestão de senha forte no cliente (o mesmo formato do servidor); o servidor
-// ainda decide a senha final — se o campo ficar vazio, gera outra por lá.
+// Sugestão de senha forte no cliente (o servidor ainda decide a final se o campo ficar vazio).
 function gerarSenhaCliente() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
   let s = ''
