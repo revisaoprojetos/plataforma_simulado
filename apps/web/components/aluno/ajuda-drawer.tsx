@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { HelpCircle, X, ChevronDown, Lightbulb, ArrowUpRight } from 'lucide-react'
+import { HelpCircle, X, ChevronDown, Lightbulb, ArrowUpRight, Maximize2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GUIAS_ALUNO } from '@/lib/ajuda/guias-aluno'
 
@@ -102,8 +102,30 @@ export function AjudaDrawer() {
 function Captura({ guia, passo }: { guia: string; passo: number }) {
   const arquivo = `ajuda/aluno-${guia}-${passo}.png`
   const [erro, setErro] = useState(false)
+  const [zoom, setZoom] = useState(false)
   // Sem captura ainda → não mostra placeholder (fica limpo). Basta soltar o PNG que ele aparece.
   if (erro) return null
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={`/${arquivo}`} alt={`Passo ${passo}`} onError={() => setErro(true)} className="mt-2 w-full rounded-lg border shadow-sm" />
+  return (
+    <>
+      <button type="button" onClick={() => setZoom(true)} title="Ampliar imagem"
+        className="group relative mt-2 block w-full overflow-hidden rounded-lg border shadow-sm">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={`/${arquivo}`} alt={`Passo ${passo}`} onError={() => setErro(true)} className="w-full cursor-zoom-in" />
+        <span className="pointer-events-none absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white opacity-0 transition-opacity group-hover:opacity-100">
+          <Maximize2 className="h-3.5 w-3.5" />
+        </span>
+      </button>
+
+      {zoom && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onClick={() => setZoom(false)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/${arquivo}`} alt={`Passo ${passo}`} onClick={(e) => e.stopPropagation()}
+            className="max-h-[92vh] max-w-[95vw] cursor-zoom-out rounded-lg shadow-2xl" />
+          <button type="button" onClick={() => setZoom(false)} aria-label="Fechar"
+            className="absolute right-4 top-4 rounded-lg bg-white/10 p-2 text-white transition hover:bg-white/20"><X className="h-5 w-5" /></button>
+        </div>,
+        document.body,
+      )}
+    </>
+  )
 }
