@@ -61,6 +61,17 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
     setRevelado(false)
   }
 
+  function resolver() {
+    setRevelado(true)
+    // Registra a tentativa (histórico de prática) — fire-and-forget, não bloqueia a UI.
+    if (escolhida) {
+      fetch('/api/aluno/questao-resposta', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questao_id: questao.id, alternativa_id: escolhida }),
+      }).catch(() => {})
+    }
+  }
+
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-md">
       <CardContent className="space-y-4 p-5">
@@ -130,7 +141,7 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
 
         {!revelado ? (
           <button
-            onClick={() => setRevelado(true)}
+            onClick={resolver}
             disabled={!escolhida}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >

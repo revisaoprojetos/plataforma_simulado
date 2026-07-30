@@ -16,4 +16,5 @@ export const OCULTAR_DISCURSIVA = true
 export const OCULTAR_ALUNO_EXTRAS = true
 
 // Rotas do aluno ocultas enquanto OCULTAR_ALUNO_EXTRAS estiver ligado.
-export const ROTAS_ALUNO_OCULTAS = ['/aluno/questoes', '/aluno/favoritos', '/aluno/cadernos']
+// Banco de Questões reativado (área dedicada de prática com filtros + histórico).
+export const ROTAS_ALUNO_OCULTAS = ['/aluno/favoritos', '/aluno/cadernos']
