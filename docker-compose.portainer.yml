@@ -4,9 +4,13 @@
 #
 # ANTES DE SUBIR:
 #  1) O workflow .github/workflows/docker-publish.yml precisa ter rodado com sucesso
-#     (publica as imagens web e worker no ghcr.io). Deixe os 2 pacotes PÚBLICOS
+#     (publica as imagens web, worker E api no ghcr.io). Deixe os 3 pacotes PÚBLICOS
 #     (GitHub → Packages → cada pacote → Package settings → Change visibility → Public),
 #     senão o Swarm não consegue baixar.
+#     RELATÓRIOS VIA API (strangler): para ligar, defina no Portainer as envs
+#       API_INTERNAL_SECRET (segredo forte) e DATABASE_URL (string do pooler do Supabase).
+#       RELATORIOS_API_URL já aponta para http://api:3001 por padrão. Sem essas envs, o web
+#       cai no SQL local (se DATABASE_URL no web) ou no PostgREST (lento).
 #  2) O schema do Supabase de produção já está aplicado — não rode migrations
 #     como parte deste deploy (ver docs/deploy/runbook-vps.md).
 #  3) Preencha as variáveis em "Environment variables" no Portainer (ver
@@ -51,6 +55,14 @@ services:
       - ALUNO_SESSION_SECRET=${ALUNO_SESSION_SECRET}
       # Opcional: tenant que pode usar as credenciais Curseduca do .env (os demais usam o banco)
       - CURSEDUCA_ENV_TENANT_ID=${CURSEDUCA_ENV_TENANT_ID}
+      # Relatórios (strangler): com RELATORIOS_API_URL setado, o web busca os relatórios pesados na
+      # API NestJS (serviço `api` abaixo) em vez de rodar SQL/PostgREST localmente. Segredo compartilhado.
+      - RELATORIOS_API_URL=${RELATORIOS_API_URL:-http://api:3001}
+      - API_INTERNAL_SECRET=${API_INTERNAL_SECRET}
+      # DATABASE_URL (pooler do Supabase) habilita o caminho SQL DIRETO como fallback — já evita o
+      # fetchAll do PostgREST nos relatórios quando a API estiver fora. Sem ela, cai no PostgREST.
+      - DATABASE_URL=${DATABASE_URL}
+      - REPORT_SQL=${REPORT_SQL:-on}
     networks:
       - default
       - traefik
@@ -80,6 +92,31 @@ services:
         - "traefik.http.routers.plataforma-simulado.tls.domains[0].main=${APP_BASE_DOMAIN:-revisaopge.com.br}"
         - "traefik.http.routers.plataforma-simulado.tls.domains[0].sans=*.${APP_BASE_DOMAIN:-revisaopge.com.br}"
         - "traefik.http.services.plataforma-simulado.loadbalancer.server.port=3000"
+
+  # API NestJS (relatórios pesados — strangler). INTERNA: sem Traefik; o web a alcança por
+  # http://api:3001 na rede `default`. Roda o SQL de relatório fora do web, aliviando-o.
+  api:
+    image: ghcr.io/revisaoprojetos/plataforma_simulado-api:${IMAGE_TAG:-latest}
+    environment:
+      - NODE_ENV=production
+      - API_PORT=3001
+      # Segredo compartilhado com o web (header x-api-secret). Gere um valor forte no Portainer.
+      - API_INTERNAL_SECRET=${API_INTERNAL_SECRET}
+      # DATABASE_URL = string do POOLER (Supavisor/PgBouncer) do Supabase — Postgres direto p/ o SQL
+      # de relatório. Opcional: DATABASE_URL_REPLICA (read-replica só-leitura), DATABASE_POOL_MAX.
+      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL_REPLICA=${DATABASE_URL_REPLICA}
+      - DATABASE_POOL_MAX=${DATABASE_POOL_MAX:-5}
+      - REPORT_SQL=${REPORT_SQL:-on}
+    networks:
+      - default
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.role == worker
 
   # Consome a fila, chama o Gotenberg, sobe o PDF no bucket `pdfs`
   worker:
