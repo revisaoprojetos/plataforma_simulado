@@ -10,6 +10,7 @@ import { getTenantTheme } from '@/lib/tenant-theme'
 import { SplashSistema } from '@/components/admin/splash-sistema'
 import { TourProvider } from '@/components/admin/tour-guiado'
 import { NavProgress } from '@/components/admin/nav-progress'
+import { AvisoSemAcesso } from '@/components/admin/aviso-sem-acesso'
 import { Suspense } from 'react'
 
 const CURRENT_POLICY_VERSION = '1.0'
@@ -123,6 +124,7 @@ export default async function AdminLayout({
             <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
               <AdminHeader userName={userName} userEmail={userEmail} />
               <Suspense fallback={null}><NavProgress /></Suspense>
+              <Suspense fallback={null}><AvisoSemAcesso /></Suspense>
               <main className="flex-1 overflow-y-auto p-6">
                 {children}
               </main>
