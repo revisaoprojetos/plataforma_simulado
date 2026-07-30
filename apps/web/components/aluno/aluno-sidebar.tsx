@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, Radio, TrendingUp, LifeBuoy } from 'lucide-react'
+import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, Radio, TrendingUp } from 'lucide-react'
 import {
   Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarMenu, SidebarMenuItem, SidebarMenuButton,
@@ -24,7 +24,6 @@ const NAV = [
   { href: '/aluno/questoes', label: 'Banco de Questões', icon: BookOpen },
   { href: '/aluno/favoritos', label: 'Favoritos', icon: Star },
   { href: '/aluno/cadernos', label: 'Cadernos', icon: NotebookPen },
-  { href: '/aluno/ajuda', label: 'Ajuda', icon: LifeBuoy },
 ]
 
 /** Filtro CSS que força a logo a branco/preto — mesmo tratamento da sidebar do admin. */
