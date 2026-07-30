@@ -12,6 +12,37 @@ import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
 import { sincronizarGrupoPassaporte } from '@/lib/estudante/grupo-passaporte'
 import { sincronizarGrupoVitalicio } from '@/lib/estudante/grupo-vitalicio'
 
+const TENANT_VAZIO = '00000000-0000-0000-0000-000000000000'
+
+export type EstudanteBase = {
+  id: string; nome: string; email: string | null; cpf: string | null; telefone: string | null
+  classificacao: string | null; created_at: string | null
+}
+
+/**
+ * Um LOTE de estudantes (paginado por range) — usado pela lista para carregar em segundo plano
+ * enquanto o usuário já vê os primeiros. Traz só colunas da tabela (leve); os agregados de sessão
+ * (feitos/média) vêm de um mapa único calculado uma vez na página. Tenant vem da sessão.
+ */
+export async function carregarLoteEstudantes(offset: number, limit: number): Promise<{ rows: EstudanteBase[]; total: number }> {
+  const svc = await createServiceClient()
+  const tenantId = (await getCurrentTenantId()) ?? TENANT_VAZIO
+  const lim = Math.min(Math.max(limit, 1), 1000) // teto do PostgREST
+  const { data, count } = await svc
+    .from('simulado_estudantes')
+    .select('id, nome, email, cpf, telefone, classificacao, created_at', { count: 'exact' })
+    .eq('deletado', false)
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: true })
+    .range(offset, offset + lim - 1)
+  const rows = (data ?? []).map((e: any) => ({
+    id: e.id, nome: e.nome, email: e.email ?? null, cpf: e.cpf ?? null, telefone: e.telefone ?? null,
+    classificacao: e.classificacao ?? null, created_at: e.created_at ?? null,
+  }))
+  return { rows, total: count ?? rows.length }
+}
+
 interface NovoEstudanteData {
   nome: string
   email: string

@@ -4,51 +4,44 @@ import { getCurrentTenantId } from '@/lib/tenant'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { Plus, Upload } from 'lucide-react'
-import { EstudantesLista, type EstudanteRow } from '@/components/admin/estudantes-lista'
+import { EstudantesLista } from '@/components/admin/estudantes-lista'
+import { carregarLoteEstudantes } from './actions'
 
 export const dynamic = 'force-dynamic'
+
+const PRIMEIRA_PAGINA = 30
 
 export default async function EstudantesPage() {
   const supabase = await createServiceClient()
   const tenantId = await getCurrentTenantId()
+  const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
 
-  // Pagina para trazer TODOS os estudantes (PostgREST trunca em ~1000/resposta).
-  const estudantes = await fetchAll<any>(() => supabase
-    .from('simulado_estudantes')
-    .select('id, nome, email, cpf, telefone, classificacao, matricula_externa, created_at')
-    .eq('deletado', false)
-    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: true }))
+  // 1) Primeiros estudantes (rápido) + total — o resto carrega em segundo plano no cliente.
+  // 2) Mapa de agregados de sessão (feitos/média) por estudante — poucas linhas (só sessões
+  //    finalizadas, sem teste), calculado UMA vez e aplicado a cada lote que chega.
+  // 3) KPIs por count (baratos) — não dependem de baixar os 9k+ estudantes.
+  const [{ rows: inicial, total }, sess, { count: totalPass }, { count: totalFeitos }] = await Promise.all([
+    carregarLoteEstudantes(0, PRIMEIRA_PAGINA),
+    fetchAll<any>(() => supabase
+      .from('simulado_sessoes_prova')
+      .select('estudante_id, nota')
+      .eq('tenant_id', tid)
+      .eq('status', 'finalizada')
+      .eq('is_teste', false)
+      .eq('deletado', false)
+      .order('estudante_id', { ascending: true })),
+    supabase.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('deletado', false).eq('tenant_id', tid).eq('classificacao', 'passaporte'),
+    supabase.from('simulado_sessoes_prova').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false),
+  ])
 
-  // Simulados feitos + média por estudante (sessões finalizadas, exceto testes).
-  // Busca por tenant (não por lista de ids) para evitar URL gigante / erro 400 no `.in()`.
-  const feitos = new Map<string, number>()
-  const somaNota = new Map<string, number>()
-  const contNota = new Map<string, number>()
-  const sess = await fetchAll<any>(() => supabase
-    .from('simulado_sessoes_prova')
-    .select('estudante_id, nota, status, is_teste')
-    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
-    .eq('status', 'finalizada')
-    .eq('is_teste', false)
-    .eq('deletado', false)
-    .order('estudante_id', { ascending: true }))
+  const soma = new Map<string, number>(); const cont = new Map<string, number>(); const feitos = new Map<string, number>()
   for (const s of sess) {
     const id = (s as any).estudante_id
     feitos.set(id, (feitos.get(id) ?? 0) + 1)
-    if ((s as any).nota != null) {
-      somaNota.set(id, (somaNota.get(id) ?? 0) + Number((s as any).nota))
-      contNota.set(id, (contNota.get(id) ?? 0) + 1)
-    }
+    if ((s as any).nota != null) { soma.set(id, (soma.get(id) ?? 0) + Number((s as any).nota)); cont.set(id, (cont.get(id) ?? 0) + 1) }
   }
-
-  const rows: EstudanteRow[] = estudantes.map((e: any) => ({
-    id: e.id, nome: e.nome, email: e.email ?? null, cpf: e.cpf ?? null, telefone: e.telefone ?? null,
-    classificacao: e.classificacao ?? null, created_at: e.created_at ?? null,
-    feitos: feitos.get(e.id) ?? 0,
-    media: contNota.get(e.id) ? Math.round(((somaNota.get(e.id) ?? 0) / (contNota.get(e.id) ?? 1)) * 10) / 10 : null,
-  }))
+  const agregados: Record<string, { feitos: number; media: number | null }> = {}
+  for (const [id, f] of feitos) agregados[id] = { feitos: f, media: cont.get(id) ? Math.round(((soma.get(id) ?? 0) / (cont.get(id) ?? 1)) * 10) / 10 : null }
 
   return (
     <div className="animate-page space-y-6">
@@ -67,7 +60,12 @@ export default async function EstudantesPage() {
         </div>
       </div>
 
-      <EstudantesLista estudantes={rows} />
+      <EstudantesLista
+        inicial={inicial}
+        agregados={agregados}
+        total={total}
+        kpis={{ total, passaporte: totalPass ?? 0, feitos: totalFeitos ?? 0 }}
+      />
     </div>
   )
 }
