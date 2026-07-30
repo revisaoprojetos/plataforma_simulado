@@ -29,6 +29,23 @@ function gerarSenha() {
 }
 
 /**
+ * Localiza o id de um usuário auth pelo e-mail — PAGINANDO. O `listUsers()` sem args só traz a 1ª
+ * página (~50), então um e-mail já existente (ex.: tentativa anterior) não era encontrado e a
+ * criação falhava com "não foi possível localizar o usuário". Percorre páginas de 1000 até achar.
+ */
+async function acharUserIdPorEmail(svc: ReturnType<typeof createAdminClient>, email: string): Promise<string | null> {
+  const alvo = email.toLowerCase()
+  for (let page = 1; page <= 30; page++) {
+    const { data, error } = await svc.auth.admin.listUsers({ page, perPage: 1000 })
+    if (error || !data?.users?.length) return null
+    const u = data.users.find((x) => x.email?.toLowerCase() === alvo)
+    if (u) return u.id
+    if (data.users.length < 1000) return null
+  }
+  return null
+}
+
+/**
  * Resolve o CONTEXTO da ação de RBAC.
  * - `tenantIdAlvo` presente → modo CONSOLE SUPER: exige super-admin global e opera na
  *   plataforma-alvo (o super gerencia o RBAC de qualquer tenant a partir de /super).
@@ -141,8 +158,7 @@ export async function criarAdministradorAction(
   let userId = novo?.user?.id ?? null
   if (!userId) {
     jaExistia = true
-    const { data: list } = await svc.auth.admin.listUsers()
-    userId = list.users.find((u) => u.email?.toLowerCase() === email)?.id ?? null
+    userId = await acharUserIdPorEmail(svc, email)
   }
   if (!userId) return { ok: false, error: 'Não foi possível criar ou localizar o usuário.' }
 
