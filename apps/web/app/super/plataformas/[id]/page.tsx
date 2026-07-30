@@ -40,11 +40,12 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
     logoAtual: typeof tema.logo_url === 'string' ? tema.logo_url : null,
   }
 
-  const [{ count: usuarios }, { count: estudantes }, { count: simulados }, rbac] = await Promise.all([
+  const [{ count: usuarios }, { count: estudantes }, { count: simulados }, rbac, bannersRes] = await Promise.all([
     svc.from('simulado_tenant_acessos').select('user_id', { count: 'exact', head: true }).eq('tenant_id', id),
     svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('tenant_id', id),
     svc.from('simulado_simulados').select('id', { count: 'exact', head: true }).eq('tenant_id', id),
     listarAdministradores(id),
+    svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor, ativo, ordem').eq('tenant_id', id).order('ordem', { ascending: true }).order('criado_em', { ascending: false }).then((r) => r.data ?? [], () => []),
   ])
 
   // Badge de estado (4 valores): Ativa (todos) · Só admin · Só super-admin · Oculta.
@@ -89,6 +90,7 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
         membros={rbac.membros ?? []}
         cargos={rbac.cargos ?? []}
         aparencia={aparencia}
+        banners={bannersRes as any}
         rbacErro={rbac.ok ? null : (rbac.error ?? 'Não foi possível carregar os acessos.')}
       />
     </div>

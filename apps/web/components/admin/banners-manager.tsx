@@ -15,7 +15,7 @@ export type Banner = {
   imagem_url: string | null; link: string | null; cor: string | null; ativo: boolean; ordem: number
 }
 
-export function BannersManager({ banners }: { banners: Banner[] }) {
+export function BannersManager({ banners, tenantId }: { banners: Banner[]; tenantId?: string }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [alvo, setAlvo] = useState<string | null>(null)
@@ -31,7 +31,7 @@ export function BannersManager({ banners }: { banners: Banner[] }) {
     if (!titulo.trim() && !mensagem.trim() && !imagem.trim()) { toast.error('Preencha ao menos um título, mensagem ou imagem.'); return }
     setAlvo('novo')
     start(async () => {
-      const r = await criarBannerAction({ tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo: true })
+      const r = await criarBannerAction({ tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo: true }, tenantId)
       setAlvo(null)
       if (!r.ok) { toast.error(r.error ?? 'Falha ao criar.'); return }
       toast.success('Criado!'); setTitulo(''); setMensagem(''); setImagem(''); setLink('')
@@ -42,7 +42,7 @@ export function BannersManager({ banners }: { banners: Banner[] }) {
   function toggle(b: Banner) {
     setAlvo(b.id)
     start(async () => {
-      const r = await toggleBannerAction(b.id, !b.ativo)
+      const r = await toggleBannerAction(b.id, !b.ativo, tenantId)
       setAlvo(null)
       if (!r.ok) { toast.error(r.error ?? 'Falha.'); return }
       router.refresh()
@@ -53,7 +53,7 @@ export function BannersManager({ banners }: { banners: Banner[] }) {
     if (!(await confirmar({ titulo: 'Excluir', mensagem: `Excluir este ${b.tipo === 'popup' ? 'pop-up' : 'banner'}?`, confirmar: 'Excluir', destrutivo: true }))) return
     setAlvo(b.id)
     start(async () => {
-      const r = await excluirBannerAction(b.id)
+      const r = await excluirBannerAction(b.id, tenantId)
       setAlvo(null)
       if (!r.ok) { toast.error(r.error ?? 'Falha.'); return }
       toast.success('Excluído.'); router.refresh()
