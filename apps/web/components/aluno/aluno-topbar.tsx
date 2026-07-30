@@ -1,16 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { LogOut, Building2, HelpCircle } from 'lucide-react'
+import { LogOut, Building2 } from 'lucide-react'
 import { TrocarPlataformaAlunoModal } from '@/components/aluno/trocar-plataforma-aluno'
 import { NotificacaoBellAluno } from '@/components/aluno/notificacao-bell-aluno'
+import { AjudaDrawer } from '@/components/aluno/ajuda-drawer'
 
 function iniciais(nome: string) {
   return nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
@@ -38,10 +38,7 @@ export function AlunoTopbar({ nome, email }: { nome: string; email?: string }) {
     >
       <SidebarTrigger />
       <div className="flex-1" />
-      <Link href="/aluno/ajuda" title="Ajuda" aria-label="Ajuda"
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[color:var(--sidebar-accent)]">
-        <HelpCircle className="h-5 w-5" />
-      </Link>
+      <AjudaDrawer />
       <NotificacaoBellAluno />
       <ThemeToggle />
       <DropdownMenu>
