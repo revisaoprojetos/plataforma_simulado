@@ -24,7 +24,7 @@ export async function importProcessor(job: Job) {
 
   for (const questao of questoes) {
     const { data: existing } = await supabase
-      .from('questoes')
+      .from('simulado_questoes')
       .select('id')
       .eq('tenant_id', tenant_id)
       .eq('external_id', questao.external_id)
@@ -32,7 +32,7 @@ export async function importProcessor(job: Job) {
 
     if (existing) {
       await supabase
-        .from('questoes')
+        .from('simulado_questoes')
         .update({ enunciado: questao.enunciado })
         .eq('id', existing.id)
       atualizadas++
