@@ -120,6 +120,7 @@ const navGroups: NavGroup[] = [
       { label: 'Relatório Simulado', href: '/admin/relatorios/simulados', icon: ClipboardList, perm: 'relatorios:view' },
       { label: 'Relatório Disciplina', href: '/admin/relatorios/disciplinas', icon: BookOpen, perm: 'relatorios:view' },
       { label: 'Relatório Estudantes', href: '/admin/relatorios/estudantes', icon: GraduationCap, perm: 'relatorios:view' },
+      { label: 'Cadernos baixados', href: '/admin/relatorios/cadernos', icon: DownloadCloud, perm: 'relatorios:view' },
       { label: 'Ranking', href: '/admin/relatorios/ranking', icon: Trophy, perm: 'relatorios:view' },
     ],
   },
