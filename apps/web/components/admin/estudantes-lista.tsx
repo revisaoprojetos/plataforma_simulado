@@ -8,7 +8,7 @@ import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { ExcluirEstudanteButton } from '@/components/admin/excluir-estudante-button'
 import { ExportButton } from '@/components/admin/export-button'
 import type { ColunaExport } from '@/lib/exportar'
-import { carregarLoteEstudantes, type EstudanteBase } from '@/app/admin/estudantes/actions'
+import { carregarLoteEstudantes, buscarEstudantes, type EstudanteBase } from '@/app/admin/estudantes/actions'
 
 export type EstudanteRow = {
   id: string; nome: string; email: string | null; cpf: string | null; telefone: string | null
@@ -52,6 +52,22 @@ export function EstudantesLista({ inicial, agregados, total, kpis }: {
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [sort, setSort] = useState<Sort>(null)
   const [pagina, setPagina] = useState(1)
+  // Busca NO SERVIDOR (acha qualquer aluno na hora, mesmo antes do carregamento em segundo plano terminar).
+  const [busca, setBusca] = useState<EstudanteRow[] | null>(null)
+  const [buscando, setBuscando] = useState(false)
+  const buscandoAtivo = q.trim().length > 0
+
+  useEffect(() => {
+    const t = q.trim()
+    if (!t) { setBusca(null); setBuscando(false); return }
+    setBuscando(true)
+    const id = setTimeout(async () => {
+      try { const res = await buscarEstudantes(t); setBusca(res.map(aplicar)) }
+      catch { setBusca([]) }
+      finally { setBuscando(false) }
+    }, 300)
+    return () => clearTimeout(id)
+  }, [q, aplicar])
 
   // Carrega o restante dos estudantes em segundo plano (em lotes), sem travar a primeira exibição.
   const rodouRef = useRef(false)
@@ -77,13 +93,10 @@ export function EstudantesLista({ inicial, agregados, total, kpis }: {
   }
 
   const filtrados = useMemo(() => {
-    const t = q.trim().toLowerCase()
-    return rows.filter((e) => {
-      const okFiltro = filtro === 'todos' || (filtro === 'passaporte' ? e.classificacao === 'passaporte' : e.classificacao !== 'passaporte')
-      const okBusca = !t || [e.nome, e.email, e.cpf, e.telefone].some((v) => (v ?? '').toLowerCase().includes(t))
-      return okFiltro && okBusca
-    })
-  }, [rows, q, filtro])
+    // Buscando → usa os resultados do SERVIDOR; senão, as linhas já carregadas.
+    const base = buscandoAtivo ? (busca ?? []) : rows
+    return base.filter((e) => filtro === 'todos' || (filtro === 'passaporte' ? e.classificacao === 'passaporte' : e.classificacao !== 'passaporte'))
+  }, [buscandoAtivo, busca, rows, filtro])
 
   const ordenados = useMemo(() => {
     if (!sort) return filtrados
@@ -161,8 +174,12 @@ export function EstudantesLista({ inicial, agregados, total, kpis }: {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs text-muted-foreground">
-          <span>{ordenados.length > 0 ? <>Exibindo <b className="tabular-nums text-foreground">{primeiroIdx}–{ultimoIdx}</b> de <b className="tabular-nums text-foreground">{ordenados.length}</b></> : 'Nenhum estudante'}</span>
-          {carregando && (
+          <span>
+            {buscandoAtivo
+              ? (buscando ? 'Buscando…' : <>{ordenados.length} resultado(s) para "<b className="text-foreground">{q.trim()}</b>"</>)
+              : ordenados.length > 0 ? <>Exibindo <b className="tabular-nums text-foreground">{primeiroIdx}–{ultimoIdx}</b> de <b className="tabular-nums text-foreground">{ordenados.length}</b></> : 'Nenhum estudante'}
+          </span>
+          {carregando && !buscandoAtivo && (
             <span className="inline-flex items-center gap-1.5 text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando estudantes… <b className="tabular-nums text-foreground">{rows.length}</b>/<b className="tabular-nums">{total}</b>
             </span>
@@ -185,7 +202,7 @@ export function EstudantesLista({ inicial, agregados, total, kpis }: {
             </thead>
             <tbody>
               {visiveis.length === 0 ? (
-                <tr><td colSpan={7} className="py-12 text-center text-muted-foreground">{carregando ? 'Carregando…' : 'Nenhum estudante encontrado.'}</td></tr>
+                <tr><td colSpan={7} className="py-12 text-center text-muted-foreground">{buscando ? 'Buscando…' : (carregando && !buscandoAtivo) ? 'Carregando…' : 'Nenhum estudante encontrado.'}</td></tr>
               ) : visiveis.map((e) => (
                 <tr key={e.id} className="group border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40">
                   <td className="px-4 py-2.5">

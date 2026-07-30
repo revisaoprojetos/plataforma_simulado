@@ -43,6 +43,30 @@ export async function carregarLoteEstudantes(offset: number, limit: number): Pro
   return { rows, total: count ?? rows.length }
 }
 
+/**
+ * Busca estudantes no SERVIDOR (nome/e-mail/CPF/telefone) — para achar qualquer aluno na hora,
+ * mesmo que a lista ainda esteja carregando os demais em segundo plano. Limitada a 200 resultados.
+ */
+export async function buscarEstudantes(termo: string): Promise<EstudanteBase[]> {
+  const t = (termo ?? '').trim()
+  if (!t) return []
+  const svc = await createServiceClient()
+  const tenantId = (await getCurrentTenantId()) ?? TENANT_VAZIO
+  const like = t.replace(/[%,()*]/g, ' ')
+  const { data } = await svc
+    .from('simulado_estudantes')
+    .select('id, nome, email, cpf, telefone, classificacao, created_at')
+    .eq('deletado', false)
+    .eq('tenant_id', tenantId)
+    .or(`nome.ilike.%${like}%,email.ilike.%${like}%,cpf.ilike.%${like}%,telefone.ilike.%${like}%`)
+    .order('nome', { ascending: true })
+    .limit(200)
+  return (data ?? []).map((e: any) => ({
+    id: e.id, nome: e.nome, email: e.email ?? null, cpf: e.cpf ?? null, telefone: e.telefone ?? null,
+    classificacao: e.classificacao ?? null, created_at: e.created_at ?? null,
+  }))
+}
+
 interface NovoEstudanteData {
   nome: string
   email: string
