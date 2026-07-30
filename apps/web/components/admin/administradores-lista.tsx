@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Search, X, Mail, Loader2, KeyRound, ShieldCheck, ShieldOff, Copy, Check, Dices, Settings2, Trash2, Save } from 'lucide-react'
+import { Search, X, Mail, Loader2, ShieldCheck, ShieldOff, Copy, Check, Dices, Settings2, Trash2, Save } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { rotuloCargo, CARGOS_ACESSO_TOTAL } from '@/lib/rbac-cargos'
@@ -55,11 +55,25 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
 
   function abrirConfig(m: AdminMembro) { setConfigId(m.userId); setNovaSenha(''); setNomeEdit(m.nome ?? ''); setEmailEdit(m.email ?? '') }
 
+  // Salvar UNIFICADO: nome + e-mail + (se preenchida) a nova SENHA. Campo de senha vazio mantém a atual.
   function salvarDados(m: AdminMembro) {
-    const n = nomeEdit.trim(); const e = emailEdit.trim()
+    const n = nomeEdit.trim(); const e = emailEdit.trim(); const s = novaSenha.trim()
     if (!n) { toast.error('Informe o nome.'); return }
     if (!e) { toast.error('Informe o e-mail.'); return }
-    agir(m.userId, () => atualizarDadosAdminAction(m.userId, { nome: n, email: e }, tenantId), 'Dados atualizados.')
+    if (s && s.length < 6) { toast.error('A senha deve ter ao menos 6 caracteres.'); return }
+    const mudouDados = n !== (m.nome ?? '') || e.toLowerCase() !== (m.email ?? '').toLowerCase()
+    if (!mudouDados && !s) { toast.info('Nada para salvar.'); return }
+    setAlvo(m.userId)
+    start(async () => {
+      let erro: string | null = null
+      if (mudouDados) { const r = await atualizarDadosAdminAction(m.userId, { nome: n, email: e }, tenantId); if (!r.ok) erro = r.error ?? 'Falha ao salvar dados.' }
+      if (!erro && s) { const r = await resetarSenhaAdminAction(m.userId, s, tenantId); if (!r.ok) erro = r.error ?? 'Falha ao definir a senha.' }
+      setAlvo(null)
+      if (erro) { toast.error(erro); return }
+      if (s) setCred({ email: e || m.email, senha: s }) // mostra a nova senha para copiar
+      setNovaSenha('')
+      toast.success('Salvo.'); router.refresh()
+    })
   }
 
   function trocarCargo(m: AdminMembro, cargo: string) {
@@ -88,20 +102,6 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
       setAlvo(null)
       if (!r.ok) { toast.error(r.error ?? 'Falha.'); return }
       toast.success('Acesso removido.'); setConfigId(null); router.refresh()
-    })
-  }
-
-  function redefinirSenha(m: AdminMembro) {
-    const digitada = novaSenha.trim()
-    if (digitada && digitada.length < 6) { toast.error('A senha deve ter ao menos 6 caracteres.'); return }
-    setAlvo(m.userId)
-    start(async () => {
-      const r = await resetarSenhaAdminAction(m.userId, digitada || undefined, tenantId)
-      setAlvo(null)
-      if (!r.ok || !r.senha) { toast.error(r.error ?? 'Falha ao redefinir.'); return }
-      setNovaSenha('')
-      if (r.gerada) setCred({ email: m.email, senha: r.senha })
-      toast.success('Senha redefinida.')
     })
   }
 
@@ -199,20 +199,17 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
               </select>
             </div>
 
-            {/* Redefinir senha */}
+            {/* Senha — vazio mantém a atual; preenchida é aplicada ao Salvar */}
             <div className="mt-4 space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Redefinir senha</label>
+              <label className="text-xs font-medium text-muted-foreground">Senha</label>
               <div className="flex gap-2">
-                <input value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} autoComplete="new-password"
-                  placeholder="Deixe em branco para gerar" className="h-9 flex-1 rounded-lg border bg-transparent px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+                <input value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} autoComplete="off"
+                  placeholder="Deixe em branco para manter a senha atual"
+                  className="h-9 flex-1 rounded-lg border bg-transparent px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
                 <button type="button" onClick={() => setNovaSenha(gerarSenhaCliente())} title="Sugerir senha forte"
-                  className="inline-flex h-9 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium transition hover:bg-muted"><Dices className="h-3.5 w-3.5" /></button>
-                <button type="button" onClick={() => redefinirSenha(config)} disabled={pending || (!!novaSenha.trim() && novaSenha.trim().length < 6)}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition hover:bg-muted disabled:opacity-50">
-                  {pending && alvo === config.userId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />} Redefinir
-                </button>
+                  className="inline-flex h-9 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium transition hover:bg-muted"><Dices className="h-3.5 w-3.5" /> Gerar</button>
               </div>
-              <p className="text-[11px] text-muted-foreground">O login é global (vale em todas as plataformas do usuário).</p>
+              <p className="text-[11px] text-muted-foreground">Preencha para <b>definir uma nova senha</b> (aplicada ao clicar em Salvar). Vazio = mantém a atual. O login é global.</p>
             </div>
 
             {/* Rodapé: Desativar (esq) · Remover + Salvar (dir) — todos na mesma linha */}
@@ -230,7 +227,7 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
                   title={config.ehVoce ? 'Você não pode remover o seu acesso' : undefined}>
                   {pending && alvo === config.userId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Remover acesso
                 </button>
-                <button type="button" onClick={() => salvarDados(config)} disabled={pending || (nomeEdit.trim() === (config.nome ?? '') && emailEdit.trim().toLowerCase() === (config.email ?? '').toLowerCase())}
+                <button type="button" onClick={() => salvarDados(config)} disabled={pending || (nomeEdit.trim() === (config.nome ?? '') && emailEdit.trim().toLowerCase() === (config.email ?? '').toLowerCase() && !novaSenha.trim())}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
                   {pending && alvo === config.userId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar dados
                 </button>
