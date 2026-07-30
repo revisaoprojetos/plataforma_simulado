@@ -17,11 +17,19 @@ export async function responderFeedback(
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
+
+  // Quem enviou (para notificar) — antes do update.
+  const { data: fb } = await svc
+    .from('simulado_feedbacks_questao')
+    .select('estudante_id')
+    .eq('id', id).eq('tenant_id', tenantId).maybeSingle()
+
+  const msg = resposta.trim()
   const { error } = await svc
     .from('simulado_feedbacks_questao')
     .update({
       status,
-      resposta_admin: resposta.trim() || null,
+      resposta_admin: msg || null,
       resolvido: status === 'resolvido',
       atualizado_em: new Date().toISOString(),
     })
@@ -29,6 +37,20 @@ export async function responderFeedback(
     .eq('tenant_id', tenantId)
 
   if (error) return { ok: false, error: error.message }
+
+  // Retorna o feedback ao ESTUDANTE (notificação in-app) quando há resposta. Best-effort.
+  if (msg && fb?.estudante_id) {
+    try {
+      await svc.from('simulado_notificacoes').insert({
+        tenant_id: tenantId,
+        estudante_id: fb.estudante_id,
+        tipo: 'info',
+        titulo: 'Resposta ao seu report de questão',
+        mensagem: msg,
+        link: '/aluno',
+      })
+    } catch { /* tabela ausente / coluna divergente — não bloqueia a moderação */ }
+  }
 
   await registrarAudit({
     operacao: 'UPDATE',

@@ -37,11 +37,11 @@ export default async function FeedbacksPage() {
       ? svc.from('simulado_questoes').select('id, enunciado').in('id', questaoIds)
       : Promise.resolve({ data: [] as { id: string; enunciado: string }[] }),
     estudanteIds.length
-      ? svc.from('simulado_estudantes').select('id, nome').in('id', estudanteIds)
-      : Promise.resolve({ data: [] as { id: string; nome: string }[] }),
+      ? svc.from('simulado_estudantes').select('id, nome, email').in('id', estudanteIds)
+      : Promise.resolve({ data: [] as { id: string; nome: string; email: string | null }[] }),
   ])
   const qMap = new Map((questoes ?? []).map((q: any) => [q.id, q.enunciado]))
-  const eMap = new Map((estudantes ?? []).map((e: any) => [e.id, e.nome]))
+  const eMap = new Map((estudantes ?? []).map((e: any) => [e.id, { nome: e.nome, email: e.email ?? null }]))
 
   const feedbacks = rows.map((f: any) => ({
     id: f.id,
@@ -51,7 +51,8 @@ export default async function FeedbacksPage() {
     resposta_admin: f.resposta_admin,
     criado_em: f.criado_em,
     enunciado: qMap.get(f.questao_id) ?? '—',
-    estudante: eMap.get(f.estudante_id) ?? 'Aluno',
+    estudante: eMap.get(f.estudante_id)?.nome ?? 'Aluno',
+    email: eMap.get(f.estudante_id)?.email ?? null,
   }))
 
   const pendentes = feedbacks.filter((f) => f.status === 'pendente').length
