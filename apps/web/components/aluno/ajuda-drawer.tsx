@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { HelpCircle, X, ChevronDown, ImageIcon, Lightbulb, ArrowUpRight } from 'lucide-react'
+import { HelpCircle, X, ChevronDown, Lightbulb, ArrowUpRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GUIAS_ALUNO } from '@/lib/ajuda/guias-aluno'
 
@@ -102,14 +102,8 @@ export function AjudaDrawer() {
 function Captura({ guia, passo }: { guia: string; passo: number }) {
   const arquivo = `ajuda/aluno-${guia}-${passo}.png`
   const [erro, setErro] = useState(false)
-  if (erro) {
-    return (
-      <div className="mt-2 flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-center">
-        <ImageIcon className="h-6 w-6 text-muted-foreground/60" />
-        <p className="text-[11px] text-muted-foreground">Captura em breve</p>
-      </div>
-    )
-  }
+  // Sem captura ainda → não mostra placeholder (fica limpo). Basta soltar o PNG que ele aparece.
+  if (erro) return null
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={`/${arquivo}`} alt={`Passo ${passo}`} onError={() => setErro(true)} className="mt-2 w-full rounded-lg border shadow-sm" />
 }
