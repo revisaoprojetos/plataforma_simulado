@@ -61,8 +61,15 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  // Já autenticado em /login: NÃO pular direto pro /admin — /login é o SELETOR de plataforma
+  // (pós-login). Só encaminha se veio de uma página protegida (redirectTo); senão mostra o seletor,
+  // para que "Trocar de plataforma" / "Seletor de plataforma" (console) voltem para a escolha.
   if (pathname === '/login' && user) {
-    return NextResponse.redirect(new URL('/admin', request.url))
+    const destino = request.nextUrl.searchParams.get('redirectTo')
+    if (destino && destino.startsWith('/') && !destino.startsWith('/login')) {
+      return NextResponse.redirect(new URL(destino, request.url))
+    }
+    return supabaseResponse
   }
 
   return supabaseResponse
