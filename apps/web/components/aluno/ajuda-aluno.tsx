@@ -2,162 +2,146 @@
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
 import {
-  PlayCircle, ListChecks, Download, BarChart3, BookOpen, Flag, LifeBuoy,
-  ChevronDown, Sparkles, MousePointerClick, Scissors, BookmarkCheck, Send, ImageIcon,
+  PlayCircle, ListChecks, Download, BarChart3, BookOpen, Flag,
+  ChevronRight, ImageIcon, Lightbulb, ArrowUpRight,
 } from 'lucide-react'
 
-type Passo = { t: string; d: string; icon?: React.ComponentType<{ className?: string }> }
-type Guia = { id: string; titulo: string; resumo: string; icon: React.ComponentType<{ className?: string }>; tom: string; passos: Passo[] }
+type Passo = { t: string; d: string; dica?: string }
+type Guia = { id: string; titulo: string; resumo: string; icon: React.ComponentType<{ className?: string }>; link?: { href: string; label: string }; passos: Passo[] }
 
 const GUIAS: Guia[] = [
   {
-    id: 'iniciar', titulo: 'Como iniciar um simulado', resumo: 'Do menu até o cronômetro começar.',
-    icon: PlayCircle, tom: 'text-emerald-500',
+    id: 'iniciar', titulo: 'Como iniciar um simulado', resumo: 'Do menu até o cronômetro começar.', icon: PlayCircle, link: { href: '/aluno/simulado', label: 'Ir para Simulados' },
     passos: [
-      { t: 'Abra "Simulados"', d: 'No menu à esquerda, toque em Simulados para ver o que está disponível para você.', icon: MousePointerClick },
-      { t: 'Escolha o simulado', d: 'Clique no card do simulado. Você verá as regras: tempo, número de tentativas e questões.', icon: ClipboardIcon },
-      { t: 'Toque em "Iniciar"', d: 'Ao iniciar, o cronômetro começa. Você pode responder na ordem que quiser.', icon: PlayCircle },
+      { t: 'Abra "Simulados"', d: 'No menu à esquerda, toque em Simulados para ver o que está disponível para você.' },
+      { t: 'Escolha o simulado', d: 'Clique no card do simulado. Você verá as regras: tempo, número de tentativas e questões.' },
+      { t: 'Toque em "Iniciar"', d: 'Ao iniciar, o cronômetro começa. Você pode responder na ordem que quiser.', dica: 'Prefere ver antes? Alguns simulados deixam você baixar o caderno pelos 3 pontinhos do card.' },
     ],
   },
   {
-    id: 'responder', titulo: 'Respondendo as questões', resumo: 'Marcar, cortar alternativas, revisar e enviar.',
-    icon: ListChecks, tom: 'text-sky-500',
+    id: 'responder', titulo: 'Respondendo as questões', resumo: 'Marcar, cortar alternativas, revisar e enviar.', icon: ListChecks,
     passos: [
-      { t: 'Marque a alternativa', d: 'Clique na letra (A–E) que você acha correta. Sua resposta é salva na hora — pode trocar quantas vezes quiser.', icon: MousePointerClick },
-      { t: 'Use a tesoura', d: 'Corte as alternativas que você já descartou para focar nas que sobraram.', icon: Scissors },
-      { t: 'Marque para revisar', d: 'Ficou em dúvida? Marque a questão para revisar e volte nela antes de enviar.', icon: BookmarkCheck },
-      { t: 'Revise e envie', d: 'Na tela de revisão você vê o que respondeu, o que ficou em branco e o que marcou. Aí é só enviar.', icon: Send },
+      { t: 'Marque a alternativa', d: 'Clique na letra (A–E) que você acha correta. Sua resposta é salva na hora — pode trocar quantas vezes quiser.' },
+      { t: 'Use a tesoura', d: 'Corte as alternativas que já descartou para focar nas que sobraram.' },
+      { t: 'Marque para revisar', d: 'Ficou em dúvida? Marque a questão e volte nela antes de enviar.' },
+      { t: 'Revise e envie', d: 'Na tela de revisão você vê o que respondeu, o que ficou em branco e o que marcou. Aí é só enviar.', dica: 'Depois de enviar não dá para voltar — confira a revisão com calma.' },
     ],
   },
   {
-    id: 'baixar', titulo: 'Baixar o caderno e materiais', resumo: 'Onde clicar para baixar em PDF.',
-    icon: Download, tom: 'text-violet-500',
+    id: 'baixar', titulo: 'Baixar o caderno e materiais', resumo: 'Onde clicar para baixar em PDF.', icon: Download,
     passos: [
-      { t: 'Abra o simulado ou resultado', d: 'Entre no simulado (ou no seu resultado, se já finalizou).', icon: ClipboardIcon },
-      { t: 'Toque nos 3 pontos do card', d: 'No canto do card há um menu (⋮) com as opções de download: caderno de questões, gabarito e material.', icon: Download },
-      { t: 'Escolha o que baixar', d: 'O PDF é gerado e baixado. O caderno vem na sua ordem de questões.', icon: Download },
+      { t: 'Abra o simulado ou o resultado', d: 'Entre no simulado (ou no seu resultado, se já finalizou).' },
+      { t: 'Toque nos 3 pontos do card', d: 'No canto do card há um menu (⋮) com as opções: caderno de questões, gabarito e material.' },
+      { t: 'Escolha o que baixar', d: 'O PDF é gerado e baixado. O caderno vem na sua ordem de questões.' },
     ],
   },
   {
-    id: 'resultado', titulo: 'Ver resultado e desempenho', resumo: 'Sua nota, acertos por matéria e evolução.',
-    icon: BarChart3, tom: 'text-amber-500',
+    id: 'resultado', titulo: 'Ver resultado e desempenho', resumo: 'Sua nota, acertos por matéria e evolução.', icon: BarChart3, link: { href: '/aluno/desempenho', label: 'Abrir Meu Desempenho' },
     passos: [
-      { t: 'Abra "Meu Desempenho"', d: 'Veja sua evolução, acertos por disciplina e comparação com a turma.', icon: BarChart3 },
-      { t: 'Abra "Meus Simulados"', d: 'Cada simulado finalizado mostra sua nota e o gabarito (quando liberado).', icon: ClipboardIcon },
+      { t: 'Abra "Meu Desempenho"', d: 'Veja sua evolução, acertos por disciplina e a comparação com a turma.' },
+      { t: 'Abra "Meus Simulados"', d: 'Cada simulado finalizado mostra sua nota e o gabarito (quando liberado).' },
     ],
   },
   {
-    id: 'banco', titulo: 'Banco de questões, favoritos e cadernos', resumo: 'Treine questões avulsas e organize seu estudo.',
-    icon: BookOpen, tom: 'text-rose-500',
+    id: 'banco', titulo: 'Banco de questões e favoritos', resumo: 'Treine questões avulsas e organize seu estudo.', icon: BookOpen, link: { href: '/aluno/questoes', label: 'Abrir Banco de Questões' },
     passos: [
-      { t: 'Banco de Questões', d: 'Resolva questões avulsas com filtros por matéria e assunto — quantas vezes quiser.', icon: BookOpen },
-      { t: 'Favoritos', d: 'Salve questões importantes tocando na estrela para revê-las depois.', icon: BookmarkCheck },
-      { t: 'Cadernos', d: 'Monte cadernos de estudo com as questões que você quer revisar.', icon: BookOpen },
+      { t: 'Banco de Questões', d: 'Resolva questões avulsas com filtros por matéria, banca, dificuldade e ano — quantas vezes quiser.' },
+      { t: 'Favoritos', d: 'Salve questões importantes tocando na estrela para revê-las depois.' },
+      { t: 'Cadernos', d: 'Monte cadernos de estudo com as questões que quer revisar.' },
     ],
   },
   {
-    id: 'reportar', titulo: 'Reportar um erro numa questão', resumo: 'Achou um problema? Avise a equipe.',
-    icon: Flag, tom: 'text-orange-500',
+    id: 'reportar', titulo: 'Reportar um erro numa questão', resumo: 'Achou um problema? Avise a equipe.', icon: Flag,
     passos: [
-      { t: 'Abra a questão', d: 'Na questão, procure a opção "Reportar erro".', icon: Flag },
-      { t: 'Descreva o problema', d: 'Escolha o motivo (gabarito, enunciado, desatualizada) e explique. A equipe recebe e te responde.', icon: Send },
+      { t: 'Abra a questão', d: 'Na questão, procure a opção "Reportar erro".' },
+      { t: 'Descreva o problema', d: 'Escolha o motivo (gabarito, enunciado, desatualizada) e explique. A equipe recebe e te responde.' },
     ],
   },
 ]
 
-const KEYFRAMES = `
-@keyframes ajudaUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
-@keyframes ajudaFloat { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
-@keyframes ajudaGrow { from { opacity: 0; transform: translateY(6px) scale(.98) } to { opacity: 1; transform: none } }
-@media (prefers-reduced-motion: reduce) { .aj-anim { animation: none !important } }
-`
-
-function ClipboardIcon(props: { className?: string }) { return <ListChecks {...props} /> }
-
 export function AjudaAluno() {
-  const [aberto, setAberto] = useState<string | null>('iniciar')
+  const [selId, setSelId] = useState<string>(GUIAS[0].id)
+  const sel = GUIAS.find((g) => g.id === selId) ?? GUIAS[0]
 
   return (
-    <div className="space-y-6">
-      <style>{KEYFRAMES}</style>
-
-      {/* Hero animado (lugar do futuro mascote) */}
-      <div className="aj-anim overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-card to-card p-5 shadow-sm" style={{ animation: 'ajudaUp .5s ease' }}>
-        <div className="flex items-center gap-4">
-          <span className="aj-anim flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-inner" style={{ animation: 'ajudaFloat 4s ease-in-out infinite' }}>
-            <LifeBuoy className="h-7 w-7" />
-          </span>
-          <div className="min-w-0">
-            <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">Bem-vindo(a)! <Sparkles className="h-4 w-4 text-primary" /></h2>
-            <p className="text-sm text-muted-foreground">Aqui você aprende, passo a passo, como usar a plataforma: iniciar simulados, responder, baixar materiais e acompanhar seu desempenho.</p>
-          </div>
+    <div className="flex flex-col gap-6 lg:h-full lg:min-h-0 lg:flex-row">
+      {/* Índice (barra lateral) — igual ao admin */}
+      <nav className="lg:h-full lg:max-h-[calc(100vh-12rem)] lg:min-h-0 lg:w-[260px] lg:shrink-0 lg:overflow-y-auto lg:pr-1">
+        <div className="space-y-1 rounded-2xl border bg-card p-3">
+          <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Guias</p>
+          {GUIAS.map((g) => (
+            <button key={g.id} type="button" onClick={() => setSelId(g.id)}
+              className={cn('flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm transition',
+                g.id === selId ? 'bg-primary/10 font-medium text-primary' : 'hover:bg-muted')}>
+              <g.icon className="h-4 w-4 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">{g.titulo}</span>
+              {g.id === selId && <ChevronRight className="h-4 w-4 shrink-0" />}
+            </button>
+          ))}
         </div>
-      </div>
+      </nav>
 
-      {/* Trilha rápida (3 passos p/ começar) */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        {[
-          { n: 1, t: 'Abra Simulados', d: 'no menu à esquerda' },
-          { n: 2, t: 'Escolha um', d: 'e veja as regras' },
-          { n: 3, t: 'Toque em Iniciar', d: 'e boa prova!' },
-        ].map((p, i) => (
-          <div key={p.n} className="aj-anim flex items-center gap-3 rounded-2xl border bg-card p-4 shadow-sm" style={{ animation: `ajudaGrow .45s ease both`, animationDelay: `${i * 90}ms` }}>
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">{p.n}</span>
-            <div className="min-w-0"><p className="text-sm font-semibold leading-tight">{p.t}</p><p className="text-xs text-muted-foreground">{p.d}</p></div>
-          </div>
-        ))}
-      </div>
+      {/* Conteúdo do guia — painel com rolagem própria */}
+      <div key={sel.id} className="min-w-0 rounded-2xl border bg-muted/20 lg:h-full lg:max-h-[calc(100vh-12rem)] lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+        <div className="p-3 sm:p-4">
+          <article className="min-w-0 space-y-6">
+            <header className="flex items-start gap-3 rounded-2xl border bg-gradient-to-br from-primary/10 via-card to-card p-5">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-sm"><sel.icon className="h-6 w-6" /></span>
+              <div>
+                <h2 className="text-xl font-bold tracking-tight">{sel.titulo}</h2>
+                <p className="mt-0.5 text-sm text-muted-foreground">{sel.resumo}</p>
+                {sel.link && (
+                  <Link href={sel.link.href} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:opacity-90">
+                    {sel.link.label} <ArrowUpRight className="h-4 w-4" />
+                  </Link>
+                )}
+              </div>
+            </header>
 
-      {/* Guias (accordion animado) */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold">Guias completos</h3>
-        {GUIAS.map((g, gi) => {
-          const on = aberto === g.id
-          return (
-            <div key={g.id} className="aj-anim overflow-hidden rounded-2xl border bg-card shadow-sm" style={{ animation: 'ajudaGrow .45s ease both', animationDelay: `${gi * 60}ms` }}>
-              <button type="button" onClick={() => setAberto(on ? null : g.id)}
-                className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-muted/40">
-                <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted', g.tom)}><g.icon className="h-5 w-5" /></span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">{g.titulo}</p>
-                  <p className="truncate text-xs text-muted-foreground">{g.resumo}</p>
-                </div>
-                <ChevronDown className={cn('h-5 w-5 shrink-0 text-muted-foreground transition-transform', on && 'rotate-180')} />
-              </button>
-
-              {on && (
-                <div className="border-t p-4">
-                  <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
-                    {/* Passos numerados (staggered) */}
-                    <ol className="space-y-3">
-                      {g.passos.map((p, i) => {
-                        const Icon = p.icon ?? g.icon
-                        return (
-                          <li key={i} className="aj-anim flex gap-3" style={{ animation: 'ajudaUp .4s ease both', animationDelay: `${i * 80}ms` }}>
-                            <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{i + 1}</span>
-                            <div className="min-w-0">
-                              <p className="flex items-center gap-1.5 text-sm font-medium"><Icon className="h-3.5 w-3.5 text-muted-foreground" /> {p.t}</p>
-                              <p className="text-sm text-muted-foreground">{p.d}</p>
-                            </div>
-                          </li>
-                        )
-                      })}
-                    </ol>
-                    {/* Captura ilustrativa (placeholder — trocaremos por prints reais) */}
-                    <div className="aj-anim flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-muted/30 p-4 text-center" style={{ animation: 'ajudaGrow .5s ease both', animationDelay: '120ms' }}>
-                      <ImageIcon className="h-8 w-8 text-muted-foreground/60" />
-                      <p className="text-xs text-muted-foreground">Captura de tela em breve</p>
+            <ol className="space-y-5">
+              {sel.passos.map((p, i) => (
+                <li key={i} className="relative rounded-2xl border bg-card p-4 sm:p-5">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground tabular-nums">{i + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold leading-snug">{p.t}</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">{p.d}</p>
+                      {p.dica && (
+                        <div className="mt-2.5 flex items-start gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                          <Lightbulb className="mt-0.5 h-4 w-4 shrink-0" /> <span>{p.dica}</span>
+                        </div>
+                      )}
+                      <Captura guia={sel.id} passo={i + 1} />
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )
-        })}
+                </li>
+              ))}
+            </ol>
+          </article>
+        </div>
       </div>
-
-      <p className="text-center text-xs text-muted-foreground">Ainda com dúvida? Fale com o suporte da sua plataforma. 💬</p>
     </div>
   )
+}
+
+/**
+ * Captura de tela do passo, por convenção de nome: `public/ajuda/aluno-<guia>-<n>.png`.
+ * Enquanto o arquivo não existe, mostra um placeholder com o nome exato a adicionar.
+ */
+function Captura({ guia, passo }: { guia: string; passo: number }) {
+  const arquivo = `ajuda/aluno-${guia}-${passo}.png`
+  const [erro, setErro] = useState(false)
+  if (erro) {
+    return (
+      <div className="mt-3 flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed py-8 text-center">
+        <ImageIcon className="h-7 w-7 text-muted-foreground/60" />
+        <p className="text-xs font-medium text-muted-foreground">Captura de tela deste passo</p>
+        <p className="text-[11px] text-muted-foreground/70">Adicione o arquivo <code className="rounded bg-muted px-1 py-0.5">public/{arquivo}</code></p>
+      </div>
+    )
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={`/${arquivo}`} alt={`Passo ${passo}`} onError={() => setErro(true)} className="mt-3 w-full rounded-xl border shadow-sm" />
 }
