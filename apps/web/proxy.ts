@@ -3,7 +3,14 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 // Next 16: convenção `proxy` (substitui o antigo `middleware`). Mesma lógica.
 export async function proxy(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+  // Expõe o caminho atual aos Server Components (headers().get('x-pathname')) para o gate de rota
+  // por permissão no layout do /admin. Reconstruído junto com os cookies do Supabase (sem alterar auth).
+  const comPath = () => {
+    const h = new Headers(request.headers)
+    h.set('x-pathname', request.nextUrl.pathname)
+    return NextResponse.next({ request: { headers: h } })
+  }
+  let supabaseResponse = comPath()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,7 +22,7 @@ export async function proxy(request: NextRequest) {
         },
         setAll(cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
+          supabaseResponse = comPath()
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options as Parameters<typeof supabaseResponse.cookies.set>[2])
           )

@@ -108,8 +108,8 @@ const navGroups: NavGroup[] = [
     label: 'Conexões',
     icon: Share2,
     items: [
-      { label: 'Integrações', href: '/admin/integracoes', icon: Plug, perm: 'estudantes:create' },
-      { label: 'Webhooks & n8n', href: '/admin/conexoes/webhooks', icon: Webhook, perm: 'estudantes:create' },
+      { label: 'Integrações', href: '/admin/integracoes', icon: Plug, perm: 'integracoes:view' },
+      { label: 'Webhooks & n8n', href: '/admin/conexoes/webhooks', icon: Webhook, perm: 'integracoes:view' },
     ],
   },
   {

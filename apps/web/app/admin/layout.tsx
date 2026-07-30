@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { AdminSidebar } from '@/components/admin/sidebar'
 import { AdminHeader } from '@/components/admin/header'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { CanProvider } from '@/components/auth/can-provider'
-import { getCurrentAccess, isSuperAdmin } from '@/lib/auth/permissions'
+import { getCurrentAccess, isSuperAdmin, accessCan } from '@/lib/auth/permissions'
 import { getTenantTheme } from '@/lib/tenant-theme'
 import { SplashSistema } from '@/components/admin/splash-sistema'
 import { TourProvider } from '@/components/admin/tour-guiado'
@@ -12,6 +13,32 @@ import { NavProgress } from '@/components/admin/nav-progress'
 import { Suspense } from 'react'
 
 const CURRENT_POLICY_VERSION = '1.0'
+
+// Gate de ROTA por permissão (defesa em profundidade, além de esconder do menu): cada área do
+// /admin exige a permissão de "ver". Cargos de acesso total (isAdmin) ignoram. O prefixo mais
+// específico primeiro. Áreas sem entrada (ex.: /admin dashboard, /admin/ajuda) são livres.
+const AREA_PERM: { prefix: string; perm: string }[] = [
+  { prefix: '/admin/simulados', perm: 'simulados:view' },
+  { prefix: '/admin/questoes', perm: 'questoes:view' },
+  { prefix: '/admin/banco-questoes', perm: 'questoes:view' },
+  { prefix: '/admin/cadernos', perm: 'questoes:view' },
+  { prefix: '/admin/correcao', perm: 'questoes:view' },
+  { prefix: '/admin/comentarios', perm: 'questoes:view' },
+  { prefix: '/admin/feedbacks', perm: 'questoes:view' },
+  { prefix: '/admin/lixeira', perm: 'questoes:view' },
+  { prefix: '/admin/estudantes', perm: 'estudantes:view' },
+  { prefix: '/admin/lgpd', perm: 'estudantes:view' },
+  { prefix: '/admin/grupos', perm: 'grupos:view' },
+  { prefix: '/admin/matriculas', perm: 'matriculas:view' },
+  { prefix: '/admin/integracoes', perm: 'integracoes:view' },
+  { prefix: '/admin/conexoes', perm: 'integracoes:view' },
+  { prefix: '/admin/relatorios', perm: 'relatorios:view' },
+  { prefix: '/admin/auditoria', perm: 'auditoria:view' },
+  { prefix: '/admin/administradores', perm: 'rbac:view' },
+  { prefix: '/admin/api-keys', perm: 'api_keys:manage' },
+  { prefix: '/admin/configuracoes', perm: 'configuracoes:view' },
+  { prefix: '/admin/sistema', perm: 'configuracoes:view' },
+]
 
 export default async function AdminLayout({
   children,
@@ -69,6 +96,16 @@ export default async function AdminLayout({
   // (defesa em profundidade), além de a plataforma não aparecer no seletor para não-super.
   if (ti.somente_super === true && !superAdmin) {
     redirect('/login')
+  }
+
+  // Gate de ROTA por permissão: cargos SEM acesso total que abrem (ou digitam a URL de) uma área
+  // bloqueada na matriz são mandados de volta ao painel. Casa com o menu, que já esconde a área.
+  if (!access.isAdmin) {
+    const pathname = (await headers()).get('x-pathname') ?? ''
+    const area = AREA_PERM.find((a) => pathname === a.prefix || pathname.startsWith(a.prefix + '/'))
+    if (area && !accessCan(access, area.perm)) {
+      redirect('/admin?erro=sem-acesso')
+    }
   }
 
   return (

@@ -18,8 +18,13 @@ const CATALOGO = [
   ['questoes', 'view'], ['questoes', 'create'], ['questoes', 'update'],
   ['simulados', 'view'], ['simulados', 'create'], ['simulados', 'update'], ['simulados', 'delete'],
   ['estudantes', 'view'], ['estudantes', 'create'], ['estudantes', 'update'], ['estudantes', 'delete'],
-  ['matriculas', 'create'], ['matriculas', 'update'], ['matriculas', 'delete'],
-  ['configuracoes', 'manage'], ['api_keys', 'manage'],
+  ['grupos', 'view'],
+  ['matriculas', 'view'], ['matriculas', 'create'], ['matriculas', 'update'], ['matriculas', 'delete'],
+  ['integracoes', 'view'], ['integracoes', 'manage'],
+  ['relatorios', 'view'], ['relatorios', 'export'],
+  ['auditoria', 'view'], ['auditoria', 'export'],
+  ['configuracoes', 'view'], ['configuracoes', 'manage'],
+  ['api_keys', 'manage'],
   ['rbac', 'view'], ['rbac', 'manage'], ['console', 'view'],
 ].map(([resource, action]) => ({ resource, action }))
 
