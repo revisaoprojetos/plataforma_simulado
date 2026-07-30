@@ -9,7 +9,21 @@ import { cn } from '@/lib/utils'
 
 const ACOES = ['INSERT', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'ANULAR', 'RECORRIGIR', 'LIBERAR']
 
-export function AuditoriaFilters({ mostrarAcao = true, buscaPlaceholder = 'Buscar…' }: { mostrarAcao?: boolean; buscaPlaceholder?: string }) {
+// Temas (área do sistema) → trecho casado por ilike na coluna `entidade` (nomes de tabela).
+const TEMAS: { valor: string; rotulo: string }[] = [
+  { valor: 'simulado_simulados', rotulo: 'Simulados' },
+  { valor: 'questoes', rotulo: 'Questões' },
+  { valor: 'estudantes', rotulo: 'Estudantes' },
+  { valor: 'grupos', rotulo: 'Grupos' },
+  { valor: 'matriculas', rotulo: 'Matrículas' },
+  { valor: 'caderno', rotulo: 'Cadernos' },
+  { valor: 'pastas', rotulo: 'Bancos / Pastas' },
+  { valor: 'tenants', rotulo: 'Plataformas' },
+  { valor: 'roles', rotulo: 'Perfis / RBAC' },
+  { valor: 'assinaturas', rotulo: 'Integrações' },
+]
+
+export function AuditoriaFilters({ mostrarAcao = true, mostrarTema = false, buscaPlaceholder = 'Buscar…' }: { mostrarAcao?: boolean; mostrarTema?: boolean; buscaPlaceholder?: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -46,6 +60,16 @@ export function AuditoriaFilters({ mostrarAcao = true, buscaPlaceholder = 'Busca
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={buscaPlaceholder}
           className="h-9 border-0 bg-transparent pl-8 shadow-none focus-visible:ring-0" />
       </div>
+
+      {mostrarTema && (
+        <Select defaultValue={searchParams.get('entidade') ?? 'all'} onValueChange={(v) => update('entidade', v === 'all' ? '' : (v ?? ''))}>
+          <SelectTrigger className="h-9 w-[150px]"><SelectValue placeholder="Tema" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os temas</SelectItem>
+            {TEMAS.map((t) => <SelectItem key={t.valor} value={t.valor}>{t.rotulo}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      )}
 
       {mostrarAcao && (
         <Select defaultValue={searchParams.get('acao') ?? 'all'} onValueChange={(v) => update('acao', v === 'all' ? '' : (v ?? ''))}>

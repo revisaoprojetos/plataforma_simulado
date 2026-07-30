@@ -39,6 +39,19 @@ function fmtBR(iso?: string | null): string {
   return `${da}/${mo}/${y} ${t}`
 }
 
+/** Data em cima, HORA embaixo — garante que o horário SEMPRE apareça (não é cortado por truncate). */
+function DataHora({ iso }: { iso?: string | null }) {
+  const s = fmtBR(iso)
+  if (s === '—') return <span className="text-muted-foreground">—</span>
+  const [d, h] = s.split(' ')
+  return (
+    <div className="leading-tight">
+      <div className="text-foreground">{d}</div>
+      <div className="text-xs tabular-nums text-muted-foreground">{h}</div>
+    </div>
+  )
+}
+
 function resumoAutomacao(log: any, nomes: Map<string, string>): { origem: string; texto: string } {
   const d = (log.dados_novos ?? (log.detalhes as any)?.depois ?? {}) as any
   const alvo = isUuid(log.entidade_id) ? (nomes.get(log.entidade_id) ?? `${String(log.entidade_id).slice(0, 8)}…`) : null
@@ -127,7 +140,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
     let query = supabase
       .from('simulado_audit_logs')
       .select('id, ator_tipo, ator_id, operacao, entidade, entidade_id, dados_anteriores, dados_novos, detalhes, ip, user_agent, criado_em', { count: 'exact' })
-      .eq('tenant_id', tid).order(ord, { ascending: dir === 'asc' }).range(offset, offset + ITEMS_PER_PAGE - 1)
+      .eq('tenant_id', tid).order(ord, { ascending: dir === 'asc', nullsFirst: false }).range(offset, offset + ITEMS_PER_PAGE - 1)
     if (tipo === 'acessos') {
       query = query.in('operacao', ACESSO_OPS)
       if (area === 'admin') query = query.neq('ator_tipo', 'estudante')
@@ -213,7 +226,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
       if (simIdsQ?.length) parts.push(`simulado_id.in.(${simIdsQ.join(',')})`)
       q = parts.length ? q.or(parts.join(',')) : q.eq('id', NADA)
     }
-    q = q.order(ord, { ascending: dir === 'asc' }).range(offset, offset + ITEMS_PER_PAGE - 1)
+    q = q.order(ord, { ascending: dir === 'asc', nullsFirst: false }).range(offset, offset + ITEMS_PER_PAGE - 1)
     // Contagens por tipo (respeitando o período), para o subtítulo "X viram · Y baixaram".
     const cbase = () => { let c = supabase.from('simulado_relatorio_eventos').select('*', { count: 'exact', head: true }).eq('tenant_id', tid); if (params.data_inicio) c = c.gte('criado_em', params.data_inicio); if (params.data_fim) c = c.lte('criado_em', params.data_fim + 'T23:59:59Z'); return c }
     const [rEv, rVis, rBx] = await Promise.all([q, cbase().eq('tipo', 'visualizou'), cbase().eq('tipo', 'baixou')])
@@ -261,6 +274,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
 
       <AuditoriaFilters
         mostrarAcao={view === 'audit' && !(acessosEstud && sub === 'plataforma')}
+        mostrarTema={view === 'audit' && !(acessosEstud && sub === 'plataforma')}
         buscaPlaceholder={view === 'sessoes' || view === 'eventos' ? 'Buscar por estudante ou simulado…' : acessosEstud ? 'Buscar por estudante…' : 'Buscar por módulo ou ação…'}
       />
 
@@ -272,7 +286,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
             const r = resumoAutomacao(log, nomesAuto)
             return (
               <TableRow key={log.id}>
-                <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(log.criado_em)}</TableCell>
+                <TableCell className="whitespace-nowrap text-sm"><DataHora iso={log.criado_em} /></TableCell>
                 <TableCell className="truncate"><Badge variant={log.operacao === 'BLOQUEAR' ? 'destructive' : 'default'}>{r.origem}</Badge></TableCell>
                 <TableCell className="truncate text-sm" title={r.texto}>{r.texto}</TableCell>
                 <TableCell><DetalhesCell log={log} resumo={`${r.origem} — ${r.texto}`} ator={r.origem} /></TableCell>
@@ -293,7 +307,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
             const onde = log.entidade === 'simulado_acesso' ? `Simulado${(log.dados_novos as any)?.simulado ? `: ${(log.dados_novos as any).simulado}` : ''}` : 'Portal do aluno'
             return (
               <TableRow key={log.id}>
-                <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(log.criado_em)}</TableCell>
+                <TableCell className="whitespace-nowrap text-sm"><DataHora iso={log.criado_em} /></TableCell>
                 <TableCell className="truncate" title={nome}><span className="font-medium">{nome}</span>{email && <span className="block truncate text-xs text-muted-foreground">{email}</span>}</TableCell>
                 <TableCell className="truncate text-sm" title={onde}>{onde}</TableCell>
                 <TableCell className="truncate text-xs text-muted-foreground">{log.ip ? String(log.ip) : '—'}</TableCell>
@@ -312,7 +326,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
             const resumo = resumoRegistro(log, nomesEntidade)
             return (
               <TableRow key={log.id}>
-                <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(log.criado_em)}</TableCell>
+                <TableCell className="whitespace-nowrap text-sm"><DataHora iso={log.criado_em} /></TableCell>
                 <TableCell className="truncate" title={nome ?? log.ator_tipo}>
                   <span className="font-medium">{nome ?? '—'}</span>
                   <span className="block truncate text-[11px] text-muted-foreground">{log.ator_tipo}{!nome && log.ator_id ? ` · ${String(log.ator_id).slice(0, 8)}…` : ''}</span>
@@ -343,8 +357,8 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
               <TableRow key={s.id}>
                 <TableCell className="truncate" title={est?.nome}><span className="font-medium">{est?.nome ?? '—'}</span>{est?.email && <span className="block truncate text-xs text-muted-foreground">{est.email}</span>}</TableCell>
                 <TableCell className="truncate text-sm" title={nomesSim.get(s.simulado_id) ?? undefined}>{nomesSim.get(s.simulado_id) ?? '—'}</TableCell>
-                <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(s.iniciado_em)}</TableCell>
-                <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(s.finalizado_em)}</TableCell>
+                <TableCell className="whitespace-nowrap text-sm"><DataHora iso={s.iniciado_em} /></TableCell>
+                <TableCell className="whitespace-nowrap text-sm"><DataHora iso={s.finalizado_em} /></TableCell>
                 <TableCell className="truncate"><span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', cfg.cls)}>{cfg.label}</span></TableCell>
               </TableRow>
             )
@@ -375,7 +389,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
             const est = nomesEst.get(e.estudante_id)
             return (
               <TableRow key={e.id}>
-                <TableCell className="truncate whitespace-nowrap text-sm text-muted-foreground">{fmtBR(e.criado_em)}</TableCell>
+                <TableCell className="whitespace-nowrap text-sm"><DataHora iso={e.criado_em} /></TableCell>
                 <TableCell className="truncate" title={est?.nome}><span className="font-medium">{est?.nome ?? '—'}</span>{est?.email && <span className="block truncate text-xs text-muted-foreground">{est.email}</span>}</TableCell>
                 <TableCell className="truncate text-sm" title={nomesSim.get(e.simulado_id) ?? undefined}>{nomesSim.get(e.simulado_id) ?? '—'}</TableCell>
                 <TableCell className="truncate"><Badge variant={e.tipo === 'baixou' ? 'default' : 'secondary'}>{e.tipo === 'baixou' ? 'Baixou' : 'Visualizou'}</Badge></TableCell>
