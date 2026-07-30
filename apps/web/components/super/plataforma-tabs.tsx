@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Settings2, ShieldCheck, Palette, Megaphone } from 'lucide-react'
 import { PlataformaGerenciar } from '@/components/super/plataforma-gerenciar'
 import { PlataformaAcessos } from '@/components/super/plataforma-acessos'
-import { PlataformaAparencia, type AparenciaInicial } from '@/components/super/plataforma-aparencia'
+import { ConfiguracoesTabs } from '@/app/admin/configuracoes/configuracoes-tabs'
 import { BannersManager, type Banner } from '@/components/admin/banners-manager'
 import type { AdminMembro, CargoOpcao } from '@/app/admin/administradores/actions'
 
@@ -19,11 +19,12 @@ type GeralProps = {
  *  - Acessos (RBAC) → equipe da plataforma (membros + cargos), gerida pelo super-admin
  *    direto do console (escopo por tenant-alvo via `tenantId`).
  */
-export function PlataformaTabs({ geral, membros, cargos, aparencia, banners, rbacErro }: {
+export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTema, banners, rbacErro }: {
   geral: GeralProps
   membros: AdminMembro[]
   cargos: CargoOpcao[]
-  aparencia: AparenciaInicial
+  temaCompleto: any
+  salvarTema: (t: Record<string, unknown>) => Promise<{ ok?: boolean } | void>
   banners: Banner[]
   rbacErro?: string | null
 }) {
@@ -41,7 +42,7 @@ export function PlataformaTabs({ geral, membros, cargos, aparencia, banners, rba
       </TabsContent>
 
       <TabsContent value="aparencia">
-        <PlataformaAparencia tenantId={geral.id} inicial={aparencia} />
+        <ConfiguracoesTabs tema={temaCompleto} salvarTema={salvarTema} />
       </TabsContent>
 
       <TabsContent value="avisos">

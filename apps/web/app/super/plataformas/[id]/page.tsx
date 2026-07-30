@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import { PlataformaTabs } from '@/components/super/plataforma-tabs'
 import { listarAdministradores } from '@/app/admin/administradores/actions'
+import { salvarTemaSuperAction } from '@/app/admin/tenants/actions'
 import { ArrowLeft, Building2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -29,16 +30,9 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
   const somenteAdmin = !!tema.somente_admin
   const somenteSuper = !!tema.somente_super
 
-  const aparencia = {
-    nome_site: String(tema.nome_site ?? ''),
-    subtitulo_site: String(tema.subtitulo_site ?? ''),
-    titulo_pagina: String(tema.titulo_pagina ?? ''),
-    cor_primaria: String(tema.cor_primaria ?? ''),
-    cor_secundaria: String(tema.cor_secundaria ?? ''),
-    cor_accent: String(tema.cor_accent ?? ''),
-    modo_padrao: String(tema.modo_padrao ?? 'light'),
-    logoAtual: typeof tema.logo_url === 'string' ? tema.logo_url : null,
-  }
+  // Edição visual completa migrada para o console: a MESMA suíte do painel, dirigida pela action
+  // super-scoped (mira este tenant). `.bind` fixa o tenantId no server action.
+  const salvarTema = salvarTemaSuperAction.bind(null, id)
 
   const [{ count: usuarios }, { count: estudantes }, { count: simulados }, rbac, bannersRes] = await Promise.all([
     svc.from('simulado_tenant_acessos').select('user_id', { count: 'exact', head: true }).eq('tenant_id', id),
@@ -89,7 +83,8 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
         }}
         membros={rbac.membros ?? []}
         cargos={rbac.cargos ?? []}
-        aparencia={aparencia}
+        temaCompleto={tema}
+        salvarTema={salvarTema}
         banners={bannersRes as any}
         rbacErro={rbac.ok ? null : (rbac.error ?? 'Não foi possível carregar os acessos.')}
       />

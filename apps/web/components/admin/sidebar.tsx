@@ -33,7 +33,6 @@ import {
   Share2,
   Plug,
   Zap,
-  Palette,
   ServerCog,
   UserCog,
   ShieldCheck,
@@ -150,7 +149,7 @@ const navGroups: NavGroup[] = [
       // (/super) — gestão cross-tenant fica fora de qualquer plataforma.
       { label: 'Administradores', href: '/admin/administradores', icon: UserCog, perm: 'rbac:view' },
       { label: 'API Keys', href: '/admin/api-keys', icon: KeyRound, perm: 'api_keys:manage' },
-      { label: 'Aparência', href: '/admin/configuracoes', icon: Palette, exact: true, perm: 'configuracoes:view' },
+      // Aparência (identidade/cores/tema) MIGRADA para o Console (super-admin) → Plataformas → Aparência.
       { label: 'Sistema', href: '/admin/sistema', icon: ServerCog, perm: 'configuracoes:view' },
       { label: 'Mensagens', href: '/admin/configuracoes/mensagens', icon: MessageSquare, perm: 'configuracoes:view' },
       { label: 'Banners & Pop-ups', href: '/admin/configuracoes/banners', icon: Megaphone, perm: 'configuracoes:view' },

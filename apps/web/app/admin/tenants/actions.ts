@@ -178,6 +178,23 @@ export async function deleteTenantAction(id: string, confirmNome: string): Promi
   return { ok: true }
 }
 
+// ─────────────────── TEMA COMPLETO (suíte de aparência migrada p/ o console) ───────────────────
+// Reusa a MESMA suíte de edição visual do painel (ConfiguracoesTabs), agora dirigida por esta
+// action super-scoped. Uso via `.bind(null, tenantId)`. Lança em erro (mesmo contrato do painel).
+
+export async function salvarTemaSuperAction(tenantId: string, tema: Record<string, unknown>): Promise<{ ok: boolean }> {
+  if (!(await isSuperAdmin())) throw new Error('Ação exclusiva do super-administrador global.')
+  const svc = createAdminClient()
+  const { data: anterior } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
+  const merged = { ...((anterior?.tema as Record<string, unknown>) ?? {}), ...tema }
+  const { error } = await svc.from('simulado_tenants').update({ tema: merged }).eq('id', tenantId)
+  if (error) throw new Error(`Erro ao salvar tema: ${error.message}`)
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenants', entidadeId: tenantId, antes: (anterior?.tema as Record<string, unknown>) ?? {}, depois: merged, tenantId })
+  revalidatePath('/', 'layout')
+  revalidatePath(`/super/plataformas/${tenantId}`)
+  return { ok: true }
+}
+
 // ─────────────────── APARÊNCIA DA PLATAFORMA (branding, no console) ───────────────────
 // Edição visual centralizada no console (super-admin), por plataforma. Mescla em tenants.tema.
 // Não toca no logo base64 aqui (fica no painel) para não apagá-lo por engano; logo por URL é opcional.
