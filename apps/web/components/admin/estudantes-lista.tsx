@@ -36,12 +36,16 @@ function notaTom(n: number | null) {
   return n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
 }
 
-export function EstudantesLista({ inicial, agregados, total, kpis }: {
+export function EstudantesLista({ inicial, agregados, total, kpis, adminEmails = [] }: {
   inicial: EstudanteBase[]
   agregados: Agregados
   total: number
   kpis: { total: number; passaporte: number; feitos: number }
+  adminEmails?: string[]
 }) {
+  const adminSet = useMemo(() => new Set(adminEmails.map((e) => e.toLowerCase())), [adminEmails])
+  const ehAdmin = (e: EstudanteRow) => !!e.email && adminSet.has(e.email.toLowerCase())
+
   const aplicar = useMemo(() => (b: EstudanteBase): EstudanteRow => ({
     ...b, feitos: agregados[b.id]?.feitos ?? 0, media: agregados[b.id]?.media ?? null,
   }), [agregados])
@@ -136,7 +140,7 @@ export function EstudantesLista({ inicial, agregados, total, kpis }: {
     { titulo: 'E-mail', valor: (e) => e.email, largura: 30 },
     { titulo: 'CPF', valor: (e) => e.cpf },
     { titulo: 'Telefone', valor: (e) => e.telefone },
-    { titulo: 'Plano', valor: (e) => (e.classificacao === 'vitalicio' ? 'Vitalício' : e.classificacao === 'passaporte' ? 'Passaporte' : 'Padrão') },
+    { titulo: 'Plano', valor: (e) => (ehAdmin(e) ? 'Admin' : e.classificacao === 'vitalicio' ? 'Vitalício' : e.classificacao === 'passaporte' ? 'Passaporte' : 'Padrão') },
     { titulo: 'Simulados feitos', valor: (e) => e.feitos },
     { titulo: 'Média', valor: (e) => (e.media != null ? e.media.toFixed(1).replace('.', ',') : '') },
     { titulo: 'Cadastrado em', valor: (e) => fmtData(e.created_at) },
@@ -215,7 +219,11 @@ export function EstudantesLista({ inicial, agregados, total, kpis }: {
                     </Link>
                   </td>
                   <td className="hidden px-4 py-2.5 text-xs tabular-nums text-muted-foreground lg:table-cell">{[e.cpf, e.telefone].filter(Boolean).join(' · ') || '—'}</td>
-                  <td className="px-4 py-2.5"><ClassificacaoBadge classificacao={e.classificacao} /></td>
+                  <td className="px-4 py-2.5">
+                    {ehAdmin(e)
+                      ? <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-2 py-0.5 text-[11px] font-medium text-indigo-600 dark:text-indigo-400">Admin</span>
+                      : <ClassificacaoBadge classificacao={e.classificacao} />}
+                  </td>
                   <td className="px-4 py-2.5 text-center tabular-nums">{e.feitos > 0 ? <span className="font-semibold">{e.feitos}</span> : <span className="text-muted-foreground">—</span>}</td>
                   <td className={cn('px-4 py-2.5 text-center font-semibold tabular-nums', notaTom(e.media))}>{e.media != null ? e.media.toFixed(1) : '—'}</td>
                   <td className="hidden whitespace-nowrap px-4 py-2.5 text-xs text-muted-foreground sm:table-cell">{fmtData(e.created_at)}</td>

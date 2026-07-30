@@ -43,6 +43,22 @@ export default async function EstudantesPage() {
   const agregados: Record<string, { feitos: number; media: number | null }> = {}
   for (const [id, f] of feitos) agregados[id] = { feitos: f, media: cont.get(id) ? Math.round(((soma.get(id) ?? 0) / (cont.get(id) ?? 1)) * 10) / 10 : null }
 
+  // E-mails de ADMIN (staff da plataforma) — NÃO contam como estudante e ganham o plano "Admin" na lista.
+  const { data: acessos } = await supabase.from('simulado_tenant_acessos').select('user_id').eq('tenant_id', tid)
+  const staffIds = [...new Set((acessos ?? []).map((a: any) => a.user_id).filter(Boolean))] as string[]
+  const adminSet = new Set<string>()
+  await Promise.all(staffIds.map(async (uid) => {
+    try { const { data } = await supabase.auth.admin.getUserById(uid); const e = data?.user?.email?.toLowerCase(); if (e) adminSet.add(e) } catch { /* auth indisponível */ }
+  }))
+  const adminEmails = [...adminSet]
+  // Desconta da contagem os estudantes cujo e-mail é de admin.
+  let adminEstudantes = 0
+  if (adminEmails.length) {
+    const { count } = await supabase.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('deletado', false).eq('tenant_id', tid).in('email', adminEmails)
+    adminEstudantes = count ?? 0
+  }
+  const totalReal = Math.max(0, total - adminEstudantes)
+
   return (
     <div className="animate-page space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -64,7 +80,8 @@ export default async function EstudantesPage() {
         inicial={inicial}
         agregados={agregados}
         total={total}
-        kpis={{ total, passaporte: totalPass ?? 0, feitos: totalFeitos ?? 0 }}
+        adminEmails={adminEmails}
+        kpis={{ total: totalReal, passaporte: totalPass ?? 0, feitos: totalFeitos ?? 0 }}
       />
     </div>
   )
