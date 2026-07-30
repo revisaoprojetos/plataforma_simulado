@@ -12,6 +12,13 @@ interface NovoTenant {
   plano: string
   admin_email: string
   admin_senha?: string
+  dominio?: string | null
+}
+
+/** Normaliza um domínio próprio: tira protocolo/caminho e caracteres inválidos; vazio → null. */
+function normDominio(v?: string | null): string | null {
+  const s = (v ?? '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/[^a-z0-9.-]/g, '')
+  return s || null
 }
 
 export async function createTenantAction(data: NovoTenant): Promise<{ ok: boolean; error?: string; senha?: string }> {
@@ -28,7 +35,7 @@ export async function createTenantAction(data: NovoTenant): Promise<{ ok: boolea
   // 1) Cria o tenant
   const { data: tenant, error: tErr } = await svc
     .from('simulado_tenants')
-    .insert({ nome, slug, plano: data.plano || 'basico', ativo: true })
+    .insert({ nome, slug, plano: data.plano || 'basico', ativo: true, dominio: normDominio(data.dominio) })
     .select('id')
     .single()
 
@@ -114,6 +121,7 @@ interface EditarTenant {
   nome: string
   slug: string
   plano: string
+  dominio?: string | null
 }
 
 export async function updateTenantAction(id: string, data: EditarTenant): Promise<{ ok: boolean; error?: string }> {
@@ -123,13 +131,15 @@ export async function updateTenantAction(id: string, data: EditarTenant): Promis
   if (!nome || !slug) return { ok: false, error: 'Informe nome e subdomínio (slug).' }
 
   const svc = createAdminClient()
-  const { data: antes } = await svc.from('simulado_tenants').select('nome, slug, plano').eq('id', id).maybeSingle()
-  const { error } = await svc.from('simulado_tenants').update({ nome, slug, plano: data.plano || 'basico' }).eq('id', id)
+  const { data: antes } = await svc.from('simulado_tenants').select('nome, slug, plano, dominio').eq('id', id).maybeSingle()
+  const update: Record<string, unknown> = { nome, slug, plano: data.plano || 'basico' }
+  if (data.dominio !== undefined) update.dominio = normDominio(data.dominio)
+  const { error } = await svc.from('simulado_tenants').update(update).eq('id', id)
   if (error) {
-    if (/duplicate|unique/i.test(error.message)) return { ok: false, error: 'Já existe uma plataforma com esse subdomínio.' }
+    if (/duplicate|unique/i.test(error.message)) return { ok: false, error: 'Já existe uma plataforma com esse subdomínio ou domínio.' }
     return { ok: false, error: error.message }
   }
-  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenants', entidadeId: id, tenantId: id, antes: antes ?? undefined, depois: { nome, slug, plano: data.plano } })
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenants', entidadeId: id, tenantId: id, antes: antes ?? undefined, depois: update })
   revalidatePath('/admin/tenants'); revalidatePath('/super/plataformas'); revalidatePath(`/super/plataformas/${id}`)
   return { ok: true }
 }

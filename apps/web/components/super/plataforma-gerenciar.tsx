@@ -31,18 +31,19 @@ export function PlataformaGerenciar(p: Props) {
   const router = useRouter()
   const [nome, setNome] = useState(p.nome)
   const [slug, setSlug] = useState(p.slug)
+  const [dominio, setDominio] = useState(p.dominio ?? '')
   const [plano, setPlano] = useState(p.plano || 'basico')
   const [pending, start] = useTransition()
   const [op, setOp] = useState<'salvar' | 'vis' | 'excluir' | null>(null)
 
-  const sujo = nome.trim() !== p.nome || slug !== p.slug || plano !== (p.plano || 'basico')
+  const sujo = nome.trim() !== p.nome || slug !== p.slug || plano !== (p.plano || 'basico') || dominio.trim() !== (p.dominio ?? '')
   const vazia = p.estudantes === 0 && p.simulados === 0
   const modo: VisibilidadeModo = p.ativo ? 'todos' : p.somenteSuper ? 'so_super' : p.somenteAdmin ? 'so_admin' : 'oculta'
   const bloqueiaExcluir = p.ativo || p.somenteAdmin || p.somenteSuper
 
   function salvar() {
     setOp('salvar'); start(async () => {
-      const r = await updateTenantAction(p.id, { nome, slug, plano })
+      const r = await updateTenantAction(p.id, { nome, slug, plano, dominio: dominio.trim() || null })
       if (r.ok) { toast.success('Plataforma atualizada!'); router.refresh() }
       else toast.error(r.error ?? 'Erro ao salvar')
       setOp(null)
@@ -104,7 +105,7 @@ export function PlataformaGerenciar(p: Props) {
       {/* Editar */}
       <div id="editar" className="rounded-2xl border bg-card p-4 shadow-sm">
         <h2 className="mb-1 text-sm font-semibold">Editar plataforma</h2>
-        <p className="mb-4 text-xs text-muted-foreground">Nome exibido, subdomínio (slug) e plano.</p>
+        <p className="mb-4 text-xs text-muted-foreground">Nome exibido, subdomínio (slug), domínio próprio e plano.</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="p-nome">Nome da plataforma</Label>
@@ -113,6 +114,11 @@ export function PlataformaGerenciar(p: Props) {
           <div className="space-y-1.5">
             <Label htmlFor="p-slug">Subdomínio (slug)</Label>
             <Input id="p-slug" value={slug} onChange={(e) => setSlug(slugify(e.target.value))} placeholder="revisaopge" />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="p-dominio">Domínio próprio (opcional)</Label>
+            <Input id="p-dominio" value={dominio} onChange={(e) => setDominio(e.target.value)} placeholder="vocenadefensoria.vnd.com.br" />
+            <p className="text-[11px] text-muted-foreground">Se preenchido, a plataforma abre neste endereço em vez de <span className="font-mono">{slug || 'slug'}.&lt;domínio-base&gt;</span>. Requer DNS + roteamento/TLS apontando para o servidor.</p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="p-plano">Plano</Label>

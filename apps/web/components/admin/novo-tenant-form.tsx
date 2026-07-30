@@ -15,6 +15,7 @@ import { createTenantAction } from '@/app/admin/tenants/actions'
 export function NovoTenantForm({ onSuccess }: { onSuccess?: () => void }) {
   const [nome, setNome] = useState('')
   const [slug, setSlug] = useState('')
+  const [dominio, setDominio] = useState('')
   const [plano, setPlano] = useState('basico')
   const [email, setEmail] = useState('')
   const [pending, startTransition] = useTransition()
@@ -30,11 +31,11 @@ export function NovoTenantForm({ onSuccess }: { onSuccess?: () => void }) {
     e.preventDefault()
     if (!nome.trim() || !slug.trim() || !email.trim()) return
     startTransition(async () => {
-      const r = await createTenantAction({ nome, slug, plano, admin_email: email })
+      const r = await createTenantAction({ nome, slug, plano, admin_email: email, dominio: dominio.trim() || null })
       if (r.ok) {
         toast.success('Plataforma criada')
         if (r.senha) setCredenciais({ email, senha: r.senha })
-        setNome(''); setSlug(''); setEmail(''); setPlano('basico')
+        setNome(''); setSlug(''); setDominio(''); setEmail(''); setPlano('basico')
         router.refresh()
         // Fecha o modal quando não há credencial para exibir (a senha gerada precisa ficar visível).
         if (!r.senha) onSuccess?.()
@@ -54,6 +55,12 @@ export function NovoTenantForm({ onSuccess }: { onSuccess?: () => void }) {
         <div className="space-y-1">
           <Label htmlFor="t-slug">Subdomínio (slug) *</Label>
           <Input id="t-slug" value={slug} onChange={(e) => setSlug(slugify(e.target.value))} placeholder="revisaopge" />
+          <p className="text-[11px] text-muted-foreground">Abre em <span className="font-mono">{slug || 'slug'}.seu-dominio</span> quando não houver domínio próprio.</p>
+        </div>
+        <div className="space-y-1 sm:col-span-2">
+          <Label htmlFor="t-dominio">Domínio próprio (opcional)</Label>
+          <Input id="t-dominio" value={dominio} onChange={(e) => setDominio(e.target.value)} placeholder="vocenadefensoria.vnd.com.br" />
+          <p className="text-[11px] text-muted-foreground">Se preenchido, a plataforma abre neste endereço em vez do subdomínio. Requer DNS + roteamento/TLS apontando para o servidor.</p>
         </div>
         <div className="space-y-1">
           <Label>Plano</Label>
