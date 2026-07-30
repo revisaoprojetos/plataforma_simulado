@@ -11,8 +11,18 @@
 #     como parte deste deploy (ver docs/deploy/runbook-vps.md).
 #  3) Preencha as variáveis em "Environment variables" no Portainer (ver
 #     docs/deploy/runbook-vps.md), incluindo TRAEFIK_NETWORK, TRAEFIK_CERTRESOLVER
-#     e APP_DOMAIN — os defaults abaixo já refletem a stack Traefik real desta VPS
-#     (rede `network_swarm_public`, resolver `letsencryptresolver`).
+#     e APP_BASE_DOMAIN — os defaults abaixo já refletem a stack Traefik real desta VPS
+#     (rede `network_swarm_public`, resolver `letsencryptresolver`, base `revisaopge.com.br`).
+#
+# MULTI-TENANT POR SUBDOMÍNIO (curinga) — cada plataforma abre em `slug.<APP_BASE_DOMAIN>`.
+# Para funcionar sem tocar na infra a cada tenant novo, é preciso 1x na VPS/DNS:
+#   a) DNS: registro curinga `*.revisaopge.com.br` → IP da VPS (A/CNAME).
+#   b) Traefik: o router já usa HostRegexp (abaixo) para casar qualquer subdomínio.
+#   c) TLS: cert WILDCARD `*.revisaopge.com.br` — o certresolver do Traefik PRECISA usar
+#      desafio DNS-01 (HTTP-01 não emite curinga). Configure no serviço do Traefik as
+#      credenciais de API do provedor de DNS (ex.: Cloudflare: CF_DNS_API_TOKEN) e
+#      `--certificatesresolvers.<nome>.acme.dnschallenge.provider=<provedor>`. Aponte
+#      TRAEFIK_CERTRESOLVER para esse resolver DNS-01.
 #
 # Roteamento HTTPS é feito pelo Traefik já existente na VPS (rede externa
 # TRAEFIK_NETWORK) — este compose não publica porta nenhuma diretamente.
@@ -54,10 +64,21 @@ services:
       labels:
         - "traefik.enable=true"
         - "traefik.docker.network=${TRAEFIK_NETWORK:-network_swarm_public}"
-        - "traefik.http.routers.plataforma-simulado.rule=Host(`${APP_DOMAIN:-simulado.revisaopge.com.br}`)"
+        # Roteamento CURINGA: entrega QUALQUER subdomínio do domínio base a esta app —
+        # cada tenant é um subdomínio `slug.<base>`, então plataformas novas abrem sem mexer na infra.
+        # Sintaxe Traefik v2 (named group). Em Traefik v3 troque por Go regexp:
+        #   HostRegexp(`^[a-z0-9-]+\.revisaopge\.com\.br$`)
+        - "traefik.http.routers.plataforma-simulado.rule=HostRegexp(`{sub:[a-z0-9-]+}.${APP_BASE_DOMAIN:-revisaopge.com.br}`)"
+        # Prioridade baixa: por ser catch-all, deixa qualquer serviço com Host() explícito
+        # (mesmo domínio) vencer o roteamento; esta app é o fallback dos subdomínios de tenant.
+        - "traefik.http.routers.plataforma-simulado.priority=1"
         - "traefik.http.routers.plataforma-simulado.entrypoints=websecure"
         - "traefik.http.routers.plataforma-simulado.tls=true"
         - "traefik.http.routers.plataforma-simulado.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencryptresolver}"
+        # Cert WILDCARD (*.base) para cobrir todos os subdomínios de uma vez. EXIGE que o
+        # certresolver use desafio DNS-01 (HTTP-01 não emite curinga) — ver nota no topo.
+        - "traefik.http.routers.plataforma-simulado.tls.domains[0].main=${APP_BASE_DOMAIN:-revisaopge.com.br}"
+        - "traefik.http.routers.plataforma-simulado.tls.domains[0].sans=*.${APP_BASE_DOMAIN:-revisaopge.com.br}"
         - "traefik.http.services.plataforma-simulado.loadbalancer.server.port=3000"
 
   # Consome a fila, chama o Gotenberg, sobe o PDF no bucket `pdfs`
