@@ -114,9 +114,19 @@ export async function listarAdministradores(tenantIdAlvo?: string): Promise<{ ok
     .or(`tenant_id.eq.${tenantId},is_sistema.eq.true`)
     .order('is_sistema', { ascending: false })
     .order('nome')
-  const cargos: CargoOpcao[] = (roles ?? []).map((r: any) => ({ nome: r.nome, descricao: r.descricao ?? null, is_sistema: !!r.is_sistema }))
+  // DEDUPE por nome: bancos migrados têm cargos de sistema repetidos (cada tenant semeou seu
+  // admin/super_admin com is_sistema=true, e o `.or(is_sistema.eq.true)` traz todos) — senão o
+  // seletor de cargo mostra "Administrador"/"Super Admin" várias vezes.
+  const vistos = new Set<string>()
+  const cargos: CargoOpcao[] = []
+  for (const r of roles ?? []) {
+    const nomeR = (r as any).nome as string
+    if (!nomeR || vistos.has(nomeR)) continue
+    vistos.add(nomeR)
+    cargos.push({ nome: nomeR, descricao: (r as any).descricao ?? null, is_sistema: !!(r as any).is_sistema })
+  }
   // Garante 'admin' disponível mesmo que a matriz ainda não tenha sido semeada neste tenant.
-  if (!cargos.some((c) => c.nome === 'admin')) cargos.unshift({ nome: 'admin', descricao: 'Administrador geral (acesso total)', is_sistema: true })
+  if (!vistos.has('admin')) cargos.unshift({ nome: 'admin', descricao: 'Administrador geral (acesso total)', is_sistema: true })
 
   const ord = (x: AdminMembro, y: AdminMembro) => (x.nome ?? x.email ?? '').localeCompare(y.nome ?? y.email ?? '', 'pt-BR')
   return { ok: true, membros: membros.sort(ord), cargos }
