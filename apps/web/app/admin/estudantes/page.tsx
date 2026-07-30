@@ -43,8 +43,9 @@ export default async function EstudantesPage() {
   const agregados: Record<string, { feitos: number; media: number | null }> = {}
   for (const [id, f] of feitos) agregados[id] = { feitos: f, media: cont.get(id) ? Math.round(((soma.get(id) ?? 0) / (cont.get(id) ?? 1)) * 10) / 10 : null }
 
-  // E-mails de ADMIN (staff da plataforma) — NÃO contam como estudante e ganham o plano "Admin" na lista.
-  const { data: acessos } = await supabase.from('simulado_tenant_acessos').select('user_id').eq('tenant_id', tid)
+  // E-mails de ADMIN (staff ATIVO da plataforma) — NÃO contam como estudante e ganham o plano "Admin".
+  // Só acessos ATIVOS e com papel de staff (não 'estudante'): um admin DESATIVADO volta a ser estudante.
+  const { data: acessos } = await supabase.from('simulado_tenant_acessos').select('user_id').eq('tenant_id', tid).eq('ativo', true).neq('role', 'estudante')
   const staffIds = [...new Set((acessos ?? []).map((a: any) => a.user_id).filter(Boolean))] as string[]
   const adminSet = new Set<string>()
   await Promise.all(staffIds.map(async (uid) => {
