@@ -4,12 +4,12 @@ import { useMemo, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Search, X, Mail, Loader2, KeyRound, ShieldCheck, ShieldOff, Copy, Check, Dices, Settings2, Trash2 } from 'lucide-react'
+import { Search, X, Mail, Loader2, KeyRound, ShieldCheck, ShieldOff, Copy, Check, Dices, Settings2, Trash2, Save } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { rotuloCargo, CARGOS_ACESSO_TOTAL } from '@/lib/rbac-cargos'
 import {
-  trocarCargoAction, toggleAtivoAdminAction, resetarSenhaAdminAction, removerAcessoAdminAction,
+  trocarCargoAction, toggleAtivoAdminAction, resetarSenhaAdminAction, removerAcessoAdminAction, atualizarDadosAdminAction,
   type AdminMembro, type CargoOpcao,
 } from '@/app/admin/administradores/actions'
 
@@ -27,6 +27,8 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
   const [copiado, setCopiado] = useState(false)
   const [configId, setConfigId] = useState<string | null>(null) // userId em configuração (modal)
   const [novaSenha, setNovaSenha] = useState('')
+  const [nomeEdit, setNomeEdit] = useState('')
+  const [emailEdit, setEmailEdit] = useState('')
 
   const lista = useMemo(() => {
     const t = q.trim().toLowerCase()
@@ -51,7 +53,14 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
     })
   }
 
-  function abrirConfig(m: AdminMembro) { setConfigId(m.userId); setNovaSenha('') }
+  function abrirConfig(m: AdminMembro) { setConfigId(m.userId); setNovaSenha(''); setNomeEdit(m.nome ?? ''); setEmailEdit(m.email ?? '') }
+
+  function salvarDados(m: AdminMembro) {
+    const n = nomeEdit.trim(); const e = emailEdit.trim()
+    if (!n) { toast.error('Informe o nome.'); return }
+    if (!e) { toast.error('Informe o e-mail.'); return }
+    agir(m.userId, () => atualizarDadosAdminAction(m.userId, { nome: n, email: e }, tenantId), 'Dados atualizados.')
+  }
 
   function trocarCargo(m: AdminMembro, cargo: string) {
     if (cargo === m.cargo) return
@@ -157,14 +166,34 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
             <div className="mb-4 flex items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">{iniciais(config.nome, config.email)}</span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{config.nome || '—'}</p>
+                <p className="truncate text-sm font-semibold">Configurar acesso</p>
                 <p className="truncate text-xs text-muted-foreground">{config.email ?? 'sem e-mail'}</p>
               </div>
               <button type="button" onClick={() => setConfigId(null)} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
 
+            {/* Dados (nome + e-mail) */}
+            <div className="space-y-2">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Nome</label>
+                  <input value={nomeEdit} onChange={(e) => setNomeEdit(e.target.value)} placeholder="Nome do administrador"
+                    className="h-9 w-full rounded-lg border bg-transparent px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">E-mail (login)</label>
+                  <input type="email" value={emailEdit} onChange={(e) => setEmailEdit(e.target.value)} placeholder="email@dominio.com" autoComplete="off"
+                    className="h-9 w-full rounded-lg border bg-transparent px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+                </div>
+              </div>
+              <button type="button" onClick={() => salvarDados(config)} disabled={pending || (nomeEdit.trim() === (config.nome ?? '') && emailEdit.trim().toLowerCase() === (config.email ?? '').toLowerCase())}
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition hover:bg-muted disabled:opacity-50">
+                {pending && alvo === config.userId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Salvar dados
+              </button>
+            </div>
+
             {/* Cargo */}
-            <div className="space-y-1.5">
+            <div className="mt-4 space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Cargo</label>
               <select value={config.cargo} disabled={pending}
                 onChange={(e) => trocarCargo(config, e.target.value)}

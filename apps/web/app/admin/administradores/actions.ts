@@ -221,6 +221,27 @@ export async function toggleAtivoAdminAction(userId: string, ativo: boolean, ten
   return { ok: true }
 }
 
+/** Atualiza NOME e E-MAIL do membro (conta global no auth + espelho em simulado_users). */
+export async function atualizarDadosAdminAction(userId: string, dados: { nome: string; email: string }, tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await resolverContexto(tenantIdAlvo)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+  const { tenantId } = ctx
+  const nome = dados.nome?.trim()
+  const email = dados.email?.trim().toLowerCase()
+  if (!nome) return { ok: false, error: 'Informe o nome.' }
+  if (!email || !EMAIL_RE.test(email)) return { ok: false, error: 'Informe um e-mail válido.' }
+  const svc = createAdminClient()
+  const { error } = await svc.auth.admin.updateUserById(userId, { email, user_metadata: { full_name: nome } })
+  if (error) {
+    if (/already.*registered|already.*exists|duplicate|been registered/i.test(error.message)) return { ok: false, error: 'Já existe uma conta com esse e-mail.' }
+    return { ok: false, error: error.message }
+  }
+  try { await svc.from('simulado_users').upsert({ id: userId, email, nome }, { onConflict: 'id' }) } catch { /* espelho best-effort */ }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_users', entidadeId: userId, tenantId, depois: { nome, email } })
+  revalidarRbac(tenantId, ctx.ehSuper)
+  return { ok: true }
+}
+
 /**
  * REMOVE o acesso do membro à plataforma (apaga a linha em tenant_acessos — a conta global
  * permanece). Bloqueia remover a si mesmo (anti-lockout). Diferente de "desativar" (que preserva).
