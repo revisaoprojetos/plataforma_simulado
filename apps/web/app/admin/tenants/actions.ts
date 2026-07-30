@@ -178,6 +178,42 @@ export async function deleteTenantAction(id: string, confirmNome: string): Promi
   return { ok: true }
 }
 
+// ─────────────────── APARÊNCIA DA PLATAFORMA (branding, no console) ───────────────────
+// Edição visual centralizada no console (super-admin), por plataforma. Mescla em tenants.tema.
+// Não toca no logo base64 aqui (fica no painel) para não apagá-lo por engano; logo por URL é opcional.
+
+export interface AparenciaInput {
+  nome_site?: string | null
+  subtitulo_site?: string | null
+  titulo_pagina?: string | null
+  cor_primaria?: string | null
+  cor_secundaria?: string | null
+  cor_accent?: string | null
+  modo_padrao?: string | null
+  logo_url?: string | null
+}
+
+export async function salvarAparenciaAction(id: string, dados: AparenciaInput): Promise<{ ok: boolean; error?: string }> {
+  if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
+  const svc = createAdminClient()
+  const { data: t } = await svc.from('simulado_tenants').select('tema').eq('id', id).maybeSingle()
+  const tema = { ...((t?.tema as Record<string, unknown>) ?? {}) }
+
+  // Campos de texto/cor: aplica (permite limpar → null).
+  for (const k of ['nome_site', 'subtitulo_site', 'titulo_pagina', 'cor_primaria', 'cor_secundaria', 'cor_accent', 'modo_padrao'] as const) {
+    if (dados[k] !== undefined) tema[k] = (dados[k]?.toString().trim() || null)
+  }
+  // Logo por URL: SÓ aplica quando vier preenchido (não apaga o logo base64 existente).
+  const logo = dados.logo_url?.toString().trim()
+  if (logo) tema.logo_url = logo
+
+  const { error } = await svc.from('simulado_tenants').update({ tema }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenants', entidadeId: id, tenantId: id, depois: { aparencia: true } })
+  revalidatePath(`/super/plataformas/${id}`)
+  return { ok: true }
+}
+
 // ─────────────────── CATEGORIAS DE CARGO (bandas da matriz RBAC) ───────────────────
 // Sem migração: guardadas em simulado_tenants.tema.rbac = { categorias:[{id,nome,cor}],
 // cargoCategoria:{ [roleId]: categoriaId } }. Só super-admin gerencia.

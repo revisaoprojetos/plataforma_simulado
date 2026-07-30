@@ -29,6 +29,17 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
   const somenteAdmin = !!tema.somente_admin
   const somenteSuper = !!tema.somente_super
 
+  const aparencia = {
+    nome_site: String(tema.nome_site ?? ''),
+    subtitulo_site: String(tema.subtitulo_site ?? ''),
+    titulo_pagina: String(tema.titulo_pagina ?? ''),
+    cor_primaria: String(tema.cor_primaria ?? ''),
+    cor_secundaria: String(tema.cor_secundaria ?? ''),
+    cor_accent: String(tema.cor_accent ?? ''),
+    modo_padrao: String(tema.modo_padrao ?? 'light'),
+    logoAtual: typeof tema.logo_url === 'string' ? tema.logo_url : null,
+  }
+
   const [{ count: usuarios }, { count: estudantes }, { count: simulados }, rbac] = await Promise.all([
     svc.from('simulado_tenant_acessos').select('user_id', { count: 'exact', head: true }).eq('tenant_id', id),
     svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('tenant_id', id),
@@ -77,6 +88,7 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
         }}
         membros={rbac.membros ?? []}
         cargos={rbac.cargos ?? []}
+        aparencia={aparencia}
         rbacErro={rbac.ok ? null : (rbac.error ?? 'Não foi possível carregar os acessos.')}
       />
     </div>
