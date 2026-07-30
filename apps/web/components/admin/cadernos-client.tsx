@@ -175,40 +175,44 @@ function CadernoCard({ c, busy, onExcluir, onPersonalizar, onDuplicar, onMover }
   const Icon = iconeBanco(c.icone)
   const cor = c.cor ?? '#6d28d9'
   return (
-    <div className="group relative overflow-hidden rounded-2xl border bg-card shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+      {c.capa ? (
+        <img src={c.capa} alt="" className="absolute inset-0 h-full w-full object-cover object-[center_30%] transition-transform duration-500 group-hover:scale-105" />
+      ) : (
+        <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />
+      )}
+      {!c.capa && <Icon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+
       <Link href={`/admin/cadernos/${c.id}`} className="absolute inset-0 z-10" aria-label={c.nome} />
-      <div className="relative h-40 overflow-hidden">
-        {c.capa ? (
-          <img src={c.capa} alt="" className="h-full w-full object-cover object-[center_30%] transition-transform duration-500 group-hover:scale-105" />
-        ) : (
-          <div className="h-full w-full" style={{ background: `linear-gradient(150deg, ${cor}, ${cor}bb)` }} />
-        )}
-        {!c.capa && <Icon className="absolute -right-3 -top-3 h-20 w-20 text-white/15" />}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-        <span className="absolute bottom-3 left-4 z-30 flex h-11 w-11 items-center justify-center rounded-xl text-white shadow-md ring-2 ring-white/25" style={{ background: cor }}><Icon className="h-5 w-5" /></span>
-        <div className="absolute right-2 top-2 z-30">
-          <DropdownMenu>
-            <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg text-white/85 outline-none transition-colors hover:bg-white/20 hover:text-white focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Ações do caderno">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem render={<Link href={`/admin/cadernos/${c.id}`} />}><Pencil className="mr-2 h-4 w-4" /> Editar blocos</DropdownMenuItem>
-              <DropdownMenuItem onClick={onPersonalizar}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
-              <DropdownMenuItem onClick={onDuplicar}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
-              {onMover && <DropdownMenuItem onClick={onMover}><FolderInput className="mr-2 h-4 w-4" /> Mover para pasta</DropdownMenuItem>}
-              <DropdownMenuItem render={<Link href={`/imprimir/caderno/${c.id}`} target="_blank" />}><Printer className="mr-2 h-4 w-4" /> Imprimir</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onExcluir} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+
+      <div className="pointer-events-none absolute left-3 top-3 z-20">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: cor }}><Icon className="h-4 w-4" /></span>
       </div>
-      <div className="p-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Caderno de prova</p>
-          <span className="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${cor}1f`, color: cor }}>{c.blocos} {c.blocos === 1 ? 'bloco' : 'blocos'}</span>
+
+      <div className="absolute right-2 top-2 z-30">
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 outline-none transition-colors hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Ações do caderno">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem render={<Link href={`/admin/cadernos/${c.id}`} />}><Pencil className="mr-2 h-4 w-4" /> Editar blocos</DropdownMenuItem>
+            <DropdownMenuItem onClick={onPersonalizar}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
+            <DropdownMenuItem onClick={onDuplicar}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
+            {onMover && <DropdownMenuItem onClick={onMover}><FolderInput className="mr-2 h-4 w-4" /> Mover para pasta</DropdownMenuItem>}
+            <DropdownMenuItem render={<Link href={`/imprimir/caderno/${c.id}`} target="_blank" />}><Printer className="mr-2 h-4 w-4" /> Imprimir</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onExcluir} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-3">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">Caderno de prova</p>
+        <h3 className="mt-0.5 line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm" title={c.nome}>{c.nome}</h3>
+        <div className="mt-1.5">
+          <span className="inline-flex items-center rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">{c.blocos} {c.blocos === 1 ? 'bloco' : 'blocos'}</span>
         </div>
-        <h3 className="mt-1 line-clamp-2 text-sm font-bold leading-tight" title={c.nome}>{c.nome}</h3>
       </div>
     </div>
   )
@@ -219,36 +223,40 @@ function FolderCard({ f, onExcluir, onPersonalizar, onDuplicar }: { f: Pasta; on
   const c = f.cor ?? '#6d28d9'
   const Icon = iconeBanco(f.icone)
   return (
-    <div className="group relative overflow-hidden rounded-2xl border bg-card shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+      {f.capa ? (
+        <img src={f.capa} alt="" className="absolute inset-0 h-full w-full object-cover object-[center_30%] transition-transform duration-500 group-hover:scale-105" />
+      ) : (
+        <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
+      )}
+      {!f.capa && <Icon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+
       <Link href={`/admin/cadernos?pasta=${f.id}`} className="absolute inset-0 z-10" aria-label={f.nome} />
-      <div className="relative h-40 overflow-hidden">
-        {f.capa ? (
-          <img src={f.capa} alt="" className="h-full w-full object-cover object-[center_30%] transition-transform duration-500 group-hover:scale-105" />
-        ) : (
-          <div className="h-full w-full" style={{ background: `linear-gradient(150deg, ${c}, ${c}bb)` }} />
-        )}
-        {!f.capa && <Icon className="absolute -right-3 -top-3 h-20 w-20 text-white/15" />}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-        <span className="absolute bottom-3 left-4 z-30 flex h-11 w-11 items-center justify-center rounded-xl text-white shadow-md ring-2 ring-white/25" style={{ background: c }}><Icon className="h-5 w-5" /></span>
-        <div className="absolute right-2 top-2 z-30">
-          <DropdownMenu>
-            <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg text-white/85 outline-none transition-colors hover:bg-white/20 hover:text-white focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Ações da pasta"><MoreVertical className="h-4 w-4" /></DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem render={<Link href={`/admin/cadernos?pasta=${f.id}`} />}><FolderOpen className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
-              <DropdownMenuItem onClick={onPersonalizar}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
-              <DropdownMenuItem onClick={onDuplicar}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onExcluir} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir pasta</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+
+      <div className="pointer-events-none absolute left-3 top-3 z-20">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: c }}><Icon className="h-4 w-4" /></span>
       </div>
-      <div className="p-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pasta</p>
-          <span className="shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${c}1f`, color: c }}><Folder className="h-3 w-3" /> {f.count}</span>
+
+      <div className="absolute right-2 top-2 z-30">
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 outline-none transition-colors hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Ações da pasta"><MoreVertical className="h-4 w-4" /></DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem render={<Link href={`/admin/cadernos?pasta=${f.id}`} />}><FolderOpen className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
+            <DropdownMenuItem onClick={onPersonalizar}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
+            <DropdownMenuItem onClick={onDuplicar}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onExcluir} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir pasta</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-3">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">Pasta</p>
+        <h3 className="mt-0.5 line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm" title={f.nome}>{f.nome}</h3>
+        <div className="mt-1.5">
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur"><Folder className="h-3 w-3" /> {f.count}</span>
         </div>
-        <h3 className="mt-1 line-clamp-2 text-sm font-bold leading-tight" title={f.nome}>{f.nome}</h3>
       </div>
     </div>
   )

@@ -64,6 +64,13 @@ export default async function AdminLayout({
   const { tema, tenantNome } = await getTenantTheme()
   const ti = (tema ?? {}) as any
 
+  // Visibilidade "Só super-admin": a plataforma está reservada a super-admins globais (p/ teste).
+  // Mesmo quem tem papel de admin no tenant NÃO entra — só o super-admin global. Bloqueio real
+  // (defesa em profundidade), além de a plataforma não aparecer no seletor para não-super.
+  if (ti.somente_super === true && !superAdmin) {
+    redirect('/login')
+  }
+
   return (
     <CanProvider isAdmin={access.isAdmin} permissions={access.permissions}>
       <SplashSistema

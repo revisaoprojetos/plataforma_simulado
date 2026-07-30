@@ -4,17 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Loader2, GraduationCap, Mail, Lock, LogOut, ArrowRight, Building2, ShieldCheck, Settings2, ChevronDown, LogIn, Share2, ServerCog, LayoutDashboard } from 'lucide-react'
+import { Loader2, GraduationCap, Mail, Lock, LogOut, ArrowRight, Building2, ShieldCheck, LayoutDashboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { molduraSelecao } from '@/lib/selecao-moldura'
-
-// Atalhos globais do super-admin → console ISOLADO /super (fora de qualquer plataforma).
-const ADMIN_ATALHOS: { href: string; label: string; desc: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { href: '/super/plataformas', label: 'Plataformas', desc: 'Criar e gerenciar tenants', icon: Building2 },
-  { href: '/super/entrada', label: 'Entrada', desc: 'Tela de login neutra', icon: LogIn },
-  { href: '/super/compartilhar', label: 'Compartilhar', desc: 'Copiar dados entre plataformas', icon: Share2 },
-  { href: '/super/sistema', label: 'Sistema', desc: 'Prontidão e saúde', icon: ServerCog },
-]
 
 // ENTRADA NEUTRA: o login é brand-agnostic — MESMA identidade em toda plataforma (não puxa
 // o tema de nenhum tenant). Tema CLARO/branco, neutro e sóbrio. A marca é só o nome/logo do
@@ -86,7 +78,6 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
   const [minhasPlats, setMinhasPlats] = useState<PlatSimples[] | null>(null)
   const [erroCarregar, setErroCarregar] = useState(false)
   const [superAdmin, setSuperAdmin] = useState(false)
-  const [avancadoAberto, setAvancadoAberto] = useState(true)
 
   const nome = marca?.nome || 'Simulados'
 
@@ -219,32 +210,11 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
 
         {superAdmin && (
           <div className="mt-5 border-t border-slate-100 pt-4">
-            <button type="button" onClick={() => setAvancadoAberto((v) => !v)}
-              className="flex w-full items-center justify-between rounded-lg px-1 py-1 text-xs font-semibold text-slate-500 transition-colors hover:text-slate-800">
-              <span className="inline-flex items-center gap-1.5"><Settings2 className="h-3.5 w-3.5" /> Configurações avançadas</span>
-              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', avancadoAberto && 'rotate-180')} />
+            <button type="button" onClick={() => irParaConfig('/super')}
+              className="group flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100">
+              <LayoutDashboard className="h-3.5 w-3.5" /> Abrir console de administração
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
             </button>
-            {avancadoAberto && (
-              <div className="mt-2.5 space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  {ADMIN_ATALHOS.map((a) => (
-                    <button key={a.href} type="button" onClick={() => irParaConfig(a.href)} title={a.desc}
-                      className="group flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5 text-left transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors group-hover:bg-slate-900 group-hover:text-white"><a.icon className="h-4 w-4" /></span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-xs font-semibold text-slate-800">{a.label}</span>
-                        <span className="block truncate text-[10px] text-slate-500">{a.desc}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                <button type="button" onClick={() => irParaConfig('/super')}
-                  className="group flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100">
-                  <LayoutDashboard className="h-3.5 w-3.5" /> Abrir console de administração
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                </button>
-              </div>
-            )}
           </div>
         )}
 

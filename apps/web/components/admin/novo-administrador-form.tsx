@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 import { criarAdministradorAction, type CargoOpcao } from '@/app/admin/administradores/actions'
 import { rotuloCargo } from '@/lib/rbac-cargos'
 
-export function NovoAdministradorForm({ cargos }: { cargos: CargoOpcao[] }) {
+export function NovoAdministradorForm({ cargos, tenantId, onSuccess }: { cargos: CargoOpcao[]; tenantId?: string; onSuccess?: () => void }) {
   const cargoPadrao = cargos.find((c) => c.nome === 'admin')?.nome ?? cargos[0]?.nome ?? 'admin'
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
@@ -28,12 +28,14 @@ export function NovoAdministradorForm({ cargos }: { cargos: CargoOpcao[] }) {
     e.preventDefault()
     if (!nome.trim() || !email.trim() || !cargo) return
     start(async () => {
-      const r = await criarAdministradorAction({ nome, email, cargo, senha: senha || undefined })
+      const r = await criarAdministradorAction({ nome, email, cargo, senha: senha || undefined }, tenantId)
       if (!r.ok) { toast.error(r.error ?? 'Erro ao criar administrador'); return }
       toast.success(r.jaExistia ? 'Usuário já existia — acesso concedido com o cargo escolhido.' : 'Administrador criado.')
       if (r.senha) setCred({ email: email.trim().toLowerCase(), senha: r.senha })
       setNome(''); setEmail(''); setSenha(''); setCargo(cargoPadrao)
       router.refresh()
+      // Fecha o modal quando não há credencial para exibir (senha gerada precisa ficar visível).
+      if (!r.senha) onSuccess?.()
     })
   }
 

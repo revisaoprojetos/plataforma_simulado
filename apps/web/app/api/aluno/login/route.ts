@@ -34,6 +34,13 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createServiceClient()
 
+  // Visibilidade da plataforma: só aluno entra em plataforma "Todos" (ativo=true).
+  // "Só admin" (teste) e "Oculta" bloqueiam o acesso do aluno ao portal.
+  const { data: tnt } = await supabase.from('simulado_tenants').select('ativo').eq('id', tenantId).maybeSingle()
+  if (!tnt?.ativo) {
+    return NextResponse.json({ message: 'Plataforma indisponível no momento.' }, { status: 403 })
+  }
+
   // Método de identificação do tenant (email | email_cpf | email_telefone).
   const { data: cfg } = await supabase
     .from('simulado_embed_config')

@@ -27,9 +27,12 @@ interface Props {
   byResource: Record<string, Permission[]>
   initialMatrix: Record<string, string[]>
   tenantId: string
+  // Rótulos amigáveis opcionais (recurso/ação). Sem eles, mostra o valor cru.
+  resourceLabels?: Record<string, string>
+  actionLabels?: Record<string, string>
 }
 
-export function RbacMatrix({ roles, permissions, byResource, initialMatrix, tenantId }: Props) {
+export function RbacMatrix({ roles, permissions, byResource, initialMatrix, tenantId, resourceLabels, actionLabels }: Props) {
   const [matrix, setMatrix] = useState<Record<string, Set<string>>>(
     Object.fromEntries(
       Object.entries(initialMatrix).map(([k, v]) => [k, new Set(v)]),
@@ -109,13 +112,15 @@ export function RbacMatrix({ roles, permissions, byResource, initialMatrix, tena
                   className="sticky left-0 px-4 py-2 font-semibold text-xs uppercase tracking-wide text-muted-foreground"
                 >
                   <ShieldCheck className="inline h-3 w-3 mr-1" />
-                  {resource}
+                  {resourceLabels?.[resource] ?? resource}
                 </td>
               </tr>
               {byResource[resource].map((perm) => (
                 <tr key={perm.id} className="border-b hover:bg-muted/10 transition-colors">
                   <td className="sticky left-0 bg-background px-4 py-2 text-muted-foreground">
-                    <span className="font-mono text-xs">{perm.action}</span>
+                    {actionLabels?.[perm.action]
+                      ? <span className="text-xs">{actionLabels[perm.action]}</span>
+                      : <span className="font-mono text-xs">{perm.action}</span>}
                   </td>
                   {roles.map((role) => {
                     const has = matrix[role.id]?.has(perm.id) ?? false

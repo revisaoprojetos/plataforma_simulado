@@ -3,18 +3,27 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Save, Loader2, Eye, EyeOff, ExternalLink, Trash2, Users, GraduationCap, ClipboardList } from 'lucide-react'
+import { Save, Loader2, Eye, EyeOff, ShieldCheck, Crown, Check, ExternalLink, Trash2, Users, GraduationCap, ClipboardList } from 'lucide-react'
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
-import { updateTenantAction, toggleTenantAtivoAction, deleteTenantAction } from '@/app/admin/tenants/actions'
+import { updateTenantAction, setTenantVisibilidadeAction, deleteTenantAction, type VisibilidadeModo } from '@/app/admin/tenants/actions'
 
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9-]/g, '')
 
+// Os 3 estados de visibilidade (o gabarito da UI da Visualização).
+const OPCOES_VIS: { modo: VisibilidadeModo; titulo: string; desc: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { modo: 'todos', titulo: 'Todos', desc: 'Alunos e administradores acessam normalmente.', icon: Eye },
+  { modo: 'so_admin', titulo: 'Só admin (teste)', desc: 'Administradores da plataforma (e super-admins) entram. Alunos ficam bloqueados.', icon: ShieldCheck },
+  { modo: 'so_super', titulo: 'Só super-admin', desc: 'Só super-admins globais entram — bloqueada para todos os demais, inclusive admins da plataforma.', icon: Crown },
+  { modo: 'oculta', titulo: 'Oculta', desc: 'Ninguém acessa. Necessária para excluir a plataforma.', icon: EyeOff },
+]
+
 type Props = {
-  id: string; nome: string; slug: string; plano: string; ativo: boolean; dominio: string | null
+  id: string; nome: string; slug: string; plano: string; ativo: boolean; somenteAdmin: boolean; somenteSuper: boolean; dominio: string | null
   usuarios: number; estudantes: number; simulados: number
 }
 
@@ -24,10 +33,12 @@ export function PlataformaGerenciar(p: Props) {
   const [slug, setSlug] = useState(p.slug)
   const [plano, setPlano] = useState(p.plano || 'basico')
   const [pending, start] = useTransition()
-  const [op, setOp] = useState<'salvar' | 'toggle' | 'excluir' | null>(null)
+  const [op, setOp] = useState<'salvar' | 'vis' | 'excluir' | null>(null)
 
   const sujo = nome.trim() !== p.nome || slug !== p.slug || plano !== (p.plano || 'basico')
   const vazia = p.estudantes === 0 && p.simulados === 0
+  const modo: VisibilidadeModo = p.ativo ? 'todos' : p.somenteSuper ? 'so_super' : p.somenteAdmin ? 'so_admin' : 'oculta'
+  const bloqueiaExcluir = p.ativo || p.somenteAdmin || p.somenteSuper
 
   function salvar() {
     setOp('salvar'); start(async () => {
@@ -38,11 +49,12 @@ export function PlataformaGerenciar(p: Props) {
     })
   }
 
-  function alternar() {
-    setOp('toggle'); start(async () => {
-      const r = await toggleTenantAtivoAction(p.id, !p.ativo)
-      if (r.ok) { toast.success(p.ativo ? 'Plataforma ocultada.' : 'Plataforma reativada.'); router.refresh() }
-      else toast.error(r.error ?? 'Erro ao alterar a visualização')
+  function definirVis(novo: VisibilidadeModo) {
+    if (novo === modo) return
+    setOp('vis'); start(async () => {
+      const r = await setTenantVisibilidadeAction(p.id, novo)
+      if (r.ok) { toast.success('Visibilidade atualizada.'); router.refresh() }
+      else toast.error(r.error ?? 'Erro ao alterar a visibilidade')
       setOp(null)
     })
   }
@@ -57,7 +69,7 @@ export function PlataformaGerenciar(p: Props) {
 
   function excluir() {
     setOp('excluir'); start(async () => {
-      if (p.ativo) { toast.error('Oculte a plataforma antes de excluir.'); setOp(null); return }
+      if (bloqueiaExcluir) { toast.error('Deixe a plataforma OCULTA antes de excluir.'); setOp(null); return }
       const digitado = await pedirTexto({
         titulo: 'Excluir plataforma', mensagem: `Esta ação é irreversível. Digite o nome "${p.nome}" para confirmar.`,
         label: 'Nome da plataforma', placeholder: p.nome, confirmar: 'Excluir definitivamente',
@@ -121,17 +133,30 @@ export function PlataformaGerenciar(p: Props) {
         </div>
       </div>
 
-      {/* Visualização + Entrar */}
+      {/* Visualização (3 estados) + Painel */}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border bg-card p-4 shadow-sm">
           <h2 className="text-sm font-semibold">Visualização</h2>
-          <p className="mb-3 mt-1 text-xs text-muted-foreground">
-            {p.ativo ? 'A plataforma está ativa e disponível para acesso.' : 'A plataforma está oculta — ninguém acessa até reativar.'}
-          </p>
-          <Button variant="outline" onClick={alternar} disabled={pending}>
-            {pending && op === 'toggle' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : p.ativo ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
-            {p.ativo ? 'Ocultar plataforma' : 'Reativar plataforma'}
-          </Button>
+          <p className="mb-3 mt-1 text-xs text-muted-foreground">Quem enxerga e acessa esta plataforma.</p>
+          <div className="space-y-1.5">
+            {OPCOES_VIS.map((o) => {
+              const atual = o.modo === modo
+              const carregando = pending && op === 'vis' && !atual
+              return (
+                <button key={o.modo} type="button" disabled={pending} onClick={() => definirVis(o.modo)}
+                  className={cn('flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors',
+                    atual ? 'border-primary bg-primary/5' : 'hover:border-primary/40 hover:bg-muted/50', pending && 'opacity-70')}>
+                  <span className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', atual ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
+                    {carregando ? <Loader2 className="h-4 w-4 animate-spin" /> : <o.icon className="h-4 w-4" />}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2 text-sm font-medium">{o.titulo}{atual && <Check className="h-3.5 w-3.5 text-primary" />}</span>
+                    <span className="block text-xs text-muted-foreground">{o.desc}</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
         <div className="rounded-2xl border bg-card p-4 shadow-sm">
           <h2 className="text-sm font-semibold">Painel da plataforma</h2>
@@ -147,12 +172,12 @@ export function PlataformaGerenciar(p: Props) {
           Remove a plataforma permanentemente. Só é possível quando ela está <span className="font-medium text-foreground">oculta</span> e <span className="font-medium text-foreground">vazia</span> (sem estudantes nem simulados).
           {!vazia && <> Atualmente ela tem {p.estudantes} estudante(s) e {p.simulados} simulado(s).</>}
         </p>
-        <Button variant="outline" onClick={excluir} disabled={pending || p.ativo || !vazia}
+        <Button variant="outline" onClick={excluir} disabled={pending || bloqueiaExcluir || !vazia}
           className="border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground">
           {pending && op === 'excluir' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />} Excluir definitivamente
         </Button>
-        {(p.ativo || !vazia) && (
-          <p className="mt-2 text-[11px] text-muted-foreground">{p.ativo ? 'Oculte a plataforma primeiro. ' : ''}{!vazia ? 'Remova o conteúdo (estudantes/simulados) antes.' : ''}</p>
+        {(bloqueiaExcluir || !vazia) && (
+          <p className="mt-2 text-[11px] text-muted-foreground">{bloqueiaExcluir ? 'Deixe a plataforma oculta primeiro. ' : ''}{!vazia ? 'Remova o conteúdo (estudantes/simulados) antes.' : ''}</p>
         )}
       </div>
     </div>

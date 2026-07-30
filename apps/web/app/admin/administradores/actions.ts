@@ -1,7 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/server'
-import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
+import { getCurrentAccess, accessCan, isSuperAdmin } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
 
@@ -29,15 +29,39 @@ function gerarSenha() {
 }
 
 /**
+ * Resolve o CONTEXTO da ação de RBAC.
+ * - `tenantIdAlvo` presente → modo CONSOLE SUPER: exige super-admin global e opera na
+ *   plataforma-alvo (o super gerencia o RBAC de qualquer tenant a partir de /super).
+ * - ausente → modo painel do tenant: exige `rbac:manage` e opera no tenant logado.
+ * `userId` é o do ator (para o anti-lockout de auto-rebaixamento/desativação).
+ */
+async function resolverContexto(tenantIdAlvo?: string):
+  Promise<{ ok: true; tenantId: string; userId: string | null; ehSuper: boolean } | { ok: false; error: string }> {
+  if (tenantIdAlvo) {
+    if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
+    const access = await getCurrentAccess()
+    return { ok: true, tenantId: tenantIdAlvo, userId: access.userId ?? null, ehSuper: true }
+  }
+  const access = await getCurrentAccess()
+  if (!accessCan(access, 'rbac:manage')) return { ok: false, error: 'Sem permissão.' }
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  return { ok: true, tenantId: access.tenantId, userId: access.userId ?? null, ehSuper: false }
+}
+
+function revalidarRbac(tenantId: string, ehSuper: boolean) {
+  if (ehSuper) revalidatePath(`/super/plataformas/${tenantId}`)
+  else revalidatePath('/admin/administradores')
+}
+
+/**
  * Lista os membros da equipe do tenant (linhas de simulado_tenant_acessos) com
  * nome/e-mail resolvidos do auth (fonte autoritativa — admins podem não ter perfil),
  * além dos cargos disponíveis para atribuir.
  */
-export async function listarAdministradores(): Promise<{ ok: boolean; error?: string; membros?: AdminMembro[]; cargos?: CargoOpcao[] }> {
-  const access = await getCurrentAccess()
-  if (!accessCan(access, 'rbac:manage')) return { ok: false, error: 'Sem permissão.' }
-  const tenantId = access.tenantId
-  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+export async function listarAdministradores(tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string; membros?: AdminMembro[]; cargos?: CargoOpcao[] }> {
+  const ctx = await resolverContexto(tenantIdAlvo)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+  const { tenantId, userId } = ctx
   const svc = createAdminClient()
 
   const { data: acessos, error } = await svc
@@ -62,7 +86,7 @@ export async function listarAdministradores(): Promise<{ ok: boolean; error?: st
       cargo: (a.role as string) ?? 'estudante',
       ativo: !!a.ativo,
       criadoEm: (a.created_at as string) ?? null,
-      ehVoce: a.user_id === access.userId,
+      ehVoce: a.user_id === userId,
     }
   }))
 
@@ -87,11 +111,11 @@ export async function listarAdministradores(): Promise<{ ok: boolean; error?: st
  */
 export async function criarAdministradorAction(
   data: { nome: string; email: string; cargo: string; senha?: string },
+  tenantIdAlvo?: string,
 ): Promise<{ ok: boolean; error?: string; senha?: string; jaExistia?: boolean }> {
-  const access = await getCurrentAccess()
-  if (!accessCan(access, 'rbac:manage')) return { ok: false, error: 'Sem permissão.' }
-  const tenantId = access.tenantId
-  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const ctx = await resolverContexto(tenantIdAlvo)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+  const { tenantId } = ctx
 
   const nome = data.nome?.trim()
   const email = data.email?.trim().toLowerCase()
@@ -134,8 +158,8 @@ export async function criarAdministradorAction(
   )
   if (acErr) return { ok: false, error: acErr.message }
 
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_tenant_acessos', entidadeId: userId, depois: { email, cargo, nome, ja_existia: jaExistia } })
-  revalidatePath('/admin/administradores')
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_tenant_acessos', entidadeId: userId, tenantId, depois: { email, cargo, nome, ja_existia: jaExistia } })
+  revalidarRbac(tenantId, ctx.ehSuper)
 
   // Só faz sentido exibir a senha quando ela foi gerada agora para um usuário novo.
   const mostrarSenha = !data.senha?.trim() && !jaExistia
@@ -143,36 +167,34 @@ export async function criarAdministradorAction(
 }
 
 /** Altera o cargo (perfil) de um membro. Bloqueia auto-rebaixamento (anti-lockout). */
-export async function trocarCargoAction(userId: string, cargo: string): Promise<{ ok: boolean; error?: string }> {
-  const access = await getCurrentAccess()
-  if (!accessCan(access, 'rbac:manage')) return { ok: false, error: 'Sem permissão.' }
-  const tenantId = access.tenantId
-  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+export async function trocarCargoAction(userId: string, cargo: string, tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await resolverContexto(tenantIdAlvo)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+  const { tenantId } = ctx
   if (!cargo?.trim()) return { ok: false, error: 'Cargo inválido.' }
-  if (userId === access.userId && !CARGOS_ACESSO_TOTAL.has(cargo)) {
+  if (userId === ctx.userId && !CARGOS_ACESSO_TOTAL.has(cargo)) {
     return { ok: false, error: 'Você não pode rebaixar o seu próprio cargo (evita se trancar para fora).' }
   }
   const svc = createAdminClient()
   const { data: antes } = await svc.from('simulado_tenant_acessos').select('role').eq('user_id', userId).eq('tenant_id', tenantId).maybeSingle()
   const { error } = await svc.from('simulado_tenant_acessos').update({ role: cargo }).eq('user_id', userId).eq('tenant_id', tenantId)
   if (error) return { ok: false, error: error.message }
-  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenant_acessos', entidadeId: userId, antes: antes ?? undefined, depois: { role: cargo } })
-  revalidatePath('/admin/administradores')
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenant_acessos', entidadeId: userId, tenantId, antes: antes ?? undefined, depois: { role: cargo } })
+  revalidarRbac(tenantId, ctx.ehSuper)
   return { ok: true }
 }
 
-/** Ativa/desativa o acesso de um membro. Bloqueia auto-desativação (anti-lockout). */
-export async function toggleAtivoAdminAction(userId: string, ativo: boolean): Promise<{ ok: boolean; error?: string }> {
-  const access = await getCurrentAccess()
-  if (!accessCan(access, 'rbac:manage')) return { ok: false, error: 'Sem permissão.' }
-  const tenantId = access.tenantId
-  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
-  if (userId === access.userId && !ativo) return { ok: false, error: 'Você não pode desativar o seu próprio acesso.' }
+/** Ativa/desativa o acesso de um membro (soft — preserva o cadastro). Bloqueia auto-desativação. */
+export async function toggleAtivoAdminAction(userId: string, ativo: boolean, tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await resolverContexto(tenantIdAlvo)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+  const { tenantId } = ctx
+  if (userId === ctx.userId && !ativo) return { ok: false, error: 'Você não pode desativar o seu próprio acesso.' }
   const svc = createAdminClient()
   const { error } = await svc.from('simulado_tenant_acessos').update({ ativo }).eq('user_id', userId).eq('tenant_id', tenantId)
   if (error) return { ok: false, error: error.message }
-  await registrarAudit({ operacao: ativo ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_tenant_acessos', entidadeId: userId, depois: { ativo } })
-  revalidatePath('/admin/administradores')
+  await registrarAudit({ operacao: ativo ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_tenant_acessos', entidadeId: userId, tenantId, depois: { ativo } })
+  revalidarRbac(tenantId, ctx.ehSuper)
   return { ok: true }
 }
 
@@ -180,11 +202,10 @@ export async function toggleAtivoAdminAction(userId: string, ativo: boolean): Pr
  * Redefine a senha do membro (login global). Se `senha` vier vazia, gera uma aleatória.
  * A senha efetiva é retornada para exibição única no painel.
  */
-export async function resetarSenhaAdminAction(userId: string, senha?: string): Promise<{ ok: boolean; error?: string; senha?: string; gerada?: boolean }> {
-  const access = await getCurrentAccess()
-  if (!accessCan(access, 'rbac:manage')) return { ok: false, error: 'Sem permissão.' }
-  const tenantId = access.tenantId
-  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+export async function resetarSenhaAdminAction(userId: string, senha?: string, tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string; senha?: string; gerada?: boolean }> {
+  const ctx = await resolverContexto(tenantIdAlvo)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+  const { tenantId } = ctx
 
   const digitada = senha?.trim()
   if (digitada && digitada.length < 6) return { ok: false, error: 'A senha deve ter ao menos 6 caracteres.' }
@@ -198,6 +219,6 @@ export async function resetarSenhaAdminAction(userId: string, senha?: string): P
   const nova = digitada || gerarSenha()
   const { error } = await svc.auth.admin.updateUserById(userId, { password: nova })
   if (error) return { ok: false, error: error.message }
-  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenant_acessos', entidadeId: userId, depois: { senha_resetada: true, gerada } })
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenant_acessos', entidadeId: userId, tenantId, depois: { senha_resetada: true, gerada } })
   return { ok: true, senha: nova, gerada }
 }

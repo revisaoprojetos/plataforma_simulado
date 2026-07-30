@@ -1,10 +1,10 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { NovoTenantForm } from '@/components/admin/novo-tenant-form'
+import { NovaPlataformaBotao } from '@/components/super/nova-plataforma-botao'
 import { PlataformaAcoes } from '@/components/super/plataforma-acoes'
 import { SecaoHeader } from '@/components/admin/secao-header'
-import { Building2, Plus } from 'lucide-react'
+import { Building2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,19 +26,15 @@ export default async function SuperPlataformasPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Plataformas</h1>
-        <p className="text-muted-foreground">
-          Crie e gerencie as plataformas (tenants). Cada uma nasce isolada, com perfis, mensagens e um admin próprio.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Plataformas</h1>
+          <p className="text-muted-foreground">
+            Crie e gerencie as plataformas (tenants). Cada uma nasce isolada, com perfis, mensagens e um admin próprio.
+          </p>
+        </div>
+        <NovaPlataformaBotao />
       </div>
-
-      <Card className="overflow-hidden" style={{ ['--card-spacing' as never]: '0px' }}>
-        <SecaoHeader icon={Plus} titulo="Nova plataforma" subtitulo="Já recebe perfis de acesso, mensagens padrão e um admin inicial." />
-        <CardContent className="px-4 py-4">
-          <NovoTenantForm />
-        </CardContent>
-      </Card>
 
       <Card className="overflow-hidden" style={{ ['--card-spacing' as never]: '0px' }}>
         <SecaoHeader icon={Building2} titulo="Plataformas cadastradas" subtitulo={`${tenants?.length ?? 0} plataforma(s)`} />

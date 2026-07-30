@@ -2,36 +2,70 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { checkPermission } from '@/lib/auth/permissions'
+import { checkPermission, isSuperAdmin } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
+
+/**
+ * Resolve o tenant do RBAC. Com `tenantIdAlvo` (só super-admin) opera na plataforma-alvo
+ * a partir do console /super; sem ele, exige `rbac:manage` e usa o tenant da sessão.
+ */
+async function ctxRbac(tenantIdAlvo?: string): Promise<{ ok: true; tenantId: string; ehSuper: boolean } | { ok: false; error: string }> {
+  if (tenantIdAlvo && (await isSuperAdmin())) return { ok: true, tenantId: tenantIdAlvo, ehSuper: true }
+  if (!(await checkPermission('rbac:manage'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  return { ok: true, tenantId, ehSuper: false }
+}
+function revalRbac(tenantId: string, ehSuper: boolean) {
+  revalidatePath('/admin/administradores/permissoes')
+  if (ehSuper) revalidatePath(`/super/plataformas/${tenantId}/rbac`)
+}
 
 export async function createRoleAction(
   nome: string,
   descricao: string,
-): Promise<{ ok: boolean; error?: string }> {
-  if (!(await checkPermission('rbac:manage'))) return { ok: false, error: 'Sem permissão.' }
-  const tenantId = await getCurrentTenantId()
-  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  tenantIdAlvo?: string,
+  categoriaId?: string,
+): Promise<{ ok: boolean; error?: string; id?: string }> {
+  const ctx = await ctxRbac(tenantIdAlvo)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+  const { tenantId } = ctx
 
   const slug = nome.trim().toLowerCase().replace(/\s+/g, '_')
   if (!slug) return { ok: false, error: 'Informe um nome de perfil.' }
 
   const supabase = createAdminClient()
-  const { error } = await supabase
+  const { data: novo, error } = await supabase
     .from('simulado_roles')
     .insert({ tenant_id: tenantId, nome: slug, descricao: descricao.trim() || null })
+    .select('id')
+    .single()
 
   if (error) return { ok: false, error: error.message }
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_roles', depois: { nome: slug, descricao } })
-  revalidatePath('/admin/administradores/permissoes')
-  return { ok: true }
+
+  // Categoria (banda da matriz) — só no console super (grava em tema.rbac.cargoCategoria).
+  if (categoriaId && ctx.ehSuper && novo?.id) {
+    try {
+      const { data: t } = await supabase.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
+      const tema = { ...((t?.tema as Record<string, unknown>) ?? {}) }
+      const rbac = (tema.rbac as { categorias?: unknown[]; cargoCategoria?: Record<string, string> } | undefined) ?? {}
+      const cc = { ...(rbac.cargoCategoria ?? {}) }
+      cc[novo.id] = categoriaId
+      tema.rbac = { categorias: rbac.categorias ?? [], cargoCategoria: cc }
+      await supabase.from('simulado_tenants').update({ tema }).eq('id', tenantId)
+    } catch { /* categoria é best-effort */ }
+  }
+
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_roles', tenantId, depois: { nome: slug, descricao } })
+  revalRbac(tenantId, ctx.ehSuper)
+  return { ok: true, id: novo?.id }
 }
 
-export async function deleteRoleAction(roleId: string): Promise<{ ok: boolean; error?: string }> {
-  if (!(await checkPermission('rbac:manage'))) return { ok: false, error: 'Sem permissão.' }
-  const tenantId = await getCurrentTenantId()
-  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+export async function deleteRoleAction(roleId: string, tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await ctxRbac(tenantIdAlvo)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+  const { tenantId } = ctx
   const supabase = createAdminClient()
   // Só perfis do próprio tenant (nunca de outro tenant, nem os de sistema).
   const { data: role } = await supabase.from('simulado_roles').select('is_sistema, nome').eq('id', roleId).eq('tenant_id', tenantId).maybeSingle()
@@ -39,20 +73,22 @@ export async function deleteRoleAction(roleId: string): Promise<{ ok: boolean; e
   if (role.is_sistema) return { ok: false, error: 'Perfil de sistema não pode ser excluído.' }
   const { error } = await supabase.from('simulado_roles').delete().eq('id', roleId).eq('tenant_id', tenantId)
   if (error) return { ok: false, error: error.message }
-  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_roles', entidadeId: roleId, antes: role ?? undefined })
-  revalidatePath('/admin/administradores/permissoes')
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_roles', entidadeId: roleId, tenantId, antes: role ?? undefined })
+  revalRbac(tenantId, ctx.ehSuper)
   return { ok: true }
 }
 
 export async function saveRolePermissions(
   roleId: string,
   permissionIds: string[],
-  _tenantIdCliente?: string, // ignorado: o tenant é sempre derivado da sessão (não confiar no cliente)
+  // Só é aceito quando o CHAMADOR é super-admin (console /super). No painel do tenant é
+  // ignorado — o tenant vem da sessão (não se confia no cliente).
+  tenantIdAlvo?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    if (!(await checkPermission('rbac:manage'))) return { ok: false, error: 'Sem permissão.' }
-    const tenantId = await getCurrentTenantId()
-    if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+    const ctx = await ctxRbac(tenantIdAlvo)
+    if (!ctx.ok) return { ok: false, error: ctx.error }
+    const { tenantId } = ctx
     const supabase = createAdminClient()
 
     // Só permite editar permissões de um perfil DO PRÓPRIO TENANT (perfis de sistema

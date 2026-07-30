@@ -27,9 +27,23 @@ export async function GET() {
     if (!tenantIds.length) return NextResponse.json({ plataformas: [] })
   }
 
-  let q = svc.from('simulado_tenants').select('id, nome, slug, dominio, tema').eq('ativo', true).order('nome')
+  let q = svc.from('simulado_tenants').select('id, nome, slug, dominio, tema, ativo').order('nome')
   if (tenantIds) q = q.in('id', tenantIds)
-  const { data: tenants } = await q
+  const { data: todas } = await q
+
+  // Visibilidade (filtro em JS — robusto e barato; o nº de plataformas é pequeno):
+  //   - "Todos" (ativo): qualquer admin.
+  //   - "Só admin" (tema.somente_admin): admins da plataforma (o recorte por tenant já está
+  //      no `tenantIds` para não-super) e super-admins.
+  //   - "Só super-admin" (tema.somente_super): APENAS super-admin global.
+  //   - "Oculta": ninguém.
+  const tenants = (todas ?? []).filter((t: any) => {
+    if (t.ativo === true) return true
+    const tema = (t.tema as any) ?? {}
+    if (tema.somente_super === true) return superAdmin
+    if (tema.somente_admin === true) return true
+    return false
+  })
 
   const plataformas = (tenants ?? []).map((t: any) => ({
     id: t.id,
@@ -40,6 +54,7 @@ export async function GET() {
     estilo: (t.tema as any)?.logo_selecao_estilo ?? 'redonda',
     semFundo: !!(t.tema as any)?.logo_selecao_sem_fundo,
     cor: (t.tema as any)?.cor_primaria ?? (t.tema as any)?.cores?.primaria ?? null,
+    teste: !t.ativo, // só-admin (não pública) — a UI pode marcar como "teste"
   }))
 
   return NextResponse.json({ plataformas, superAdmin })

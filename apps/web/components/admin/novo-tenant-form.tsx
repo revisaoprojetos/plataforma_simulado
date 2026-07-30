@@ -12,7 +12,7 @@ import { Plus, Loader2, Copy, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { createTenantAction } from '@/app/admin/tenants/actions'
 
-export function NovoTenantForm() {
+export function NovoTenantForm({ onSuccess }: { onSuccess?: () => void }) {
   const [nome, setNome] = useState('')
   const [slug, setSlug] = useState('')
   const [plano, setPlano] = useState('basico')
@@ -36,6 +36,8 @@ export function NovoTenantForm() {
         if (r.senha) setCredenciais({ email, senha: r.senha })
         setNome(''); setSlug(''); setEmail(''); setPlano('basico')
         router.refresh()
+        // Fecha o modal quando não há credencial para exibir (a senha gerada precisa ficar visível).
+        if (!r.senha) onSuccess?.()
       } else {
         toast.error(r.error ?? 'Erro ao criar plataforma')
       }

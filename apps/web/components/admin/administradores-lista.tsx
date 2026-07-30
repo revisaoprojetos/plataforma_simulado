@@ -18,7 +18,7 @@ function iniciais(nome: string | null, email: string | null) {
   return base.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((n) => n[0]?.toUpperCase()).join('')
 }
 
-export function AdministradoresLista({ membros, cargos }: { membros: AdminMembro[]; cargos: CargoOpcao[] }) {
+export function AdministradoresLista({ membros, cargos, tenantId }: { membros: AdminMembro[]; cargos: CargoOpcao[]; tenantId?: string }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [q, setQ] = useState('')
@@ -50,7 +50,7 @@ export function AdministradoresLista({ membros, cargos }: { membros: AdminMembro
 
   function trocarCargo(m: AdminMembro, cargo: string) {
     if (cargo === m.cargo) return
-    agir(m.userId, () => trocarCargoAction(m.userId, cargo), 'Cargo atualizado.')
+    agir(m.userId, () => trocarCargoAction(m.userId, cargo, tenantId), 'Cargo atualizado.')
   }
 
   async function toggleAtivo(m: AdminMembro) {
@@ -59,7 +59,7 @@ export function AdministradoresLista({ membros, cargos }: { membros: AdminMembro
       mensagem: `Desativar o acesso de ${m.nome || m.email || 'este administrador'}? Ele deixa de conseguir entrar no painel (o cadastro é preservado).`,
       confirmar: 'Desativar', destrutivo: true,
     }))) return
-    agir(m.userId, () => toggleAtivoAdminAction(m.userId, !m.ativo), m.ativo ? 'Acesso desativado.' : 'Acesso reativado.')
+    agir(m.userId, () => toggleAtivoAdminAction(m.userId, !m.ativo, tenantId), m.ativo ? 'Acesso desativado.' : 'Acesso reativado.')
   }
 
   function confirmarReset() {
@@ -69,7 +69,7 @@ export function AdministradoresLista({ membros, cargos }: { membros: AdminMembro
     if (digitada && digitada.length < 6) { toast.error('A senha deve ter ao menos 6 caracteres.'); return }
     setAlvo(m.userId)
     start(async () => {
-      const r = await resetarSenhaAdminAction(m.userId, digitada || undefined)
+      const r = await resetarSenhaAdminAction(m.userId, digitada || undefined, tenantId)
       setAlvo(null)
       if (!r.ok || !r.senha) { toast.error(r.error ?? 'Falha ao redefinir.'); return }
       setResetAlvo(null); setResetSenha('')

@@ -83,6 +83,33 @@ export async function toggleTenantAtivoAction(id: string, ativo: boolean): Promi
   return { ok: true }
 }
 
+export type VisibilidadeModo = 'todos' | 'so_admin' | 'so_super' | 'oculta'
+
+/**
+ * Define a VISIBILIDADE da plataforma (super-admin) em 4 estados — sem migração, usando o
+ * `ativo` (boolean) + as flags `tema.somente_admin` / `tema.somente_super` (jsonb já existente):
+ *   - todos:    ativo=true                        → alunos + admins.
+ *   - so_admin: ativo=false + tema.somente_admin  → admins da plataforma (e super); alunos bloqueados.
+ *   - so_super: ativo=false + tema.somente_super  → SÓ super-admin global; todo o resto bloqueado.
+ *   - oculta:   ativo=false                        → ninguém.
+ * O seletor de admin lista as `so_admin` (para os admins da plataforma) e as `so_super` (só p/ super);
+ * o seletor de aluno e o login do aluno continuam exigindo `ativo=true`.
+ */
+export async function setTenantVisibilidadeAction(id: string, modo: VisibilidadeModo): Promise<{ ok: boolean; error?: string }> {
+  if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
+  const svc = createAdminClient()
+  const { data: t } = await svc.from('simulado_tenants').select('tema').eq('id', id).maybeSingle()
+  const tema = { ...((t?.tema as Record<string, unknown>) ?? {}) }
+  const ativo = modo === 'todos'
+  tema.somente_admin = modo === 'so_admin'
+  tema.somente_super = modo === 'so_super'
+  const { error } = await svc.from('simulado_tenants').update({ ativo, tema }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: ativo ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_tenants', entidadeId: id, tenantId: id, depois: { visibilidade: modo } })
+  revalidatePath('/admin/tenants'); revalidatePath('/super/plataformas'); revalidatePath(`/super/plataformas/${id}`)
+  return { ok: true }
+}
+
 interface EditarTenant {
   nome: string
   slug: string
@@ -115,10 +142,12 @@ export async function deleteTenantAction(id: string, confirmNome: string): Promi
   if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
   const svc = createAdminClient()
 
-  const { data: tenant } = await svc.from('simulado_tenants').select('nome, slug, ativo').eq('id', id).maybeSingle()
+  const { data: tenant } = await svc.from('simulado_tenants').select('nome, slug, ativo, tema').eq('id', id).maybeSingle()
   if (!tenant) return { ok: false, error: 'Plataforma não encontrada.' }
   if ((confirmNome ?? '').trim() !== tenant.nome) return { ok: false, error: 'O nome digitado não confere com o da plataforma.' }
-  if (tenant.ativo) return { ok: false, error: 'Oculte (desative) a plataforma antes de excluí-la.' }
+  const tema = (tenant.tema as Record<string, unknown> | null) ?? {}
+  const naoOculta = tenant.ativo || !!tema.somente_admin || !!tema.somente_super
+  if (naoOculta) return { ok: false, error: 'Deixe a plataforma OCULTA (nem “Todos”, nem “Só admin”, nem “Só super-admin”) antes de excluí-la.' }
 
   // Bloqueia se houver conteúdo real.
   const [{ count: estudantes }, { count: simulados }] = await Promise.all([
@@ -136,6 +165,66 @@ export async function deleteTenantAction(id: string, confirmNome: string): Promi
 
   await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_tenants', entidadeId: id, antes: { nome: tenant.nome, slug: tenant.slug } })
   revalidatePath('/admin/tenants'); revalidatePath('/super/plataformas')
+  return { ok: true }
+}
+
+// ─────────────────── CATEGORIAS DE CARGO (bandas da matriz RBAC) ───────────────────
+// Sem migração: guardadas em simulado_tenants.tema.rbac = { categorias:[{id,nome,cor}],
+// cargoCategoria:{ [roleId]: categoriaId } }. Só super-admin gerencia.
+
+export type RbacCategoria = { id: string; nome: string; cor: string }
+
+async function lerRbacTema(svc: ReturnType<typeof createAdminClient>, id: string) {
+  const { data } = await svc.from('simulado_tenants').select('tema').eq('id', id).maybeSingle()
+  const tema = { ...((data?.tema as Record<string, unknown>) ?? {}) }
+  const rbac = (tema.rbac as { categorias?: RbacCategoria[]; cargoCategoria?: Record<string, string> } | undefined) ?? {}
+  return {
+    tema,
+    categorias: Array.isArray(rbac.categorias) ? rbac.categorias : [],
+    cargoCategoria: (rbac.cargoCategoria && typeof rbac.cargoCategoria === 'object') ? { ...rbac.cargoCategoria } : {},
+  }
+}
+async function gravarRbacTema(svc: ReturnType<typeof createAdminClient>, id: string, tema: Record<string, unknown>, categorias: RbacCategoria[], cargoCategoria: Record<string, string>) {
+  tema.rbac = { categorias, cargoCategoria }
+  return svc.from('simulado_tenants').update({ tema }).eq('id', id)
+}
+
+export async function criarCategoriaCargoAction(id: string, nome: string, cor: string): Promise<{ ok: boolean; error?: string }> {
+  if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
+  const nm = nome?.trim()
+  if (!nm) return { ok: false, error: 'Informe o nome da categoria.' }
+  const svc = createAdminClient()
+  const { tema, categorias, cargoCategoria } = await lerRbacTema(svc, id)
+  if (categorias.some((c) => c.nome.toLowerCase() === nm.toLowerCase())) return { ok: false, error: 'Já existe uma categoria com esse nome.' }
+  const catId = globalThis.crypto?.randomUUID?.() ?? `cat_${categorias.length + 1}`
+  categorias.push({ id: catId, nome: nm, cor: cor || '#6366f1' })
+  const { error } = await gravarRbacTema(svc, id, tema, categorias, cargoCategoria)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath(`/super/plataformas/${id}/rbac`)
+  return { ok: true }
+}
+
+export async function excluirCategoriaCargoAction(id: string, categoriaId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
+  const svc = createAdminClient()
+  const { tema, categorias, cargoCategoria } = await lerRbacTema(svc, id)
+  const cats = categorias.filter((c) => c.id !== categoriaId)
+  for (const [rid, cid] of Object.entries(cargoCategoria)) if (cid === categoriaId) delete cargoCategoria[rid]
+  const { error } = await gravarRbacTema(svc, id, tema, cats, cargoCategoria)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath(`/super/plataformas/${id}/rbac`)
+  return { ok: true }
+}
+
+export async function atribuirCategoriaCargoAction(id: string, roleId: string, categoriaId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
+  const svc = createAdminClient()
+  const { tema, categorias, cargoCategoria } = await lerRbacTema(svc, id)
+  if (categoriaId) cargoCategoria[roleId] = categoriaId
+  else delete cargoCategoria[roleId]
+  const { error } = await gravarRbacTema(svc, id, tema, categorias, cargoCategoria)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath(`/super/plataformas/${id}/rbac`)
   return { ok: true }
 }
 
