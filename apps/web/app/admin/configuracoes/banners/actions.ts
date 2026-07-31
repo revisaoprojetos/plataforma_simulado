@@ -80,6 +80,16 @@ export async function toggleBannerAction(id: string, ativo: boolean, tenantIdAlv
   return { ok: true }
 }
 
+export async function reordenarBannersAction(ordens: { id: string; ordem: number }[], tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string }> {
+  const c = await ctx(tenantIdAlvo); if (!c.ok) return c
+  for (const o of ordens) {
+    const { error } = await c.svc.from('simulado_banners').update({ ordem: o.ordem, atualizado_em: new Date().toISOString() }).eq('id', o.id).eq('tenant_id', c.tenantId)
+    if (error) return { ok: false, error: error.message }
+  }
+  reval(c.tenantId, c.ehSuper)
+  return { ok: true }
+}
+
 export async function excluirBannerAction(id: string, tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string }> {
   const c = await ctx(tenantIdAlvo); if (!c.ok) return c
   const { error } = await c.svc.from('simulado_banners').delete().eq('id', id).eq('tenant_id', c.tenantId)

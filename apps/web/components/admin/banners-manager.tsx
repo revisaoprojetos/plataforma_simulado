@@ -1,9 +1,9 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, Loader2, Trash2, Eye, EyeOff, Megaphone, MessageSquareWarning, ImageIcon, Upload, X, Crop, Settings, Clapperboard } from 'lucide-react'
+import { Plus, Loader2, Trash2, Eye, EyeOff, Megaphone, MessageSquareWarning, ImageIcon, Upload, X, Crop, Settings, Clapperboard, GripVertical } from 'lucide-react'
 import { redimensionarImagem } from '@/lib/imagem'
 import { BannerCropper } from '@/components/admin/banner-cropper'
 import { BannerEditModal } from '@/components/admin/banner-edit-modal'
@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { criarBannerAction, toggleBannerAction, excluirBannerAction } from '@/app/admin/configuracoes/banners/actions'
+import { criarBannerAction, toggleBannerAction, excluirBannerAction, reordenarBannersAction } from '@/app/admin/configuracoes/banners/actions'
 
 export type Banner = {
   id: string; tipo: 'banner' | 'popup' | 'hero'; titulo: string | null; mensagem: string | null
@@ -45,7 +45,30 @@ export function BannersManager({ banners, tenantId, destinos }: { banners: Banne
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropOpen, setCropOpen] = useState(false)
   const [editando, setEditando] = useState<Banner | null>(null)
+  const [lista, setLista] = useState<Banner[]>(banners)
+  useEffect(() => { setLista(banners) }, [banners])
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [overIdx, setOverIdx] = useState<number | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  function persistirOrdem(nova: Banner[]) {
+    setLista(nova) // otimista
+    setAlvo('ordem')
+    start(async () => {
+      const r = await reordenarBannersAction(nova.map((b, i) => ({ id: b.id, ordem: i })), tenantId)
+      setAlvo(null)
+      if (!r.ok) { toast.error(r.error ?? 'Falha ao reordenar.'); setLista(banners); return }
+      router.refresh()
+    })
+  }
+  function soltarEm(destino: number) {
+    if (dragIdx === null || dragIdx === destino) { setDragIdx(null); setOverIdx(null); return }
+    const nova = [...lista]
+    const [it] = nova.splice(dragIdx, 1)
+    nova.splice(destino, 0, it)
+    setDragIdx(null); setOverIdx(null)
+    persistirOrdem(nova)
+  }
 
   async function onArquivo(f: File | null) {
     if (!f) return
@@ -193,11 +216,25 @@ export function BannersManager({ banners, tenantId, destinos }: { banners: Banne
 
       {/* Lista */}
       <div className="space-y-2">
-        <h2 className="text-sm font-semibold">Avisos ({banners.length})</h2>
-        {banners.length === 0 ? (
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Avisos ({lista.length})</h2>
+          {lista.length > 1 && <span className="text-[11px] text-muted-foreground">Arraste pelos ⠿ para ordenar</span>}
+        </div>
+        {lista.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Nenhum banner ou pop-up ainda.</div>
-        ) : banners.map((b) => (
-          <div key={b.id} className={cn('flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm', !b.ativo && 'opacity-60')}>
+        ) : lista.map((b, idx) => {
+          const primeiro = idx === 0, ultimo = idx === lista.length - 1
+          return (
+          <div key={b.id} draggable
+            onDragStart={() => setDragIdx(idx)}
+            onDragOver={(e) => { e.preventDefault(); if (overIdx !== idx) setOverIdx(idx) }}
+            onDrop={(e) => { e.preventDefault(); soltarEm(idx) }}
+            onDragEnd={() => { setDragIdx(null); setOverIdx(null) }}
+            className={cn('flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm transition', !b.ativo && 'opacity-60', dragIdx === idx && 'opacity-40', overIdx === idx && dragIdx !== null && dragIdx !== idx && 'ring-2 ring-primary')}>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <span className={cn('flex h-6 w-6 items-center justify-center rounded-md text-[11px] font-bold', primeiro ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground')}>{idx + 1}</span>
+              <span className="cursor-grab text-muted-foreground/50 transition-colors hover:text-muted-foreground active:cursor-grabbing" title="Arraste para reordenar"><GripVertical className="h-4 w-4" /></span>
+            </div>
             {b.imagem_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={b.imagem_url} alt="" className="h-11 w-16 shrink-0 rounded-lg border object-cover" />
@@ -210,6 +247,8 @@ export function BannersManager({ banners, tenantId, destinos }: { banners: Banne
               <p className="flex items-center gap-2 truncate text-sm font-medium">
                 {b.titulo || '(sem título)'}
                 <span className="rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">{ehBannerSimulado(b) ? 'simulado' : (TIPO_LABEL[b.tipo] ?? b.tipo)}</span>
+                {primeiro && lista.length > 1 && <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">1º · primeiro</span>}
+                {ultimo && lista.length > 1 && <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">último</span>}
               </p>
               <p className="truncate text-xs text-muted-foreground">{b.mensagem || b.link || '—'}</p>
             </div>
@@ -226,7 +265,8 @@ export function BannersManager({ banners, tenantId, destinos }: { banners: Banne
               <Trash2 className="h-4 w-4" />
             </button>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} onClose={() => setEditando(null)} />}
