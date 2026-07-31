@@ -26,7 +26,9 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   // Banners de DESTAQUE (tipo 'hero'): os que apontam para um simulado (link /simulado/token)
   // viram SLIDE com o fundo do próprio simulado; os demais são banners de imagem.
   const heroAll = todosBanners.filter((b) => b.tipo === 'hero')
-  const ehSimBanner = (b: any) => typeof b.link === 'string' && b.link.startsWith('/simulado/')
+  // "Sim banner" = destaque que aponta para um simulado (/simulado/token) OU uma pasta de
+  // simulados (…?pasta=id). Ambos viram slide com o fundo do simulado/pasta.
+  const ehSimBanner = (b: any) => b.tipo === 'hero' && typeof b.link === 'string' && (b.link.startsWith('/simulado/') || /[?&]pasta=/.test(b.link))
   const simBanners = heroAll.filter(ehSimBanner)
   // Banners de imagem (banner/destaque + pop-up), SEM os de simulado (esses viram slides via `simulados`).
   const bannersSemSim = todosBanners.filter((b) => !ehSimBanner(b))
@@ -77,18 +79,49 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   // simulado referenciado (capa/cor), independentemente do acesso do aluno (clique é validado no destino).
   let heroSims: HeroSimSlide[] = []
   if (!pasta && simBanners.length) {
-    const tokens = [...new Set(simBanners.map((b) => (b.link as string).split('/simulado/')[1]?.split(/[/?#]/)[0]).filter(Boolean))]
-    const { data: simRows } = await svc.from('simulado_simulados').select('id, titulo, embed_token, regras').in('embed_token', tokens).eq('deletado', false)
-    const simPorToken = new Map<string, any>((simRows ?? []).map((s: any) => [s.embed_token, s]))
-    const visB = await resolverVisualSimulados(svc, (simRows ?? []).map((s: any) => ({ id: s.id, regras: s.regras })))
+    const tokenDe = (l: string) => l.startsWith('/simulado/') ? (l.split('/simulado/')[1]?.split(/[/?#]/)[0] || null) : null
+    const pastaDe = (l: string) => l.match(/[?&]pasta=([^&#]+)/)?.[1] ? decodeURIComponent(l.match(/[?&]pasta=([^&#]+)/)![1]) : null
+
+    // Simulados únicos (por token) → fundo do próprio simulado.
+    const tokens = [...new Set(simBanners.map((b) => tokenDe(b.link as string)).filter(Boolean))] as string[]
+    const simPorToken = new Map<string, any>()
+    if (tokens.length) {
+      const { data: simRows } = await svc.from('simulado_simulados').select('id, titulo, embed_token, regras').in('embed_token', tokens).eq('deletado', false)
+      const visB = await resolverVisualSimulados(svc, (simRows ?? []).map((s: any) => ({ id: s.id, regras: s.regras })))
+      for (const s of (simRows ?? []) as any[]) simPorToken.set(s.embed_token, { ...s, vis: visB.get(s.id) ?? null })
+    }
+
+    // Pastas (grupos de simulados) → fundo da pasta + CONTAGEM de simulados que ela tem.
+    const pastaIds = [...new Set(simBanners.map((b) => pastaDe(b.link as string)).filter(Boolean))] as string[]
+    const pastaRow = new Map<string, any>()
+    if (pastaIds.length) {
+      const r = await svc.from('simulado_pastas').select('id, nome, cor, capa_url').in('id', pastaIds)
+      for (const p of (r.data ?? []) as any[]) pastaRow.set(p.id, p)
+    }
+    const grupoById = new Map(grupos.map((g) => [g.id, g]))
+
     heroSims = simBanners.map((b) => {
-      const tok = (b.link as string).split('/simulado/')[1]?.split(/[/?#]/)[0]
+      const tok = tokenDe(b.link as string)
+      const pid = pastaDe(b.link as string)
+      if (pid) {
+        const g = grupoById.get(pid)
+        const pr = pastaRow.get(pid)
+        const total = progresso[pid]?.total ?? 0
+        return {
+          id: b.id, kind: 'sim' as const,
+          capa: b.imagem_url || g?.capa || pr?.capa_url || null,
+          cor: b.cor || g?.cor || '#6d28d9',
+          titulo: b.titulo || g?.nome || pr?.nome || 'Simulados',
+          quando: b.mensagem || null,
+          link: b.link, acao: 'Ver simulados',
+          chip: total > 0 ? `${total} simulado${total === 1 ? '' : 's'}` : null,
+        }
+      }
       const sim = tok ? simPorToken.get(tok) : null
-      const vis = sim ? visB.get(sim.id) : null
       return {
         id: b.id, kind: 'sim' as const,
-        capa: b.imagem_url || vis?.capa || null,
-        cor: b.cor || vis?.cor || '#6d28d9',
+        capa: b.imagem_url || sim?.vis?.capa || null,
+        cor: b.cor || sim?.vis?.cor || '#6d28d9',
         titulo: b.titulo || sim?.titulo || 'Simulado',
         quando: b.mensagem || null,
         link: b.link, acao: 'Fazer agora',

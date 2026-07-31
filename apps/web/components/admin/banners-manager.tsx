@@ -24,9 +24,9 @@ export type Banner = {
 
 const TIPO_LABEL: Record<string, string> = { banner: 'banner', popup: 'pop-up', hero: 'destaque' }
 
-/** Um banner de destaque que aponta para um simulado (link /simulado/token) usa o FUNDO do
- *  próprio simulado e ganha CTA "Fazer agora" na home do aluno. */
-export const ehBannerSimulado = (b: { tipo: string; link: string | null }) => b.tipo === 'hero' && !!b.link && b.link.startsWith('/simulado/')
+/** Um banner de destaque que aponta para um simulado (/simulado/token) OU uma pasta de simulados
+ *  (…?pasta=id) usa o FUNDO do simulado/pasta e ganha CTA na home do aluno (com contagem, no caso de pasta). */
+export const ehBannerSimulado = (b: { tipo: string; link: string | null }) => b.tipo === 'hero' && !!b.link && (b.link.startsWith('/simulado/') || /[?&]pasta=/.test(b.link))
 
 export type DestinoBanner = { label: string; href: string; grupo?: string }
 
@@ -65,6 +65,8 @@ export function BannersManager({ banners, tenantId, destinos }: { banners: Banne
   }
 
   const simulados = (destinos ?? []).filter((d) => (d.grupo ?? 'Simulados') === 'Simulados')
+  const pastasDest = (destinos ?? []).filter((d) => d.grupo === 'Pastas')
+  const destSim = [...pastasDest, ...simulados] // opções da aba "Simulado": pasta (com contagem) ou simulado
 
   function criar(e: React.FormEvent) {
     e.preventDefault()
@@ -122,14 +124,15 @@ export function BannersManager({ banners, tenantId, destinos }: { banners: Banne
         {uiTipo === 'hero' && <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">Banner de <strong>destaque</strong> aparece no topo da home do aluno, em carrossel. Use uma <strong>imagem larga</strong> (ex.: 1920×600). O link é opcional. A ordem segue a criação.</p>}
         {uiTipo === 'simulado' && (
           <div className="space-y-1.5 rounded-lg bg-muted/50 px-3 py-2.5">
-            <p className="text-xs text-muted-foreground">Banner que promove um <strong>simulado</strong> no topo da home, usando o <strong>fundo do próprio simulado</strong> e um botão <strong>Fazer agora</strong>. Escolha qual simulado:</p>
-            <select value={simulados.some((d) => d.href === link) ? link : ''}
-              onChange={(e) => { const d = simulados.find((x) => x.href === e.target.value); setLink(e.target.value); if (d && !titulo.trim()) setTitulo(d.label) }}
+            <p className="text-xs text-muted-foreground">Banner que promove um <strong>simulado</strong> (ou uma <strong>pasta de simulados</strong>) no topo da home, usando o <strong>fundo do próprio simulado/pasta</strong>. Pasta mostra a <strong>quantidade de simulados</strong>. Escolha:</p>
+            <select value={destSim.some((d) => d.href === link) ? link : ''}
+              onChange={(e) => { const d = destSim.find((x) => x.href === e.target.value); setLink(e.target.value); if (d && !titulo.trim()) setTitulo(d.label) }}
               className="h-9 w-full rounded-lg border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <option value="">Selecione um simulado…</option>
-              {simulados.map((d) => <option key={d.href} value={d.href}>{d.label}</option>)}
+              <option value="">Selecione um simulado ou pasta…</option>
+              {pastasDest.length > 0 && <optgroup label="Pastas (grupos de simulados)">{pastasDest.map((d) => <option key={d.href} value={d.href}>{d.label}</option>)}</optgroup>}
+              {simulados.length > 0 && <optgroup label="Simulados">{simulados.map((d) => <option key={d.href} value={d.href}>{d.label}</option>)}</optgroup>}
             </select>
-            {simulados.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhum simulado com link de acesso disponível ainda.</p>}
+            {destSim.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhum simulado ou pasta disponível ainda.</p>}
           </div>
         )}
         <div className="space-y-1"><label className="text-xs text-muted-foreground">Título</label><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Novo simulado disponível!" /></div>

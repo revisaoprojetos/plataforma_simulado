@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { X, Megaphone, ChevronLeft, ChevronRight, Play } from 'lucide-react'
+import { X, Megaphone, ChevronLeft, ChevronRight, Play, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type BannerPortal = {
@@ -21,6 +21,7 @@ export type HeroSimSlide = {
   quando: string | null
   link: string | null
   acao: string
+  chip?: string | null // ex.: "5 simulados" quando o banner aponta para uma pasta
 }
 
 type Slide = ({ kind: 'img' } & BannerPortal) | HeroSimSlide
@@ -160,6 +161,11 @@ function SimSlide({ s }: { s: HeroSimSlide }) {
         </div>
         <h2 className="text-2xl font-extrabold leading-[1.04] tracking-tight text-white drop-shadow-sm sm:text-4xl">{s.titulo}</h2>
         {s.quando && <p className="mt-1.5 line-clamp-1 max-w-lg text-xs text-white/70 sm:text-sm">{s.quando}.</p>}
+        {s.chip && (
+          <span className="mt-3 inline-flex w-fit items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+            <BookOpen className="h-3.5 w-3.5" /> {s.chip}
+          </span>
+        )}
         {s.link && (
           <span className="mt-4 inline-flex w-fit items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold shadow-lg ring-1 ring-white/15 transition-transform group-hover:scale-[1.02]"
             style={{ background: `linear-gradient(135deg, ${s.cor}, color-mix(in oklab, ${s.cor} 62%, #f5e6b8))`, color: '#1b1036' }}>
