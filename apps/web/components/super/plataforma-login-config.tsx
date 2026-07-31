@@ -223,6 +223,7 @@ export function PlataformaLoginConfig({
           </div>
           <div className="space-y-1"><label className="text-xs text-muted-foreground">Texto abaixo do botão — <strong>aluno</strong> <span className="text-muted-foreground/70">(vazio = oculto)</span></label><Input value={c.textoRodape} onChange={(e) => set('textoRodape', e.target.value)} placeholder="Ex.: Como aluno, basta o e-mail — sem senha." /></div>
           <div className="space-y-1"><label className="text-xs text-muted-foreground">Texto abaixo do botão — <strong>admin</strong> <span className="text-muted-foreground/70">(vazio = oculto)</span></label><Input value={c.textoRodapeAdmin} onChange={(e) => set('textoRodapeAdmin', e.target.value)} placeholder="Ex.: Acesso restrito à equipe administrativa." /></div>
+          <p className="text-[11px] text-muted-foreground">Dica: use <code className="rounded bg-muted px-1">[texto](https://link)</code> para adicionar um link (fica em negrito e na cor primária).</p>
         </Bloco>
 
         <div className="flex items-center gap-2 border-t pt-3">

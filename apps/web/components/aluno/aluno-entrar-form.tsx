@@ -102,6 +102,22 @@ export function AlunoEntrarForm({
   const kickerCor = ehAdmin ? (c.corTextoFormAdmin ?? c.corTextoForm ?? accent) : (c.corTextoForm ?? accent)
   const kickerTexto = ehAdmin ? (c.textoKickerAdmin || 'Área administrativa') : c.textoKicker
   const rodapeTexto = ehAdmin ? c.textoRodapeAdmin : c.textoRodape
+  // Renderiza o rodapé com suporte a links markdown [texto](url) — link em negrito e na cor primária (roxo p/ marcas roxas).
+  function rodapeNodes(txt: string): React.ReactNode {
+    const re = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g
+    const out: React.ReactNode[] = []
+    let last = 0, m: RegExpExecArray | null, i = 0
+    while ((m = re.exec(txt))) {
+      if (m.index > last) out.push(txt.slice(last, m.index))
+      out.push(
+        <a key={i} href={m[2]} target="_blank" rel="noreferrer" onClick={preview ? (e) => e.preventDefault() : undefined}
+          className="font-bold underline decoration-transparent underline-offset-2 transition hover:decoration-current" style={{ color: primaria }}>{m[1]}</a>,
+      )
+      last = m.index + m[0].length; i++
+    }
+    if (last < txt.length) out.push(txt.slice(last))
+    return out
+  }
   const plataformaLabel = c.textoPlataforma === null ? plataforma : c.textoPlataforma
   const anim = c.animacao && !preview
   const btnCor = c.botaoCor ?? primaria
@@ -168,7 +184,7 @@ export function AlunoEntrarForm({
         </div>
         <form onSubmit={submit} className="space-y-3.5">
           <Campos />
-          {rodapeTexto && <p className={cn('text-xs leading-relaxed text-muted-foreground', centro ? 'text-center' : 'text-left')}>{rodapeTexto}</p>}
+          {rodapeTexto && <p className={cn('text-xs leading-relaxed text-muted-foreground', centro ? 'text-center' : 'text-left')}>{rodapeNodes(rodapeTexto)}</p>}
         </form>
       </div>
     )
@@ -256,7 +272,7 @@ export function AlunoEntrarForm({
             )}
           </div>
           <form onSubmit={submit} className="space-y-3.5"><Campos /></form>
-          {rodapeTexto && <p className="mt-3 text-center text-xs text-muted-foreground">{rodapeTexto}</p>}
+          {rodapeTexto && <p className="mt-3 text-center text-xs text-muted-foreground">{rodapeNodes(rodapeTexto)}</p>}
         </div>
       </div>
     )
