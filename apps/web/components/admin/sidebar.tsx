@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
+import { toast } from 'sonner'
 import {
   LayoutDashboard,
   BookOpen,
@@ -37,6 +38,8 @@ import {
   UserCog,
   ShieldCheck,
   Megaphone,
+  LogOut,
+  Building2,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -50,10 +53,15 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarHeader,
+  SidebarFooter,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { useCan } from '@/components/auth/can-provider'
+import { ThemeToggle } from '@/components/theme-toggle'
+import { NotificationBell } from '@/components/admin/notification-bell'
+import { AjudaButton } from '@/components/admin/ajuda-center'
+import { logoutAction } from '@/app/login/actions'
 
 type IconType = React.ComponentType<{ className?: string; style?: React.CSSProperties }>
 
@@ -186,10 +194,12 @@ function filtroLogo(f?: string): string | undefined {
   return undefined
 }
 
-export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', isSuperAdmin = false }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; isSuperAdmin?: boolean }) {
+export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', isSuperAdmin = false, userName = 'Administrador', userEmail }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; isSuperAdmin?: boolean; userName?: string; userEmail?: string | null }) {
   const pathname = usePathname()
   const search = useSearchParams()
   const can = useCan()
+  const iniciais = userName.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || 'A'
+  const btnFooter = 'flex-1 rounded-lg border border-sidebar-border bg-[color:var(--sidebar-accent)]/40 px-3 py-1.5 text-center text-xs font-medium text-sidebar-foreground/80 transition-colors hover:bg-[color:var(--sidebar-accent)] hover:text-[color:var(--sidebar-text-active)]'
 
   // Filtra itens/grupos por permissão do usuário (super-admin gate + flag discursiva).
   const gruposVisiveis = navGroups
@@ -283,6 +293,30 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      {/* RODAPÉ: perfil + notificações + ajuda + tema + trocar/sair (absorveu a antiga topbar). */}
+      <SidebarFooter className="gap-2 border-t border-sidebar-border p-3 [&_svg]:text-[color:var(--sidebar-icon)] [&_button:hover_svg]:text-[color:var(--sidebar-icon-active)]">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary ring-1 ring-primary/25">{iniciais}</span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium leading-tight">{userName}</p>
+            {userEmail && <p className="truncate text-[11px] leading-tight text-sidebar-foreground/55">{userEmail}</p>}
+          </div>
+          <NotificationBell />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <AjudaButton />
+          <button type="button" onClick={() => { window.location.href = '/login' }} title="Trocar de plataforma" aria-label="Trocar de plataforma"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[color:var(--sidebar-accent)]">
+            <Building2 className="h-4 w-4" />
+          </button>
+          <button type="button" onClick={() => { toast.success('Saindo… logout realizado.'); logoutAction() }} className={cn(btnFooter, 'flex items-center justify-center gap-1.5')}>
+            <LogOut className="h-3.5 w-3.5" /> Sair
+          </button>
+        </div>
+      </SidebarFooter>
     </Sidebar>
   )
 }

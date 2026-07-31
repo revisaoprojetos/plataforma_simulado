@@ -2,8 +2,8 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { AdminSidebar } from '@/components/admin/sidebar'
-import { AdminHeader } from '@/components/admin/header'
 import { SidebarProvider } from '@/components/ui/sidebar'
+import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
 import { CanProvider } from '@/components/auth/can-provider'
 import { getCurrentAccess, isSuperAdmin, accessCan } from '@/lib/auth/permissions'
 import { getTenantTheme } from '@/lib/tenant-theme'
@@ -119,10 +119,10 @@ export default async function AdminLayout({
       />
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
-          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none'} isSuperAdmin={superAdmin} />
+          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none'} isSuperAdmin={superAdmin} userName={userName} userEmail={userEmail} />
           <TourProvider>
             <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-              <AdminHeader userName={userName} userEmail={userEmail} />
+              <SidebarEdgeToggle />
               <Suspense fallback={null}><NavProgress /></Suspense>
               <Suspense fallback={null}><AvisoSemAcesso /></Suspense>
               <main className="flex-1 overflow-y-auto p-6">
