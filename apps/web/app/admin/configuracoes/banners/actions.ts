@@ -7,7 +7,7 @@ import { checkPermission, isSuperAdmin } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 
 export interface BannerInput {
-  tipo: 'banner' | 'popup'
+  tipo: 'banner' | 'popup' | 'hero'
   titulo?: string | null
   mensagem?: string | null
   imagem_url?: string | null
@@ -33,7 +33,7 @@ function reval(tenantId: string, ehSuper: boolean) {
 
 export async function criarBannerAction(data: BannerInput, tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string }> {
   const c = await ctx(tenantIdAlvo); if (!c.ok) return c
-  const tipo = data.tipo === 'popup' ? 'popup' : 'banner'
+  const tipo = data.tipo === 'popup' ? 'popup' : data.tipo === 'hero' ? 'hero' : 'banner'
   const { error } = await c.svc.from('simulado_banners').insert({
     tenant_id: c.tenantId, tipo,
     titulo: data.titulo?.trim() || null,
@@ -53,7 +53,7 @@ export async function criarBannerAction(data: BannerInput, tenantIdAlvo?: string
 export async function atualizarBannerAction(id: string, data: BannerInput, tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string }> {
   const c = await ctx(tenantIdAlvo); if (!c.ok) return c
   const { error } = await c.svc.from('simulado_banners').update({
-    tipo: data.tipo === 'popup' ? 'popup' : 'banner',
+    tipo: data.tipo === 'popup' ? 'popup' : data.tipo === 'hero' ? 'hero' : 'banner',
     titulo: data.titulo?.trim() || null,
     mensagem: data.mensagem?.trim() || null,
     imagem_url: data.imagem_url?.trim() || null,

@@ -11,15 +11,17 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { criarBannerAction, toggleBannerAction, excluirBannerAction } from '@/app/admin/configuracoes/banners/actions'
 
 export type Banner = {
-  id: string; tipo: 'banner' | 'popup'; titulo: string | null; mensagem: string | null
+  id: string; tipo: 'banner' | 'popup' | 'hero'; titulo: string | null; mensagem: string | null
   imagem_url: string | null; link: string | null; cor: string | null; ativo: boolean; ordem: number
 }
+
+const TIPO_LABEL: Record<string, string> = { banner: 'banner', popup: 'pop-up', hero: 'destaque' }
 
 export function BannersManager({ banners, tenantId }: { banners: Banner[]; tenantId?: string }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [alvo, setAlvo] = useState<string | null>(null)
-  const [tipo, setTipo] = useState<'banner' | 'popup'>('banner')
+  const [tipo, setTipo] = useState<'banner' | 'popup' | 'hero'>('banner')
   const [titulo, setTitulo] = useState('')
   const [mensagem, setMensagem] = useState('')
   const [imagem, setImagem] = useState('')
@@ -66,14 +68,15 @@ export function BannersManager({ banners, tenantId }: { banners: Banner[]; tenan
       <form onSubmit={criar} className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
         <h2 className="text-sm font-semibold">Novo aviso</h2>
         <div className="flex gap-2">
-          {(['banner', 'popup'] as const).map((t) => (
+          {(['banner', 'popup', 'hero'] as const).map((t) => (
             <button key={t} type="button" onClick={() => setTipo(t)}
-              className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition', tipo === t ? 'border-primary bg-primary/5 text-primary' : 'hover:bg-muted')}>
-              {t === 'banner' ? <Megaphone className="h-4 w-4" /> : <MessageSquareWarning className="h-4 w-4" />}
-              {t === 'banner' ? 'Banner' : 'Pop-up'}
+              className={cn('flex flex-1 flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-medium transition', tipo === t ? 'border-primary bg-primary/5 text-primary' : 'hover:bg-muted')}>
+              {t === 'banner' ? <Megaphone className="h-4 w-4" /> : t === 'popup' ? <MessageSquareWarning className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
+              {t === 'banner' ? 'Banner' : t === 'popup' ? 'Pop-up' : 'Destaque'}
             </button>
           ))}
         </div>
+        {tipo === 'hero' && <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">Banner de <strong>destaque</strong> aparece no topo da home do aluno, em carrossel. Use uma <strong>imagem larga</strong> (ex.: 1920×600). O link é opcional. A ordem segue a criação.</p>}
         <div className="space-y-1"><label className="text-xs text-muted-foreground">Título</label><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Novo simulado disponível!" /></div>
         <div className="space-y-1"><label className="text-xs text-muted-foreground">Mensagem</label>
           <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={3} placeholder="Texto do aviso…" className="w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
@@ -99,7 +102,7 @@ export function BannersManager({ banners, tenantId }: { banners: Banner[]; tenan
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-2 truncate text-sm font-medium">
                 {b.titulo || '(sem título)'}
-                <span className="rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">{b.tipo === 'popup' ? 'pop-up' : 'banner'}</span>
+                <span className="rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">{TIPO_LABEL[b.tipo] ?? b.tipo}</span>
               </p>
               <p className="truncate text-xs text-muted-foreground">{b.mensagem || b.link || '—'}</p>
             </div>
