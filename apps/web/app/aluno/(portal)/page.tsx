@@ -88,9 +88,9 @@ export default async function AlunoHome() {
   ].filter((a) => !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(a.href)))
 
   const Kpi = ({ icon: Icon, label, value, tone, chip }: { icon: any; label: string; value: React.ReactNode; tone?: string; chip: string }) => (
-    <div className="rounded-2xl border bg-card/70 p-4 shadow-sm backdrop-blur">
+    <div className="group rounded-2xl border bg-card/70 p-4 shadow-sm ring-1 ring-transparent backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:ring-primary/20">
       <div className="flex items-center gap-3">
-        <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', chip)}><Icon className="h-5 w-5" /></span>
+        <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ring-white/10 transition-transform duration-300 group-hover:scale-105', chip)}><Icon className="h-5 w-5" /></span>
         <div className="min-w-0">
           <p className={cn('text-2xl font-extrabold leading-none tabular-nums', tone)}>{value}</p>
           <p className="mt-1 truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
@@ -101,15 +101,22 @@ export default async function AlunoHome() {
 
   return (
     <div className="animate-page space-y-5">
-      {/* HERO */}
-      <div className="relative overflow-hidden rounded-3xl border bg-card shadow-sm">
-        <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent" />
-        <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-primary/25 blur-3xl" />
-        <div className="relative p-5 sm:p-6">
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Olá, {sessao!.nome.split(' ')[0]} 👋</h1>
-          <p className="mt-1 text-muted-foreground">Bem-vindo à sua área de estudos. {disponiveis.length > 0 ? `Você tem ${disponiveis.length} simulado(s) disponível(is).` : 'Você está em dia com seus simulados.'}</p>
+      {/* HERO — profundidade em violeta (primary) + brilho dourado (accent). Dark/light via tokens. */}
+      <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/[0.10] via-card to-card shadow-sm">
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/[0.04] to-transparent" />
+        <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-primary/25 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute right-1/3 -top-16 h-56 w-56 rounded-full blur-3xl" style={{ background: 'color-mix(in oklab, var(--brand-accent) 28%, transparent)' }} />
+        {/* fio de acento dourado no topo */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--brand-accent) 75%, transparent), transparent)' }} />
+        <div className="relative p-5 sm:p-7">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--brand-accent)', boxShadow: '0 0 10px 1px color-mix(in oklab, var(--brand-accent) 60%, transparent)' }} />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand-accent)' }}>Sua área de estudos</span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-[2rem]">Olá, {sessao!.nome.split(' ')[0]} 👋</h1>
+          <p className="mt-1.5 text-muted-foreground">Bem-vindo à sua área de estudos. {disponiveis.length > 0 ? `Você tem ${disponiveis.length} simulado(s) disponível(is).` : 'Você está em dia com seus simulados.'}</p>
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Kpi icon={ListChecks} label="Simulados feitos" value={simuladosFeitos.length} chip="bg-indigo-500/15 text-indigo-600 dark:text-indigo-400" tone="text-indigo-600 dark:text-indigo-400" />
+            <Kpi icon={ListChecks} label="Simulados feitos" value={simuladosFeitos.length} chip="bg-primary/15 text-primary" tone="text-primary" />
             <Kpi icon={Star} label="Nota média" value={nota(notaMedia)} chip="bg-violet-500/15 text-violet-600 dark:text-violet-400" tone={notaMedia != null ? notaTone(notaMedia) : undefined} />
             <Kpi icon={Trophy} label="Melhor nota" value={nota(melhorNota)} chip="bg-amber-500/15 text-amber-600 dark:text-amber-400" tone={melhorNota != null ? notaTone(melhorNota) : undefined} />
             <Kpi icon={Star} label="Favoritos" value={favoritos ?? 0} chip="bg-sky-500/15 text-sky-600 dark:text-sky-400" tone="text-sky-600 dark:text-sky-400" />
