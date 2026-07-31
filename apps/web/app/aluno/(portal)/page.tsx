@@ -8,6 +8,7 @@ import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
 import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
 import { BannersPortal, type HeroSimSlide, type BannerChip, type BannerStats } from '@/components/aluno/banners-portal'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
+import { idsSimuladosGratuitos } from '@/lib/simulado/gratuito'
 import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } from '@/components/aluno/simulados-catalogo-aluno'
 import { SemAcessoModal } from '@/components/aluno/sem-acesso-modal'
 import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
@@ -43,10 +44,13 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   // Banners de imagem (banner/destaque + pop-up), SEM os de simulado (esses viram slides via `simulados`).
   const bannersSemSim = todosBanners.filter((b) => !ehSimBanner(b))
 
+  // Simulados de "acesso gratuito" (classificação própria) aparecem para TODOS, sem matrícula.
+  const gratuitoIds = await idsSimuladosGratuitos(svc, sessao!.tenantId)
   const ids = [...new Set([
     ...(mats ?? []).filter((m: any) => m.liberado !== false).map((m: any) => m.simulado_id),
     ...(acs ?? []).map((a: any) => a.simulado_id),
     ...(sessAll ?? []).map((s: any) => s.simulado_id),
+    ...gratuitoIds,
   ].filter(Boolean))]
   const expiraPorSim = new Map<string, string | null>()
   for (const a of (acs ?? []) as any[]) {

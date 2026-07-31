@@ -54,6 +54,7 @@ const simuladoSchema = z.object({
       caderno_publico: z.enum(['todos', 'passaporte']).optional(),
       iniciar_atrasado: z.boolean().optional(),
       entrada_antecipada: z.boolean().optional(),
+      acesso_gratuito: z.boolean().optional(),
       politica_anulacao: z.enum(['pontua_todos', 'desconsidera']).optional(),
     })
     .optional(),
@@ -96,6 +97,7 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
         caderno_publico: 'todos',
         iniciar_atrasado: false,
         entrada_antecipada: false,
+        acesso_gratuito: false,
         politica_anulacao: 'pontua_todos',
       },
       ...initialData,
@@ -201,6 +203,20 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
                 </button>{' '}— os campos de data/hora aparecem logo abaixo.
               </p>
             )}
+          </div>
+
+          {/* Acesso gratuito: classificação PRÓPRIA (≠ modo "Aberto"). Libera para TODOS os
+              alunos do tenant, sem matrícula — o simulado aparece no portal de todos. */}
+          <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+            <Switch
+              id="acesso_gratuito"
+              defaultChecked={initialData?.regras?.acesso_gratuito ?? false}
+              onCheckedChange={(v) => setValue('regras.acesso_gratuito', v)}
+            />
+            <div>
+              <Label htmlFor="acesso_gratuito">Acesso gratuito (liberado para todos)</Label>
+              <p className="text-xs text-muted-foreground">Todo aluno do tenant vê e pode fazer este simulado sem precisar de matrícula. Use no simulado gratuito de vitrine. Diferente do modo <strong>Aberto</strong>, que ainda exige matrícula.</p>
+            </div>
           </div>
 
           {(modo === 'janela_fixa') && (
