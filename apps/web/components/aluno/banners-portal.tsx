@@ -10,60 +10,45 @@ export type BannerPortal = {
   imagem_url: string | null; link: string | null; cor: string | null
 }
 
-/** Renderiza os banners (faixa dispensável) e o pop-up (modal 1x por navegador) do portal do aluno. */
+/** Renderiza os banners (imagem cheia, FIXOS — sem opção de fechar) e o pop-up (modal 1x por navegador). */
 export function BannersPortal({ banners }: { banners: BannerPortal[] }) {
-  const [dispensados, setDispensados] = useState<Set<string>>(new Set())
   const [popup, setPopup] = useState<BannerPortal | null>(null)
 
   useEffect(() => {
-    // Banners dispensados (persistente) + primeiro pop-up ainda não visto (1x por navegador).
-    const disp = new Set<string>()
-    for (const b of banners) if (b.tipo === 'banner' && localStorage.getItem('banner-dispensado-' + b.id)) disp.add(b.id)
-    setDispensados(disp)
+    // Primeiro pop-up ainda não visto (1x por navegador). Banners são fixos (não dispensáveis).
     const pop = banners.find((b) => b.tipo === 'popup' && !localStorage.getItem('popup-visto-' + b.id))
     if (pop) setPopup(pop)
   }, [banners])
 
-  function dispensar(id: string) {
-    localStorage.setItem('banner-dispensado-' + id, '1')
-    setDispensados((s) => new Set([...s, id]))
-  }
   function fecharPopup() {
     if (popup) localStorage.setItem('popup-visto-' + popup.id, '1')
     setPopup(null)
   }
 
-  const faixas = banners.filter((b) => b.tipo === 'banner' && !dispensados.has(b.id))
+  const faixas = banners.filter((b) => b.tipo === 'banner')
 
   return (
     <>
       {faixas.length > 0 && (
-        <div className="mb-4 space-y-2">
+        <div className="mb-5 space-y-3">
           {faixas.map((b) => {
             const cor = b.cor ?? '#6366f1'
-            const conteudo = (
-              <div className="flex items-center gap-3 rounded-2xl border p-3 shadow-sm" style={{ background: cor + '14', borderColor: cor + '33' }}>
-                {b.imagem_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={b.imagem_url} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
-                ) : (
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: cor + '22', color: cor }}><Megaphone className="h-5 w-5" /></span>
-                )}
+            // Banner com imagem → imagem CHEIA (largura total), sem X. Sem imagem → faixa de texto.
+            const conteudo = b.imagem_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={b.imagem_url} alt={b.titulo ?? ''} className="w-full rounded-2xl border object-cover shadow-sm" />
+            ) : (
+              <div className="flex items-center gap-3 rounded-2xl border p-4 shadow-sm" style={{ background: cor + '14', borderColor: cor + '33' }}>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: cor + '22', color: cor }}><Megaphone className="h-5 w-5" /></span>
                 <div className="min-w-0 flex-1">
-                  {b.titulo && <p className="truncate text-sm font-semibold">{b.titulo}</p>}
-                  {b.mensagem && <p className="truncate text-xs text-muted-foreground">{b.mensagem}</p>}
+                  {b.titulo && <p className="text-sm font-semibold">{b.titulo}</p>}
+                  {b.mensagem && <p className="text-xs text-muted-foreground">{b.mensagem}</p>}
                 </div>
               </div>
             )
-            return (
-              <div key={b.id} className="relative">
-                {b.link ? <Link href={b.link} className="block transition hover:opacity-90">{conteudo}</Link> : conteudo}
-                <button type="button" onClick={() => dispensar(b.id)} aria-label="Dispensar"
-                  className="absolute right-2 top-2 rounded-md p-1 text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10">
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )
+            return b.link
+              ? <Link key={b.id} href={b.link} className="block transition hover:opacity-95">{conteudo}</Link>
+              : <div key={b.id}>{conteudo}</div>
           })}
         </div>
       )}
