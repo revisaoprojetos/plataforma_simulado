@@ -61,6 +61,9 @@ export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTem
           corPrimaria={(temaCompleto as any)?.cor_primaria ?? '#6d28d9'}
           corAccent={(temaCompleto as any)?.cor_accent ?? '#f5c542'}
           logo={(temaCompleto as any)?.logo_url ?? null}
+          logoBg={(temaCompleto as any)?.logo_png_bg ?? '#ffffff'}
+          logoEstilo={(temaCompleto as any)?.logo_estilo ?? 'arredondado'}
+          logoFiltro={(temaCompleto as any)?.logo_filtro_sistema ?? (temaCompleto as any)?.logo_filtro ?? 'none'}
           plataforma={geral.nome}
           dominio={geral.dominio}
           slug={geral.slug}

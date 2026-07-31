@@ -12,9 +12,9 @@ type Metodo = 'email' | 'email_cpf' | 'email_telefone'
 const KF = `@keyframes lgDriftA{0%,100%{transform:translate(0,0) scale(1);opacity:.7}50%{transform:translate(8%,-6%) scale(1.12);opacity:1}}@keyframes lgDriftB{0%,100%{transform:translate(0,0) scale(1.08);opacity:.7}50%{transform:translate(-8%,6%) scale(1);opacity:1}}.lg-aurora{animation:lgDriftA 18s ease-in-out infinite}.lg-aurora2{animation:lgDriftB 22s ease-in-out infinite}@media (prefers-reduced-motion:reduce){.lg-aurora,.lg-aurora2{animation:none}}`
 
 export function AlunoEntrarForm({
-  metodo, plataforma, logo = null, subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', config = LOGIN_DEFAULT, preview = false,
+  metodo, plataforma, logo = null, subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', config = LOGIN_DEFAULT, preview = false,
 }: {
-  metodo: Metodo; plataforma: string; logo?: string | null; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; config?: LoginConfig; preview?: boolean
+  metodo: Metodo; plataforma: string; logo?: string | null; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; config?: LoginConfig; preview?: boolean
 }) {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -49,12 +49,22 @@ export function AlunoEntrarForm({
     } catch { setErro('Erro de conexão. Tente novamente.') } finally { setCarregando(false) }
   }
 
-  const molde = logoEstilo === 'quadrado' ? 'rounded-none' : logoEstilo === 'borda' ? 'rounded-xl border' : 'rounded-xl'
-  function Emblema({ tam = 'md' }: { tam?: 'md' | 'lg' }) {
-    const s = tam === 'lg' ? 'h-16 w-16' : 'h-14 w-14'
+  // Config de logo (override do login) com fallback ao tema.
+  const effLogo = c.logoUrl ?? logo
+  const effBg = c.logoBg ?? logoBg
+  const effEstilo = c.logoEstilo ?? logoEstilo
+  const effFiltro = c.logoFiltro ?? logoFiltro ?? 'none'
+  const molde = effEstilo === 'quadrado' ? 'rounded-none' : effEstilo === 'borda' ? 'rounded-xl border' : 'rounded-xl'
+  const filtroCss = effFiltro === 'branco' ? 'brightness(0) invert(1)' : effFiltro === 'preto' ? 'brightness(0)' : undefined
+  const SZ: Record<string, [string, string]> = { p: ['h-11 w-11', 'h-6 w-6'], m: ['h-14 w-14', 'h-7 w-7'], g: ['h-20 w-20', 'h-10 w-10'] }
+  const bump: Record<string, 'p' | 'm' | 'g'> = { p: 'm', m: 'g', g: 'g' }
+  function Emblema({ tam }: { tam?: 'lg' }) {
+    if (!c.mostrarLogo) return null
+    const key = tam === 'lg' ? bump[c.logoTamanho] : c.logoTamanho
+    const [box, ic] = SZ[key]
     return (
-      <div className={cn('flex shrink-0 items-center justify-center overflow-hidden shadow-sm', s, molde, !logo && 'bg-primary text-primary-foreground')} style={logo ? { background: logoBg } : undefined}>
-        {logo ? <img src={logo} alt={plataforma} className="h-full w-full object-contain" /> : <GraduationCap className={tam === 'lg' ? 'h-8 w-8' : 'h-7 w-7'} />}
+      <div className={cn('flex shrink-0 items-center justify-center overflow-hidden shadow-sm', box, molde, !effLogo && 'bg-primary text-primary-foreground')} style={effLogo ? { background: effBg ?? '#ffffff' } : undefined}>
+        {effLogo ? <img src={effLogo} alt={plataforma} className="h-full w-full object-contain" style={{ filter: filtroCss }} /> : <GraduationCap className={ic} />}
       </div>
     )
   }
@@ -66,17 +76,17 @@ export function AlunoEntrarForm({
     </div>
   ) : null
 
-  function MarcaTexto({ dark = true }: { dark?: boolean }) {
-    const muted = dark ? 'text-white/70' : 'text-muted-foreground'
-    const strong = dark ? 'text-white' : 'text-foreground'
+  const textoMarca = c.corTextoMarca ?? '#ffffff'
+  const mix = (pct: number) => `color-mix(in oklab, ${textoMarca} ${pct}%, transparent)`
+  function MarcaTexto() {
     return (
       <div className="relative max-w-md space-y-5">
-        <h2 className={cn('whitespace-pre-line text-[2.3rem] font-extrabold leading-[1.06] tracking-tight', strong)}>{c.titulo}</h2>
-        {c.subtitulo && <p className={muted}>{c.subtitulo}</p>}
+        {c.titulo && <h2 className="whitespace-pre-line text-[2.3rem] font-extrabold leading-[1.06] tracking-tight" style={{ color: textoMarca }}>{c.titulo}</h2>}
+        {c.subtitulo && <p style={{ color: mix(72) }}>{c.subtitulo}</p>}
         {c.destaques.length > 0 && (
           <ul className="space-y-2.5 pt-1">
             {c.destaques.map((d, i) => (
-              <li key={i} className={cn('flex items-center gap-2.5 text-sm', dark ? 'text-white/85' : 'text-foreground/80')}>
+              <li key={i} className="flex items-center gap-2.5 text-sm" style={{ color: mix(85) }}>
                 <CheckCircle2 className="h-4.5 w-4.5 shrink-0" style={{ color: accent }} /> {d}
               </li>
             ))}
@@ -137,10 +147,10 @@ export function AlunoEntrarForm({
         {Blobs}
         <div className="relative flex items-center gap-3">
           <Emblema />
-          <div className="leading-tight"><p className="text-lg font-semibold">{plataforma}</p>{subtitulo && <p className="text-sm text-white/60">{subtitulo}</p>}</div>
+          <div className="leading-tight"><p className="text-lg font-semibold" style={{ color: textoMarca }}>{plataforma}</p>{subtitulo && <p className="text-sm" style={{ color: mix(60) }}>{subtitulo}</p>}</div>
         </div>
         <MarcaTexto />
-        <div className="relative text-xs text-white/45">© {new Date().getFullYear()} {plataforma}</div>
+        <div className="relative text-xs" style={{ color: mix(45) }}>© {new Date().getFullYear()} {plataforma}</div>
       </aside>
     )
     const form = <main className={cn('relative flex items-center justify-center bg-background p-6', screen)}>{FormBloco({})}</main>
@@ -195,10 +205,12 @@ export function AlunoEntrarForm({
         <div className={cn('relative w-full max-w-md', cardCls)}>
           <div className="mb-5 flex flex-col items-center gap-3 text-center">
             <Emblema tam="lg" />
-            <div>
-              <h2 className="text-xl font-extrabold tracking-tight">{c.titulo}</h2>
-              {c.subtitulo && <p className="mt-1 text-sm text-muted-foreground">{c.subtitulo}</p>}
-            </div>
+            {(c.titulo || c.subtitulo) && (
+              <div>
+                {c.titulo && <h2 className="text-xl font-extrabold tracking-tight">{c.titulo}</h2>}
+                {c.subtitulo && <p className="mt-1 text-sm text-muted-foreground">{c.subtitulo}</p>}
+              </div>
+            )}
           </div>
           <form onSubmit={submit} className="space-y-3.5"><Campos /></form>
           <p className="mt-3 text-center text-xs text-muted-foreground">{plataforma} · basta o e-mail, sem senha.</p>

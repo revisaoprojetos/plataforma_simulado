@@ -5,6 +5,9 @@ export type LoginTemplate = 'split' | 'central' | 'hero' | 'vitrine' | 'cartao'
 export type LoginFundo = 'gradiente' | 'cor' | 'imagem'
 export type LoginLado = 'esquerda' | 'direita'
 export type CardEstilo = 'solido' | 'vidro'
+export type LogoEstilo = 'arredondado' | 'quadrado' | 'borda'
+export type LogoFiltro = 'none' | 'branco' | 'preto'
+export type LogoTam = 'p' | 'm' | 'g'
 
 export type LoginConfig = {
   template: LoginTemplate     // estilo/layout da tela
@@ -14,7 +17,15 @@ export type LoginConfig = {
   fundoImagem: string | null  // usado quando fundo = 'imagem'
   corPrimaria: string | null  // OVERRIDE da cor primária do login (botões/acento); null = usa o tema
   corAccent: string | null    // OVERRIDE da cor de destaque (kicker/checks); null = usa o tema
+  corTextoMarca: string | null // cor do TEXTO do painel da marca (separada do fundo); null = branco
   cardEstilo: CardEstilo      // card do formulário: sólido | vidro (glass)
+  // Logo (todas overrides; null = herda do tema)
+  mostrarLogo: boolean        // exibe o logo/emblema
+  logoUrl: string | null      // logo específico do login; null = logo do tema
+  logoBg: string | null       // fundo atrás do logo; null = do tema
+  logoEstilo: LogoEstilo | null // moldura do logo; null = do tema
+  logoFiltro: LogoFiltro | null // filtro (branco/preto/nenhum); null = do tema
+  logoTamanho: LogoTam        // tamanho do logo
   titulo: string              // headline do painel da marca
   subtitulo: string           // texto de apoio
   destaques: string[]         // bullets do painel da marca
@@ -30,7 +41,14 @@ export const LOGIN_DEFAULT: LoginConfig = {
   fundoImagem: null,
   corPrimaria: null,
   corAccent: null,
+  corTextoMarca: null,
   cardEstilo: 'vidro',
+  mostrarLogo: true,
+  logoUrl: null,
+  logoBg: null,
+  logoEstilo: null,
+  logoFiltro: null,
+  logoTamanho: 'm',
   titulo: 'Sua preparação começa aqui.',
   subtitulo: 'Entre com o seu e-mail e continue de onde parou — sem senha, sem atrito.',
   destaques: ['Simulados no padrão da banca', 'Correção automática e gabarito', 'Seu desempenho e evolução num só lugar'],
@@ -57,8 +75,16 @@ export function resolverLoginConfig(raw: unknown): LoginConfig {
     fundoImagem: typeof c.fundoImagem === 'string' ? c.fundoImagem : null,
     corPrimaria: typeof c.corPrimaria === 'string' && c.corPrimaria ? c.corPrimaria : null,
     corAccent: typeof c.corAccent === 'string' && c.corAccent ? c.corAccent : null,
+    corTextoMarca: typeof c.corTextoMarca === 'string' && c.corTextoMarca ? c.corTextoMarca : null,
     cardEstilo: c.cardEstilo === 'solido' ? 'solido' : 'vidro',
-    titulo: typeof c.titulo === 'string' && c.titulo.trim() ? c.titulo : LOGIN_DEFAULT.titulo,
+    mostrarLogo: c.mostrarLogo !== false,
+    logoUrl: typeof c.logoUrl === 'string' && c.logoUrl ? c.logoUrl : null,
+    logoBg: typeof c.logoBg === 'string' && c.logoBg ? c.logoBg : null,
+    logoEstilo: c.logoEstilo === 'quadrado' || c.logoEstilo === 'borda' || c.logoEstilo === 'arredondado' ? c.logoEstilo : null,
+    logoFiltro: c.logoFiltro === 'branco' || c.logoFiltro === 'preto' ? c.logoFiltro : (c.logoFiltro === 'none' ? 'none' : null),
+    logoTamanho: c.logoTamanho === 'p' || c.logoTamanho === 'g' ? c.logoTamanho : 'm',
+    // título/subtítulo: string vazia = removido (oculto); undefined = usa o default.
+    titulo: typeof c.titulo === 'string' ? c.titulo : LOGIN_DEFAULT.titulo,
     subtitulo: typeof c.subtitulo === 'string' ? c.subtitulo : LOGIN_DEFAULT.subtitulo,
     destaques: Array.isArray(c.destaques) ? c.destaques.filter((x): x is string => typeof x === 'string').slice(0, 5) : LOGIN_DEFAULT.destaques,
     mostrarMarca: c.mostrarMarca !== false,

@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Save, Loader2, Plus, X, Upload, ExternalLink, RotateCcw } from 'lucide-react'
+import { Save, Loader2, Plus, X, Upload, ExternalLink, RotateCcw, ImageOff } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { redimensionarImagem } from '@/lib/imagem'
 import { salvarTemaSuperAction } from '@/app/admin/tenants/actions'
-import { LOGIN_DEFAULT, type LoginConfig, type LoginTemplate, type LoginFundo, type CardEstilo } from '@/lib/login-config'
+import { LOGIN_DEFAULT, type LoginConfig, type LoginTemplate, type LoginFundo, type CardEstilo, type LogoEstilo, type LogoFiltro, type LogoTam } from '@/lib/login-config'
 import { AlunoEntrarForm } from '@/components/aluno/aluno-entrar-form'
 
 const TEMPLATES: { v: LoginTemplate; nome: string; desc: string; thumb: React.ReactNode }[] = [
@@ -29,16 +29,21 @@ function Thumb({ children, solid, col, pos }: { children: React.ReactNode; solid
 
 export function PlataformaLoginConfig({
   tenantId, config, corPrimaria = '#6d28d9', corAccent = '#f5c542', logo = null, plataforma = 'Plataforma', dominio = null, slug = '',
+  logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none',
 }: {
   tenantId: string; config: LoginConfig; corPrimaria?: string; corAccent?: string; logo?: string | null; plataforma?: string; dominio?: string | null; slug?: string
+  logoBg?: string; logoEstilo?: string; logoFiltro?: string
 }) {
   const router = useRouter()
   const [c, setC] = useState<LoginConfig>({ ...LOGIN_DEFAULT, ...config })
   const [pending, start] = useTransition()
   const [enviando, setEnviando] = useState(false)
+  const [enviandoLogo, setEnviandoLogo] = useState(false)
   const [urlPrevia, setUrlPrevia] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const logoRef = useRef<HTMLInputElement>(null)
   const set = <K extends keyof LoginConfig>(k: K, v: LoginConfig[K]) => setC((p) => ({ ...p, [k]: v }))
+  const logoAtual = c.logoUrl ?? logo
 
   const boxRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.32)
@@ -64,6 +69,12 @@ export function PlataformaLoginConfig({
     setEnviando(true)
     try { set('fundoImagem', await redimensionarImagem(f, 1600, 0.82)); set('fundo', 'imagem') }
     catch { toast.error('Falha ao processar a imagem.') } finally { setEnviando(false); if (fileRef.current) fileRef.current.value = '' }
+  }
+  async function onLogo(f: File | null) {
+    if (!f) return
+    setEnviandoLogo(true)
+    try { set('logoUrl', await redimensionarImagem(f, 512, 0.9)) }
+    catch { toast.error('Falha ao processar o logo.') } finally { setEnviandoLogo(false); if (logoRef.current) logoRef.current.value = '' }
   }
 
   const seg = 'flex-1 rounded-lg border px-2 py-2 text-xs font-medium transition inline-flex items-center justify-center gap-1.5'
@@ -99,10 +110,41 @@ export function PlataformaLoginConfig({
         </Bloco>
 
         <Bloco titulo="Cores">
-          <div className="grid grid-cols-2 gap-3">
+          <p className="text-[11px] text-muted-foreground">Fundo é definido em “Fundo &amp; card”. Aqui só as cores de elementos e texto.</p>
+          <div className="grid grid-cols-3 gap-3">
             <ColorField rotulo="Primária" valor={c.corPrimaria} fallback={corPrimaria} onChange={(v) => set('corPrimaria', v)} />
             <ColorField rotulo="Destaque" valor={c.corAccent} fallback={corAccent} onChange={(v) => set('corAccent', v)} />
+            <ColorField rotulo="Texto marca" valor={c.corTextoMarca} fallback="#ffffff" rotuloReset="Branco" onChange={(v) => set('corTextoMarca', v)} />
           </div>
+        </Bloco>
+
+        <Bloco titulo="Logo">
+          <label className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Mostrar logo</span><Switch checked={c.mostrarLogo} onCheckedChange={(v) => set('mostrarLogo', v)} /></label>
+          {c.mostrarLogo && (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border" style={{ background: c.logoBg ?? logoBg }}>
+                  {logoAtual ? <img src={logoAtual} alt="" className="h-full w-full object-contain" style={{ filter: (c.logoFiltro ?? logoFiltro) === 'branco' ? 'brightness(0) invert(1)' : (c.logoFiltro ?? logoFiltro) === 'preto' ? 'brightness(0)' : undefined }} /> : <ImageOff className="h-5 w-5 text-muted-foreground" />}
+                </span>
+                <Input value={c.logoUrl?.startsWith('data:') ? '' : (c.logoUrl ?? '')} onChange={(e) => set('logoUrl', e.target.value || null)} placeholder="URL do logo (ou envie →) — vazio usa o do tema" className="flex-1" />
+                <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={(e) => onLogo(e.target.files?.[0] ?? null)} />
+                <button type="button" onClick={() => logoRef.current?.click()} disabled={enviandoLogo} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted disabled:opacity-50">{enviandoLogo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}</button>
+                {c.logoUrl && <button type="button" onClick={() => set('logoUrl', null)} title="Usar logo do tema" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><label className="text-xs text-muted-foreground">Fundo do logo</label><input type="color" value={c.logoBg ?? logoBg} onChange={(e) => set('logoBg', e.target.value)} className="h-8 w-full cursor-pointer rounded border bg-transparent p-0.5" /></div>
+                <div className="space-y-1"><label className="text-xs text-muted-foreground">Tamanho</label>
+                  <div className="flex gap-1">{(['p', 'm', 'g'] as LogoTam[]).map((t) => <button key={t} type="button" onClick={() => set('logoTamanho', t)} className={cn('flex-1 rounded-lg border py-1.5 text-xs font-medium uppercase transition', c.logoTamanho === t ? on : off)}>{t}</button>)}</div>
+                </div>
+              </div>
+              <div className="space-y-1"><label className="text-xs text-muted-foreground">Moldura</label>
+                <div className="flex gap-1">{([['arredondado', 'Arredondado'], ['quadrado', 'Quadrado'], ['borda', 'Borda']] as [LogoEstilo, string][]).map(([v, r]) => <button key={v} type="button" onClick={() => set('logoEstilo', v)} className={cn(seg, (c.logoEstilo ?? logoEstilo) === v ? on : off)}>{r}</button>)}</div>
+              </div>
+              <div className="space-y-1"><label className="text-xs text-muted-foreground">Filtro de cor</label>
+                <div className="flex gap-1">{([['none', 'Nenhum'], ['branco', 'Branco'], ['preto', 'Preto']] as [LogoFiltro, string][]).map(([v, r]) => <button key={v} type="button" onClick={() => set('logoFiltro', v)} className={cn(seg, (c.logoFiltro ?? logoFiltro) === v ? on : off)}>{r}</button>)}</div>
+              </div>
+            </>
+          )}
         </Bloco>
 
         <Bloco titulo="Fundo & card">
@@ -129,8 +171,20 @@ export function PlataformaLoginConfig({
         </Bloco>
 
         <Bloco titulo="Textos">
-          <div className="space-y-1"><label className="text-xs text-muted-foreground">Título (headline)</label><Input value={c.titulo} onChange={(e) => set('titulo', e.target.value)} placeholder={LOGIN_DEFAULT.titulo} /></div>
-          <div className="space-y-1"><label className="text-xs text-muted-foreground">Subtítulo</label><textarea value={c.subtitulo} onChange={(e) => set('subtitulo', e.target.value)} rows={2} className="w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" /></div>
+          {c.titulo !== '' ? (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between"><label className="text-xs text-muted-foreground">Título (headline)</label><button type="button" onClick={() => set('titulo', '')} className="text-[11px] text-muted-foreground transition hover:text-destructive">Remover</button></div>
+              <Input value={c.titulo} onChange={(e) => set('titulo', e.target.value)} placeholder={LOGIN_DEFAULT.titulo} />
+            </div>
+          ) : <button type="button" onClick={() => set('titulo', LOGIN_DEFAULT.titulo)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted"><Plus className="h-3.5 w-3.5" /> Adicionar título</button>}
+
+          {c.subtitulo !== '' ? (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between"><label className="text-xs text-muted-foreground">Subtítulo</label><button type="button" onClick={() => set('subtitulo', '')} className="text-[11px] text-muted-foreground transition hover:text-destructive">Remover</button></div>
+              <textarea value={c.subtitulo} onChange={(e) => set('subtitulo', e.target.value)} rows={2} className="w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
+            </div>
+          ) : <button type="button" onClick={() => set('subtitulo', LOGIN_DEFAULT.subtitulo)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted"><Plus className="h-3.5 w-3.5" /> Adicionar subtítulo</button>}
+
           <div className="space-y-1.5">
             <label className="text-xs text-muted-foreground">Destaques (bullets)</label>
             {c.destaques.map((d, i) => (
@@ -154,7 +208,7 @@ export function PlataformaLoginConfig({
         <h2 className="mb-3 text-sm font-semibold">Prévia</h2>
         <div ref={boxRef} className="relative w-full overflow-hidden rounded-xl border bg-background" style={{ aspectRatio: '16 / 10' }}>
           <div className="pointer-events-none absolute left-0 top-0" style={{ width: 1200, height: 750, transform: `scale(${scale})`, transformOrigin: 'top left', ['--primary' as any]: corPrimaria, ['--brand-accent' as any]: corAccent }}>
-            <AlunoEntrarForm preview metodo="email" plataforma={plataforma} logo={logo} config={c} />
+            <AlunoEntrarForm preview metodo="email" plataforma={plataforma} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} config={c} />
           </div>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">Prévia com a marca real. A tela de login final abre no endereço da empresa.</p>
@@ -167,15 +221,16 @@ function Bloco({ titulo, children }: { titulo: string; children: React.ReactNode
   return <div className="space-y-2 border-t pt-3 first:border-t-0 first:pt-0"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</p>{children}</div>
 }
 
-function ColorField({ rotulo, valor, fallback, onChange }: { rotulo: string; valor: string | null; fallback: string; onChange: (v: string | null) => void }) {
+function ColorField({ rotulo, valor, fallback, onChange, rotuloReset = 'Do tema' }: { rotulo: string; valor: string | null; fallback: string; onChange: (v: string | null) => void; rotuloReset?: string }) {
   const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(fallback) ? fallback : '#6d28d9'
   return (
     <div className="space-y-1">
       <label className="text-xs text-muted-foreground">{rotulo}</label>
-      <div className="flex items-center gap-2">
-        <input type="color" value={valor ?? hex} onChange={(e) => onChange(e.target.value)} className="h-8 w-10 cursor-pointer rounded border bg-transparent p-0.5" />
-        <span className="flex-1 truncate text-xs text-muted-foreground">{valor ?? 'Do tema'}</span>
-        {valor && <button type="button" onClick={() => onChange(null)} title="Usar cor do tema" className="inline-flex h-7 w-7 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"><RotateCcw className="h-3.5 w-3.5" /></button>}
+      <div className="flex items-center gap-1.5">
+        <input type="color" value={valor ?? hex} onChange={(e) => onChange(e.target.value)} className="h-8 w-9 shrink-0 cursor-pointer rounded border bg-transparent p-0.5" />
+        {valor
+          ? <button type="button" onClick={() => onChange(null)} title={`Usar ${rotuloReset.toLowerCase()}`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"><RotateCcw className="h-3.5 w-3.5" /></button>
+          : <span className="truncate text-[10px] text-muted-foreground">{rotuloReset}</span>}
       </div>
     </div>
   )

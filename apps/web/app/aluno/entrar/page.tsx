@@ -30,6 +30,7 @@ export default async function AlunoEntrarPage() {
       subtitulo={tema.subtitulo_site ?? null}
       logoBg={tema.logo_png_bg ?? '#ffffff'}
       logoEstilo={tema.logo_estilo ?? 'arredondado'}
+      logoFiltro={tema.logo_filtro_sistema ?? tema.logo_filtro ?? 'none'}
       config={resolverLoginConfig(tema.login)}
     />
   )
