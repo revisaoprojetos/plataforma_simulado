@@ -6,8 +6,7 @@ import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
 import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
 import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
-import { HeroCarrossel, type HeroSimSlide } from '@/components/aluno/hero-carrossel'
-import { BannersPortal } from '@/components/aluno/banners-portal'
+import { BannersPortal, type HeroSimSlide } from '@/components/aluno/banners-portal'
 import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } from '@/components/aluno/simulados-catalogo-aluno'
 import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
 
@@ -28,8 +27,9 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   // viram SLIDE com o fundo do próprio simulado; os demais são banners de imagem.
   const heroAll = todosBanners.filter((b) => b.tipo === 'hero')
   const ehSimBanner = (b: any) => typeof b.link === 'string' && b.link.startsWith('/simulado/')
-  const hero = heroAll.filter((b) => !ehSimBanner(b))
   const simBanners = heroAll.filter(ehSimBanner)
+  // Banners de imagem (banner/destaque + pop-up), SEM os de simulado (esses viram slides via `simulados`).
+  const bannersSemSim = todosBanners.filter((b) => !ehSimBanner(b))
 
   const ids = [...new Set([
     ...(mats ?? []).filter((m: any) => m.liberado !== false).map((m: any) => m.simulado_id),
@@ -114,15 +114,8 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
 
   return (
     <div className="animate-page space-y-6">
-      {/* Banners do tenant (carrossel/pop-up) — SÓ na Início. */}
-      <BannersPortal banners={todosBanners} />
-
-      {/* Banners de DESTAQUE (tipo 'hero') + simulado em destaque — FULL-BLEED, um carrossel só. */}
-      {(hero.length > 0 || heroSims.length > 0) && (
-        <div className="-mx-6 -mt-6">
-          <HeroCarrossel banners={hero} simulados={heroSims} />
-        </div>
-      )}
+      {/* Banners do tenant — UM carrossel só (banner + destaque + simulado) + pop-up. SÓ na Início. */}
+      <BannersPortal banners={bannersSemSim} simulados={heroSims} />
 
       {/* Saudação solta. */}
       <div>
