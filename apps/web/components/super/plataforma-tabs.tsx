@@ -72,7 +72,7 @@ export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTem
       </TabsContent>
 
       <TabsContent value="avisos">
-        <BannersManager banners={banners} tenantId={geral.id} destinos={destinosBanner} />
+        <BannersManager banners={banners} tenantId={geral.id} destinos={destinosBanner} desempenhoAtivo={(temaCompleto as any)?.banners_desempenho === true} />
       </TabsContent>
 
       <TabsContent value="embed">

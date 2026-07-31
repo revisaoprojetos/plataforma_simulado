@@ -27,6 +27,10 @@ export default async function BannersPage() {
     banners = (data ?? []) as Banner[]
   } catch { /* tabela ainda não migrada */ }
 
+  // Flag do painel de desempenho nos banners de simulado (default OFF).
+  const { data: tRow } = await svc.from('simulado_tenants').select('tema').eq('id', tid).maybeSingle()
+  const desempenhoAtivo = (tRow?.tema as any)?.banners_desempenho === true
+
   // Destinos rápidos para linkar/escolher no banner: pastas + simulados publicados. Tolerante ao schema.
   const [pastasDest, simsDest] = await Promise.all([
     svc.from('simulado_pastas').select('id, nome, folder_area').eq('tenant_id', tid).eq('is_folder', true).eq('deletado', false).order('nome', { ascending: true }).then((r: any) => (r.data ?? []).filter((f: any) => f.folder_area !== 'caderno'), () => []),
@@ -46,7 +50,7 @@ export default async function BannersPage() {
           <p className="text-muted-foreground">Avisos que aparecem no portal do aluno. Banner = faixa no topo; Pop-up = janela exibida uma vez.</p>
         </div>
       </div>
-      <BannersManager banners={banners} destinos={destinosBanner} />
+      <BannersManager banners={banners} destinos={destinosBanner} desempenhoAtivo={desempenhoAtivo} />
     </div>
   )
 }

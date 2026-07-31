@@ -19,12 +19,15 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const svc = await createServiceClient()
   const estId = sessao!.estudanteId
 
-  const [{ data: mats }, { data: acs }, { data: sessAll }, { data: banRows }] = await Promise.all([
+  const [{ data: mats }, { data: acs }, { data: sessAll }, { data: banRows }, { data: tenantRow }] = await Promise.all([
     svc.from('simulado_matriculas').select('simulado_id, liberado').eq('estudante_id', estId),
     svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', estId),
     svc.from('simulado_sessoes_prova').select('simulado_id, status, nota').eq('estudante_id', estId).eq('is_teste', false).eq('deletado', false),
     svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor').eq('tenant_id', sessao!.tenantId).eq('ativo', true).order('ordem', { ascending: true }).order('criado_em', { ascending: true }),
+    svc.from('simulado_tenants').select('tema').eq('id', sessao!.tenantId).maybeSingle(),
   ])
+  // Painel de desempenho (KPIs) nos banners de simulado: só quando o tenant liga (default OFF).
+  const mostrarDesempenhoBanner = (tenantRow?.tema as any)?.banners_desempenho === true
   // KPIs do aluno p/ o banner de simulado (Simulados · Nota média · Melhor nota).
   const finalizadasNota = ((sessAll ?? []) as any[]).filter((x) => x.status === 'finalizada')
   const notasAluno = finalizadasNota.map((x) => (x.nota != null ? Number(x.nota) : null)).filter((n): n is number => n != null)
@@ -154,7 +157,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
           descricao: b.mensagem || null,
           link: b.link, acao: 'Ver simulados',
           chips: total > 0 ? [{ label: `${total} ${total === 1 ? 'simulado' : 'simulados'}`, tone: 'muted', icon: 'book' }] : undefined,
-          stats: statsDe((id) => grupoPorSimAll.get(id) === pid),
+          stats: mostrarDesempenhoBanner ? statsDe((id) => grupoPorSimAll.get(id) === pid) : null,
         }
       }
       const sim = tok ? simByToken.get(tok) : null
@@ -175,7 +178,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
         link: b.link, acao: item?.emAndamento ? 'Continuar' : item?.refazer ? 'Refazer' : 'Fazer agora',
         detalhesLink: sim?.id ? `/aluno/simulados/${sim.id}` : null,
         chips: chips.length ? chips : undefined,
-        stats: sim?.id ? statsDe((id) => id === sim.id) : null,
+        stats: mostrarDesempenhoBanner && sim?.id ? statsDe((id) => id === sim.id) : null,
       }
     })
   }
@@ -221,7 +224,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   return (
     <div className="animate-page space-y-6">
       {/* Banners do tenant — UM carrossel só (banner + destaque + simulado) + pop-up. SÓ na Início. */}
-      <BannersPortal banners={bannersSemSim} simulados={heroSims} stats={statsAluno} />
+      <BannersPortal banners={bannersSemSim} simulados={heroSims} stats={mostrarDesempenhoBanner ? statsAluno : null} />
 
       {/* Saudação solta. */}
       <div>

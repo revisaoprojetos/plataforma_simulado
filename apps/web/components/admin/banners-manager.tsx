@@ -15,7 +15,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { criarBannerAction, toggleBannerAction, excluirBannerAction, reordenarBannersAction } from '@/app/admin/configuracoes/banners/actions'
+import { Switch } from '@/components/ui/switch'
+import { criarBannerAction, toggleBannerAction, excluirBannerAction, reordenarBannersAction, toggleBannerDesempenhoAction } from '@/app/admin/configuracoes/banners/actions'
 
 export type Banner = {
   id: string; tipo: 'banner' | 'popup' | 'hero'; titulo: string | null; mensagem: string | null
@@ -30,9 +31,20 @@ export const ehBannerSimulado = (b: { tipo: string; link: string | null }) => b.
 
 export type DestinoBanner = { label: string; href: string; grupo?: string }
 
-export function BannersManager({ banners, tenantId, destinos }: { banners: Banner[]; tenantId?: string; destinos?: DestinoBanner[] }) {
+export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = false }: { banners: Banner[]; tenantId?: string; destinos?: DestinoBanner[]; desempenhoAtivo?: boolean }) {
   const router = useRouter()
   const [pending, start] = useTransition()
+  const [desempenho, setDesempenho] = useState(desempenhoAtivo)
+  useEffect(() => { setDesempenho(desempenhoAtivo) }, [desempenhoAtivo])
+  function alternarDesempenho(v: boolean) {
+    setDesempenho(v) // otimista
+    start(async () => {
+      const r = await toggleBannerDesempenhoAction(v, tenantId)
+      if (!r.ok) { toast.error(r.error ?? 'Falha ao salvar.'); setDesempenho(!v); return }
+      toast.success(v ? 'Desempenho no banner ativado.' : 'Desempenho no banner desativado.')
+      router.refresh()
+    })
+  }
   const [alvo, setAlvo] = useState<string | null>(null)
   const [uiTipo, setUiTipo] = useState<'banner' | 'popup' | 'hero' | 'simulado'>('banner')
   const tipo: 'banner' | 'popup' | 'hero' = uiTipo === 'simulado' ? 'hero' : uiTipo
@@ -156,6 +168,16 @@ export function BannersManager({ banners, tenantId, destinos }: { banners: Banne
               {simulados.length > 0 && <optgroup label="Simulados">{simulados.map((d) => <option key={d.href} value={d.href}>{d.label}</option>)}</optgroup>}
             </select>
             {destSim.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhum simulado ou pasta disponível ainda.</p>}
+            {/* Configuração GERAL (vale para todos os banners de simulado deste tenant): mostrar ou não
+                o painel de desempenho do aluno (Simulados/Nota média/Melhor nota) no canto inferior direito.
+                Vem DESATIVADO por padrão. */}
+            <div className="flex items-start gap-3 rounded-lg border bg-background px-3 py-2.5">
+              <Switch checked={desempenho} onCheckedChange={alternarDesempenho} disabled={pending} />
+              <div className="min-w-0">
+                <p className="text-xs font-medium">Mostrar desempenho do aluno no banner</p>
+                <p className="text-[11px] text-muted-foreground">Painel com Simulados/Nota média/Melhor nota no canto inferior direito. Vale para <strong>todos</strong> os banners de simulado. Desativado por padrão.</p>
+              </div>
+            </div>
           </div>
         )}
         <div className="space-y-1"><label className="text-xs text-muted-foreground">Título</label><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Novo simulado disponível!" /></div>

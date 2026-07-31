@@ -90,6 +90,21 @@ export async function reordenarBannersAction(ordens: { id: string; ordem: number
   return { ok: true }
 }
 
+/**
+ * Liga/desliga o painel de desempenho do aluno (Simulados/Nota média/Melhor nota) que aparece
+ * no canto inferior direito dos banners de simulado. Guardado em `simulado_tenants.tema.banners_desempenho`
+ * (jsonb, sem migração). Default = desligado (a UI trata ausência/false como oculto).
+ */
+export async function toggleBannerDesempenhoAction(ativo: boolean, tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string }> {
+  const c = await ctx(tenantIdAlvo); if (!c.ok) return c
+  const { data: t } = await c.svc.from('simulado_tenants').select('tema').eq('id', c.tenantId).maybeSingle()
+  const tema = { ...(((t?.tema as Record<string, unknown>) ?? {})), banners_desempenho: ativo }
+  const { error } = await c.svc.from('simulado_tenants').update({ tema }).eq('id', c.tenantId)
+  if (error) return { ok: false, error: error.message }
+  reval(c.tenantId, c.ehSuper)
+  return { ok: true }
+}
+
 export async function excluirBannerAction(id: string, tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string }> {
   const c = await ctx(tenantIdAlvo); if (!c.ok) return c
   const { error } = await c.svc.from('simulado_banners').delete().eq('id', id).eq('tenant_id', c.tenantId)
