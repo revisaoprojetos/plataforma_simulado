@@ -127,9 +127,14 @@ export function BannersManager({ banners, tenantId }: { banners: Banner[]; tenan
           <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Nenhum banner ou pop-up ainda.</div>
         ) : banners.map((b) => (
           <div key={b.id} className={cn('flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm', !b.ativo && 'opacity-60')}>
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: (b.cor ?? '#6366f1') + '22', color: b.cor ?? '#6366f1' }}>
-              {b.imagem_url ? <ImageIcon className="h-5 w-5" /> : b.tipo === 'popup' ? <MessageSquareWarning className="h-5 w-5" /> : <Megaphone className="h-5 w-5" />}
-            </span>
+            {b.imagem_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={b.imagem_url} alt="" className="h-11 w-16 shrink-0 rounded-lg border object-cover" />
+            ) : (
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: (b.cor ?? '#6366f1') + '22', color: b.cor ?? '#6366f1' }}>
+                {b.tipo === 'popup' ? <MessageSquareWarning className="h-5 w-5" /> : <Megaphone className="h-5 w-5" />}
+              </span>
+            )}
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-2 truncate text-sm font-medium">
                 {b.titulo || '(sem título)'}
