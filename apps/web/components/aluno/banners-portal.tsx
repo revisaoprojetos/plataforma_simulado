@@ -36,6 +36,7 @@ export type HeroSimSlide = {
   acao: string
   detalhesLink?: string | null // "Ver detalhes" (simulado único); ausente em banner de pasta
   chips?: BannerChip[] // disponibilidade + nº de questões + objetiva/discursiva (simulado) ou "N simulados" (pasta)
+  stats?: BannerStats | null // KPIs do aluno ESPECÍFICOS deste alvo (simulado/pasta); cai no global se ausente
 }
 
 type Slide = ({ kind: 'img' } & BannerPortal) | HeroSimSlide
@@ -211,14 +212,19 @@ function SimSlide({ s, stats }: { s: HeroSimSlide; stats?: BannerStats | null })
         </div>
       </div>
 
-      {/* KPIs do aluno — canto inferior direito (some em telas estreitas). */}
-      {stats && stats.simulados > 0 && (
-        <div className="pointer-events-none absolute bottom-4 right-5 hidden items-stretch gap-0 rounded-2xl border border-white/12 bg-black/25 backdrop-blur md:flex">
-          <Kpi valor={stats.simulados.toLocaleString('pt-BR')} rotulo="Simulados" />
-          <Kpi valor={stats.notaMedia != null ? stats.notaMedia.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'} rotulo="Nota média" divisor />
-          <Kpi valor={stats.melhorNota != null ? stats.melhorNota.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'} rotulo="Melhor nota" divisor />
-        </div>
-      )}
+      {/* KPIs do aluno — canto inferior direito (some em telas estreitas).
+          Usa as estatísticas ESPECÍFICAS do alvo (simulado/pasta) deste slide; sem elas, cai no global. */}
+      {(() => {
+        const kpi = s.stats ?? stats
+        if (!kpi || kpi.simulados <= 0) return null
+        return (
+          <div className="pointer-events-none absolute bottom-4 right-5 hidden items-stretch gap-0 rounded-2xl border border-white/12 bg-black/25 backdrop-blur md:flex">
+            <Kpi valor={kpi.simulados.toLocaleString('pt-BR')} rotulo="Simulados" />
+            <Kpi valor={kpi.notaMedia != null ? kpi.notaMedia.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'} rotulo="Nota média" divisor />
+            <Kpi valor={kpi.melhorNota != null ? kpi.melhorNota.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'} rotulo="Melhor nota" divisor />
+          </div>
+        )
+      })()}
     </div>
   )
 }

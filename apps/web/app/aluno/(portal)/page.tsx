@@ -92,6 +92,20 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   // Banners de simulado (VITRINE): aparecem para TODOS os alunos com a QUANTIDADE de simulados da
   // pasta e a descrição — pra mostrar que há mais conteúdo. O bloqueio real acontece ao clicar
   // (destino sem acesso → pop-up "sem acesso"). Contagem é tenant-wide (não depende do acesso do aluno).
+  // KPIs por-slide: estatísticas do aluno ESPECÍFICAS do simulado/pasta de cada banner
+  // (antes era um agregado global repetido em todos os slides).
+  const { grupoPorSim: grupoPorSimAll } = await resolverGruposCatalogo(svc, sims.map((s: any) => ({ id: s.id, regras: s.regras })))
+  const finalizadasAll = ((sessAll ?? []) as any[]).filter((x) => x.status === 'finalizada')
+  const statsDe = (pred: (simId: string) => boolean): BannerStats => {
+    const fs = finalizadasAll.filter((x) => pred(x.simulado_id))
+    const notas = fs.map((x) => (x.nota != null ? Number(x.nota) : null)).filter((n): n is number => n != null)
+    return {
+      simulados: fs.length,
+      notaMedia: notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : null,
+      melhorNota: notas.length ? Math.max(...notas) : null,
+    }
+  }
+
   let heroSims: HeroSimSlide[] = []
   if (!pasta && simBanners.length) {
     const tokenDe = (l: string) => l.startsWith('/simulado/') ? (l.split('/simulado/')[1]?.split(/[/?#]/)[0] || null) : null
@@ -140,6 +154,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
           descricao: b.mensagem || null,
           link: b.link, acao: 'Ver simulados',
           chips: total > 0 ? [{ label: `${total} ${total === 1 ? 'simulado' : 'simulados'}`, tone: 'muted', icon: 'book' }] : undefined,
+          stats: statsDe((id) => grupoPorSimAll.get(id) === pid),
         }
       }
       const sim = tok ? simByToken.get(tok) : null
@@ -160,6 +175,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
         link: b.link, acao: item?.emAndamento ? 'Continuar' : item?.refazer ? 'Refazer' : 'Fazer agora',
         detalhesLink: sim?.id ? `/aluno/simulados/${sim.id}` : null,
         chips: chips.length ? chips : undefined,
+        stats: sim?.id ? statsDe((id) => id === sim.id) : null,
       }
     })
   }
