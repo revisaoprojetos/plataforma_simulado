@@ -7,7 +7,8 @@ import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
 import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
 import { SimuladosCatalogoAluno } from '@/components/aluno/simulados-catalogo-aluno'
 
-export default async function SimuladoDisponivelPage() {
+export default async function SimuladoDisponivelPage({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
+  const { pasta } = await searchParams
   const sessao = await getSessaoAluno()
   const svc = await createServiceClient()
   const estId = sessao!.estudanteId
@@ -62,5 +63,5 @@ export default async function SimuladoDisponivelPage() {
     )
   }
 
-  return <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} />
+  return <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} pastaAtiva={pasta ?? null} />
 }
