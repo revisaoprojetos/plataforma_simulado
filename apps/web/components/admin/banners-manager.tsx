@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, Loader2, Trash2, Eye, EyeOff, Megaphone, MessageSquareWarning, ImageIcon, Upload, X, Crop, Settings } from 'lucide-react'
+import { Plus, Loader2, Trash2, Eye, EyeOff, Megaphone, MessageSquareWarning, ImageIcon, Upload, X, Crop, Settings, Clapperboard } from 'lucide-react'
 import { redimensionarImagem } from '@/lib/imagem'
 import { BannerCropper } from '@/components/admin/banner-cropper'
 import { BannerEditModal } from '@/components/admin/banner-edit-modal'
@@ -24,13 +24,18 @@ export type Banner = {
 
 const TIPO_LABEL: Record<string, string> = { banner: 'banner', popup: 'pop-up', hero: 'destaque' }
 
+/** Um banner de destaque que aponta para um simulado (link /simulado/token) usa o FUNDO do
+ *  próprio simulado e ganha CTA "Fazer agora" na home do aluno. */
+export const ehBannerSimulado = (b: { tipo: string; link: string | null }) => b.tipo === 'hero' && !!b.link && b.link.startsWith('/simulado/')
+
 export type DestinoBanner = { label: string; href: string; grupo?: string }
 
 export function BannersManager({ banners, tenantId, destinos }: { banners: Banner[]; tenantId?: string; destinos?: DestinoBanner[] }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [alvo, setAlvo] = useState<string | null>(null)
-  const [tipo, setTipo] = useState<'banner' | 'popup' | 'hero'>('banner')
+  const [uiTipo, setUiTipo] = useState<'banner' | 'popup' | 'hero' | 'simulado'>('banner')
+  const tipo: 'banner' | 'popup' | 'hero' = uiTipo === 'simulado' ? 'hero' : uiTipo
   const [titulo, setTitulo] = useState('')
   const [mensagem, setMensagem] = useState('')
   const [imagem, setImagem] = useState('')
@@ -59,9 +64,12 @@ export function BannersManager({ banners, tenantId, destinos }: { banners: Banne
     finally { setEnviando(false); if (fileRef.current) fileRef.current.value = '' }
   }
 
+  const simulados = (destinos ?? []).filter((d) => (d.grupo ?? 'Simulados') === 'Simulados')
+
   function criar(e: React.FormEvent) {
     e.preventDefault()
-    if (!titulo.trim() && !mensagem.trim() && !imagem.trim()) { toast.error('Preencha ao menos um título, mensagem ou imagem.'); return }
+    if (uiTipo === 'simulado' && !link.trim()) { toast.error('Escolha o simulado deste banner.'); return }
+    if (uiTipo !== 'simulado' && !titulo.trim() && !mensagem.trim() && !imagem.trim()) { toast.error('Preencha ao menos um título, mensagem ou imagem.'); return }
     setAlvo('novo')
     start(async () => {
       const r = await criarBannerAction({ tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo: true }, tenantId)
@@ -98,22 +106,38 @@ export function BannersManager({ banners, tenantId, destinos }: { banners: Banne
       {/* Form de criação */}
       <form onSubmit={criar} className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
         <h2 className="text-sm font-semibold">Novo aviso</h2>
-        <div className="flex gap-2">
-          {(['banner', 'popup', 'hero'] as const).map((t) => (
-            <button key={t} type="button" onClick={() => setTipo(t)}
-              className={cn('flex flex-1 flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-medium transition', tipo === t ? 'border-primary bg-primary/5 text-primary' : 'hover:bg-muted')}>
-              {t === 'banner' ? <Megaphone className="h-4 w-4" /> : t === 'popup' ? <MessageSquareWarning className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
-              {t === 'banner' ? 'Banner' : t === 'popup' ? 'Pop-up' : 'Destaque'}
+        <div className="grid grid-cols-4 gap-2">
+          {([
+            { t: 'banner', label: 'Banner', Icon: Megaphone },
+            { t: 'popup', label: 'Pop-up', Icon: MessageSquareWarning },
+            { t: 'hero', label: 'Destaque', Icon: ImageIcon },
+            { t: 'simulado', label: 'Simulado', Icon: Clapperboard },
+          ] as const).map(({ t, label, Icon }) => (
+            <button key={t} type="button" onClick={() => setUiTipo(t)}
+              className={cn('flex flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-[11px] font-medium transition', uiTipo === t ? 'border-primary bg-primary/5 text-primary' : 'hover:bg-muted')}>
+              <Icon className="h-4 w-4" /> {label}
             </button>
           ))}
         </div>
-        {tipo === 'hero' && <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">Banner de <strong>destaque</strong> aparece no topo da home do aluno, em carrossel. Use uma <strong>imagem larga</strong> (ex.: 1920×600). O link é opcional. A ordem segue a criação.</p>}
+        {uiTipo === 'hero' && <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">Banner de <strong>destaque</strong> aparece no topo da home do aluno, em carrossel. Use uma <strong>imagem larga</strong> (ex.: 1920×600). O link é opcional. A ordem segue a criação.</p>}
+        {uiTipo === 'simulado' && (
+          <div className="space-y-1.5 rounded-lg bg-muted/50 px-3 py-2.5">
+            <p className="text-xs text-muted-foreground">Banner que promove um <strong>simulado</strong> no topo da home, usando o <strong>fundo do próprio simulado</strong> e um botão <strong>Fazer agora</strong>. Escolha qual simulado:</p>
+            <select value={simulados.some((d) => d.href === link) ? link : ''}
+              onChange={(e) => { const d = simulados.find((x) => x.href === e.target.value); setLink(e.target.value); if (d && !titulo.trim()) setTitulo(d.label) }}
+              className="h-9 w-full rounded-lg border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <option value="">Selecione um simulado…</option>
+              {simulados.map((d) => <option key={d.href} value={d.href}>{d.label}</option>)}
+            </select>
+            {simulados.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhum simulado com link de acesso disponível ainda.</p>}
+          </div>
+        )}
         <div className="space-y-1"><label className="text-xs text-muted-foreground">Título</label><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Novo simulado disponível!" /></div>
         <div className="space-y-1"><label className="text-xs text-muted-foreground">Mensagem</label>
           <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={3} placeholder="Texto do aviso…" className="w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : '(molde 1920×500 — largura total)'}</label>
+          <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : uiTipo === 'simulado' ? '(opcional — padrão: fundo do simulado)' : '(molde 1920×500 — largura total)'}</label>
           <div className="flex gap-2">
             <Input value={imagem.startsWith('data:') ? '' : imagem} onChange={(e) => setImagem(e.target.value)} placeholder="Cole uma URL ou envie um arquivo →" className="flex-1" />
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onArquivo(e.target.files?.[0] ?? null)} />
@@ -140,7 +164,7 @@ export function BannersManager({ banners, tenantId, destinos }: { banners: Banne
             <BannerCropper src={cropSrc} onApply={(d) => { setImagem(d); setCropOpen(false) }} onCancel={() => setCropOpen(false)} />
           )}
         </div>
-        <div className="space-y-1">
+        <div className={cn('space-y-1', uiTipo === 'simulado' && 'hidden')}>
           <label className="text-xs text-muted-foreground">Link ao clicar (opcional)</label>
           {destinos && destinos.length > 0 && (
             <select value={destinos.some((d) => d.href === link) ? link : ''} onChange={(e) => e.target.value && setLink(e.target.value)}
@@ -182,7 +206,7 @@ export function BannersManager({ banners, tenantId, destinos }: { banners: Banne
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-2 truncate text-sm font-medium">
                 {b.titulo || '(sem título)'}
-                <span className="rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">{TIPO_LABEL[b.tipo] ?? b.tipo}</span>
+                <span className="rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">{ehBannerSimulado(b) ? 'simulado' : (TIPO_LABEL[b.tipo] ?? b.tipo)}</span>
               </p>
               <p className="truncate text-xs text-muted-foreground">{b.mensagem || b.link || '—'}</p>
             </div>

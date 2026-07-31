@@ -26,6 +26,16 @@ export default async function BannersPage() {
     banners = (data ?? []) as Banner[]
   } catch { /* tabela ainda não migrada */ }
 
+  // Destinos rápidos para linkar/escolher no banner: pastas + simulados publicados. Tolerante ao schema.
+  const [pastasDest, simsDest] = await Promise.all([
+    svc.from('simulado_pastas').select('id, nome').eq('tenant_id', tid).eq('is_folder', true).order('nome', { ascending: true }).then((r: any) => r.data ?? [], () => []),
+    svc.from('simulado_simulados').select('id, titulo, embed_token').eq('tenant_id', tid).eq('deletado', false).eq('status', 'publicado').order('created_at', { ascending: false }).limit(60).then((r: any) => r.data ?? [], () => []),
+  ])
+  const destinosBanner = [
+    ...(pastasDest as any[]).map((f) => ({ label: f.nome as string, href: `/aluno/simulado?pasta=${f.id}`, grupo: 'Pastas' })),
+    ...(simsDest as any[]).filter((s) => s.embed_token).map((s) => ({ label: s.titulo as string, href: `/simulado/${s.embed_token}`, grupo: 'Simulados' })),
+  ]
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -35,7 +45,7 @@ export default async function BannersPage() {
           <p className="text-muted-foreground">Avisos que aparecem no portal do aluno. Banner = faixa no topo; Pop-up = janela exibida uma vez.</p>
         </div>
       </div>
-      <BannersManager banners={banners} />
+      <BannersManager banners={banners} destinos={destinosBanner} />
     </div>
   )
 }

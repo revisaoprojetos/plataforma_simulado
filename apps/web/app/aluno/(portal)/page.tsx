@@ -6,8 +6,7 @@ import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
 import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
 import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
-import { HeroCarrossel } from '@/components/aluno/hero-carrossel'
-import { HeroSimulado } from '@/components/aluno/hero-simulado'
+import { HeroCarrossel, type HeroSimSlide } from '@/components/aluno/hero-carrossel'
 import { BannersPortal } from '@/components/aluno/banners-portal'
 import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } from '@/components/aluno/simulados-catalogo-aluno'
 import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
@@ -25,7 +24,12 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor').eq('tenant_id', sessao!.tenantId).eq('ativo', true).order('ordem', { ascending: true }).order('criado_em', { ascending: true }),
   ])
   const todosBanners = (banRows ?? []) as any[]
-  const hero = todosBanners.filter((b) => b.tipo === 'hero')
+  // Banners de DESTAQUE (tipo 'hero'): os que apontam para um simulado (link /simulado/token)
+  // viram SLIDE com o fundo do próprio simulado; os demais são banners de imagem.
+  const heroAll = todosBanners.filter((b) => b.tipo === 'hero')
+  const ehSimBanner = (b: any) => typeof b.link === 'string' && b.link.startsWith('/simulado/')
+  const hero = heroAll.filter((b) => !ehSimBanner(b))
+  const simBanners = heroAll.filter(ehSimBanner)
 
   const ids = [...new Set([
     ...(mats ?? []).filter((m: any) => m.liberado !== false).map((m: any) => m.simulado_id),
@@ -69,8 +73,28 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     .filter((i) => (i.podeFazer || i.emAndamento || i.statusLabel === 'Agendado') && !feitosSet.has(i.id))
     .sort((a, b) => lancamento(b) - lancamento(a))
     .slice(0, 12)
-  // Simulado em DESTAQUE (hero) — o mais recente que o aluno pode fazer.
-  const destaque = recentes.find((i) => i.podeFazer || i.emAndamento) ?? null
+  // Banners de simulado (config no console): resolve o FUNDO de cada um a partir do próprio
+  // simulado referenciado (capa/cor), independentemente do acesso do aluno (clique é validado no destino).
+  let heroSims: HeroSimSlide[] = []
+  if (!pasta && simBanners.length) {
+    const tokens = [...new Set(simBanners.map((b) => (b.link as string).split('/simulado/')[1]?.split(/[/?#]/)[0]).filter(Boolean))]
+    const { data: simRows } = await svc.from('simulado_simulados').select('id, titulo, embed_token, regras').in('embed_token', tokens).eq('deletado', false)
+    const simPorToken = new Map<string, any>((simRows ?? []).map((s: any) => [s.embed_token, s]))
+    const visB = await resolverVisualSimulados(svc, (simRows ?? []).map((s: any) => ({ id: s.id, regras: s.regras })))
+    heroSims = simBanners.map((b) => {
+      const tok = (b.link as string).split('/simulado/')[1]?.split(/[/?#]/)[0]
+      const sim = tok ? simPorToken.get(tok) : null
+      const vis = sim ? visB.get(sim.id) : null
+      return {
+        id: b.id, kind: 'sim' as const,
+        capa: b.imagem_url || vis?.capa || null,
+        cor: b.cor || vis?.cor || '#6d28d9',
+        titulo: b.titulo || sim?.titulo || 'Simulado',
+        quando: b.mensagem || null,
+        link: b.link, acao: 'Fazer agora',
+      }
+    })
+  }
 
   // VISÃO DE PASTA — só o conteúdo da pasta (sem saudação/atalhos).
   if (pasta) {
@@ -93,15 +117,12 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
       {/* Banners do tenant (carrossel/pop-up) — SÓ na Início. */}
       <BannersPortal banners={todosBanners} />
 
-      {/* Banner de DESTAQUE (tipo 'hero') — FULL-BLEED. */}
-      {hero.length > 0 && (
+      {/* Banners de DESTAQUE (tipo 'hero') + simulado em destaque — FULL-BLEED, um carrossel só. */}
+      {(hero.length > 0 || heroSims.length > 0) && (
         <div className="-mx-6 -mt-6">
-          <HeroCarrossel banners={hero} />
+          <HeroCarrossel banners={hero} simulados={heroSims} />
         </div>
       )}
-
-      {/* Simulado em DESTAQUE — hero com o fundo do próprio simulado. */}
-      {destaque && <HeroSimulado s={destaque} />}
 
       {/* Saudação solta. */}
       <div>
