@@ -14,16 +14,16 @@ type Metodo = 'email' | 'email_cpf' | 'email_telefone'
 const KF = `@keyframes lgDriftA{0%,100%{transform:translate(0,0) scale(1);opacity:.7}50%{transform:translate(8%,-6%) scale(1.12);opacity:1}}@keyframes lgDriftB{0%,100%{transform:translate(0,0) scale(1.08);opacity:.7}50%{transform:translate(-8%,6%) scale(1);opacity:1}}@keyframes lgUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}.lg-aurora{animation:lgDriftA 18s ease-in-out infinite}.lg-aurora2{animation:lgDriftB 22s ease-in-out infinite}.lg-up{animation:lgUp .55s cubic-bezier(.2,.7,.2,1) both}@media (prefers-reduced-motion:reduce){.lg-aurora,.lg-aurora2,.lg-up{animation:none}}`
 
 export function AlunoEntrarForm({
-  metodo, plataforma, logo = null, subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', config = LOGIN_DEFAULT, preview = false,
+  metodo, plataforma, logo = null, subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', config = LOGIN_DEFAULT, preview = false, modoInicial = 'aluno',
 }: {
-  metodo: Metodo; plataforma: string; logo?: string | null; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; config?: LoginConfig; preview?: boolean
+  metodo: Metodo; plataforma: string; logo?: string | null; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; config?: LoginConfig; preview?: boolean; modoInicial?: 'aluno' | 'admin'
 }) {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [cpf, setCpf] = useState('')
   const [telefone, setTelefone] = useState('')
   const [senha, setSenha] = useState('')
-  const [modo, setModo] = useState<'aluno' | 'admin'>('aluno')
+  const [modo, setModo] = useState<'aluno' | 'admin'>(modoInicial)
   const [entrando, setEntrando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [manutencao, setManutencao] = useState<{ titulo: string; mensagem: string } | null>(null)
