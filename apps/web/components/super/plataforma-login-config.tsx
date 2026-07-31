@@ -230,8 +230,8 @@ export function PlataformaLoginConfig({
         </div>
       </div>
 
-      {/* Prévia WYSIWYG (a própria tela, escalada) */}
-      <div className="rounded-2xl border bg-card p-4 shadow-sm">
+      {/* Prévia WYSIWYG (a própria tela, escalada) — TRAVADA ao rolar os controles. */}
+      <div className="rounded-2xl border bg-card p-4 shadow-sm lg:sticky lg:top-4 lg:self-start">
         <h2 className="mb-3 text-sm font-semibold">Prévia</h2>
         <div ref={boxRef} className="relative w-full overflow-hidden rounded-xl border bg-background" style={{ aspectRatio: '16 / 10' }}>
           <div className="pointer-events-none absolute left-0 top-0" style={{ width: 1200, height: 750, transform: `scale(${scale})`, transformOrigin: 'top left', ['--primary' as any]: corPrimaria, ['--brand-accent' as any]: corAccent }}>
