@@ -37,7 +37,7 @@ export function BannersPortal({ banners }: { banners: BannerPortal[] }) {
             // Banner com imagem → imagem CHEIA no padrão 1920×600 (largura total), sem X.
             const conteudo = b.imagem_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={b.imagem_url} alt={b.titulo ?? ''} className="aspect-[1920/600] w-full object-cover" />
+              <img src={b.imagem_url} alt={b.titulo ?? ''} className="aspect-[1920/500] w-full object-cover" />
             ) : (
               <div className="flex items-center gap-3 p-4" style={{ background: cor + '14' }}>
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: cor + '22', color: cor }}><Megaphone className="h-5 w-5" /></span>

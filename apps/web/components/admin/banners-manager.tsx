@@ -35,8 +35,8 @@ export function BannersManager({ banners, tenantId }: { banners: Banner[]; tenan
     if (!f) return
     if (!f.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
     setEnviando(true)
-    // Banner e Destaque são largos (padrão 1920×600) → alta resolução; pop-up menor.
-    try { setImagem(await redimensionarImagem(f, tipo === 'popup' ? 900 : 1920)) }
+    // Banner e Destaque são largos → 1920px em ALTA qualidade (0.9); pop-up menor.
+    try { setImagem(await redimensionarImagem(f, tipo === 'popup' ? 900 : 1920, tipo === 'popup' ? 0.72 : 0.9)) }
     catch { toast.error('Falha ao processar a imagem.') }
     finally { setEnviando(false); if (fileRef.current) fileRef.current.value = '' }
   }
@@ -107,7 +107,7 @@ export function BannersManager({ banners, tenantId }: { banners: Banner[]; tenan
           {imagem && (
             <div className="relative overflow-hidden rounded-lg border">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imagem} alt="" className={cn('w-full object-cover', tipo === 'popup' ? 'h-20' : 'aspect-[1920/600]')} />
+              <img src={imagem} alt="" className={cn('w-full object-cover', tipo === 'popup' ? 'h-20' : 'aspect-[1920/500]')} />
               <button type="button" onClick={() => setImagem('')} title="Remover imagem"
                 className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><X className="h-3.5 w-3.5" /></button>
             </div>
