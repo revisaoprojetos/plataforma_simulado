@@ -33,10 +33,16 @@ export function LoginLoading({
   const transp = effBg === 'transparent'
   const molde = effEstilo === 'quadrado' ? 'rounded-none' : effEstilo === 'borda' ? 'rounded-xl border' : 'rounded-xl'
   const filtroCss = effFiltro === 'branco' ? 'brightness(0) invert(1)' : effFiltro === 'preto' ? 'brightness(0)' : undefined
+  const effOpac = (c.logoOpacidade ?? 100) / 100
+  const logoTint = effFiltro === 'cor' ? (c.logoCor ?? primaria) : null
+  const maskStyle = (url: string): React.CSSProperties => ({ WebkitMaskImage: `url(${url})`, maskImage: `url(${url})`, WebkitMaskSize: 'contain', maskSize: 'contain', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat', WebkitMaskPosition: 'center', maskPosition: 'center' })
+  const nomeMarca = c.marcaNome ?? plataforma
 
   const Logo = c.carMostrarLogo ? (
     <div className={cn('flex h-16 w-16 items-center justify-center overflow-hidden', molde, transp ? '' : 'shadow-sm', !effLogo && 'bg-primary text-primary-foreground')} style={effLogo ? { background: transp ? 'transparent' : effBg } : undefined}>
-      {effLogo ? <img src={effLogo} alt="" className="h-full w-full object-contain" style={{ filter: filtroCss }} /> : <GraduationCap className="h-8 w-8" />}
+      {!effLogo ? <GraduationCap className="h-8 w-8" />
+        : logoTint ? <span className="h-full w-full" style={{ background: logoTint, opacity: effOpac, ...maskStyle(effLogo) }} />
+        : <img src={effLogo} alt="" className="h-full w-full object-contain" style={{ filter: filtroCss, opacity: effOpac }} />}
     </div>
   ) : null
 
@@ -45,7 +51,8 @@ export function LoginLoading({
       case 'barra':
         return <div className="h-1.5 w-52 overflow-hidden rounded-full bg-white/15"><div className="ll-bar h-full w-1/3 rounded-full" style={{ background: accent }} /></div>
       case 'pulso':
-        return null // o pulso é aplicado no próprio logo abaixo
+      case 'anel':
+        return null // logo-cêntricos: tratados no render abaixo
       case 'pontos':
         return <div className="flex gap-2">{[0, 1, 2].map((i) => <span key={i} className="ll-dot h-2.5 w-2.5 rounded-full" style={{ background: accent, animationDelay: `${i * 0.15}s` }} />)}</div>
       case 'orbita':
@@ -69,8 +76,15 @@ export function LoginLoading({
 
       <div className="relative flex flex-col items-center gap-5">
         {c.carModelo === 'orbita' ? (
-          <div className="relative flex h-24 w-24 items-center justify-center">
+          // Raio maior p/ o ponto não bater no logo (container 8rem, logo 4rem).
+          <div className="relative flex h-32 w-32 items-center justify-center">
             <div className="ll-orbit absolute inset-0"><span className="absolute left-1/2 top-0 h-3 w-3 -translate-x-1/2 rounded-full" style={{ background: accent, boxShadow: `0 0 10px 1px ${accent}` }} /></div>
+            {Logo}
+          </div>
+        ) : c.carModelo === 'anel' ? (
+          // Spinner com o logo NO MEIO: anel girando ao redor.
+          <div className="relative flex h-28 w-28 items-center justify-center">
+            <div className="absolute inset-0 animate-spin rounded-full border-[3px] border-white/15" style={{ borderTopColor: accent }} />
             {Logo}
           </div>
         ) : c.carModelo === 'pulso' ? (
@@ -82,7 +96,7 @@ export function LoginLoading({
           </>
         )}
         {c.carTexto && <p className="text-sm font-medium" style={{ color: `color-mix(in oklab, ${texto} 85%, transparent)` }}>{c.carTexto}</p>}
-        {plataforma && <p className="text-xs" style={{ color: `color-mix(in oklab, ${texto} 50%, transparent)` }}>{plataforma}</p>}
+        {nomeMarca && <p className="text-xs" style={{ color: `color-mix(in oklab, ${texto} 50%, transparent)` }}>{nomeMarca}</p>}
       </div>
     </div>
   )

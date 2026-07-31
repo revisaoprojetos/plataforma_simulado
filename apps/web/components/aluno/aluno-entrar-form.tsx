@@ -77,9 +77,12 @@ export function AlunoEntrarForm({
   const effFiltro = c.logoFiltro ?? logoFiltro ?? 'none'
   const molde = effEstilo === 'quadrado' ? 'rounded-none' : effEstilo === 'borda' ? 'rounded-xl border' : 'rounded-xl'
   const filtroCss = effFiltro === 'branco' ? 'brightness(0) invert(1)' : effFiltro === 'preto' ? 'brightness(0)' : undefined
+  const effOpac = (c.logoOpacidade ?? 100) / 100
+  const logoTint = effFiltro === 'cor' ? (c.logoCor ?? primaria) : null
   const SZ: Record<string, [string, string]> = { p: ['h-11 w-11', 'h-6 w-6'], m: ['h-14 w-14', 'h-7 w-7'], g: ['h-20 w-20', 'h-10 w-10'] }
   const bump: Record<string, 'p' | 'm' | 'g'> = { p: 'm', m: 'g', g: 'g' }
   const logoTransp = effBg === 'transparent'
+  const maskStyle = (url: string): React.CSSProperties => ({ WebkitMaskImage: `url(${url})`, maskImage: `url(${url})`, WebkitMaskSize: 'contain', maskSize: 'contain', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat', WebkitMaskPosition: 'center', maskPosition: 'center' })
   function Emblema({ tam }: { tam?: 'lg' }) {
     if (!c.mostrarLogo) return null
     const key = tam === 'lg' ? bump[c.logoTamanho] : c.logoTamanho
@@ -87,7 +90,9 @@ export function AlunoEntrarForm({
     return (
       <div className={cn('flex shrink-0 items-center justify-center overflow-hidden', box, molde, logoTransp ? 'shadow-none' : 'shadow-sm', !effLogo && 'bg-primary text-primary-foreground')}
         style={effLogo ? { background: logoTransp ? 'transparent' : (effBg ?? '#ffffff') } : undefined}>
-        {effLogo ? <img src={effLogo} alt={plataforma} className="h-full w-full object-contain" style={{ filter: filtroCss }} /> : <GraduationCap className={ic} />}
+        {!effLogo ? <GraduationCap className={ic} />
+          : logoTint ? <span className="h-full w-full" style={{ background: logoTint, opacity: effOpac, ...maskStyle(effLogo) }} />
+          : <img src={effLogo} alt={plataforma} className="h-full w-full object-contain" style={{ filter: filtroCss, opacity: effOpac }} />}
       </div>
     )
   }
@@ -104,6 +109,8 @@ export function AlunoEntrarForm({
   const kickerCor = ehAdmin ? (c.corTextoFormAdmin ?? c.corTextoForm ?? accent) : (c.corTextoForm ?? accent)
   const kickerTexto = ehAdmin ? (c.textoKickerAdmin || 'Área administrativa') : c.textoKicker
   const rodapeTexto = ehAdmin ? c.textoRodapeAdmin : c.textoRodape
+  const marcaNome = c.marcaNome ?? plataforma
+  const marcaSub = c.marcaSub === null ? (subtitulo ?? null) : c.marcaSub
   // Renderiza o rodapé com suporte a links markdown [texto](url) — link em negrito e na cor primária (roxo p/ marcas roxas).
   function rodapeNodes(txt: string): React.ReactNode {
     const re = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g
@@ -208,7 +215,7 @@ export function AlunoEntrarForm({
         {Blobs}
         <div className="relative flex items-center gap-3">
           {Emblema({})}
-          <div className="leading-tight"><p className="text-lg font-semibold" style={{ color: textoMarca }}>{plataforma}</p>{subtitulo && <p className="text-sm" style={{ color: mix(60) }}>{subtitulo}</p>}</div>
+          <div className="leading-tight">{marcaNome && <p className="text-lg font-semibold" style={{ color: textoMarca }}>{marcaNome}</p>}{marcaSub && <p className="text-sm" style={{ color: mix(60) }}>{marcaSub}</p>}</div>
         </div>
         {MarcaTexto()}
         <div className="relative text-xs" style={{ color: mix(45) }}>© {new Date().getFullYear()} {plataforma}</div>

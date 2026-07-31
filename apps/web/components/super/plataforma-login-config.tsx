@@ -30,10 +30,10 @@ function Thumb({ children, solid, col, pos }: { children: React.ReactNode; solid
 
 export function PlataformaLoginConfig({
   tenantId, config, corPrimaria = '#6d28d9', corAccent = '#f5c542', logo = null, plataforma = 'Plataforma', dominio = null, slug = '',
-  logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none',
+  logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', subtitulo = '',
 }: {
   tenantId: string; config: LoginConfig; corPrimaria?: string; corAccent?: string; logo?: string | null; plataforma?: string; dominio?: string | null; slug?: string
-  logoBg?: string; logoEstilo?: string; logoFiltro?: string
+  logoBg?: string; logoEstilo?: string; logoFiltro?: string; subtitulo?: string
 }) {
   const router = useRouter()
   const [c, setC] = useState<LoginConfig>({ ...LOGIN_DEFAULT, ...config })
@@ -94,7 +94,7 @@ export function PlataformaLoginConfig({
         {abaPrevia === 'carregamento' && (
           <Bloco titulo="Modelo de carregamento">
             <div className="grid grid-cols-2 gap-2">
-              {([['spinner', 'Spinner'], ['barra', 'Barra'], ['pulso', 'Pulso do logo'], ['pontos', 'Pontos'], ['orbita', 'Órbita']] as [CarModelo, string][]).map(([v, r]) => (
+              {([['spinner', 'Spinner'], ['anel', 'Anel (logo no meio)'], ['barra', 'Barra'], ['pulso', 'Pulso do logo'], ['pontos', 'Pontos'], ['orbita', 'Órbita']] as [CarModelo, string][]).map(([v, r]) => (
                 <button key={v} type="button" onClick={() => set('carModelo', v)} className={cn('rounded-xl border px-3 py-2.5 text-xs font-semibold transition', c.carModelo === v ? on : off)}>{r}</button>
               ))}
             </div>
@@ -160,7 +160,11 @@ export function PlataformaLoginConfig({
                 <div className="flex gap-1">{([['arredondado', 'Arredondado'], ['quadrado', 'Quadrado'], ['borda', 'Borda']] as [LogoEstilo, string][]).map(([v, r]) => <button key={v} type="button" onClick={() => set('logoEstilo', v)} className={cn(seg, (c.logoEstilo ?? logoEstilo) === v ? on : off)}>{r}</button>)}</div>
               </div>
               <div className="space-y-1"><label className="text-xs text-muted-foreground">Filtro de cor</label>
-                <div className="flex gap-1">{([['none', 'Nenhum'], ['branco', 'Branco'], ['preto', 'Preto']] as [LogoFiltro, string][]).map(([v, r]) => <button key={v} type="button" onClick={() => set('logoFiltro', v)} className={cn(seg, (c.logoFiltro ?? logoFiltro) === v ? on : off)}>{r}</button>)}</div>
+                <div className="flex gap-1">{([['none', 'Nenhum'], ['branco', 'Branco'], ['preto', 'Preto'], ['cor', 'Cor']] as [LogoFiltro, string][]).map(([v, r]) => <button key={v} type="button" onClick={() => set('logoFiltro', v)} className={cn(seg, (c.logoFiltro ?? logoFiltro) === v ? on : off)}>{r}</button>)}</div>
+                {(c.logoFiltro ?? logoFiltro) === 'cor' && <div className="flex items-center gap-2 pt-1"><span className="text-xs text-muted-foreground">Cor da logo</span><input type="color" value={c.logoCor ?? corPrimaria} onChange={(e) => set('logoCor', e.target.value)} className="h-8 w-10 cursor-pointer rounded border bg-transparent p-0.5" /></div>}
+              </div>
+              <div className="space-y-1"><label className="flex items-center justify-between text-xs text-muted-foreground">Transparência da logo <span className="tabular-nums">{c.logoOpacidade ?? 100}%</span></label>
+                <input type="range" min={10} max={100} step={5} value={c.logoOpacidade ?? 100} onChange={(e) => set('logoOpacidade', Number(e.target.value))} className="h-1.5 w-full cursor-pointer accent-primary" />
               </div>
             </>
           )}
@@ -190,6 +194,11 @@ export function PlataformaLoginConfig({
         </Bloco>
 
         <Bloco titulo="Textos">
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">Marca (painel/carregamento) <span className="text-muted-foreground/70">(vazio = oculto)</span></label>
+            <Input value={c.marcaNome ?? plataforma} onChange={(e) => set('marcaNome', e.target.value)} placeholder="Nome — ex.: Revisão" />
+            <Input value={c.marcaSub ?? subtitulo} onChange={(e) => set('marcaSub', e.target.value)} placeholder="Subtítulo — ex.: Ensino Jurídico" />
+          </div>
           {c.titulo !== '' ? (
             <div className="space-y-1">
               <div className="flex items-center justify-between"><label className="text-xs text-muted-foreground">Título (headline) <span className="text-muted-foreground/70">— cor do texto da marca →</span></label><button type="button" onClick={() => set('titulo', '')} className="text-[11px] text-muted-foreground transition hover:text-destructive">Remover</button></div>
@@ -258,7 +267,7 @@ export function PlataformaLoginConfig({
         <div ref={boxRef} className="relative w-full overflow-hidden rounded-xl border bg-background" style={{ aspectRatio: '16 / 10' }}>
           <div className="absolute left-0 top-0" style={{ width: 1200, height: 750, transform: `scale(${scale})`, transformOrigin: 'top left', ['--primary' as any]: corPrimaria, ['--brand-accent' as any]: corAccent }}>
             {abaPrevia === 'login'
-              ? <AlunoEntrarForm preview metodo="email" plataforma={plataforma} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} config={c} />
+              ? <AlunoEntrarForm preview metodo="email" plataforma={plataforma} subtitulo={subtitulo} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} config={c} />
               : <LoginLoading preview config={c} plataforma={plataforma} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} />}
           </div>
         </div>

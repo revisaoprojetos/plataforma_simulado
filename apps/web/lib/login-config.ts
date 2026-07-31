@@ -6,10 +6,10 @@ export type LoginFundo = 'gradiente' | 'cor' | 'imagem'
 export type LoginLado = 'esquerda' | 'direita'
 export type CardEstilo = 'solido' | 'vidro'
 export type LogoEstilo = 'arredondado' | 'quadrado' | 'borda'
-export type LogoFiltro = 'none' | 'branco' | 'preto'
+export type LogoFiltro = 'none' | 'branco' | 'preto' | 'cor'
 export type LogoTam = 'p' | 'm' | 'g'
 export type BotaoEstilo = 'solido' | 'gradiente' | 'contorno'
-export type CarModelo = 'spinner' | 'barra' | 'pulso' | 'pontos' | 'orbita'
+export type CarModelo = 'spinner' | 'anel' | 'barra' | 'pulso' | 'pontos' | 'orbita'
 
 export type LoginConfig = {
   template: LoginTemplate     // estilo/layout da tela
@@ -28,8 +28,12 @@ export type LoginConfig = {
   logoUrl: string | null      // logo específico do login; null = logo do tema
   logoBg: string | null       // fundo atrás do logo; null = do tema
   logoEstilo: LogoEstilo | null // moldura do logo; null = do tema
-  logoFiltro: LogoFiltro | null // filtro (branco/preto/nenhum); null = do tema
+  logoFiltro: LogoFiltro | null // filtro (branco/preto/cor/nenhum); null = do tema
+  logoCor: string | null      // cor de tingimento quando logoFiltro = 'cor'
+  logoOpacidade: number       // 0–100 (transparência da logo)
   logoTamanho: LogoTam        // tamanho do logo
+  marcaNome: string | null    // nome da marca no painel/carregamento (ex.: "Revisão"); null = nome da plataforma
+  marcaSub: string | null     // subtítulo da marca (ex.: "Ensino Jurídico"); null = do tema; '' = oculto
   titulo: string              // headline do painel da marca
   subtitulo: string           // texto de apoio
   textoKicker: string         // rótulo pequeno do formulário (ex.: "Área do aluno"); vazio = oculto
@@ -67,7 +71,11 @@ export const LOGIN_DEFAULT: LoginConfig = {
   logoBg: null,
   logoEstilo: null,
   logoFiltro: null,
+  logoCor: null,
+  logoOpacidade: 100,
   logoTamanho: 'm',
+  marcaNome: null,
+  marcaSub: null,
   titulo: 'Sua preparação começa aqui.',
   subtitulo: 'Entre com o seu e-mail e continue de onde parou — sem senha, sem atrito.',
   textoKicker: 'Área do aluno',
@@ -114,8 +122,12 @@ export function resolverLoginConfig(raw: unknown): LoginConfig {
     logoUrl: typeof c.logoUrl === 'string' && c.logoUrl ? c.logoUrl : null,
     logoBg: typeof c.logoBg === 'string' && c.logoBg ? c.logoBg : null,
     logoEstilo: c.logoEstilo === 'quadrado' || c.logoEstilo === 'borda' || c.logoEstilo === 'arredondado' ? c.logoEstilo : null,
-    logoFiltro: c.logoFiltro === 'branco' || c.logoFiltro === 'preto' ? c.logoFiltro : (c.logoFiltro === 'none' ? 'none' : null),
+    logoFiltro: c.logoFiltro === 'branco' || c.logoFiltro === 'preto' || c.logoFiltro === 'cor' ? c.logoFiltro : (c.logoFiltro === 'none' ? 'none' : null),
+    logoCor: typeof c.logoCor === 'string' && c.logoCor ? c.logoCor : null,
+    logoOpacidade: typeof c.logoOpacidade === 'number' ? Math.min(100, Math.max(0, c.logoOpacidade)) : 100,
     logoTamanho: c.logoTamanho === 'p' || c.logoTamanho === 'g' ? c.logoTamanho : 'm',
+    marcaNome: typeof c.marcaNome === 'string' ? c.marcaNome : null,
+    marcaSub: typeof c.marcaSub === 'string' ? c.marcaSub : null,
     // título/subtítulo: string vazia = removido (oculto); undefined = usa o default.
     titulo: typeof c.titulo === 'string' ? c.titulo : LOGIN_DEFAULT.titulo,
     subtitulo: typeof c.subtitulo === 'string' ? c.subtitulo : LOGIN_DEFAULT.subtitulo,
@@ -131,7 +143,7 @@ export function resolverLoginConfig(raw: unknown): LoginConfig {
     destaques: Array.isArray(c.destaques) ? c.destaques.filter((x): x is string => typeof x === 'string').slice(0, 5) : LOGIN_DEFAULT.destaques,
     mostrarMarca: c.mostrarMarca !== false,
     animacao: c.animacao !== false,
-    carModelo: (['spinner', 'barra', 'pulso', 'pontos', 'orbita'] as CarModelo[]).includes(c.carModelo as CarModelo) ? (c.carModelo as CarModelo) : 'spinner',
+    carModelo: (['spinner', 'anel', 'barra', 'pulso', 'pontos', 'orbita'] as CarModelo[]).includes(c.carModelo as CarModelo) ? (c.carModelo as CarModelo) : 'spinner',
     carTexto: typeof c.carTexto === 'string' ? c.carTexto : LOGIN_DEFAULT.carTexto,
     carMostrarLogo: c.carMostrarLogo !== false,
   }
