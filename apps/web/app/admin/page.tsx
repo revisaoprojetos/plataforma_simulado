@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { startOfDay } from 'date-fns'
 import { createServiceClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetch-all'
+import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { Card, CardContent } from '@/components/ui/card'
 import { BookOpen, ClipboardList, Users, Activity, Trophy, ArrowRight, Plus } from 'lucide-react'
@@ -21,7 +22,7 @@ async function getDados(tenantId: string) {
     { count: sessoesHoje },
     serieInicial,
     { data: recentes },
-    notasData,
+    notaMedia,
   ] = await Promise.all([
     svc.from('simulado_questoes').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false),
     svc.from('simulado_simulados').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('status', 'publicado'),
@@ -29,12 +30,17 @@ async function getDados(tenantId: string) {
     svc.from('simulado_sessoes_prova').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('is_teste', false).gte('iniciado_em', hojeIso),
     montarDashboardSerie(svc, tenantId, 'semana'),
     svc.from('simulado_simulados').select('id, titulo, status, modo_aplicacao, created_at').match(t).eq('deletado', false).order('created_at', { ascending: false }).limit(5),
-    // fetchAll: nota média precisa de TODAS as notas (o .limit não burla o teto de 1000 do PostgREST).
-    fetchAll<{ nota: number | null }>(() => svc.from('simulado_sessoes_prova').select('nota').match(t).eq('deletado', false).eq('is_teste', false).eq('status', 'finalizada').not('nota', 'is', null).order('id', { ascending: true })),
+    // Nota média = agregação sobre TODAS as notas finalizadas. Como a agregação do
+    // PostgREST está desabilitada e não temos RPC, o cálculo ainda percorre as notas
+    // (fetchAll), mas fica MEMOIZADO no Redis (TTL) — no cache-hit o dashboard não
+    // toca no banco. Degrada sozinho sem Redis (computa direto). Ver relatorio-cache.
+    remember<number | null>(chaveRelatorio(tenantId, 'dashboard', 'nota-media'), TTL_RELATORIO, async () => {
+      const notasData = await fetchAll<{ nota: number | null }>(() =>
+        svc.from('simulado_sessoes_prova').select('nota').match(t).eq('deletado', false).eq('is_teste', false).eq('status', 'finalizada').not('nota', 'is', null).order('id', { ascending: true }))
+      const notas = (notasData ?? []).map((n: any) => Number(n.nota)).filter((n) => !Number.isNaN(n))
+      return notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : null
+    }),
   ])
-
-  const notas = (notasData ?? []).map((n: any) => Number(n.nota)).filter((n) => !Number.isNaN(n))
-  const notaMedia = notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : null
 
   return {
     totalQuestoes: totalQuestoes ?? 0,
