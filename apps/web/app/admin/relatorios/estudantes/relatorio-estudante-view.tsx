@@ -15,7 +15,7 @@ export type DadosRelatorioEstudante = {
   historico: { simulado: string; quando: string; nota: number | null; acerto: number; tempo: string }[]
 }
 
-export function RelatorioEstudanteView({ d, print }: { d: DadosRelatorioEstudante; print?: boolean }) {
+export function RelatorioEstudanteView({ d, print, semCabecalho }: { d: DadosRelatorioEstudante; print?: boolean; semCabecalho?: boolean }) {
   const nota = (n: number | null) => (n == null ? '—' : n.toFixed(1).replace('.', ','))
   const sobe = d.evolucao.length >= 2 && d.evolucao[d.evolucao.length - 1].nota >= d.evolucao[0].nota
   const temTend = d.evolucao.length >= 2
@@ -36,9 +36,11 @@ export function RelatorioEstudanteView({ d, print }: { d: DadosRelatorioEstudant
 
   return (
     <div className="space-y-5">
-      <Hero icon={<GraduationCap className="h-6 w-6" />} tom="primary" titulo={d.nome}
-        badge={!temTend ? undefined : <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${sobe ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'}`}>{sobe ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}{sobe ? 'Evoluindo' : 'Em queda'}</span>}
-        subtitulo="Evolução e desempenho vs. a turma" acoes={print ? undefined : <BotaoExportar onClick={exportar} />} />
+      {!semCabecalho && (
+        <Hero icon={<GraduationCap className="h-6 w-6" />} tom="primary" titulo={d.nome}
+          badge={!temTend ? undefined : <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${sobe ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'}`}>{sobe ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}{sobe ? 'Evoluindo' : 'Em queda'}</span>}
+          subtitulo="Evolução e desempenho vs. a turma" acoes={print ? undefined : <BotaoExportar onClick={exportar} />} />
+      )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <KpiCard label="Simulados feitos" valor={d.simulados} icon={<ClipboardList className="h-4 w-4" />} tom="primary" />
