@@ -83,6 +83,12 @@ export function AlunoEntrarForm({
   const kickerCor = c.corTextoForm ?? accent
   const plataformaLabel = c.textoPlataforma === null ? plataforma : c.textoPlataforma
   const anim = c.animacao && !preview
+  const btnCor = c.botaoCor ?? primaria
+  const btnStyle: React.CSSProperties = c.botaoEstilo === 'contorno'
+    ? { background: 'transparent', border: `1.5px solid ${btnCor}`, color: btnCor }
+    : c.botaoEstilo === 'gradiente'
+      ? { background: `linear-gradient(135deg, ${btnCor}, color-mix(in oklab, ${btnCor} 66%, #000))`, color: '#ffffff' }
+      : { background: btnCor, color: '#ffffff' }
   function MarcaTexto() {
     return (
       <div className="relative max-w-md space-y-5">
@@ -110,9 +116,10 @@ export function AlunoEntrarForm({
         {manutencao && <AlertBox variante="aviso" icon={Wrench} titulo={manutencao.titulo}>{manutencao.mensagem}</AlertBox>}
         {erro && <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-sm text-destructive">{erro}</p>}
         <button type="submit" disabled={carregando || (!preview && !email)}
-          className="group flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-95 hover:shadow-md disabled:opacity-60">
+          className={cn('group flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all hover:opacity-95 disabled:opacity-60', c.botaoEstilo !== 'contorno' && 'shadow-sm hover:shadow-md')}
+          style={btnStyle}>
           {carregando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Entrar
+          {c.textoBotao}
           {!carregando && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />}
         </button>
       </>
@@ -134,7 +141,7 @@ export function AlunoEntrarForm({
         </div>
         <form onSubmit={submit} className="space-y-3.5">
           <Campos />
-          <p className={cn('text-xs leading-relaxed text-muted-foreground', centro ? 'text-center' : 'text-left')}>Como aluno, basta o e-mail — sem senha.</p>
+          {c.textoRodape && <p className={cn('text-xs leading-relaxed text-muted-foreground', centro ? 'text-center' : 'text-left')}>{c.textoRodape}</p>}
         </form>
       </div>
     )
@@ -222,7 +229,7 @@ export function AlunoEntrarForm({
             )}
           </div>
           <form onSubmit={submit} className="space-y-3.5"><Campos /></form>
-          <p className="mt-3 text-center text-xs text-muted-foreground">{plataforma} · basta o e-mail, sem senha.</p>
+          {c.textoRodape && <p className="mt-3 text-center text-xs text-muted-foreground">{c.textoRodape}</p>}
         </div>
       </div>
     )

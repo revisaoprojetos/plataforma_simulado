@@ -8,6 +8,7 @@ export type CardEstilo = 'solido' | 'vidro'
 export type LogoEstilo = 'arredondado' | 'quadrado' | 'borda'
 export type LogoFiltro = 'none' | 'branco' | 'preto'
 export type LogoTam = 'p' | 'm' | 'g'
+export type BotaoEstilo = 'solido' | 'gradiente' | 'contorno'
 
 export type LoginConfig = {
   template: LoginTemplate     // estilo/layout da tela
@@ -32,6 +33,10 @@ export type LoginConfig = {
   textoKicker: string         // rótulo pequeno do formulário (ex.: "Área do aluno"); vazio = oculto
   textoEntrar: string         // título do formulário (ex.: "Entrar"); vazio = oculto
   textoPlataforma: string | null // nome exibido no formulário; null = usa o nome da plataforma; '' = oculto
+  textoBotao: string          // rótulo do botão (ex.: "Entrar")
+  botaoEstilo: BotaoEstilo    // sólido | gradiente | contorno
+  botaoCor: string | null     // cor do botão; null = usa a primária
+  textoRodape: string         // texto abaixo do botão; vazio = oculto
   destaques: string[]         // bullets do painel da marca
   mostrarMarca: boolean       // exibe o painel/cabeçalho da marca
   animacao: boolean           // véus/aurora animados no fundo
@@ -59,6 +64,10 @@ export const LOGIN_DEFAULT: LoginConfig = {
   textoKicker: 'Área do aluno',
   textoEntrar: 'Entrar',
   textoPlataforma: null,
+  textoBotao: 'Entrar',
+  botaoEstilo: 'solido',
+  botaoCor: null,
+  textoRodape: 'Como aluno, basta o e-mail — sem senha.',
   destaques: ['Simulados no padrão da banca', 'Correção automática e gabarito', 'Seu desempenho e evolução num só lugar'],
   mostrarMarca: true,
   animacao: true,
@@ -98,6 +107,10 @@ export function resolverLoginConfig(raw: unknown): LoginConfig {
     textoKicker: typeof c.textoKicker === 'string' ? c.textoKicker : LOGIN_DEFAULT.textoKicker,
     textoEntrar: typeof c.textoEntrar === 'string' ? c.textoEntrar : LOGIN_DEFAULT.textoEntrar,
     textoPlataforma: typeof c.textoPlataforma === 'string' ? c.textoPlataforma : null,
+    textoBotao: typeof c.textoBotao === 'string' && c.textoBotao.trim() ? c.textoBotao : LOGIN_DEFAULT.textoBotao,
+    botaoEstilo: c.botaoEstilo === 'gradiente' || c.botaoEstilo === 'contorno' ? c.botaoEstilo : 'solido',
+    botaoCor: typeof c.botaoCor === 'string' && c.botaoCor ? c.botaoCor : null,
+    textoRodape: typeof c.textoRodape === 'string' ? c.textoRodape : LOGIN_DEFAULT.textoRodape,
     destaques: Array.isArray(c.destaques) ? c.destaques.filter((x): x is string => typeof x === 'string').slice(0, 5) : LOGIN_DEFAULT.destaques,
     mostrarMarca: c.mostrarMarca !== false,
     animacao: c.animacao !== false,

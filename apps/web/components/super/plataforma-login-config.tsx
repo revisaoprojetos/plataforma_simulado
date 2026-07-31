@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { redimensionarImagem } from '@/lib/imagem'
 import { salvarTemaSuperAction } from '@/app/admin/tenants/actions'
-import { LOGIN_DEFAULT, type LoginConfig, type LoginTemplate, type LoginFundo, type CardEstilo, type LogoEstilo, type LogoFiltro, type LogoTam } from '@/lib/login-config'
+import { LOGIN_DEFAULT, type LoginConfig, type LoginTemplate, type LoginFundo, type CardEstilo, type LogoEstilo, type LogoFiltro, type LogoTam, type BotaoEstilo } from '@/lib/login-config'
 import { AlunoEntrarForm } from '@/components/aluno/aluno-entrar-form'
 
 const TEMPLATES: { v: LoginTemplate; nome: string; desc: string; thumb: React.ReactNode }[] = [
@@ -206,6 +206,20 @@ export function PlataformaLoginConfig({
             ))}
             {c.destaques.length < 5 && <button type="button" onClick={() => set('destaques', [...c.destaques, ''])} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted"><Plus className="h-3.5 w-3.5" /> Adicionar destaque</button>}
           </div>
+        </Bloco>
+
+        <Bloco titulo="Botão & rodapé">
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Texto do botão <span className="text-muted-foreground/70">— cor →</span></label>
+            <div className="flex gap-2"><Input value={c.textoBotao} onChange={(e) => set('textoBotao', e.target.value)} placeholder="Entrar" className="flex-1" /><SwatchInline valor={c.botaoCor} fallback={corPrimaria} onChange={(v) => set('botaoCor', v)} title="Cor do botão" /></div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Estilo:</span>
+            {([['solido', 'Sólido'], ['gradiente', 'Gradiente'], ['contorno', 'Contorno']] as [BotaoEstilo, string][]).map(([v, r]) => (
+              <button key={v} type="button" onClick={() => set('botaoEstilo', v)} className={cn('flex-1 rounded-lg border py-1.5 text-xs font-medium transition', c.botaoEstilo === v ? on : off)}>{r}</button>
+            ))}
+          </div>
+          <div className="space-y-1"><label className="text-xs text-muted-foreground">Texto abaixo do botão <span className="text-muted-foreground/70">(vazio = oculto)</span></label><Input value={c.textoRodape} onChange={(e) => set('textoRodape', e.target.value)} placeholder="Ex.: Como aluno, basta o e-mail — sem senha." /></div>
         </Bloco>
 
         <div className="flex items-center gap-2 border-t pt-3">
