@@ -44,8 +44,10 @@ export function PlataformaLoginConfig({
   const [abaPrevia, setAbaPrevia] = useState<'login' | 'carregamento'>('login')
   const fileRef = useRef<HTMLInputElement>(null)
   const logoRef = useRef<HTMLInputElement>(null)
+  const carLogoRef = useRef<HTMLInputElement>(null)
   const set = <K extends keyof LoginConfig>(k: K, v: LoginConfig[K]) => setC((p) => ({ ...p, [k]: v }))
   const logoAtual = c.logoUrl ?? logo
+  const logoAtualCar = c.carLogoUrl ?? logo
 
   const boxRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.32)
@@ -77,6 +79,12 @@ export function PlataformaLoginConfig({
     setEnviandoLogo(true)
     try { set('logoUrl', await redimensionarImagem(f, 512, 0.9)) }
     catch { toast.error('Falha ao processar o logo.') } finally { setEnviandoLogo(false); if (logoRef.current) logoRef.current.value = '' }
+  }
+  async function onLogoCar(f: File | null) {
+    if (!f) return
+    setEnviandoLogo(true)
+    try { set('carLogoUrl', await redimensionarImagem(f, 512, 0.9)) }
+    catch { toast.error('Falha ao processar o logo.') } finally { setEnviandoLogo(false); if (carLogoRef.current) carLogoRef.current.value = '' }
   }
 
   const seg = 'flex-1 rounded-lg border px-2 py-2 text-xs font-medium transition inline-flex items-center justify-center gap-1.5'
@@ -122,6 +130,46 @@ export function PlataformaLoginConfig({
     </Bloco>
   )
 
+  const blocoLogoCar = (
+    <Bloco titulo="Logo do carregamento">
+      <label className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Mostrar logo</span><Switch checked={c.carMostrarLogo} onCheckedChange={(v) => set('carMostrarLogo', v)} /></label>
+      {c.carMostrarLogo && (
+        <>
+          <div className="flex items-center gap-2">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border" style={{ background: c.carLogoBg ?? logoBg }}>
+              {logoAtualCar ? <img src={logoAtualCar} alt="" className="h-full w-full object-contain" style={{ filter: (c.carLogoFiltro ?? logoFiltro) === 'branco' ? 'brightness(0) invert(1)' : (c.carLogoFiltro ?? logoFiltro) === 'preto' ? 'brightness(0)' : undefined }} /> : <ImageOff className="h-5 w-5 text-muted-foreground" />}
+            </span>
+            <Input value={c.carLogoUrl?.startsWith('data:') ? '' : (c.carLogoUrl ?? '')} onChange={(e) => set('carLogoUrl', e.target.value || null)} placeholder="URL do logo (ou envie →) — vazio usa o do tema" className="flex-1" />
+            <input ref={carLogoRef} type="file" accept="image/*" className="hidden" onChange={(e) => onLogoCar(e.target.files?.[0] ?? null)} />
+            <button type="button" onClick={() => carLogoRef.current?.click()} disabled={enviandoLogo} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted disabled:opacity-50">{enviandoLogo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}</button>
+            {c.carLogoUrl && <button type="button" onClick={() => set('carLogoUrl', null)} title="Usar logo do tema" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><label className="text-xs text-muted-foreground">Fundo do logo</label>
+              <div className="flex items-center gap-1.5">
+                <input type="color" disabled={c.carLogoBg === 'transparent'} value={c.carLogoBg && c.carLogoBg !== 'transparent' ? c.carLogoBg : logoBg} onChange={(e) => set('carLogoBg', e.target.value)} className="h-8 w-9 shrink-0 cursor-pointer rounded border bg-transparent p-0.5 disabled:opacity-40" />
+                <button type="button" onClick={() => set('carLogoBg', c.carLogoBg === 'transparent' ? null : 'transparent')} className={cn('flex-1 rounded-lg border py-1.5 text-[11px] font-medium transition', c.carLogoBg === 'transparent' ? on : off)}>Transparente</button>
+              </div>
+            </div>
+            <div className="space-y-1"><label className="text-xs text-muted-foreground">Tamanho</label>
+              <div className="flex gap-1">{(['p', 'm', 'g'] as LogoTam[]).map((t) => <button key={t} type="button" onClick={() => set('carLogoTamanho', t)} className={cn('flex-1 rounded-lg border py-1.5 text-xs font-medium uppercase transition', c.carLogoTamanho === t ? on : off)}>{t}</button>)}</div>
+            </div>
+          </div>
+          <div className="space-y-1"><label className="text-xs text-muted-foreground">Moldura</label>
+            <div className="flex gap-1">{([['arredondado', 'Arredondado'], ['quadrado', 'Quadrado'], ['borda', 'Borda']] as [LogoEstilo, string][]).map(([v, r]) => <button key={v} type="button" onClick={() => set('carLogoEstilo', v)} className={cn(seg, (c.carLogoEstilo ?? logoEstilo) === v ? on : off)}>{r}</button>)}</div>
+          </div>
+          <div className="space-y-1"><label className="text-xs text-muted-foreground">Filtro de cor</label>
+            <div className="flex gap-1">{([['none', 'Nenhum'], ['branco', 'Branco'], ['preto', 'Preto'], ['cor', 'Cor']] as [LogoFiltro, string][]).map(([v, r]) => <button key={v} type="button" onClick={() => set('carLogoFiltro', v)} className={cn(seg, (c.carLogoFiltro ?? logoFiltro) === v ? on : off)}>{r}</button>)}</div>
+            {(c.carLogoFiltro ?? logoFiltro) === 'cor' && <div className="flex items-center gap-2 pt-1"><span className="text-xs text-muted-foreground">Cor da logo</span><input type="color" value={c.carLogoCor ?? corPrimaria} onChange={(e) => set('carLogoCor', e.target.value)} className="h-8 w-10 cursor-pointer rounded border bg-transparent p-0.5" /></div>}
+          </div>
+          <div className="space-y-1"><label className="flex items-center justify-between text-xs text-muted-foreground">Transparência da logo <span className="tabular-nums">{c.carLogoOpacidade ?? 100}%</span></label>
+            <input type="range" min={10} max={100} step={5} value={c.carLogoOpacidade ?? 100} onChange={(e) => set('carLogoOpacidade', Number(e.target.value))} className="h-1.5 w-full cursor-pointer accent-primary" />
+          </div>
+        </>
+      )}
+    </Bloco>
+  )
+
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,400px)_1fr]">
       {/* Controles */}
@@ -141,9 +189,8 @@ export function PlataformaLoginConfig({
             <div className="flex items-center gap-2 pt-1"><span className="text-xs text-muted-foreground">Cor da animação</span><SwatchInline valor={c.carCorAnim} fallback={corAccent} onChange={(v) => set('carCorAnim', v)} title="Cor da animação de carregamento" /></div>
             <div className="space-y-1 pt-1"><label className="text-xs text-muted-foreground">Texto <span className="text-muted-foreground/70">(vazio = oculto)</span></label><div className="flex gap-2"><Input value={c.carTexto} onChange={(e) => set('carTexto', e.target.value)} placeholder="Ex.: Entrando…" className="flex-1" /><SwatchInline valor={c.carCorTexto} fallback={c.corTextoMarca ?? '#ffffff'} onChange={(v) => set('carCorTexto', v)} title="Cor do texto do carregamento" /></div></div>
             <div className="space-y-1"><label className="text-xs text-muted-foreground">Texto da marca <span className="text-muted-foreground/70">(vazio = oculto)</span></label><div className="flex gap-2"><Input value={c.carTextoMarca ?? (c.marcaNome ?? plataforma)} onChange={(e) => set('carTextoMarca', e.target.value)} placeholder="Ex.: Revisão / Ensino Jurídico" className="flex-1" /><SwatchInline valor={c.carCorTexto} fallback={c.corTextoMarca ?? '#ffffff'} onChange={(v) => set('carCorTexto', v)} title="Cor do texto do carregamento" /></div></div>
-            <label className="flex items-center justify-between pt-1 text-sm"><span className="text-muted-foreground">Mostrar logo</span><Switch checked={c.carMostrarLogo} onCheckedChange={(v) => set('carMostrarLogo', v)} /></label>
           </Bloco>
-          {blocoLogo}
+          {blocoLogoCar}
         </>)}
 
         {abaPrevia === 'login' && (<>

@@ -55,6 +55,14 @@ export type LoginConfig = {
   carCorTexto: string | null  // cor dos textos do carregamento; null = usa a cor do texto da marca (ou branco)
   carCorAnim: string | null   // cor da animação (spinner/pontos/anel/órbita); null = usa o destaque
   carMostrarLogo: boolean     // exibe o logo na tela de carregamento
+  // Logo do CARREGAMENTO (independente do logo do login; null = herda do tema)
+  carLogoUrl: string | null
+  carLogoBg: string | null
+  carLogoEstilo: LogoEstilo | null
+  carLogoFiltro: LogoFiltro | null
+  carLogoCor: string | null
+  carLogoOpacidade: number
+  carLogoTamanho: LogoTam
 }
 
 export const LOGIN_DEFAULT: LoginConfig = {
@@ -99,6 +107,13 @@ export const LOGIN_DEFAULT: LoginConfig = {
   carCorTexto: null,
   carCorAnim: null,
   carMostrarLogo: true,
+  carLogoUrl: null,
+  carLogoBg: null,
+  carLogoEstilo: null,
+  carLogoFiltro: null,
+  carLogoCor: null,
+  carLogoOpacidade: 100,
+  carLogoTamanho: 'm',
 }
 
 const TEMPLATES: LoginTemplate[] = ['split', 'central', 'hero', 'vitrine', 'cartao']
@@ -155,6 +170,13 @@ export function resolverLoginConfig(raw: unknown): LoginConfig {
     carCorTexto: typeof c.carCorTexto === 'string' && c.carCorTexto ? c.carCorTexto : null,
     carCorAnim: typeof c.carCorAnim === 'string' && c.carCorAnim ? c.carCorAnim : null,
     carMostrarLogo: c.carMostrarLogo !== false,
+    carLogoUrl: typeof c.carLogoUrl === 'string' && c.carLogoUrl ? c.carLogoUrl : null,
+    carLogoBg: typeof c.carLogoBg === 'string' && c.carLogoBg ? c.carLogoBg : null,
+    carLogoEstilo: c.carLogoEstilo === 'quadrado' || c.carLogoEstilo === 'borda' || c.carLogoEstilo === 'arredondado' ? c.carLogoEstilo : null,
+    carLogoFiltro: c.carLogoFiltro === 'branco' || c.carLogoFiltro === 'preto' || c.carLogoFiltro === 'cor' || c.carLogoFiltro === 'none' ? c.carLogoFiltro : null,
+    carLogoCor: typeof c.carLogoCor === 'string' && c.carLogoCor ? c.carLogoCor : null,
+    carLogoOpacidade: typeof c.carLogoOpacidade === 'number' ? Math.min(100, Math.max(0, c.carLogoOpacidade)) : 100,
+    carLogoTamanho: c.carLogoTamanho === 'p' || c.carLogoTamanho === 'g' ? c.carLogoTamanho : 'm',
   }
 }
 

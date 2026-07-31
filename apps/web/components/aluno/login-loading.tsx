@@ -26,21 +26,23 @@ export function LoginLoading({
   const accent = c.carCorAnim ?? corAccentLogin(c)
   const primaria = corPrimariaLogin(c)
   const texto = c.carCorTexto ?? c.corTextoMarca ?? '#ffffff'
-  const effLogo = c.logoUrl ?? logo
-  const effBg = c.logoBg ?? logoBg
-  const effEstilo = c.logoEstilo ?? logoEstilo
-  const effFiltro = c.logoFiltro ?? logoFiltro
+  // Logo do carregamento é INDEPENDENTE do login (config própria; herda o tema quando null).
+  const effLogo = c.carLogoUrl ?? logo
+  const effBg = c.carLogoBg ?? logoBg
+  const effEstilo = c.carLogoEstilo ?? logoEstilo
+  const effFiltro = c.carLogoFiltro ?? logoFiltro
   const transp = effBg === 'transparent'
   const molde = effEstilo === 'quadrado' ? 'rounded-none' : effEstilo === 'borda' ? 'rounded-xl border' : 'rounded-xl'
   const filtroCss = effFiltro === 'branco' ? 'brightness(0) invert(1)' : effFiltro === 'preto' ? 'brightness(0)' : undefined
-  const effOpac = (c.logoOpacidade ?? 100) / 100
-  const logoTint = effFiltro === 'cor' ? (c.logoCor ?? primaria) : null
+  const effOpac = (c.carLogoOpacidade ?? 100) / 100
+  const logoTint = effFiltro === 'cor' ? (c.carLogoCor ?? primaria) : null
   const maskStyle = (url: string): React.CSSProperties => ({ WebkitMaskImage: `url("${url}")`, maskImage: `url("${url}")`, WebkitMaskSize: 'contain', maskSize: 'contain', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat', WebkitMaskPosition: 'center', maskPosition: 'center' })
   const nomeMarca = c.carTextoMarca === null ? (c.marcaNome ?? plataforma) : c.carTextoMarca
+  const [boxSz, icSz] = c.carLogoTamanho === 'p' ? ['h-12 w-12', 'h-6 w-6'] : c.carLogoTamanho === 'g' ? ['h-24 w-24', 'h-12 w-12'] : ['h-16 w-16', 'h-8 w-8']
 
   const Logo = c.carMostrarLogo ? (
-    <div className={cn('flex h-16 w-16 items-center justify-center overflow-hidden', molde, transp ? '' : 'shadow-sm', !effLogo && 'bg-primary text-primary-foreground')} style={effLogo ? { background: transp ? 'transparent' : effBg } : undefined}>
-      {!effLogo ? <GraduationCap className="h-8 w-8" />
+    <div className={cn('flex items-center justify-center overflow-hidden', boxSz, molde, transp ? '' : 'shadow-sm', !effLogo && 'bg-primary text-primary-foreground')} style={effLogo ? { background: transp ? 'transparent' : effBg } : undefined}>
+      {!effLogo ? <GraduationCap className={icSz} />
         : logoTint ? <span className="h-full w-full" style={{ background: logoTint, opacity: effOpac, ...maskStyle(effLogo) }} />
         : <img src={effLogo} alt="" className="h-full w-full object-contain" style={{ filter: filtroCss, opacity: effOpac }} />}
     </div>
