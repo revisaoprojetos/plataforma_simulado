@@ -99,7 +99,7 @@ export function AlunoEntrarForm({
 
   const textoMarca = c.corTextoMarca ?? '#ffffff'
   const mix = (pct: number) => `color-mix(in oklab, ${textoMarca} ${pct}%, transparent)`
-  const kickerCor = c.corTextoForm ?? accent
+  const kickerCor = ehAdmin ? (c.corTextoFormAdmin ?? c.corTextoForm ?? accent) : (c.corTextoForm ?? accent)
   const kickerTexto = ehAdmin ? (c.textoKickerAdmin || 'Área administrativa') : c.textoKicker
   const plataformaLabel = c.textoPlataforma === null ? plataforma : c.textoPlataforma
   const anim = c.animacao && !preview
@@ -275,12 +275,11 @@ export function AlunoEntrarForm({
   return (
     <>
       {tela}
-      {!preview && (
-        <button type="button" onClick={alternarModo} aria-label={ehAdmin ? 'Voltar para a área do aluno' : 'Acesso administrativo'}
-          className="fixed bottom-4 right-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/25 px-3 py-1.5 text-xs font-medium text-white/80 shadow-sm backdrop-blur transition-colors hover:border-white/30 hover:text-white">
-          {ehAdmin ? <><GraduationCap className="h-3.5 w-3.5" /> Área do aluno</> : <><ShieldCheck className="h-3.5 w-3.5" /> Admin</>}
-        </button>
-      )}
+      {/* Botão que alterna Aluno ↔ Admin. Também aparece (e funciona) na prévia do console. */}
+      <button type="button" onClick={alternarModo} aria-label={ehAdmin ? 'Voltar para a área do aluno' : 'Acesso administrativo'}
+        className="fixed bottom-4 right-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/25 px-3 py-1.5 text-xs font-medium text-white/80 shadow-sm backdrop-blur transition-colors hover:border-white/30 hover:text-white">
+        {ehAdmin ? <><GraduationCap className="h-3.5 w-3.5" /> Área do aluno</> : <><ShieldCheck className="h-3.5 w-3.5" /> Admin</>}
+      </button>
     </>
   )
 }

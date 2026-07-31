@@ -192,7 +192,7 @@ export function PlataformaLoginConfig({
           <div className="space-y-1.5 border-t pt-2">
             <label className="text-xs text-muted-foreground">Textos do formulário <span className="text-muted-foreground/70">(vazio = oculto)</span></label>
             <div className="flex gap-2"><Input value={c.textoKicker} onChange={(e) => set('textoKicker', e.target.value)} placeholder="Rótulo (aluno) — ex.: Área do aluno" className="flex-1" /><SwatchInline valor={c.corTextoForm} fallback={corAccent} onChange={(v) => set('corTextoForm', v)} title="Cor do rótulo “Área do aluno”" /></div>
-            <Input value={c.textoKickerAdmin} onChange={(e) => set('textoKickerAdmin', e.target.value)} placeholder="Rótulo (admin) — ex.: Área administrativa" />
+            <div className="flex gap-2"><Input value={c.textoKickerAdmin} onChange={(e) => set('textoKickerAdmin', e.target.value)} placeholder="Rótulo (admin) — ex.: Área administrativa" className="flex-1" /><SwatchInline valor={c.corTextoFormAdmin} fallback={corAccent} onChange={(v) => set('corTextoFormAdmin', v)} title="Cor do rótulo admin" /></div>
             <Input value={c.textoEntrar} onChange={(e) => set('textoEntrar', e.target.value)} placeholder="Título — ex.: Entrar" />
             <Input value={c.textoPlataforma === null ? plataforma : c.textoPlataforma} onChange={(e) => set('textoPlataforma', e.target.value)} placeholder="Nome exibido — ex.: Revisão" />
             <p className="text-[11px] text-muted-foreground">O rótulo <strong>admin</strong> e o campo de <strong>senha</strong> aparecem quando o aluno clica em “Admin” no canto da tela.</p>
@@ -234,11 +234,11 @@ export function PlataformaLoginConfig({
       <div className="rounded-2xl border bg-card p-4 shadow-sm lg:sticky lg:top-4 lg:self-start">
         <h2 className="mb-3 text-sm font-semibold">Prévia</h2>
         <div ref={boxRef} className="relative w-full overflow-hidden rounded-xl border bg-background" style={{ aspectRatio: '16 / 10' }}>
-          <div className="pointer-events-none absolute left-0 top-0" style={{ width: 1200, height: 750, transform: `scale(${scale})`, transformOrigin: 'top left', ['--primary' as any]: corPrimaria, ['--brand-accent' as any]: corAccent }}>
+          <div className="absolute left-0 top-0" style={{ width: 1200, height: 750, transform: `scale(${scale})`, transformOrigin: 'top left', ['--primary' as any]: corPrimaria, ['--brand-accent' as any]: corAccent }}>
             <AlunoEntrarForm preview metodo="email" plataforma={plataforma} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} config={c} />
           </div>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">Prévia com a marca real. A tela de login final abre no endereço da empresa.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Prévia com a marca real — clique em <strong>“Admin”</strong> (canto inferior direito) para ver o modo administrativo. A tela final abre no endereço da empresa.</p>
       </div>
     </div>
   )

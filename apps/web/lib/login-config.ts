@@ -20,6 +20,7 @@ export type LoginConfig = {
   corAccent: string | null    // OVERRIDE da cor de destaque (kicker/checks); null = usa o tema
   corTextoMarca: string | null // cor do TEXTO do painel da marca (separada do fundo); null = branco
   corTextoForm: string | null  // cor do rótulo "Área do aluno" (lado do formulário); null = usa o destaque
+  corTextoFormAdmin: string | null // cor do rótulo "Área administrativa" (modo admin); null = usa a do aluno
   cardEstilo: CardEstilo      // card do formulário: sólido | vidro (glass)
   // Logo (todas overrides; null = herda do tema)
   mostrarLogo: boolean        // exibe o logo/emblema
@@ -53,6 +54,7 @@ export const LOGIN_DEFAULT: LoginConfig = {
   corAccent: null,
   corTextoMarca: null,
   corTextoForm: null,
+  corTextoFormAdmin: null,
   cardEstilo: 'vidro',
   mostrarLogo: true,
   logoUrl: null,
@@ -96,6 +98,7 @@ export function resolverLoginConfig(raw: unknown): LoginConfig {
     corAccent: typeof c.corAccent === 'string' && c.corAccent ? c.corAccent : null,
     corTextoMarca: typeof c.corTextoMarca === 'string' && c.corTextoMarca ? c.corTextoMarca : null,
     corTextoForm: typeof c.corTextoForm === 'string' && c.corTextoForm ? c.corTextoForm : null,
+    corTextoFormAdmin: typeof c.corTextoFormAdmin === 'string' && c.corTextoFormAdmin ? c.corTextoFormAdmin : null,
     cardEstilo: c.cardEstilo === 'solido' ? 'solido' : 'vidro',
     mostrarLogo: c.mostrarLogo !== false,
     logoUrl: typeof c.logoUrl === 'string' && c.logoUrl ? c.logoUrl : null,
