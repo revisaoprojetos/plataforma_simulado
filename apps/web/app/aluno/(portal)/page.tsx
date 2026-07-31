@@ -9,6 +9,7 @@ import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
 import { BannersPortal, type HeroSimSlide, type BannerChip, type BannerStats } from '@/components/aluno/banners-portal'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
 import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } from '@/components/aluno/simulados-catalogo-aluno'
+import { SemAcessoModal } from '@/components/aluno/sem-acesso-modal'
 import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
 
 export default async function AlunoHome({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
@@ -84,40 +85,49 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     .filter((i) => (i.podeFazer || i.emAndamento || i.statusLabel === 'Agendado') && !feitosSet.has(i.id))
     .sort((a, b) => lancamento(b) - lancamento(a))
     .slice(0, 12)
-  // Banners de simulado (config no console). REGRA: só aparecem para quem tem o simulado/pasta
-  // LIBERADO para fazer — se o aluno não tem acesso, o banner não é exibido.
+  // Banners de simulado (VITRINE): aparecem para TODOS os alunos com a QUANTIDADE de simulados da
+  // pasta e a descrição — pra mostrar que há mais conteúdo. O bloqueio real acontece ao clicar
+  // (destino sem acesso → pop-up "sem acesso"). Contagem é tenant-wide (não depende do acesso do aluno).
   let heroSims: HeroSimSlide[] = []
   if (!pasta && simBanners.length) {
     const tokenDe = (l: string) => l.startsWith('/simulado/') ? (l.split('/simulado/')[1]?.split(/[/?#]/)[0] || null) : null
     const pastaDe = (l: string) => l.match(/[?&]pasta=([^&#]+)/)?.[1] ? decodeURIComponent(l.match(/[?&]pasta=([^&#]+)/)![1]) : null
-
-    // Só o que o aluno pode fazer: mapa por token dos itens ACESSÍVEIS (itensCat já é filtrado).
-    const itensByToken = new Map(itensCat.filter((i) => i.embed_token).map((i) => [i.embed_token as string, i]))
     const grupoById = new Map(grupos.map((g) => [g.id, g]))
 
-    // Capa/nome das pastas referenciadas (fallback do grupo).
-    const pastaIds = [...new Set(simBanners.map((b) => pastaDe(b.link as string)).filter(Boolean))] as string[]
-    const pastaRow = new Map<string, any>()
-    if (pastaIds.length) {
-      const r = await svc.from('simulado_pastas').select('id, nome, cor, capa_url').in('id', pastaIds)
-      for (const p of (r.data ?? []) as any[]) pastaRow.set(p.id, p)
-    }
-
-    // Nº de questões + tipo apenas dos simulados-alvo ACESSÍVEIS.
-    const simIds = [...new Set(simBanners.map((b) => itensByToken.get(tokenDe(b.link as string) ?? '')?.id).filter(Boolean))] as string[]
+    // Simulados-alvo (por token) — capa/título/estado genérico + nº de questões/tipo.
+    const tokens = [...new Set(simBanners.map((b) => tokenDe(b.link as string)).filter(Boolean))] as string[]
+    const simByToken = new Map<string, any>()
     const cntPorSim = new Map<string, number>(); const tiposPorSim = new Map<string, string[]>()
-    if (simIds.length) {
-      const { data: pq } = await svc.from('simulado_prova_questoes').select('simulado_id, questoes:simulado_questoes(tipo)').in('simulado_id', simIds)
+    if (tokens.length) {
+      const { data: rows0 } = await svc.from('simulado_simulados').select('id, titulo, embed_token, regras, status, modo_aplicacao, data_inicio, data_fim, created_at').in('embed_token', tokens).eq('deletado', false)
+      const rows = (rows0 ?? []) as any[]
+      const visB = await resolverVisualSimulados(svc, rows.map((s) => ({ id: s.id, regras: s.regras })))
+      const itemById = new Map(montarItensSimulado(rows, new Map(), expiraPorSim, visB).map((i) => [i.id, i]))
+      const { data: pq } = rows.length ? await svc.from('simulado_prova_questoes').select('simulado_id, questoes:simulado_questoes(tipo)').in('simulado_id', rows.map((r) => r.id)) : { data: [] as any[] }
       for (const r of (pq ?? []) as any[]) { cntPorSim.set(r.simulado_id, (cntPorSim.get(r.simulado_id) ?? 0) + 1); const a = tiposPorSim.get(r.simulado_id) ?? []; a.push((r.questoes as any)?.tipo); tiposPorSim.set(r.simulado_id, a) }
+      for (const s of rows) simByToken.set(s.embed_token, { ...s, vis: visB.get(s.id) ?? null, item: itemById.get(s.id) })
     }
 
-    heroSims = simBanners.map((b): HeroSimSlide | null => {
+    // Pastas: capa/nome + CONTAGEM TENANT-WIDE de simulados (banco_base_id → banco → pasta-pai, ou a própria pasta).
+    const pastaIds = [...new Set(simBanners.map((b) => pastaDe(b.link as string)).filter(Boolean))] as string[]
+    const pastaRow = new Map<string, any>(); const pastaCount = new Map<string, number>()
+    if (pastaIds.length) {
+      const pr = await svc.from('simulado_pastas').select('id, nome, cor, capa_url').in('id', pastaIds)
+      for (const p of (pr.data ?? []) as any[]) pastaRow.set(p.id, p)
+      const bancos = await svc.from('simulado_pastas').select('id, pai_id').in('pai_id', pastaIds).then((r: any) => r.data ?? [], () => [])
+      const bancoToFolder = new Map<string, string>()
+      for (const f of pastaIds) bancoToFolder.set(f, f)
+      for (const bc of bancos as any[]) if (bc.pai_id) bancoToFolder.set(bc.id, bc.pai_id)
+      const { data: simsT } = await svc.from('simulado_simulados').select('regras').eq('tenant_id', sessao!.tenantId).eq('deletado', false).eq('status', 'publicado')
+      for (const s of (simsT ?? []) as any[]) { const bb = (s.regras as any)?.banco_base_id; const f = bb ? bancoToFolder.get(bb) : null; if (f) pastaCount.set(f, (pastaCount.get(f) ?? 0) + 1) }
+    }
+
+    heroSims = simBanners.map((b): HeroSimSlide => {
       const tok = tokenDe(b.link as string)
       const pid = pastaDe(b.link as string)
       if (pid) {
-        const total = progresso[pid]?.total ?? 0
-        if (total === 0) return null // aluno não tem simulado liberado nessa pasta → oculto
         const g = grupoById.get(pid); const pr = pastaRow.get(pid)
+        const total = pastaCount.get(pid) ?? progresso[pid]?.total ?? 0
         return {
           id: b.id, kind: 'sim',
           capa: b.imagem_url || g?.capa || pr?.capa_url || null,
@@ -125,35 +135,39 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
           titulo: b.titulo || g?.nome || pr?.nome || 'Simulados',
           descricao: b.mensagem || null,
           link: b.link, acao: 'Ver simulados',
-          chips: [{ label: `${total} ${total === 1 ? 'simulado' : 'simulados'}`, tone: 'muted', icon: 'book' }],
+          chips: total > 0 ? [{ label: `${total} ${total === 1 ? 'simulado' : 'simulados'}`, tone: 'muted', icon: 'book' }] : undefined,
         }
       }
-      const item = tok ? itensByToken.get(tok) : null
-      if (!item) return null // simulado não liberado para este aluno → oculto
-      const chips: BannerChip[] = [{ label: item.statusLabel + (item.quando ? ` · ${item.quando}` : ''), tone: item.podeFazer ? 'ok' : 'muted' }]
-      const cnt = cntPorSim.get(item.id) ?? 0
+      const sim = tok ? simByToken.get(tok) : null
+      const item = sim?.item
+      const chips: BannerChip[] = []
+      if (item) chips.push({ label: item.statusLabel + (item.quando ? ` · ${item.quando}` : ''), tone: item.podeFazer ? 'ok' : 'muted' })
+      const cnt = sim ? cntPorSim.get(sim.id) ?? 0 : 0
       if (cnt) chips.push({ label: `${cnt} ${cnt === 1 ? 'questão' : 'questões'}`, tone: 'muted', icon: 'book' })
-      const tp = tipoDoSimulado(tiposPorSim.get(item.id) ?? [])
+      const tp = tipoDoSimulado(sim ? tiposPorSim.get(sim.id) ?? [] : [])
       const tpLabel = tp === 'mista' ? 'Objetivas + discursiva' : tp === 'discursiva' ? 'Discursivas' : tp === 'objetiva' ? 'Objetivas' : null
       if (tpLabel) chips.push({ label: tpLabel, tone: 'muted' })
       return {
         id: b.id, kind: 'sim',
-        capa: b.imagem_url || item.vis?.capa || null,
-        cor: b.cor || item.vis?.cor || '#6d28d9',
-        titulo: b.titulo || item.titulo || 'Simulado',
+        capa: b.imagem_url || sim?.vis?.capa || null,
+        cor: b.cor || sim?.vis?.cor || '#6d28d9',
+        titulo: b.titulo || sim?.titulo || 'Simulado',
         descricao: b.mensagem || null,
-        link: b.link, acao: item.emAndamento ? 'Continuar' : item.refazer ? 'Refazer' : 'Fazer agora',
-        detalhesLink: `/aluno/simulados/${item.id}`,
-        chips,
+        link: b.link, acao: item?.emAndamento ? 'Continuar' : item?.refazer ? 'Refazer' : 'Fazer agora',
+        detalhesLink: sim?.id ? `/aluno/simulados/${sim.id}` : null,
+        chips: chips.length ? chips : undefined,
       }
-    }).filter(Boolean) as HeroSimSlide[]
+    })
   }
 
   // VISÃO DE PASTA — só o conteúdo da pasta (sem saudação/atalhos).
   if (pasta) {
+    const naPasta = itensCat.filter((i) => i.grupoId === pasta)
     return (
       <div className="animate-page">
         <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} pastaAtiva={pasta} />
+        {/* Chegou aqui por um banner de vitrine, mas não tem acesso a esta pasta → pop-up. */}
+        {naPasta.length === 0 && <SemAcessoModal />}
       </div>
     )
   }
