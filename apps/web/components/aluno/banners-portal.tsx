@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { X, Megaphone, ChevronLeft, ChevronRight, Play, BookOpen, Clock } from 'lucide-react'
+import { X, Megaphone, ChevronLeft, ChevronRight, Play, BookOpen, Clock, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type BannerPortal = {
@@ -14,6 +14,9 @@ export type BannerPortal = {
 /** Chip informativo do banner de simulado (ex.: disponibilidade, nº de questões, tipo, contagem). */
 export type BannerChip = { label: string; tone?: 'ok' | 'muted'; icon?: 'book' | 'clock' }
 
+/** KPIs do aluno exibidos no canto do banner de simulado. */
+export type BannerStats = { simulados: number; notaMedia: number | null; melhorNota: number | null; favoritos: number }
+
 /** Slide de um simulado em destaque, renderizado COMO banner (fundo do próprio simulado). */
 export type HeroSimSlide = {
   id: string
@@ -21,9 +24,10 @@ export type HeroSimSlide = {
   capa: string | null
   cor: string
   titulo: string
-  quando: string | null
+  descricao: string | null
   link: string | null
   acao: string
+  detalhesLink?: string | null // "Ver detalhes" (simulado único); ausente em banner de pasta
   chips?: BannerChip[] // disponibilidade + nº de questões + objetiva/discursiva (simulado) ou "N simulados" (pasta)
 }
 
@@ -34,7 +38,7 @@ type Slide = ({ kind: 'img' } & BannerPortal) | HeroSimSlide
  * um por vez) que reúne: banners de imagem (tipo 'banner'/'hero') E simulados em destaque
  * (fundo do próprio simulado + CTA). Também exibe o pop-up (modal 1x por navegador).
  */
-export function BannersPortal({ banners, simulados = [] }: { banners: BannerPortal[]; simulados?: HeroSimSlide[] }) {
+export function BannersPortal({ banners, simulados = [], stats }: { banners: BannerPortal[]; simulados?: HeroSimSlide[]; stats?: BannerStats | null }) {
   const [popup, setPopup] = useState<BannerPortal | null>(null)
 
   useEffect(() => {
@@ -58,7 +62,7 @@ export function BannersPortal({ banners, simulados = [] }: { banners: BannerPort
       {slides.length > 0 && (
         // FULL-BLEED: cancela o padding do <main> (p-6) → ocupa até as laterais e cola no topo.
         <div className="-mx-6 -mt-6 mb-5">
-          <Carrossel slides={slides} />
+          <Carrossel slides={slides} stats={stats} />
         </div>
       )}
 
@@ -90,22 +94,24 @@ export function BannersPortal({ banners, simulados = [] }: { banners: BannerPort
 }
 
 /** Carrossel único (um slide por vez), auto-rotativo, molde 1920×500. Slides = imagem ou simulado. */
-function Carrossel({ slides }: { slides: Slide[] }) {
+function Carrossel({ slides, stats }: { slides: Slide[]; stats?: BannerStats | null }) {
   const n = slides.length
   const [i, setI] = useState(0)
   const ir = (idx: number) => setI(((idx % n) + n) % n)
 
+  // Reinicia a contagem a cada mudança de slide (manual ou automática): setTimeout + dep [i]
+  // garante 6s cheios após passar a folha (evita "pular" logo depois de avançar na mão).
   useEffect(() => {
     if (n <= 1) return
-    const t = setInterval(() => setI((p) => (p + 1) % n), 6000)
-    return () => clearInterval(t)
-  }, [n])
+    const t = setTimeout(() => setI((p) => (p + 1) % n), 6000)
+    return () => clearTimeout(t)
+  }, [n, i])
 
   return (
     <div className="group relative aspect-[1920/500] w-full overflow-hidden">
       {slides.map((s, idx) => (
         <div key={s.id} className={cn('absolute inset-0 transition-opacity duration-700 ease-out', idx === i ? 'z-10 opacity-100' : 'pointer-events-none z-0 opacity-0')}>
-          {s.kind === 'sim' ? <SimSlide s={s} /> : <ImgSlide b={s} />}
+          {s.kind === 'sim' ? <SimSlide s={s} stats={stats} /> : <ImgSlide b={s} />}
         </div>
       ))}
 
@@ -149,22 +155,27 @@ function ImgSlide({ b }: { b: BannerPortal }) {
   return b.link ? <Link href={b.link} aria-label={b.titulo ?? 'Abrir'} className="absolute inset-0">{conteudo}</Link> : <>{conteudo}</>
 }
 
-/** Simulado em destaque como banner: capa/cor de fundo + overlay com título e CTA. */
-function SimSlide({ s }: { s: HeroSimSlide }) {
-  const body = (
-    <>
+/** Simulado em destaque como banner: capa/cor de fundo + overlay com título, descrição, chips,
+ *  ações (Fazer agora / Ver detalhes / favorito) e — no canto — os KPIs do aluno. */
+function SimSlide({ s, stats }: { s: HeroSimSlide; stats?: BannerStats | null }) {
+  return (
+    <div className="absolute inset-0">
       {s.capa
         ? <img src={s.capa} alt="" className="absolute inset-0 h-full w-full object-cover" /> // eslint-disable-line @next/next/no-img-element
         : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${s.cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(10,7,20,0.92) 2%, rgba(10,7,20,0.66) 38%, rgba(10,7,20,0.12) 74%, rgba(10,7,20,0.5) 100%)' }} />
-      <div className="relative flex h-full max-w-2xl flex-col justify-center p-6 sm:p-9 md:p-11">
-        <div className="mb-2 flex items-center gap-2">
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(10,7,20,0.94) 2%, rgba(10,7,20,0.7) 42%, rgba(10,7,20,0.14) 78%, rgba(10,7,20,0.5) 100%)' }} />
+
+      {/* Conteúdo — recuado à esquerda p/ não ficar atrás da seta "anterior". */}
+      <div className="relative flex h-full max-w-2xl flex-col justify-center py-5 pl-14 pr-6 sm:py-7 sm:pl-16 md:pl-20">
+        <div className="mb-1.5 flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 10px 1px rgba(52,211,153,.7)' }} />
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] sm:text-[11px]" style={{ color: 'var(--brand-accent)' }}>Em destaque para você</span>
         </div>
-        <h2 className="text-2xl font-extrabold leading-[1.04] tracking-tight text-white drop-shadow-sm sm:text-4xl">{s.titulo}</h2>
+        <h2 className="line-clamp-2 text-xl font-extrabold leading-[1.05] tracking-tight text-white drop-shadow-sm sm:text-3xl md:text-4xl">{s.titulo}</h2>
+        {s.descricao && <p className="mt-1.5 line-clamp-2 max-w-lg text-xs text-white/75 sm:text-sm">{s.descricao}</p>}
+
         {s.chips && s.chips.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
             {s.chips.map((c, k) => (
               <span key={k} className={cn(
                 'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur',
@@ -177,16 +188,40 @@ function SimSlide({ s }: { s: HeroSimSlide }) {
             ))}
           </div>
         )}
-        {s.link && (
-          <span className="mt-4 inline-flex w-fit items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold shadow-lg ring-1 ring-white/15 transition-transform group-hover:scale-[1.02]"
-            style={{ background: `linear-gradient(135deg, ${s.cor}, color-mix(in oklab, ${s.cor} 62%, #f5e6b8))`, color: '#1b1036' }}>
-            <Play className="h-4 w-4 fill-current" /> {s.acao}
-          </span>
-        )}
+
+        <div className="mt-4 flex flex-wrap items-center gap-2.5">
+          {s.link && (
+            <Link href={s.link} className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold shadow-lg ring-1 ring-white/15 transition-transform hover:scale-[1.03]"
+              style={{ background: `linear-gradient(135deg, ${s.cor}, color-mix(in oklab, ${s.cor} 62%, #f5e6b8))`, color: '#1b1036' }}>
+              <Play className="h-4 w-4 fill-current" /> {s.acao}
+            </Link>
+          )}
+          {s.detalhesLink && (
+            <Link href={s.detalhesLink} className="inline-flex items-center gap-1.5 rounded-xl border border-white/16 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20">
+              Ver detalhes <ArrowRight className="h-4 w-4" />
+            </Link>
+          )}
+        </div>
       </div>
-    </>
+
+      {/* KPIs do aluno — canto inferior direito (some em telas estreitas). */}
+      {stats && stats.simulados > 0 && (
+        <div className="pointer-events-none absolute bottom-4 right-5 hidden items-stretch gap-0 rounded-2xl border border-white/12 bg-black/25 backdrop-blur md:flex">
+          <Kpi valor={stats.simulados.toLocaleString('pt-BR')} rotulo="Simulados" />
+          <Kpi valor={stats.notaMedia != null ? stats.notaMedia.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'} rotulo="Nota média" divisor />
+          <Kpi valor={stats.melhorNota != null ? stats.melhorNota.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'} rotulo="Melhor nota" divisor />
+          <Kpi valor={stats.favoritos.toLocaleString('pt-BR')} rotulo="Favoritos" divisor />
+        </div>
+      )}
+    </div>
   )
-  return s.link
-    ? <Link href={s.link} aria-label={s.acao} className="absolute inset-0">{body}</Link>
-    : <div className="absolute inset-0">{body}</div>
+}
+
+function Kpi({ valor, rotulo, divisor }: { valor: string; rotulo: string; divisor?: boolean }) {
+  return (
+    <div className={cn('px-4 py-3 text-center', divisor && 'border-l border-white/12')}>
+      <div className="text-lg font-extrabold leading-none text-white sm:text-xl">{valor}</div>
+      <div className="mt-1 text-[10px] font-medium uppercase tracking-wider text-white/60">{rotulo}</div>
+    </div>
+  )
 }

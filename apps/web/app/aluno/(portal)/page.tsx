@@ -6,7 +6,7 @@ import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
 import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
 import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
-import { BannersPortal, type HeroSimSlide, type BannerChip } from '@/components/aluno/banners-portal'
+import { BannersPortal, type HeroSimSlide, type BannerChip, type BannerStats } from '@/components/aluno/banners-portal'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
 import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } from '@/components/aluno/simulados-catalogo-aluno'
 import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
@@ -17,12 +17,22 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const svc = await createServiceClient()
   const estId = sessao!.estudanteId
 
-  const [{ data: mats }, { data: acs }, { data: sessAll }, { data: banRows }] = await Promise.all([
+  const [{ data: mats }, { data: acs }, { data: sessAll }, { data: banRows }, { count: favCount }] = await Promise.all([
     svc.from('simulado_matriculas').select('simulado_id, liberado').eq('estudante_id', estId),
     svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', estId),
-    svc.from('simulado_sessoes_prova').select('simulado_id, status').eq('estudante_id', estId).eq('is_teste', false).eq('deletado', false),
+    svc.from('simulado_sessoes_prova').select('simulado_id, status, nota').eq('estudante_id', estId).eq('is_teste', false).eq('deletado', false),
     svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor').eq('tenant_id', sessao!.tenantId).eq('ativo', true).order('ordem', { ascending: true }).order('criado_em', { ascending: true }),
+    svc.from('simulado_favoritos').select('id', { count: 'exact', head: true }).eq('estudante_id', estId),
   ])
+  // KPIs do aluno p/ o banner de simulado (Simulados · Nota média · Melhor nota · Favoritos).
+  const finalizadasNota = ((sessAll ?? []) as any[]).filter((x) => x.status === 'finalizada')
+  const notasAluno = finalizadasNota.map((x) => (x.nota != null ? Number(x.nota) : null)).filter((n): n is number => n != null)
+  const statsAluno: BannerStats = {
+    simulados: finalizadasNota.length,
+    notaMedia: notasAluno.length ? notasAluno.reduce((a, b) => a + b, 0) / notasAluno.length : null,
+    melhorNota: notasAluno.length ? Math.max(...notasAluno) : null,
+    favoritos: favCount ?? 0,
+  }
   const todosBanners = (banRows ?? []) as any[]
   // Banners de DESTAQUE (tipo 'hero'): os que apontam para um simulado (link /simulado/token)
   // viram SLIDE com o fundo do próprio simulado; os demais são banners de imagem.
@@ -136,7 +146,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
           capa: b.imagem_url || g?.capa || pr?.capa_url || null,
           cor: b.cor || g?.cor || '#6d28d9',
           titulo: b.titulo || g?.nome || pr?.nome || 'Simulados',
-          quando: b.mensagem || null,
+          descricao: b.mensagem || null,
           link: b.link, acao: 'Ver simulados',
           chips: total > 0 ? [{ label: `${total} ${total === 1 ? 'simulado' : 'simulados'}`, tone: 'muted' as const, icon: 'book' as const }] : undefined,
         }
@@ -147,8 +157,9 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
         capa: b.imagem_url || sim?.vis?.capa || null,
         cor: b.cor || sim?.vis?.cor || '#6d28d9',
         titulo: b.titulo || sim?.titulo || 'Simulado',
-        quando: b.mensagem || null,
+        descricao: b.mensagem || null,
         link: b.link, acao: 'Fazer agora',
+        detalhesLink: sim?.id ? `/aluno/simulados/${sim.id}` : null,
         chips: tok ? chipsPorToken.get(tok) : undefined,
       }
     })
@@ -173,7 +184,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   return (
     <div className="animate-page space-y-6">
       {/* Banners do tenant — UM carrossel só (banner + destaque + simulado) + pop-up. SÓ na Início. */}
-      <BannersPortal banners={bannersSemSim} simulados={heroSims} />
+      <BannersPortal banners={bannersSemSim} simulados={heroSims} stats={statsAluno} />
 
       {/* Saudação solta. */}
       <div>
