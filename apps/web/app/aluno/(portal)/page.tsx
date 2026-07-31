@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { BookOpen, Star, NotebookPen, ArrowRight, Sparkles } from 'lucide-react'
+import { BookOpen, Star, NotebookPen, ArrowRight, Sparkles, ClipboardList, TrendingUp } from 'lucide-react'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
 import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
@@ -173,6 +173,8 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   }
 
   const atalhos = [
+    { href: '/aluno/simulados', icon: ClipboardList, titulo: 'Meus Simulados', desc: 'Seus simulados e resultados' },
+    { href: '/aluno/desempenho', icon: TrendingUp, titulo: 'Meu Desempenho', desc: 'Evolução, notas e acertos' },
     { href: '/aluno/recomendado', icon: Sparkles, titulo: 'Recomendado', desc: 'Questões focadas nos seus pontos fracos' },
     { href: '/aluno/questoes', icon: BookOpen, titulo: 'Banco de questões', desc: 'Pratique questões avulsas com filtros' },
     { href: '/aluno/favoritos', icon: Star, titulo: 'Favoritos', desc: 'Questões que você marcou' },
