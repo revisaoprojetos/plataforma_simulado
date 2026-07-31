@@ -111,7 +111,7 @@ export function AlunoSidebar({
           Colapsado → coluna centrada de ícones; o texto some com fade+colapso suave. */}
       <SidebarFooter className="gap-2 border-t border-sidebar-border p-3 transition-[padding] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:p-2 [&_svg]:text-[color:var(--sidebar-icon)] [&_button:hover_svg]:text-[color:var(--sidebar-icon-active)]">
         <div className="flex w-full items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais(usuarioNome)}</span>
+          <Link href="/aluno/perfil" title="Meu perfil" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-primary shadow-sm ring-1 ring-black/10 transition-transform hover:scale-105 hover:ring-primary/40">{iniciais(usuarioNome)}</Link>
           {/* nome/email: colapsam largura + opacidade (não somem de golpe) */}
           <div className="min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:opacity-0">
             <p className="truncate text-sm font-medium leading-tight">{usuarioNome}</p>
