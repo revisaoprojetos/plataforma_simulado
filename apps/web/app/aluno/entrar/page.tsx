@@ -20,5 +20,15 @@ export default async function AlunoEntrarPage() {
     if (data?.metodo_identificacao) metodo = data.metodo_identificacao as typeof metodo
   }
 
-  return <AlunoEntrarForm metodo={metodo} plataforma={tenant?.nome ?? 'Área do Aluno'} />
+  const tema = (tenant?.tema ?? {}) as any
+  return (
+    <AlunoEntrarForm
+      metodo={metodo}
+      plataforma={tema.nome_site ?? tenant?.nome ?? 'Área do Aluno'}
+      logo={tema.logo_url ?? null}
+      subtitulo={tema.subtitulo_site ?? null}
+      logoBg={tema.logo_png_bg ?? '#ffffff'}
+      logoEstilo={tema.logo_estilo ?? 'arredondado'}
+    />
+  )
 }
