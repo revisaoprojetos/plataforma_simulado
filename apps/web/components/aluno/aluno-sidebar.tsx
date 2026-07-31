@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, Radio, TrendingUp, LogOut } from 'lucide-react'
+import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, TrendingUp, LogOut } from 'lucide-react'
 import {
   Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter,
@@ -21,7 +21,6 @@ const NAV_STATES =
 
 const NAV = [
   { href: '/aluno', label: 'Início', icon: Home, exact: true },
-  { href: '/aluno/simulado', label: 'Simulados', icon: Radio, exact: true },
   { href: '/aluno/simulados', label: 'Meus Simulados', icon: ClipboardList },
   { href: '/aluno/desempenho', label: 'Meu Desempenho', icon: TrendingUp },
   { href: '/aluno/recomendado', label: 'Recomendado', icon: Sparkles },

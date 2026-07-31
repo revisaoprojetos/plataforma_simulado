@@ -1,14 +1,19 @@
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, FolderOpen } from 'lucide-react'
+import { ArrowLeft, ArrowRight, FolderOpen, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { CardSimulado } from '@/components/aluno/card-simulado'
+import { FileiraHorizontal } from '@/components/fileira-horizontal'
 import type { ItemSimulado } from '@/lib/aluno/simulado-item'
 import type { GrupoCatalogo } from '@/lib/aluno/grupos-catalogo'
 
 export type ItemSimuladoCat = ItemSimulado & { grupoId: string | null }
+export type ProgressoGrupo = Record<string, { done: number; total: number }>
 
-// Seções semânticas do aluno (por estado), não por status de vida do simulado.
+// Largura de cada card na fileira (deixa espiar um pedaço do próximo).
+const FILEIRA_BASIS = 'shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-3rem)/4.3)] xl:basis-[calc((100%-4rem)/5.3)]'
+
+// Seções semânticas do aluno (por estado). Usadas na visão de dentro da pasta.
 const SECOES = [
   { chave: 'agendados', titulo: 'Agendados', cor: 'bg-amber-500' },
   { chave: 'disponiveis', titulo: 'Disponíveis', cor: 'bg-emerald-500' },
@@ -21,14 +26,12 @@ function bucketDe(i: ItemSimuladoCat): 'agendados' | 'disponiveis' | 'refazer' {
   return i.modo_aplicacao === 'janela_fixa' ? 'agendados' : 'disponiveis'
 }
 
-/** Sções (agendados/disponíveis/concluídos) de uma lista, em grade. Seção vazia some. */
 function SecoesGrid({ itens }: { itens: ItemSimuladoCat[] }) {
   const buckets: Record<string, ItemSimuladoCat[]> = { agendados: [], disponiveis: [], refazer: [] }
   for (const i of itens) buckets[bucketDe(i)].push(i)
-  const temAlgo = itens.length > 0
+  if (itens.length === 0) return <p className="rounded-2xl border border-dashed py-10 text-center text-sm text-muted-foreground">Nenhum simulado nesta pasta ainda.</p>
   return (
     <div className="space-y-6">
-      {!temAlgo && <p className="rounded-2xl border border-dashed py-10 text-center text-sm text-muted-foreground">Nenhum simulado por aqui ainda.</p>}
       {SECOES.map((sec) => {
         const arr = buckets[sec.chave]
         if (arr.length === 0) return null
@@ -49,12 +52,15 @@ function SecoesGrid({ itens }: { itens: ItemSimuladoCat[] }) {
   )
 }
 
-/** Card PÔSTER de uma pasta (grupo) — abre o conteúdo em /aluno/simulado?pasta=id. */
-function CardPasta({ g, count }: { g: GrupoCatalogo; count: number }) {
+/** Card PÔSTER de uma pasta (grupo) — abre o conteúdo em /aluno?pasta=id. Barra de progresso no hover. */
+function CardPasta({ g, count, prog }: { g: GrupoCatalogo; count: number; prog?: { done: number; total: number } }) {
   const cor = g.cor ?? '#6d28d9'
   const Icon = iconeBanco(g.icone)
+  const total = prog?.total ?? count
+  const done = prog?.done ?? 0
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
   return (
-    <Link href={`/aluno/simulado?pasta=${g.id}`}
+    <Link href={`/aluno?pasta=${g.id}`}
       className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
       {g.capa
         ? <img src={g.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -68,25 +74,44 @@ function CardPasta({ g, count }: { g: GrupoCatalogo; count: number }) {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
         <span className="mb-1 inline-flex items-center gap-1 rounded-md bg-black/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/85 backdrop-blur"><FolderOpen className="h-3 w-3" /> Pasta</span>
         <h3 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{g.nome}</h3>
-        <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-white">Ver conteúdo <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" /></span>
+        <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-white">Ver conteúdo <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" /></span>
+
+        {/* PROGRESSO — aparece/expande no hover */}
+        <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-300 group-hover:mt-2.5 group-hover:grid-rows-[1fr] group-hover:opacity-100">
+          <div className="overflow-hidden">
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/25">
+                <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${pct}%`, background: 'var(--brand-accent)' }} />
+              </div>
+              <span className="shrink-0 text-[11px] font-semibold tabular-nums text-white">{pct}%</span>
+            </div>
+            <p className="mt-1 text-[10px] text-white/70">{done} de {total} concluído{done !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
       </div>
     </Link>
   )
 }
 
 /**
- * Catálogo de simulados do aluno com PASTAS: simulados agrupados aparecem como card de
- * pasta (pôster) e, ao abrir (?pasta=id), mostram os simulados de dentro. Os sem pasta
- * (avulsos) aparecem direto em grade por seção.
+ * Catálogo de simulados do aluno na HOME: simulados RECENTES (fileira) + PASTAS (cards pôster
+ * com progresso no hover). Ao abrir uma pasta (?pasta=id), mostra os simulados de dentro.
+ * Os sem pasta (avulsos) aparecem em grade. A área "Simulados" foi absorvida por aqui.
  */
-export function SimuladosCatalogoAluno({ itens, grupos, pastaAtiva }: { itens: ItemSimuladoCat[]; grupos: GrupoCatalogo[]; pastaAtiva?: string | null }) {
+export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pastaAtiva }: {
+  itens: ItemSimuladoCat[]
+  grupos: GrupoCatalogo[]
+  progresso?: ProgressoGrupo
+  recentes?: ItemSimuladoCat[]
+  pastaAtiva?: string | null
+}) {
   // VISÃO DA PASTA — só os simulados de dentro dela.
   if (pastaAtiva) {
     const g = grupos.find((x) => x.id === pastaAtiva)
     const its = itens.filter((s) => s.grupoId === pastaAtiva)
     return (
       <div className="space-y-5">
-        <Link href="/aluno/simulado" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Simulados</Link>
+        <Link href="/aluno" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Início</Link>
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: g?.cor ?? '#6d28d9' }}><FolderOpen className="h-5 w-5" /></span>
           <div className="min-w-0">
@@ -99,35 +124,36 @@ export function SimuladosCatalogoAluno({ itens, grupos, pastaAtiva }: { itens: I
     )
   }
 
-  // RAIZ — cards de pasta + simulados avulsos.
+  // RAIZ (dentro da home) — recentes + pastas + avulsos.
   const avulsos = itens.filter((s) => !s.grupoId)
   const contar = (gid: string) => itens.filter((s) => s.grupoId === gid).length
+  const recent = recentes ?? []
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Simulados</h1>
-        <p className="text-muted-foreground">Simulados liberados para você — abra uma pasta ou faça um avulso.</p>
-      </div>
+      {recent.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold"><Play className="h-4 w-4 text-primary" /> Simulados recentes</h2>
+          <FileiraHorizontal>
+            {recent.map((s) => <div key={s.id} className={FILEIRA_BASIS}><CardSimulado s={s} /></div>)}
+          </FileiraHorizontal>
+        </section>
+      )}
 
       {grupos.length > 0 && (
         <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold"><FolderOpen className="h-4 w-4 text-primary" /> Pastas</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold"><FolderOpen className="h-4 w-4 text-primary" /> Cursos e pacotes</h2>
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {grupos.map((g) => <CardPasta key={g.id} g={g} count={contar(g.id)} />)}
+            {grupos.map((g) => <CardPasta key={g.id} g={g} count={contar(g.id)} prog={progresso?.[g.id]} />)}
           </div>
         </section>
       )}
 
       {avulsos.length > 0 && (
         <section className="space-y-3">
-          {grupos.length > 0 && <h2 className="text-sm font-semibold text-muted-foreground">Avulsos</h2>}
+          {grupos.length > 0 && <h2 className="text-sm font-semibold text-muted-foreground">Outros simulados</h2>}
           <SecoesGrid itens={avulsos} />
         </section>
-      )}
-
-      {grupos.length === 0 && avulsos.length === 0 && (
-        <p className="rounded-2xl border border-dashed py-12 text-center text-sm text-muted-foreground">Nenhum simulado liberado no momento.</p>
       )}
     </div>
   )
