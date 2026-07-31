@@ -17,21 +17,19 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const svc = await createServiceClient()
   const estId = sessao!.estudanteId
 
-  const [{ data: mats }, { data: acs }, { data: sessAll }, { data: banRows }, { count: favCount }] = await Promise.all([
+  const [{ data: mats }, { data: acs }, { data: sessAll }, { data: banRows }] = await Promise.all([
     svc.from('simulado_matriculas').select('simulado_id, liberado').eq('estudante_id', estId),
     svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', estId),
     svc.from('simulado_sessoes_prova').select('simulado_id, status, nota').eq('estudante_id', estId).eq('is_teste', false).eq('deletado', false),
     svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor').eq('tenant_id', sessao!.tenantId).eq('ativo', true).order('ordem', { ascending: true }).order('criado_em', { ascending: true }),
-    svc.from('simulado_favoritos').select('id', { count: 'exact', head: true }).eq('estudante_id', estId),
   ])
-  // KPIs do aluno p/ o banner de simulado (Simulados · Nota média · Melhor nota · Favoritos).
+  // KPIs do aluno p/ o banner de simulado (Simulados · Nota média · Melhor nota).
   const finalizadasNota = ((sessAll ?? []) as any[]).filter((x) => x.status === 'finalizada')
   const notasAluno = finalizadasNota.map((x) => (x.nota != null ? Number(x.nota) : null)).filter((n): n is number => n != null)
   const statsAluno: BannerStats = {
     simulados: finalizadasNota.length,
     notaMedia: notasAluno.length ? notasAluno.reduce((a, b) => a + b, 0) / notasAluno.length : null,
     melhorNota: notasAluno.length ? Math.max(...notasAluno) : null,
-    favoritos: favCount ?? 0,
   }
   const todosBanners = (banRows ?? []) as any[]
   // Banners de DESTAQUE (tipo 'hero'): os que apontam para um simulado (link /simulado/token)

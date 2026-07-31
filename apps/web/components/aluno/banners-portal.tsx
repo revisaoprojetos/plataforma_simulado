@@ -15,7 +15,7 @@ export type BannerPortal = {
 export type BannerChip = { label: string; tone?: 'ok' | 'muted'; icon?: 'book' | 'clock' }
 
 /** KPIs do aluno exibidos no canto do banner de simulado. */
-export type BannerStats = { simulados: number; notaMedia: number | null; melhorNota: number | null; favoritos: number }
+export type BannerStats = { simulados: number; notaMedia: number | null; melhorNota: number | null }
 
 /** Slide de um simulado em destaque, renderizado COMO banner (fundo do próprio simulado). */
 export type HeroSimSlide = {
@@ -210,7 +210,6 @@ function SimSlide({ s, stats }: { s: HeroSimSlide; stats?: BannerStats | null })
           <Kpi valor={stats.simulados.toLocaleString('pt-BR')} rotulo="Simulados" />
           <Kpi valor={stats.notaMedia != null ? stats.notaMedia.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'} rotulo="Nota média" divisor />
           <Kpi valor={stats.melhorNota != null ? stats.melhorNota.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'} rotulo="Melhor nota" divisor />
-          <Kpi valor={stats.favoritos.toLocaleString('pt-BR')} rotulo="Favoritos" divisor />
         </div>
       )}
     </div>
