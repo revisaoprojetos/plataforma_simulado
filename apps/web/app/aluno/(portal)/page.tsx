@@ -6,7 +6,8 @@ import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
 import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
 import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
-import { BannersPortal, type HeroSimSlide } from '@/components/aluno/banners-portal'
+import { BannersPortal, type HeroSimSlide, type BannerChip } from '@/components/aluno/banners-portal'
+import { tipoDoSimulado } from '@/lib/simulado/tipo'
 import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } from '@/components/aluno/simulados-catalogo-aluno'
 import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
 
@@ -82,13 +83,36 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     const tokenDe = (l: string) => l.startsWith('/simulado/') ? (l.split('/simulado/')[1]?.split(/[/?#]/)[0] || null) : null
     const pastaDe = (l: string) => l.match(/[?&]pasta=([^&#]+)/)?.[1] ? decodeURIComponent(l.match(/[?&]pasta=([^&#]+)/)![1]) : null
 
-    // Simulados únicos (por token) → fundo do próprio simulado.
+    // Simulados únicos (por token) → fundo do próprio simulado + chips (disponibilidade, nº de questões, tipo).
     const tokens = [...new Set(simBanners.map((b) => tokenDe(b.link as string)).filter(Boolean))] as string[]
     const simPorToken = new Map<string, any>()
+    const chipsPorToken = new Map<string, BannerChip[]>()
     if (tokens.length) {
-      const { data: simRows } = await svc.from('simulado_simulados').select('id, titulo, embed_token, regras').in('embed_token', tokens).eq('deletado', false)
-      const visB = await resolverVisualSimulados(svc, (simRows ?? []).map((s: any) => ({ id: s.id, regras: s.regras })))
-      for (const s of (simRows ?? []) as any[]) simPorToken.set(s.embed_token, { ...s, vis: visB.get(s.id) ?? null })
+      const { data: simRows } = await svc.from('simulado_simulados').select('id, titulo, embed_token, regras, status, modo_aplicacao, data_inicio, data_fim, created_at').in('embed_token', tokens).eq('deletado', false)
+      const rows = (simRows ?? []) as any[]
+      const visB = await resolverVisualSimulados(svc, rows.map((s) => ({ id: s.id, regras: s.regras })))
+      // Sessões do aluno p/ esses simulados (a partir de sessAll) → status/tentativas corretos.
+      const sessB = new Map<string, any[]>()
+      for (const x of (sessAll ?? []) as any[]) if (rows.some((r) => r.id === x.simulado_id)) { const a = sessB.get(x.simulado_id) ?? []; a.push(x); sessB.set(x.simulado_id, a) }
+      const itemById = new Map(montarItensSimulado(rows, sessB, expiraPorSim, visB).map((i) => [i.id, i]))
+      // Nº de questões + tipo (objetiva/discursiva/mista) numa query só.
+      const { data: pq } = rows.length
+        ? await svc.from('simulado_prova_questoes').select('simulado_id, questoes:simulado_questoes(tipo)').in('simulado_id', rows.map((r) => r.id))
+        : { data: [] as any[] }
+      const cntPorSim = new Map<string, number>(); const tiposPorSim = new Map<string, string[]>()
+      for (const r of (pq ?? []) as any[]) { cntPorSim.set(r.simulado_id, (cntPorSim.get(r.simulado_id) ?? 0) + 1); const a = tiposPorSim.get(r.simulado_id) ?? []; a.push((r.questoes as any)?.tipo); tiposPorSim.set(r.simulado_id, a) }
+      for (const s of rows) {
+        const item = itemById.get(s.id)
+        simPorToken.set(s.embed_token, { ...s, vis: visB.get(s.id) ?? null, item })
+        const chips: BannerChip[] = []
+        if (item) chips.push({ label: item.statusLabel + (item.quando ? ` · ${item.quando}` : ''), tone: item.podeFazer ? 'ok' : 'muted' })
+        const cnt = cntPorSim.get(s.id) ?? 0
+        if (cnt) chips.push({ label: `${cnt} ${cnt === 1 ? 'questão' : 'questões'}`, tone: 'muted', icon: 'book' })
+        const tp = tipoDoSimulado(tiposPorSim.get(s.id) ?? [])
+        const tpLabel = tp === 'mista' ? 'Objetivas + discursiva' : tp === 'discursiva' ? 'Discursivas' : tp === 'objetiva' ? 'Objetivas' : null
+        if (tpLabel) chips.push({ label: tpLabel, tone: 'muted' })
+        chipsPorToken.set(s.embed_token, chips)
+      }
     }
 
     // Pastas (grupos de simulados) → fundo da pasta + CONTAGEM de simulados que ela tem.
@@ -114,7 +138,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
           titulo: b.titulo || g?.nome || pr?.nome || 'Simulados',
           quando: b.mensagem || null,
           link: b.link, acao: 'Ver simulados',
-          chip: total > 0 ? `${total} simulado${total === 1 ? '' : 's'}` : null,
+          chips: total > 0 ? [{ label: `${total} ${total === 1 ? 'simulado' : 'simulados'}`, tone: 'muted' as const, icon: 'book' as const }] : undefined,
         }
       }
       const sim = tok ? simPorToken.get(tok) : null
@@ -125,6 +149,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
         titulo: b.titulo || sim?.titulo || 'Simulado',
         quando: b.mensagem || null,
         link: b.link, acao: 'Fazer agora',
+        chips: tok ? chipsPorToken.get(tok) : undefined,
       }
     })
   }

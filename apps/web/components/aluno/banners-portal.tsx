@@ -3,13 +3,16 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { X, Megaphone, ChevronLeft, ChevronRight, Play, BookOpen } from 'lucide-react'
+import { X, Megaphone, ChevronLeft, ChevronRight, Play, BookOpen, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type BannerPortal = {
   id: string; tipo: 'banner' | 'popup' | 'hero'; titulo: string | null; mensagem: string | null
   imagem_url: string | null; link: string | null; cor: string | null
 }
+
+/** Chip informativo do banner de simulado (ex.: disponibilidade, nº de questões, tipo, contagem). */
+export type BannerChip = { label: string; tone?: 'ok' | 'muted'; icon?: 'book' | 'clock' }
 
 /** Slide de um simulado em destaque, renderizado COMO banner (fundo do próprio simulado). */
 export type HeroSimSlide = {
@@ -21,7 +24,7 @@ export type HeroSimSlide = {
   quando: string | null
   link: string | null
   acao: string
-  chip?: string | null // ex.: "5 simulados" quando o banner aponta para uma pasta
+  chips?: BannerChip[] // disponibilidade + nº de questões + objetiva/discursiva (simulado) ou "N simulados" (pasta)
 }
 
 type Slide = ({ kind: 'img' } & BannerPortal) | HeroSimSlide
@@ -160,11 +163,19 @@ function SimSlide({ s }: { s: HeroSimSlide }) {
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] sm:text-[11px]" style={{ color: 'var(--brand-accent)' }}>Em destaque para você</span>
         </div>
         <h2 className="text-2xl font-extrabold leading-[1.04] tracking-tight text-white drop-shadow-sm sm:text-4xl">{s.titulo}</h2>
-        {s.quando && <p className="mt-1.5 line-clamp-1 max-w-lg text-xs text-white/70 sm:text-sm">{s.quando}.</p>}
-        {s.chip && (
-          <span className="mt-3 inline-flex w-fit items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-            <BookOpen className="h-3.5 w-3.5" /> {s.chip}
-          </span>
+        {s.chips && s.chips.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {s.chips.map((c, k) => (
+              <span key={k} className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur',
+                c.tone === 'ok' ? 'border-emerald-400/35 bg-emerald-400/15 text-emerald-200' : 'border-white/18 bg-white/10 text-white/90',
+              )}>
+                {c.icon === 'book' && <BookOpen className="h-3.5 w-3.5" />}
+                {c.icon === 'clock' && <Clock className="h-3.5 w-3.5" />}
+                {c.label}
+              </span>
+            ))}
+          </div>
         )}
         {s.link && (
           <span className="mt-4 inline-flex w-fit items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold shadow-lg ring-1 ring-white/15 transition-transform group-hover:scale-[1.02]"
