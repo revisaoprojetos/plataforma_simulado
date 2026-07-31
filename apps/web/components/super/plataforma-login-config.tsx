@@ -110,12 +110,10 @@ export function PlataformaLoginConfig({
         </Bloco>
 
         <Bloco titulo="Cores">
-          <p className="text-[11px] text-muted-foreground">Fundo é definido em “Fundo &amp; card”. Aqui só as cores de elementos e texto.</p>
+          <p className="text-[11px] text-muted-foreground">Fundo é definido em “Fundo &amp; card”. As cores de texto ficam ao lado de cada campo em “Textos”.</p>
           <div className="grid grid-cols-2 gap-3">
             <ColorField rotulo="Primária (botões)" valor={c.corPrimaria} fallback={corPrimaria} onChange={(v) => set('corPrimaria', v)} />
             <ColorField rotulo="Destaque" valor={c.corAccent} fallback={corAccent} onChange={(v) => set('corAccent', v)} />
-            <ColorField rotulo="Texto da marca" valor={c.corTextoMarca} fallback="#ffffff" rotuloReset="Branco" onChange={(v) => set('corTextoMarca', v)} />
-            <ColorField rotulo="Texto “Área do aluno”" valor={c.corTextoForm} fallback={corAccent} rotuloReset="Destaque" onChange={(v) => set('corTextoForm', v)} />
           </div>
         </Bloco>
 
@@ -179,8 +177,8 @@ export function PlataformaLoginConfig({
         <Bloco titulo="Textos">
           {c.titulo !== '' ? (
             <div className="space-y-1">
-              <div className="flex items-center justify-between"><label className="text-xs text-muted-foreground">Título (headline)</label><button type="button" onClick={() => set('titulo', '')} className="text-[11px] text-muted-foreground transition hover:text-destructive">Remover</button></div>
-              <Input value={c.titulo} onChange={(e) => set('titulo', e.target.value)} placeholder={LOGIN_DEFAULT.titulo} />
+              <div className="flex items-center justify-between"><label className="text-xs text-muted-foreground">Título (headline) <span className="text-muted-foreground/70">— cor do texto da marca →</span></label><button type="button" onClick={() => set('titulo', '')} className="text-[11px] text-muted-foreground transition hover:text-destructive">Remover</button></div>
+              <div className="flex gap-2"><Input value={c.titulo} onChange={(e) => set('titulo', e.target.value)} placeholder={LOGIN_DEFAULT.titulo} className="flex-1" /><SwatchInline valor={c.corTextoMarca} fallback="#ffffff" onChange={(v) => set('corTextoMarca', v)} title="Cor do texto da marca (título, subtítulo e destaques)" /></div>
             </div>
           ) : <button type="button" onClick={() => set('titulo', LOGIN_DEFAULT.titulo)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted"><Plus className="h-3.5 w-3.5" /> Adicionar título</button>}
 
@@ -193,7 +191,7 @@ export function PlataformaLoginConfig({
 
           <div className="space-y-1.5 border-t pt-2">
             <label className="text-xs text-muted-foreground">Textos do formulário <span className="text-muted-foreground/70">(vazio = oculto)</span></label>
-            <Input value={c.textoKicker} onChange={(e) => set('textoKicker', e.target.value)} placeholder="Rótulo — ex.: Área do aluno" />
+            <div className="flex gap-2"><Input value={c.textoKicker} onChange={(e) => set('textoKicker', e.target.value)} placeholder="Rótulo — ex.: Área do aluno" className="flex-1" /><SwatchInline valor={c.corTextoForm} fallback={corAccent} onChange={(v) => set('corTextoForm', v)} title="Cor do rótulo “Área do aluno”" /></div>
             <Input value={c.textoEntrar} onChange={(e) => set('textoEntrar', e.target.value)} placeholder="Título — ex.: Entrar" />
             <Input value={c.textoPlataforma === null ? plataforma : c.textoPlataforma} onChange={(e) => set('textoPlataforma', e.target.value)} placeholder="Nome exibido — ex.: Revisão" />
           </div>
@@ -226,6 +224,17 @@ export function PlataformaLoginConfig({
         </div>
         <p className="mt-2 text-xs text-muted-foreground">Prévia com a marca real. A tela de login final abre no endereço da empresa.</p>
       </div>
+    </div>
+  )
+}
+
+/** Swatch de cor compacto para ficar AO LADO de um campo de texto (com reset p/ o padrão). */
+function SwatchInline({ valor, fallback, onChange, title }: { valor: string | null; fallback: string; onChange: (v: string | null) => void; title?: string }) {
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(fallback) ? fallback : '#6d28d9'
+  return (
+    <div className="flex shrink-0 items-center gap-1" title={title}>
+      <input type="color" value={valor ?? hex} onChange={(e) => onChange(e.target.value)} className="h-9 w-9 shrink-0 cursor-pointer rounded-lg border bg-transparent p-0.5" />
+      {valor && <button type="button" onClick={() => onChange(null)} title="Cor padrão" className="inline-flex h-9 w-7 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted"><RotateCcw className="h-3.5 w-3.5" /></button>}
     </div>
   )
 }
