@@ -32,12 +32,13 @@ function CardConcluido({ s }: { s: MeuSimuladoItem }) {
   const BancoIcon = iconeBanco(s.vis?.icone)
   const capa = s.vis?.capa
   return (
-    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
       {capa
         ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
-      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
 
       <Link href={`/aluno/simulados/${s.id}`} className="absolute inset-0 z-10" aria-label={s.titulo} />
 

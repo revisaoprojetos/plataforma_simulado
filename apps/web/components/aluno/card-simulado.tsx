@@ -29,12 +29,15 @@ export function CardSimulado({ s }: { s: ItemSimulado }) {
   const BancoIcon = iconeBanco(s.vis?.icone)
   const capa = s.vis?.capa
   return (
-    <div className={cn('group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all', s.podeFazer && 'hover:-translate-y-1 hover:shadow-lg')}>
+    <div className={cn('group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300', s.podeFazer && 'hover:-translate-y-1 hover:shadow-xl hover:ring-white/25')}>
       {capa
         ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
-      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
+      {/* glow da cor da marca no rodapé — dá profundidade e identidade */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
+      {/* escurecimento p/ legibilidade do texto */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
 
       {s.novo && <FitaNovo />}
       {(s.podeFazer || s.podeAguardar) && <Link href={`/simulado/${s.embed_token}`} className="absolute inset-0 z-10" aria-label={s.titulo} />}
@@ -57,11 +60,13 @@ export function CardSimulado({ s }: { s: ItemSimulado }) {
         {s.quando && <p className="mt-1 flex items-start gap-1 text-xs leading-snug text-white/80"><Clock className="mt-0.5 h-3 w-3 shrink-0" /> <span>{s.quando}</span></p>}
         {s.refazer && !s.emAndamento && <p className="text-[11px] text-white/70">Já feito {s.finalizadas}x{Number.isFinite(s.restantes) ? ` · ${s.restantes} restante(s)` : ''}</p>}
         {s.podeFazer ? (
-          <span className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-black shadow-sm">
+          <span className="mt-2.5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-lg"
+            style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
             {s.emAndamento ? <><RotateCcw className="h-4 w-4" /> Continuar</> : s.refazer ? <><RotateCcw className="h-4 w-4" /> Refazer</> : <><Play className="h-4 w-4" /> Fazer agora</>}
           </span>
         ) : s.podeAguardar ? (
-          <span className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-black shadow-sm">
+          <span className="mt-2.5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-lg"
+            style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
             <Clock className="h-4 w-4" /> Entrar e aguardar início
           </span>
         ) : (

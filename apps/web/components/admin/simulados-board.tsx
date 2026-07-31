@@ -199,13 +199,14 @@ function CardItem({ s, appUrl, online, onMover }: { s: SimuladoCard; appUrl: str
   const capa = s.vis?.capa
 
   return (
-    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
       {/* Fundo: imagem do banco ou degradê da cor */}
       {capa
         ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
-      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
 
       {/* Link cobre o card (abaixo do kebab) */}
       <Link href={`/admin/simulados/${s.id}`} className="absolute inset-0 z-10" aria-label={s.titulo} />
@@ -453,14 +454,15 @@ function FolderCardSim({ f, onExcluir, onPersonalizar }: { f: PastaSim; onExclui
   const c = f.cor ?? '#6d28d9'
   const Icon = iconeBanco(f.icone)
   return (
-    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
       {f.capa ? (
         <img src={f.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
       ) : (
         <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
       )}
-      {!f.capa && <Icon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+      {!f.capa && <Icon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${c}, transparent)` }} />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
       <Link href={`/admin/simulados?pasta=${f.id}`} className="absolute inset-0 z-10" aria-label={f.nome} />
       <div className="pointer-events-none absolute left-3 top-3 z-20">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: c }}><Icon className="h-4 w-4" /></span>

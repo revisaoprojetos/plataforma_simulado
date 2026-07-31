@@ -94,17 +94,22 @@ export default async function AdminDashboard() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
           <Link key={card.title} href={card.href}
-            className="group relative overflow-hidden rounded-2xl border bg-card p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.08] to-transparent" />
-            <card.icon className="pointer-events-none absolute -right-3 -top-3 h-20 w-20 text-primary opacity-[0.06] transition-transform duration-300 group-hover:scale-110" />
-            <div className="relative flex items-center gap-3">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform duration-200 group-hover:scale-105"><card.icon className="h-6 w-6" /></span>
+            className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/[0.06] via-card to-card p-5 shadow-sm ring-1 ring-border/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5 hover:ring-primary/25">
+            {/* fio de acento no topo, aparece no hover */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+            {/* brilho no canto (mais presente) */}
+            <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-primary/10 blur-2xl transition-all duration-300 group-hover:bg-primary/20" />
+            <div className="relative flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-3xl font-bold leading-none tracking-tight">{card.value.toLocaleString('pt-BR')}</p>
-                <p className="mt-1 truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">{card.title} · {card.sub}</p>
+                <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">{card.title}</p>
+                <p className="mt-2 text-[2.1rem] font-bold leading-none tracking-tight tabular-nums">{card.value.toLocaleString('pt-BR')}</p>
+                <p className="mt-2 truncate text-xs text-muted-foreground">{card.sub}</p>
               </div>
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-md shadow-primary/25 ring-1 ring-white/10 transition-transform duration-300 group-hover:scale-110">
+                <card.icon className="h-5 w-5" />
+              </span>
             </div>
-            <ArrowRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+            <ArrowRight className="absolute bottom-4 right-4 h-4 w-4 text-primary opacity-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:opacity-100" />
           </Link>
         ))}
       </div>
@@ -114,12 +119,14 @@ export default async function AdminDashboard() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Destaque: nota média */}
-        <Card className="overflow-hidden" style={{ ['--card-spacing' as string]: '0px' }}>
+        <Card className="relative overflow-hidden" style={{ ['--card-spacing' as string]: '0px' }}>
           <SecaoHeader icon={Trophy} titulo="Desempenho" subtitulo="Sessões finalizadas" />
-          <CardContent className="flex flex-col items-center justify-center gap-1 px-4 py-8">
-            <div className="text-5xl font-bold tabular-nums text-primary">{fmtNota(d.notaMedia)}</div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">nota média geral</div>
-            <Link href="/admin/relatorios/graficos" className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+          <CardContent className="relative flex flex-col items-center justify-center gap-1 px-4 py-10">
+            {/* brilho radial suave atrás do número */}
+            <div className="pointer-events-none absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-[60%] rounded-full bg-primary/10 blur-3xl" />
+            <div className="relative text-6xl font-bold tabular-nums tracking-tight text-primary drop-shadow-sm">{fmtNota(d.notaMedia)}</div>
+            <div className="relative text-[11px] font-medium uppercase tracking-wide text-muted-foreground">nota média geral</div>
+            <Link href="/admin/relatorios/graficos" className="relative mt-5 inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary/5 hover:border-primary/30">
               Ver relatórios <ArrowRight className="h-4 w-4" />
             </Link>
           </CardContent>
