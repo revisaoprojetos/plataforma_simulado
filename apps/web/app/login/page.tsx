@@ -15,14 +15,13 @@ export default async function LoginPage() {
   const tenant = await getCurrentTenant()
   const tenantAtualId = tenant?.id ?? (await getCurrentTenantId())
 
-  // NÃO LOGADO + tenant resolvido → tela de login BRANDED da empresa (modo admin: e-mail + senha),
-  // a MESMA que o aluno vê, montada no console. Após autenticar, o form manda para /login já com
-  // sessão → cai no seletor/console abaixo (super-admin) ou é levado ao /admin (admin comum).
+  // NÃO LOGADO + tenant resolvido → tela de login BRANDED da empresa. Inicia no modo ALUNO
+  // (este caminho /login foi o compartilhado com os estudantes); o admin acessa pelo botão "Admin".
   if (!jaLogado && tenant) {
     const tema = (tenant.tema ?? {}) as any
     return (
       <AlunoEntrarForm
-        modoInicial="admin"
+        modoInicial="aluno"
         metodo="email"
         plataforma={tema.nome_site ?? tenant.nome ?? 'Plataforma'}
         logo={tema.logo_url ?? null}
