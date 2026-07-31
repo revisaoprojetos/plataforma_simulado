@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import { PlataformaTabs } from '@/components/super/plataforma-tabs'
 import { listarAdministradores } from '@/app/admin/administradores/actions'
-import { salvarTemaSuperAction } from '@/app/admin/tenants/actions'
+import { salvarTemaSuperAction, salvarEmbedConfigAction } from '@/app/admin/tenants/actions'
 import { ArrowLeft, Building2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -33,14 +33,23 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
   // Edição visual completa migrada para o console: a MESMA suíte do painel, dirigida pela action
   // super-scoped (mira este tenant). `.bind` fixa o tenantId no server action.
   const salvarTema = salvarTemaSuperAction.bind(null, id)
+  const salvarEmbed = salvarEmbedConfigAction.bind(null, id)
 
-  const [{ count: usuarios }, { count: estudantes }, { count: simulados }, rbac, bannersRes] = await Promise.all([
+  const [{ count: usuarios }, { count: estudantes }, { count: simulados }, rbac, bannersRes, embedRow] = await Promise.all([
     svc.from('simulado_tenant_acessos').select('user_id', { count: 'exact', head: true }).eq('tenant_id', id),
     svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('tenant_id', id),
     svc.from('simulado_simulados').select('id', { count: 'exact', head: true }).eq('tenant_id', id),
     listarAdministradores(id),
     svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor, ativo, ordem').eq('tenant_id', id).order('ordem', { ascending: true }).order('criado_em', { ascending: false }).then((r) => r.data ?? [], () => []),
+    svc.from('simulado_embed_config').select('ativo, origens_permitidas, metodo_identificacao, otp_email').eq('tenant_id', id).maybeSingle().then((r) => r.data, () => null),
   ])
+
+  const embedConfig = {
+    ativo: (embedRow as any)?.ativo ?? true,
+    origens_permitidas: ((embedRow as any)?.origens_permitidas as string[] | null) ?? [],
+    metodo_identificacao: ((embedRow as any)?.metodo_identificacao as string | null) ?? 'email_cpf',
+    otp_email: (embedRow as any)?.otp_email ?? false,
+  }
 
   // Badge de estado (4 valores): Ativa (todos) · Só admin · Só super-admin · Oculta.
   const estado = t.ativo
@@ -86,6 +95,8 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
         temaCompleto={tema}
         salvarTema={salvarTema}
         banners={bannersRes as any}
+        embedConfig={embedConfig}
+        salvarEmbed={salvarEmbed}
         rbacErro={rbac.ok ? null : (rbac.error ?? 'Não foi possível carregar os acessos.')}
       />
     </div>

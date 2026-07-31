@@ -231,6 +231,48 @@ export async function salvarAparenciaAction(id: string, dados: AparenciaInput): 
   return { ok: true }
 }
 
+// ─────────────────── EMBED (área embedável por tenant) ───────────────────
+// Config do widget embedável (simulado_embed_config): se a área está ativa, os
+// domínios que podem embedar (frame-ancestors — enforcement de fato é no proxy),
+// o método de identificação PADRÃO do aluno (cada simulado pode sobrescrever) e OTP
+// por e-mail. Uma linha por tenant (upsert manual — sem depender de constraint).
+
+const METODOS_ID = ['email', 'email_cpf', 'email_telefone'] as const
+
+export interface EmbedConfigInput {
+  ativo: boolean
+  origens_permitidas: string[]
+  metodo_identificacao: string
+  otp_email: boolean
+}
+
+/** Normaliza uma origem para frame-ancestors: minúsculas, sem espaço/caminho final; mantém
+ *  esquema/host/porta/curinga. Só caracteres de URL (não dá pra escapar do meta/CSP). Vazio → null. */
+function normOrigem(v: string): string | null {
+  const s = (v ?? '').trim().toLowerCase().replace(/\/+$/, '').replace(/\s/g, '')
+  if (!s) return null
+  return /^[a-z0-9.:*/\-]+$/.test(s) ? s : null
+}
+
+export async function salvarEmbedConfigAction(tenantId: string, dados: EmbedConfigInput): Promise<{ ok: boolean; error?: string }> {
+  if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
+  const svc = createAdminClient()
+
+  const metodo = (METODOS_ID as readonly string[]).includes(dados.metodo_identificacao) ? dados.metodo_identificacao : 'email_cpf'
+  const origens = [...new Set((dados.origens_permitidas ?? []).map(normOrigem).filter((x): x is string => !!x))]
+  const payload = { ativo: !!dados.ativo, origens_permitidas: origens, metodo_identificacao: metodo, otp_email: !!dados.otp_email }
+
+  const { data: existente } = await svc.from('simulado_embed_config').select('id').eq('tenant_id', tenantId).maybeSingle()
+  const { error } = existente
+    ? await svc.from('simulado_embed_config').update(payload).eq('tenant_id', tenantId)
+    : await svc.from('simulado_embed_config').insert({ tenant_id: tenantId, ...payload })
+  if (error) return { ok: false, error: `Erro ao salvar: ${error.message}` }
+
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_embed_config', entidadeId: tenantId, depois: payload, tenantId })
+  revalidatePath(`/super/plataformas/${tenantId}`)
+  return { ok: true }
+}
+
 // ─────────────────── CATEGORIAS DE CARGO (bandas da matriz RBAC) ───────────────────
 // Sem migração: guardadas em simulado_tenants.tema.rbac = { categorias:[{id,nome,cor}],
 // cargoCategoria:{ [roleId]: categoriaId } }. Só super-admin gerencia.

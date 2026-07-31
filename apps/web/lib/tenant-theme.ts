@@ -43,6 +43,20 @@ function safeFont(raw?: string): string | null {
 }
 
 /**
+ * Carrega a fonte do tenant via Google Fonts. O `--font-sans` já aponta para o
+ * nome da fonte, mas sem isto o arquivo nunca é baixado (só funcionava com fontes
+ * do sistema). Como o CSS do tema é injetado em <style>, o `@import` precisa ser a
+ * PRIMEIRA regra da folha — por isso este trecho é sempre prefixado ao CSS gerado.
+ * `fonte` já vem sanitizada por safeFont (letras/números/espaço/hífen), seguro
+ * para interpolar. Fonte inexistente no Google apenas 404 silencioso (inofensivo).
+ */
+function fontImport(fonte: string | null): string {
+  if (!fonte) return ''
+  const fam = fonte.trim().replace(/\s+/g, '+')
+  return `@import url('https://fonts.googleapis.com/css2?family=${fam}:wght@400;500;600;700&display=swap');\n`
+}
+
+/**
  * Converts a hex color (#rrggbb / #rgb) to an oklch() CSS string.
  * This is a best-effort approximation via sRGB → linear sRGB → XYZ D65 → Oklab → Oklch.
  * If the input is already an oklch() or other CSS color, it is returned as-is.
@@ -177,7 +191,7 @@ function construirPaletaCompleta(cores: Record<string, unknown>, coresDark: Reco
   css += `\n:root:not(.dark) {\n${L.surf.join('\n')}\n}`
   // Paleta escura completa (marca + superfícies) só no .dark, se configurada.
   if (D) css += `\n.dark {\n${[...D.marca, ...D.surf].join('\n')}\n}`
-  return `${css}\nmain h1 { color: var(--content-title); }`
+  return `${fontImport(fonte)}${css}\nmain h1 { color: var(--content-title); }`
 }
 
 /**
@@ -269,7 +283,7 @@ export const getTenantTheme = cache(async (): Promise<TenantThemeResult> => {
       lines.push(`  --brand-secondary: ${hexToOklch(corSecundaria)};`)
     }
 
-    const css = lines.length > 0 ? `:root, .dark {\n${lines.join('\n')}\n}` : ''
+    const css = lines.length > 0 ? `${fontImport(fonte)}:root, .dark {\n${lines.join('\n')}\n}` : ''
 
     return {
       css,
