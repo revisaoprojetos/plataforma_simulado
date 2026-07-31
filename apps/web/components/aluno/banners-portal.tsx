@@ -30,15 +30,16 @@ export function BannersPortal({ banners }: { banners: BannerPortal[] }) {
   return (
     <>
       {faixas.length > 0 && (
-        <div className="mb-5 space-y-3">
+        // FULL-BLEED: cancela o padding do <main> (p-6) → ocupa até as laterais e cola no topo.
+        <div className="-mx-6 -mt-6 mb-5">
           {faixas.map((b) => {
             const cor = b.cor ?? '#6366f1'
-            // Banner com imagem → imagem CHEIA (largura total), sem X. Sem imagem → faixa de texto.
+            // Banner com imagem → imagem CHEIA no padrão 1920×600 (largura total), sem X.
             const conteudo = b.imagem_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={b.imagem_url} alt={b.titulo ?? ''} className="w-full rounded-2xl border object-cover shadow-sm" />
+              <img src={b.imagem_url} alt={b.titulo ?? ''} className="aspect-[1920/600] w-full object-cover" />
             ) : (
-              <div className="flex items-center gap-3 rounded-2xl border p-4 shadow-sm" style={{ background: cor + '14', borderColor: cor + '33' }}>
+              <div className="flex items-center gap-3 p-4" style={{ background: cor + '14' }}>
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: cor + '22', color: cor }}><Megaphone className="h-5 w-5" /></span>
                 <div className="min-w-0 flex-1">
                   {b.titulo && <p className="text-sm font-semibold">{b.titulo}</p>}
