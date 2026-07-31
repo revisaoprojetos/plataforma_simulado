@@ -7,6 +7,7 @@ import { montarItensSimulado } from '@/lib/aluno/simulado-item'
 import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
 import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
 import { HeroCarrossel } from '@/components/aluno/hero-carrossel'
+import { HeroSimulado } from '@/components/aluno/hero-simulado'
 import { BannersPortal } from '@/components/aluno/banners-portal'
 import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } from '@/components/aluno/simulados-catalogo-aluno'
 import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
@@ -68,6 +69,8 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     .filter((i) => (i.podeFazer || i.emAndamento || i.statusLabel === 'Agendado') && !feitosSet.has(i.id))
     .sort((a, b) => lancamento(b) - lancamento(a))
     .slice(0, 12)
+  // Simulado em DESTAQUE (hero) — o mais recente que o aluno pode fazer.
+  const destaque = recentes.find((i) => i.podeFazer || i.emAndamento) ?? null
 
   // VISÃO DE PASTA — só o conteúdo da pasta (sem saudação/atalhos).
   if (pasta) {
@@ -96,6 +99,9 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
           <HeroCarrossel banners={hero} />
         </div>
       )}
+
+      {/* Simulado em DESTAQUE — hero com o fundo do próprio simulado. */}
+      {destaque && <HeroSimulado s={destaque} />}
 
       {/* Saudação solta. */}
       <div>
