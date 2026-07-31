@@ -57,12 +57,12 @@ export function NavProgress() {
   return (
     <>
       <style>{'@keyframes navprog{0%{transform:translateX(-100%)}50%{transform:translateX(35%)}100%{transform:translateX(220%)}}'}</style>
-      {/* Barra fina indeterminada, colada abaixo da topbar */}
-      <div className="pointer-events-none absolute inset-x-0 top-14 z-50 h-[3px] overflow-hidden bg-primary/15">
+      {/* Barra fina indeterminada, colada no TOPO da área de conteúdo (a topbar foi removida). */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-50 h-[3px] overflow-hidden bg-primary/15">
         <div className="h-full w-2/5 rounded-full bg-primary" style={{ animation: 'navprog 1.1s ease-in-out infinite' }} />
       </div>
       {/* Pílula com o ícone girando */}
-      <div className="pointer-events-none absolute right-4 top-[3.9rem] z-50">
+      <div className="pointer-events-none absolute right-4 top-3 z-50">
         <span className="flex items-center gap-1.5 rounded-full border bg-card/90 px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur">
           <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" /> Carregando…
         </span>

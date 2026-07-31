@@ -297,7 +297,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
       {/* RODAPÉ: perfil + notificações + ajuda + tema + trocar/sair (absorveu a antiga topbar). */}
       <SidebarFooter className="gap-2 border-t border-sidebar-border p-3 [&_svg]:text-[color:var(--sidebar-icon)] [&_button:hover_svg]:text-[color:var(--sidebar-icon-active)]">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary ring-1 ring-primary/25">{iniciais}</span>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais}</span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium leading-tight">{userName}</p>
             {userEmail && <p className="truncate text-[11px] leading-tight text-sidebar-foreground/55">{userEmail}</p>}

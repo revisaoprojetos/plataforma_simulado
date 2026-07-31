@@ -101,7 +101,7 @@ export function NotificacaoBellAluno() {
 
   return (
     <>
-      <button ref={btnRef} onClick={toggle} aria-label="Notificações" className="relative flex h-9 w-9 items-center justify-center rounded-full outline-none hover:bg-[color:var(--sidebar-accent)] focus-visible:ring-2 focus-visible:ring-ring">
+      <button ref={btnRef} onClick={toggle} aria-label="Notificações" className="relative flex h-9 w-9 items-center justify-center rounded-lg outline-none hover:bg-[color:var(--sidebar-accent)] focus-visible:ring-2 focus-visible:ring-ring">
         <Bell className="h-[1.15rem] w-[1.15rem]" />
         {naoLidas > 0 && (
           <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] animate-in zoom-in items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-[color:var(--sidebar)]">{naoLidas > 9 ? '9+' : naoLidas}</span>

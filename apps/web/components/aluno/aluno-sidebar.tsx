@@ -111,7 +111,7 @@ export function AlunoSidebar({
           Colapsado → coluna centrada de ícones; o texto some com fade+colapso suave. */}
       <SidebarFooter className="gap-2 border-t border-sidebar-border p-3 transition-[padding] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:p-2 [&_svg]:text-[color:var(--sidebar-icon)] [&_button:hover_svg]:text-[color:var(--sidebar-icon-active)]">
         <div className="flex w-full items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary ring-1 ring-primary/25">{iniciais(usuarioNome)}</span>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais(usuarioNome)}</span>
           {/* nome/email: colapsam largura + opacidade (não somem de golpe) */}
           <div className="min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:opacity-0">
             <p className="truncate text-sm font-medium leading-tight">{usuarioNome}</p>
@@ -120,17 +120,20 @@ export function AlunoSidebar({
           <div className="shrink-0 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0"><NotificacaoBellAluno /></div>
         </div>
 
-        <div className="flex w-full items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1.5">
-          <ThemeToggle />
-          {/* Ajuda/Sair (rótulo): colapsam largura+opacidade */}
-          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:opacity-0">
+        <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2">
+          {/* tema — normalizado para 36px (mesmo tamanho do avatar/sino/sair) */}
+          <span className="flex h-9 w-9 items-center justify-center"><ThemeToggle /></span>
+          {/* Ajuda/Sair (rótulo): some por completo na colapsada (sem gap fantasma) */}
+          <div className="flex min-w-0 flex-1 items-center gap-2 group-data-[collapsible=icon]:hidden">
             <AjudaDrawer renderTrigger={(abrir) => (
               <button type="button" onClick={abrir} className={btnFooter}>Ajuda</button>
             )} />
             <button type="button" onClick={sair} className={btnFooter}>Sair</button>
           </div>
-          {/* colapsada: só o ícone de sair */}
-          <button type="button" onClick={sair} title="Sair" aria-label="Sair" className="hidden h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[color:var(--sidebar-accent)] group-data-[collapsible=icon]:flex">
+          {/* colapsada: sino de notificações (abaixo do tema) */}
+          <div className="hidden group-data-[collapsible=icon]:block"><NotificacaoBellAluno /></div>
+          {/* colapsada: ícone de sair */}
+          <button type="button" onClick={sair} title="Sair" aria-label="Sair" className="hidden h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[color:var(--sidebar-accent)] group-data-[collapsible=icon]:flex">
             <LogOut className="h-4 w-4" />
           </button>
         </div>
