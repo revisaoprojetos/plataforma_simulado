@@ -36,7 +36,7 @@ export function LoginLoading({
   const effOpac = (c.logoOpacidade ?? 100) / 100
   const logoTint = effFiltro === 'cor' ? (c.logoCor ?? primaria) : null
   const maskStyle = (url: string): React.CSSProperties => ({ WebkitMaskImage: `url(${url})`, maskImage: `url(${url})`, WebkitMaskSize: 'contain', maskSize: 'contain', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat', WebkitMaskPosition: 'center', maskPosition: 'center' })
-  const nomeMarca = c.marcaNome ?? plataforma
+  const nomeMarca = c.carTextoMarca === null ? (c.marcaNome ?? plataforma) : c.carTextoMarca
 
   const Logo = c.carMostrarLogo ? (
     <div className={cn('flex h-16 w-16 items-center justify-center overflow-hidden', molde, transp ? '' : 'shadow-sm', !effLogo && 'bg-primary text-primary-foreground')} style={effLogo ? { background: transp ? 'transparent' : effBg } : undefined}>

@@ -82,6 +82,46 @@ export function PlataformaLoginConfig({
   const seg = 'flex-1 rounded-lg border px-2 py-2 text-xs font-medium transition inline-flex items-center justify-center gap-1.5'
   const on = 'border-primary bg-primary/5 text-primary', off = 'hover:bg-muted'
 
+  const blocoLogo = (
+    <Bloco titulo="Logo">
+      <label className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Mostrar logo</span><Switch checked={c.mostrarLogo} onCheckedChange={(v) => set('mostrarLogo', v)} /></label>
+      {c.mostrarLogo && (
+        <>
+          <div className="flex items-center gap-2">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border" style={{ background: c.logoBg ?? logoBg }}>
+              {logoAtual ? <img src={logoAtual} alt="" className="h-full w-full object-contain" style={{ filter: (c.logoFiltro ?? logoFiltro) === 'branco' ? 'brightness(0) invert(1)' : (c.logoFiltro ?? logoFiltro) === 'preto' ? 'brightness(0)' : undefined }} /> : <ImageOff className="h-5 w-5 text-muted-foreground" />}
+            </span>
+            <Input value={c.logoUrl?.startsWith('data:') ? '' : (c.logoUrl ?? '')} onChange={(e) => set('logoUrl', e.target.value || null)} placeholder="URL do logo (ou envie →) — vazio usa o do tema" className="flex-1" />
+            <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={(e) => onLogo(e.target.files?.[0] ?? null)} />
+            <button type="button" onClick={() => logoRef.current?.click()} disabled={enviandoLogo} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted disabled:opacity-50">{enviandoLogo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}</button>
+            {c.logoUrl && <button type="button" onClick={() => set('logoUrl', null)} title="Usar logo do tema" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><label className="text-xs text-muted-foreground">Fundo do logo</label>
+              <div className="flex items-center gap-1.5">
+                <input type="color" disabled={c.logoBg === 'transparent'} value={c.logoBg && c.logoBg !== 'transparent' ? c.logoBg : logoBg} onChange={(e) => set('logoBg', e.target.value)} className="h-8 w-9 shrink-0 cursor-pointer rounded border bg-transparent p-0.5 disabled:opacity-40" />
+                <button type="button" onClick={() => set('logoBg', c.logoBg === 'transparent' ? null : 'transparent')} className={cn('flex-1 rounded-lg border py-1.5 text-[11px] font-medium transition', c.logoBg === 'transparent' ? on : off)}>Transparente</button>
+              </div>
+            </div>
+            <div className="space-y-1"><label className="text-xs text-muted-foreground">Tamanho</label>
+              <div className="flex gap-1">{(['p', 'm', 'g'] as LogoTam[]).map((t) => <button key={t} type="button" onClick={() => set('logoTamanho', t)} className={cn('flex-1 rounded-lg border py-1.5 text-xs font-medium uppercase transition', c.logoTamanho === t ? on : off)}>{t}</button>)}</div>
+            </div>
+          </div>
+          <div className="space-y-1"><label className="text-xs text-muted-foreground">Moldura</label>
+            <div className="flex gap-1">{([['arredondado', 'Arredondado'], ['quadrado', 'Quadrado'], ['borda', 'Borda']] as [LogoEstilo, string][]).map(([v, r]) => <button key={v} type="button" onClick={() => set('logoEstilo', v)} className={cn(seg, (c.logoEstilo ?? logoEstilo) === v ? on : off)}>{r}</button>)}</div>
+          </div>
+          <div className="space-y-1"><label className="text-xs text-muted-foreground">Filtro de cor</label>
+            <div className="flex gap-1">{([['none', 'Nenhum'], ['branco', 'Branco'], ['preto', 'Preto'], ['cor', 'Cor']] as [LogoFiltro, string][]).map(([v, r]) => <button key={v} type="button" onClick={() => set('logoFiltro', v)} className={cn(seg, (c.logoFiltro ?? logoFiltro) === v ? on : off)}>{r}</button>)}</div>
+            {(c.logoFiltro ?? logoFiltro) === 'cor' && <div className="flex items-center gap-2 pt-1"><span className="text-xs text-muted-foreground">Cor da logo</span><input type="color" value={c.logoCor ?? corPrimaria} onChange={(e) => set('logoCor', e.target.value)} className="h-8 w-10 cursor-pointer rounded border bg-transparent p-0.5" /></div>}
+          </div>
+          <div className="space-y-1"><label className="flex items-center justify-between text-xs text-muted-foreground">Transparência da logo <span className="tabular-nums">{c.logoOpacidade ?? 100}%</span></label>
+            <input type="range" min={10} max={100} step={5} value={c.logoOpacidade ?? 100} onChange={(e) => set('logoOpacidade', Number(e.target.value))} className="h-1.5 w-full cursor-pointer accent-primary" />
+          </div>
+        </>
+      )}
+    </Bloco>
+  )
+
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,400px)_1fr]">
       {/* Controles */}
@@ -91,7 +131,7 @@ export function PlataformaLoginConfig({
           <p className="text-xs text-muted-foreground">{abaPrevia === 'login' ? 'Vale para a tela de alunos e a de administradores desta empresa.' : 'Mostrada ao entrar na plataforma. Usa o mesmo fundo, cores e logo do login.'}</p>
         </div>
 
-        {abaPrevia === 'carregamento' && (
+        {abaPrevia === 'carregamento' && (<>
           <Bloco titulo="Modelo de carregamento">
             <div className="grid grid-cols-2 gap-2">
               {([['spinner', 'Spinner'], ['anel', 'Anel (logo no meio)'], ['barra', 'Barra'], ['pulso', 'Pulso do logo'], ['pontos', 'Pontos'], ['orbita', 'Órbita']] as [CarModelo, string][]).map(([v, r]) => (
@@ -99,9 +139,11 @@ export function PlataformaLoginConfig({
               ))}
             </div>
             <div className="space-y-1 pt-1"><label className="text-xs text-muted-foreground">Texto <span className="text-muted-foreground/70">(vazio = oculto)</span></label><Input value={c.carTexto} onChange={(e) => set('carTexto', e.target.value)} placeholder="Ex.: Entrando…" /></div>
+            <div className="space-y-1 pt-1"><label className="text-xs text-muted-foreground">Texto da marca <span className="text-muted-foreground/70">(vazio = oculto)</span></label><Input value={c.carTextoMarca ?? (c.marcaNome ?? plataforma)} onChange={(e) => set('carTextoMarca', e.target.value)} placeholder="Ex.: Revisão / Ensino Jurídico" /></div>
             <label className="flex items-center justify-between pt-1 text-sm"><span className="text-muted-foreground">Mostrar logo</span><Switch checked={c.carMostrarLogo} onCheckedChange={(v) => set('carMostrarLogo', v)} /></label>
           </Bloco>
-        )}
+          {blocoLogo}
+        </>)}
 
         {abaPrevia === 'login' && (<>
         <Bloco titulo="Modelo">
@@ -132,43 +174,7 @@ export function PlataformaLoginConfig({
           </div>
         </Bloco>
 
-        <Bloco titulo="Logo">
-          <label className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Mostrar logo</span><Switch checked={c.mostrarLogo} onCheckedChange={(v) => set('mostrarLogo', v)} /></label>
-          {c.mostrarLogo && (
-            <>
-              <div className="flex items-center gap-2">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border" style={{ background: c.logoBg ?? logoBg }}>
-                  {logoAtual ? <img src={logoAtual} alt="" className="h-full w-full object-contain" style={{ filter: (c.logoFiltro ?? logoFiltro) === 'branco' ? 'brightness(0) invert(1)' : (c.logoFiltro ?? logoFiltro) === 'preto' ? 'brightness(0)' : undefined }} /> : <ImageOff className="h-5 w-5 text-muted-foreground" />}
-                </span>
-                <Input value={c.logoUrl?.startsWith('data:') ? '' : (c.logoUrl ?? '')} onChange={(e) => set('logoUrl', e.target.value || null)} placeholder="URL do logo (ou envie →) — vazio usa o do tema" className="flex-1" />
-                <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={(e) => onLogo(e.target.files?.[0] ?? null)} />
-                <button type="button" onClick={() => logoRef.current?.click()} disabled={enviandoLogo} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted disabled:opacity-50">{enviandoLogo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}</button>
-                {c.logoUrl && <button type="button" onClick={() => set('logoUrl', null)} title="Usar logo do tema" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>}
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><label className="text-xs text-muted-foreground">Fundo do logo</label>
-                  <div className="flex items-center gap-1.5">
-                    <input type="color" disabled={c.logoBg === 'transparent'} value={c.logoBg && c.logoBg !== 'transparent' ? c.logoBg : logoBg} onChange={(e) => set('logoBg', e.target.value)} className="h-8 w-9 shrink-0 cursor-pointer rounded border bg-transparent p-0.5 disabled:opacity-40" />
-                    <button type="button" onClick={() => set('logoBg', c.logoBg === 'transparent' ? null : 'transparent')} className={cn('flex-1 rounded-lg border py-1.5 text-[11px] font-medium transition', c.logoBg === 'transparent' ? on : off)}>Transparente</button>
-                  </div>
-                </div>
-                <div className="space-y-1"><label className="text-xs text-muted-foreground">Tamanho</label>
-                  <div className="flex gap-1">{(['p', 'm', 'g'] as LogoTam[]).map((t) => <button key={t} type="button" onClick={() => set('logoTamanho', t)} className={cn('flex-1 rounded-lg border py-1.5 text-xs font-medium uppercase transition', c.logoTamanho === t ? on : off)}>{t}</button>)}</div>
-                </div>
-              </div>
-              <div className="space-y-1"><label className="text-xs text-muted-foreground">Moldura</label>
-                <div className="flex gap-1">{([['arredondado', 'Arredondado'], ['quadrado', 'Quadrado'], ['borda', 'Borda']] as [LogoEstilo, string][]).map(([v, r]) => <button key={v} type="button" onClick={() => set('logoEstilo', v)} className={cn(seg, (c.logoEstilo ?? logoEstilo) === v ? on : off)}>{r}</button>)}</div>
-              </div>
-              <div className="space-y-1"><label className="text-xs text-muted-foreground">Filtro de cor</label>
-                <div className="flex gap-1">{([['none', 'Nenhum'], ['branco', 'Branco'], ['preto', 'Preto'], ['cor', 'Cor']] as [LogoFiltro, string][]).map(([v, r]) => <button key={v} type="button" onClick={() => set('logoFiltro', v)} className={cn(seg, (c.logoFiltro ?? logoFiltro) === v ? on : off)}>{r}</button>)}</div>
-                {(c.logoFiltro ?? logoFiltro) === 'cor' && <div className="flex items-center gap-2 pt-1"><span className="text-xs text-muted-foreground">Cor da logo</span><input type="color" value={c.logoCor ?? corPrimaria} onChange={(e) => set('logoCor', e.target.value)} className="h-8 w-10 cursor-pointer rounded border bg-transparent p-0.5" /></div>}
-              </div>
-              <div className="space-y-1"><label className="flex items-center justify-between text-xs text-muted-foreground">Transparência da logo <span className="tabular-nums">{c.logoOpacidade ?? 100}%</span></label>
-                <input type="range" min={10} max={100} step={5} value={c.logoOpacidade ?? 100} onChange={(e) => set('logoOpacidade', Number(e.target.value))} className="h-1.5 w-full cursor-pointer accent-primary" />
-              </div>
-            </>
-          )}
-        </Bloco>
+        {blocoLogo}
 
         <Bloco titulo="Fundo & card">
           <div className="flex gap-2">
