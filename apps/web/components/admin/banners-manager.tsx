@@ -23,7 +23,9 @@ export type Banner = {
 
 const TIPO_LABEL: Record<string, string> = { banner: 'banner', popup: 'pop-up', hero: 'destaque' }
 
-export function BannersManager({ banners, tenantId }: { banners: Banner[]; tenantId?: string }) {
+export type DestinoBanner = { label: string; href: string; grupo?: string }
+
+export function BannersManager({ banners, tenantId, destinos }: { banners: Banner[]; tenantId?: string; destinos?: DestinoBanner[] }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [alvo, setAlvo] = useState<string | null>(null)
@@ -136,7 +138,24 @@ export function BannersManager({ banners, tenantId }: { banners: Banner[]; tenan
             <BannerCropper src={cropSrc} onApply={(d) => { setImagem(d); setCropOpen(false) }} onCancel={() => setCropOpen(false)} />
           )}
         </div>
-        <div className="space-y-1"><label className="text-xs text-muted-foreground">Link ao clicar (opcional)</label><Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="/aluno/simulado ou https://…" /></div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Link ao clicar (opcional)</label>
+          {destinos && destinos.length > 0 && (
+            <select value={destinos.some((d) => d.href === link) ? link : ''} onChange={(e) => e.target.value && setLink(e.target.value)}
+              className="mb-1.5 h-9 w-full rounded-lg border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <option value="">Destino rápido (pasta, simulado…) — ou digite abaixo</option>
+              {['Pastas', 'Simulados'].map((grp) => {
+                const opts = destinos.filter((d) => (d.grupo ?? 'Simulados') === grp)
+                return opts.length ? (
+                  <optgroup key={grp} label={grp}>
+                    {opts.map((d) => <option key={d.href} value={d.href}>{d.label}</option>)}
+                  </optgroup>
+                ) : null
+              })}
+            </select>
+          )}
+          <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="/aluno/simulado ou https://…" />
+        </div>
         <div className="flex items-center gap-2"><label className="text-xs text-muted-foreground">Cor de destaque</label><input type="color" value={cor} onChange={(e) => setCor(e.target.value)} className="h-8 w-10 cursor-pointer rounded border bg-transparent p-0.5" /></div>
         <Button type="submit" disabled={pending && alvo === 'novo'} className="w-full">
           {pending && alvo === 'novo' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />} Adicionar

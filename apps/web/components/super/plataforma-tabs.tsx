@@ -6,7 +6,7 @@ import { PlataformaGerenciar } from '@/components/super/plataforma-gerenciar'
 import { PlataformaAcessos } from '@/components/super/plataforma-acessos'
 import { PlataformaEmbed } from '@/components/super/plataforma-embed'
 import { ConfiguracoesTabs } from '@/app/admin/configuracoes/configuracoes-tabs'
-import { BannersManager, type Banner } from '@/components/admin/banners-manager'
+import { BannersManager, type Banner, type DestinoBanner } from '@/components/admin/banners-manager'
 import type { AdminMembro, CargoOpcao } from '@/app/admin/administradores/actions'
 import type { EmbedConfigInput } from '@/app/admin/tenants/actions'
 
@@ -21,13 +21,14 @@ type GeralProps = {
  *  - Acessos (RBAC) → equipe da plataforma (membros + cargos), gerida pelo super-admin
  *    direto do console (escopo por tenant-alvo via `tenantId`).
  */
-export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTema, banners, embedConfig, salvarEmbed, rbacErro }: {
+export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTema, banners, destinosBanner, embedConfig, salvarEmbed, rbacErro }: {
   geral: GeralProps
   membros: AdminMembro[]
   cargos: CargoOpcao[]
   temaCompleto: any
   salvarTema: (t: Record<string, unknown>) => Promise<{ ok?: boolean } | void>
   banners: Banner[]
+  destinosBanner?: DestinoBanner[]
   embedConfig: EmbedConfigInput
   salvarEmbed: (dados: EmbedConfigInput) => Promise<{ ok: boolean; error?: string }>
   rbacErro?: string | null
@@ -51,7 +52,7 @@ export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTem
       </TabsContent>
 
       <TabsContent value="avisos">
-        <BannersManager banners={banners} tenantId={geral.id} />
+        <BannersManager banners={banners} tenantId={geral.id} destinos={destinosBanner} />
       </TabsContent>
 
       <TabsContent value="embed">

@@ -51,6 +51,16 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
     otp_email: (embedRow as any)?.otp_email ?? false,
   }
 
+  // Destinos rápidos para linkar um banner: pastas (folders) + simulados publicados. Tolerante ao schema.
+  const [pastasDest, simsDest] = await Promise.all([
+    svc.from('simulado_pastas').select('id, nome').eq('tenant_id', id).eq('is_folder', true).order('nome', { ascending: true }).then((r: any) => r.data ?? [], () => []),
+    svc.from('simulado_simulados').select('id, titulo, embed_token').eq('tenant_id', id).eq('deletado', false).eq('status', 'publicado').order('created_at', { ascending: false }).limit(60).then((r: any) => r.data ?? [], () => []),
+  ])
+  const destinosBanner = [
+    ...(pastasDest as any[]).map((f) => ({ label: f.nome as string, href: `/aluno/simulado?pasta=${f.id}`, grupo: 'Pastas' })),
+    ...(simsDest as any[]).filter((s) => s.embed_token).map((s) => ({ label: s.titulo as string, href: `/simulado/${s.embed_token}`, grupo: 'Simulados' })),
+  ]
+
   // Badge de estado (4 valores): Ativa (todos) · Só admin · Só super-admin · Oculta.
   const estado = t.ativo
     ? { label: 'Ativa', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' }
@@ -95,6 +105,7 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
         temaCompleto={tema}
         salvarTema={salvarTema}
         banners={bannersRes as any}
+        destinosBanner={destinosBanner}
         embedConfig={embedConfig}
         salvarEmbed={salvarEmbed}
         rbacErro={rbac.ok ? null : (rbac.error ?? 'Não foi possível carregar os acessos.')}
