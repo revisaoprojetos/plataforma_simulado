@@ -84,83 +84,69 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     .filter((i) => (i.podeFazer || i.emAndamento || i.statusLabel === 'Agendado') && !feitosSet.has(i.id))
     .sort((a, b) => lancamento(b) - lancamento(a))
     .slice(0, 12)
-  // Banners de simulado (config no console): resolve o FUNDO de cada um a partir do próprio
-  // simulado referenciado (capa/cor), independentemente do acesso do aluno (clique é validado no destino).
+  // Banners de simulado (config no console). REGRA: só aparecem para quem tem o simulado/pasta
+  // LIBERADO para fazer — se o aluno não tem acesso, o banner não é exibido.
   let heroSims: HeroSimSlide[] = []
   if (!pasta && simBanners.length) {
     const tokenDe = (l: string) => l.startsWith('/simulado/') ? (l.split('/simulado/')[1]?.split(/[/?#]/)[0] || null) : null
     const pastaDe = (l: string) => l.match(/[?&]pasta=([^&#]+)/)?.[1] ? decodeURIComponent(l.match(/[?&]pasta=([^&#]+)/)![1]) : null
 
-    // Simulados únicos (por token) → fundo do próprio simulado + chips (disponibilidade, nº de questões, tipo).
-    const tokens = [...new Set(simBanners.map((b) => tokenDe(b.link as string)).filter(Boolean))] as string[]
-    const simPorToken = new Map<string, any>()
-    const chipsPorToken = new Map<string, BannerChip[]>()
-    if (tokens.length) {
-      const { data: simRows } = await svc.from('simulado_simulados').select('id, titulo, embed_token, regras, status, modo_aplicacao, data_inicio, data_fim, created_at').in('embed_token', tokens).eq('deletado', false)
-      const rows = (simRows ?? []) as any[]
-      const visB = await resolverVisualSimulados(svc, rows.map((s) => ({ id: s.id, regras: s.regras })))
-      // Sessões do aluno p/ esses simulados (a partir de sessAll) → status/tentativas corretos.
-      const sessB = new Map<string, any[]>()
-      for (const x of (sessAll ?? []) as any[]) if (rows.some((r) => r.id === x.simulado_id)) { const a = sessB.get(x.simulado_id) ?? []; a.push(x); sessB.set(x.simulado_id, a) }
-      const itemById = new Map(montarItensSimulado(rows, sessB, expiraPorSim, visB).map((i) => [i.id, i]))
-      // Nº de questões + tipo (objetiva/discursiva/mista) numa query só.
-      const { data: pq } = rows.length
-        ? await svc.from('simulado_prova_questoes').select('simulado_id, questoes:simulado_questoes(tipo)').in('simulado_id', rows.map((r) => r.id))
-        : { data: [] as any[] }
-      const cntPorSim = new Map<string, number>(); const tiposPorSim = new Map<string, string[]>()
-      for (const r of (pq ?? []) as any[]) { cntPorSim.set(r.simulado_id, (cntPorSim.get(r.simulado_id) ?? 0) + 1); const a = tiposPorSim.get(r.simulado_id) ?? []; a.push((r.questoes as any)?.tipo); tiposPorSim.set(r.simulado_id, a) }
-      for (const s of rows) {
-        const item = itemById.get(s.id)
-        simPorToken.set(s.embed_token, { ...s, vis: visB.get(s.id) ?? null, item })
-        const chips: BannerChip[] = []
-        if (item) chips.push({ label: item.statusLabel + (item.quando ? ` · ${item.quando}` : ''), tone: item.podeFazer ? 'ok' : 'muted' })
-        const cnt = cntPorSim.get(s.id) ?? 0
-        if (cnt) chips.push({ label: `${cnt} ${cnt === 1 ? 'questão' : 'questões'}`, tone: 'muted', icon: 'book' })
-        const tp = tipoDoSimulado(tiposPorSim.get(s.id) ?? [])
-        const tpLabel = tp === 'mista' ? 'Objetivas + discursiva' : tp === 'discursiva' ? 'Discursivas' : tp === 'objetiva' ? 'Objetivas' : null
-        if (tpLabel) chips.push({ label: tpLabel, tone: 'muted' })
-        chipsPorToken.set(s.embed_token, chips)
-      }
-    }
+    // Só o que o aluno pode fazer: mapa por token dos itens ACESSÍVEIS (itensCat já é filtrado).
+    const itensByToken = new Map(itensCat.filter((i) => i.embed_token).map((i) => [i.embed_token as string, i]))
+    const grupoById = new Map(grupos.map((g) => [g.id, g]))
 
-    // Pastas (grupos de simulados) → fundo da pasta + CONTAGEM de simulados que ela tem.
+    // Capa/nome das pastas referenciadas (fallback do grupo).
     const pastaIds = [...new Set(simBanners.map((b) => pastaDe(b.link as string)).filter(Boolean))] as string[]
     const pastaRow = new Map<string, any>()
     if (pastaIds.length) {
       const r = await svc.from('simulado_pastas').select('id, nome, cor, capa_url').in('id', pastaIds)
       for (const p of (r.data ?? []) as any[]) pastaRow.set(p.id, p)
     }
-    const grupoById = new Map(grupos.map((g) => [g.id, g]))
 
-    heroSims = simBanners.map((b) => {
+    // Nº de questões + tipo apenas dos simulados-alvo ACESSÍVEIS.
+    const simIds = [...new Set(simBanners.map((b) => itensByToken.get(tokenDe(b.link as string) ?? '')?.id).filter(Boolean))] as string[]
+    const cntPorSim = new Map<string, number>(); const tiposPorSim = new Map<string, string[]>()
+    if (simIds.length) {
+      const { data: pq } = await svc.from('simulado_prova_questoes').select('simulado_id, questoes:simulado_questoes(tipo)').in('simulado_id', simIds)
+      for (const r of (pq ?? []) as any[]) { cntPorSim.set(r.simulado_id, (cntPorSim.get(r.simulado_id) ?? 0) + 1); const a = tiposPorSim.get(r.simulado_id) ?? []; a.push((r.questoes as any)?.tipo); tiposPorSim.set(r.simulado_id, a) }
+    }
+
+    heroSims = simBanners.map((b): HeroSimSlide | null => {
       const tok = tokenDe(b.link as string)
       const pid = pastaDe(b.link as string)
       if (pid) {
-        const g = grupoById.get(pid)
-        const pr = pastaRow.get(pid)
         const total = progresso[pid]?.total ?? 0
+        if (total === 0) return null // aluno não tem simulado liberado nessa pasta → oculto
+        const g = grupoById.get(pid); const pr = pastaRow.get(pid)
         return {
-          id: b.id, kind: 'sim' as const,
+          id: b.id, kind: 'sim',
           capa: b.imagem_url || g?.capa || pr?.capa_url || null,
           cor: b.cor || g?.cor || '#6d28d9',
           titulo: b.titulo || g?.nome || pr?.nome || 'Simulados',
           descricao: b.mensagem || null,
           link: b.link, acao: 'Ver simulados',
-          chips: total > 0 ? [{ label: `${total} ${total === 1 ? 'simulado' : 'simulados'}`, tone: 'muted' as const, icon: 'book' as const }] : undefined,
+          chips: [{ label: `${total} ${total === 1 ? 'simulado' : 'simulados'}`, tone: 'muted', icon: 'book' }],
         }
       }
-      const sim = tok ? simPorToken.get(tok) : null
+      const item = tok ? itensByToken.get(tok) : null
+      if (!item) return null // simulado não liberado para este aluno → oculto
+      const chips: BannerChip[] = [{ label: item.statusLabel + (item.quando ? ` · ${item.quando}` : ''), tone: item.podeFazer ? 'ok' : 'muted' }]
+      const cnt = cntPorSim.get(item.id) ?? 0
+      if (cnt) chips.push({ label: `${cnt} ${cnt === 1 ? 'questão' : 'questões'}`, tone: 'muted', icon: 'book' })
+      const tp = tipoDoSimulado(tiposPorSim.get(item.id) ?? [])
+      const tpLabel = tp === 'mista' ? 'Objetivas + discursiva' : tp === 'discursiva' ? 'Discursivas' : tp === 'objetiva' ? 'Objetivas' : null
+      if (tpLabel) chips.push({ label: tpLabel, tone: 'muted' })
       return {
-        id: b.id, kind: 'sim' as const,
-        capa: b.imagem_url || sim?.vis?.capa || null,
-        cor: b.cor || sim?.vis?.cor || '#6d28d9',
-        titulo: b.titulo || sim?.titulo || 'Simulado',
+        id: b.id, kind: 'sim',
+        capa: b.imagem_url || item.vis?.capa || null,
+        cor: b.cor || item.vis?.cor || '#6d28d9',
+        titulo: b.titulo || item.titulo || 'Simulado',
         descricao: b.mensagem || null,
-        link: b.link, acao: 'Fazer agora',
-        detalhesLink: sim?.id ? `/aluno/simulados/${sim.id}` : null,
-        chips: tok ? chipsPorToken.get(tok) : undefined,
+        link: b.link, acao: item.emAndamento ? 'Continuar' : item.refazer ? 'Refazer' : 'Fazer agora',
+        detalhesLink: `/aluno/simulados/${item.id}`,
+        chips,
       }
-    })
+    }).filter(Boolean) as HeroSimSlide[]
   }
 
   // VISÃO DE PASTA — só o conteúdo da pasta (sem saudação/atalhos).

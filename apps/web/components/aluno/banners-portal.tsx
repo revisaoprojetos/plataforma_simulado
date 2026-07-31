@@ -6,6 +6,13 @@ import Link from 'next/link'
 import { X, Megaphone, ChevronLeft, ChevronRight, Play, BookOpen, Clock, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+/** Link do banner: se for URL externa (http/https), abre em NOVA aba (mantém o simulado aberto);
+ *  se for rota interna, navega no app normalmente. */
+function Alvo({ href, className, style, children, onClick, 'aria-label': ariaLabel }: { href: string; className?: string; style?: React.CSSProperties; children: React.ReactNode; onClick?: () => void; 'aria-label'?: string }) {
+  if (/^https?:\/\//i.test(href)) return <a href={href} target="_blank" rel="noopener noreferrer" onClick={onClick} aria-label={ariaLabel} className={className} style={style}>{children}</a>
+  return <Link href={href} onClick={onClick} aria-label={ariaLabel} className={className} style={style}>{children}</Link>
+}
+
 export type BannerPortal = {
   id: string; tipo: 'banner' | 'popup' | 'hero'; titulo: string | null; mensagem: string | null
   imagem_url: string | null; link: string | null; cor: string | null
@@ -81,7 +88,7 @@ export function BannersPortal({ banners, simulados = [], stats }: { banners: Ban
               {popup.titulo && <h3 className="text-lg font-bold tracking-tight">{popup.titulo}</h3>}
               {popup.mensagem && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{popup.mensagem}</p>}
               <div className="flex justify-end gap-2 pt-1">
-                {popup.link && <Link href={popup.link} onClick={fecharPopup} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90">Ver mais</Link>}
+                {popup.link && <Alvo href={popup.link} onClick={fecharPopup} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90">Ver mais</Alvo>}
                 <button type="button" onClick={fecharPopup} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Fechar</button>
               </div>
             </div>
@@ -152,7 +159,7 @@ function ImgSlide({ b }: { b: BannerPortal }) {
       </div>
     </div>
   )
-  return b.link ? <Link href={b.link} aria-label={b.titulo ?? 'Abrir'} className="absolute inset-0">{conteudo}</Link> : <>{conteudo}</>
+  return b.link ? <Alvo href={b.link} aria-label={b.titulo ?? 'Abrir'} className="absolute inset-0">{conteudo}</Alvo> : <>{conteudo}</>
 }
 
 /** Simulado em destaque como banner: capa/cor de fundo + overlay com título, descrição, chips,
@@ -191,15 +198,15 @@ function SimSlide({ s, stats }: { s: HeroSimSlide; stats?: BannerStats | null })
 
         <div className="mt-4 flex flex-wrap items-center gap-2.5">
           {s.link && (
-            <Link href={s.link} className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold shadow-lg ring-1 ring-white/15 transition-transform hover:scale-[1.03]"
+            <Alvo href={s.link} className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold shadow-lg ring-1 ring-white/15 transition-transform hover:scale-[1.03]"
               style={{ background: `linear-gradient(135deg, ${s.cor}, color-mix(in oklab, ${s.cor} 62%, #f5e6b8))`, color: '#1b1036' }}>
               <Play className="h-4 w-4 fill-current" /> {s.acao}
-            </Link>
+            </Alvo>
           )}
           {s.detalhesLink && (
-            <Link href={s.detalhesLink} className="inline-flex items-center gap-1.5 rounded-xl border border-white/16 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20">
+            <Alvo href={s.detalhesLink} className="inline-flex items-center gap-1.5 rounded-xl border border-white/16 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20">
               Ver detalhes <ArrowRight className="h-4 w-4" />
-            </Link>
+            </Alvo>
           )}
         </div>
       </div>
