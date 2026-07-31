@@ -167,13 +167,16 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     if (naPasta.length === 0) {
       // Chegou por um banner de vitrine, mas não tem acesso → pop-up com dados da pasta + suporte.
       const [{ data: pRow }, { data: contatoRow }] = await Promise.all([
-        svc.from('simulado_pastas').select('nome').eq('id', pasta).maybeSingle(),
+        svc.from('simulado_pastas').select('nome, capa_url').eq('id', pasta).maybeSingle(),
         svc.from('simulado_tenant_contatos').select('whatsapp, email_suporte, link_ajuda, horario_atendimento').eq('tenant_id', sessao!.tenantId).maybeSingle().then((r) => r, () => ({ data: null })),
       ])
       const ct = (contatoRow ?? null) as any
+      // Imagem do BANNER que leva a esta pasta (fallback: capa da pasta).
+      const bannerImg = todosBanners.find((b: any) => typeof b.link === 'string' && b.link.includes('pasta=' + pasta))?.imagem_url ?? null
       semAcesso = (
         <SemAcessoModal
           pastaNome={(pRow as any)?.nome ?? null}
+          capa={bannerImg || (pRow as any)?.capa_url || null}
           suporte={ct ? { whatsapp: ct.whatsapp, email: ct.email_suporte, link: ct.link_ajuda, horario: ct.horario_atendimento } : undefined}
         />
       )

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { Lock, ShoppingCart, BadgeCheck, GraduationCap, MessageCircle, Mail, ExternalLink } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { FitaTopo } from '@/components/prova/fita-topo'
 
 export type SuporteInfo = { whatsapp?: string | null; email?: string | null; link?: string | null; horario?: string | null }
@@ -11,7 +12,7 @@ export type SuporteInfo = { whatsapp?: string | null; email?: string | null; lin
 /** Pop-up (upsell) quando o aluno chega a uma pasta/simulado que o perfil dele NÃO tem acesso.
  *  Mesmo visual do aviso de acesso da prova (login-popups): cabeçalho na cor da marca + ícone,
  *  passo a passo para liberar e canal de suporte. */
-export function SemAcessoModal({ pastaNome, suporte }: { pastaNome?: string | null; suporte?: SuporteInfo }) {
+export function SemAcessoModal({ pastaNome, capa = null, suporte }: { pastaNome?: string | null; capa?: string | null; suporte?: SuporteInfo }) {
   const [montado, setMontado] = useState(false)
   useEffect(() => { setMontado(true) }, [])
   if (!montado || typeof document === 'undefined') return null
@@ -29,24 +30,37 @@ export function SemAcessoModal({ pastaNome, suporte }: { pastaNome?: string | nu
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4 text-foreground backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative w-full max-w-md animate-in fade-in zoom-in-95 overflow-hidden rounded-2xl border-2 border-primary/50 bg-card text-center shadow-2xl duration-300">
         <FitaTopo />
-        {/* Cabeçalho — tom da marca (linkado ao --primary). */}
-        <div className="px-8 pb-6 pt-8" style={{ background: `color-mix(in oklab, ${cor} 12%, var(--card))` }}>
-          <span className="relative mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full" style={{ background: `color-mix(in oklab, ${cor} 22%, var(--card))` }}>
-            <span className="absolute inset-0 animate-ping rounded-full" style={{ background: cor, opacity: 0.12 }} />
-            <Lock className="h-9 w-9" style={{ color: cor }} />
-          </span>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Conteúdo exclusivo</p>
-          <h2 className="mt-1 text-lg font-semibold" style={{ color: cor }}>Acesso não liberado</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Seu perfil ainda não tem acesso a <strong className="font-semibold text-foreground">{nome}</strong>. Esses simulados fazem parte de outro plano da plataforma.
+
+        {/* Imagem do BANNER (proporção 1920×500 → não corta) + cadeado sobreposto. */}
+        {capa && (
+          <div className="relative border-b-2 border-primary/40">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={capa} alt="" className="aspect-[1920/500] w-full object-cover" />
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(10,7,20,.5), transparent 62%)' }} />
+            <span className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg bg-black/35 text-white ring-1 ring-white/25 backdrop-blur"><Lock className="h-4 w-4" /></span>
+          </div>
+        )}
+
+        {/* Cabeçalho — tom da marca (linkado ao --primary). Ícone só quando NÃO há imagem. */}
+        <div className={cn('flex flex-col items-center px-6 pb-5 text-center', capa ? 'pt-5' : 'pt-7')} style={capa ? undefined : { background: `color-mix(in oklab, ${cor} 12%, var(--card))` }}>
+          {!capa && (
+            <span className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-full" style={{ background: `color-mix(in oklab, ${cor} 22%, var(--card))` }}>
+              <span className="absolute inset-0 animate-ping rounded-full" style={{ background: cor, opacity: 0.12 }} />
+              <Lock className="h-9 w-9" style={{ color: cor }} />
+            </span>
+          )}
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Conteúdo exclusivo</p>
+          <h2 className="mt-1 text-xl font-bold tracking-tight" style={{ color: cor }}>Acesso não liberado</h2>
+          <p className="mx-auto mt-2 max-w-[19rem] text-sm leading-relaxed text-muted-foreground">
+            Seu perfil ainda não tem acesso a <strong className="font-semibold text-foreground">{nome}</strong> — esse conteúdo faz parte de outro plano da plataforma.
           </p>
         </div>
 
         {/* Corpo */}
-        <div className="space-y-4 p-6 text-left">
+        <div className="space-y-4 px-6 pb-6 pt-1 text-left">
           <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Como liberar</p>
-            <ol className="space-y-2.5">
+            <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Como liberar</p>
+            <ol className="space-y-3">
               {passos.map((p, i) => (
                 <li key={i} className="flex items-start gap-2.5">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">{i + 1}</span>
