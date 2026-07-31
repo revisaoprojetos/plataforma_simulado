@@ -4,14 +4,14 @@ import { useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { X, Upload, Crop, Loader2, Check, Megaphone, MessageSquareWarning, ImageIcon } from 'lucide-react'
+import { X, Upload, Crop, Loader2, Check, Megaphone, MessageSquareWarning, ImageIcon, Clapperboard } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { redimensionarImagem } from '@/lib/imagem'
 import { BannerCropper } from '@/components/admin/banner-cropper'
 import { atualizarBannerAction } from '@/app/admin/configuracoes/banners/actions'
-import type { Banner, DestinoBanner } from '@/components/admin/banners-manager'
+import { ehBannerSimulado, type Banner, type DestinoBanner } from '@/components/admin/banners-manager'
 
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f) })
@@ -22,7 +22,12 @@ function fileToDataUrl(f: File): Promise<string> {
 export function BannerEditModal({ banner, tenantId, destinos, onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; onClose: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [tipo, setTipo] = useState<Banner['tipo']>(banner.tipo)
+  // Modo da UI: "simulado" é um destaque (hero) que aponta p/ um simulado/pasta. Detecta pelo banner.
+  const [uiTipo, setUiTipo] = useState<'banner' | 'popup' | 'hero' | 'simulado'>(ehBannerSimulado(banner) ? 'simulado' : banner.tipo)
+  const tipo: Banner['tipo'] = uiTipo === 'simulado' ? 'hero' : uiTipo
+  const simulados = (destinos ?? []).filter((d) => (d.grupo ?? 'Simulados') === 'Simulados')
+  const pastasDest = (destinos ?? []).filter((d) => d.grupo === 'Pastas')
+  const destSim = [...pastasDest, ...simulados]
   const [titulo, setTitulo] = useState(banner.titulo ?? '')
   const [mensagem, setMensagem] = useState(banner.mensagem ?? '')
   const [imagem, setImagem] = useState(banner.imagem_url ?? '')
@@ -66,15 +71,33 @@ export function BannerEditModal({ banner, tenantId, destinos, onClose }: { banne
         </header>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
-          <div className="flex gap-2">
-            {(['banner', 'popup', 'hero'] as const).map((t) => (
-              <button key={t} type="button" onClick={() => setTipo(t)}
-                className={cn('flex flex-1 flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-medium transition', tipo === t ? 'border-primary bg-primary/5 text-primary' : 'hover:bg-muted')}>
-                {t === 'banner' ? <Megaphone className="h-4 w-4" /> : t === 'popup' ? <MessageSquareWarning className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
-                {t === 'banner' ? 'Banner' : t === 'popup' ? 'Pop-up' : 'Destaque'}
+          <div className="grid grid-cols-4 gap-2">
+            {([
+              { t: 'banner', label: 'Banner', Icon: Megaphone },
+              { t: 'popup', label: 'Pop-up', Icon: MessageSquareWarning },
+              { t: 'hero', label: 'Destaque', Icon: ImageIcon },
+              { t: 'simulado', label: 'Simulado', Icon: Clapperboard },
+            ] as const).map(({ t, label, Icon }) => (
+              <button key={t} type="button" onClick={() => setUiTipo(t)}
+                className={cn('flex flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-[11px] font-medium transition', uiTipo === t ? 'border-primary bg-primary/5 text-primary' : 'hover:bg-muted')}>
+                <Icon className="h-4 w-4" /> {label}
               </button>
             ))}
           </div>
+
+          {uiTipo === 'simulado' && (
+            <div className="space-y-1.5 rounded-lg bg-muted/50 px-3 py-2.5">
+              <p className="text-xs text-muted-foreground">Banner que promove um <strong>simulado</strong> (ou uma <strong>pasta de simulados</strong>) no topo da home, usando o <strong>fundo do próprio simulado/pasta</strong>. Escolha:</p>
+              <select value={destSim.some((d) => d.href === link) ? link : ''}
+                onChange={(e) => { const d = destSim.find((x) => x.href === e.target.value); setLink(e.target.value); if (d && !titulo.trim()) setTitulo(d.label) }}
+                className="h-9 w-full rounded-lg border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <option value="">Selecione um simulado ou pasta…</option>
+                {pastasDest.length > 0 && <optgroup label="Pastas (grupos de simulados)">{pastasDest.map((d) => <option key={d.href} value={d.href}>{d.label}</option>)}</optgroup>}
+                {simulados.length > 0 && <optgroup label="Simulados">{simulados.map((d) => <option key={d.href} value={d.href}>{d.label}</option>)}</optgroup>}
+              </select>
+              {destSim.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhum simulado ou pasta disponível ainda.</p>}
+            </div>
+          )}
 
           <div className="space-y-1"><label className="text-xs text-muted-foreground">Título</label><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Novo simulado disponível!" /></div>
           <div className="space-y-1"><label className="text-xs text-muted-foreground">Mensagem</label>
@@ -82,7 +105,7 @@ export function BannerEditModal({ banner, tenantId, destinos, onClose }: { banne
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : '(molde 1920×500 — largura total)'}</label>
+            <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : uiTipo === 'simulado' ? '(opcional — padrão: fundo do simulado)' : '(molde 1920×500 — largura total)'}</label>
             <div className="flex gap-2">
               <Input value={imagem.startsWith('data:') ? '' : imagem} onChange={(e) => setImagem(e.target.value)} placeholder="Cole uma URL ou envie um arquivo →" className="flex-1" />
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onArquivo(e.target.files?.[0] ?? null)} />
@@ -108,7 +131,7 @@ export function BannerEditModal({ banner, tenantId, destinos, onClose }: { banne
             {cropOpen && cropSrc && <BannerCropper src={cropSrc} onApply={(d) => { setImagem(d); setCropOpen(false) }} onCancel={() => setCropOpen(false)} />}
           </div>
 
-          <div className="space-y-1">
+          <div className={cn('space-y-1', uiTipo === 'simulado' && 'hidden')}>
             <label className="text-xs text-muted-foreground">Link ao clicar (opcional)</label>
             {destinos && destinos.length > 0 && (
               <select value={destinos.some((d) => d.href === link) ? link : ''} onChange={(e) => e.target.value && setLink(e.target.value)}
