@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertBox } from '@/components/ui/alert-box'
 import { cn } from '@/lib/utils'
-import { GraduationCap, Loader2, Wrench, Mail, IdCard, Phone, ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react'
+import { GraduationCap, Loader2, Wrench, Mail, IdCard, Phone, Lock, ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { LOGIN_DEFAULT, fundoLoginStyle, loginVars, corPrimariaLogin, corAccentLogin, type LoginConfig } from '@/lib/login-config'
 
 type Metodo = 'email' | 'email_cpf' | 'email_telefone'
@@ -20,10 +21,13 @@ export function AlunoEntrarForm({
   const [email, setEmail] = useState('')
   const [cpf, setCpf] = useState('')
   const [telefone, setTelefone] = useState('')
+  const [senha, setSenha] = useState('')
+  const [modo, setModo] = useState<'aluno' | 'admin'>('aluno')
   const [erro, setErro] = useState<string | null>(null)
   const [manutencao, setManutencao] = useState<{ titulo: string; mensagem: string } | null>(null)
   const [carregando, setCarregando] = useState(false)
 
+  const ehAdmin = modo === 'admin'
   const c = config
   const accent = corAccentLogin(c)
   const primaria = corPrimariaLogin(c)
@@ -33,6 +37,7 @@ export function AlunoEntrarForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (preview) return
+    if (ehAdmin) return entrarAdmin()
     setErro(null); setManutencao(null); setCarregando(true)
     try {
       const res = await fetch('/api/aluno/login', {
@@ -48,6 +53,20 @@ export function AlunoEntrarForm({
       router.push('/aluno'); router.refresh()
     } catch { setErro('Erro de conexão. Tente novamente.') } finally { setCarregando(false) }
   }
+
+  // Login administrativo (e-mail + senha). Após autenticar, o /login roteia: admin comum → /admin;
+  // super-admin → seletor de plataformas + console.
+  async function entrarAdmin() {
+    setErro(null); setManutencao(null); setCarregando(true)
+    try {
+      const { error } = await createClient().auth.signInWithPassword({ email, password: senha })
+      if (error) { setErro(error.message === 'Invalid login credentials' ? 'Credenciais inválidas. Verifique e-mail e senha.' : error.message); return }
+      void fetch('/api/audit/login', { method: 'POST' }).catch(() => {})
+      router.push('/login'); router.refresh()
+    } catch { setErro('Erro de conexão. Tente novamente.') } finally { setCarregando(false) }
+  }
+
+  function alternarModo() { setModo((m) => (m === 'admin' ? 'aluno' : 'admin')); setErro(null); setManutencao(null); setSenha('') }
 
   // Config de logo (override do login) com fallback ao tema.
   const effLogo = c.logoUrl ?? logo
@@ -81,6 +100,7 @@ export function AlunoEntrarForm({
   const textoMarca = c.corTextoMarca ?? '#ffffff'
   const mix = (pct: number) => `color-mix(in oklab, ${textoMarca} ${pct}%, transparent)`
   const kickerCor = c.corTextoForm ?? accent
+  const kickerTexto = ehAdmin ? (c.textoKickerAdmin || 'Área administrativa') : c.textoKicker
   const plataformaLabel = c.textoPlataforma === null ? plataforma : c.textoPlataforma
   const anim = c.animacao && !preview
   const btnCor = c.botaoCor ?? primaria
@@ -111,11 +131,17 @@ export function AlunoEntrarForm({
     return (
       <>
         <Campo icon={Mail} type="email" placeholder="Seu e-mail" value={email} onChange={setEmail} autoComplete="email" required readOnly={preview} />
-        {metodo === 'email_cpf' && <Campo icon={IdCard} type="text" placeholder="CPF" value={cpf} onChange={setCpf} inputMode="numeric" readOnly={preview} />}
-        {metodo === 'email_telefone' && <Campo icon={Phone} type="text" placeholder="Telefone" value={telefone} onChange={setTelefone} inputMode="tel" readOnly={preview} />}
+        {ehAdmin ? (
+          <Campo icon={Lock} type="password" placeholder="Senha" value={senha} onChange={setSenha} autoComplete="current-password" required readOnly={preview} />
+        ) : (
+          <>
+            {metodo === 'email_cpf' && <Campo icon={IdCard} type="text" placeholder="CPF" value={cpf} onChange={setCpf} inputMode="numeric" readOnly={preview} />}
+            {metodo === 'email_telefone' && <Campo icon={Phone} type="text" placeholder="Telefone" value={telefone} onChange={setTelefone} inputMode="tel" readOnly={preview} />}
+          </>
+        )}
         {manutencao && <AlertBox variante="aviso" icon={Wrench} titulo={manutencao.titulo}>{manutencao.mensagem}</AlertBox>}
         {erro && <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-sm text-destructive">{erro}</p>}
-        <button type="submit" disabled={carregando || (!preview && !email)}
+        <button type="submit" disabled={carregando || (!preview && (!email || (ehAdmin && !senha)))}
           className={cn('group flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all hover:opacity-95 disabled:opacity-60', c.botaoEstilo !== 'contorno' && 'shadow-sm hover:shadow-md')}
           style={btnStyle}>
           {carregando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -131,9 +157,9 @@ export function AlunoEntrarForm({
       <div className="w-full max-w-sm space-y-6">
         <div className={cn('flex flex-col gap-3', centro ? 'items-center text-center' : 'items-start text-left')}>
           {comEmblema && <Emblema />}
-          {(c.textoKicker || c.textoEntrar || plataformaLabel) && (
+          {(kickerTexto || c.textoEntrar || plataformaLabel) && (
             <div>
-              {c.textoKicker && <p className={cn('text-[11px] font-semibold uppercase tracking-[0.2em]', anim && 'lg-up')} style={{ color: kickerCor, animationDelay: '.05s' }}>{c.textoKicker}</p>}
+              {kickerTexto && <p className={cn('text-[11px] font-semibold uppercase tracking-[0.2em]', anim && 'lg-up')} style={{ color: kickerCor, animationDelay: '.05s' }}>{kickerTexto}</p>}
               {c.textoEntrar && <h1 className={cn('mt-1 text-2xl font-bold tracking-tight', anim && 'lg-up')} style={{ animationDelay: '.1s' }}>{c.textoEntrar}</h1>}
               {plataformaLabel && <p className={cn('mt-1 text-sm text-muted-foreground', anim && 'lg-up')} style={{ animationDelay: '.14s' }}>{plataformaLabel}</p>}
             </div>
@@ -250,10 +276,10 @@ export function AlunoEntrarForm({
     <>
       {tela}
       {!preview && (
-        <a href="/login" aria-label="Acesso administrativo"
+        <button type="button" onClick={alternarModo} aria-label={ehAdmin ? 'Voltar para a área do aluno' : 'Acesso administrativo'}
           className="fixed bottom-4 right-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/25 px-3 py-1.5 text-xs font-medium text-white/80 shadow-sm backdrop-blur transition-colors hover:border-white/30 hover:text-white">
-          <ShieldCheck className="h-3.5 w-3.5" /> Admin
-        </a>
+          {ehAdmin ? <><GraduationCap className="h-3.5 w-3.5" /> Área do aluno</> : <><ShieldCheck className="h-3.5 w-3.5" /> Admin</>}
+        </button>
       )}
     </>
   )

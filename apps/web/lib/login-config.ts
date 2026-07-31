@@ -31,6 +31,7 @@ export type LoginConfig = {
   titulo: string              // headline do painel da marca
   subtitulo: string           // texto de apoio
   textoKicker: string         // rótulo pequeno do formulário (ex.: "Área do aluno"); vazio = oculto
+  textoKickerAdmin: string    // rótulo quando o botão Admin é acionado (ex.: "Área administrativa")
   textoEntrar: string         // título do formulário (ex.: "Entrar"); vazio = oculto
   textoPlataforma: string | null // nome exibido no formulário; null = usa o nome da plataforma; '' = oculto
   textoBotao: string          // rótulo do botão (ex.: "Entrar")
@@ -62,6 +63,7 @@ export const LOGIN_DEFAULT: LoginConfig = {
   titulo: 'Sua preparação começa aqui.',
   subtitulo: 'Entre com o seu e-mail e continue de onde parou — sem senha, sem atrito.',
   textoKicker: 'Área do aluno',
+  textoKickerAdmin: 'Área administrativa',
   textoEntrar: 'Entrar',
   textoPlataforma: null,
   textoBotao: 'Entrar',
@@ -105,6 +107,7 @@ export function resolverLoginConfig(raw: unknown): LoginConfig {
     titulo: typeof c.titulo === 'string' ? c.titulo : LOGIN_DEFAULT.titulo,
     subtitulo: typeof c.subtitulo === 'string' ? c.subtitulo : LOGIN_DEFAULT.subtitulo,
     textoKicker: typeof c.textoKicker === 'string' ? c.textoKicker : LOGIN_DEFAULT.textoKicker,
+    textoKickerAdmin: typeof c.textoKickerAdmin === 'string' ? c.textoKickerAdmin : LOGIN_DEFAULT.textoKickerAdmin,
     textoEntrar: typeof c.textoEntrar === 'string' ? c.textoEntrar : LOGIN_DEFAULT.textoEntrar,
     textoPlataforma: typeof c.textoPlataforma === 'string' ? c.textoPlataforma : null,
     textoBotao: typeof c.textoBotao === 'string' && c.textoBotao.trim() ? c.textoBotao : LOGIN_DEFAULT.textoBotao,

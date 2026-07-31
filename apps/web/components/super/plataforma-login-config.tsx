@@ -191,9 +191,11 @@ export function PlataformaLoginConfig({
 
           <div className="space-y-1.5 border-t pt-2">
             <label className="text-xs text-muted-foreground">Textos do formulário <span className="text-muted-foreground/70">(vazio = oculto)</span></label>
-            <div className="flex gap-2"><Input value={c.textoKicker} onChange={(e) => set('textoKicker', e.target.value)} placeholder="Rótulo — ex.: Área do aluno" className="flex-1" /><SwatchInline valor={c.corTextoForm} fallback={corAccent} onChange={(v) => set('corTextoForm', v)} title="Cor do rótulo “Área do aluno”" /></div>
+            <div className="flex gap-2"><Input value={c.textoKicker} onChange={(e) => set('textoKicker', e.target.value)} placeholder="Rótulo (aluno) — ex.: Área do aluno" className="flex-1" /><SwatchInline valor={c.corTextoForm} fallback={corAccent} onChange={(v) => set('corTextoForm', v)} title="Cor do rótulo “Área do aluno”" /></div>
+            <Input value={c.textoKickerAdmin} onChange={(e) => set('textoKickerAdmin', e.target.value)} placeholder="Rótulo (admin) — ex.: Área administrativa" />
             <Input value={c.textoEntrar} onChange={(e) => set('textoEntrar', e.target.value)} placeholder="Título — ex.: Entrar" />
             <Input value={c.textoPlataforma === null ? plataforma : c.textoPlataforma} onChange={(e) => set('textoPlataforma', e.target.value)} placeholder="Nome exibido — ex.: Revisão" />
+            <p className="text-[11px] text-muted-foreground">O rótulo <strong>admin</strong> e o campo de <strong>senha</strong> aparecem quando o aluno clica em “Admin” no canto da tela.</p>
           </div>
 
           <div className="space-y-1.5 border-t pt-2">
