@@ -30,20 +30,22 @@ export function SemAcessoModal({
     { icon: GraduationCap, titulo: 'Comece a praticar', desc: 'Volte aqui e os simulados estarão disponíveis para fazer.' },
   ]
 
-  const bg = capa
-    ? { backgroundImage: `url(${capa})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : { background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 55%, #0b0716))` }
+  // Fundo da marca (linkado ao --primary via `cor`); a capa aparece INTEIRA (contain, sem cortar).
+  const bg: React.CSSProperties = {
+    backgroundColor: `color-mix(in oklab, ${cor} 55%, #0b0716)`,
+    ...(capa ? { backgroundImage: `url(${capa})`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' } : { backgroundImage: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 55%, #0b0716))` }),
+  }
 
   return createPortal(
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl border bg-card shadow-2xl animate-in zoom-in-95 duration-200">
-        {/* Topo: capa/logo do conteúdo */}
-        <div className="relative flex h-32 items-end overflow-hidden p-4 text-white" style={bg}>
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(10,7,20,.85), rgba(10,7,20,.25))' }} />
-          <span className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 backdrop-blur"><Lock className="h-4.5 w-4.5" /></span>
+      <div className="w-full max-w-md overflow-hidden rounded-2xl border-2 border-primary/60 bg-card shadow-2xl animate-in zoom-in-95 duration-200">
+        {/* Topo: capa/logo do conteúdo (inteira) + borda roxa da marca. */}
+        <div className="relative flex h-40 items-end overflow-hidden border-b-2 border-primary/60 p-4 text-white" style={bg}>
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(10,7,20,.8) 8%, rgba(10,7,20,.15) 70%)' }} />
+          <span className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25 backdrop-blur"><Lock className="h-4.5 w-4.5" /></span>
           <div className="relative">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">Conteúdo exclusivo</p>
-            <h2 className="line-clamp-1 text-xl font-extrabold leading-tight drop-shadow">{pastaNome || 'Simulados premium'}</h2>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/75">Conteúdo exclusivo</p>
+            <h2 className="line-clamp-2 text-lg font-extrabold leading-tight drop-shadow sm:text-xl">{pastaNome || 'Simulados premium'}</h2>
           </div>
         </div>
 
@@ -81,11 +83,13 @@ export function SemAcessoModal({
 
           <div className="flex flex-col gap-2 pt-1 sm:flex-row-reverse">
             {suporteLink && (
-              <a href={suporteLink} target="_blank" rel="noreferrer" className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
-                Quero liberar o acesso <ArrowRight className="h-4 w-4" />
+              <a href={suporteLink} target="_blank" rel="noreferrer"
+                className="group inline-flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-primary bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg hover:brightness-110">
+                Quero liberar o acesso <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </a>
             )}
-            <Link href="/aluno" className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-muted">
+            <Link href="/aluno"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-primary/40 bg-primary/5 py-2.5 text-sm font-semibold text-primary transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-primary/10 hover:shadow-md">
               Ir para o início
             </Link>
           </div>
