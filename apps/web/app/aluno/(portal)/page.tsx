@@ -9,6 +9,7 @@ import { montarItensSimulado } from '@/lib/aluno/simulado-item'
 import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
 import { CardSimulado } from '@/components/aluno/card-simulado'
 import { HeroCarrossel } from '@/components/aluno/hero-carrossel'
+import { BannersPortal } from '@/components/aluno/banners-portal'
 import { FileiraHorizontal } from '@/components/fileira-horizontal'
 import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
 
@@ -27,10 +28,11 @@ export default async function AlunoHome() {
     // Sessões dela (independem do acesso ATUAL): garantem que simulados JÁ FEITOS contem
     // e não sumam se a matrícula/acesso mudou depois de concluir (histórico não some).
     svc.from('simulado_sessoes_prova').select('simulado_id, status, nota').eq('estudante_id', estId).eq('is_teste', false).eq('deletado', false),
-    // Banners de DESTAQUE (carrossel do topo), configurados no console.
-    svc.from('simulado_banners').select('id, imagem_url, link, titulo, mensagem').eq('tenant_id', sessao!.tenantId).eq('tipo', 'hero').eq('ativo', true).order('ordem', { ascending: true }).order('criado_em', { ascending: true }),
+    // Banners do tenant (só aparecem na HOME): destaque/carrossel + pop-up. Configurados no console.
+    svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor').eq('tenant_id', sessao!.tenantId).eq('ativo', true).order('ordem', { ascending: true }).order('criado_em', { ascending: true }),
   ])
-  const hero = (heroBanners ?? []) as any[]
+  const todosBanners = (heroBanners ?? []) as any[]
+  const hero = todosBanners.filter((b) => b.tipo === 'hero')
 
   const ids = [...new Set([
     ...(mats ?? []).filter((m: any) => m.liberado !== false).map((m: any) => m.simulado_id),
@@ -92,7 +94,10 @@ export default async function AlunoHome() {
 
   return (
     <div className="animate-page space-y-5">
-      {/* Banner de DESTAQUE — FULL-BLEED: ocupa toda a largura e cola no topo (fora do padding). */}
+      {/* Banners do tenant (carrossel/pop-up) — SÓ na Início. */}
+      <BannersPortal banners={todosBanners} />
+
+      {/* Banner de DESTAQUE (tipo 'hero') — FULL-BLEED: ocupa toda a largura e cola no topo. */}
       {hero.length > 0 && (
         <div className="-mx-6 -mt-6">
           <HeroCarrossel banners={hero} />

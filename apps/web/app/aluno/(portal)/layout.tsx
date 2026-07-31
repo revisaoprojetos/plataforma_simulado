@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getTenantTheme } from '@/lib/tenant-theme'
-import { BannersPortal, type BannerPortal } from '@/components/aluno/banners-portal'
 import { normalizarManutencao, emManutencaoAgora } from '@/lib/sistema/manutencao'
 import { Suspense } from 'react'
 import { SidebarProvider } from '@/components/ui/sidebar'
@@ -18,14 +17,6 @@ export default async function AlunoPortalLayout({ children }: { children: React.
 
   const { css, tema, tenantNome } = await getTenantTheme()
   const t = (tema ?? {}) as any
-
-  // Banners/pop-ups ativos do tenant (tolerante se a tabela não migrou).
-  let banners: BannerPortal[] = []
-  try {
-    const svc = await createServiceClient()
-    const { data } = await svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor').eq('tenant_id', sessao.tenantId).eq('ativo', true).order('ordem', { ascending: true })
-    banners = (data ?? []) as BannerPortal[]
-  } catch { /* sem banners */ }
 
   // Contagens leves para os números da sidebar (tolerante a falhas). "Meus Simulados" =
   // simulados distintos já finalizados; "Favoritos" = questões favoritadas.
@@ -63,7 +54,6 @@ export default async function AlunoPortalLayout({ children }: { children: React.
             <SidebarEdgeToggle />
             <Suspense fallback={null}><NavProgress /></Suspense>
             <main className="flex-1 overflow-y-auto p-6">
-              <BannersPortal banners={banners} />
               {children}
             </main>
           </div>
