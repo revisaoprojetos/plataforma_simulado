@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenant } from '@/lib/tenant'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { AlunoEntrarForm } from '@/components/aluno/aluno-entrar-form'
+import { resolverLoginConfig } from '@/lib/login-config'
 
 export default async function AlunoEntrarPage() {
   // Já logado → vai pro portal.
@@ -29,6 +30,7 @@ export default async function AlunoEntrarPage() {
       subtitulo={tema.subtitulo_site ?? null}
       logoBg={tema.logo_png_bg ?? '#ffffff'}
       logoEstilo={tema.logo_estilo ?? 'arredondado'}
+      config={resolverLoginConfig(tema.login)}
     />
   )
 }

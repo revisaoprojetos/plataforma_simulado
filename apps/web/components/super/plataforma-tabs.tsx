@@ -1,12 +1,14 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Settings2, ShieldCheck, Palette, Megaphone, Code2 } from 'lucide-react'
+import { Settings2, ShieldCheck, Palette, Megaphone, Code2, LogIn } from 'lucide-react'
 import { PlataformaGerenciar } from '@/components/super/plataforma-gerenciar'
 import { PlataformaAcessos } from '@/components/super/plataforma-acessos'
 import { PlataformaEmbed } from '@/components/super/plataforma-embed'
+import { PlataformaLoginConfig } from '@/components/super/plataforma-login-config'
 import { ConfiguracoesTabs } from '@/app/admin/configuracoes/configuracoes-tabs'
 import { BannersManager, type Banner, type DestinoBanner } from '@/components/admin/banners-manager'
+import { resolverLoginConfig } from '@/lib/login-config'
 import type { AdminMembro, CargoOpcao } from '@/app/admin/administradores/actions'
 import type { EmbedConfigInput } from '@/app/admin/tenants/actions'
 
@@ -38,6 +40,7 @@ export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTem
       <TabsList>
         <TabsTrigger value="geral"><Settings2 className="mr-1.5 h-4 w-4" /> Geral</TabsTrigger>
         <TabsTrigger value="aparencia"><Palette className="mr-1.5 h-4 w-4" /> Aparência</TabsTrigger>
+        <TabsTrigger value="login"><LogIn className="mr-1.5 h-4 w-4" /> Login</TabsTrigger>
         <TabsTrigger value="avisos"><Megaphone className="mr-1.5 h-4 w-4" /> Avisos</TabsTrigger>
         <TabsTrigger value="embed"><Code2 className="mr-1.5 h-4 w-4" /> Embed</TabsTrigger>
         <TabsTrigger value="acessos"><ShieldCheck className="mr-1.5 h-4 w-4" /> Acessos (RBAC)</TabsTrigger>
@@ -49,6 +52,19 @@ export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTem
 
       <TabsContent value="aparencia">
         <ConfiguracoesTabs tema={temaCompleto} salvarTema={salvarTema} />
+      </TabsContent>
+
+      <TabsContent value="login">
+        <PlataformaLoginConfig
+          tenantId={geral.id}
+          config={resolverLoginConfig((temaCompleto as any)?.login)}
+          corPrimaria={(temaCompleto as any)?.cor_primaria ?? '#6d28d9'}
+          corAccent={(temaCompleto as any)?.cor_accent ?? '#f5c542'}
+          logo={(temaCompleto as any)?.logo_url ?? null}
+          plataforma={geral.nome}
+          dominio={geral.dominio}
+          slug={geral.slug}
+        />
       </TabsContent>
 
       <TabsContent value="avisos">
