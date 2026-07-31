@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Save, Loader2, Eye, EyeOff, ShieldCheck, Crown, Check, ExternalLink, Trash2, Users, GraduationCap, ClipboardList } from 'lucide-react'
+import { Save, Loader2, Eye, EyeOff, ShieldCheck, Crown, Check, ExternalLink, Trash2, Users, GraduationCap, ClipboardList, Copy, Link2 } from 'lucide-react'
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
 import { updateTenantAction, setTenantVisibilidadeAction, deleteTenantAction, type VisibilidadeModo } from '@/app/admin/tenants/actions'
 
@@ -35,6 +35,16 @@ export function PlataformaGerenciar(p: Props) {
   const [plano, setPlano] = useState(p.plano || 'basico')
   const [pending, start] = useTransition()
   const [op, setOp] = useState<'salvar' | 'vis' | 'excluir' | null>(null)
+
+  // URLs de acesso desta plataforma (baseadas no domínio próprio OU no subdomínio do slug SALVO).
+  const [origem, setOrigem] = useState('')
+  useEffect(() => {
+    const { protocol, host } = window.location
+    if (p.dominio) setOrigem(`${protocol}//${p.dominio}`)
+    else { const partes = host.split('.'); const base = partes.length > 1 ? partes.slice(1).join('.') : host; setOrigem(`${protocol}//${p.slug}.${base}`) }
+  }, [p.dominio, p.slug])
+  const urlAluno = origem ? `${origem}/aluno/entrar` : ''
+  const urlAdmin = origem ? `${origem}/login` : ''
 
   const sujo = nome.trim() !== p.nome || slug !== p.slug || plano !== (p.plano || 'basico') || dominio.trim() !== (p.dominio ?? '')
   const vazia = p.estudantes === 0 && p.simulados === 0
@@ -82,6 +92,21 @@ export function PlataformaGerenciar(p: Props) {
       else toast.error(r.error ?? 'Erro ao excluir')
       setOp(null)
     })
+  }
+
+  function LinkRow({ icon: Icon, rotulo, url }: { icon: React.ComponentType<{ className?: string }>; rotulo: string; url: string }) {
+    async function copiar() { try { await navigator.clipboard.writeText(url); toast.success(`Link de ${rotulo.toLowerCase()} copiado!`) } catch { toast.error('Não foi possível copiar.') } }
+    return (
+      <div className="flex items-center gap-2">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"><Icon className="h-4 w-4" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-medium text-muted-foreground">{rotulo}</p>
+          <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} className="w-full truncate bg-transparent text-sm font-medium outline-none" />
+        </div>
+        <button type="button" onClick={copiar} title="Copiar" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted hover:text-foreground"><Copy className="h-4 w-4" /></button>
+        <a href={url || '#'} target="_blank" rel="noreferrer" title="Abrir" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted hover:text-foreground"><ExternalLink className="h-4 w-4" /></a>
+      </div>
+    )
   }
 
   const kpis = [
@@ -136,6 +161,21 @@ export function PlataformaGerenciar(p: Props) {
           <Button onClick={salvar} disabled={!sujo || pending}>
             {pending && op === 'salvar' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Salvar alterações
           </Button>
+        </div>
+      </div>
+
+      {/* Links de acesso (copiáveis) */}
+      <div className="rounded-2xl border bg-card p-4 shadow-sm">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><Link2 className="h-4 w-4" /></span>
+          <div>
+            <h2 className="text-sm font-semibold">Links de acesso</h2>
+            <p className="text-xs text-muted-foreground">Endereços de login exclusivos desta plataforma — copie e compartilhe.</p>
+          </div>
+        </div>
+        <div className="space-y-2.5">
+          <LinkRow icon={GraduationCap} rotulo="Alunos" url={urlAluno} />
+          <LinkRow icon={ShieldCheck} rotulo="Administradores" url={urlAdmin} />
         </div>
       </div>
 
