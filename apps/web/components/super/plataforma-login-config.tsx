@@ -111,10 +111,11 @@ export function PlataformaLoginConfig({
 
         <Bloco titulo="Cores">
           <p className="text-[11px] text-muted-foreground">Fundo é definido em “Fundo &amp; card”. Aqui só as cores de elementos e texto.</p>
-          <div className="grid grid-cols-3 gap-3">
-            <ColorField rotulo="Primária" valor={c.corPrimaria} fallback={corPrimaria} onChange={(v) => set('corPrimaria', v)} />
+          <div className="grid grid-cols-2 gap-3">
+            <ColorField rotulo="Primária (botões)" valor={c.corPrimaria} fallback={corPrimaria} onChange={(v) => set('corPrimaria', v)} />
             <ColorField rotulo="Destaque" valor={c.corAccent} fallback={corAccent} onChange={(v) => set('corAccent', v)} />
-            <ColorField rotulo="Texto marca" valor={c.corTextoMarca} fallback="#ffffff" rotuloReset="Branco" onChange={(v) => set('corTextoMarca', v)} />
+            <ColorField rotulo="Texto da marca" valor={c.corTextoMarca} fallback="#ffffff" rotuloReset="Branco" onChange={(v) => set('corTextoMarca', v)} />
+            <ColorField rotulo="Texto “Área do aluno”" valor={c.corTextoForm} fallback={corAccent} rotuloReset="Destaque" onChange={(v) => set('corTextoForm', v)} />
           </div>
         </Bloco>
 
@@ -132,7 +133,12 @@ export function PlataformaLoginConfig({
                 {c.logoUrl && <button type="button" onClick={() => set('logoUrl', null)} title="Usar logo do tema" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>}
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><label className="text-xs text-muted-foreground">Fundo do logo</label><input type="color" value={c.logoBg ?? logoBg} onChange={(e) => set('logoBg', e.target.value)} className="h-8 w-full cursor-pointer rounded border bg-transparent p-0.5" /></div>
+                <div className="space-y-1"><label className="text-xs text-muted-foreground">Fundo do logo</label>
+                  <div className="flex items-center gap-1.5">
+                    <input type="color" disabled={c.logoBg === 'transparent'} value={c.logoBg && c.logoBg !== 'transparent' ? c.logoBg : logoBg} onChange={(e) => set('logoBg', e.target.value)} className="h-8 w-9 shrink-0 cursor-pointer rounded border bg-transparent p-0.5 disabled:opacity-40" />
+                    <button type="button" onClick={() => set('logoBg', c.logoBg === 'transparent' ? null : 'transparent')} className={cn('flex-1 rounded-lg border py-1.5 text-[11px] font-medium transition', c.logoBg === 'transparent' ? on : off)}>Transparente</button>
+                  </div>
+                </div>
                 <div className="space-y-1"><label className="text-xs text-muted-foreground">Tamanho</label>
                   <div className="flex gap-1">{(['p', 'm', 'g'] as LogoTam[]).map((t) => <button key={t} type="button" onClick={() => set('logoTamanho', t)} className={cn('flex-1 rounded-lg border py-1.5 text-xs font-medium uppercase transition', c.logoTamanho === t ? on : off)}>{t}</button>)}</div>
                 </div>
@@ -185,7 +191,14 @@ export function PlataformaLoginConfig({
             </div>
           ) : <button type="button" onClick={() => set('subtitulo', LOGIN_DEFAULT.subtitulo)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted"><Plus className="h-3.5 w-3.5" /> Adicionar subtítulo</button>}
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 border-t pt-2">
+            <label className="text-xs text-muted-foreground">Textos do formulário <span className="text-muted-foreground/70">(vazio = oculto)</span></label>
+            <Input value={c.textoKicker} onChange={(e) => set('textoKicker', e.target.value)} placeholder="Rótulo — ex.: Área do aluno" />
+            <Input value={c.textoEntrar} onChange={(e) => set('textoEntrar', e.target.value)} placeholder="Título — ex.: Entrar" />
+            <Input value={c.textoPlataforma === null ? plataforma : c.textoPlataforma} onChange={(e) => set('textoPlataforma', e.target.value)} placeholder="Nome exibido — ex.: Revisão" />
+          </div>
+
+          <div className="space-y-1.5 border-t pt-2">
             <label className="text-xs text-muted-foreground">Destaques (bullets)</label>
             {c.destaques.map((d, i) => (
               <div key={i} className="flex gap-2">

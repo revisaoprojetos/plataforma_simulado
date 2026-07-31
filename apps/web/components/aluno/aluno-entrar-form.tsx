@@ -4,12 +4,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertBox } from '@/components/ui/alert-box'
 import { cn } from '@/lib/utils'
-import { GraduationCap, Loader2, Wrench, Mail, IdCard, Phone, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { GraduationCap, Loader2, Wrench, Mail, IdCard, Phone, ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react'
 import { LOGIN_DEFAULT, fundoLoginStyle, loginVars, corPrimariaLogin, corAccentLogin, type LoginConfig } from '@/lib/login-config'
 
 type Metodo = 'email' | 'email_cpf' | 'email_telefone'
 
-const KF = `@keyframes lgDriftA{0%,100%{transform:translate(0,0) scale(1);opacity:.7}50%{transform:translate(8%,-6%) scale(1.12);opacity:1}}@keyframes lgDriftB{0%,100%{transform:translate(0,0) scale(1.08);opacity:.7}50%{transform:translate(-8%,6%) scale(1);opacity:1}}.lg-aurora{animation:lgDriftA 18s ease-in-out infinite}.lg-aurora2{animation:lgDriftB 22s ease-in-out infinite}@media (prefers-reduced-motion:reduce){.lg-aurora,.lg-aurora2{animation:none}}`
+const KF = `@keyframes lgDriftA{0%,100%{transform:translate(0,0) scale(1);opacity:.7}50%{transform:translate(8%,-6%) scale(1.12);opacity:1}}@keyframes lgDriftB{0%,100%{transform:translate(0,0) scale(1.08);opacity:.7}50%{transform:translate(-8%,6%) scale(1);opacity:1}}@keyframes lgUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}.lg-aurora{animation:lgDriftA 18s ease-in-out infinite}.lg-aurora2{animation:lgDriftB 22s ease-in-out infinite}.lg-up{animation:lgUp .55s cubic-bezier(.2,.7,.2,1) both}@media (prefers-reduced-motion:reduce){.lg-aurora,.lg-aurora2,.lg-up{animation:none}}`
 
 export function AlunoEntrarForm({
   metodo, plataforma, logo = null, subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', config = LOGIN_DEFAULT, preview = false,
@@ -58,12 +58,14 @@ export function AlunoEntrarForm({
   const filtroCss = effFiltro === 'branco' ? 'brightness(0) invert(1)' : effFiltro === 'preto' ? 'brightness(0)' : undefined
   const SZ: Record<string, [string, string]> = { p: ['h-11 w-11', 'h-6 w-6'], m: ['h-14 w-14', 'h-7 w-7'], g: ['h-20 w-20', 'h-10 w-10'] }
   const bump: Record<string, 'p' | 'm' | 'g'> = { p: 'm', m: 'g', g: 'g' }
+  const logoTransp = effBg === 'transparent'
   function Emblema({ tam }: { tam?: 'lg' }) {
     if (!c.mostrarLogo) return null
     const key = tam === 'lg' ? bump[c.logoTamanho] : c.logoTamanho
     const [box, ic] = SZ[key]
     return (
-      <div className={cn('flex shrink-0 items-center justify-center overflow-hidden shadow-sm', box, molde, !effLogo && 'bg-primary text-primary-foreground')} style={effLogo ? { background: effBg ?? '#ffffff' } : undefined}>
+      <div className={cn('flex shrink-0 items-center justify-center overflow-hidden', box, molde, logoTransp ? 'shadow-none' : 'shadow-sm', !effLogo && 'bg-primary text-primary-foreground')}
+        style={effLogo ? { background: logoTransp ? 'transparent' : (effBg ?? '#ffffff') } : undefined}>
         {effLogo ? <img src={effLogo} alt={plataforma} className="h-full w-full object-contain" style={{ filter: filtroCss }} /> : <GraduationCap className={ic} />}
       </div>
     )
@@ -78,15 +80,18 @@ export function AlunoEntrarForm({
 
   const textoMarca = c.corTextoMarca ?? '#ffffff'
   const mix = (pct: number) => `color-mix(in oklab, ${textoMarca} ${pct}%, transparent)`
+  const kickerCor = c.corTextoForm ?? accent
+  const plataformaLabel = c.textoPlataforma === null ? plataforma : c.textoPlataforma
+  const anim = c.animacao && !preview
   function MarcaTexto() {
     return (
       <div className="relative max-w-md space-y-5">
-        {c.titulo && <h2 className="whitespace-pre-line text-[2.3rem] font-extrabold leading-[1.06] tracking-tight" style={{ color: textoMarca }}>{c.titulo}</h2>}
-        {c.subtitulo && <p style={{ color: mix(72) }}>{c.subtitulo}</p>}
+        {c.titulo && <h2 className={cn('whitespace-pre-line text-[2.3rem] font-extrabold leading-[1.06] tracking-tight', anim && 'lg-up')} style={{ color: textoMarca, animationDelay: '.05s' }}>{c.titulo}</h2>}
+        {c.subtitulo && <p className={cn(anim && 'lg-up')} style={{ color: mix(72), animationDelay: '.12s' }}>{c.subtitulo}</p>}
         {c.destaques.length > 0 && (
           <ul className="space-y-2.5 pt-1">
             {c.destaques.map((d, i) => (
-              <li key={i} className="flex items-center gap-2.5 text-sm" style={{ color: mix(85) }}>
+              <li key={i} className={cn('flex items-center gap-2.5 text-sm', anim && 'lg-up')} style={{ color: mix(85), animationDelay: `${0.18 + i * 0.06}s` }}>
                 <CheckCircle2 className="h-4.5 w-4.5 shrink-0" style={{ color: accent }} /> {d}
               </li>
             ))}
@@ -119,11 +124,13 @@ export function AlunoEntrarForm({
       <div className="w-full max-w-sm space-y-6">
         <div className={cn('flex flex-col gap-3', centro ? 'items-center text-center' : 'items-start text-left')}>
           {comEmblema && <Emblema />}
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: accent }}>Área do aluno</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight">Entrar</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{plataforma}</p>
-          </div>
+          {(c.textoKicker || c.textoEntrar || plataformaLabel) && (
+            <div>
+              {c.textoKicker && <p className={cn('text-[11px] font-semibold uppercase tracking-[0.2em]', anim && 'lg-up')} style={{ color: kickerCor, animationDelay: '.05s' }}>{c.textoKicker}</p>}
+              {c.textoEntrar && <h1 className={cn('mt-1 text-2xl font-bold tracking-tight', anim && 'lg-up')} style={{ animationDelay: '.1s' }}>{c.textoEntrar}</h1>}
+              {plataformaLabel && <p className={cn('mt-1 text-sm text-muted-foreground', anim && 'lg-up')} style={{ animationDelay: '.14s' }}>{plataformaLabel}</p>}
+            </div>
+          )}
         </div>
         <form onSubmit={submit} className="space-y-3.5">
           <Campos />
@@ -138,6 +145,8 @@ export function AlunoEntrarForm({
     : 'rounded-2xl border bg-card p-7 shadow-xl'
 
   const style = { ...rootVars } as React.CSSProperties
+
+  let tela: React.ReactNode
 
   // ---------------- TEMPLATE: SPLIT ----------------
   if (c.template === 'split' && c.mostrarMarca) {
@@ -154,7 +163,7 @@ export function AlunoEntrarForm({
       </aside>
     )
     const form = <main className={cn('relative flex items-center justify-center bg-background p-6', screen)}>{FormBloco({})}</main>
-    return (
+    tela = (
       <div className={cn('lg:grid lg:grid-cols-[1.05fr_1fr]', screen)} style={style}>
         <style>{KF}</style>
         {c.painelLado === 'direita' ? <>{form}{marca}</> : <>{marca}{form}</>}
@@ -163,8 +172,8 @@ export function AlunoEntrarForm({
   }
 
   // ---------------- TEMPLATE: HERO (imagem/gradiente cheio + card) ----------------
-  if (c.template === 'hero') {
-    return (
+  else if (c.template === 'hero') {
+    tela = (
       <div className={cn('relative flex items-center justify-center overflow-hidden p-6 text-white', screen)} style={{ ...style, ...fundoLoginStyle(c) }}>
         <style>{KF}</style>{Blobs}
         <div className="absolute inset-0 bg-black/45" />
@@ -177,8 +186,8 @@ export function AlunoEntrarForm({
   }
 
   // ---------------- TEMPLATE: VITRINE (faixa da marca no topo + card) ----------------
-  if (c.template === 'vitrine') {
-    return (
+  else if (c.template === 'vitrine') {
+    tela = (
       <div className={cn('relative flex flex-col bg-background', screen)} style={style}>
         <style>{KF}</style>
         {c.mostrarMarca && (
@@ -197,8 +206,8 @@ export function AlunoEntrarForm({
   }
 
   // ---------------- TEMPLATE: CARTÃO (card único sobre gradiente) ----------------
-  if (c.template === 'cartao') {
-    return (
+  else if (c.template === 'cartao') {
+    tela = (
       <div className={cn('relative flex items-center justify-center overflow-hidden p-6', screen)} style={{ ...style, ...fundoLoginStyle(c) }}>
         <style>{KF}</style>{Blobs}
         {c.fundo === 'imagem' && <div className="absolute inset-0 bg-black/40" />}
@@ -207,8 +216,8 @@ export function AlunoEntrarForm({
             <Emblema tam="lg" />
             {(c.titulo || c.subtitulo) && (
               <div>
-                {c.titulo && <h2 className="text-xl font-extrabold tracking-tight">{c.titulo}</h2>}
-                {c.subtitulo && <p className="mt-1 text-sm text-muted-foreground">{c.subtitulo}</p>}
+                {c.titulo && <h2 className={cn('text-xl font-extrabold tracking-tight', anim && 'lg-up')} style={{ animationDelay: '.06s' }}>{c.titulo}</h2>}
+                {c.subtitulo && <p className={cn('mt-1 text-sm text-muted-foreground', anim && 'lg-up')} style={{ animationDelay: '.12s' }}>{c.subtitulo}</p>}
               </div>
             )}
           </div>
@@ -220,12 +229,26 @@ export function AlunoEntrarForm({
   }
 
   // ---------------- TEMPLATE: CENTRAL (card central sobre gradiente + aurora) ----------------
+  else {
+    tela = (
+      <div className={cn('relative flex items-center justify-center overflow-hidden p-6', screen)} style={{ ...style, ...fundoLoginStyle(c) }}>
+        <style>{KF}</style>{Blobs}
+        {c.fundo === 'imagem' && <div className="absolute inset-0 bg-black/40" />}
+        <div className={cn('relative w-full max-w-sm text-foreground', cardCls)}>{FormBloco({ centro: true })}</div>
+      </div>
+    )
+  }
+
   return (
-    <div className={cn('relative flex items-center justify-center overflow-hidden p-6', screen)} style={{ ...style, ...fundoLoginStyle(c) }}>
-      <style>{KF}</style>{Blobs}
-      {c.fundo === 'imagem' && <div className="absolute inset-0 bg-black/40" />}
-      <div className={cn('relative w-full max-w-sm text-foreground', cardCls)}>{FormBloco({ centro: true })}</div>
-    </div>
+    <>
+      {tela}
+      {!preview && (
+        <a href="/login" aria-label="Acesso administrativo"
+          className="fixed bottom-4 right-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/25 px-3 py-1.5 text-xs font-medium text-white/80 shadow-sm backdrop-blur transition-colors hover:border-white/30 hover:text-white">
+          <ShieldCheck className="h-3.5 w-3.5" /> Admin
+        </a>
+      )}
+    </>
   )
 }
 

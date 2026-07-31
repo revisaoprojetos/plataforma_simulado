@@ -18,6 +18,7 @@ export type LoginConfig = {
   corPrimaria: string | null  // OVERRIDE da cor primária do login (botões/acento); null = usa o tema
   corAccent: string | null    // OVERRIDE da cor de destaque (kicker/checks); null = usa o tema
   corTextoMarca: string | null // cor do TEXTO do painel da marca (separada do fundo); null = branco
+  corTextoForm: string | null  // cor do rótulo "Área do aluno" (lado do formulário); null = usa o destaque
   cardEstilo: CardEstilo      // card do formulário: sólido | vidro (glass)
   // Logo (todas overrides; null = herda do tema)
   mostrarLogo: boolean        // exibe o logo/emblema
@@ -28,6 +29,9 @@ export type LoginConfig = {
   logoTamanho: LogoTam        // tamanho do logo
   titulo: string              // headline do painel da marca
   subtitulo: string           // texto de apoio
+  textoKicker: string         // rótulo pequeno do formulário (ex.: "Área do aluno"); vazio = oculto
+  textoEntrar: string         // título do formulário (ex.: "Entrar"); vazio = oculto
+  textoPlataforma: string | null // nome exibido no formulário; null = usa o nome da plataforma; '' = oculto
   destaques: string[]         // bullets do painel da marca
   mostrarMarca: boolean       // exibe o painel/cabeçalho da marca
   animacao: boolean           // véus/aurora animados no fundo
@@ -42,6 +46,7 @@ export const LOGIN_DEFAULT: LoginConfig = {
   corPrimaria: null,
   corAccent: null,
   corTextoMarca: null,
+  corTextoForm: null,
   cardEstilo: 'vidro',
   mostrarLogo: true,
   logoUrl: null,
@@ -51,6 +56,9 @@ export const LOGIN_DEFAULT: LoginConfig = {
   logoTamanho: 'm',
   titulo: 'Sua preparação começa aqui.',
   subtitulo: 'Entre com o seu e-mail e continue de onde parou — sem senha, sem atrito.',
+  textoKicker: 'Área do aluno',
+  textoEntrar: 'Entrar',
+  textoPlataforma: null,
   destaques: ['Simulados no padrão da banca', 'Correção automática e gabarito', 'Seu desempenho e evolução num só lugar'],
   mostrarMarca: true,
   animacao: true,
@@ -76,6 +84,7 @@ export function resolverLoginConfig(raw: unknown): LoginConfig {
     corPrimaria: typeof c.corPrimaria === 'string' && c.corPrimaria ? c.corPrimaria : null,
     corAccent: typeof c.corAccent === 'string' && c.corAccent ? c.corAccent : null,
     corTextoMarca: typeof c.corTextoMarca === 'string' && c.corTextoMarca ? c.corTextoMarca : null,
+    corTextoForm: typeof c.corTextoForm === 'string' && c.corTextoForm ? c.corTextoForm : null,
     cardEstilo: c.cardEstilo === 'solido' ? 'solido' : 'vidro',
     mostrarLogo: c.mostrarLogo !== false,
     logoUrl: typeof c.logoUrl === 'string' && c.logoUrl ? c.logoUrl : null,
@@ -86,6 +95,9 @@ export function resolverLoginConfig(raw: unknown): LoginConfig {
     // título/subtítulo: string vazia = removido (oculto); undefined = usa o default.
     titulo: typeof c.titulo === 'string' ? c.titulo : LOGIN_DEFAULT.titulo,
     subtitulo: typeof c.subtitulo === 'string' ? c.subtitulo : LOGIN_DEFAULT.subtitulo,
+    textoKicker: typeof c.textoKicker === 'string' ? c.textoKicker : LOGIN_DEFAULT.textoKicker,
+    textoEntrar: typeof c.textoEntrar === 'string' ? c.textoEntrar : LOGIN_DEFAULT.textoEntrar,
+    textoPlataforma: typeof c.textoPlataforma === 'string' ? c.textoPlataforma : null,
     destaques: Array.isArray(c.destaques) ? c.destaques.filter((x): x is string => typeof x === 'string').slice(0, 5) : LOGIN_DEFAULT.destaques,
     mostrarMarca: c.mostrarMarca !== false,
     animacao: c.animacao !== false,
