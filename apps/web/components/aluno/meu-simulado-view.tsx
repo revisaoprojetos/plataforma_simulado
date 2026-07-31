@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -61,8 +61,14 @@ export function MeuSimuladoView({
     else { toast.success('Tentativa apagada (aluno pode refazer)'); router.refresh() }
   }
 
-  // Multi-seleção de tentativas DESTE simulado (padrão: todas marcadas).
-  const [selTents, setSelTents] = useState<Set<string>>(() => new Set(tentativas.map((t) => t.id)))
+  // Multi-seleção de tentativas DESTE simulado. Se veio ?tentativa=<id> (ex.: clique no
+  // histórico do perfil), abre com SÓ aquela marcada; senão, todas.
+  const tentativaParam = useSearchParams().get('tentativa')
+  const [selTents, setSelTents] = useState<Set<string>>(() =>
+    tentativaParam && tentativas.some((t) => t.id === tentativaParam)
+      ? new Set([tentativaParam])
+      : new Set(tentativas.map((t) => t.id)),
+  )
   const toggleTent = (id: string) => setSelTents((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
   const selTodasTent = () => setSelTents(new Set(tentativas.map((t) => t.id)))
   const limparTent = () => setSelTents(new Set())

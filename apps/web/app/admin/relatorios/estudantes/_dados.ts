@@ -55,7 +55,7 @@ function montarEstudante(nome: string, sessoes: EstSessaoRow[], disciplinas: Est
   const porDisciplina = disciplinas.map((d) => ({ nome: d.disc, aluno: pct(d.aluno_ac, d.aluno_tt), turma: pct(d.turma_ac, d.turma_tt) })).sort((a, b) => b.aluno - a.aluno).slice(0, 15)
   const historico = finalizadas.map((s) => {
     const tMin = s.iniciado_em && s.finalizado_em ? (new Date(s.finalizado_em as any).getTime() - new Date(s.iniciado_em as any).getTime()) / 60000 : null
-    return { simulado: s.titulo ?? '—', quando: fmtData(s.iniciado_em as any), nota: s.nota != null ? Number(s.nota) : null, acerto: s.tt ? Math.round((s.ac / s.tt) * 100) : 0, tempo: tMin != null ? fmtDur(tMin) : '—' }
+    return { simulado: s.titulo ?? '—', quando: fmtData(s.iniciado_em as any), nota: s.nota != null ? Number(s.nota) : null, acerto: s.tt ? Math.round((s.ac / s.tt) * 100) : 0, tempo: tMin != null ? fmtDur(tMin) : '—', simuladoId: (s as any).simulado_id ?? undefined, sessaoId: (s as any).id ?? undefined }
   }).reverse()
 
   return { nome, simulados: finalizadas.length, notaMedia, melhorNota, acertoMedio, tempoMedioMin, evolucao, porDisciplina, historico }
@@ -146,7 +146,7 @@ async function _estudanteViaPostgrest(svc: SupabaseClient, estId: string, tenant
   const historico = finalizadas.map((s) => {
     const ac = acPorSess.get(s.id) ?? 0, tt = ttPorSess.get(s.id) ?? 0
     const tMin = s.iniciado_em && s.finalizado_em ? (new Date(s.finalizado_em).getTime() - new Date(s.iniciado_em).getTime()) / 60000 : null
-    return { simulado: simTitulo.get(s.simulado_id) ?? '—', quando: fmtData(s.iniciado_em), nota: s.nota != null ? Number(s.nota) : null, acerto: tt ? Math.round((ac / tt) * 100) : 0, tempo: tMin != null ? fmtDur(tMin) : '—' }
+    return { simulado: simTitulo.get(s.simulado_id) ?? '—', quando: fmtData(s.iniciado_em), nota: s.nota != null ? Number(s.nota) : null, acerto: tt ? Math.round((ac / tt) * 100) : 0, tempo: tMin != null ? fmtDur(tMin) : '—', simuladoId: s.simulado_id, sessaoId: s.id }
   }).reverse()
 
   return { nome: (alvo as any)?.nome ?? 'Estudante', simulados: finalizadas.length, notaMedia, melhorNota, acertoMedio, tempoMedioMin, evolucao, porDisciplina, historico }
