@@ -109,7 +109,7 @@ export function BannersManager({ banners, tenantId }: { banners: Banner[]; tenan
           <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={3} placeholder="Texto do aviso…" className="w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : '(padrão 1920×600 — largura total)'}</label>
+          <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : '(largura total — proporção ajustável no recorte)'}</label>
           <div className="flex gap-2">
             <Input value={imagem.startsWith('data:') ? '' : imagem} onChange={(e) => setImagem(e.target.value)} placeholder="Cole uma URL ou envie um arquivo →" className="flex-1" />
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onArquivo(e.target.files?.[0] ?? null)} />
@@ -121,7 +121,7 @@ export function BannersManager({ banners, tenantId }: { banners: Banner[]; tenan
           {imagem && (
             <div className="relative overflow-hidden rounded-lg border">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imagem} alt="" className={cn('w-full object-cover', tipo === 'popup' ? 'h-20' : 'aspect-[1920/500]')} />
+              <img src={imagem} alt="" className={cn('w-full', tipo === 'popup' ? 'h-20 object-cover' : '')} />
               <div className="absolute right-1.5 top-1.5 flex gap-1.5">
                 {tipo !== 'popup' && (
                   <button type="button" onClick={() => { setCropSrc(cropSrc || imagem); setCropOpen(true) }} title="Ajustar área (recorte)"

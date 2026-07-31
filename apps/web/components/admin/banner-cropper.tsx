@@ -2,19 +2,30 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Check, ZoomIn, Move, Loader2 } from 'lucide-react'
+import { X, Check, ZoomIn, Move, Loader2, RectangleHorizontal } from 'lucide-react'
+
+// Presets de proporção (largura fixa 1920 → o que muda é a ALTURA/proporção do molde).
+const PRESETS = [
+  { label: 'Fino', r: 1920 / 360 },
+  { label: 'Baixo', r: 1920 / 480 },
+  { label: 'Médio', r: 1920 / 600 },
+  { label: 'Alto', r: 1920 / 760 },
+]
+const R_MIN = 1920 / 900 // mais alto
+const R_MAX = 1920 / 300 // mais fino
 
 /**
- * Recortador de banner: mostra a imagem original com um MOLDE (frame) na proporção alvo
- * (1920×500) por cima — o que estiver dentro do molde é o que aparece. Arraste para
- * mover e use o zoom; ao aplicar, renderiza só a área do molde num canvas de saída.
- * Igual aos editores de foto. Funciona com imagens fora de proporção (object-cover + pan/zoom).
+ * Recortador de banner com MOLDE DINÂMICO: mostra a imagem original e um molde por cima na
+ * proporção escolhida (presets + slider). O que estiver dentro do molde é o que aparece.
+ * Arraste para mover, use o zoom, e escolha a proporção; ao aplicar, renderiza só a área do
+ * molde num canvas na largura padrão (1920) e altura conforme a proporção. Estilo editor de foto.
  */
 export function BannerCropper({
-  src, outW = 1920, outH = 500, onApply, onCancel,
+  src, larguraSaida = 1920, ratioInicial = 1920 / 500, onApply, onCancel,
 }: {
   src: string
-  outW?: number; outH?: number
+  larguraSaida?: number
+  ratioInicial?: number
   onApply: (dataUrl: string) => void
   onCancel: () => void
 }) {
@@ -22,11 +33,15 @@ export function BannerCropper({
   const imgRef = useRef<HTMLImageElement>(null)
   const [nat, setNat] = useState<{ w: number; h: number } | null>(null)
   const [frame, setFrame] = useState<{ w: number; h: number }>({ w: 0, h: 0 })
+  const [ratio, setRatio] = useState(ratioInicial) // largura/altura do molde
   const [zoom, setZoom] = useState(1)
   const [tx, setTx] = useState(0)
   const [ty, setTy] = useState(0)
   const [salvando, setSalvando] = useState(false)
   const drag = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null)
+
+  const OW = Math.round(larguraSaida)
+  const OH = Math.round(larguraSaida / ratio)
 
   useEffect(() => {
     const el = frameRef.current
@@ -55,8 +70,8 @@ export function BannerCropper({
     return { x: Math.min(maxX, Math.max(-maxX, x)), y: Math.min(maxY, Math.max(-maxY, y)) }
   }, [nat, frame, effScale])
 
-  // Re-clampa ao mudar o zoom (evita mostrar vazio nas bordas).
-  useEffect(() => { const c = clamp(tx, ty); if (c.x !== tx || c.y !== ty) { setTx(c.x); setTy(c.y) } }, [zoom]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Re-clampa ao mudar zoom/proporção/tamanho do molde (evita mostrar vazio nas bordas).
+  useEffect(() => { const c = clamp(tx, ty); if (c.x !== tx || c.y !== ty) { setTx(c.x); setTy(c.y) } }, [zoom, ratio, frame.w, frame.h]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function onDown(e: React.PointerEvent) { drag.current = { x: e.clientX, y: e.clientY, tx, ty }; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId) }
   function onMove(e: React.PointerEvent) {
@@ -72,21 +87,21 @@ export function BannerCropper({
     setSalvando(true)
     try {
       const canvas = document.createElement('canvas')
-      canvas.width = outW; canvas.height = outH
+      canvas.width = OW; canvas.height = OH
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('canvas')
-      // Retângulo-fonte (no espaço da imagem) correspondente ao molde inteiro.
       const sw = frame.w / effScale
       const sh = frame.h / effScale
       const sx = nat.w / 2 - (frame.w / 2 + tx) / effScale
       const sy = nat.h / 2 - (frame.h / 2 + ty) / effScale
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH)
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, OW, OH)
       onApply(canvas.toDataURL('image/jpeg', 0.9))
     } catch {
-      // Imagem de outra origem (URL externa) pode "tainted" o canvas → usa a original.
-      onApply(src)
+      onApply(src) // origem externa pode "tainted" o canvas → usa a original
     } finally { setSalvando(false) }
   }
+
+  const ativoPreset = (r: number) => Math.abs(r - ratio) < 0.02
 
   if (typeof document === 'undefined') return null
   return createPortal(
@@ -98,19 +113,30 @@ export function BannerCropper({
         </header>
 
         <div className="p-5">
-          <p className="mb-3 text-xs text-muted-foreground">Arraste a imagem e use o zoom para escolher a parte que aparece dentro do molde ({outW}×{outH}).</p>
-          {/* Molde na proporção alvo — o que estiver aqui dentro é o que aparece. */}
+          <p className="mb-3 text-xs text-muted-foreground">Arraste a imagem, ajuste o zoom e a <strong>proporção</strong> do molde. O que ficar dentro é o que aparece.</p>
+
+          {/* Molde na proporção escolhida — o que estiver aqui dentro é o que aparece. */}
           <div ref={frameRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
-            className="relative w-full cursor-grab touch-none select-none overflow-hidden rounded-lg border bg-black active:cursor-grabbing" style={{ aspectRatio: `${outW}/${outH}` }}>
+            className="relative w-full cursor-grab touch-none select-none overflow-hidden rounded-lg border bg-black active:cursor-grabbing" style={{ aspectRatio: `${ratio}` }}>
             {nat && frame.w > 0 && (
               // eslint-disable-next-line @next/next/no-img-element
               <img ref={imgRef} src={src} alt="" draggable={false}
                 style={{ position: 'absolute', left: '50%', top: '50%', width: nat.w * effScale, height: nat.h * effScale, maxWidth: 'none', transform: `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px))` }} />
             )}
             {!nat && <div className="absolute inset-0 flex items-center justify-center text-white/70"><Loader2 className="h-6 w-6 animate-spin" /></div>}
-            {/* Guias do molde */}
             <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/30" />
           </div>
+
+          {/* Proporção do molde: presets + slider (largura fixa, altura varia) */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><RectangleHorizontal className="h-4 w-4" /> Proporção</span>
+            {PRESETS.map((p) => (
+              <button key={p.label} type="button" onClick={() => setRatio(p.r)}
+                className={cn('rounded-full border px-3 py-1 text-xs font-medium transition', ativoPreset(p.r) ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted')}>{p.label}</button>
+            ))}
+            <span className="ml-auto text-xs tabular-nums text-muted-foreground">{OW}×{OH}</span>
+          </div>
+          <input type="range" min={R_MIN} max={R_MAX} step={0.01} value={ratio} onChange={(e) => setRatio(Number(e.target.value))} className="mt-2 h-1.5 w-full cursor-pointer accent-primary" />
 
           <div className="mt-4 flex items-center gap-3">
             <ZoomIn className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -130,3 +156,5 @@ export function BannerCropper({
     document.body,
   )
 }
+
+function cn(...xs: (string | false | null | undefined)[]) { return xs.filter(Boolean).join(' ') }
