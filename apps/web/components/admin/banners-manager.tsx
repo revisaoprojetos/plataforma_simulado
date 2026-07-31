@@ -121,7 +121,7 @@ export function BannersManager({ banners, tenantId }: { banners: Banner[]; tenan
           {imagem && (
             <div className="relative overflow-hidden rounded-lg border">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imagem} alt="" className={cn('w-full', tipo === 'popup' ? 'h-20 object-cover' : 'aspect-[1920/500] bg-muted object-contain')} />
+              <img src={imagem} alt="" className={cn('w-full object-cover', tipo === 'popup' ? 'h-20' : 'aspect-[1920/500]')} />
               <div className="absolute right-1.5 top-1.5 flex gap-1.5">
                 {tipo !== 'popup' && (
                   <button type="button" onClick={() => { setCropSrc(cropSrc || imagem); setCropOpen(true) }} title="Ajustar área (recorte)"
