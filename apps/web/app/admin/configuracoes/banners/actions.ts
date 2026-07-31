@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission, isSuperAdmin } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
@@ -20,6 +20,10 @@ export interface BannerInput {
 // Com `tenantIdAlvo` (só super-admin) opera na plataforma-alvo a partir do console; senão exige
 // `configuracoes:manage` e usa o tenant da sessão.
 async function ctx(tenantIdAlvo?: string) {
+  // Sessão expirada (token do Supabase venceu com a página aberta) leva a getUser()=null e faria
+  // isSuperAdmin/checkPermission caírem em "Sem permissão." — mensagem enganosa. Detecta e avisa.
+  const { data: { user } } = await (await createClient()).auth.getUser()
+  if (!user) return { ok: false as const, error: 'Sessão expirada. Recarregue a página (F5) e entre novamente.' }
   if (tenantIdAlvo && (await isSuperAdmin())) return { ok: true as const, tenantId: tenantIdAlvo, ehSuper: true, svc: createAdminClient() }
   if (!(await checkPermission('configuracoes:manage'))) return { ok: false as const, error: 'Sem permissão.' }
   const tenantId = await getCurrentTenantId()
