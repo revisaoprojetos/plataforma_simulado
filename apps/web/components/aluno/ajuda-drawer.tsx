@@ -9,8 +9,10 @@ import { GUIAS_ALUNO } from '@/lib/ajuda/guias-aluno'
 
 const KEYFRAMES = `@keyframes ajudaSlideIn { from { transform: translateX(100%) } to { transform: translateX(0) } }`
 
-/** Botão "?" (topbar) que abre a AJUDA como BARRA LATERAL (drawer deslizante), sobre a tela. */
-export function AjudaDrawer() {
+/** Botão "?" que abre a AJUDA como BARRA LATERAL (drawer deslizante), sobre a tela.
+ *  `renderTrigger` permite um gatilho customizado (ex.: botão "Ajuda" no rodapé da
+ *  sidebar). Sem ele, usa o botão "?" padrão. */
+export function AjudaDrawer({ renderTrigger }: { renderTrigger?: (abrir: () => void) => React.ReactNode }) {
   const [aberto, setAberto] = useState(false)
   const [guia, setGuia] = useState<string>(GUIAS_ALUNO[0].id)
 
@@ -24,10 +26,12 @@ export function AjudaDrawer() {
 
   return (
     <>
-      <button type="button" onClick={() => setAberto(true)} title="Ajuda" aria-label="Ajuda"
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[color:var(--sidebar-accent)]">
-        <HelpCircle className="h-5 w-5" />
-      </button>
+      {renderTrigger ? renderTrigger(() => setAberto(true)) : (
+        <button type="button" onClick={() => setAberto(true)} title="Ajuda" aria-label="Ajuda"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[color:var(--sidebar-accent)]">
+          <HelpCircle className="h-5 w-5" />
+        </button>
+      )}
 
       {aberto && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[110]">
