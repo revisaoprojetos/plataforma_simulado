@@ -69,16 +69,22 @@ export function BannerCropper({
     if (!img || !nat || !frame.w) return
     setSalvando(true)
     try {
-      const canvas = document.createElement('canvas')
-      canvas.width = outW; canvas.height = outH
-      const ctx = canvas.getContext('2d')
-      if (!ctx) throw new Error('canvas')
       const sw = frame.w / effScale
       const sh = frame.h / effScale
       const sx = nat.w / 2 - (frame.w / 2 + tx) / effScale
       const sy = nat.h / 2 - (frame.h / 2 + ty) / effScale
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH)
-      onApply(canvas.toDataURL('image/jpeg', 0.9))
+      // Saída na resolução NATIVA da área recortada (sem upscalar o original), com teto p/ não
+      // gerar arquivo gigante. Preserva o máximo de nitidez para telas de alta densidade.
+      const TETO = 3200
+      const outWpx = Math.max(outW, Math.min(TETO, Math.round(sw)))
+      const outHpx = Math.round((outWpx * outH) / outW)
+      const canvas = document.createElement('canvas')
+      canvas.width = outWpx; canvas.height = outHpx
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('canvas')
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outWpx, outHpx)
+      onApply(canvas.toDataURL('image/jpeg', 0.95))
     } catch {
       onApply(src) // origem externa pode "tainted" o canvas → usa a original
     } finally { setSalvando(false) }

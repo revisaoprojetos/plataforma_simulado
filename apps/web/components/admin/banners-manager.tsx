@@ -3,9 +3,10 @@
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, Loader2, Trash2, Eye, EyeOff, Megaphone, MessageSquareWarning, ImageIcon, Upload, X, Crop } from 'lucide-react'
+import { Plus, Loader2, Trash2, Eye, EyeOff, Megaphone, MessageSquareWarning, ImageIcon, Upload, X, Crop, Settings } from 'lucide-react'
 import { redimensionarImagem } from '@/lib/imagem'
 import { BannerCropper } from '@/components/admin/banner-cropper'
+import { BannerEditModal } from '@/components/admin/banner-edit-modal'
 
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f) })
@@ -38,6 +39,7 @@ export function BannersManager({ banners, tenantId, destinos }: { banners: Banne
   const [enviando, setEnviando] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropOpen, setCropOpen] = useState(false)
+  const [editando, setEditando] = useState<Banner | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function onArquivo(f: File | null) {
@@ -184,6 +186,10 @@ export function BannersManager({ banners, tenantId, destinos }: { banners: Banne
               </p>
               <p className="truncate text-xs text-muted-foreground">{b.mensagem || b.link || '—'}</p>
             </div>
+            <button type="button" onClick={() => setEditando(b)} title="Configurar"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted">
+              <Settings className="h-4 w-4" />
+            </button>
             <button type="button" onClick={() => toggle(b)} disabled={pending && alvo === b.id} title={b.ativo ? 'Desativar' : 'Ativar'}
               className="inline-flex h-8 w-8 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted disabled:opacity-50">
               {pending && alvo === b.id ? <Loader2 className="h-4 w-4 animate-spin" /> : b.ativo ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -195,6 +201,8 @@ export function BannersManager({ banners, tenantId, destinos }: { banners: Banne
           </div>
         ))}
       </div>
+
+      {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} onClose={() => setEditando(null)} />}
     </div>
   )
 }
