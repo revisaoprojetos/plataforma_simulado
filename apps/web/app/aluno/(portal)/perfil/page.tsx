@@ -43,7 +43,7 @@ export default async function PerfilAlunoPage() {
   ].filter(Boolean) as { icon: any; label: string }[]
 
   return (
-    <div className="animate-page mx-auto max-w-5xl space-y-6">
+    <div className="animate-page space-y-6">
       {/* Cabeçalho do perfil */}
       <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/[0.10] via-card to-card p-6 shadow-sm sm:p-7">
         <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 h-64 w-64 rounded-full bg-primary/25 blur-3xl" />
@@ -73,7 +73,7 @@ export default async function PerfilAlunoPage() {
           <BarChart3 className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
           <h2 className="text-lg font-semibold">Seu desempenho aparecerá aqui</h2>
           <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">Finalize ao menos um simulado para ver seus números, a evolução e o acerto por disciplina.</p>
-          <Link href="/aluno/simulado" className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90">
+          <Link href="/aluno" className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90">
             Ver simulados disponíveis <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
