@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { KpiCard, Painel, Hero, AreaSpark, BarrasDupla, ListaBusca, BotaoExportar, baixarCsv } from '@/components/admin/relatorios/viz'
-import { ClipboardList, Trophy, Target, Clock, TrendingUp, TrendingDown, Minus, GraduationCap, BookOpen, ChevronRight } from 'lucide-react'
+import { ClipboardList, Trophy, Target, Clock, TrendingUp, TrendingDown, Minus, GraduationCap, BookOpen, ChevronRight, Award } from 'lucide-react'
 
 export type DadosRelatorioEstudante = {
   nome: string
@@ -16,7 +16,7 @@ export type DadosRelatorioEstudante = {
   historico: { simulado: string; quando: string; nota: number | null; acerto: number; tempo: string; simuladoId?: string; sessaoId?: string }[]
 }
 
-export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink }: { d: DadosRelatorioEstudante; print?: boolean; semCabecalho?: boolean; historicoLink?: boolean }) {
+export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, semTurma, semTendencia }: { d: DadosRelatorioEstudante; print?: boolean; semCabecalho?: boolean; historicoLink?: boolean; semTurma?: boolean; semTendencia?: boolean }) {
   const nota = (n: number | null) => (n == null ? '—' : n.toFixed(1).replace('.', ','))
   const sobe = d.evolucao.length >= 2 && d.evolucao[d.evolucao.length - 1].nota >= d.evolucao[0].nota
   const temTend = d.evolucao.length >= 2
@@ -45,18 +45,47 @@ export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink }
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <KpiCard label="Simulados feitos" valor={d.simulados} icon={<ClipboardList className="h-4 w-4" />} tom="primary" />
-        <KpiCard label="Nota média" valor={nota(d.notaMedia)} sub={`melhor ${nota(d.melhorNota)}`} icon={<Trophy className="h-4 w-4" />} tom="amber" />
+        <KpiCard label="Nota média" valor={nota(d.notaMedia)} sub={semTendencia ? undefined : `melhor ${nota(d.melhorNota)}`} icon={<Trophy className="h-4 w-4" />} tom="amber" />
         <KpiCard label="Acerto médio" valor={d.acertoMedio != null ? `${d.acertoMedio}%` : '—'} icon={<Target className="h-4 w-4" />} tom="emerald" />
         <KpiCard label="Tempo médio" valor={d.tempoMedioMin != null ? `${d.tempoMedioMin}min` : '—'} icon={<Clock className="h-4 w-4" />} tom="violet" />
-        <KpiCard label="Tendência" valor={!temTend ? '—' : sobe ? 'Subindo' : 'Caindo'} icon={!temTend ? <Minus className="h-4 w-4" /> : sobe ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />} tom={!temTend ? 'slate' : sobe ? 'emerald' : 'rose'} />
+        {semTendencia ? (
+          <KpiCard label="Melhor nota" valor={nota(d.melhorNota)} icon={<Award className="h-4 w-4" />} tom="amber" />
+        ) : (
+          <KpiCard label="Tendência" valor={!temTend ? '—' : sobe ? 'Subindo' : 'Caindo'} icon={!temTend ? <Minus className="h-4 w-4" /> : sobe ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />} tom={!temTend ? 'slate' : sobe ? 'emerald' : 'rose'} />
+        )}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Painel titulo="Evolução da nota" sub="Nota em cada simulado, na ordem cronológica" tom="primary" icon={<TrendingUp className="h-4 w-4" />}>
-          <AreaSpark pontos={d.evolucao.map((x) => ({ rotulo: x.rotulo, valor: x.nota }))} tom="primary" min={0} max={100} formato={(n) => n.toFixed(1).replace('.', ',')} />
-        </Painel>
-        <Painel titulo="Acerto por disciplina" sub="Comparação do estudante com a média da turma" tom="emerald" icon={<BookOpen className="h-4 w-4" />}>
-          <BarrasDupla itens={d.porDisciplina.map((x) => ({ rotulo: x.nome, a: x.aluno, b: x.turma }))} aTom="primary" bTom="slate" aNome="Aluno" bNome="Turma" />
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+        {/* Coluna esquerda: evolução da NOTA + evolução do ACERTO (novo). */}
+        <div className="space-y-4">
+          <Painel titulo="Evolução da nota" sub="Nota em cada simulado, na ordem cronológica" tom="primary" icon={<TrendingUp className="h-4 w-4" />}>
+            <AreaSpark pontos={d.evolucao.map((x) => ({ rotulo: x.rotulo, valor: x.nota }))} tom="primary" min={0} max={100} formato={(n) => n.toFixed(1).replace('.', ',')} />
+          </Painel>
+          <Painel titulo="Acerto ao longo do tempo" sub="% de acerto em cada simulado (cronológico)" tom="emerald" icon={<Target className="h-4 w-4" />}>
+            <AreaSpark pontos={[...d.historico].reverse().map((h) => ({ rotulo: h.quando, valor: h.acerto }))} tom="emerald" min={0} max={100} formato={(n) => `${Math.round(n)}%`} />
+          </Painel>
+        </div>
+
+        <Painel titulo="Acerto por disciplina" sub={semTurma ? 'Seu percentual de acerto por matéria' : 'Comparação do estudante com a média da turma'} tom="emerald" icon={<BookOpen className="h-4 w-4" />}>
+          {/* Rolamento quando há muitas disciplinas. */}
+          <div className="max-h-[520px] overflow-y-auto pr-1 [scrollbar-width:thin]">
+            {semTurma ? (
+              <div className="flex flex-col gap-3.5">
+                {d.porDisciplina.length === 0 && <p className="text-sm text-muted-foreground">Sem dados de acerto por disciplina ainda.</p>}
+                {d.porDisciplina.map((x) => (
+                  <div key={x.nome}>
+                    <div className="mb-1 flex items-baseline justify-between gap-2">
+                      <span className="truncate text-xs font-medium uppercase tracking-wide text-foreground/80">{x.nome}</span>
+                      <span className="shrink-0 text-sm font-bold tabular-nums text-primary">{x.aluno}%</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${x.aluno}%` }} /></div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <BarrasDupla itens={d.porDisciplina.map((x) => ({ rotulo: x.nome, a: x.aluno, b: x.turma }))} aTom="primary" bTom="slate" aNome="Aluno" bNome="Turma" />
+            )}
+          </div>
         </Painel>
       </div>
 

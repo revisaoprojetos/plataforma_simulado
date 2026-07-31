@@ -67,7 +67,7 @@ export default async function PerfilAlunoPage() {
 
       {/* Desempenho — KPIs, gráficos e histórico (mesmo motor do admin) */}
       {dados && dados.simulados > 0 ? (
-        <RelatorioEstudanteView d={dados} semCabecalho historicoLink />
+        <RelatorioEstudanteView d={dados} semCabecalho historicoLink semTurma semTendencia />
       ) : (
         <div className="rounded-2xl border bg-muted/30 p-10 text-center">
           <BarChart3 className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
