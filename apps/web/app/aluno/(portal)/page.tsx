@@ -92,22 +92,21 @@ export default async function AlunoHome() {
 
   return (
     <div className="animate-page space-y-5">
-      {/* Banner de DESTAQUE (carrossel) — configurável no console (tipo 'hero'). */}
-      {hero.length > 0 && <HeroCarrossel banners={hero} />}
-
-      {/* Saudação enxuta. Os dados detalhados (feitos/média/gráficos) foram para o Perfil. */}
-      <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/[0.10] via-card to-card shadow-sm">
-        <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/[0.04] to-transparent" />
-        <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 h-64 w-64 rounded-full bg-primary/25 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--brand-accent) 75%, transparent), transparent)' }} />
-        <div className="relative p-5 sm:p-6">
-          <div className="mb-2 flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--brand-accent)', boxShadow: '0 0 10px 1px color-mix(in oklab, var(--brand-accent) 60%, transparent)' }} />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand-accent)' }}>Sua área de estudos</span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-[2rem]">Olá, {sessao!.nome.split(' ')[0]} 👋</h1>
-          <p className="mt-1.5 text-muted-foreground">Bem-vindo à sua área de estudos. {disponiveis.length > 0 ? `Você tem ${disponiveis.length} simulado(s) disponível(is).` : 'Você está em dia com seus simulados.'}</p>
+      {/* Banner de DESTAQUE — FULL-BLEED: ocupa toda a largura e cola no topo (fora do padding). */}
+      {hero.length > 0 && (
+        <div className="-mx-6 -mt-6">
+          <HeroCarrossel banners={hero} />
         </div>
+      )}
+
+      {/* Saudação SOLTA na tela (sem card). Dados detalhados foram para o Perfil. */}
+      <div>
+        <div className="mb-1.5 flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--brand-accent)', boxShadow: '0 0 10px 1px color-mix(in oklab, var(--brand-accent) 60%, transparent)' }} />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand-accent)' }}>Sua área de estudos</span>
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-[2rem]">Olá, {sessao!.nome.split(' ')[0]} 👋</h1>
+        <p className="mt-1 text-muted-foreground">Bem-vindo à sua área de estudos. {disponiveis.length > 0 ? `Você tem ${disponiveis.length} simulado(s) disponível(is).` : 'Você está em dia com seus simulados.'}</p>
       </div>
 
       {/* Atalhos */}

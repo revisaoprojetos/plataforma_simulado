@@ -27,7 +27,7 @@ export function HeroCarrossel({ banners }: { banners: HeroBanner[] }) {
   if (n === 0) return null
 
   return (
-    <div className="group relative aspect-[16/5] w-full overflow-hidden rounded-3xl border shadow-sm">
+    <div className="group relative aspect-[16/5] w-full overflow-hidden">
       {slides.map((b, idx) => {
         const img = (
           // eslint-disable-next-line @next/next/no-img-element
