@@ -21,8 +21,10 @@
 BEGIN;
 
 -- Mapa canônico: 1 id por (resource, action).
+-- min() não existe para uuid nesta instância → escolhe o canônico pelo menor uuid
+-- em texto (determinístico). keep_id volta a ser uuid.
 CREATE TEMP TABLE _canon ON COMMIT DROP AS
-SELECT resource, action, min(id) AS keep_id
+SELECT resource, action, min(id::text)::uuid AS keep_id
 FROM public.simulado_permissions
 GROUP BY resource, action;
 
