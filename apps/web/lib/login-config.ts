@@ -52,6 +52,8 @@ export type LoginConfig = {
   carModelo: CarModelo        // modelo da animação de carregamento
   carTexto: string            // texto (ex.: "Entrando…"); vazio = oculto
   carTextoMarca: string | null // texto da marca no carregamento (ex.: "Revisão / Ensino Jurídico"); null = usa o nome da marca; '' = oculto
+  carCorTexto: string | null  // cor dos textos do carregamento; null = usa a cor do texto da marca (ou branco)
+  carCorAnim: string | null   // cor da animação (spinner/pontos/anel/órbita); null = usa o destaque
   carMostrarLogo: boolean     // exibe o logo na tela de carregamento
 }
 
@@ -94,6 +96,8 @@ export const LOGIN_DEFAULT: LoginConfig = {
   carModelo: 'spinner',
   carTexto: 'Entrando…',
   carTextoMarca: null,
+  carCorTexto: null,
+  carCorAnim: null,
   carMostrarLogo: true,
 }
 
@@ -148,6 +152,8 @@ export function resolverLoginConfig(raw: unknown): LoginConfig {
     carModelo: (['spinner', 'anel', 'barra', 'pulso', 'pontos', 'orbita'] as CarModelo[]).includes(c.carModelo as CarModelo) ? (c.carModelo as CarModelo) : 'spinner',
     carTexto: typeof c.carTexto === 'string' ? c.carTexto : LOGIN_DEFAULT.carTexto,
     carTextoMarca: typeof c.carTextoMarca === 'string' ? c.carTextoMarca : null,
+    carCorTexto: typeof c.carCorTexto === 'string' && c.carCorTexto ? c.carCorTexto : null,
+    carCorAnim: typeof c.carCorAnim === 'string' && c.carCorAnim ? c.carCorAnim : null,
     carMostrarLogo: c.carMostrarLogo !== false,
   }
 }

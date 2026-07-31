@@ -23,9 +23,9 @@ export function LoginLoading({
   config: LoginConfig; plataforma?: string; logo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; preview?: boolean
 }) {
   const c = config
-  const accent = corAccentLogin(c)
+  const accent = c.carCorAnim ?? corAccentLogin(c)
   const primaria = corPrimariaLogin(c)
-  const texto = c.corTextoMarca ?? '#ffffff'
+  const texto = c.carCorTexto ?? c.corTextoMarca ?? '#ffffff'
   const effLogo = c.logoUrl ?? logo
   const effBg = c.logoBg ?? logoBg
   const effEstilo = c.logoEstilo ?? logoEstilo

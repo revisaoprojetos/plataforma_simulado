@@ -140,6 +140,10 @@ export function PlataformaLoginConfig({
             </div>
             <div className="space-y-1 pt-1"><label className="text-xs text-muted-foreground">Texto <span className="text-muted-foreground/70">(vazio = oculto)</span></label><Input value={c.carTexto} onChange={(e) => set('carTexto', e.target.value)} placeholder="Ex.: Entrando…" /></div>
             <div className="space-y-1 pt-1"><label className="text-xs text-muted-foreground">Texto da marca <span className="text-muted-foreground/70">(vazio = oculto)</span></label><Input value={c.carTextoMarca ?? (c.marcaNome ?? plataforma)} onChange={(e) => set('carTextoMarca', e.target.value)} placeholder="Ex.: Revisão / Ensino Jurídico" /></div>
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <ColorField rotulo="Cor do texto" valor={c.carCorTexto} fallback={c.corTextoMarca ?? '#ffffff'} rotuloReset="Texto marca" onChange={(v) => set('carCorTexto', v)} />
+              <ColorField rotulo="Cor da animação" valor={c.carCorAnim} fallback={corAccent} rotuloReset="Destaque" onChange={(v) => set('carCorAnim', v)} />
+            </div>
             <label className="flex items-center justify-between pt-1 text-sm"><span className="text-muted-foreground">Mostrar logo</span><Switch checked={c.carMostrarLogo} onCheckedChange={(v) => set('carMostrarLogo', v)} /></label>
           </Bloco>
           {blocoLogo}
