@@ -64,10 +64,24 @@ export function BannersPortal({ banners }: { banners: BannerPortal[] }) {
   )
 }
 
+/** Cor MÉDIA da imagem (desenha em 1×1) → usada para preencher as sobras do molde com
+ *  uma cor parecida quando a imagem não preenche toda a largura. Fallback vazio se tainted. */
+function corMedia(img: HTMLImageElement): string {
+  try {
+    const c = document.createElement('canvas'); c.width = 1; c.height = 1
+    const ctx = c.getContext('2d'); if (!ctx) return ''
+    ctx.drawImage(img, 0, 0, 1, 1)
+    const d = ctx.getImageData(0, 0, 1, 1).data
+    return `rgb(${d[0]}, ${d[1]}, ${d[2]})`
+  } catch { return '' }
+}
+
 /** Carrossel de banners (estilo propaganda/Netflix): mostra UM por vez, auto-rotativo,
- *  com setas no hover e bolinhas. Largura total; altura = proporção do banner atual. */
+ *  com setas no hover e bolinhas. Molde FIXO 1920×500; imagem em object-contain (sem
+ *  esticar) e as sobras são preenchidas com a cor média da imagem. */
 function FaixaRotativa({ banners }: { banners: BannerPortal[] }) {
   const [i, setI] = useState(0)
+  const [bg, setBg] = useState('')
   const n = banners.length
   const ir = (idx: number) => setI(((idx % n) + n) % n)
 
@@ -77,11 +91,15 @@ function FaixaRotativa({ banners }: { banners: BannerPortal[] }) {
     return () => clearInterval(t)
   }, [n])
 
+  useEffect(() => { setBg('') }, [i]) // reset ao trocar de banner (recalcula no onLoad)
+
   const b = banners[Math.min(i, n - 1)]
   const cor = b.cor ?? '#6366f1'
   const conteudo = b.imagem_url ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img key={b.id} src={b.imagem_url} alt={b.titulo ?? ''} className="block w-full animate-in fade-in duration-700" />
+    <div key={b.id} className="aspect-[1920/500] w-full animate-in fade-in duration-700" style={{ background: bg || cor }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={b.imagem_url} alt={b.titulo ?? ''} onLoad={(e) => { const c = corMedia(e.currentTarget); if (c) setBg(c) }} className="h-full w-full object-contain" />
+    </div>
   ) : (
     <div key={b.id} className="flex animate-in items-center gap-3 fade-in p-4 duration-500" style={{ background: cor + '14' }}>
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: cor + '22', color: cor }}><Megaphone className="h-5 w-5" /></span>
