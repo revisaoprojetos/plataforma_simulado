@@ -9,6 +9,7 @@ export type LogoEstilo = 'arredondado' | 'quadrado' | 'borda'
 export type LogoFiltro = 'none' | 'branco' | 'preto'
 export type LogoTam = 'p' | 'm' | 'g'
 export type BotaoEstilo = 'solido' | 'gradiente' | 'contorno'
+export type CarModelo = 'spinner' | 'barra' | 'pulso' | 'pontos' | 'orbita'
 
 export type LoginConfig = {
   template: LoginTemplate     // estilo/layout da tela
@@ -43,6 +44,10 @@ export type LoginConfig = {
   destaques: string[]         // bullets do painel da marca
   mostrarMarca: boolean       // exibe o painel/cabeçalho da marca
   animacao: boolean           // véus/aurora animados no fundo
+  // Tela de CARREGAMENTO (mostrada ao entrar na plataforma) — usa o mesmo fundo/cores da marca.
+  carModelo: CarModelo        // modelo da animação de carregamento
+  carTexto: string            // texto (ex.: "Entrando…"); vazio = oculto
+  carMostrarLogo: boolean     // exibe o logo na tela de carregamento
 }
 
 export const LOGIN_DEFAULT: LoginConfig = {
@@ -77,6 +82,9 @@ export const LOGIN_DEFAULT: LoginConfig = {
   destaques: ['Simulados no padrão da banca', 'Correção automática e gabarito', 'Seu desempenho e evolução num só lugar'],
   mostrarMarca: true,
   animacao: true,
+  carModelo: 'spinner',
+  carTexto: 'Entrando…',
+  carMostrarLogo: true,
 }
 
 const TEMPLATES: LoginTemplate[] = ['split', 'central', 'hero', 'vitrine', 'cartao']
@@ -123,6 +131,9 @@ export function resolverLoginConfig(raw: unknown): LoginConfig {
     destaques: Array.isArray(c.destaques) ? c.destaques.filter((x): x is string => typeof x === 'string').slice(0, 5) : LOGIN_DEFAULT.destaques,
     mostrarMarca: c.mostrarMarca !== false,
     animacao: c.animacao !== false,
+    carModelo: (['spinner', 'barra', 'pulso', 'pontos', 'orbita'] as CarModelo[]).includes(c.carModelo as CarModelo) ? (c.carModelo as CarModelo) : 'spinner',
+    carTexto: typeof c.carTexto === 'string' ? c.carTexto : LOGIN_DEFAULT.carTexto,
+    carMostrarLogo: c.carMostrarLogo !== false,
   }
 }
 

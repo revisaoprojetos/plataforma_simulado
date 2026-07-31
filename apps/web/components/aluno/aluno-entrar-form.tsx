@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { GraduationCap, Loader2, Wrench, Mail, IdCard, Phone, Lock, ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { LOGIN_DEFAULT, fundoLoginStyle, loginVars, corPrimariaLogin, corAccentLogin, type LoginConfig } from '@/lib/login-config'
+import { LoginLoading } from '@/components/aluno/login-loading'
 
 type Metodo = 'email' | 'email_cpf' | 'email_telefone'
 
@@ -23,6 +24,7 @@ export function AlunoEntrarForm({
   const [telefone, setTelefone] = useState('')
   const [senha, setSenha] = useState('')
   const [modo, setModo] = useState<'aluno' | 'admin'>('aluno')
+  const [entrando, setEntrando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [manutencao, setManutencao] = useState<{ titulo: string; mensagem: string } | null>(null)
   const [carregando, setCarregando] = useState(false)
@@ -50,7 +52,7 @@ export function AlunoEntrarForm({
         else setErro(j.message ?? 'Não foi possível entrar.')
         return
       }
-      router.push('/aluno'); router.refresh()
+      setEntrando(true); router.push('/aluno'); router.refresh()
     } catch { setErro('Erro de conexão. Tente novamente.') } finally { setCarregando(false) }
   }
 
@@ -62,7 +64,7 @@ export function AlunoEntrarForm({
       const { error } = await createClient().auth.signInWithPassword({ email, password: senha })
       if (error) { setErro(error.message === 'Invalid login credentials' ? 'Credenciais inválidas. Verifique e-mail e senha.' : error.message); return }
       void fetch('/api/audit/login', { method: 'POST' }).catch(() => {})
-      router.push('/login'); router.refresh()
+      setEntrando(true); router.push('/login'); router.refresh()
     } catch { setErro('Erro de conexão. Tente novamente.') } finally { setCarregando(false) }
   }
 
@@ -292,6 +294,12 @@ export function AlunoEntrarForm({
   return (
     <>
       {tela}
+      {/* Tela de carregamento branded ao entrar na plataforma. */}
+      {entrando && !preview && (
+        <div className="fixed inset-0 z-[60]">
+          <LoginLoading config={c} plataforma={plataforma} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} />
+        </div>
+      )}
       {/* Botão que alterna Aluno ↔ Admin. Também aparece (e funciona) na prévia do console. */}
       <button type="button" onClick={alternarModo} aria-label={ehAdmin ? 'Voltar para a área do aluno' : 'Acesso administrativo'}
         className="fixed bottom-4 right-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/25 px-3 py-1.5 text-xs font-medium text-white/80 shadow-sm backdrop-blur transition-colors hover:border-white/30 hover:text-white">

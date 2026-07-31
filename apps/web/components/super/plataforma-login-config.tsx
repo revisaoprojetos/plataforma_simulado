@@ -10,8 +10,9 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { redimensionarImagem } from '@/lib/imagem'
 import { salvarTemaSuperAction } from '@/app/admin/tenants/actions'
-import { LOGIN_DEFAULT, type LoginConfig, type LoginTemplate, type LoginFundo, type CardEstilo, type LogoEstilo, type LogoFiltro, type LogoTam, type BotaoEstilo } from '@/lib/login-config'
+import { LOGIN_DEFAULT, type LoginConfig, type LoginTemplate, type LoginFundo, type CardEstilo, type LogoEstilo, type LogoFiltro, type LogoTam, type BotaoEstilo, type CarModelo } from '@/lib/login-config'
 import { AlunoEntrarForm } from '@/components/aluno/aluno-entrar-form'
+import { LoginLoading } from '@/components/aluno/login-loading'
 
 const TEMPLATES: { v: LoginTemplate; nome: string; desc: string; thumb: React.ReactNode }[] = [
   { v: 'split', nome: 'Split', desc: 'Painel da marca + formulário', thumb: <Thumb><div className="h-full w-1/2 bg-primary" /><div className="flex h-full w-1/2 items-center justify-center bg-muted"><i className="h-2.5 w-4 rounded-sm bg-primary/60" /></div></Thumb> },
@@ -40,6 +41,7 @@ export function PlataformaLoginConfig({
   const [enviando, setEnviando] = useState(false)
   const [enviandoLogo, setEnviandoLogo] = useState(false)
   const [urlPrevia, setUrlPrevia] = useState('')
+  const [abaPrevia, setAbaPrevia] = useState<'login' | 'carregamento'>('login')
   const fileRef = useRef<HTMLInputElement>(null)
   const logoRef = useRef<HTMLInputElement>(null)
   const set = <K extends keyof LoginConfig>(k: K, v: LoginConfig[K]) => setC((p) => ({ ...p, [k]: v }))
@@ -85,10 +87,23 @@ export function PlataformaLoginConfig({
       {/* Controles */}
       <div className="space-y-4 rounded-2xl border bg-card p-4 shadow-sm">
         <div>
-          <h2 className="text-sm font-semibold">Aparência do login</h2>
-          <p className="text-xs text-muted-foreground">Vale para a tela de alunos e a de administradores desta empresa.</p>
+          <h2 className="text-sm font-semibold">{abaPrevia === 'login' ? 'Aparência do login' : 'Tela de carregamento'}</h2>
+          <p className="text-xs text-muted-foreground">{abaPrevia === 'login' ? 'Vale para a tela de alunos e a de administradores desta empresa.' : 'Mostrada ao entrar na plataforma. Usa o mesmo fundo, cores e logo do login.'}</p>
         </div>
 
+        {abaPrevia === 'carregamento' && (
+          <Bloco titulo="Modelo de carregamento">
+            <div className="grid grid-cols-2 gap-2">
+              {([['spinner', 'Spinner'], ['barra', 'Barra'], ['pulso', 'Pulso do logo'], ['pontos', 'Pontos'], ['orbita', 'Órbita']] as [CarModelo, string][]).map(([v, r]) => (
+                <button key={v} type="button" onClick={() => set('carModelo', v)} className={cn('rounded-xl border px-3 py-2.5 text-xs font-semibold transition', c.carModelo === v ? on : off)}>{r}</button>
+              ))}
+            </div>
+            <div className="space-y-1 pt-1"><label className="text-xs text-muted-foreground">Texto <span className="text-muted-foreground/70">(vazio = oculto)</span></label><Input value={c.carTexto} onChange={(e) => set('carTexto', e.target.value)} placeholder="Ex.: Entrando…" /></div>
+            <label className="flex items-center justify-between pt-1 text-sm"><span className="text-muted-foreground">Mostrar logo</span><Switch checked={c.carMostrarLogo} onCheckedChange={(v) => set('carMostrarLogo', v)} /></label>
+          </Bloco>
+        )}
+
+        {abaPrevia === 'login' && (<>
         <Bloco titulo="Modelo">
           <div className="grid grid-cols-2 gap-2">
             {TEMPLATES.map((t) => (
@@ -225,6 +240,7 @@ export function PlataformaLoginConfig({
           <div className="space-y-1"><label className="text-xs text-muted-foreground">Texto abaixo do botão — <strong>admin</strong> <span className="text-muted-foreground/70">(vazio = oculto)</span></label><Input value={c.textoRodapeAdmin} onChange={(e) => set('textoRodapeAdmin', e.target.value)} placeholder="Ex.: Acesso restrito à equipe administrativa." /></div>
           <p className="text-[11px] text-muted-foreground">Dica: use <code className="rounded bg-muted px-1">[texto](https://link)</code> para adicionar um link (fica em negrito e na cor primária).</p>
         </Bloco>
+        </>)}
 
         <div className="flex items-center gap-2 border-t pt-3">
           <Button onClick={salvar} disabled={pending} className="flex-1">{pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Salvar login</Button>
@@ -234,13 +250,19 @@ export function PlataformaLoginConfig({
 
       {/* Prévia WYSIWYG (a própria tela, escalada) — TRAVADA ao rolar os controles. */}
       <div className="rounded-2xl border bg-card p-4 shadow-sm lg:sticky lg:top-4 lg:self-start">
-        <h2 className="mb-3 text-sm font-semibold">Prévia</h2>
+        <div className="mb-3 flex w-fit items-center gap-1 rounded-lg border bg-muted/40 p-1">
+          {(['login', 'carregamento'] as const).map((a) => (
+            <button key={a} type="button" onClick={() => setAbaPrevia(a)} className={cn('rounded-md px-3 py-1 text-xs font-medium transition', abaPrevia === a ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground')}>{a === 'login' ? 'Login' : 'Carregamento'}</button>
+          ))}
+        </div>
         <div ref={boxRef} className="relative w-full overflow-hidden rounded-xl border bg-background" style={{ aspectRatio: '16 / 10' }}>
           <div className="absolute left-0 top-0" style={{ width: 1200, height: 750, transform: `scale(${scale})`, transformOrigin: 'top left', ['--primary' as any]: corPrimaria, ['--brand-accent' as any]: corAccent }}>
-            <AlunoEntrarForm preview metodo="email" plataforma={plataforma} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} config={c} />
+            {abaPrevia === 'login'
+              ? <AlunoEntrarForm preview metodo="email" plataforma={plataforma} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} config={c} />
+              : <LoginLoading preview config={c} plataforma={plataforma} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} />}
           </div>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">Prévia com a marca real — clique em <strong>“Admin”</strong> (canto inferior direito) para ver o modo administrativo. A tela final abre no endereço da empresa.</p>
+        <p className="mt-2 text-xs text-muted-foreground">{abaPrevia === 'login' ? <>Prévia com a marca real — clique em <strong>“Admin”</strong> (canto inferior direito) para ver o modo administrativo.</> : 'Tela mostrada ao entrar na plataforma (mesmo fundo, cores e logo do login).'}</p>
       </div>
     </div>
   )

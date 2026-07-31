@@ -37,5 +37,6 @@ export async function logoutAction() {
   await registrarAudit({ operacao: 'LOGOUT', entidade: 'auth', atorTipo: 'usuario', atorId: data.user?.id ?? null })
   await supabase.auth.signOut()
   revalidatePath('/', 'layout')
-  redirect('/login')
+  // Volta para a tela de login DESTA plataforma (mesmo host), como se cada empresa tivesse seu domínio.
+  redirect('/aluno/entrar')
 }

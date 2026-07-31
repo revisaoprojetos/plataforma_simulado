@@ -59,7 +59,8 @@ export function AlunoSidebar({
   async function sair() {
     toast.success('Saindo… logout realizado.')
     await fetch('/api/aluno/logout', { method: 'POST' }).catch(() => {})
-    router.push('/login')
+    // Volta para a MESMA tela de login desta plataforma (mesmo host/subdomínio), não a entrada neutra.
+    router.push('/aluno/entrar')
     router.refresh()
   }
 
