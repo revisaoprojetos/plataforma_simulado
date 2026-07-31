@@ -47,7 +47,6 @@ export function QuestoesFiltrosAluno({
 
   const nomeDe = (arr: { id: string; nome: string }[], id?: string) => arr.find((x) => x.id === id)?.nome
   const chips: { k: keyof FiltrosParams; label: string }[] = []
-  if (f.tipo) chips.push({ k: 'tipo', label: f.tipo === 'discursiva' ? 'Discursivas' : 'Objetivas' })
   if (f.minhas) chips.push({ k: 'minhas', label: MINHAS.find((m) => m.v === f.minhas)?.r ?? f.minhas })
   if (f.disciplina) chips.push({ k: 'disciplina', label: `Disciplina: ${nomeDe(disciplinas, f.disciplina) ?? '—'}` })
   if (f.assunto) chips.push({ k: 'assunto', label: `Assunto: ${nomeDe(assuntos, f.assunto) ?? '—'}` })
@@ -61,19 +60,6 @@ export function QuestoesFiltrosAluno({
 
   return (
     <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
-      {/* Abas por tipo */}
-      <div className="flex flex-wrap gap-2">
-        {[{ v: '', r: 'Questões Objetivas' }, { v: 'discursiva', r: 'Questões Discursivas' }].map((t) => {
-          const on = (f.tipo ?? '') === t.v
-          return (
-            <button key={t.v} type="button" onClick={() => { set('tipo', t.v); aplicar({ tipo: t.v || undefined }) }}
-              className={cn('rounded-lg border px-3 py-1.5 text-sm font-medium transition', on ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted')}>
-              {t.r}
-            </button>
-          )
-        })}
-      </div>
-
       {/* Minhas questões */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium text-muted-foreground">Minhas questões:</span>

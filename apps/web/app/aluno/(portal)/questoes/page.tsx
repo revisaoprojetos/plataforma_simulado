@@ -23,15 +23,18 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
   const estId = sessao!.estudanteId
 
   // Taxonomia dos filtros + anos distintos + resumo de prática.
-  const [{ data: disciplinas }, { data: bancas }, { data: assuntos }, { data: anosRows }, praticaTotal, praticaAcertos] = await Promise.all([
+  const [{ data: disciplinasAll }, { data: bancas }, { data: assuntos }, { data: metaRows }, praticaTotal, praticaAcertos] = await Promise.all([
     svc.from('simulado_disciplinas').select('id, nome').eq('tenant_id', tid).order('nome'),
     svc.from('simulado_bancas').select('id, nome').eq('tenant_id', tid).order('nome'),
     svc.from('simulado_assuntos').select('id, nome, disciplina_id').eq('tenant_id', tid).order('nome'),
-    svc.from('simulado_questoes').select('ano').eq('tenant_id', tid).eq('status', 'publicada').eq('deletado', false).not('ano', 'is', null).limit(3000),
+    svc.from('simulado_questoes').select('ano, disciplina_id').eq('tenant_id', tid).eq('status', 'publicada').eq('deletado', false).neq('tipo', 'discursiva').limit(3000),
     svc.from('simulado_respostas_avulsas').select('*', { count: 'exact', head: true }).eq('estudante_id', estId).then((r) => r.count ?? 0, () => 0),
     svc.from('simulado_respostas_avulsas').select('*', { count: 'exact', head: true }).eq('estudante_id', estId).eq('correta', true).then((r) => r.count ?? 0, () => 0),
   ])
-  const anos = [...new Set((anosRows ?? []).map((r: any) => r.ano).filter(Boolean))].sort((a, b) => b - a)
+  const anos = [...new Set((metaRows ?? []).map((r: any) => r.ano).filter(Boolean))].sort((a, b) => b - a)
+  // Só mostra no filtro as disciplinas que realmente têm questões (esconde as nunca usadas).
+  const discUsadas = new Set((metaRows ?? []).map((r: any) => r.disciplina_id).filter(Boolean))
+  const disciplinas = (disciplinasAll ?? []).filter((d: any) => discUsadas.has(d.id))
   const pct = praticaTotal > 0 ? Math.round((praticaAcertos / praticaTotal) * 100) : 0
 
   // Questões publicadas (com filtros).
@@ -43,7 +46,7 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
     .eq('deletado', false)
     .order('created_at', { ascending: false })
 
-  if (params.tipo) q = q.eq('tipo', params.tipo)
+  q = q.neq('tipo', 'discursiva') // discursivas ocultas por enquanto
   if (params.disciplina) q = q.eq('disciplina_id', params.disciplina)
   if (params.assunto) q = q.eq('assunto_id', params.assunto)
   if (params.banca) q = q.eq('banca_id', params.banca)
