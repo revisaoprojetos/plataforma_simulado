@@ -221,7 +221,8 @@ export function PlataformaLoginConfig({
               <button key={v} type="button" onClick={() => set('botaoEstilo', v)} className={cn('flex-1 rounded-lg border py-1.5 text-xs font-medium transition', c.botaoEstilo === v ? on : off)}>{r}</button>
             ))}
           </div>
-          <div className="space-y-1"><label className="text-xs text-muted-foreground">Texto abaixo do botão <span className="text-muted-foreground/70">(vazio = oculto)</span></label><Input value={c.textoRodape} onChange={(e) => set('textoRodape', e.target.value)} placeholder="Ex.: Como aluno, basta o e-mail — sem senha." /></div>
+          <div className="space-y-1"><label className="text-xs text-muted-foreground">Texto abaixo do botão — <strong>aluno</strong> <span className="text-muted-foreground/70">(vazio = oculto)</span></label><Input value={c.textoRodape} onChange={(e) => set('textoRodape', e.target.value)} placeholder="Ex.: Como aluno, basta o e-mail — sem senha." /></div>
+          <div className="space-y-1"><label className="text-xs text-muted-foreground">Texto abaixo do botão — <strong>admin</strong> <span className="text-muted-foreground/70">(vazio = oculto)</span></label><Input value={c.textoRodapeAdmin} onChange={(e) => set('textoRodapeAdmin', e.target.value)} placeholder="Ex.: Acesso restrito à equipe administrativa." /></div>
         </Bloco>
 
         <div className="flex items-center gap-2 border-t pt-3">

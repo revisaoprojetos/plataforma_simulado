@@ -101,6 +101,7 @@ export function AlunoEntrarForm({
   const mix = (pct: number) => `color-mix(in oklab, ${textoMarca} ${pct}%, transparent)`
   const kickerCor = ehAdmin ? (c.corTextoFormAdmin ?? c.corTextoForm ?? accent) : (c.corTextoForm ?? accent)
   const kickerTexto = ehAdmin ? (c.textoKickerAdmin || 'Área administrativa') : c.textoKicker
+  const rodapeTexto = ehAdmin ? c.textoRodapeAdmin : c.textoRodape
   const plataformaLabel = c.textoPlataforma === null ? plataforma : c.textoPlataforma
   const anim = c.animacao && !preview
   const btnCor = c.botaoCor ?? primaria
@@ -167,7 +168,7 @@ export function AlunoEntrarForm({
         </div>
         <form onSubmit={submit} className="space-y-3.5">
           <Campos />
-          {c.textoRodape && <p className={cn('text-xs leading-relaxed text-muted-foreground', centro ? 'text-center' : 'text-left')}>{c.textoRodape}</p>}
+          {rodapeTexto && <p className={cn('text-xs leading-relaxed text-muted-foreground', centro ? 'text-center' : 'text-left')}>{rodapeTexto}</p>}
         </form>
       </div>
     )
@@ -255,7 +256,7 @@ export function AlunoEntrarForm({
             )}
           </div>
           <form onSubmit={submit} className="space-y-3.5"><Campos /></form>
-          {c.textoRodape && <p className="mt-3 text-center text-xs text-muted-foreground">{c.textoRodape}</p>}
+          {rodapeTexto && <p className="mt-3 text-center text-xs text-muted-foreground">{rodapeTexto}</p>}
         </div>
       </div>
     )

@@ -38,7 +38,8 @@ export type LoginConfig = {
   textoBotao: string          // rótulo do botão (ex.: "Entrar")
   botaoEstilo: BotaoEstilo    // sólido | gradiente | contorno
   botaoCor: string | null     // cor do botão; null = usa a primária
-  textoRodape: string         // texto abaixo do botão; vazio = oculto
+  textoRodape: string         // texto abaixo do botão (aluno); vazio = oculto
+  textoRodapeAdmin: string    // texto abaixo do botão no modo admin; vazio = oculto
   destaques: string[]         // bullets do painel da marca
   mostrarMarca: boolean       // exibe o painel/cabeçalho da marca
   animacao: boolean           // véus/aurora animados no fundo
@@ -72,6 +73,7 @@ export const LOGIN_DEFAULT: LoginConfig = {
   botaoEstilo: 'solido',
   botaoCor: null,
   textoRodape: 'Como aluno, basta o e-mail — sem senha.',
+  textoRodapeAdmin: 'Acesso restrito à equipe administrativa.',
   destaques: ['Simulados no padrão da banca', 'Correção automática e gabarito', 'Seu desempenho e evolução num só lugar'],
   mostrarMarca: true,
   animacao: true,
@@ -117,6 +119,7 @@ export function resolverLoginConfig(raw: unknown): LoginConfig {
     botaoEstilo: c.botaoEstilo === 'gradiente' || c.botaoEstilo === 'contorno' ? c.botaoEstilo : 'solido',
     botaoCor: typeof c.botaoCor === 'string' && c.botaoCor ? c.botaoCor : null,
     textoRodape: typeof c.textoRodape === 'string' ? c.textoRodape : LOGIN_DEFAULT.textoRodape,
+    textoRodapeAdmin: typeof c.textoRodapeAdmin === 'string' ? c.textoRodapeAdmin : LOGIN_DEFAULT.textoRodapeAdmin,
     destaques: Array.isArray(c.destaques) ? c.destaques.filter((x): x is string => typeof x === 'string').slice(0, 5) : LOGIN_DEFAULT.destaques,
     mostrarMarca: c.mostrarMarca !== false,
     animacao: c.animacao !== false,
