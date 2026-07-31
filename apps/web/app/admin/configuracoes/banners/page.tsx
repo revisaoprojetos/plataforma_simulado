@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { BannersManager, type Banner } from '@/components/admin/banners-manager'
+import { dedupePorLabel } from '@/lib/banner-destinos'
 import { Megaphone } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -28,13 +29,13 @@ export default async function BannersPage() {
 
   // Destinos rápidos para linkar/escolher no banner: pastas + simulados publicados. Tolerante ao schema.
   const [pastasDest, simsDest] = await Promise.all([
-    svc.from('simulado_pastas').select('id, nome').eq('tenant_id', tid).eq('is_folder', true).order('nome', { ascending: true }).then((r: any) => r.data ?? [], () => []),
+    svc.from('simulado_pastas').select('id, nome, folder_area').eq('tenant_id', tid).eq('is_folder', true).eq('deletado', false).order('nome', { ascending: true }).then((r: any) => (r.data ?? []).filter((f: any) => f.folder_area !== 'caderno'), () => []),
     svc.from('simulado_simulados').select('id, titulo, embed_token').eq('tenant_id', tid).eq('deletado', false).eq('status', 'publicado').order('created_at', { ascending: false }).limit(60).then((r: any) => r.data ?? [], () => []),
   ])
-  const destinosBanner = [
+  const destinosBanner = dedupePorLabel([
     ...(pastasDest as any[]).map((f) => ({ label: f.nome as string, href: `/aluno/simulado?pasta=${f.id}`, grupo: 'Pastas' })),
     ...(simsDest as any[]).filter((s) => s.embed_token).map((s) => ({ label: s.titulo as string, href: `/simulado/${s.embed_token}`, grupo: 'Simulados' })),
-  ]
+  ])
 
   return (
     <div className="space-y-6">

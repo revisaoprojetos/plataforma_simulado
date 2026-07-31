@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { PlataformaTabs } from '@/components/super/plataforma-tabs'
 import { listarAdministradores } from '@/app/admin/administradores/actions'
 import { salvarTemaSuperAction, salvarEmbedConfigAction } from '@/app/admin/tenants/actions'
+import { dedupePorLabel } from '@/lib/banner-destinos'
 import { ArrowLeft, Building2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -53,13 +54,13 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
 
   // Destinos rápidos para linkar um banner: pastas (folders) + simulados publicados. Tolerante ao schema.
   const [pastasDest, simsDest] = await Promise.all([
-    svc.from('simulado_pastas').select('id, nome').eq('tenant_id', id).eq('is_folder', true).order('nome', { ascending: true }).then((r: any) => r.data ?? [], () => []),
+    svc.from('simulado_pastas').select('id, nome, folder_area').eq('tenant_id', id).eq('is_folder', true).eq('deletado', false).order('nome', { ascending: true }).then((r: any) => (r.data ?? []).filter((f: any) => f.folder_area !== 'caderno'), () => []),
     svc.from('simulado_simulados').select('id, titulo, embed_token').eq('tenant_id', id).eq('deletado', false).eq('status', 'publicado').order('created_at', { ascending: false }).limit(60).then((r: any) => r.data ?? [], () => []),
   ])
-  const destinosBanner = [
+  const destinosBanner = dedupePorLabel([
     ...(pastasDest as any[]).map((f) => ({ label: f.nome as string, href: `/aluno/simulado?pasta=${f.id}`, grupo: 'Pastas' })),
     ...(simsDest as any[]).filter((s) => s.embed_token).map((s) => ({ label: s.titulo as string, href: `/simulado/${s.embed_token}`, grupo: 'Simulados' })),
-  ]
+  ])
 
   // Badge de estado (4 valores): Ativa (todos) · Só admin · Só super-admin · Oculta.
   const estado = t.ativo
