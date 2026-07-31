@@ -17,7 +17,9 @@ import { AjudaDrawer } from '@/components/aluno/ajuda-drawer'
 // Mesmas cores de estado do admin (hover = ativo; ícone segue --sidebar-icon).
 const NAV_STATES =
   'hover:text-[color:var(--sidebar-text-active)] data-active:text-[color:var(--sidebar-text-active)] ' +
-  '[&>svg]:text-[color:var(--sidebar-icon)] [&:hover>svg]:text-[color:var(--sidebar-icon-active)] [&[data-active]>svg]:text-[color:var(--sidebar-icon-active)]'
+  '[&>svg]:text-[color:var(--sidebar-icon)] [&:hover>svg]:text-[color:var(--sidebar-icon-active)] [&[data-active]>svg]:text-[color:var(--sidebar-icon-active)] ' +
+  // Badge de contagem: acompanha a cor do texto quando ativo/hover (some no estado normal, visível quando selecionado).
+  '[&:hover_.nav-badge]:text-[color:var(--sidebar-text-active)] [&[data-active]_.nav-badge]:text-[color:var(--sidebar-text-active)]'
 
 const NAV = [
   { href: '/aluno', label: 'Início', icon: Home, exact: true },
@@ -95,7 +97,7 @@ export function AlunoSidebar({
                       <n.icon className="h-4 w-4" />
                       <span>{n.label}</span>
                       {c != null && c > 0 && (
-                        <span className="ml-auto text-xs font-medium tabular-nums text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">{c}</span>
+                        <span className="nav-badge ml-auto text-xs font-medium tabular-nums text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">{c}</span>
                       )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
