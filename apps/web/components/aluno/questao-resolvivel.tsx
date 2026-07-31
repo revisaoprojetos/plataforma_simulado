@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { Star, CheckCircle2, XCircle, RotateCcw } from 'lucide-react'
+import { Star, CheckCircle2, XCircle, RotateCcw, Scissors } from 'lucide-react'
 import { ComentariosQuestao } from '@/components/aluno/comentarios-questao'
 import { AddToCaderno } from '@/components/aluno/add-to-caderno'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -21,7 +21,9 @@ export interface QuestaoAluno {
   tipo?: string
   enunciado: string
   imagem_url?: string | null
+  codigo?: string | null
   disciplina?: string | null
+  assunto?: string | null
   banca?: string | null
   ano?: number | null
   comentario_professor?: string | null
@@ -34,6 +36,8 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
   const [revelado, setRevelado] = useState(false)
   const [favorito, setFavorito] = useState(questao.favorito)
   const [favPending, setFavPending] = useState(false)
+  const [eliminadas, setEliminadas] = useState<Set<string>>(new Set())
+  const eliminar = (id: string) => setEliminadas((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const alts = [...questao.alternativas].sort((a, b) => a.ordem - b.ordem)
   const acertou = revelado && alts.find((a) => a.id === escolhida)?.correta
@@ -77,8 +81,11 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
       <CardContent className="space-y-4 p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {numero != null && <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono font-semibold text-primary">#{numero}</span>}
+            {questao.codigo
+              ? <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono font-semibold text-primary">{questao.codigo}</span>
+              : numero != null && <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono font-semibold text-primary">#{numero}</span>}
             {questao.disciplina && <span className="rounded-full bg-muted px-2 py-0.5 font-medium">{questao.disciplina}</span>}
+            {questao.assunto && <span className="rounded-full bg-muted px-2 py-0.5">{questao.assunto}</span>}
             {questao.banca && <span className="rounded-full bg-muted px-2 py-0.5">{questao.banca}</span>}
             {questao.ano && <span className="rounded-full bg-muted px-2 py-0.5">{questao.ano}</span>}
           </div>
@@ -109,32 +116,41 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
             const escolha = escolhida === alt.id
             const mostrarCerta = revelado && alt.correta
             const mostrarErrada = revelado && escolha && !alt.correta
+            const cortada = eliminadas.has(alt.id) && !revelado
             return (
-              <button
-                key={alt.id}
-                disabled={revelado}
-                onClick={() => setEscolhida(alt.id)}
-                className={cn(
-                  'flex w-full items-start gap-3 rounded-lg border p-3 text-left text-sm transition-colors',
-                  !revelado && escolha && 'border-primary bg-primary/5',
-                  !revelado && !escolha && 'hover:bg-muted',
-                  mostrarCerta && 'border-emerald-500 bg-emerald-50 dark:border-emerald-500/60 dark:bg-emerald-950/30',
-                  mostrarErrada && 'border-rose-500 bg-rose-50 dark:border-rose-500/60 dark:bg-rose-950/30',
+              <div key={alt.id} className="flex items-stretch gap-1.5">
+                <button
+                  disabled={revelado || cortada}
+                  onClick={() => setEscolhida(alt.id)}
+                  className={cn(
+                    'flex flex-1 items-start gap-3 rounded-lg border p-3 text-left text-sm transition-colors',
+                    !revelado && escolha && 'border-primary bg-primary/5',
+                    !revelado && !escolha && !cortada && 'hover:bg-muted',
+                    cortada && 'opacity-45',
+                    mostrarCerta && 'border-emerald-500 bg-emerald-50 dark:border-emerald-500/60 dark:bg-emerald-950/30',
+                    mostrarErrada && 'border-rose-500 bg-rose-50 dark:border-rose-500/60 dark:bg-rose-950/30',
+                  )}
+                >
+                  <span className={cn(
+                    'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold',
+                    mostrarCerta && 'border-emerald-500 bg-emerald-500 text-white',
+                    mostrarErrada && 'border-rose-500 bg-rose-500 text-white',
+                    !mostrarCerta && !mostrarErrada && escolha && 'border-primary bg-primary text-primary-foreground',
+                    !mostrarCerta && !mostrarErrada && !escolha && 'border-muted-foreground/30 text-muted-foreground',
+                  )}>
+                    {LETRA[i] ?? i + 1}
+                  </span>
+                  <MarkdownContent inline className={cn('flex-1', cortada && 'line-through')}>{alt.texto}</MarkdownContent>
+                  {mostrarCerta && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />}
+                  {mostrarErrada && <XCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />}
+                </button>
+                {!revelado && (
+                  <button type="button" onClick={() => eliminar(alt.id)} aria-label={cortada ? 'Restaurar alternativa' : 'Eliminar alternativa'} title="Eliminar (tesoura)"
+                    className={cn('flex w-9 shrink-0 items-center justify-center rounded-lg border transition-colors', cortada ? 'border-primary/40 bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>
+                    <Scissors className="h-4 w-4" />
+                  </button>
                 )}
-              >
-                <span className={cn(
-                  'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold',
-                  mostrarCerta && 'border-emerald-500 bg-emerald-500 text-white',
-                  mostrarErrada && 'border-rose-500 bg-rose-500 text-white',
-                  !mostrarCerta && !mostrarErrada && escolha && 'border-primary bg-primary text-primary-foreground',
-                  !mostrarCerta && !mostrarErrada && !escolha && 'border-muted-foreground/30 text-muted-foreground',
-                )}>
-                  {LETRA[i] ?? i + 1}
-                </span>
-                <MarkdownContent inline className="flex-1">{alt.texto}</MarkdownContent>
-                {mostrarCerta && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />}
-                {mostrarErrada && <XCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />}
-              </button>
+              </div>
             )
           })}
         </div>
