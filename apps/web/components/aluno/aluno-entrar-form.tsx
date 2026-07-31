@@ -173,7 +173,7 @@ export function AlunoEntrarForm({
     return (
       <div className="w-full max-w-sm space-y-6">
         <div className={cn('flex flex-col gap-3', centro ? 'items-center text-center' : 'items-start text-left')}>
-          {comEmblema && <Emblema />}
+          {comEmblema && Emblema({})}
           {(kickerTexto || c.textoEntrar || plataformaLabel) && (
             <div>
               {kickerTexto && <p className={cn('text-[11px] font-semibold uppercase tracking-[0.2em]', anim && 'lg-up')} style={{ color: kickerCor, animationDelay: '.05s' }}>{kickerTexto}</p>}
@@ -183,7 +183,7 @@ export function AlunoEntrarForm({
           )}
         </div>
         <form onSubmit={submit} className="space-y-3.5">
-          <Campos />
+          {Campos()}
           {rodapeTexto && <p className={cn('text-xs leading-relaxed text-muted-foreground', centro ? 'text-center' : 'text-left')}>{rodapeNodes(rodapeTexto)}</p>}
         </form>
       </div>
@@ -205,10 +205,10 @@ export function AlunoEntrarForm({
         {c.fundo === 'imagem' && <div className="absolute inset-0 bg-black/45" />}
         {Blobs}
         <div className="relative flex items-center gap-3">
-          <Emblema />
+          {Emblema({})}
           <div className="leading-tight"><p className="text-lg font-semibold" style={{ color: textoMarca }}>{plataforma}</p>{subtitulo && <p className="text-sm" style={{ color: mix(60) }}>{subtitulo}</p>}</div>
         </div>
-        <MarcaTexto />
+        {MarcaTexto()}
         <div className="relative text-xs" style={{ color: mix(45) }}>© {new Date().getFullYear()} {plataforma}</div>
       </aside>
     )
@@ -228,7 +228,7 @@ export function AlunoEntrarForm({
         <style>{KF}</style>{Blobs}
         <div className="absolute inset-0 bg-black/45" />
         <div className="relative flex w-full max-w-5xl flex-col items-center gap-8 lg:flex-row lg:items-center lg:justify-between">
-          {c.mostrarMarca && <div className="hidden max-w-md lg:block"><MarcaTexto /></div>}
+          {c.mostrarMarca && <div className="hidden max-w-md lg:block">{MarcaTexto()}</div>}
           <div className={cn('w-full max-w-sm text-foreground', cardCls)}>{FormBloco({ centro: false })}</div>
         </div>
       </div>
@@ -244,8 +244,8 @@ export function AlunoEntrarForm({
           <div className="relative flex flex-col items-center gap-4 overflow-hidden px-6 py-12 text-center text-white" style={fundoLoginStyle(c)}>
             {c.fundo === 'imagem' && <div className="absolute inset-0 bg-black/45" />}
             {Blobs}
-            <div className="relative"><Emblema tam="lg" /></div>
-            <div className="relative"><MarcaTexto /></div>
+            <div className="relative">{Emblema({ tam: 'lg' })}</div>
+            <div className="relative">{MarcaTexto()}</div>
           </div>
         )}
         <div className="relative flex flex-1 items-center justify-center p-6">
@@ -263,7 +263,7 @@ export function AlunoEntrarForm({
         {c.fundo === 'imagem' && <div className="absolute inset-0 bg-black/40" />}
         <div className={cn('relative w-full max-w-md', cardCls)}>
           <div className="mb-5 flex flex-col items-center gap-3 text-center">
-            <Emblema tam="lg" />
+            {Emblema({ tam: 'lg' })}
             {(c.titulo || c.subtitulo) && (
               <div>
                 {c.titulo && <h2 className={cn('text-xl font-extrabold tracking-tight', anim && 'lg-up')} style={{ animationDelay: '.06s' }}>{c.titulo}</h2>}
@@ -271,7 +271,7 @@ export function AlunoEntrarForm({
               </div>
             )}
           </div>
-          <form onSubmit={submit} className="space-y-3.5"><Campos /></form>
+          <form onSubmit={submit} className="space-y-3.5">{Campos()}</form>
           {rodapeTexto && <p className="mt-3 text-center text-xs text-muted-foreground">{rodapeNodes(rodapeTexto)}</p>}
         </div>
       </div>
