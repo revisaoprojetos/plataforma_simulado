@@ -82,7 +82,7 @@ export function AlunoEntrarForm({
   const SZ: Record<string, [string, string]> = { p: ['h-11 w-11', 'h-6 w-6'], m: ['h-14 w-14', 'h-7 w-7'], g: ['h-20 w-20', 'h-10 w-10'] }
   const bump: Record<string, 'p' | 'm' | 'g'> = { p: 'm', m: 'g', g: 'g' }
   const logoTransp = effBg === 'transparent'
-  const maskStyle = (url: string): React.CSSProperties => ({ WebkitMaskImage: `url(${url})`, maskImage: `url(${url})`, WebkitMaskSize: 'contain', maskSize: 'contain', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat', WebkitMaskPosition: 'center', maskPosition: 'center' })
+  const maskStyle = (url: string): React.CSSProperties => ({ WebkitMaskImage: `url("${url}")`, maskImage: `url("${url}")`, WebkitMaskSize: 'contain', maskSize: 'contain', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat', WebkitMaskPosition: 'center', maskPosition: 'center' })
   function Emblema({ tam }: { tam?: 'lg' }) {
     if (!c.mostrarLogo) return null
     const key = tam === 'lg' ? bump[c.logoTamanho] : c.logoTamanho
