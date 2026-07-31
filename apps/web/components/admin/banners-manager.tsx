@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, Loader2, Trash2, Eye, EyeOff, Megaphone, MessageSquareWarning, ImageIcon } from 'lucide-react'
+import { Plus, Loader2, Trash2, Eye, EyeOff, Megaphone, MessageSquareWarning, ImageIcon, Upload, X } from 'lucide-react'
+import { redimensionarImagem } from '@/lib/imagem'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -27,6 +28,18 @@ export function BannersManager({ banners, tenantId }: { banners: Banner[]; tenan
   const [imagem, setImagem] = useState('')
   const [link, setLink] = useState('')
   const [cor, setCor] = useState('#6366f1')
+  const [enviando, setEnviando] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function onArquivo(f: File | null) {
+    if (!f) return
+    if (!f.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
+    setEnviando(true)
+    // Destaque (hero) é largo → resolução maior; banner/pop-up menores.
+    try { setImagem(await redimensionarImagem(f, tipo === 'hero' ? 1600 : 900)) }
+    catch { toast.error('Falha ao processar a imagem.') }
+    finally { setEnviando(false); if (fileRef.current) fileRef.current.value = '' }
+  }
 
   function criar(e: React.FormEvent) {
     e.preventDefault()
@@ -81,7 +94,25 @@ export function BannersManager({ banners, tenantId }: { banners: Banner[]; tenan
         <div className="space-y-1"><label className="text-xs text-muted-foreground">Mensagem</label>
           <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={3} placeholder="Texto do aviso…" className="w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
         </div>
-        <div className="space-y-1"><label className="text-xs text-muted-foreground">Imagem (URL, opcional)</label><Input value={imagem} onChange={(e) => setImagem(e.target.value)} placeholder="https://…" /></div>
+        <div className="space-y-1.5">
+          <label className="text-xs text-muted-foreground">Imagem {tipo === 'hero' ? '(recomendado — larga, ex. 1920×600)' : '(opcional)'}</label>
+          <div className="flex gap-2">
+            <Input value={imagem.startsWith('data:') ? '' : imagem} onChange={(e) => setImagem(e.target.value)} placeholder="Cole uma URL ou envie um arquivo →" className="flex-1" />
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onArquivo(e.target.files?.[0] ?? null)} />
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={enviando} title="Enviar imagem do computador"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted disabled:opacity-50">
+              {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            </button>
+          </div>
+          {imagem && (
+            <div className="relative overflow-hidden rounded-lg border">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imagem} alt="" className={cn('w-full object-cover', tipo === 'hero' ? 'aspect-[16/5]' : 'h-20')} />
+              <button type="button" onClick={() => setImagem('')} title="Remover imagem"
+                className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><X className="h-3.5 w-3.5" /></button>
+            </div>
+          )}
+        </div>
         <div className="space-y-1"><label className="text-xs text-muted-foreground">Link ao clicar (opcional)</label><Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="/aluno/simulado ou https://…" /></div>
         <div className="flex items-center gap-2"><label className="text-xs text-muted-foreground">Cor de destaque</label><input type="color" value={cor} onChange={(e) => setCor(e.target.value)} className="h-8 w-10 cursor-pointer rounded border bg-transparent p-0.5" /></div>
         <Button type="submit" disabled={pending && alvo === 'novo'} className="w-full">

@@ -63,6 +63,10 @@ export function SuperChrome({ userEmail, children }: { userEmail: string; childr
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-4">{Nav}</div>
       <div className="border-t border-white/10 p-3">
+        <div className="mb-1.5 flex items-center gap-2 px-3">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold text-white">{(userEmail[0] || 'A').toUpperCase()}</span>
+          <span className="min-w-0 flex-1 truncate text-[11px] text-slate-400">{userEmail}</span>
+        </div>
         <Link href="/login" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-100">
           <ArrowLeft className="h-4 w-4" /> Seletor de plataforma
         </Link>
@@ -88,19 +92,9 @@ export function SuperChrome({ userEmail, children }: { userEmail: string; childr
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b bg-card px-4 md:px-6">
-          <div className="flex items-center gap-2">
-            <button onClick={() => setAberto(true)} aria-label="Menu" className="rounded-lg p-2 text-muted-foreground hover:bg-muted md:hidden"><Menu className="h-5 w-5" /></button>
-            <span className="text-sm font-semibold">Administração do sistema</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden truncate text-xs text-muted-foreground sm:inline">{userEmail}</span>
-            <button onClick={sair} disabled={saindo} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive disabled:opacity-60">
-              {saindo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />} Sair
-            </button>
-          </div>
-        </header>
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+        {/* Topbar removida — botão de menu flutuante só no mobile (abre o drawer da sidebar). */}
+        <button onClick={() => setAberto(true)} aria-label="Menu" className="absolute left-3 top-3 z-20 rounded-lg border bg-card p-2 text-muted-foreground shadow-sm hover:bg-muted md:hidden"><Menu className="h-5 w-5" /></button>
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           {children}
         </main>
