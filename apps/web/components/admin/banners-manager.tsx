@@ -291,7 +291,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
         })}
       </div>
 
-      {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} onClose={() => setEditando(null)} />}
+      {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} onClose={() => setEditando(null)} />}
     </div>
   )
 }

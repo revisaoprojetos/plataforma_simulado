@@ -19,7 +19,7 @@ function fileToDataUrl(f: File): Promise<string> {
 
 /** Pop-up de configuração TOTAL de um banner já criado (tipo, título, mensagem, imagem+recorte,
  *  link/destino, cor, ativo). Salva via atualizarBannerAction. */
-export function BannerEditModal({ banner, tenantId, destinos, onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; onClose: () => void }) {
+export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; onClose: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   // Modo da UI: "simulado" é um destaque (hero) que aponta p/ um simulado/pasta. Detecta pelo banner.
@@ -96,6 +96,17 @@ export function BannerEditModal({ banner, tenantId, destinos, onClose }: { banne
                 {simulados.length > 0 && <optgroup label="Simulados">{simulados.map((d) => <option key={d.href} value={d.href}>{d.label}</option>)}</optgroup>}
               </select>
               {destSim.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhum simulado ou pasta disponível ainda.</p>}
+              {/* Toggle GERAL (vale para todos os banners de simulado): mostrar/ocultar o painel de
+                  desempenho do aluno (Simulados/Nota média/Melhor nota) no canto inferior direito. */}
+              {onToggleDesempenho && (
+                <div className="mt-1 flex items-start gap-3 rounded-lg border bg-background px-3 py-2.5">
+                  <Switch checked={!!desempenho} onCheckedChange={onToggleDesempenho} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium">Mostrar desempenho do aluno no banner</p>
+                    <p className="text-[11px] text-muted-foreground">Painel com Simulados/Nota média/Melhor nota no canto inferior direito. Vale para <strong>todos</strong> os banners de simulado. Desativado por padrão.</p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
