@@ -138,12 +138,9 @@ export function PlataformaLoginConfig({
                 <button key={v} type="button" onClick={() => set('carModelo', v)} className={cn('rounded-xl border px-3 py-2.5 text-xs font-semibold transition', c.carModelo === v ? on : off)}>{r}</button>
               ))}
             </div>
-            <div className="space-y-1 pt-1"><label className="text-xs text-muted-foreground">Texto <span className="text-muted-foreground/70">(vazio = oculto)</span></label><Input value={c.carTexto} onChange={(e) => set('carTexto', e.target.value)} placeholder="Ex.: Entrando…" /></div>
-            <div className="space-y-1 pt-1"><label className="text-xs text-muted-foreground">Texto da marca <span className="text-muted-foreground/70">(vazio = oculto)</span></label><Input value={c.carTextoMarca ?? (c.marcaNome ?? plataforma)} onChange={(e) => set('carTextoMarca', e.target.value)} placeholder="Ex.: Revisão / Ensino Jurídico" /></div>
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <ColorField rotulo="Cor do texto" valor={c.carCorTexto} fallback={c.corTextoMarca ?? '#ffffff'} rotuloReset="Texto marca" onChange={(v) => set('carCorTexto', v)} />
-              <ColorField rotulo="Cor da animação" valor={c.carCorAnim} fallback={corAccent} rotuloReset="Destaque" onChange={(v) => set('carCorAnim', v)} />
-            </div>
+            <div className="flex items-center gap-2 pt-1"><span className="text-xs text-muted-foreground">Cor da animação</span><SwatchInline valor={c.carCorAnim} fallback={corAccent} onChange={(v) => set('carCorAnim', v)} title="Cor da animação de carregamento" /></div>
+            <div className="space-y-1 pt-1"><label className="text-xs text-muted-foreground">Texto <span className="text-muted-foreground/70">(vazio = oculto)</span></label><div className="flex gap-2"><Input value={c.carTexto} onChange={(e) => set('carTexto', e.target.value)} placeholder="Ex.: Entrando…" className="flex-1" /><SwatchInline valor={c.carCorTexto} fallback={c.corTextoMarca ?? '#ffffff'} onChange={(v) => set('carCorTexto', v)} title="Cor do texto do carregamento" /></div></div>
+            <div className="space-y-1"><label className="text-xs text-muted-foreground">Texto da marca <span className="text-muted-foreground/70">(vazio = oculto)</span></label><div className="flex gap-2"><Input value={c.carTextoMarca ?? (c.marcaNome ?? plataforma)} onChange={(e) => set('carTextoMarca', e.target.value)} placeholder="Ex.: Revisão / Ensino Jurídico" className="flex-1" /><SwatchInline valor={c.carCorTexto} fallback={c.corTextoMarca ?? '#ffffff'} onChange={(v) => set('carCorTexto', v)} title="Cor do texto do carregamento" /></div></div>
             <label className="flex items-center justify-between pt-1 text-sm"><span className="text-muted-foreground">Mostrar logo</span><Switch checked={c.carMostrarLogo} onCheckedChange={(v) => set('carMostrarLogo', v)} /></label>
           </Bloco>
           {blocoLogo}
