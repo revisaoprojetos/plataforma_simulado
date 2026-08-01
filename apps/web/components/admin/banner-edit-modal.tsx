@@ -68,7 +68,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
   if (typeof document === 'undefined') return null
   return createPortal(
     <div className="fixed inset-0 z-[125] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <header className="flex shrink-0 items-center justify-between border-b px-5 py-3.5">
           <span className="text-sm font-semibold">Configurar aviso</span>
           <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
@@ -89,6 +89,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
             ))}
           </div>
 
+          {/* Seleção do simulado/pasta — largura total (só no modo Simulado). */}
           {uiTipo === 'simulado' && (
             <div className="space-y-1.5 rounded-lg bg-muted/50 px-3 py-2.5">
               <p className="text-xs text-muted-foreground">Banner que promove um <strong>simulado</strong> (ou uma <strong>pasta de simulados</strong>) no topo da home, usando o <strong>fundo do próprio simulado/pasta</strong>. Escolha:</p>
@@ -100,98 +101,110 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                 {simulados.length > 0 && <optgroup label="Simulados">{simulados.map((d) => <option key={d.href} value={d.href}>{d.label}</option>)}</optgroup>}
               </select>
               {destSim.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhum simulado ou pasta disponível ainda.</p>}
-              {/* Rótulo "Em destaque para você" (por banner): ligar/desligar + trocar o texto. */}
-              <div className="space-y-1.5 rounded-lg border bg-background px-3 py-2.5">
-                <div className="flex items-start gap-3">
-                  <Switch checked={destaqueAtivo} onCheckedChange={setDestaqueAtivo} />
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium">Rótulo em destaque (acima do título)</p>
-                    <p className="text-[11px] text-muted-foreground">A tarja verde “Em destaque para você”. Desligue para ocultá-la.</p>
-                  </div>
-                </div>
-                {destaqueAtivo && <Input value={destaqueTexto} onChange={(e) => setDestaqueTexto(e.target.value)} placeholder="Em destaque para você" className="h-8 text-xs" />}
-              </div>
-              {/* Degradê escuro sobre a imagem: liga/desliga + intensidade (0–150; 100 = padrão). */}
-              <div className="space-y-1.5 rounded-lg border bg-background px-3 py-2.5">
-                <div className="flex items-start gap-3">
-                  <Switch checked={fadeAtivo} onCheckedChange={setFadeAtivo} />
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium">Degradê sobre a imagem</p>
-                    <p className="text-[11px] text-muted-foreground">Escurecimento à esquerda que dá legibilidade ao texto.</p>
-                  </div>
-                </div>
-                {fadeAtivo && (
-                  <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <span className="w-10 shrink-0">Fade</span>
-                    <input type="range" min={0} max={150} step={5} value={fadeNivel} onChange={(e) => setFadeNivel(Number(e.target.value))} className="h-1.5 flex-1 cursor-pointer accent-primary" />
-                    <span className="w-8 shrink-0 text-right tabular-nums">{fadeNivel}%</span>
-                  </label>
-                )}
-              </div>
-              {/* Toggle GERAL (vale para todos os banners de simulado): mostrar/ocultar o painel de
-                  desempenho do aluno (Simulados/Nota média/Melhor nota) no canto inferior direito. */}
-              {onToggleDesempenho && (
-                <div className="mt-1 flex items-start gap-3 rounded-lg border bg-background px-3 py-2.5">
-                  <Switch checked={!!desempenho} onCheckedChange={onToggleDesempenho} />
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium">Mostrar desempenho do aluno no banner</p>
-                    <p className="text-[11px] text-muted-foreground">Painel com Simulados/Nota média/Melhor nota no canto inferior direito. Vale para <strong>todos</strong> os banners de simulado. Desativado por padrão.</p>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
-          <div className="space-y-1"><label className="text-xs text-muted-foreground">Título</label><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Novo simulado disponível!" /></div>
-          <div className="space-y-1"><label className="text-xs text-muted-foreground">Mensagem</label>
-            <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={3} placeholder="Texto do aviso…" className="w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : uiTipo === 'simulado' ? '(opcional — padrão: fundo do simulado)' : '(molde 1920×500 — largura total)'}</label>
-            <div className="flex gap-2">
-              <Input value={imagem.startsWith('data:') ? '' : imagem} onChange={(e) => setImagem(e.target.value)} placeholder="Cole uma URL ou envie um arquivo →" className="flex-1" />
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onArquivo(e.target.files?.[0] ?? null)} />
-              <button type="button" onClick={() => fileRef.current?.click()} disabled={enviando} title="Enviar imagem"
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted disabled:opacity-50">
-                {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              </button>
-            </div>
-            {imagem && (
-              <div className="relative overflow-hidden rounded-lg border">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imagem} alt="" className={cn('w-full object-cover', tipo === 'popup' ? 'h-20' : 'aspect-[1920/500]')} />
-                <div className="absolute right-1.5 top-1.5 flex gap-1.5">
-                  {tipo !== 'popup' && (
-                    <button type="button" onClick={() => { setCropSrc(cropSrc || imagem); setCropOpen(true) }} title="Ajustar recorte"
-                      className="flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><Crop className="h-3.5 w-3.5" /></button>
-                  )}
-                  <button type="button" onClick={() => setImagem('')} title="Remover imagem"
-                    className="flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><X className="h-3.5 w-3.5" /></button>
-                </div>
+          {/* Duas colunas: Conteúdo (texto/link) | Aparência (imagem, cor, opções do slide). */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* Coluna 1 — Conteúdo */}
+            <div className="space-y-3">
+              <div className="space-y-1"><label className="text-xs text-muted-foreground">Título</label><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Novo simulado disponível!" /></div>
+              <div className="space-y-1"><label className="text-xs text-muted-foreground">Mensagem</label>
+                <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={4} placeholder="Texto do aviso…" className="w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
               </div>
-            )}
-            {cropOpen && cropSrc && <BannerCropper src={cropSrc} onApply={(d) => { setImagem(d); setCropOpen(false) }} onCancel={() => setCropOpen(false)} />}
-          </div>
+              <div className={cn('space-y-1', uiTipo === 'simulado' && 'hidden')}>
+                <label className="text-xs text-muted-foreground">Link ao clicar (opcional)</label>
+                {destinos && destinos.length > 0 && (
+                  <select value={destinos.some((d) => d.href === link) ? link : ''} onChange={(e) => e.target.value && setLink(e.target.value)}
+                    className="mb-1.5 h-9 w-full rounded-lg border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <option value="">Destino rápido (pasta, simulado…) — ou digite abaixo</option>
+                    {['Pastas', 'Simulados'].map((grp) => {
+                      const opts = destinos.filter((d) => (d.grupo ?? 'Simulados') === grp)
+                      return opts.length ? <optgroup key={grp} label={grp}>{opts.map((d) => <option key={d.href} value={d.href}>{d.label}</option>)}</optgroup> : null
+                    })}
+                  </select>
+                )}
+                <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="/aluno ou https://…" />
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-lg border bg-background px-3 py-2.5">
+                <div className="flex items-center gap-2"><label className="text-xs text-muted-foreground">Cor de destaque</label><input type="color" value={cor} onChange={(e) => setCor(e.target.value)} className="h-8 w-10 cursor-pointer rounded border bg-transparent p-0.5" /></div>
+                <div className="flex items-center gap-2"><span className="text-xs text-muted-foreground">Ativo</span><Switch checked={ativo} onCheckedChange={setAtivo} /></div>
+              </div>
+            </div>
 
-          <div className={cn('space-y-1', uiTipo === 'simulado' && 'hidden')}>
-            <label className="text-xs text-muted-foreground">Link ao clicar (opcional)</label>
-            {destinos && destinos.length > 0 && (
-              <select value={destinos.some((d) => d.href === link) ? link : ''} onChange={(e) => e.target.value && setLink(e.target.value)}
-                className="mb-1.5 h-9 w-full rounded-lg border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <option value="">Destino rápido (pasta, simulado…) — ou digite abaixo</option>
-                {['Pastas', 'Simulados'].map((grp) => {
-                  const opts = destinos.filter((d) => (d.grupo ?? 'Simulados') === grp)
-                  return opts.length ? <optgroup key={grp} label={grp}>{opts.map((d) => <option key={d.href} value={d.href}>{d.label}</option>)}</optgroup> : null
-                })}
-              </select>
-            )}
-            <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="/aluno ou https://…" />
-          </div>
+            {/* Coluna 2 — Aparência */}
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : uiTipo === 'simulado' ? '(opcional — padrão: fundo do simulado)' : '(molde 1920×500 — largura total)'}</label>
+                <div className="flex gap-2">
+                  <Input value={imagem.startsWith('data:') ? '' : imagem} onChange={(e) => setImagem(e.target.value)} placeholder="Cole uma URL ou envie um arquivo →" className="flex-1" />
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onArquivo(e.target.files?.[0] ?? null)} />
+                  <button type="button" onClick={() => fileRef.current?.click()} disabled={enviando} title="Enviar imagem"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted disabled:opacity-50">
+                    {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  </button>
+                </div>
+                {imagem && (
+                  <div className="relative overflow-hidden rounded-lg border">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={imagem} alt="" className={cn('w-full object-cover', tipo === 'popup' ? 'h-20' : 'aspect-[1920/500]')} />
+                    <div className="absolute right-1.5 top-1.5 flex gap-1.5">
+                      {tipo !== 'popup' && (
+                        <button type="button" onClick={() => { setCropSrc(cropSrc || imagem); setCropOpen(true) }} title="Ajustar recorte"
+                          className="flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><Crop className="h-3.5 w-3.5" /></button>
+                      )}
+                      <button type="button" onClick={() => setImagem('')} title="Remover imagem"
+                        className="flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><X className="h-3.5 w-3.5" /></button>
+                    </div>
+                  </div>
+                )}
+                {cropOpen && cropSrc && <BannerCropper src={cropSrc} onApply={(d) => { setImagem(d); setCropOpen(false) }} onCancel={() => setCropOpen(false)} />}
+              </div>
 
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2"><label className="text-xs text-muted-foreground">Cor de destaque</label><input type="color" value={cor} onChange={(e) => setCor(e.target.value)} className="h-8 w-10 cursor-pointer rounded border bg-transparent p-0.5" /></div>
-            <div className="flex items-center gap-2"><span className="text-xs text-muted-foreground">Ativo</span><Switch checked={ativo} onCheckedChange={setAtivo} /></div>
+              {/* Opções do slide de simulado. */}
+              {uiTipo === 'simulado' && (
+                <>
+                  {/* Rótulo "Em destaque para você" (por banner). */}
+                  <div className="space-y-1.5 rounded-lg border bg-background px-3 py-2.5">
+                    <div className="flex items-start gap-3">
+                      <Switch checked={destaqueAtivo} onCheckedChange={setDestaqueAtivo} />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium">Rótulo em destaque (acima do título)</p>
+                        <p className="text-[11px] text-muted-foreground">A tarja verde “Em destaque para você”. Desligue para ocultá-la.</p>
+                      </div>
+                    </div>
+                    {destaqueAtivo && <Input value={destaqueTexto} onChange={(e) => setDestaqueTexto(e.target.value)} placeholder="Em destaque para você" className="h-8 text-xs" />}
+                  </div>
+                  {/* Degradê escuro sobre a imagem: liga/desliga + intensidade (0–150; 100 = padrão). */}
+                  <div className="space-y-1.5 rounded-lg border bg-background px-3 py-2.5">
+                    <div className="flex items-start gap-3">
+                      <Switch checked={fadeAtivo} onCheckedChange={setFadeAtivo} />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium">Degradê sobre a imagem</p>
+                        <p className="text-[11px] text-muted-foreground">Escurecimento à esquerda que dá legibilidade ao texto.</p>
+                      </div>
+                    </div>
+                    {fadeAtivo && (
+                      <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="w-10 shrink-0">Fade</span>
+                        <input type="range" min={0} max={150} step={5} value={fadeNivel} onChange={(e) => setFadeNivel(Number(e.target.value))} className="h-1.5 flex-1 cursor-pointer accent-primary" />
+                        <span className="w-8 shrink-0 text-right tabular-nums">{fadeNivel}%</span>
+                      </label>
+                    )}
+                  </div>
+                  {/* Toggle GERAL (vale para todos os banners de simulado). */}
+                  {onToggleDesempenho && (
+                    <div className="flex items-start gap-3 rounded-lg border bg-background px-3 py-2.5">
+                      <Switch checked={!!desempenho} onCheckedChange={onToggleDesempenho} />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium">Mostrar desempenho do aluno no banner</p>
+                        <p className="text-[11px] text-muted-foreground">Painel com Simulados/Nota média/Melhor nota no canto inferior direito. Vale para <strong>todos</strong> os banners de simulado. Desativado por padrão.</p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
 
