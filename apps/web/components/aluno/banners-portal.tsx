@@ -169,7 +169,7 @@ function ImgSlide({ b }: { b: BannerPortal }) {
 
 /** Simulado em destaque como banner: capa/cor de fundo + overlay com título, descrição, chips,
  *  ações (Fazer agora / Ver detalhes / favorito) e — no canto — os KPIs do aluno. */
-function SimSlide({ s, stats }: { s: HeroSimSlide; stats?: BannerStats | null }) {
+export function SimSlide({ s, stats }: { s: HeroSimSlide; stats?: BannerStats | null }) {
   // Degradê escuro sobre a imagem (dá legibilidade ao texto à esquerda). Configurável por banner:
   // liga/desliga e intensidade (0–150; 100 = padrão). As alfas do padrão são escaladas pelo nível.
   const fadeAtivo = s.fadeAtivo !== false

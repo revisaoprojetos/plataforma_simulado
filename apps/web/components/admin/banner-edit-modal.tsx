@@ -12,6 +12,7 @@ import { redimensionarImagem } from '@/lib/imagem'
 import { BannerCropper } from '@/components/admin/banner-cropper'
 import { atualizarBannerAction } from '@/app/admin/configuracoes/banners/actions'
 import { ehBannerSimulado, type Banner, type DestinoBanner } from '@/components/admin/banners-manager'
+import { SimSlide, type HeroSimSlide } from '@/components/aluno/banners-portal'
 
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f) })
@@ -65,9 +66,21 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
     })
   }
 
-  // Prévia do degradê: mesmas alfas do slide real, escaladas pelo nível (100 = padrão).
-  const fadeFactor = Math.max(0, fadeNivel) / 100
-  const fa = (base: number) => Math.min(1, base * fadeFactor).toFixed(3)
+  // Prévia EXATA: monta um HeroSimSlide com o estado atual e renderiza o MESMO componente do portal.
+  const ehPasta = /[?&]pasta=/.test(link)
+  const previewSlide: HeroSimSlide = {
+    id: banner.id, kind: 'sim',
+    capa: imagem || null,
+    cor: cor || '#6d28d9',
+    titulo: titulo || 'Título do banner',
+    descricao: mensagem || null,
+    link: link || '#',
+    acao: ehPasta ? 'Ver simulados' : 'Fazer agora',
+    detalhesLink: !ehPasta && link ? '#' : null,
+    stats: desempenho ? { simulados: 12, notaMedia: 82.5, melhorNota: 100 } : null,
+    destaqueAtivo, destaqueTexto: destaqueTexto || null,
+    fadeAtivo, fadeNivel,
+  }
 
   if (typeof document === 'undefined') return null
   return createPortal(
@@ -79,20 +92,6 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
         </header>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
-          <div className="grid grid-cols-4 gap-2">
-            {([
-              { t: 'banner', label: 'Banner', Icon: Megaphone },
-              { t: 'popup', label: 'Pop-up', Icon: MessageSquareWarning },
-              { t: 'hero', label: 'Destaque', Icon: ImageIcon },
-              { t: 'simulado', label: 'Simulado', Icon: Clapperboard },
-            ] as const).map(({ t, label, Icon }) => (
-              <button key={t} type="button" onClick={() => setUiTipo(t)}
-                className={cn('flex flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-[11px] font-medium transition', uiTipo === t ? 'border-primary bg-primary/5 text-primary' : 'hover:bg-muted')}>
-                <Icon className="h-4 w-4" /> {label}
-              </button>
-            ))}
-          </div>
-
           {/* Seleção do simulado/pasta — largura total (só no modo Simulado). */}
           {uiTipo === 'simulado' && (
             <div className="space-y-1.5 rounded-lg bg-muted/50 px-3 py-2.5">
@@ -113,24 +112,13 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
           <div className="space-y-1.5">
             <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : uiTipo === 'simulado' ? '(prévia — padrão: fundo do simulado)' : '(molde 1920×500 — largura total)'}</label>
             <div className={cn('relative w-full overflow-hidden rounded-lg border', tipo === 'popup' ? 'aspect-[16/6]' : 'aspect-[1920/500]')}>
-              {imagem
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={imagem} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
-              {uiTipo === 'simulado' && fadeAtivo && (
-                <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, rgba(10,7,20,${fa(0.94)}) 2%, rgba(10,7,20,${fa(0.7)}) 42%, rgba(10,7,20,${fa(0.14)}) 78%, rgba(10,7,20,${fa(0.5)}) 100%)` }} />
-              )}
-              {uiTipo === 'simulado' && (
-                <div className="absolute inset-0 flex flex-col justify-center gap-1 pl-[5%] pr-4">
-                  {destaqueAtivo && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 8px 1px rgba(52,211,153,.7)' }} />
-                      <span className="text-[9px] font-semibold uppercase tracking-[0.2em] sm:text-[10px]" style={{ color: 'var(--brand-accent)' }}>{destaqueTexto || 'Em destaque para você'}</span>
-                    </div>
-                  )}
-                  <p className="line-clamp-2 max-w-[65%] text-base font-extrabold leading-tight tracking-tight text-white drop-shadow sm:text-xl">{titulo || 'Título do banner'}</p>
-                </div>
-              )}
+              {uiTipo === 'simulado'
+                // Prévia EXATA: mesmo componente do carrossel do aluno (pointer-events-none = não navega).
+                ? <div className="pointer-events-none absolute inset-0"><SimSlide s={previewSlide} stats={previewSlide.stats} /></div>
+                : imagem
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={imagem} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                  : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
               {imagem && (
                 <div className="absolute right-1.5 top-1.5 flex gap-1.5">
                   {tipo !== 'popup' && (
@@ -227,6 +215,24 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
               ) : (
                 <p className="rounded-lg border border-dashed px-3 py-2.5 text-[11px] text-muted-foreground">As opções de rótulo, degradê e desempenho valem só para banners do tipo <strong>Simulado</strong>.</p>
               )}
+            </div>
+          </div>
+
+          {/* Tipo do aviso — compacto, no rodapé (troca o modo sem roubar espaço da prévia). */}
+          <div className="space-y-1 border-t pt-3">
+            <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Tipo do aviso</label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {([
+                { t: 'banner', label: 'Banner', Icon: Megaphone },
+                { t: 'popup', label: 'Pop-up', Icon: MessageSquareWarning },
+                { t: 'hero', label: 'Destaque', Icon: ImageIcon },
+                { t: 'simulado', label: 'Simulado', Icon: Clapperboard },
+              ] as const).map(({ t, label, Icon }) => (
+                <button key={t} type="button" onClick={() => setUiTipo(t)}
+                  className={cn('flex items-center justify-center gap-1.5 rounded-md border px-1.5 py-1.5 text-[11px] font-medium transition', uiTipo === t ? 'border-primary bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-muted')}>
+                  <Icon className="h-3.5 w-3.5" /> {label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
