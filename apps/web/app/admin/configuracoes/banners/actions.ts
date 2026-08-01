@@ -15,24 +15,32 @@ export interface BannerInput {
   cor?: string | null
   ativo?: boolean
   ordem?: number
-  // Rótulo "Em destaque para você" (só nos banners de simulado) — por banner, guardado em tema.
+  // Config visual por-banner (só nos banners de simulado) — guardada em tema.banner_destaques[id].
   destaqueAtivo?: boolean
   destaqueTexto?: string | null
+  fadeAtivo?: boolean
+  fadeNivel?: number
 }
 
-/** Salva a config por-banner do rótulo "Em destaque para você" em tema.banner_destaques[bannerId]. */
+type DestaqueEntry = { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number }
+
+/** Salva a config por-banner (rótulo "Em destaque" + degradê) em tema.banner_destaques[bannerId]. */
 async function salvarDestaque(
   svc: ReturnType<typeof createAdminClient>,
   tenantId: string,
   bannerId: string,
-  ativo: boolean | undefined,
-  texto: string | null | undefined,
+  data: Pick<BannerInput, 'destaqueAtivo' | 'destaqueTexto' | 'fadeAtivo' | 'fadeNivel'>,
 ) {
-  if (ativo === undefined && texto === undefined) return
+  if (data.destaqueAtivo === undefined && data.destaqueTexto === undefined && data.fadeAtivo === undefined && data.fadeNivel === undefined) return
   const { data: t } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
   const tema = { ...(((t?.tema as Record<string, unknown>) ?? {})) }
-  const mapa = { ...(((tema.banner_destaques as Record<string, unknown>) ?? {})) } as Record<string, { ativo?: boolean; texto?: string }>
-  mapa[bannerId] = { ativo: ativo !== false, texto: (texto?.trim() || undefined) }
+  const mapa = { ...(((tema.banner_destaques as Record<string, unknown>) ?? {})) } as Record<string, DestaqueEntry>
+  mapa[bannerId] = {
+    ativo: data.destaqueAtivo !== false,
+    texto: (data.destaqueTexto?.trim() || undefined),
+    fadeAtivo: data.fadeAtivo !== false,
+    fadeNivel: typeof data.fadeNivel === 'number' ? Math.max(0, Math.min(150, Math.round(data.fadeNivel))) : undefined,
+  }
   tema.banner_destaques = mapa
   await svc.from('simulado_tenants').update({ tema }).eq('id', tenantId)
 }
@@ -69,7 +77,7 @@ export async function criarBannerAction(data: BannerInput, tenantIdAlvo?: string
     ordem: data.ordem ?? 0,
   }).select('id').single()
   if (error) return { ok: false, error: error.message }
-  if (novo?.id) await salvarDestaque(c.svc, c.tenantId, novo.id, data.destaqueAtivo, data.destaqueTexto)
+  if (novo?.id) await salvarDestaque(c.svc, c.tenantId, novo.id, data)
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_banners', tenantId: c.tenantId, depois: { tipo, titulo: data.titulo } })
   reval(c.tenantId, c.ehSuper)
   return { ok: true }
@@ -89,7 +97,7 @@ export async function atualizarBannerAction(id: string, data: BannerInput, tenan
     atualizado_em: new Date().toISOString(),
   }).eq('id', id).eq('tenant_id', c.tenantId)
   if (error) return { ok: false, error: error.message }
-  await salvarDestaque(c.svc, c.tenantId, id, data.destaqueAtivo, data.destaqueTexto)
+  await salvarDestaque(c.svc, c.tenantId, id, data)
   reval(c.tenantId, c.ehSuper)
   return { ok: true }
 }

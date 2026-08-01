@@ -29,8 +29,13 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   // Painel de desempenho (KPIs) nos banners de simulado: só quando o tenant liga (default OFF).
   const mostrarDesempenhoBanner = (tenantRow?.tema as any)?.banners_desempenho === true
   // Config por-banner do rótulo "Em destaque para você" (ativo + texto). Default: ativo, texto padrão.
-  const destaquesBanner = ((tenantRow?.tema as any)?.banner_destaques ?? {}) as Record<string, { ativo?: boolean; texto?: string }>
-  const destaqueDe = (id: string) => ({ destaqueAtivo: destaquesBanner[id]?.ativo !== false, destaqueTexto: destaquesBanner[id]?.texto ?? null })
+  const destaquesBanner = ((tenantRow?.tema as any)?.banner_destaques ?? {}) as Record<string, { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number }>
+  const destaqueDe = (id: string) => ({
+    destaqueAtivo: destaquesBanner[id]?.ativo !== false,
+    destaqueTexto: destaquesBanner[id]?.texto ?? null,
+    fadeAtivo: destaquesBanner[id]?.fadeAtivo !== false,
+    fadeNivel: destaquesBanner[id]?.fadeNivel ?? 100,
+  })
   // KPIs do aluno p/ o banner de simulado (Simulados · Nota média · Melhor nota).
   const finalizadasNota = ((sessAll ?? []) as any[]).filter((x) => x.status === 'finalizada')
   const notasAluno = finalizadasNota.map((x) => (x.nota != null ? Number(x.nota) : null)).filter((n): n is number => n != null)

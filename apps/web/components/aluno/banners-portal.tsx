@@ -39,6 +39,8 @@ export type HeroSimSlide = {
   stats?: BannerStats | null // KPIs do aluno ESPECÍFICOS deste alvo (simulado/pasta); cai no global se ausente
   destaqueAtivo?: boolean // mostrar o rótulo "Em destaque para você" acima do título (default true)
   destaqueTexto?: string | null // texto desse rótulo (default "Em destaque para você")
+  fadeAtivo?: boolean // aplicar o degradê escuro sobre a imagem (default true)
+  fadeNivel?: number // intensidade do degradê, 0–150 (100 = padrão)
 }
 
 type Slide = ({ kind: 'img' } & BannerPortal) | HeroSimSlide
@@ -168,12 +170,17 @@ function ImgSlide({ b }: { b: BannerPortal }) {
 /** Simulado em destaque como banner: capa/cor de fundo + overlay com título, descrição, chips,
  *  ações (Fazer agora / Ver detalhes / favorito) e — no canto — os KPIs do aluno. */
 function SimSlide({ s, stats }: { s: HeroSimSlide; stats?: BannerStats | null }) {
+  // Degradê escuro sobre a imagem (dá legibilidade ao texto à esquerda). Configurável por banner:
+  // liga/desliga e intensidade (0–150; 100 = padrão). As alfas do padrão são escaladas pelo nível.
+  const fadeAtivo = s.fadeAtivo !== false
+  const f = Math.max(0, s.fadeNivel ?? 100) / 100
+  const a = (base: number) => Math.min(1, base * f).toFixed(3)
   return (
     <div className="absolute inset-0">
       {s.capa
         ? <img src={s.capa} alt="" className="absolute inset-0 h-full w-full object-cover" /> // eslint-disable-line @next/next/no-img-element
         : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${s.cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(10,7,20,0.94) 2%, rgba(10,7,20,0.7) 42%, rgba(10,7,20,0.14) 78%, rgba(10,7,20,0.5) 100%)' }} />
+      {fadeAtivo && <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, rgba(10,7,20,${a(0.94)}) 2%, rgba(10,7,20,${a(0.7)}) 42%, rgba(10,7,20,${a(0.14)}) 78%, rgba(10,7,20,${a(0.5)}) 100%)` }} />}
 
       {/* Conteúdo — recuado à esquerda p/ não ficar atrás da seta "anterior". */}
       <div className="relative flex h-full max-w-2xl flex-col justify-center py-5 pl-14 pr-6 sm:py-7 sm:pl-16 md:pl-20">

@@ -19,7 +19,7 @@ function fileToDataUrl(f: File): Promise<string> {
 
 /** Pop-up de configuração TOTAL de um banner já criado (tipo, título, mensagem, imagem+recorte,
  *  link/destino, cor, ativo). Salva via atualizarBannerAction. */
-export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; onClose: () => void }) {
+export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; onClose: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   // Modo da UI: "simulado" é um destaque (hero) que aponta p/ um simulado/pasta. Detecta pelo banner.
@@ -36,6 +36,8 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
   const [ativo, setAtivo] = useState(banner.ativo)
   const [destaqueAtivo, setDestaqueAtivo] = useState(destaqueAtivoInicial)
   const [destaqueTexto, setDestaqueTexto] = useState(destaqueTextoInicial)
+  const [fadeAtivo, setFadeAtivo] = useState(fadeAtivoInicial)
+  const [fadeNivel, setFadeNivel] = useState(fadeNivelInicial)
   const [enviando, setEnviando] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropOpen, setCropOpen] = useState(false)
@@ -57,7 +59,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
 
   function salvar() {
     start(async () => {
-      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto }, tenantId)
+      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel }, tenantId)
       if (r.ok) { toast.success('Banner atualizado.'); router.refresh(); onClose() }
       else toast.error(r.error ?? 'Falha ao salvar.')
     })
@@ -108,6 +110,23 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                   </div>
                 </div>
                 {destaqueAtivo && <Input value={destaqueTexto} onChange={(e) => setDestaqueTexto(e.target.value)} placeholder="Em destaque para você" className="h-8 text-xs" />}
+              </div>
+              {/* Degradê escuro sobre a imagem: liga/desliga + intensidade (0–150; 100 = padrão). */}
+              <div className="space-y-1.5 rounded-lg border bg-background px-3 py-2.5">
+                <div className="flex items-start gap-3">
+                  <Switch checked={fadeAtivo} onCheckedChange={setFadeAtivo} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium">Degradê sobre a imagem</p>
+                    <p className="text-[11px] text-muted-foreground">Escurecimento à esquerda que dá legibilidade ao texto.</p>
+                  </div>
+                </div>
+                {fadeAtivo && (
+                  <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <span className="w-10 shrink-0">Fade</span>
+                    <input type="range" min={0} max={150} step={5} value={fadeNivel} onChange={(e) => setFadeNivel(Number(e.target.value))} className="h-1.5 flex-1 cursor-pointer accent-primary" />
+                    <span className="w-8 shrink-0 text-right tabular-nums">{fadeNivel}%</span>
+                  </label>
+                )}
               </div>
               {/* Toggle GERAL (vale para todos os banners de simulado): mostrar/ocultar o painel de
                   desempenho do aluno (Simulados/Nota média/Melhor nota) no canto inferior direito. */}

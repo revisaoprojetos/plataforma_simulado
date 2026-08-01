@@ -31,7 +31,7 @@ export const ehBannerSimulado = (b: { tipo: string; link: string | null }) => b.
 
 export type DestinoBanner = { label: string; href: string; grupo?: string }
 
-export type DestaqueMap = Record<string, { ativo?: boolean; texto?: string }>
+export type DestaqueMap = Record<string, { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number }>
 
 export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = false, destaques = {} }: { banners: Banner[]; tenantId?: string; destinos?: DestinoBanner[]; desempenhoAtivo?: boolean; destaques?: DestaqueMap }) {
   const router = useRouter()
@@ -57,6 +57,8 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
   const [cor, setCor] = useState('#6366f1')
   const [destaqueAtivoN, setDestaqueAtivoN] = useState(true)
   const [destaqueTextoN, setDestaqueTextoN] = useState('')
+  const [fadeAtivoN, setFadeAtivoN] = useState(true)
+  const [fadeNivelN, setFadeNivelN] = useState(100)
   const [enviando, setEnviando] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropOpen, setCropOpen] = useState(false)
@@ -113,10 +115,10 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
     if (uiTipo !== 'simulado' && !titulo.trim() && !mensagem.trim() && !imagem.trim()) { toast.error('Preencha ao menos um título, mensagem ou imagem.'); return }
     setAlvo('novo')
     start(async () => {
-      const r = await criarBannerAction({ tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo: true, destaqueAtivo: destaqueAtivoN, destaqueTexto: destaqueTextoN }, tenantId)
+      const r = await criarBannerAction({ tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo: true, destaqueAtivo: destaqueAtivoN, destaqueTexto: destaqueTextoN, fadeAtivo: fadeAtivoN, fadeNivel: fadeNivelN }, tenantId)
       setAlvo(null)
       if (!r.ok) { toast.error(r.error ?? 'Falha ao criar.'); return }
-      toast.success('Criado!'); setTitulo(''); setMensagem(''); setImagem(''); setLink(''); setDestaqueTextoN(''); setDestaqueAtivoN(true)
+      toast.success('Criado!'); setTitulo(''); setMensagem(''); setImagem(''); setLink(''); setDestaqueTextoN(''); setDestaqueAtivoN(true); setFadeAtivoN(true); setFadeNivelN(100)
       router.refresh()
     })
   }
@@ -182,6 +184,23 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
                 </div>
               </div>
               {destaqueAtivoN && <Input value={destaqueTextoN} onChange={(e) => setDestaqueTextoN(e.target.value)} placeholder="Em destaque para você" className="h-8 text-xs" />}
+            </div>
+            {/* Degradê escuro sobre a imagem: liga/desliga + intensidade (0–150; 100 = padrão). */}
+            <div className="space-y-1.5 rounded-lg border bg-background px-3 py-2.5">
+              <div className="flex items-start gap-3">
+                <Switch checked={fadeAtivoN} onCheckedChange={setFadeAtivoN} />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium">Degradê sobre a imagem</p>
+                  <p className="text-[11px] text-muted-foreground">Escurecimento à esquerda que dá legibilidade ao texto.</p>
+                </div>
+              </div>
+              {fadeAtivoN && (
+                <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <span className="w-10 shrink-0">Fade</span>
+                  <input type="range" min={0} max={150} step={5} value={fadeNivelN} onChange={(e) => setFadeNivelN(Number(e.target.value))} className="h-1.5 flex-1 cursor-pointer accent-primary" />
+                  <span className="w-8 shrink-0 text-right tabular-nums">{fadeNivelN}%</span>
+                </label>
+              )}
             </div>
             {/* Configuração GERAL (vale para todos os banners de simulado deste tenant): mostrar ou não
                 o painel de desempenho do aluno (Simulados/Nota média/Melhor nota) no canto inferior direito.
@@ -306,7 +325,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
         })}
       </div>
 
-      {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} destaqueAtivoInicial={destaques[editando.id]?.ativo !== false} destaqueTextoInicial={destaques[editando.id]?.texto ?? ''} onClose={() => setEditando(null)} />}
+      {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} destaqueAtivoInicial={destaques[editando.id]?.ativo !== false} destaqueTextoInicial={destaques[editando.id]?.texto ?? ''} fadeAtivoInicial={destaques[editando.id]?.fadeAtivo !== false} fadeNivelInicial={destaques[editando.id]?.fadeNivel ?? 100} onClose={() => setEditando(null)} />}
     </div>
   )
 }
