@@ -15,7 +15,7 @@ function Alvo({ href, className, style, children, onClick, 'aria-label': ariaLab
 
 export type BannerPortal = {
   id: string; tipo: 'banner' | 'popup' | 'hero'; titulo: string | null; mensagem: string | null
-  imagem_url: string | null; link: string | null; cor: string | null
+  imagem_url: string | null; link: string | null; cor: string | null; ordem?: number
 }
 
 /** Chip informativo do banner de simulado (ex.: disponibilidade, nº de questões, tipo, contagem). */
@@ -41,6 +41,7 @@ export type HeroSimSlide = {
   destaqueTexto?: string | null // texto desse rótulo (default "Em destaque para você")
   fadeAtivo?: boolean // aplicar o degradê escuro sobre a imagem (default true)
   fadeNivel?: number // intensidade do degradê, 0–150 (100 = padrão)
+  ordem?: number // posição global no carrossel (respeita a ordenação do console)
 }
 
 type Slide = ({ kind: 'img' } & BannerPortal) | HeroSimSlide
@@ -63,11 +64,12 @@ export function BannersPortal({ banners, simulados = [], stats }: { banners: Ban
     setPopup(null)
   }
 
-  // Um carrossel só: banners de imagem (banner/destaque) + simulados em destaque.
+  // Um carrossel só: banners de imagem (banner/destaque) + simulados em destaque,
+  // ORDENADOS pela ordem global do console (campo `ordem`), não agrupados por tipo.
   const slides: Slide[] = [
     ...banners.filter((b) => b.tipo === 'banner' || b.tipo === 'hero').map((b) => ({ kind: 'img' as const, ...b })),
     ...simulados,
-  ]
+  ].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
 
   return (
     <>

@@ -45,6 +45,8 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     melhorNota: notasAluno.length ? Math.max(...notasAluno) : null,
   }
   const todosBanners = (banRows ?? []) as any[]
+  // Ordem GLOBAL do carrossel = posição na lista já ordenada por (ordem, criado_em) no console.
+  const ordemGlobal = new Map<string, number>(todosBanners.map((b, i) => [b.id, i]))
   // Banners de DESTAQUE (tipo 'hero'): os que apontam para um simulado (link /simulado/token)
   // viram SLIDE com o fundo do próprio simulado; os demais são banners de imagem.
   const heroAll = todosBanners.filter((b) => b.tipo === 'hero')
@@ -167,6 +169,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
           chips: total > 0 ? [{ label: `${total} ${total === 1 ? 'simulado' : 'simulados'}`, tone: 'muted', icon: 'book' }] : undefined,
           stats: mostrarDesempenhoBanner ? statsDe((id) => grupoPorSimAll.get(id) === pid) : null,
           ...destaqueDe(b.id),
+          ordem: ordemGlobal.get(b.id) ?? 0,
         }
       }
       const sim = tok ? simByToken.get(tok) : null
@@ -189,6 +192,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
         chips: chips.length ? chips : undefined,
         stats: mostrarDesempenhoBanner && sim?.id ? statsDe((id) => id === sim.id) : null,
         ...destaqueDe(b.id),
+        ordem: ordemGlobal.get(b.id) ?? 0,
       }
     })
   }
@@ -234,7 +238,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   return (
     <div className="animate-page space-y-6">
       {/* Banners do tenant — UM carrossel só (banner + destaque + simulado) + pop-up. SÓ na Início. */}
-      <BannersPortal banners={bannersSemSim} simulados={heroSims} stats={mostrarDesempenhoBanner ? statsAluno : null} />
+      <BannersPortal banners={bannersSemSim.map((b) => ({ ...b, ordem: ordemGlobal.get(b.id) ?? 0 }))} simulados={heroSims} stats={mostrarDesempenhoBanner ? statsAluno : null} />
 
       {/* Saudação solta. */}
       <div>
