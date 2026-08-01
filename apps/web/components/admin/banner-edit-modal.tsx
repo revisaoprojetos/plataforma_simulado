@@ -65,6 +65,10 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
     })
   }
 
+  // Prévia do degradê: mesmas alfas do slide real, escaladas pelo nível (100 = padrão).
+  const fadeFactor = Math.max(0, fadeNivel) / 100
+  const fa = (base: number) => Math.min(1, base * fadeFactor).toFixed(3)
+
   if (typeof document === 'undefined') return null
   return createPortal(
     <div className="fixed inset-0 z-[125] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
@@ -104,13 +108,58 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
             </div>
           )}
 
-          {/* Duas colunas: Conteúdo (texto/link) | Aparência (imagem, cor, opções do slide). */}
+          {/* PRÉVIA no topo — a imagem selecionada com, no modo simulado, o degradê + rótulo + título
+              renderizados por cima (WYSIWYG, atualiza ao vivo conforme você configura). */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : uiTipo === 'simulado' ? '(prévia — padrão: fundo do simulado)' : '(molde 1920×500 — largura total)'}</label>
+            <div className={cn('relative w-full overflow-hidden rounded-lg border', tipo === 'popup' ? 'aspect-[16/6]' : 'aspect-[1920/500]')}>
+              {imagem
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={imagem} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
+              {uiTipo === 'simulado' && fadeAtivo && (
+                <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, rgba(10,7,20,${fa(0.94)}) 2%, rgba(10,7,20,${fa(0.7)}) 42%, rgba(10,7,20,${fa(0.14)}) 78%, rgba(10,7,20,${fa(0.5)}) 100%)` }} />
+              )}
+              {uiTipo === 'simulado' && (
+                <div className="absolute inset-0 flex flex-col justify-center gap-1 pl-[5%] pr-4">
+                  {destaqueAtivo && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 8px 1px rgba(52,211,153,.7)' }} />
+                      <span className="text-[9px] font-semibold uppercase tracking-[0.2em] sm:text-[10px]" style={{ color: 'var(--brand-accent)' }}>{destaqueTexto || 'Em destaque para você'}</span>
+                    </div>
+                  )}
+                  <p className="line-clamp-2 max-w-[65%] text-base font-extrabold leading-tight tracking-tight text-white drop-shadow sm:text-xl">{titulo || 'Título do banner'}</p>
+                </div>
+              )}
+              {imagem && (
+                <div className="absolute right-1.5 top-1.5 flex gap-1.5">
+                  {tipo !== 'popup' && (
+                    <button type="button" onClick={() => { setCropSrc(cropSrc || imagem); setCropOpen(true) }} title="Ajustar recorte"
+                      className="flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><Crop className="h-3.5 w-3.5" /></button>
+                  )}
+                  <button type="button" onClick={() => setImagem('')} title="Remover imagem"
+                    className="flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><X className="h-3.5 w-3.5" /></button>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Input value={imagem.startsWith('data:') ? '' : imagem} onChange={(e) => setImagem(e.target.value)} placeholder="Cole uma URL ou envie um arquivo →" className="flex-1" />
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onArquivo(e.target.files?.[0] ?? null)} />
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={enviando} title="Enviar imagem"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted disabled:opacity-50">
+                {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              </button>
+            </div>
+            {cropOpen && cropSrc && <BannerCropper src={cropSrc} onApply={(d) => { setImagem(d); setCropOpen(false) }} onCancel={() => setCropOpen(false)} />}
+          </div>
+
+          {/* Controles em 2 colunas: Conteúdo | Opções do slide. */}
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Coluna 1 — Conteúdo */}
             <div className="space-y-3">
               <div className="space-y-1"><label className="text-xs text-muted-foreground">Título</label><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Novo simulado disponível!" /></div>
               <div className="space-y-1"><label className="text-xs text-muted-foreground">Mensagem</label>
-                <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={4} placeholder="Texto do aviso…" className="w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
+                <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={3} placeholder="Texto do aviso…" className="w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
               </div>
               <div className={cn('space-y-1', uiTipo === 'simulado' && 'hidden')}>
                 <label className="text-xs text-muted-foreground">Link ao clicar (opcional)</label>
@@ -132,37 +181,9 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
               </div>
             </div>
 
-            {/* Coluna 2 — Aparência */}
+            {/* Coluna 2 — Opções do slide de simulado (refletem na prévia acima). */}
             <div className="space-y-3">
-              <div className="space-y-1.5">
-                <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : uiTipo === 'simulado' ? '(opcional — padrão: fundo do simulado)' : '(molde 1920×500 — largura total)'}</label>
-                <div className="flex gap-2">
-                  <Input value={imagem.startsWith('data:') ? '' : imagem} onChange={(e) => setImagem(e.target.value)} placeholder="Cole uma URL ou envie um arquivo →" className="flex-1" />
-                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onArquivo(e.target.files?.[0] ?? null)} />
-                  <button type="button" onClick={() => fileRef.current?.click()} disabled={enviando} title="Enviar imagem"
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted disabled:opacity-50">
-                    {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  </button>
-                </div>
-                {imagem && (
-                  <div className="relative overflow-hidden rounded-lg border">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={imagem} alt="" className={cn('w-full object-cover', tipo === 'popup' ? 'h-20' : 'aspect-[1920/500]')} />
-                    <div className="absolute right-1.5 top-1.5 flex gap-1.5">
-                      {tipo !== 'popup' && (
-                        <button type="button" onClick={() => { setCropSrc(cropSrc || imagem); setCropOpen(true) }} title="Ajustar recorte"
-                          className="flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><Crop className="h-3.5 w-3.5" /></button>
-                      )}
-                      <button type="button" onClick={() => setImagem('')} title="Remover imagem"
-                        className="flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><X className="h-3.5 w-3.5" /></button>
-                    </div>
-                  </div>
-                )}
-                {cropOpen && cropSrc && <BannerCropper src={cropSrc} onApply={(d) => { setImagem(d); setCropOpen(false) }} onCancel={() => setCropOpen(false)} />}
-              </div>
-
-              {/* Opções do slide de simulado. */}
-              {uiTipo === 'simulado' && (
+              {uiTipo === 'simulado' ? (
                 <>
                   {/* Rótulo "Em destaque para você" (por banner). */}
                   <div className="space-y-1.5 rounded-lg border bg-background px-3 py-2.5">
@@ -203,6 +224,8 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                     </div>
                   )}
                 </>
+              ) : (
+                <p className="rounded-lg border border-dashed px-3 py-2.5 text-[11px] text-muted-foreground">As opções de rótulo, degradê e desempenho valem só para banners do tipo <strong>Simulado</strong>.</p>
               )}
             </div>
           </div>
