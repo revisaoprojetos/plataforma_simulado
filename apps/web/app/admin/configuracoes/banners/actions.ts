@@ -15,6 +15,26 @@ export interface BannerInput {
   cor?: string | null
   ativo?: boolean
   ordem?: number
+  // Rótulo "Em destaque para você" (só nos banners de simulado) — por banner, guardado em tema.
+  destaqueAtivo?: boolean
+  destaqueTexto?: string | null
+}
+
+/** Salva a config por-banner do rótulo "Em destaque para você" em tema.banner_destaques[bannerId]. */
+async function salvarDestaque(
+  svc: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  bannerId: string,
+  ativo: boolean | undefined,
+  texto: string | null | undefined,
+) {
+  if (ativo === undefined && texto === undefined) return
+  const { data: t } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
+  const tema = { ...(((t?.tema as Record<string, unknown>) ?? {})) }
+  const mapa = { ...(((tema.banner_destaques as Record<string, unknown>) ?? {})) } as Record<string, { ativo?: boolean; texto?: string }>
+  mapa[bannerId] = { ativo: ativo !== false, texto: (texto?.trim() || undefined) }
+  tema.banner_destaques = mapa
+  await svc.from('simulado_tenants').update({ tema }).eq('id', tenantId)
 }
 
 // Com `tenantIdAlvo` (só super-admin) opera na plataforma-alvo a partir do console; senão exige
@@ -38,7 +58,7 @@ function reval(tenantId: string, ehSuper: boolean) {
 export async function criarBannerAction(data: BannerInput, tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string }> {
   const c = await ctx(tenantIdAlvo); if (!c.ok) return c
   const tipo = data.tipo === 'popup' ? 'popup' : data.tipo === 'hero' ? 'hero' : 'banner'
-  const { error } = await c.svc.from('simulado_banners').insert({
+  const { data: novo, error } = await c.svc.from('simulado_banners').insert({
     tenant_id: c.tenantId, tipo,
     titulo: data.titulo?.trim() || null,
     mensagem: data.mensagem?.trim() || null,
@@ -47,8 +67,9 @@ export async function criarBannerAction(data: BannerInput, tenantIdAlvo?: string
     cor: data.cor?.trim() || null,
     ativo: data.ativo ?? true,
     ordem: data.ordem ?? 0,
-  })
+  }).select('id').single()
   if (error) return { ok: false, error: error.message }
+  if (novo?.id) await salvarDestaque(c.svc, c.tenantId, novo.id, data.destaqueAtivo, data.destaqueTexto)
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_banners', tenantId: c.tenantId, depois: { tipo, titulo: data.titulo } })
   reval(c.tenantId, c.ehSuper)
   return { ok: true }
@@ -68,6 +89,7 @@ export async function atualizarBannerAction(id: string, data: BannerInput, tenan
     atualizado_em: new Date().toISOString(),
   }).eq('id', id).eq('tenant_id', c.tenantId)
   if (error) return { ok: false, error: error.message }
+  await salvarDestaque(c.svc, c.tenantId, id, data.destaqueAtivo, data.destaqueTexto)
   reval(c.tenantId, c.ehSuper)
   return { ok: true }
 }

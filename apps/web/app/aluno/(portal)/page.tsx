@@ -28,6 +28,9 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   ])
   // Painel de desempenho (KPIs) nos banners de simulado: só quando o tenant liga (default OFF).
   const mostrarDesempenhoBanner = (tenantRow?.tema as any)?.banners_desempenho === true
+  // Config por-banner do rótulo "Em destaque para você" (ativo + texto). Default: ativo, texto padrão.
+  const destaquesBanner = ((tenantRow?.tema as any)?.banner_destaques ?? {}) as Record<string, { ativo?: boolean; texto?: string }>
+  const destaqueDe = (id: string) => ({ destaqueAtivo: destaquesBanner[id]?.ativo !== false, destaqueTexto: destaquesBanner[id]?.texto ?? null })
   // KPIs do aluno p/ o banner de simulado (Simulados · Nota média · Melhor nota).
   const finalizadasNota = ((sessAll ?? []) as any[]).filter((x) => x.status === 'finalizada')
   const notasAluno = finalizadasNota.map((x) => (x.nota != null ? Number(x.nota) : null)).filter((n): n is number => n != null)
@@ -158,6 +161,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
           link: b.link, acao: 'Ver simulados',
           chips: total > 0 ? [{ label: `${total} ${total === 1 ? 'simulado' : 'simulados'}`, tone: 'muted', icon: 'book' }] : undefined,
           stats: mostrarDesempenhoBanner ? statsDe((id) => grupoPorSimAll.get(id) === pid) : null,
+          ...destaqueDe(b.id),
         }
       }
       const sim = tok ? simByToken.get(tok) : null
@@ -179,6 +183,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
         detalhesLink: sim?.id ? `/aluno/simulados/${sim.id}` : null,
         chips: chips.length ? chips : undefined,
         stats: mostrarDesempenhoBanner && sim?.id ? statsDe((id) => id === sim.id) : null,
+        ...destaqueDe(b.id),
       }
     })
   }

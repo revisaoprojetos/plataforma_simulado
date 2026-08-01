@@ -37,6 +37,8 @@ export type HeroSimSlide = {
   detalhesLink?: string | null // "Ver detalhes" (simulado único); ausente em banner de pasta
   chips?: BannerChip[] // disponibilidade + nº de questões + objetiva/discursiva (simulado) ou "N simulados" (pasta)
   stats?: BannerStats | null // KPIs do aluno ESPECÍFICOS deste alvo (simulado/pasta); cai no global se ausente
+  destaqueAtivo?: boolean // mostrar o rótulo "Em destaque para você" acima do título (default true)
+  destaqueTexto?: string | null // texto desse rótulo (default "Em destaque para você")
 }
 
 type Slide = ({ kind: 'img' } & BannerPortal) | HeroSimSlide
@@ -175,10 +177,12 @@ function SimSlide({ s, stats }: { s: HeroSimSlide; stats?: BannerStats | null })
 
       {/* Conteúdo — recuado à esquerda p/ não ficar atrás da seta "anterior". */}
       <div className="relative flex h-full max-w-2xl flex-col justify-center py-5 pl-14 pr-6 sm:py-7 sm:pl-16 md:pl-20">
-        <div className="mb-1.5 flex items-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 10px 1px rgba(52,211,153,.7)' }} />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] sm:text-[11px]" style={{ color: 'var(--brand-accent)' }}>Em destaque para você</span>
-        </div>
+        {s.destaqueAtivo !== false && (
+          <div className="mb-1.5 flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 10px 1px rgba(52,211,153,.7)' }} />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] sm:text-[11px]" style={{ color: 'var(--brand-accent)' }}>{s.destaqueTexto || 'Em destaque para você'}</span>
+          </div>
+        )}
         <h2 className="line-clamp-2 text-xl font-extrabold leading-[1.05] tracking-tight text-white drop-shadow-sm sm:text-3xl md:text-4xl">{s.titulo}</h2>
         {s.descricao && <p className="mt-1.5 line-clamp-2 max-w-lg text-xs text-white/75 sm:text-sm">{s.descricao}</p>}
 

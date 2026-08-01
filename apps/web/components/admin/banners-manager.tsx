@@ -31,7 +31,9 @@ export const ehBannerSimulado = (b: { tipo: string; link: string | null }) => b.
 
 export type DestinoBanner = { label: string; href: string; grupo?: string }
 
-export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = false }: { banners: Banner[]; tenantId?: string; destinos?: DestinoBanner[]; desempenhoAtivo?: boolean }) {
+export type DestaqueMap = Record<string, { ativo?: boolean; texto?: string }>
+
+export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = false, destaques = {} }: { banners: Banner[]; tenantId?: string; destinos?: DestinoBanner[]; desempenhoAtivo?: boolean; destaques?: DestaqueMap }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [desempenho, setDesempenho] = useState(desempenhoAtivo)
@@ -53,6 +55,8 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
   const [imagem, setImagem] = useState('')
   const [link, setLink] = useState('')
   const [cor, setCor] = useState('#6366f1')
+  const [destaqueAtivoN, setDestaqueAtivoN] = useState(true)
+  const [destaqueTextoN, setDestaqueTextoN] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropOpen, setCropOpen] = useState(false)
@@ -109,10 +113,10 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
     if (uiTipo !== 'simulado' && !titulo.trim() && !mensagem.trim() && !imagem.trim()) { toast.error('Preencha ao menos um título, mensagem ou imagem.'); return }
     setAlvo('novo')
     start(async () => {
-      const r = await criarBannerAction({ tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo: true }, tenantId)
+      const r = await criarBannerAction({ tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo: true, destaqueAtivo: destaqueAtivoN, destaqueTexto: destaqueTextoN }, tenantId)
       setAlvo(null)
       if (!r.ok) { toast.error(r.error ?? 'Falha ao criar.'); return }
-      toast.success('Criado!'); setTitulo(''); setMensagem(''); setImagem(''); setLink('')
+      toast.success('Criado!'); setTitulo(''); setMensagem(''); setImagem(''); setLink(''); setDestaqueTextoN(''); setDestaqueAtivoN(true)
       router.refresh()
     })
   }
@@ -168,6 +172,17 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
               {simulados.length > 0 && <optgroup label="Simulados">{simulados.map((d) => <option key={d.href} value={d.href}>{d.label}</option>)}</optgroup>}
             </select>
             {destSim.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhum simulado ou pasta disponível ainda.</p>}
+            {/* Rótulo "Em destaque para você" (por banner): ligar/desligar + trocar o texto. */}
+            <div className="space-y-1.5 rounded-lg border bg-background px-3 py-2.5">
+              <div className="flex items-start gap-3">
+                <Switch checked={destaqueAtivoN} onCheckedChange={setDestaqueAtivoN} />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium">Rótulo em destaque (acima do título)</p>
+                  <p className="text-[11px] text-muted-foreground">A tarja verde “Em destaque para você”. Desligue para ocultá-la.</p>
+                </div>
+              </div>
+              {destaqueAtivoN && <Input value={destaqueTextoN} onChange={(e) => setDestaqueTextoN(e.target.value)} placeholder="Em destaque para você" className="h-8 text-xs" />}
+            </div>
             {/* Configuração GERAL (vale para todos os banners de simulado deste tenant): mostrar ou não
                 o painel de desempenho do aluno (Simulados/Nota média/Melhor nota) no canto inferior direito.
                 Vem DESATIVADO por padrão. */}
@@ -291,7 +306,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
         })}
       </div>
 
-      {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} onClose={() => setEditando(null)} />}
+      {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} destaqueAtivoInicial={destaques[editando.id]?.ativo !== false} destaqueTextoInicial={destaques[editando.id]?.texto ?? ''} onClose={() => setEditando(null)} />}
     </div>
   )
 }

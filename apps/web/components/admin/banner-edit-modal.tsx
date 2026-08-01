@@ -19,7 +19,7 @@ function fileToDataUrl(f: File): Promise<string> {
 
 /** Pop-up de configuração TOTAL de um banner já criado (tipo, título, mensagem, imagem+recorte,
  *  link/destino, cor, ativo). Salva via atualizarBannerAction. */
-export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; onClose: () => void }) {
+export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; onClose: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   // Modo da UI: "simulado" é um destaque (hero) que aponta p/ um simulado/pasta. Detecta pelo banner.
@@ -34,6 +34,8 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
   const [link, setLink] = useState(banner.link ?? '')
   const [cor, setCor] = useState(banner.cor ?? '#6366f1')
   const [ativo, setAtivo] = useState(banner.ativo)
+  const [destaqueAtivo, setDestaqueAtivo] = useState(destaqueAtivoInicial)
+  const [destaqueTexto, setDestaqueTexto] = useState(destaqueTextoInicial)
   const [enviando, setEnviando] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropOpen, setCropOpen] = useState(false)
@@ -55,7 +57,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
 
   function salvar() {
     start(async () => {
-      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem }, tenantId)
+      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto }, tenantId)
       if (r.ok) { toast.success('Banner atualizado.'); router.refresh(); onClose() }
       else toast.error(r.error ?? 'Falha ao salvar.')
     })
@@ -96,6 +98,17 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                 {simulados.length > 0 && <optgroup label="Simulados">{simulados.map((d) => <option key={d.href} value={d.href}>{d.label}</option>)}</optgroup>}
               </select>
               {destSim.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhum simulado ou pasta disponível ainda.</p>}
+              {/* Rótulo "Em destaque para você" (por banner): ligar/desligar + trocar o texto. */}
+              <div className="space-y-1.5 rounded-lg border bg-background px-3 py-2.5">
+                <div className="flex items-start gap-3">
+                  <Switch checked={destaqueAtivo} onCheckedChange={setDestaqueAtivo} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium">Rótulo em destaque (acima do título)</p>
+                    <p className="text-[11px] text-muted-foreground">A tarja verde “Em destaque para você”. Desligue para ocultá-la.</p>
+                  </div>
+                </div>
+                {destaqueAtivo && <Input value={destaqueTexto} onChange={(e) => setDestaqueTexto(e.target.value)} placeholder="Em destaque para você" className="h-8 text-xs" />}
+              </div>
               {/* Toggle GERAL (vale para todos os banners de simulado): mostrar/ocultar o painel de
                   desempenho do aluno (Simulados/Nota média/Melhor nota) no canto inferior direito. */}
               {onToggleDesempenho && (
