@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -66,6 +66,22 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
     })
   }
 
+  // Prévia EXATA e proporcional: renderiza o SimSlide no tamanho REAL (STAGE) e escala p/ caber na
+  // caixa. Assim o texto/botões ficam nas mesmas proporções do banner real, só que menores.
+  const STAGE_W = 1100
+  const STAGE_H = (STAGE_W * 500) / 1920
+  const previewRef = useRef<HTMLDivElement>(null)
+  const [previewScale, setPreviewScale] = useState(0.5)
+  useEffect(() => {
+    const el = previewRef.current
+    if (!el) return
+    const upd = () => setPreviewScale(el.clientWidth / STAGE_W)
+    upd()
+    const ro = new ResizeObserver(upd)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   // Prévia EXATA: monta um HeroSimSlide com o estado atual e renderiza o MESMO componente do portal.
   const ehPasta = /[?&]pasta=/.test(link)
   const previewSlide: HeroSimSlide = {
@@ -111,10 +127,10 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
               renderizados por cima (WYSIWYG, atualiza ao vivo conforme você configura). */}
           <div className="space-y-1.5">
             <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : uiTipo === 'simulado' ? '(prévia — padrão: fundo do simulado)' : '(molde 1920×500 — largura total)'}</label>
-            <div className={cn('relative w-full overflow-hidden rounded-lg border', tipo === 'popup' ? 'aspect-[16/6]' : 'aspect-[1920/500]')}>
+            <div ref={previewRef} className={cn('relative w-full overflow-hidden rounded-lg border', tipo === 'popup' ? 'aspect-[16/6]' : 'aspect-[1920/500]')}>
               {uiTipo === 'simulado'
-                // Prévia EXATA: mesmo componente do carrossel do aluno (pointer-events-none = não navega).
-                ? <div className="pointer-events-none absolute inset-0"><SimSlide s={previewSlide} stats={previewSlide.stats} /></div>
+                // Prévia EXATA: mesmo componente do aluno, renderizado no tamanho real e ESCALADO.
+                ? <div className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${previewScale})` }}><SimSlide s={previewSlide} stats={previewSlide.stats} /></div>
                 : imagem
                   // eslint-disable-next-line @next/next/no-img-element
                   ? <img src={imagem} alt="" className="absolute inset-0 h-full w-full object-cover" />
