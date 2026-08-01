@@ -68,7 +68,8 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
 
   // Prévia EXATA e proporcional: renderiza o SimSlide no tamanho REAL (STAGE) e escala p/ caber na
   // caixa. Assim o texto/botões ficam nas mesmas proporções do banner real, só que menores.
-  const STAGE_W = 1100
+  // Palco largo (≈ largura real do banner no portal) → escala menor → texto/botão menores na caixa.
+  const STAGE_W = 1600
   const STAGE_H = (STAGE_W * 500) / 1920
   const previewRef = useRef<HTMLDivElement>(null)
   const [previewScale, setPreviewScale] = useState(0.5)
