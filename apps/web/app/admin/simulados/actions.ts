@@ -94,8 +94,13 @@ export async function createSimuladoAction(data: SimuladoData) {
       const jaSet = new Set((ja ?? []).map((m: any) => m.estudante_id))
       const novos = estIds.filter((e) => !jaSet.has(e))
       for (let i = 0; i < novos.length; i += 500) {
-        const lote = novos.slice(i, i + 500)
-        await svc.from('simulado_matriculas').insert(lote.map((estudante_id) => ({ tenant_id: tenantId, estudante_id, simulado_id: simulado.id, liberado: true })))
+        const lote = novos.slice(i, i + 500).map((estudante_id) => ({ tenant_id: tenantId, estudante_id, simulado_id: simulado.id, liberado: true }))
+        // upsert-ignore (anti-corrida); fallback p/ insert enquanto o índice único não existir.
+        const { error } = await svc.from('simulado_matriculas').upsert(lote, { onConflict: 'tenant_id,estudante_id,simulado_id', ignoreDuplicates: true })
+        if (error) {
+          if (/no unique|exclusion constraint|on conflict|42P10/i.test(error.message)) await svc.from('simulado_matriculas').insert(lote)
+          else throw new Error(error.message)
+        }
       }
       herdados = novos.length
     }

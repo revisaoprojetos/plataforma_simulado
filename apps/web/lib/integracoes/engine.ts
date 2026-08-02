@@ -154,7 +154,7 @@ async function outraAtivaConcede(svc: any, tenantId: string, estudanteId: string
 async function matricular(svc: any, tenantId: string, estudanteId: string, simuladoId: string) {
   try {
     const { data } = await svc.from('simulado_matriculas').select('id').eq('simulado_id', simuladoId).eq('estudante_id', estudanteId).maybeSingle()
-    if (!data) await svc.from('simulado_matriculas').insert({ tenant_id: tenantId, estudante_id: estudanteId, simulado_id: simuladoId, liberado: true })
+    if (!data) await svc.from('simulado_matriculas').upsert({ tenant_id: tenantId, estudante_id: estudanteId, simulado_id: simuladoId, liberado: true }, { onConflict: 'tenant_id,estudante_id,simulado_id', ignoreDuplicates: true })
   } catch (e) { logIntegracao(e) }
 }
 

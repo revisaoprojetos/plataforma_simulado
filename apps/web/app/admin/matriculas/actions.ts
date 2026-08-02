@@ -26,12 +26,14 @@ export async function criarMatricula(data: {
     if (!est) return { ok: false, error: 'Estudante não pertence a esta plataforma.' }
     if (!sim) return { ok: false, error: 'Simulado não pertence a esta plataforma.' }
 
-    const { error } = await supabase.from('simulado_matriculas').insert({
+    // upsert-ignore: re-matricular alguém já matriculado é no-op idempotente (não estoura o
+    // UNIQUE tenant+estudante+simulado nem mostra erro de "duplicate key").
+    const { error } = await supabase.from('simulado_matriculas').upsert({
       tenant_id: tenantId,
       estudante_id: data.estudante_id,
       simulado_id: data.simulado_id,
       liberado: true,
-    })
+    }, { onConflict: 'tenant_id,estudante_id,simulado_id', ignoreDuplicates: true })
 
     if (error) return { ok: false, error: error.message }
     await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_matriculas', entidadeId: data.estudante_id, depois: { estudante_id: data.estudante_id, simulado_id: data.simulado_id } })
