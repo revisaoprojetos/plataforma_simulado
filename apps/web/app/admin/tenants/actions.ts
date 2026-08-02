@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/auth/permissions'
 import { seedTenantDefaults } from '@/lib/auth/onboard-tenant'
 import { registrarAudit } from '@/lib/audit'
+import { hospedarBase64, hospedarBase64NoObjeto } from '@/lib/storage/hospedar-base64'
 import { revalidatePath } from 'next/cache'
 
 interface NovoTenant {
@@ -187,6 +188,8 @@ export async function salvarTemaSuperAction(tenantId: string, tema: Record<strin
   const svc = createAdminClient()
   const { data: anterior } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
   const merged = { ...((anterior?.tema as Record<string, unknown>) ?? {}), ...tema }
+  // base64 (logo, login, fundos) → storage; grava só URLs (evita data URLs enormes na row do tenant).
+  await hospedarBase64NoObjeto(merged, svc)
   const { error } = await svc.from('simulado_tenants').update({ tema: merged }).eq('id', tenantId)
   if (error) throw new Error(`Erro ao salvar tema: ${error.message}`)
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenants', entidadeId: tenantId, antes: (anterior?.tema as Record<string, unknown>) ?? {}, depois: merged, tenantId })
@@ -221,8 +224,9 @@ export async function salvarAparenciaAction(id: string, dados: AparenciaInput): 
     if (dados[k] !== undefined) tema[k] = (dados[k]?.toString().trim() || null)
   }
   // Logo por URL: SÓ aplica quando vier preenchido (não apaga o logo base64 existente).
+  // Se vier base64 (upload de arquivo), sobe pro storage e guarda só a URL.
   const logo = dados.logo_url?.toString().trim()
-  if (logo) tema.logo_url = logo
+  if (logo) tema.logo_url = (await hospedarBase64(logo, svc)) || logo
 
   const { error } = await svc.from('simulado_tenants').update({ tema }).eq('id', id)
   if (error) return { ok: false, error: error.message }

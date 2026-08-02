@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission, isSuperAdmin } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
@@ -66,11 +67,13 @@ function reval(tenantId: string, ehSuper: boolean) {
 export async function criarBannerAction(data: BannerInput, tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string }> {
   const c = await ctx(tenantIdAlvo); if (!c.ok) return c
   const tipo = data.tipo === 'popup' ? 'popup' : data.tipo === 'hero' ? 'hero' : 'banner'
+  // base64 → sobe pro storage e guarda só a URL (evita base64 gigante na linha do banco).
+  const imagemUrl = await hospedarBase64(data.imagem_url, c.svc)
   const { data: novo, error } = await c.svc.from('simulado_banners').insert({
     tenant_id: c.tenantId, tipo,
     titulo: data.titulo?.trim() || null,
     mensagem: data.mensagem?.trim() || null,
-    imagem_url: data.imagem_url?.trim() || null,
+    imagem_url: imagemUrl,
     link: data.link?.trim() || null,
     cor: data.cor?.trim() || null,
     ativo: data.ativo ?? true,
@@ -85,11 +88,12 @@ export async function criarBannerAction(data: BannerInput, tenantIdAlvo?: string
 
 export async function atualizarBannerAction(id: string, data: BannerInput, tenantIdAlvo?: string): Promise<{ ok: boolean; error?: string }> {
   const c = await ctx(tenantIdAlvo); if (!c.ok) return c
+  const imagemUrl = await hospedarBase64(data.imagem_url, c.svc)
   const { error } = await c.svc.from('simulado_banners').update({
     tipo: data.tipo === 'popup' ? 'popup' : data.tipo === 'hero' ? 'hero' : 'banner',
     titulo: data.titulo?.trim() || null,
     mensagem: data.mensagem?.trim() || null,
-    imagem_url: data.imagem_url?.trim() || null,
+    imagem_url: imagemUrl,
     link: data.link?.trim() || null,
     cor: data.cor?.trim() || null,
     ativo: data.ativo ?? true,
