@@ -49,9 +49,18 @@ export async function matricularEmSimuladosDoBanco(
   if (!novos.length) return 0
 
   // Insere em lotes (grupo grande × vários simulados = payload potencialmente enorme).
+  // UPSERT ignorando duplicatas: além do filtro `jaSet` acima, isto fecha a CORRIDA (dois syncs
+  // simultâneos viam "não existe" e inseriam 2x). Requer o índice único
+  // (tenant_id, estudante_id, simulado_id); enquanto ele não existir, cai no insert antigo.
   for (let i = 0; i < novos.length; i += 500) {
-    const { error } = await svc.from('simulado_matriculas').insert(novos.slice(i, i + 500))
-    if (error) throw new Error(error.message)
+    const lote = novos.slice(i, i + 500)
+    const { error } = await svc.from('simulado_matriculas').upsert(lote, { onConflict: 'tenant_id,estudante_id,simulado_id', ignoreDuplicates: true })
+    if (error) {
+      if (/no unique|exclusion constraint|on conflict|42P10/i.test(error.message)) {
+        const r2 = await svc.from('simulado_matriculas').insert(lote)
+        if (r2.error) throw new Error(r2.error.message)
+      } else throw new Error(error.message)
+    }
   }
   return novos.length
 }

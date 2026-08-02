@@ -28,6 +28,7 @@ import {
   Trash2,
   PieChart,
   Trophy,
+  Star,
   HelpCircle,
   DownloadCloud,
   Webhook,
@@ -130,6 +131,7 @@ const navGroups: NavGroup[] = [
       { label: 'Relatório Estudantes', href: '/admin/relatorios/estudantes', icon: GraduationCap, perm: 'relatorios:view' },
       { label: 'Cadernos baixados', href: '/admin/relatorios/cadernos', icon: DownloadCloud, perm: 'relatorios:view' },
       { label: 'Ranking', href: '/admin/relatorios/ranking', icon: Trophy, perm: 'relatorios:view' },
+      { label: 'NPS / Satisfação', href: '/admin/relatorios/nps', icon: Star, perm: 'relatorios:view' },
     ],
   },
   {

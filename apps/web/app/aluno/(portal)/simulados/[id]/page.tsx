@@ -11,6 +11,7 @@ import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { tiposDeSimulados } from '@/lib/simulado/tipo'
 import { modalidadesDoAluno, type ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
 import { MeuSimuladoView } from '@/components/aluno/meu-simulado-view'
+import { NpsAvaliacao } from '@/components/aluno/nps-avaliacao'
 
 const notaTone = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
 const nota = (n: number | null) => (n == null ? '—' : Number(n).toFixed(1).replace('.', ','))
@@ -87,6 +88,11 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
     modalidades = modalidadesDoAluno((cad as any)?.config, tipo)
   }
 
+  // NPS: mostra o card se o aluno ainda não avaliou este simulado. Tolerante: se a tabela
+  // simulado_avaliacoes ainda não foi migrada (avErr), não mostra (não quebra a página).
+  const { data: avRow, error: avErr } = await svc.from('simulado_avaliacoes').select('id').eq('estudante_id', estId).eq('simulado_id', id).maybeSingle()
+  const mostrarNps = !avErr && !avRow
+
   return (
     <div className="animate-page space-y-5">
       <Voltar />
@@ -113,6 +119,8 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
           </div>
         </div>
       </div>
+
+      {mostrarNps && <NpsAvaliacao simuladoId={id} sessaoId={melhor.id} />}
 
       <MeuSimuladoView
         tentativas={tentativas}
