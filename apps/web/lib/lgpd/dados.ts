@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 
 const SEM_TENANT = '00000000-0000-0000-0000-000000000000'
 const nowIso = () => new Date().toISOString()
@@ -44,8 +45,10 @@ export async function exportarDadosEstudante(svc: SupabaseClient, estudanteId: s
   // acertos por sessão + títulos dos simulados
   const acPorSess = new Map<string, number>(), ttPorSess = new Map<string, number>()
   if (sessIds.length) {
-    const { data: resp } = await svc.from('simulado_respostas_objetivas').select('sessao_id, correta').in('sessao_id', sessIds)
-    for (const r of (resp ?? []) as any[]) {
+    // fetchAllByIn: export LGPD deve ser COMPLETO — titular ativo pode ter >1000 respostas.
+    const resp = await fetchAllByIn<{ sessao_id: string; correta: boolean }>(sessIds, (chunk) =>
+      svc.from('simulado_respostas_objetivas').select('sessao_id, correta').in('sessao_id', chunk).order('id', { ascending: true }))
+    for (const r of resp as any[]) {
       ttPorSess.set(r.sessao_id, (ttPorSess.get(r.sessao_id) ?? 0) + 1)
       if (r.correta) acPorSess.set(r.sessao_id, (acPorSess.get(r.sessao_id) ?? 0) + 1)
     }

@@ -96,7 +96,7 @@ async function _graficoViaPostgrest(svc: SupabaseClient, tenantId: string | null
       svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).order('id'))
     const qids = [...new Set(respArr.map((r) => r.questao_id))]
     const discDeQ = new Map<string, string>()
-    if (qids.length) { const { data: qs } = await svc.from('simulado_questoes').select('id, disciplinas:simulado_disciplinas(nome)').in('id', qids); for (const q of (qs ?? []) as any[]) discDeQ.set(q.id, q.disciplinas?.nome ?? 'Sem disciplina') }
+    if (qids.length) { const qs = await fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questoes').select('id, disciplinas:simulado_disciplinas(nome)').in('id', chunk).order('id', { ascending: true })); for (const q of qs as any[]) discDeQ.set(q.id, q.disciplinas?.nome ?? 'Sem disciplina') }
     for (const r of respArr) {
       totRespostas++; if (r.correta) totAc++
       ttPorSess.set(r.sessao_id, (ttPorSess.get(r.sessao_id) ?? 0) + 1)

@@ -9,6 +9,7 @@ import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
 import { BannersPortal, type HeroSimSlide, type BannerChip, type BannerStats } from '@/components/aluno/banners-portal'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
 import { idsSimuladosGratuitos } from '@/lib/simulado/gratuito'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } from '@/components/aluno/simulados-catalogo-aluno'
 import { SemAcessoModal } from '@/components/aluno/sem-acesso-modal'
 import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
@@ -75,8 +76,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   let sims: any[] = []
   const sessoesPorSim = new Map<string, any[]>()
   if (ids.length) {
-    const { data: s } = await svc.from('simulado_simulados').select('id, titulo, status, embed_token, regras, modo_aplicacao, data_inicio, data_fim, created_at').in('id', ids).eq('deletado', false)
-    sims = s ?? []
+    sims = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_simulados').select('id, titulo, status, embed_token, regras, modo_aplicacao, data_inicio, data_fim, created_at').in('id', chunk).eq('deletado', false).order('id', { ascending: true }))
     for (const x of (sessAll ?? []) as any[]) { const arr = sessoesPorSim.get(x.simulado_id) ?? []; arr.push(x); sessoesPorSim.set(x.simulado_id, arr) }
   }
   const feitosSet = new Set(sims.filter((s) => (sessoesPorSim.get(s.id) ?? []).some((x) => x.status === 'finalizada')).map((s) => s.id))
@@ -150,8 +150,8 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
       const bancoToFolder = new Map<string, string>()
       for (const f of pastaIds) bancoToFolder.set(f, f)
       for (const bc of bancos as any[]) if (bc.pai_id) bancoToFolder.set(bc.id, bc.pai_id)
-      const { data: simsT } = await svc.from('simulado_simulados').select('regras').eq('tenant_id', sessao!.tenantId).eq('deletado', false).eq('status', 'publicado')
-      for (const s of (simsT ?? []) as any[]) { const bb = (s.regras as any)?.banco_base_id; const f = bb ? bancoToFolder.get(bb) : null; if (f) pastaCount.set(f, (pastaCount.get(f) ?? 0) + 1) }
+      const simsT = await fetchAll<{ regras: any }>(() => svc.from('simulado_simulados').select('regras').eq('tenant_id', sessao!.tenantId).eq('deletado', false).eq('status', 'publicado').order('id', { ascending: true }))
+      for (const s of simsT as any[]) { const bb = (s.regras as any)?.banco_base_id; const f = bb ? bancoToFolder.get(bb) : null; if (f) pastaCount.set(f, (pastaCount.get(f) ?? 0) + 1) }
     }
 
     heroSims = simBanners.map((b): HeroSimSlide => {
