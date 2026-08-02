@@ -8,6 +8,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
 import { ReportarErroButton } from '@/components/aluno/reportar-erro-button'
+import { NpsAvaliacao } from '@/components/aluno/nps-avaliacao'
 import {
   CheckCircle2,
   XCircle,
@@ -450,6 +451,9 @@ export function RevisaoFinal({
             )}
           </CardContent>
         </Card>
+
+        {/* NPS — avaliação de satisfação ao concluir a prova (embed). Some após enviar. */}
+        <NpsAvaliacao sessaoId={sessionToken} />
 
         {/* Desempenho por matéria */}
         {liberado && (data?.stats_por_disciplina?.length ?? 0) > 0 && (

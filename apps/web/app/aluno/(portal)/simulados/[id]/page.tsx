@@ -120,7 +120,7 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
         </div>
       </div>
 
-      {mostrarNps && <NpsAvaliacao simuladoId={id} sessaoId={melhor.id} />}
+      {mostrarNps && <NpsAvaliacao sessaoId={melhor.id} />}
 
       <MeuSimuladoView
         tentativas={tentativas}

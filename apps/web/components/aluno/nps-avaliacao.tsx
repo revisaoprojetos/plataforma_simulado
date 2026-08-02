@@ -1,30 +1,42 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Star, Check, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { submeterAvaliacao } from '@/app/aluno/(portal)/simulados/[id]/nps-actions'
 
 /**
- * Card de NPS mostrado na página de resultado quando o aluno ainda não avaliou o simulado.
+ * Card de NPS mostrado ao concluir um simulado (página de resultado do portal E tela final da
+ * prova embed). Autentica pelo `sessaoId` via /api/sessoes/avaliar — serve os dois contextos.
  * Nota 0–10 (recomendaria?) + comentário opcional. Some após enviar (mostra agradecimento).
  */
-export function NpsAvaliacao({ simuladoId, sessaoId }: { simuladoId: string; sessaoId?: string | null }) {
+export function NpsAvaliacao({ sessaoId }: { sessaoId?: string | null }) {
   const [nota, setNota] = useState<number | null>(null)
   const [comentario, setComentario] = useState('')
   const [enviado, setEnviado] = useState(false)
+  const [jaAvaliou, setJaAvaliou] = useState(false) // guard local (embed não tem check server-side)
   const [pending, start] = useTransition()
+
+  useEffect(() => { try { if (sessaoId && localStorage.getItem('nps_' + sessaoId)) setJaAvaliou(true) } catch {} }, [sessaoId])
 
   function enviar() {
     if (nota === null) { toast.error('Escolha uma nota de 0 a 10.'); return }
+    if (!sessaoId) { toast.error('Sessão não encontrada.'); return }
     start(async () => {
-      const r = await submeterAvaliacao({ simuladoId, sessaoId, nps: nota, comentario })
-      if (!r.ok) { toast.error(r.error ?? 'Não foi possível enviar.'); return }
-      setEnviado(true)
-      toast.success('Obrigado pela sua avaliação!')
+      try {
+        const res = await fetch('/api/sessoes/avaliar', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessao_id: sessaoId, nps: nota, comentario }),
+        })
+        if (!res.ok) { const j = await res.json().catch(() => ({})); toast.error(j.error ?? 'Não foi possível enviar.'); return }
+        try { if (sessaoId) localStorage.setItem('nps_' + sessaoId, '1') } catch {}
+        setEnviado(true)
+        toast.success('Obrigado pela sua avaliação!')
+      } catch { toast.error('Falha de rede. Tente novamente.') }
     })
   }
+
+  if (jaAvaliou) return null
 
   if (enviado) {
     return (
