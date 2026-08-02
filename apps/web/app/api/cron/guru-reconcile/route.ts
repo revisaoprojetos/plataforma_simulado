@@ -15,7 +15,9 @@ export const dynamic = 'force-dynamic'
  * Não substitui um pull do Guru (que pegaria assinaturas nunca recebidas e cancelamentos
  * perdidos) — isso depende de verificar os endpoints da API Guru (`guru.ts` marca "⚠️ VERIFICAR").
  *
- * Uso: chamar 1×/dia, fora de pico (reaplica todas as assinaturas ativas de cada tenant).
+ * INCREMENTAL por padrão: só reaplica assinaturas ativas ALTERADAS nas últimas 48h (barato,
+ * pega os webhooks recém-falhados). Isso evita reprocessar milhares de assinaturas por dia
+ * (o tenant tem ~4,7k ativas) num único request. `?full=1` reprocessa TODAS (uso manual/ocasional).
  * Aceita `?tenant=<id>` para reconciliar um tenant específico.
  */
 function autorizado(req: NextRequest): boolean {
@@ -28,7 +30,10 @@ function autorizado(req: NextRequest): boolean {
 export async function POST(req: NextRequest) {
   if (!autorizado(req)) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 })
   const svc = createAdminClient()
-  const alvo = new URL(req.url).searchParams.get('tenant')
+  const sp = new URL(req.url).searchParams
+  const alvo = sp.get('tenant')
+  // Incremental (48h) por padrão; ?full=1 reprocessa tudo. Evita martelar o banco com ~4,7k/dia.
+  const desde = sp.get('full') === '1' ? undefined : new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
 
   // Tenants com integração Guru ATIVA (ou o tenant pedido).
   let tenantIds: string[]
@@ -42,7 +47,7 @@ export async function POST(req: NextRequest) {
   const resultados: Array<{ tenantId: string; total: number; concedidos: number; erros: number; semMapeamento: number }> = []
   for (const tenantId of tenantIds) {
     try {
-      const r = await reaplicarLiberacoes(tenantId, 'guru')
+      const r = await reaplicarLiberacoes(tenantId, 'guru', undefined, desde)
       resultados.push({ tenantId, total: r.total, concedidos: r.concedidos, erros: r.erros, semMapeamento: r.semMapeamento })
     } catch (e: any) {
       resultados.push({ tenantId, total: 0, concedidos: 0, erros: 1, semMapeamento: 0 })

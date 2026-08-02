@@ -328,11 +328,12 @@ export interface ResumoReprocesso { total: number; concedidos: number; semMapeam
  * (ex.: produto mapeado depois, falha no webhook). Não revoga nada.
  * `soProduto` opcional limita a um produto (fonte_ref).
  */
-export async function reaplicarLiberacoes(tenantId: string, provider: Provider, soProduto?: string): Promise<ResumoReprocesso> {
+export async function reaplicarLiberacoes(tenantId: string, provider: Provider, soProduto?: string, desde?: string): Promise<ResumoReprocesso> {
   const svc = createAdminClient()
   const ativas = await fetchAll<{ estudante_id: string; produto_ref: string }>(() => {
     let q = svc.from('simulado_assinaturas').select('estudante_id, produto_ref').eq('tenant_id', tenantId).eq('provider', provider).eq('status', 'ativo')
     if (soProduto) q = q.eq('produto_ref', soProduto)
+    if (desde) q = q.gte('atualizado_em', desde) // reconcile incremental: só assinaturas mexidas desde `desde`
     return q.order('estudante_id', { ascending: true })
   })
 
