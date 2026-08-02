@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useTransition, useMemo, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,11 +13,12 @@ import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { BRT_LABEL } from '@/lib/brt'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
+import { buscarEstudantesSimulado, listarEstudanteIdsSimulado } from '@/app/admin/simulados/actions'
 import { toast } from 'sonner'
 
 interface Questao { id: string; enunciado: string; tipo: string; nivel_dificuldade?: string | null; disciplina?: string | null; banca?: string | null; bancoIds: string[] }
 interface Banco { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null; nQuestoes?: number; nEstudantes?: number }
-interface Estudante { id: string; nome: string; email?: string | null }
+interface Estudante { id: string; nome: string; email: string | null }
 
 // No modo "banco" o tipo já vem do banco → não há etapa "Tipo".
 const PASSOS_BANCO = ['Banco', 'Informações', 'Regras']
@@ -27,14 +28,12 @@ export function SimuladoWizard({
   bancos,
   questoes,
   ordemPorBanco = {},
-  estudantes,
   onSubmit,
 }: {
   bancos: Banco[]
   questoes: Questao[]
   /** Ordem manual das questões por banco (id do banco → lista de questao_id na ordem exibida). */
   ordemPorBanco?: Record<string, string[]>
-  estudantes: Estudante[]
   onSubmit: (data: any) => Promise<{ error?: string } | void>
 }) {
   const [step, setStep] = useState(0)
@@ -58,6 +57,11 @@ export function SimuladoWizard({
   const [estSel, setEstSel] = useState<Set<string>>(new Set())
   const [busca, setBusca] = useState('')
   const [buscaEst, setBuscaEst] = useState('')
+  // Estudantes: buscados SOB DEMANDA no servidor (não pré-carregados) — o passo é opcional e o tenant
+  // pode ter ~10k alunos. `estTotal` = quantos casam a busca atual; usado no "Selecionar todos".
+  const [estDisp, setEstDisp] = useState<Estudante[]>([])
+  const [estBuscando, setEstBuscando] = useState(false)
+  const [estTotal, setEstTotal] = useState(0)
   const [buscaBanco, setBuscaBanco] = useState('')
   const [fBanco, setFBanco] = useState('all')
   const [fDisc, setFDisc] = useState('all')
@@ -101,15 +105,32 @@ export function SimuladoWizard({
     })
   }, [disponiveis, busca, fBanco, fDisc])
 
-  const estFiltrados = useMemo(() => {
-    const s = buscaEst.toLowerCase().trim()
-    return s ? estudantes.filter((e) => `${e.nome} ${e.email ?? ''}`.toLowerCase().includes(s)) : estudantes
-  }, [estudantes, buscaEst])
+  // Busca de estudantes sob demanda (debounce 300ms). Só dispara quando o passo Estudantes está ativo.
+  useEffect(() => {
+    if (atual !== 'Estudantes') return
+    let vivo = true
+    setEstBuscando(true)
+    const t = setTimeout(async () => {
+      const r = await buscarEstudantesSimulado(buscaEst)
+      if (!vivo) return
+      setEstDisp(r.ok ? (r.itens ?? []) : [])
+      setEstTotal(r.ok ? (r.total ?? 0) : 0)
+      setEstBuscando(false)
+    }, 300)
+    return () => { vivo = false; clearTimeout(t) }
+  }, [buscaEst, atual])
 
   const set = (k: string, v: any) => setInfo((p) => ({ ...p, [k]: v }))
   const setR = (k: string, v: any) => setRegras((p) => ({ ...p, [k]: v }))
   const toggleQ = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleE = (id: string) => setEstSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const todosSelecionados = estTotal > 0 && estSel.size >= estTotal
+  async function selecionarTodos() {
+    if (todosSelecionados) { setEstSel(new Set()); return } // já todos → limpa
+    const r = await listarEstudanteIdsSimulado(buscaEst) // só ids que casam a busca atual
+    if (r.ok) setEstSel(new Set(r.ids))
+    else toast.error(r.error ?? 'Falha ao selecionar estudantes.')
+  }
 
   function podeAvancar() {
     if (atual === 'Banco') return modo !== null
@@ -438,16 +459,17 @@ export function SimuladoWizard({
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input value={buscaEst} onChange={(e) => setBuscaEst(e.target.value)} placeholder="Buscar estudante…" className="pl-8" />
                 </div>
-                <Button type="button" variant="outline" size="sm"
-                  onClick={() => setEstSel((p) => p.size === estudantes.length ? new Set() : new Set(estudantes.map((e) => e.id)))}>
-                  {estSel.size === estudantes.length && estudantes.length > 0 ? 'Limpar seleção' : 'Selecionar todos'}
+                <Button type="button" variant="outline" size="sm" onClick={selecionarTodos} disabled={estBuscando}>
+                  {todosSelecionados ? 'Limpar seleção' : 'Selecionar todos'}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">{estFiltrados.length} estudante(s) · {estSel.size} selecionado(s) para matricular</p>
+              <p className="text-xs text-muted-foreground">{estTotal} estudante(s){buscaEst.trim() && ' encontrados'} · {estSel.size} selecionado(s) para matricular</p>
               <div className="max-h-[45vh] overflow-auto rounded-lg border">
-                {estFiltrados.length === 0 ? (
+                {estBuscando ? (
+                  <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Buscando…</p>
+                ) : estDisp.length === 0 ? (
                   <p className="py-10 text-center text-sm text-muted-foreground">Nenhum estudante encontrado.</p>
-                ) : estFiltrados.map((e) => {
+                ) : estDisp.map((e) => {
                   const on = estSel.has(e.id)
                   return (
                     <button key={e.id} type="button" onClick={() => toggleE(e.id)}

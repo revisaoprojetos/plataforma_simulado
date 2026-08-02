@@ -14,7 +14,9 @@ export default async function NovoSimuladoPage() {
   // Todas as varreduras usam fetchAll — o PostgREST corta em 1000 linhas por resposta;
   // sem paginar, as contagens de alunos/questões por banco e a lista do seletor ficam
   // truncadas (era o motivo de o banco mostrar 436 em vez dos ~3 mil reais).
-  const [questoesRaw, vinculos, pastaEst, estudantesRaw] = await Promise.all([
+  // Estudantes NÃO são pré-carregados: o passo "Estudantes" do wizard busca sob demanda no servidor
+  // (buscarEstudantesSimulado) — evitava serializar ~10k alunos no load da página.
+  const [questoesRaw, vinculos, pastaEst] = await Promise.all([
     fetchAll<any>(() => svc.from('simulado_questoes')
       .select('id, enunciado, tipo, nivel_dificuldade, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)')
       .eq('tenant_id', tid)
@@ -22,7 +24,6 @@ export default async function NovoSimuladoPage() {
       .order('created_at', { ascending: true })),
     fetchAll<any>(() => svc.from('simulado_questao_pasta').select('questao_id, pasta_id').eq('tenant_id', tid).order('questao_id')),
     fetchAll<any>(() => svc.from('simulado_pasta_estudantes').select('pasta_id, estudante_id').eq('tenant_id', tid).order('estudante_id')),
-    fetchAll<any>(() => svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tid).order('nome')),
   ])
 
   // Bancos: tolerante à coluna `tipo` (migration pode não ter rodado).
@@ -76,8 +77,6 @@ export default async function NovoSimuladoPage() {
     bancoIds: bancosPorQuestao.get(q.id) ?? [],
   }))
 
-  const estudantes = (estudantesRaw ?? []).map((e: any) => ({ id: e.id, nome: e.nome ?? 'Estudante', email: e.email ?? null }))
-
   return (
     <div className="space-y-6">
       <div>
@@ -87,7 +86,7 @@ export default async function NovoSimuladoPage() {
         <h1 className="text-2xl font-bold tracking-tight">Novo Simulado</h1>
       </div>
 
-      <SimuladoWizard bancos={bancosDetalhe} questoes={questoes} ordemPorBanco={ordemPorBanco} estudantes={estudantes} onSubmit={createSimuladoAction} />
+      <SimuladoWizard bancos={bancosDetalhe} questoes={questoes} ordemPorBanco={ordemPorBanco} onSubmit={createSimuladoAction} />
     </div>
   )
 }

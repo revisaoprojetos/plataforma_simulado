@@ -85,7 +85,6 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
   const [
     { data: questoes, count: totalQuestoes },
     { data: sessoes, count: totalSessoes },
-    { data: todasQuestoes },
   ] = await Promise.all([
     supabase
       .from('simulado_prova_questoes')
@@ -105,11 +104,6 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
       .eq('deletado', false)
       .order('iniciado_em', { ascending: false })
       .limit(50),
-    supabase
-      .from('simulado_questoes')
-      .select('id, enunciado, status, disciplinas:simulado_disciplinas(nome)')
-      .eq('deletado', false)
-      .order('created_at', { ascending: false }),
   ])
 
   // Cadernos de design do tenant (para vincular o tema/HUD ao simulado).
@@ -135,16 +129,6 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
     enunciado: sq.questoes?.enunciado ?? '',
     disciplina: sq.questoes?.disciplinas?.nome,
   }))
-  const idsNoSimulado = new Set(questoesNoSimulado.map((q) => q.questao_id))
-  const questoesDisponiveis = (todasQuestoes ?? [])
-    .filter((q: any) => !idsNoSimulado.has(q.id))
-    .map((q: any) => ({
-      id: q.id,
-      enunciado: q.enunciado ?? '',
-      status: q.status ?? 'rascunho',
-      disciplina: q.disciplinas?.nome,
-    }))
-
   const sessoesFinalizadas = sessoes?.filter((s) => s.status === 'finalizada') ?? []
   const notaMedia =
     sessoesFinalizadas.length > 0
@@ -364,7 +348,6 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
               <SimuladoQuestoesManager
                 simuladoId={id}
                 questoesNoSimulado={questoesNoSimulado}
-                questoesDisponiveis={questoesDisponiveis}
               />
             </CardContent>
           </Card>

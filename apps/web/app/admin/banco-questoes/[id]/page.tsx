@@ -19,6 +19,7 @@ import { BancoGrupos } from '@/components/admin/banco-grupos'
 import { BancoPersonalizar } from '@/components/admin/banco-personalizar'
 import { iconeBanco } from '@/lib/banco-visual'
 import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
+import { listarDisciplinasFiltro } from '@/app/admin/banco-questoes/actions'
 import { ArrowLeft, BookOpen, Layers, Palette, ListTree } from 'lucide-react'
 
 /** Cabeçalho de seção com gradiente da cor do banco + chip de ícone (colado no topo do card). */
@@ -100,18 +101,9 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
     if (!gErr && Array.isArray((gRow as any)?.grupos)) gruposIniciais = (gRow as any).grupos
   }
 
-  // Todas as questões do tenant (para o pop-up de adicionar) + disciplinas (filtro).
-  const { data: todasRaw } = await svc
-    .from('simulado_questoes')
-    .select('id, external_id, enunciado, tipo, nivel_dificuldade, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
-    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
-    .order('created_at', { ascending: false })
-    .limit(500)
-  const todasQuestoes = (todasRaw ?? []).map((q: any) => ({
-    id: q.id, external_id: q.external_id, enunciado: q.enunciado ?? '', tipo: q.tipo,
-    nivel_dificuldade: q.nivel_dificuldade, disciplina: q.disciplinas?.nome ?? null, assunto: q.assuntos?.nome ?? null,
-  }))
-  const disciplinasFiltro = [...new Set(todasQuestoes.map((q: any) => q.disciplina).filter(Boolean))].sort() as string[]
+  // Disciplinas do tenant (id+nome) para o filtro do pop-up. As questões candidatas são buscadas
+  // SOB DEMANDA no servidor (buscarQuestoesForaBanco) — não carregamos mais 500 no load da página.
+  const disciplinasFiltro = await listarDisciplinasFiltro()
 
   const IconeBanco = iconeBanco(banco.icone)
   const corBanco = banco.cor ?? '#6d28d9'
@@ -251,7 +243,7 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
           {questoes.length === 0 ? (
             <>
               <div className="flex justify-end">
-                <AdicionarQuestoesDialog bancoId={id} questoes={todasQuestoes} jaNoBanco={ids} disciplinas={disciplinasFiltro} />
+                <AdicionarQuestoesDialog bancoId={id} disciplinas={disciplinasFiltro} />
               </div>
               <div className="rounded-lg border border-dashed p-12 text-center">
                 <p className="text-muted-foreground">Nenhuma questão neste banco. Clique em “Adicionar questões”.</p>
@@ -261,7 +253,7 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
             <BancoQuestoesTable
               bancoId={id}
               cor={corBanco}
-              acao={<AdicionarQuestoesDialog bancoId={id} questoes={todasQuestoes} jaNoBanco={ids} disciplinas={disciplinasFiltro} />}
+              acao={<AdicionarQuestoesDialog bancoId={id} disciplinas={disciplinasFiltro} />}
               questoes={questoes.map((q: any) => ({
                 id: q.id, enunciado: q.enunciado ?? '', nivel_dificuldade: q.nivel_dificuldade,
                 status: q.status, disciplina: q.disciplinas?.nome ?? null, assunto: q.assuntos?.nome ?? null,

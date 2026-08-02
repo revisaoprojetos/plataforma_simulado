@@ -573,6 +573,59 @@ export async function addQuestaoToSimulado(simuladoId: string, questaoId: string
   return { ok: true }
 }
 
+// ─────────── Busca server-side sob demanda (evita carregar todo o banco/estudantes no load) ───────────
+
+export type EstudanteBuscaItem = { id: string; nome: string; email: string | null }
+
+/** Busca estudantes do tenant (nome/email) para o seletor do wizard, limitada. `total` = quantos casam a busca. */
+export async function buscarEstudantesSimulado(busca: string, limite = 40): Promise<{ ok: boolean; itens?: EstudanteBuscaItem[]; total?: number; error?: string }> {
+  if (!(await checkPermission('simulados:create')) && !(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const safe = busca.replace(/[,()%*]/g, ' ').trim() // chars que quebram o parser do .or()
+  let q = svc.from('simulado_estudantes').select('id, nome, email', { count: 'exact' }).eq('tenant_id', tenantId).eq('deletado', false)
+  if (safe) q = q.or(`nome.ilike.%${safe}%,email.ilike.%${safe}%`)
+  const { data, error, count } = await q.order('nome', { ascending: true }).limit(Math.min(100, limite))
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, total: count ?? 0, itens: (data ?? []).map((e: any) => ({ id: e.id, nome: e.nome ?? 'Estudante', email: e.email ?? null })) }
+}
+
+/** Todos os ids de estudantes que casam a busca (para "Selecionar todos") — só ids, leve. */
+export async function listarEstudanteIdsSimulado(busca = ''): Promise<{ ok: boolean; ids?: string[]; error?: string }> {
+  if (!(await checkPermission('simulados:create')) && !(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const safe = busca.replace(/[,()%*]/g, ' ').trim()
+  const rows = await fetchAll<{ id: string }>(() => {
+    let q = svc.from('simulado_estudantes').select('id').eq('tenant_id', tenantId).eq('deletado', false)
+    if (safe) q = q.or(`nome.ilike.%${safe}%,email.ilike.%${safe}%`)
+    return q.order('id', { ascending: true })
+  })
+  return { ok: true, ids: rows.map((r) => r.id) }
+}
+
+export type QuestaoBuscaItem = { id: string; enunciado: string; status: string | null; disciplina: string | null }
+
+/** Busca questões do tenant que NÃO estão no simulado (para o picker "Adicionar questões"), limitada. */
+export async function buscarQuestoesForaSimulado(simuladoId: string, busca: string, limite = 40): Promise<{ ok: boolean; itens?: QuestaoBuscaItem[]; error?: string }> {
+  if (!(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const jaNo = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', simuladoId).eq('tenant_id', tenantId).order('questao_id', { ascending: true }))
+  const noSet = new Set(jaNo.map((r) => r.questao_id))
+  const safe = busca.replace(/[,()%*]/g, ' ').trim()
+  let q = svc.from('simulado_questoes').select('id, enunciado, status, disciplinas:simulado_disciplinas(nome)').eq('tenant_id', tenantId).eq('deletado', false)
+  if (safe) q = q.ilike('enunciado', `%${safe}%`)
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(Math.min(200, Math.max(limite * 4, 80)))
+  if (error) return { ok: false, error: error.message }
+  const itens = (data ?? []).filter((r: any) => !noSet.has(r.id)).slice(0, limite)
+    .map((r: any) => ({ id: r.id, enunciado: r.enunciado ?? '', status: r.status ?? null, disciplina: r.disciplinas?.nome ?? null }))
+  return { ok: true, itens }
+}
+
 export async function removeQuestaoFromSimulado(simuladoQuestaoId: string, simuladoId: string) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const tenantId = await getCurrentTenantId()

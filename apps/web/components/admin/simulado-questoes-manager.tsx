@@ -1,15 +1,15 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { Plus, Trash2, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Loader2, Search } from 'lucide-react'
 import { toast } from 'sonner'
-import { addQuestaoToSimulado, removeQuestaoFromSimulado } from '@/app/admin/simulados/actions'
+import { addQuestaoToSimulado, removeQuestaoFromSimulado, buscarQuestoesForaSimulado, type QuestaoBuscaItem } from '@/app/admin/simulados/actions'
 
 interface QuestaoNoSimulado {
   id: string // id do vínculo simulado_questoes
@@ -21,39 +21,43 @@ interface QuestaoNoSimulado {
   disciplina?: string
 }
 
-interface QuestaoDisponivel {
-  id: string
-  enunciado: string
-  disciplina?: string
-  status: string
-}
-
 interface Props {
   simuladoId: string
   questoesNoSimulado: QuestaoNoSimulado[]
-  questoesDisponiveis: QuestaoDisponivel[]
 }
 
 function preview(t: string, n = 70) {
   return t.length > n ? t.slice(0, n) + '…' : t
 }
 
-export function SimuladoQuestoesManager({ simuladoId, questoesNoSimulado, questoesDisponiveis }: Props) {
+export function SimuladoQuestoesManager({ simuladoId, questoesNoSimulado }: Props) {
   const [busca, setBusca] = useState('')
   const [adicionando, setAdicionando] = useState(false)
   const [pending, startTransition] = useTransition()
   const [actingId, setActingId] = useState<string | null>(null)
+  // Candidatas buscadas SOB DEMANDA no servidor (evita serializar o banco inteiro no load da página).
+  const [disp, setDisp] = useState<QuestaoBuscaItem[]>([])
+  const [buscando, setBuscando] = useState(false)
 
-  const disponiveisFiltradas = questoesDisponiveis.filter((q) =>
-    q.enunciado.toLowerCase().includes(busca.toLowerCase()),
-  )
+  useEffect(() => {
+    if (!adicionando) return
+    let vivo = true
+    setBuscando(true)
+    const t = setTimeout(async () => {
+      const r = await buscarQuestoesForaSimulado(simuladoId, busca)
+      if (!vivo) return
+      setDisp(r.ok ? (r.itens ?? []) : [])
+      setBuscando(false)
+    }, 300)
+    return () => { vivo = false; clearTimeout(t) }
+  }, [busca, adicionando, simuladoId, questoesNoSimulado.length])
 
   function handleAdd(questaoId: string) {
     setActingId(questaoId)
     startTransition(async () => {
       const r = await addQuestaoToSimulado(simuladoId, questaoId)
       if (r?.error) toast.error(r.error)
-      else toast.success('Questão adicionada')
+      else { toast.success('Questão adicionada'); setDisp((p) => p.filter((q) => q.id !== questaoId)) }
       setActingId(null)
     })
   }
@@ -83,21 +87,28 @@ export function SimuladoQuestoesManager({ simuladoId, questoesNoSimulado, questo
       {/* Banco de questões disponíveis */}
       {adicionando && (
         <div className="rounded-lg border p-3 space-y-3 bg-muted/30">
-          <Input
-            placeholder="Buscar questão por enunciado…"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            className="max-w-md"
-          />
-          {disponiveisFiltradas.length === 0 ? (
+          <div className="relative max-w-md">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar questão por enunciado…"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          {buscando ? (
+            <p className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Buscando…
+            </p>
+          ) : disp.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
-              Nenhuma questão disponível. Cadastre questões no banco primeiro.
+              {busca.trim() ? 'Nenhuma questão encontrada.' : 'Nenhuma questão disponível para adicionar.'}
             </p>
           ) : (
             <div className="max-h-72 overflow-y-auto rounded-md border bg-background">
               <Table>
                 <TableBody>
-                  {disponiveisFiltradas.map((q) => (
+                  {disp.map((q) => (
                     <TableRow key={q.id}>
                       <TableCell className="text-sm">{preview(q.enunciado)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground w-[160px]">

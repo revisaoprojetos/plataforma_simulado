@@ -290,6 +290,49 @@ export async function adicionarQuestoes(bancoId: string, questaoIds: string[]): 
   return { ok: true, adicionadas: novas.length }
 }
 
+export type QuestaoBancoBuscaItem = {
+  id: string; external_id: string | null; enunciado: string; tipo: string
+  nivel_dificuldade: string | null; disciplina: string | null; assunto: string | null
+}
+export type FiltrosBuscaBanco = { busca?: string; disciplinaId?: string; dificuldade?: string; tipo?: string }
+
+/**
+ * Busca questões do tenant que NÃO estão no banco (para o pop-up "Adicionar questões"), server-side
+ * e limitada. Antes a página carregava 500 questões no load — bancos grandes perdiam o resto.
+ * Filtra por enunciado/código, disciplina (id), dificuldade e tipo direto no banco.
+ */
+export async function buscarQuestoesForaBanco(bancoId: string, filtros: FiltrosBuscaBanco = {}, limite = 40): Promise<{ ok: boolean; itens?: QuestaoBancoBuscaItem[]; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const jaNo = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', g.tenantId).order('questao_id', { ascending: true }))
+  const noSet = new Set(jaNo.map((r) => r.questao_id))
+  const safe = (filtros.busca ?? '').replace(/[,()%*]/g, ' ').trim()
+  let q = svc.from('simulado_questoes')
+    .select('id, external_id, enunciado, tipo, nivel_dificuldade, disciplina_id, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
+    .eq('tenant_id', g.tenantId).eq('deletado', false)
+  if (filtros.disciplinaId && filtros.disciplinaId !== 'all') q = q.eq('disciplina_id', filtros.disciplinaId)
+  if (filtros.dificuldade && filtros.dificuldade !== 'all') q = q.eq('nivel_dificuldade', filtros.dificuldade)
+  if (filtros.tipo && filtros.tipo !== 'all') q = q.eq('tipo', filtros.tipo)
+  if (safe) q = q.or(`enunciado.ilike.%${safe}%,external_id.ilike.%${safe}%`)
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(Math.min(200, Math.max(limite * 4, 80)))
+  if (error) return { ok: false, error: error.message }
+  const itens = (data ?? []).filter((r: any) => !noSet.has(r.id)).slice(0, limite).map((r: any) => ({
+    id: r.id, external_id: r.external_id ?? null, enunciado: r.enunciado ?? '', tipo: r.tipo,
+    nivel_dificuldade: r.nivel_dificuldade ?? null, disciplina: r.disciplinas?.nome ?? null, assunto: r.assuntos?.nome ?? null,
+  }))
+  return { ok: true, itens }
+}
+
+/** Disciplinas do tenant (id + nome) para o filtro do pop-up — tabela pequena, carga leve. */
+export async function listarDisciplinasFiltro(): Promise<{ id: string; nome: string }[]> {
+  const g = await guard()
+  if (!g.ok) return []
+  const svc = createAdminClient()
+  const rows = await fetchAll<{ id: string; nome: string }>(() => svc.from('simulado_disciplinas').select('id, nome').eq('tenant_id', g.tenantId).order('nome', { ascending: true }))
+  return rows.map((d) => ({ id: d.id, nome: d.nome ?? '—' }))
+}
+
 /** Remove várias questões de um banco de uma vez (as questões continuam existindo). */
 export async function removerQuestoes(bancoId: string, questaoIds: string[]): Promise<{ ok: boolean; error?: string }> {
   const g = await guard()

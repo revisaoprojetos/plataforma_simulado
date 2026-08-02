@@ -1,29 +1,19 @@
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useEffect, useState, useTransition, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Plus, Search, Check, Loader2, Upload, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { adicionarQuestoes } from '@/app/admin/banco-questoes/actions'
+import { adicionarQuestoes, buscarQuestoesForaBanco, type QuestaoBancoBuscaItem } from '@/app/admin/banco-questoes/actions'
 import { ImportarQuestoesTab } from '@/components/admin/importar-questoes-tab'
-
-interface Questao {
-  id: string
-  external_id?: string | null
-  enunciado: string
-  tipo: string
-  nivel_dificuldade?: string | null
-  disciplina?: string | null
-  assunto?: string | null
-}
 
 const difCfg: Record<string, { label: string; cls: string }> = {
   facil: { label: 'Fácil', cls: 'text-green-600' },
@@ -33,14 +23,11 @@ const difCfg: Record<string, { label: string; cls: string }> = {
 
 export function AdicionarQuestoesDialog({
   bancoId,
-  questoes,
-  jaNoBanco,
   disciplinas,
 }: {
   bancoId: string
-  questoes: Questao[]
-  jaNoBanco: string[]
-  disciplinas: string[]
+  /** Disciplinas do tenant para o filtro (id + nome). */
+  disciplinas: { id: string; nome: string }[]
 }) {
   const [open, setOpen] = useState(false)
   const [modo, setModo] = useState<'existentes' | 'importar'>('existentes')
@@ -51,36 +38,40 @@ export function AdicionarQuestoesDialog({
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
   const router = useRouter()
-  const noBanco = useMemo(() => new Set(jaNoBanco), [jaNoBanco])
+  // Candidatas buscadas SOB DEMANDA no servidor (já exclui as que estão no banco).
+  const [itens, setItens] = useState<QuestaoBancoBuscaItem[]>([])
+  const [buscando, setBuscando] = useState(false)
 
-  const discItems = useMemo(() => ({ all: 'Todas disciplinas', ...Object.fromEntries(disciplinas.map((d) => [d, d])) }), [disciplinas])
   const difItems = { all: 'Todas', facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' }
   const tipoItems = { all: 'Todos tipos', objetiva: 'Objetiva', discursiva: 'Discursiva' }
 
-  const filtrados = useMemo(() => {
-    const q = busca.toLowerCase().trim()
-    return questoes.filter((x) => {
-      if (disc !== 'all' && x.disciplina !== disc) return false
-      if (dif !== 'all' && x.nivel_dificuldade !== dif) return false
-      if (tipoF !== 'all' && x.tipo !== tipoF) return false
-      if (q && !(`${x.enunciado} ${x.external_id ?? ''} ${x.disciplina ?? ''} ${x.assunto ?? ''}`.toLowerCase().includes(q))) return false
-      return true
-    })
-  }, [questoes, busca, disc, dif, tipoF])
+  useEffect(() => {
+    if (!open || modo !== 'existentes') return
+    let vivo = true
+    setBuscando(true)
+    const t = setTimeout(async () => {
+      const r = await buscarQuestoesForaBanco(bancoId, { busca, disciplinaId: disc, dificuldade: dif, tipo: tipoF })
+      if (!vivo) return
+      setItens(r.ok ? (r.itens ?? []) : [])
+      setBuscando(false)
+    }, 300)
+    return () => { vivo = false; clearTimeout(t) }
+  }, [open, modo, busca, disc, dif, tipoF, bancoId])
 
   function toggle(id: string) {
-    if (noBanco.has(id)) return
     setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
   function adicionar() {
     if (sel.size === 0) return
     start(async () => {
-      const r = await adicionarQuestoes(bancoId, [...sel])
+      const ids = [...sel]
+      const r = await adicionarQuestoes(bancoId, ids)
       if (r.ok) {
         toast.success(`${r.adicionadas ?? 0} questão(ões) adicionada(s)`)
         setOpen(false)
         setSel(new Set())
+        setItens((p) => p.filter((q) => !ids.includes(q.id)))
         // Navegação suave (a action faz revalidatePath): sem window.location.assign / reload total.
         router.push(`/admin/banco-questoes/${bancoId}?tab=questoes`)
         router.refresh()
@@ -123,11 +114,11 @@ export function AdicionarQuestoesDialog({
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por enunciado, código, disciplina…" className="pl-8" />
           </div>
-          <Select value={disc} onValueChange={(v) => setDisc(v ?? '')} items={discItems}>
+          <Select value={disc} onValueChange={(v) => setDisc(v ?? '')} items={{ all: 'Todas disciplinas', ...Object.fromEntries(disciplinas.map((d) => [d.id, d.nome])) }}>
             <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas disciplinas</SelectItem>
-              {disciplinas.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+              {disciplinas.map((d) => <SelectItem key={d.id} value={d.id}>{d.nome}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={dif} onValueChange={(v) => setDif(v ?? '')} items={difItems}>
@@ -148,7 +139,7 @@ export function AdicionarQuestoesDialog({
             </SelectContent>
           </Select>
         </div>
-        <p className="px-6 pb-1 pt-3 text-xs text-muted-foreground">{filtrados.length} questão(ões) disponível(is)</p>
+        <p className="px-6 pb-1 pt-3 text-xs text-muted-foreground">{buscando ? 'Buscando…' : `${itens.length} questão(ões) disponível(is)${itens.length >= 40 ? '+' : ''}`}</p>
 
         {/* Lista (tabela com rolagem lateral) */}
         <div className="min-h-0 flex-1 overflow-auto px-3">
@@ -163,20 +154,21 @@ export function AdicionarQuestoesDialog({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtrados.length === 0 ? (
+              {buscando ? (
+                <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground"><Loader2 className="mx-auto h-4 w-4 animate-spin" /></TableCell></TableRow>
+              ) : itens.length === 0 ? (
                 <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Nenhuma questão encontrada.</TableCell></TableRow>
               ) : (
-                filtrados.map((q) => {
-                  const jaTem = noBanco.has(q.id)
+                itens.map((q) => {
                   const on = sel.has(q.id)
                   const enun = q.enunciado.length > 120 ? q.enunciado.slice(0, 120) + '…' : q.enunciado
                   const d = difCfg[q.nivel_dificuldade ?? '']
                   return (
-                    <TableRow key={q.id} onClick={() => toggle(q.id)} className={cn(jaTem ? 'opacity-50' : 'cursor-pointer', on && 'bg-primary/5')}>
+                    <TableRow key={q.id} onClick={() => toggle(q.id)} className={cn('cursor-pointer', on && 'bg-primary/5')}>
                       <TableCell>
                         <span className={cn('flex h-5 w-5 items-center justify-center rounded-full border',
-                          jaTem ? 'border-green-500 bg-green-500 text-white' : on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
-                          {(on || jaTem) && <Check className="h-3 w-3" />}
+                          on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
+                          {on && <Check className="h-3 w-3" />}
                         </span>
                       </TableCell>
                       <TableCell className="align-top">
@@ -184,7 +176,6 @@ export function AdicionarQuestoesDialog({
                           {q.external_id && <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-muted-foreground">#{q.external_id}</span>}
                           {q.disciplina && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-semibold uppercase text-primary">{q.disciplina}</span>}
                         </span>
-                        {jaTem && <span className="mt-1 block text-xs font-medium text-green-600">já na pasta</span>}
                       </TableCell>
                       <TableCell className="align-top text-sm leading-relaxed">{enun}</TableCell>
                       <TableCell className="align-top">
