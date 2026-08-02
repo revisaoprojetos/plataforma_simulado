@@ -37,7 +37,7 @@ export async function importProcessor(job: Job) {
         .eq('id', existing.id)
       atualizadas++
     } else {
-      await supabase.from('questoes').insert({
+      await supabase.from('simulado_questoes').insert({
         tenant_id,
         external_id: questao.external_id,
         enunciado: questao.enunciado,

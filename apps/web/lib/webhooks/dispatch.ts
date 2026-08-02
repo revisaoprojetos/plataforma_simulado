@@ -13,6 +13,32 @@ export const EVENTOS_WEBHOOK = [
 
 export type WebhookEvento = (typeof EVENTOS_WEBHOOK)[number]['chave']
 
+/**
+ * POST best-effort com RETRY + backoff exponencial. Repete em erro de rede/timeout e em 5xx/429
+ * (até 3 tentativas: 0ms → 500ms → 1000ms); NÃO repete em 4xx (exceto 429), pois é erro do payload.
+ * Retorna o texto de status a gravar em `ultimo_status`.
+ */
+async function enviarComRetry(url: string, headers: Record<string, string>, corpo: string): Promise<string> {
+  const MAX = 3
+  for (let tentativa = 1; tentativa <= MAX; tentativa++) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 8000)
+    try {
+      const res = await fetch(url, { method: 'POST', headers, body: corpo, signal: ctrl.signal })
+      clearTimeout(timer)
+      if (res.ok) return tentativa > 1 ? `ok (${res.status}) na tentativa ${tentativa}` : `ok (${res.status})`
+      // 4xx (menos 429) é erro do request — não adianta repetir.
+      if (res.status < 500 && res.status !== 429) return `erro (${res.status})`
+      if (tentativa === MAX) return `erro (${res.status}) após ${MAX} tentativas`
+    } catch {
+      clearTimeout(timer)
+      if (tentativa === MAX) return `erro de rede após ${MAX} tentativas`
+    }
+    await new Promise((r) => setTimeout(r, 500 * 2 ** (tentativa - 1)))
+  }
+  return 'erro'
+}
+
 // Status "humano" de cada evento (estilo `status` do payload da Guru).
 const STATUS_EVENTO: Record<WebhookEvento, string> = {
   'estudante.iniciou': 'iniciado',
@@ -89,16 +115,8 @@ export async function dispararWebhook(tenantId: string | null | undefined, event
     await Promise.allSettled(alvos.map(async (e: any) => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Webhook-Evento': evento }
       if (e.secret) headers['X-Webhook-Signature'] = 'sha256=' + crypto.createHmac('sha256', e.secret).update(corpo).digest('hex')
-      const ctrl = new AbortController()
-      const timer = setTimeout(() => ctrl.abort(), 8000)
-      try {
-        const res = await fetch(e.url, { method: 'POST', headers, body: corpo, signal: ctrl.signal })
-        await svc.from('simulado_webhook_saida').update({ ultimo_status: res.ok ? `ok (${res.status})` : `erro (${res.status})`, ultimo_envio: new Date().toISOString() }).eq('id', e.id)
-      } catch {
-        await svc.from('simulado_webhook_saida').update({ ultimo_status: 'erro de rede', ultimo_envio: new Date().toISOString() }).eq('id', e.id)
-      } finally {
-        clearTimeout(timer)
-      }
+      const status = await enviarComRetry(e.url, headers, corpo)
+      await svc.from('simulado_webhook_saida').update({ ultimo_status: status, ultimo_envio: new Date().toISOString() }).eq('id', e.id)
     }))
   } catch {
     // best-effort — ignora

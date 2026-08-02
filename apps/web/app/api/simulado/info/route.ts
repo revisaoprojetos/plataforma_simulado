@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const supabase = await createServiceClient()
   const { data } = await supabase
     .from('simulado_simulados')
-    .select('titulo, metodo_identificacao, status')
+    .select('titulo, status')
     .eq('embed_token', token)
     .maybeSingle()
 
@@ -21,9 +21,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: 'Simulado não encontrado.' }, { status: 404 })
   }
 
+  // NÃO expor `metodo_identificacao` aqui: dizer publicamente se o simulado pede CPF/telefone
+  // facilita brute-force do 2º fator. O campo é resolvido server-side na tela de identificação.
   return NextResponse.json({
     titulo: data.titulo,
-    metodo_identificacao: data.metodo_identificacao ?? 'email',
     status: data.status,
   })
 }
