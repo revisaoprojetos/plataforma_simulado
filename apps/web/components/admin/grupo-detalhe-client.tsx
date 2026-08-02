@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useTransition, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { adicionarMembros, removerMembro } from '@/app/admin/grupos/actions'
+import { adicionarMembros, removerMembro, buscarNaoMembros } from '@/app/admin/grupos/actions'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { EditarGrupoDialog } from '@/components/admin/editar-grupo-dialog'
 import { ImportarMembrosDialog } from '@/components/admin/importar-membros-dialog'
@@ -15,7 +15,7 @@ import { ArrowLeft, Pencil, Users, UserPlus, UserMinus, Search, Upload } from 'l
 
 type Est = { id: string; nome: string; email: string | null; classificacao: string | null }
 
-export function GrupoDetalheClient({ grupo, membros, naoMembros }: { grupo: { id: string; nome: string; cor: string | null }; membros: Est[]; naoMembros: Est[] }) {
+export function GrupoDetalheClient({ grupo, membros }: { grupo: { id: string; nome: string; cor: string | null }; membros: Est[] }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [editando, setEditando] = useState(false)
@@ -23,8 +23,21 @@ export function GrupoDetalheClient({ grupo, membros, naoMembros }: { grupo: { id
   const [busca, setBusca] = useState('')
   const [buscaMembros, setBuscaMembros] = useState('')
 
-  const q = busca.trim().toLowerCase()
-  const disponiveis = q ? naoMembros.filter((e) => `${e.nome} ${e.email ?? ''}`.toLowerCase().includes(q)) : naoMembros
+  // Não-membros do seletor "Adicionar" vêm do servidor sob demanda (evita carregar ~10k ao cliente).
+  const [disponiveis, setDisponiveis] = useState<Est[]>([])
+  const [buscando, setBuscando] = useState(true)
+  useEffect(() => {
+    let vivo = true
+    setBuscando(true)
+    const t = setTimeout(async () => {
+      const r = await buscarNaoMembros(grupo.id, busca)
+      if (!vivo) return
+      setDisponiveis(r.ok ? (r.itens ?? []) : [])
+      setBuscando(false)
+    }, 300)
+    return () => { vivo = false; clearTimeout(t) }
+  }, [busca, grupo.id])
+
   const qm = buscaMembros.trim().toLowerCase()
   const membrosFiltrados = qm ? membros.filter((e) => `${e.nome} ${e.email ?? ''}`.toLowerCase().includes(qm)) : membros
   const { sort, ordenarPor } = useOrdenacao<'nome' | 'classificacao'>()
@@ -38,7 +51,11 @@ export function GrupoDetalheClient({ grupo, membros, naoMembros }: { grupo: { id
   const cor = grupo.cor ?? '#6d28d9'
 
   function add(e: Est) {
-    start(async () => { const r = await adicionarMembros(grupo.id, [e.id]); if (r.ok) { toast.success(`${e.nome} adicionado`); router.refresh() } else toast.error(r.error ?? 'Erro') })
+    start(async () => {
+      const r = await adicionarMembros(grupo.id, [e.id])
+      if (r.ok) { toast.success(`${e.nome} adicionado`); setDisponiveis((prev) => prev.filter((x) => x.id !== e.id)); router.refresh() }
+      else toast.error(r.error ?? 'Erro')
+    })
   }
   async function remover(e: Est) {
     if (!(await confirmar({ mensagem: `Remover "${e.nome}" do grupo?`, destrutivo: true }))) return
@@ -129,8 +146,10 @@ export function GrupoDetalheClient({ grupo, membros, naoMembros }: { grupo: { id
               <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar estudante…" className="w-full rounded-lg border bg-[var(--input-bg,transparent)] py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
             </div>
             <div className="scroll-claro max-h-[360px] space-y-1.5 overflow-auto">
-              {disponiveis.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">{naoMembros.length === 0 ? 'Todos os estudantes já estão no grupo.' : 'Nenhum estudante encontrado.'}</p>
+              {buscando ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">Buscando…</p>
+              ) : disponiveis.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">{busca.trim() ? 'Nenhum estudante encontrado.' : 'Comece a digitar para buscar estudantes.'}</p>
               ) : disponiveis.map((e) => (
                 <div key={e.id} className="flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors hover:border-primary/40">
                   <div className="min-w-0 flex-1">

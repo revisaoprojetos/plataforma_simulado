@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { fetchAll } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { GrupoDetalheClient } from '@/components/admin/grupo-detalhe-client'
 
 // Sempre fresco: os membros do grupo mudam por import/vínculo e não podem ficar em cache.
@@ -28,12 +28,16 @@ export default async function GrupoDetalhePage({ params }: { params: Promise<{ i
   // (ex.: quem está alfabeticamente após o 1000º nome nunca era carregado).
   const gm = await fetchAll<{ estudante_id: string }>(() =>
     svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', id).order('estudante_id', { ascending: true }))
-  const memberIds = new Set(gm.map((r) => r.estudante_id))
+  const memberIds = [...new Set(gm.map((r) => r.estudante_id).filter(Boolean))]
 
-  const todos = await fetchAll<any>(() =>
-    svc.from('simulado_estudantes').select('id, nome, email, classificacao').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').eq('deletado', false).order('nome', { ascending: true }).order('id', { ascending: true }))
-  const membros = todos.filter((e: any) => memberIds.has(e.id)).map((e: any) => ({ id: e.id, nome: e.nome, email: e.email ?? null, classificacao: e.classificacao ?? null }))
-  const naoMembros = todos.filter((e: any) => !memberIds.has(e.id)).map((e: any) => ({ id: e.id, nome: e.nome, email: e.email ?? null, classificacao: e.classificacao ?? null }))
+  // Carrega SÓ os membros (fetchAllByIn) — não os ~10k estudantes do tenant. Os não-membros do
+  // seletor "Adicionar" vêm por busca server-side sob demanda (buscarNaoMembros).
+  const membrosRows = memberIds.length
+    ? await fetchAllByIn<any>(memberIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, classificacao').in('id', chunk).eq('deletado', false).order('nome', { ascending: true }))
+    : []
+  const membros = membrosRows
+    .map((e: any) => ({ id: e.id, nome: e.nome, email: e.email ?? null, classificacao: e.classificacao ?? null }))
+    .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'))
 
-  return <GrupoDetalheClient grupo={{ id: grupo.id, nome: grupo.nome, cor: (grupo as any).cor ?? null }} membros={membros} naoMembros={naoMembros} />
+  return <GrupoDetalheClient grupo={{ id: grupo.id, nome: grupo.nome, cor: (grupo as any).cor ?? null }} membros={membros} />
 }

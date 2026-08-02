@@ -17,6 +17,29 @@ function revalidar(id?: string) {
   if (id) revalidatePath(`/admin/grupos/${id}`)
 }
 
+export type EstBusca = { id: string; nome: string; email: string | null; classificacao: string | null }
+
+/**
+ * Busca estudantes NÃO-membros do grupo (para o seletor "Adicionar"), server-side e limitada.
+ * Evita carregar/serializar os ~10k estudantes do tenant no load da página: o cliente chama isto
+ * conforme digita. Filtra por nome/email; exclui quem já é membro em memória.
+ */
+export async function buscarNaoMembros(grupoId: string, busca: string, limite = 30): Promise<{ ok: boolean; itens?: EstBusca[]; error?: string }> {
+  const g = await guard(); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const gm = await fetchAll<{ estudante_id: string }>(() => svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id', { ascending: true }))
+  const memberSet = new Set(gm.map((m) => m.estudante_id))
+  // Remove chars que quebram o parser do .or() do PostgREST (vírgula/parênteses/curinga).
+  const safe = busca.replace(/[,()%*]/g, ' ').trim()
+  let query = svc.from('simulado_estudantes').select('id, nome, email, classificacao').eq('tenant_id', g.tenantId).eq('deletado', false)
+  if (safe) query = query.or(`nome.ilike.%${safe}%,email.ilike.%${safe}%`)
+  const { data, error } = await query.order('nome', { ascending: true }).limit(Math.min(200, limite * 4))
+  if (error) return { ok: false, error: error.message }
+  const itens = (data ?? []).filter((e: any) => !memberSet.has(e.id)).slice(0, limite)
+    .map((e: any) => ({ id: e.id, nome: e.nome, email: e.email ?? null, classificacao: e.classificacao ?? null }))
+  return { ok: true, itens }
+}
+
 /**
  * Cria um grupo de estudantes.
  * `opts.isMestre` cria uma pasta (grupo mestre); `opts.paiId` cria o grupo já dentro de uma pasta.
