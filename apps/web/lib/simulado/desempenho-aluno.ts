@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { resolverLiberacoes } from './liberacao'
 
 export type DesempenhoTentativa = { n: number; nota: number | null; finalizado: string | null }
@@ -35,14 +36,14 @@ export async function montarDesempenhoAluno(svc: SupabaseClient, estId: string):
   if (!ids.length) return []
 
   const sess = sessAll ?? []
-  const [{ data: sims }, { data: pq }] = await Promise.all([
-    svc.from('simulado_simulados').select('id, titulo, regras, status, data_fim').in('id', ids).eq('deletado', false),
-    svc.from('simulado_prova_questoes').select('simulado_id, questao_id, questoes:simulado_questoes(disciplinas:simulado_disciplinas(nome))').in('simulado_id', ids).eq('anulada', false),
+  const [sims, pq] = await Promise.all([
+    fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_simulados').select('id, titulo, regras, status, data_fim').in('id', chunk).eq('deletado', false).order('id', { ascending: true })),
+    fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_prova_questoes').select('simulado_id, questao_id, questoes:simulado_questoes(disciplinas:simulado_disciplinas(nome))').in('simulado_id', chunk).eq('anulada', false).order('questao_id', { ascending: true })),
   ])
 
   const totalPorSim = new Map<string, number>()
   const discDeQ = new Map<string, string>()
-  for (const r of (pq ?? []) as any[]) {
+  for (const r of pq as any[]) {
     totalPorSim.set(r.simulado_id, (totalPorSim.get(r.simulado_id) ?? 0) + 1)
     discDeQ.set(r.questao_id, r.questoes?.disciplinas?.nome ?? 'Sem disciplina')
   }
@@ -65,8 +66,10 @@ export async function montarDesempenhoAluno(svc: SupabaseClient, estId: string):
   const sessaoIds = [...best.values()].map((b) => b.id)
   const respPorSim = new Map<string, any[]>()
   if (sessaoIds.length) {
-    const { data: resp } = await svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', sessaoIds)
-    for (const r of (resp ?? []) as any[]) {
+    // fetchAllByIn: aluno com muitos simulados (melhor sessão de cada) × questões pode passar de 1000.
+    const resp = await fetchAllByIn<{ sessao_id: string; questao_id: string; correta: boolean }>(sessaoIds, (chunk) =>
+      svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).order('id', { ascending: true }))
+    for (const r of resp as any[]) {
       const sid = sessaoDeSim.get(r.sessao_id)
       if (!sid) continue
       const arr = respPorSim.get(sid) ?? []; arr.push(r); respPorSim.set(sid, arr)
@@ -74,7 +77,7 @@ export async function montarDesempenhoAluno(svc: SupabaseClient, estId: string):
   }
 
   const out: DesempenhoSimulado[] = []
-  for (const sim of (sims ?? []) as any[]) {
+  for (const sim of sims as any[]) {
     const b = best.get(sim.id)
     if (!b) continue
     if (!resolverLiberacoes(sim.regras, sim).notaLiberada) continue   // só notas liberadas

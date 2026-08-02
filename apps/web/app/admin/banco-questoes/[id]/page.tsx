@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -50,25 +51,20 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
   }
   if (!banco) notFound()
 
-  const { data: vinculos } = await svc
-    .from('simulado_questao_pasta')
-    .select('questao_id')
-    .eq('pasta_id', id)
-    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
-  const ids = (vinculos ?? []).map((v: any) => v.questao_id)
+  // fetchAll: banco com >1000 questões truncava os vínculos → banco aparecia incompleto.
+  const tidB = tenantId ?? '00000000-0000-0000-0000-000000000000'
+  const vinculos = await fetchAll<{ questao_id: string }>(() =>
+    svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', id).eq('tenant_id', tidB).order('questao_id', { ascending: true }))
+  const ids = vinculos.map((v) => v.questao_id)
 
   let questoes: any[] = []
   if (ids.length) {
-    const { data } = await svc
-      .from('simulado_questoes')
-      .select('id, enunciado, tipo, nivel_dificuldade, status, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
-      .in('id', ids)
-      .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
-      // Ordem de leitura (a 1ª questão importada aparece primeiro). Import insere 1→100
-      // com created_at crescente; ASC preserva a ordem do CSV. `ordem_questoes` (abaixo)
-      // ainda sobrepõe quando o admin reordena manualmente.
-      .order('created_at', { ascending: true })
-    questoes = data ?? []
+    // fetchAllByIn: além de não truncar em 1000, evita estourar a URL do .in() com muitos ids.
+    // Ordem de leitura preservada abaixo por `ordem_questoes` (reordenação manual do admin).
+    questoes = await fetchAllByIn<any>(ids, (chunk) =>
+      svc.from('simulado_questoes')
+        .select('id, enunciado, tipo, nivel_dificuldade, status, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
+        .in('id', chunk).eq('tenant_id', tidB).order('created_at', { ascending: true }))
   }
 
   // Ordem manual das questões no banco (tolerante: coluna pode não existir até a migration).

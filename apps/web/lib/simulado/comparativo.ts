@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 
 export type Comparativo = {
   participantes: number
@@ -20,12 +21,11 @@ export async function montarComparativo(svc: SupabaseClient, simuladoId: string,
   const discDeQ = new Map<string, string>()
   for (const r of (pq ?? []) as any[]) discDeQ.set(r.questao_id, r.questoes?.disciplinas?.nome ?? 'Sem disciplina')
 
-  const { data: sess } = await svc
-    .from('simulado_sessoes_prova')
-    .select('id, estudante_id, nota')
-    .eq('simulado_id', simuladoId).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada')
+  // fetchAll: um simulado com >1000 sessões truncava → participantes/média da turma errados.
+  const sess = await fetchAll<{ id: string; estudante_id: string; nota: number | null }>(() =>
+    svc.from('simulado_sessoes_prova').select('id, estudante_id, nota').eq('simulado_id', simuladoId).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada').order('id', { ascending: true }))
   const best = new Map<string, { id: string; nota: number }>()
-  for (const s of (sess ?? []) as any[]) {
+  for (const s of sess as any[]) {
     const n = s.nota != null ? Number(s.nota) : -1
     const cur = best.get(s.estudante_id)
     if (!cur || n > cur.nota) best.set(s.estudante_id, { id: s.id, nota: n })
@@ -45,8 +45,10 @@ export async function montarComparativo(svc: SupabaseClient, simuladoId: string,
   let totAc = 0
   const repIds = reps.map((r) => r.id)
   if (repIds.length) {
-    const { data: resp } = await svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', repIds)
-    for (const r of (resp ?? []) as any[]) {
+    // fetchAllByIn: respostas de TODAS as sessões da turma (participantes×questões pode passar de 1000).
+    const resp = await fetchAllByIn<{ sessao_id: string; questao_id: string; correta: boolean }>(repIds, (chunk) =>
+      svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).order('id', { ascending: true }))
+    for (const r of resp as any[]) {
       if (r.correta) totAc++
       const d = discDeQ.get(r.questao_id) ?? 'Sem disciplina'
       const v = acPorDisc.get(d) ?? { ac: 0, tt: 0 }; v.tt++; if (r.correta) v.ac++; acPorDisc.set(d, v)
