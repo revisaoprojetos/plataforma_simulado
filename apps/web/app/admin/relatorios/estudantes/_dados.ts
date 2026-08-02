@@ -90,15 +90,16 @@ async function _estudanteViaPostgrest(svc: SupabaseClient, estId: string, tenant
   const acDiscAluno = new Map<string, { ac: number; tt: number }>()
   let respAll: any[] = []
   if (sessIds.length) {
-    const { data: resp } = await svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', sessIds)
-    respAll = (resp ?? []) as any[]
+    // fetchAllByIn: aluno ativo pode ter >1000 respostas → truncava e distorcia o relatório.
+    respAll = await fetchAllByIn<any>(sessIds, (chunk) =>
+      svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).order('id', { ascending: true }))
   }
   const qidsAluno = [...new Set(respAll.map((r) => r.questao_id))]
 
   const discDeQ = new Map<string, string>()
   if (qidsAluno.length) {
-    const { data: qs } = await svc.from('simulado_questoes').select('id, disciplinas:simulado_disciplinas(nome)').in('id', qidsAluno)
-    for (const q of (qs ?? []) as any[]) discDeQ.set(q.id, q.disciplinas?.nome ?? 'Sem disciplina')
+    const qs = await fetchAllByIn<any>(qidsAluno, (chunk) => svc.from('simulado_questoes').select('id, disciplinas:simulado_disciplinas(nome)').in('id', chunk).order('id', { ascending: true }))
+    for (const q of qs as any[]) discDeQ.set(q.id, q.disciplinas?.nome ?? 'Sem disciplina')
   }
   for (const r of respAll) {
     ttPorSess.set(r.sessao_id, (ttPorSess.get(r.sessao_id) ?? 0) + 1)

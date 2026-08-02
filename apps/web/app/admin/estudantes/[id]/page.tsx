@@ -167,18 +167,19 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
       // grupos de disciplinas das pastas usadas (tolerante: coluna pode não existir).
       const pastasUsadas = [...new Set([...pastaPorSim.values()])]
       if (pastasUsadas.length) {
-        const { data: gRows, error: gErr } = await svc.from('simulado_pastas').select('id, grupos').in('id', pastasUsadas)
-        if (!gErr) for (const p of gRows ?? []) if (Array.isArray((p as any).grupos)) gruposPorPasta.set((p as any).id, (p as any).grupos)
-        // Visual do banco (capa/cor/ícone) — para os cards de simulado feito ficarem iguais ao do banco.
-        // Prefere capa_card_url (pôster 4:5, igual aos cards do Banco de Simulado); fallback p/ capa_url (banner).
-        {
-          let vRows: any[] | null = null
-          const comCard = await svc.from('simulado_pastas').select('id, cor, icone, capa_url, capa_card_url').in('id', pastasUsadas)
-          if (comCard.error && /capa_card_url/i.test(comCard.error.message)) {
-            const semCard = await svc.from('simulado_pastas').select('id, cor, icone, capa_url').in('id', pastasUsadas)
-            vRows = semCard.data ?? null
-          } else vRows = comCard.data ?? null
-          for (const p of vRows ?? []) visualPorPasta.set((p as any).id, { cor: (p as any).cor ?? null, icone: (p as any).icone ?? null, capa: (p as any).capa_card_url ?? (p as any).capa_url ?? null })
+        // UMA query (grupos + visual em vez de duas) — tolerante às colunas opcionais
+        // capa_card_url/grupos: tenta o select completo e degrada removendo a que faltar.
+        const tentativas = ['id, grupos, cor, icone, capa_url, capa_card_url', 'id, grupos, cor, icone, capa_url', 'id, cor, icone, capa_url']
+        let pRows: any[] = []
+        for (const cols of tentativas) {
+          const r = await svc.from('simulado_pastas').select(cols).in('id', pastasUsadas)
+          if (!r.error) { pRows = r.data ?? []; break }
+          if (!/capa_card_url|grupos|column/i.test(r.error.message)) break
+        }
+        for (const p of pRows as any[]) {
+          if (Array.isArray(p.grupos)) gruposPorPasta.set(p.id, p.grupos)
+          // Prefere capa_card_url (pôster 4:5); fallback p/ capa_url (banner).
+          visualPorPasta.set(p.id, { cor: p.cor ?? null, icone: p.icone ?? null, capa: p.capa_card_url ?? p.capa_url ?? null })
         }
       }
     }

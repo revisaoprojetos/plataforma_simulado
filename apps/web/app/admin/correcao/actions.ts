@@ -125,10 +125,16 @@ async function recomputarNotaSessao(svc: ReturnType<typeof createAdminClient>, s
     .select('questao_id, nota')
     .eq('sessao_id', sessaoId)
     .eq('status', 'corrigida')
+  // Pontos máximos por questão (soma das competências) — EM LOTE (era N+1: 1 query por discursiva).
+  const qids = [...new Set((rd ?? []).map((d: any) => d.questao_id).filter(Boolean))]
+  const maxPorQ = new Map<string, number>()
+  if (qids.length) {
+    const { data: comps } = await svc.from('simulado_competencias').select('questao_id, pontos').in('questao_id', qids)
+    for (const c of (comps ?? []) as any[]) maxPorQ.set(c.questao_id, (maxPorQ.get(c.questao_id) ?? 0) + Number(c.pontos ?? 0))
+  }
   let fracDisc = 0
   for (const d of rd ?? []) {
-    const { data: comps } = await svc.from('simulado_competencias').select('pontos').eq('questao_id', d.questao_id)
-    const maxP = (comps ?? []).reduce((a: number, c: any) => a + Number(c.pontos ?? 0), 0)
+    const maxP = maxPorQ.get(d.questao_id) ?? 0
     if (maxP > 0) fracDisc += Math.min(1, Number(d.nota ?? 0) / maxP)
   }
 

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { CadernoEditorV2 } from '@/components/admin/caderno-editor-v2'
 import { carregarRegistros } from '@/lib/caderno-designer/merge'
 import { dataComQuestao } from '@/lib/caderno-designer/blocks'
@@ -42,26 +43,26 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
   // Questões: do banco vinculado (se houver) ou publicadas do tenant.
   let questoes: any[] | null = null
   if (bancoId) {
-    const { data: vinc } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', tid)
-    const ids = (vinc ?? []).map((v: any) => v.questao_id)
+    // fetchAll/fetchAllByIn: banco com >1000 questões truncava (vínculos + questões) → caderno incompleto.
+    const vinc = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', tid).order('questao_id', { ascending: true }))
+    const ids = vinc.map((v) => v.questao_id)
     questoes = ids.length
-      ? (await svc.from('simulado_questoes').select('id, enunciado, tipo, comentario_professor').in('id', ids).eq('tenant_id', tid).limit(1000)).data
+      ? await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_questoes').select('id, enunciado, tipo, comentario_professor').in('id', chunk).eq('tenant_id', tid).order('id', { ascending: true }))
       : []
   } else {
-    questoes = (await svc
+    questoes = await fetchAll<any>(() => svc
       .from('simulado_questoes')
       .select('id, enunciado, tipo, comentario_professor')
       .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
       .eq('status', 'publicada')
-      .order('created_at', { ascending: false })
-      .limit(300)).data
+      .order('created_at', { ascending: false }))
   }
 
   // Alternativas de TODAS as questões do preview (para navegar por elas no repetidor).
   const amostraIds = (questoes ?? []).map((q: any) => q.id)
-  const { data: alts } = amostraIds.length
-    ? await svc.from('simulado_alternativas').select('questao_id, texto, ordem, correta, comentario, lei').in('questao_id', amostraIds).eq('tenant_id', tid)
-    : { data: [] as any[] }
+  const alts = amostraIds.length
+    ? await fetchAllByIn<any>(amostraIds, (chunk) => svc.from('simulado_alternativas').select('questao_id, texto, ordem, correta, comentario, lei').in('questao_id', chunk).eq('tenant_id', tid).order('questao_id', { ascending: true }))
+    : []
   const altMap = new Map<string, any[]>()
   for (const a of alts ?? []) { const arr = altMap.get(a.questao_id) ?? []; arr.push(a); altMap.set(a.questao_id, arr) }
 

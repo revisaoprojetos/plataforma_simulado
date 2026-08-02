@@ -1,6 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { DadosRelatorioDisciplina } from './relatorio-disciplina-view'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { relatorioDisciplinaSql, type DiscData } from '@/lib/data/relatorios.repo'
@@ -63,11 +63,11 @@ async function _disciplinaViaPostgrest(svc: SupabaseClient, discId: string, tena
   const { data: alvo } = await svc.from('simulado_disciplinas').select('id, nome').eq('id', discId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
   if (!alvo) return null
 
-  // Questões da disciplina.
-  const { data: qs } = await svc.from('simulado_questoes')
-    .select('id, assunto_id').eq('disciplina_id', discId).eq('deletado', false)
-  const qIds = (qs ?? []).map((q: any) => q.id)
-  const assuntoDeQ = new Map<string, string | null>((qs ?? []).map((q: any) => [q.id, q.assunto_id]))
+  // Questões da disciplina (fetchAll: disciplina com >1000 questões truncava → stats incoerentes).
+  const qs = await fetchAll<{ id: string; assunto_id: string | null }>(() =>
+    svc.from('simulado_questoes').select('id, assunto_id').eq('disciplina_id', discId).eq('deletado', false).order('id', { ascending: true }))
+  const qIds = qs.map((q) => q.id)
+  const assuntoDeQ = new Map<string, string | null>(qs.map((q) => [q.id, q.assunto_id]))
 
   const acPorSim = new Map<string, { ac: number; tt: number }>()
   const acPorAssunto = new Map<string, { ac: number; tt: number }>()

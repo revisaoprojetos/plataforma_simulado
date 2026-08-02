@@ -25,17 +25,17 @@ export function filtrarModsPorTipo<M extends { id: string }>(mods: M[], tipo: Ti
   return mods
 }
 
-/** Busca em lote o tipo de vários simulados (uma query só). `svc` = cliente supabase. */
+/** Busca em lote o tipo de vários simulados. `svc` = cliente supabase. */
 export async function tiposDeSimulados(svc: any, simuladoIds: string[]): Promise<Map<string, TipoSimulado | null>> {
   const map = new Map<string, TipoSimulado | null>()
   const ids = [...new Set(simuladoIds.filter(Boolean))]
   if (!ids.length) return map
-  const { data } = await svc
-    .from('simulado_prova_questoes')
-    .select('simulado_id, questoes:simulado_questoes(tipo)')
-    .in('simulado_id', ids)
+  // fetchAllByIn: board com muitos simulados × questões passava de 1000 → tipo dos cards errado.
+  const { fetchAllByIn } = await import('@/lib/supabase/fetch-all')
+  const data = await fetchAllByIn<any>(ids, (chunk: string[]) =>
+    svc.from('simulado_prova_questoes').select('simulado_id, questoes:simulado_questoes(tipo)').in('simulado_id', chunk).order('simulado_id', { ascending: true }))
   const porSim = new Map<string, string[]>()
-  for (const r of (data ?? []) as any[]) {
+  for (const r of data as any[]) {
     const t = r.questoes?.tipo
     const arr = porSim.get(r.simulado_id) ?? []
     arr.push(t)

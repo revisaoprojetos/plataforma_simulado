@@ -537,10 +537,12 @@ export async function analisarQuestoesImport(formData: FormData): Promise<Analis
   if (!questoes.length) return { ok: false, error: 'Nenhuma questão encontrada. Confira se há um cabeçalho e ao menos uma linha.' }
 
   // Dedupe por enunciado normalizado (contra as questões já cadastradas no tenant).
+  // fetchAll: com >1000 questões no tenant, o dedupe truncava e re-importava duplicatas.
   const svc = createAdminClient()
-  const { data: existentes } = await svc.from('simulado_questoes').select('id, enunciado').eq('tenant_id', g.tenantId).eq('deletado', false)
+  const existentes = await fetchAll<{ id: string; enunciado: string | null }>(() =>
+    svc.from('simulado_questoes').select('id, enunciado').eq('tenant_id', g.tenantId).eq('deletado', false).order('id', { ascending: true }))
   const mapa = new Map<string, string>()
-  for (const e of existentes ?? []) mapa.set(normEnun((e as any).enunciado ?? ''), (e as any).id)
+  for (const e of existentes) mapa.set(normEnun(e.enunciado ?? ''), e.id)
   for (const q of questoes) {
     const id = mapa.get(normEnun(q.enunciado))
     if (id) { q.jaExiste = true; q.questaoIdExistente = id }

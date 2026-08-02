@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
@@ -19,11 +20,15 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
   let simulados: any[] = []
   {
     const base = 'id, titulo, status, data_inicio, data_fim, modo_aplicacao, tempo_limite_min, embed_token, created_at, regras'
-    let r: { data: any[] | null; error: { message: string } | null } = await supabase.from('simulado_simulados').select(`${base}, pasta_id`).eq('deletado', false).eq('tenant_id', tid).order('created_at', { ascending: false })
-    if (r.error && /pasta_id|column/i.test(r.error.message)) {
-      r = await supabase.from('simulado_simulados').select(base).eq('deletado', false).eq('tenant_id', tid).order('created_at', { ascending: false })
+    // fetchAll: tenant com >1000 simulados truncava o board. Tolerante à coluna pasta_id ausente.
+    const buscar = (cols: string) => fetchAll<any>(() => supabase.from('simulado_simulados').select(cols).eq('deletado', false).eq('tenant_id', tid).order('created_at', { ascending: false }).order('id', { ascending: true }))
+    try {
+      simulados = await buscar(`${base}, pasta_id`)
+    } catch (e: any) {
+      if (/pasta_id|column/i.test(e?.message ?? '')) simulados = await buscar(base)
+      else throw e
     }
-    simulados = (r.data ?? []).map((s: any) => ({ ...s, pasta_id: s.pasta_id ?? null }))
+    simulados = simulados.map((s: any) => ({ ...s, pasta_id: s.pasta_id ?? null }))
   }
 
   // Pastas da Aplicação de Simulado (is_folder + folder_area='simulado'). Tolerante: se as colunas

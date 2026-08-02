@@ -88,24 +88,33 @@ export async function listarAdministradores(tenantIdAlvo?: string): Promise<{ ok
     .order('created_at', { ascending: true })
   if (error) return { ok: false, error: error.message }
 
-  const membros: AdminMembro[] = await Promise.all((acessos ?? []).map(async (a: any) => {
-    let email: string | null = null
-    let nome: string | null = null
+  // Nome/e-mail: 1 lookup EM LOTE em simulado_users (evita 1 getUserById por membro). Só cai no
+  // Auth (getUserById) para os user_ids que ainda não estão em simulado_users — geralmente poucos.
+  const userIds = [...new Set((acessos ?? []).map((a: any) => a.user_id).filter(Boolean))] as string[]
+  const perfil = new Map<string, { nome: string | null; email: string | null }>()
+  if (userIds.length) {
+    const { data: us } = await svc.from('simulado_users').select('id, nome, email').in('id', userIds)
+    for (const u of (us ?? []) as any[]) perfil.set(u.id, { nome: u.nome ?? null, email: u.email ?? null })
+  }
+  const faltando = userIds.filter((id) => !perfil.has(id))
+  await Promise.all(faltando.map(async (id) => {
     try {
-      const { data } = await svc.auth.admin.getUserById(a.user_id)
-      email = data?.user?.email ?? null
+      const { data } = await svc.auth.admin.getUserById(id)
       const meta = (data?.user?.user_metadata ?? {}) as Record<string, unknown>
-      nome = (meta.full_name as string) ?? (meta.nome as string) ?? null
-    } catch { /* fonte auth indisponível — mostra só o id/cargo */ }
+      perfil.set(id, { nome: (meta.full_name as string) ?? (meta.nome as string) ?? null, email: data?.user?.email ?? null })
+    } catch { perfil.set(id, { nome: null, email: null }) }
+  }))
+  const membros: AdminMembro[] = (acessos ?? []).map((a: any) => {
+    const p = perfil.get(a.user_id) ?? { nome: null, email: null }
     return {
       userId: a.user_id as string,
-      nome, email,
+      nome: p.nome, email: p.email,
       cargo: (a.role as string) ?? 'estudante',
       ativo: !!a.ativo,
       criadoEm: (a.created_at as string) ?? null,
       ehVoce: a.user_id === userId,
     }
-  }))
+  })
 
   // Cargos = perfis do próprio tenant + perfis de sistema (mesma fonte do RBAC).
   const { data: roles } = await svc

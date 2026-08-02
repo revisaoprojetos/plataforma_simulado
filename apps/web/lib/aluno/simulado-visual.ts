@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 
 export type VisualSim = { cor: string | null; icone: string | null; capa: string | null }
 
@@ -21,16 +22,17 @@ export async function resolverVisualSimulados(svc: SupabaseClient, simulados: { 
     else semBanco.push(s.id)
   }
 
-  // Fallback pelas questões → pasta mais comum.
+  // Fallback pelas questões → pasta mais comum. fetchAllByIn: muitos simulados/questões passavam
+  // de 1000 e a capa dos cards ficava errada por truncamento.
   if (semBanco.length) {
-    const { data: pq } = await svc.from('simulado_prova_questoes').select('simulado_id, questao_id').in('simulado_id', semBanco)
-    const qids = [...new Set((pq ?? []).map((r: any) => r.questao_id).filter(Boolean))]
+    const pq = await fetchAllByIn<any>(semBanco, (chunk) => svc.from('simulado_prova_questoes').select('simulado_id, questao_id').in('simulado_id', chunk).order('simulado_id', { ascending: true }))
+    const qids = [...new Set(pq.map((r: any) => r.questao_id).filter(Boolean))]
     if (qids.length) {
-      const { data: qp } = await svc.from('simulado_questao_pasta').select('questao_id, pasta_id').in('questao_id', qids)
+      const qp = await fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questao_pasta').select('questao_id, pasta_id').in('questao_id', chunk).order('questao_id', { ascending: true }))
       const pastaDeQ = new Map<string, string>()
-      for (const r of (qp ?? []) as any[]) if (!pastaDeQ.has(r.questao_id)) pastaDeQ.set(r.questao_id, r.pasta_id)
+      for (const r of qp as any[]) if (!pastaDeQ.has(r.questao_id)) pastaDeQ.set(r.questao_id, r.pasta_id)
       const cont = new Map<string, Map<string, number>>()
-      for (const r of (pq ?? []) as any[]) {
+      for (const r of pq as any[]) {
         const p = pastaDeQ.get(r.questao_id); if (!p) continue
         let m = cont.get(r.simulado_id); if (!m) { m = new Map(); cont.set(r.simulado_id, m) }
         m.set(p, (m.get(p) ?? 0) + 1)
