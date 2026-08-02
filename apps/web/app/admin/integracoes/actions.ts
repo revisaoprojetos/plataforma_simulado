@@ -11,7 +11,7 @@ import { getAdapter } from '@/lib/integracoes/registry'
 import { importarViaProvider, listarFontesProvider, processarEvento } from '@/lib/integracoes/orquestrador'
 import { aplicarEntitlement, reaplicarLiberacoes } from '@/lib/integracoes/engine'
 import { coalescer } from '@/lib/integracoes/ratelimit'
-import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { normalizarPorMapa, ehProdutoPassaporte } from '@/lib/integracoes/normalizar-mapa'
 import type { Provider, PessoaNormalizada, Entitlement } from '@/lib/integracoes/tipos'
 
@@ -660,13 +660,13 @@ export async function listarAssinaturasSalvas(provider: string): Promise<Assinat
   const { data: maps } = await svc.from('simulado_integracao_mapeamentos').select('fonte_ref').eq('tenant_id', g.tenantId).eq('provider', provider).eq('ativo', true)
   const mapeados = new Set((maps ?? []).map((m: any) => m.fonte_ref))
 
-  // "Já no sistema?" em lote: casa por email e por cpf (uma consulta chunk'd cada).
-  const emails = [...new Set(linhas.map((r) => (r.email ?? '').trim().toLowerCase()).filter(Boolean))]
-  const cpfs = [...new Set(linhas.map((r) => chaveDigitos(r.cpf)).filter(Boolean))]
-  const porEmail = emails.length ? await fetchAllByIn<{ email: string }>(emails, (c) => svc.from('simulado_estudantes').select('email').eq('tenant_id', g.tenantId).eq('deletado', false).in('email', c)) : []
-  const porCpf = cpfs.length ? await fetchAllByIn<{ cpf: string }>(cpfs, (c) => svc.from('simulado_estudantes').select('cpf').eq('tenant_id', g.tenantId).eq('deletado', false).in('cpf', c)) : []
-  const emailSet = new Set(porEmail.map((e) => (e.email ?? '').trim().toLowerCase()))
-  const cpfSet = new Set(porCpf.map((e) => chaveDigitos(e.cpf)))
+  // "Já no sistema?" — em vez de checar cada email/cpf da base (dezenas de queries chunk'd),
+  // carrega os identificadores de TODOS os estudantes do tenant UMA vez (poucas páginas) e compara
+  // em memória. Muito menos round-trips (≈ estudantes/1000) e mesmo resultado.
+  const estAll = await fetchAll<{ email: string | null; cpf: string | null }>(() =>
+    svc.from('simulado_estudantes').select('email, cpf').eq('tenant_id', g.tenantId).eq('deletado', false).order('id', { ascending: true }))
+  const emailSet = new Set(estAll.map((e) => (e.email ?? '').trim().toLowerCase()).filter(Boolean))
+  const cpfSet = new Set(estAll.map((e) => chaveDigitos(e.cpf)).filter(Boolean))
 
   const itens: AssinaturaGuruDTO[] = linhas.map((r) => {
     const email = (r.email ?? '').trim().toLowerCase() || null
