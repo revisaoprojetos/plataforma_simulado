@@ -11,7 +11,6 @@ import { getAdapter } from '@/lib/integracoes/registry'
 import { importarViaProvider, listarFontesProvider, processarEvento } from '@/lib/integracoes/orquestrador'
 import { aplicarEntitlement, reaplicarLiberacoes } from '@/lib/integracoes/engine'
 import { coalescer } from '@/lib/integracoes/ratelimit'
-import { fetchAll } from '@/lib/supabase/fetch-all'
 import { normalizarPorMapa, ehProdutoPassaporte } from '@/lib/integracoes/normalizar-mapa'
 import type { Provider, PessoaNormalizada, Entitlement } from '@/lib/integracoes/tipos'
 
@@ -623,7 +622,9 @@ export interface AssinaturasResult {
   ok: boolean; error?: string
   itens?: AssinaturaGuruDTO[]
   sincronizadoEm?: string | null   // ISO da última sincronização (base_sync_em)
-  total?: number
+  total?: number                   // total de linhas que casam a busca (para a paginação)
+  page?: number
+  totalPages?: number
   nuncaSync?: boolean              // base vazia e nunca sincronizada → sugerir "Sincronizar"
 }
 
@@ -633,40 +634,47 @@ export interface AssinaturasResult {
  * Assim o uso do dia a dia (abrir a tela, comparar, adicionar) NÃO sobrecarrega a chave/rate
  * limit. Enriquece com "já está no sistema?" e "produto mapeado?".
  */
-export async function listarAssinaturasSalvas(provider: string): Promise<AssinaturasResult> {
+export async function listarAssinaturasSalvas(provider: string, opts?: { page?: number; busca?: string; limite?: number }): Promise<AssinaturasResult> {
   if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
   const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
+  const limite = Math.min(200, Math.max(10, opts?.limite ?? 50))
+  const page = Math.max(1, opts?.page ?? 1)
+  const offset = (page - 1) * limite
+  const busca = (opts?.busca ?? '').replace(/[,()%*]/g, ' ').trim()
 
   const { data: cfgRow } = await svc.from('simulado_integracao_config').select('base_sync_em').eq('tenant_id', g.tenantId).eq('provider', provider).maybeSingle()
   const sincronizadoEm = (cfgRow as any)?.base_sync_em ?? null
 
-  // Lê a base salva (paginada; sem teto de 1000). Se a tabela ainda não existe → orienta a migration.
-  let linhas: BaseRow[]
+  // Base PAGINADA no servidor (com busca opcional). Antes trazia as ~milhares de linhas ao cliente.
+  let q = svc.from('simulado_integracao_base')
+    .select('pessoa_external_id, ent_external_id, nome, email, cpf, telefone, produto_ref, produto_nome, status', { count: 'exact' })
+    .eq('tenant_id', g.tenantId).eq('provider', provider)
+  if (busca) q = q.or(`nome.ilike.%${busca}%,email.ilike.%${busca}%,cpf.ilike.%${busca}%,produto_ref.ilike.%${busca}%,produto_nome.ilike.%${busca}%`)
+  let linhas: BaseRow[]; let total = 0
   try {
-    linhas = await fetchAll<BaseRow>(() =>
-      svc.from('simulado_integracao_base')
-        .select('pessoa_external_id, ent_external_id, nome, email, cpf, telefone, produto_ref, produto_nome, status')
-        .eq('tenant_id', g.tenantId).eq('provider', provider)
-        .order('status', { ascending: true }).order('nome', { ascending: true }))
+    const r = await q.order('status', { ascending: true }).order('nome', { ascending: true }).range(offset, offset + limite - 1)
+    if (r.error) throw r.error
+    linhas = (r.data ?? []) as BaseRow[]; total = r.count ?? 0
   } catch (e) {
     if ((e as any)?.code === '42P01') return { ok: false, error: 'A base ainda não foi criada. Aplique a migration 20260717000001_integracao_base.' }
     return { ok: false, error: (e as Error).message ?? 'Falha ao ler a base.' }
   }
-  if (!linhas.length) return { ok: true, itens: [], sincronizadoEm, total: 0, nuncaSync: !sincronizadoEm }
+  const totalPages = Math.max(1, Math.ceil(total / limite))
+  if (!linhas.length) return { ok: true, itens: [], sincronizadoEm, total, page, totalPages, nuncaSync: !sincronizadoEm && total === 0 }
 
-  // Mapeamentos ativos (para marcar "produto mapeado?").
-  const { data: maps } = await svc.from('simulado_integracao_mapeamentos').select('fonte_ref').eq('tenant_id', g.tenantId).eq('provider', provider).eq('ativo', true)
-  const mapeados = new Set((maps ?? []).map((m: any) => m.fonte_ref))
-
-  // "Já no sistema?" — em vez de checar cada email/cpf da base (dezenas de queries chunk'd),
-  // carrega os identificadores de TODOS os estudantes do tenant UMA vez (poucas páginas) e compara
-  // em memória. Muito menos round-trips (≈ estudantes/1000) e mesmo resultado.
-  const estAll = await fetchAll<{ email: string | null; cpf: string | null }>(() =>
-    svc.from('simulado_estudantes').select('email, cpf').eq('tenant_id', g.tenantId).eq('deletado', false).order('id', { ascending: true }))
-  const emailSet = new Set(estAll.map((e) => (e.email ?? '').trim().toLowerCase()).filter(Boolean))
-  const cpfSet = new Set(estAll.map((e) => chaveDigitos(e.cpf)).filter(Boolean))
+  // Mapeamentos ativos + "já no sistema?" SÓ da página (≤limite emails/cpfs → 2 .in() pequenas).
+  const emails = [...new Set(linhas.map((r) => (r.email ?? '').trim().toLowerCase()).filter(Boolean))]
+  const cpfs = [...new Set(linhas.map((r) => chaveDigitos(r.cpf)).filter(Boolean))]
+  const [mapsRes, peRes, pcRes] = await Promise.all([
+    svc.from('simulado_integracao_mapeamentos').select('fonte_ref').eq('tenant_id', g.tenantId).eq('provider', provider).eq('ativo', true).then((r) => r.data ?? []),
+    emails.length ? svc.from('simulado_estudantes').select('email').eq('tenant_id', g.tenantId).eq('deletado', false).in('email', emails).then((r) => r.data ?? []) : Promise.resolve([] as any[]),
+    cpfs.length ? svc.from('simulado_estudantes').select('cpf').eq('tenant_id', g.tenantId).eq('deletado', false).in('cpf', cpfs).then((r) => r.data ?? []) : Promise.resolve([] as any[]),
+  ])
+  const mapeados = new Set((mapsRes as any[]).map((m) => m.fonte_ref))
+  const emailSet = new Set((peRes as any[]).map((e) => (e.email ?? '').trim().toLowerCase()))
+  const cpfSet = new Set((pcRes as any[]).map((e) => chaveDigitos(e.cpf)))
 
   const itens: AssinaturaGuruDTO[] = linhas.map((r) => {
     const email = (r.email ?? '').trim().toLowerCase() || null
@@ -680,7 +688,7 @@ export async function listarAssinaturasSalvas(provider: string): Promise<Assinat
       temMapeamento: !!r.produto_ref && mapeados.has(r.produto_ref),
     }
   })
-  return { ok: true, itens, sincronizadoEm, total: itens.length, nuncaSync: !sincronizadoEm }
+  return { ok: true, itens, sincronizadoEm, total, page, totalPages, nuncaSync: !sincronizadoEm && total === 0 }
 }
 
 /**

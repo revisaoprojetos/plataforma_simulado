@@ -117,8 +117,11 @@ export function IntegracaoProviderClient({ provider, appUrl, config, mapeamentos
 // ── Assinaturas (Guru): analisa quem comprou e adiciona ao sistema ────────────
 function Assinaturas({ provider }: { provider: Provider }) {
   const [itens, setItens] = useState<AssinaturaGuruDTO[] | null>(null)
-  const [sel, setSel] = useState<Set<string>>(new Set())
+  const [selMap, setSelMap] = useState<Map<string, AssinaturaGuruDTO>>(new Map()) // seleção sobrevive à troca de página
   const [busca, setBusca] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
   const [syncEm, setSyncEm] = useState<string | null>(null)
   const [nuncaSync, setNuncaSync] = useState(false)
   const [carregando, start] = useTransition()
@@ -126,25 +129,29 @@ function Assinaturas({ provider }: { provider: Provider }) {
   const [aplicando, startAplicar] = useTransition()
   const nomeProv = PROVIDER_META[provider].nome
 
-  // Lê da BASE local (rápido, sem tocar a API).
-  const carregar = () => start(async () => {
-    const r = await listarAssinaturasSalvas(provider)
+  // Lê a BASE local PAGINADA no servidor (rápido, sem tocar a API nem trazer milhares de linhas).
+  const carregar = (pg: number, bs: string) => start(async () => {
+    const r = await listarAssinaturasSalvas(provider, { page: pg, busca: bs })
     if (!r.ok) { toast.error(r.error ?? 'Erro ao ler a base'); setItens([]); return }
     setItens(r.itens ?? [])
-    setSyncEm(r.sincronizadoEm ?? null)
-    setNuncaSync(!!r.nuncaSync)
-    setSel(new Set())
+    setTotal(r.total ?? 0); setTotalPages(r.totalPages ?? 1); setPage(r.page ?? pg)
+    setSyncEm(r.sincronizadoEm ?? null); setNuncaSync(!!r.nuncaSync)
   })
 
-  // Toca a API do provedor e grava na base; depois relê a base.
+  // Toca a API do provedor e grava na base; depois relê (página 1, limpa a seleção).
   const sincronizar = () => startSync(async () => {
     const r = await sincronizarAssinaturas(provider)
     if (!r.ok) { toast.error(r.error ?? 'Falha ao sincronizar'); return }
     toast.success(`Sincronizado: ${r.total ?? 0} assinatura(s) da ${nomeProv}`)
-    carregar()
+    setSelMap(new Map()); carregar(1, busca)
   })
 
-  useEffect(() => { carregar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Busca com debounce (volta pra página 1) — dispara também na montagem (carga inicial).
+  useEffect(() => {
+    const t = setTimeout(() => carregar(1, busca), 350)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busca])
 
   const fmtSync = (iso: string | null) => {
     if (!iso) return 'nunca sincronizado'
@@ -153,26 +160,21 @@ function Assinaturas({ provider }: { provider: Provider }) {
     return `última sincronização ${quando}`
   }
 
-  const filtrados = (itens ?? []).filter((a) => {
-    const q = busca.trim().toLowerCase()
-    // Inclui o ID do produto (produtoRef) além do nome → dá p/ filtrar por "1783709089".
-    return !q || `${a.nome} ${a.email ?? ''} ${a.cpf ?? ''} ${a.produtoNome ?? ''} ${a.produtoRef ?? ''}`.toLowerCase().includes(q)
-  })
   const key = (a: AssinaturaGuruDTO) => `${a.pessoaExternalId}::${a.entExternalId}`
-  const toggle = (a: AssinaturaGuruDTO) => setSel((p) => { const n = new Set(p); const k = key(a); n.has(k) ? n.delete(k) : n.add(k); return n })
-  const selecionaveis = filtrados // permite reaplicar mesmo os já no sistema (idempotente)
-  const todosMarcados = selecionaveis.length > 0 && selecionaveis.every((a) => sel.has(key(a)))
-  const marcarTodos = () => setSel(todosMarcados ? new Set() : new Set(selecionaveis.map(key)))
+  const pageItens = itens ?? []
+  const toggle = (a: AssinaturaGuruDTO) => setSelMap((p) => { const n = new Map(p); const k = key(a); n.has(k) ? n.delete(k) : n.set(k, a); return n })
+  const todosMarcados = pageItens.length > 0 && pageItens.every((a) => selMap.has(key(a)))
+  const marcarTodos = () => setSelMap((p) => { const n = new Map(p); if (todosMarcados) pageItens.forEach((a) => n.delete(key(a))); else pageItens.forEach((a) => n.set(key(a), a)); return n })
 
   const aplicar = () => {
-    const escolhidos = (itens ?? []).filter((a) => sel.has(key(a)))
+    const escolhidos = [...selMap.values()] // seleção acumulada em TODAS as páginas
     if (!escolhidos.length) { toast.error('Selecione ao menos uma assinatura.'); return }
     startAplicar(async () => {
       const r = await aplicarAssinaturasGuru(provider, escolhidos)
       if (!r.ok) { toast.error(r.error ?? 'Erro ao adicionar'); return }
       const s = r.resumo!
       toast.success(`${s.concedidos} com acesso · ${s.criados} aluno(s) · ${s.semMapeamento} sem mapeamento${s.erros ? ` · ${s.erros} erro(s)` : ''}`)
-      carregar()
+      setSelMap(new Map()); carregar(page, busca)
     })
   }
 
@@ -193,8 +195,8 @@ function Assinaturas({ provider }: { provider: Provider }) {
         <Button variant="outline" onClick={sincronizar} disabled={sincronizando || carregando}>
           {sincronizando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DownloadCloud className="mr-2 h-4 w-4" />} Sincronizar da {nomeProv}
         </Button>
-        <Button onClick={aplicar} disabled={aplicando || sel.size === 0}>
-          {aplicando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Confirmar e adicionar ({sel.size})
+        <Button onClick={aplicar} disabled={aplicando || selMap.size === 0}>
+          {aplicando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Confirmar e adicionar ({selMap.size})
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
@@ -202,13 +204,13 @@ function Assinaturas({ provider }: { provider: Provider }) {
       </p>
       {itens !== null && (
         <p className="text-[11px] text-muted-foreground">
-          {(itens?.length ?? 0)} na base · {fmtSync(syncEm)}
+          {total.toLocaleString('pt-BR')} na base{busca.trim() ? ' (na busca)' : ''} · {fmtSync(syncEm)}{selMap.size > 0 ? ` · ${selMap.size} selecionado(s)` : ''}
         </p>
       )}
 
       {itens === null ? (
         <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Lendo a base…</div>
-      ) : filtrados.length === 0 ? (
+      ) : pageItens.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
           {nuncaSync
             ? <>A base ainda está vazia. Clique em <b>Sincronizar da {nomeProv}</b> para trazer as assinaturas (verifique antes o User Token em Credenciais).</>
@@ -230,8 +232,8 @@ function Assinaturas({ provider }: { provider: Provider }) {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filtrados.map((a) => {
-                const on = sel.has(key(a))
+              {pageItens.map((a) => {
+                const on = selMap.has(key(a))
                 return (
                   <tr key={key(a)} className={cn('cursor-pointer transition-colors hover:bg-muted/30', on && 'bg-primary/5')} onClick={() => toggle(a)}>
                     <td className="px-3 py-2"><input type="checkbox" checked={on} onChange={() => toggle(a)} onClick={(e) => e.stopPropagation()} /></td>
@@ -248,6 +250,17 @@ function Assinaturas({ provider }: { provider: Provider }) {
               })}
             </tbody>
           </table>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
+              <span>Página {page} de {totalPages}</span>
+              <div className="flex items-center gap-1">
+                <button type="button" disabled={page <= 1 || carregando} onClick={() => carregar(1, busca)} className="rounded-md border px-2 py-1 transition-colors hover:bg-muted disabled:opacity-40">Início</button>
+                <button type="button" disabled={page <= 1 || carregando} onClick={() => carregar(page - 1, busca)} className="rounded-md border px-2 py-1 transition-colors hover:bg-muted disabled:opacity-40">Anterior</button>
+                <button type="button" disabled={page >= totalPages || carregando} onClick={() => carregar(page + 1, busca)} className="rounded-md border px-2 py-1 transition-colors hover:bg-muted disabled:opacity-40">Próxima</button>
+                <button type="button" disabled={page >= totalPages || carregando} onClick={() => carregar(totalPages, busca)} className="rounded-md border px-2 py-1 transition-colors hover:bg-muted disabled:opacity-40">Final</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
