@@ -4,10 +4,11 @@ import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { QuestaoCard } from '@/components/aluno/questao-card'
 import { QuestoesFiltrosAluno, type FiltrosParams } from '@/components/aluno/questoes-filtros-aluno'
 import { PaginationControls } from '@/components/admin/pagination-controls'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { Target, CheckCircle2, Percent } from 'lucide-react'
 
 const POR_PAGINA = 10
-const UUID_ZERO = '00000000-0000-0000-0000-000000000000'
+const COLS_QUESTAO = 'id, tipo, enunciado, disciplina_id, banca_id, ano, nivel_dificuldade, comentario_professor, codigo, numero, assunto_id, imagem_url'
 
 interface PageProps {
   searchParams: Promise<FiltrosParams & { page?: string }>
@@ -37,39 +38,52 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
   const disciplinas = (disciplinasAll ?? []).filter((d: any) => discUsadas.has(d.id))
   const pct = praticaTotal > 0 ? Math.round((praticaAcertos / praticaTotal) * 100) : 0
 
-  // Questões publicadas (com filtros).
-  let q = svc
-    .from('simulado_questoes')
-    .select('id, tipo, enunciado, disciplina_id, banca_id, ano, nivel_dificuldade, comentario_professor, codigo, numero, assunto_id, imagem_url', { count: 'exact' })
-    .eq('tenant_id', tid)
-    .eq('status', 'publicada')
-    .eq('deletado', false)
-    .order('created_at', { ascending: false })
-
-  q = q.neq('tipo', 'discursiva') // discursivas ocultas por enquanto
-  if (params.disciplina) q = q.eq('disciplina_id', params.disciplina)
-  if (params.assunto) q = q.eq('assunto_id', params.assunto)
-  if (params.banca) q = q.eq('banca_id', params.banca)
-  if (params.ano) q = q.eq('ano', Number(params.ano))
-  if (params.dificuldade) q = q.eq('nivel_dificuldade', params.dificuldade)
-  if (params.comentadas) q = q.not('comentario_professor', 'is', null)
-  if (params.busca) q = q.ilike('enunciado', `%${params.busca}%`)
-
-  // "Minhas questões": resolvidas / não resolvidas / acertei / errei (via respostas avulsas).
-  if (params.minhas) {
-    const { data: ra } = await svc.from('simulado_respostas_avulsas').select('questao_id, correta').eq('estudante_id', estId)
-    const rows = (ra ?? []) as any[]
-    const resolvidas = [...new Set(rows.map((r) => r.questao_id).filter(Boolean))]
-    const acertei = [...new Set(rows.filter((r) => r.correta).map((r) => r.questao_id).filter(Boolean))]
-    const errei = [...new Set(rows.filter((r) => !r.correta).map((r) => r.questao_id).filter(Boolean))]
-    if (params.minhas === 'resolvidas') q = q.in('id', resolvidas.length ? resolvidas : [UUID_ZERO])
-    else if (params.minhas === 'acertei') q = q.in('id', acertei.length ? acertei : [UUID_ZERO])
-    else if (params.minhas === 'errei') q = q.in('id', errei.length ? errei : [UUID_ZERO])
-    else if (params.minhas === 'nao_resolvidas' && resolvidas.length) q = q.not('id', 'in', `(${resolvidas.join(',')})`)
+  // Aplica os filtros de taxonomia/busca a QUALQUER query builder de questões (reusado nos 2 caminhos).
+  const aplicarFiltros = (qb: any) => {
+    qb = qb.eq('tenant_id', tid).eq('status', 'publicada').eq('deletado', false).neq('tipo', 'discursiva')
+    if (params.disciplina) qb = qb.eq('disciplina_id', params.disciplina)
+    if (params.assunto) qb = qb.eq('assunto_id', params.assunto)
+    if (params.banca) qb = qb.eq('banca_id', params.banca)
+    if (params.ano) qb = qb.eq('ano', Number(params.ano))
+    if (params.dificuldade) qb = qb.eq('nivel_dificuldade', params.dificuldade)
+    if (params.comentadas) qb = qb.not('comentario_professor', 'is', null)
+    if (params.busca) qb = qb.ilike('enunciado', `%${params.busca}%`)
+    return qb
   }
 
-  const { data: questoes, count } = await q.range(offset, offset + POR_PAGINA - 1)
-  const totalPages = Math.ceil((count ?? 0) / POR_PAGINA)
+  let questoes: any[] = []
+  let count = 0
+  if (params.minhas) {
+    // Filtro "minhas" (resolvidas/não-resolvidas/acertei/errei): antes usava .in()/.not-in() de uma
+    // lista GRANDE de ids na URL → estourava (400) e/ou truncava. Agora: busca só os IDS que casam os
+    // filtros (leve) + as respostas do aluno, intersecta/complementa em memória e busca só a PÁGINA.
+    const [idsFiltrados, ra] = await Promise.all([
+      fetchAll<{ id: string }>(() => aplicarFiltros(svc.from('simulado_questoes').select('id')).order('created_at', { ascending: false })),
+      fetchAll<{ questao_id: string; correta: boolean }>(() => svc.from('simulado_respostas_avulsas').select('questao_id, correta').eq('estudante_id', estId).order('questao_id', { ascending: true })),
+    ])
+    const resolvidas = new Set(ra.map((r) => r.questao_id).filter(Boolean))
+    const acertei = new Set(ra.filter((r) => r.correta).map((r) => r.questao_id).filter(Boolean))
+    const errei = new Set(ra.filter((r) => !r.correta).map((r) => r.questao_id).filter(Boolean))
+    const alvo = idsFiltrados.map((x) => x.id).filter((id) =>
+      params.minhas === 'resolvidas' ? resolvidas.has(id)
+        : params.minhas === 'nao_resolvidas' ? !resolvidas.has(id)
+          : params.minhas === 'acertei' ? acertei.has(id)
+            : params.minhas === 'errei' ? errei.has(id)
+              : true)
+    count = alvo.length
+    const pageIds = alvo.slice(offset, offset + POR_PAGINA)
+    if (pageIds.length) {
+      const { data } = await svc.from('simulado_questoes').select(COLS_QUESTAO).in('id', pageIds)
+      const byId = new Map((data ?? []).map((x: any) => [x.id, x]))
+      questoes = pageIds.map((id) => byId.get(id)).filter(Boolean) // preserva a ordem (created_at desc)
+    }
+  } else {
+    const r = await aplicarFiltros(svc.from('simulado_questoes').select(COLS_QUESTAO, { count: 'exact' }))
+      .order('created_at', { ascending: false }).range(offset, offset + POR_PAGINA - 1)
+    questoes = r.data ?? []
+    count = r.count ?? 0
+  }
+  const totalPages = Math.ceil(count / POR_PAGINA)
 
   const ids = (questoes ?? []).map((x: any) => x.id)
   const discIds = (questoes ?? []).map((x: any) => x.disciplina_id).filter(Boolean)
