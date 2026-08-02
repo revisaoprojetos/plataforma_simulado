@@ -7,6 +7,7 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
 import { hospedarImagensDoc } from '@/lib/caderno-designer/hospedar-imagens'
+import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 
 export interface CadernoBloco {
   id: string
@@ -229,9 +230,11 @@ export async function atualizarCaderno(id: string, nome: string, cor: string | n
   if (!titulo) return { ok: false, error: 'Informe um nome.' }
 
   const svc = createAdminClient()
+  // Capa vem como base64 (redimensionar → toDataURL) → storage; grava só a URL (não infla a linha).
+  const capa = capaUrl ? (await hospedarBase64(capaUrl, svc)) : null
   const { error } = await svc
     .from('simulado_cadernos_designer')
-    .update({ nome: titulo, cor: cor || null, icone: icone || null, capa_url: capaUrl || null })
+    .update({ nome: titulo, cor: cor || null, icone: icone || null, capa_url: capa || null })
     .eq('id', id).eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
   if (error && /cor|icone|capa_url|column/i.test(error.message)) {
     const { error: e2 } = await svc.from('simulado_cadernos_designer').update({ nome: titulo }).eq('id', id).eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')

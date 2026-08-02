@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { softDelete } from '@/lib/soft-delete'
 import { tipoEhCertoErrado, alternativasSaoCertoErrado } from '@/lib/simulado/formato'
 import type { AnaliseImport, QuestaoImport, AltImport, ResultadoImport } from './import-types'
@@ -129,8 +130,11 @@ export async function atualizarBanco(id: string, nome: string, cor: string | nul
   if (!titulo) return { ok: false, error: 'Informe um nome.' }
 
   const svc = createAdminClient()
+  // Capas vêm como base64 (redimensionar → toDataURL) → storage; grava só a URL (não infla a linha).
+  const capa = capaUrl ? (await hospedarBase64(capaUrl, svc)) : null
+  const capaCard = capaCardUrl ? (await hospedarBase64(capaCardUrl, svc)) : null
   const upd = (patch: Record<string, unknown>) => svc.from('simulado_pastas').update(patch).eq('id', id).eq('tenant_id', g.tenantId)
-  const completo = { nome: titulo, cor: cor || null, icone: icone || null, capa_url: capaUrl || null, capa_card_url: capaCardUrl || null }
+  const completo = { nome: titulo, cor: cor || null, icone: icone || null, capa_url: capa || null, capa_card_url: capaCard || null }
 
   let { error } = await upd(completo)
   // Fallback 1: coluna capa_card_url ainda não migrada → salva o resto (cor/ícone/capa preservados).

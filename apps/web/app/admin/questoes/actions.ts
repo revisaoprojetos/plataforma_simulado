@@ -7,6 +7,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 interface AlternativaData {
@@ -217,7 +218,9 @@ async function buildQuestaoFields(supabase: SupabaseClient, tenantId: string, da
     gabarito_tipo: data.gabarito_tipo || 'oficial',
     comentario_professor: data.comentario_professor || null,
     status: data.status,
-    imagem_url: data.imagem_url || null,
+    // Normalmente já vem como URL (o form hospeda ao selecionar). Defensivo: se chegar base64
+    // (ex.: import), sobe pro storage e grava a URL — hospedarBase64 no-op quando já é URL.
+    imagem_url: await hospedarBase64(data.imagem_url, createAdminClient()),
   }
 }
 
