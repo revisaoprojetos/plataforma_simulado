@@ -35,6 +35,10 @@ async function getDados(tenantId: string) {
     // (fetchAll), mas fica MEMOIZADO no Redis (TTL) — no cache-hit o dashboard não
     // toca no banco. Degrada sozinho sem Redis (computa direto). Ver relatorio-cache.
     remember<number | null>(chaveRelatorio(tenantId, 'dashboard', 'nota-media'), TTL_RELATORIO, async () => {
+      // Agregação NO BANCO (RPC avg) — não transfere linhas. Fallback p/ o cálculo em JS
+      // enquanto a função não estiver migrada (scripts/sql/nota-media-rpc.sql).
+      const rpc = await svc.rpc('simulado_nota_media', { p_tenant: tenantId })
+      if (!rpc.error) return rpc.data == null ? null : Number(rpc.data)
       const notasData = await fetchAll<{ nota: number | null }>(() =>
         svc.from('simulado_sessoes_prova').select('nota').match(t).eq('deletado', false).eq('is_teste', false).eq('status', 'finalizada').not('nota', 'is', null).order('id', { ascending: true }))
       const notas = (notasData ?? []).map((n: any) => Number(n.nota)).filter((n) => !Number.isNaN(n))
