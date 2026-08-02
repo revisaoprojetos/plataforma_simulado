@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     await registrarRelatorioEvento(svc, {
       tenantId: access.tenantId, simuladoId: sessao.simulado_id, estudanteId: sessao.estudante_id, sessaoId: sessao.id, tipo: 'baixou',
     })
-    await dispararWebhook(access.tenantId, 'estudante.baixou_relatorio', await dadosProgressao(svc, sessao as any))
+    void dispararWebhook(access.tenantId, 'estudante.baixou_relatorio', await dadosProgressao(svc, sessao as any))
 
     url = `${WEB_INTERNAL}/imprimir/resultado/${body.sessaoToken}`
     referencia = body.sessaoToken

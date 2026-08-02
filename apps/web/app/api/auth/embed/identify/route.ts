@@ -279,7 +279,8 @@ export async function POST(request: NextRequest) {
     // Notifica sistemas externos só na prova REAL (não em sessão de teste).
     if (!ehTeste) {
       void publicarAoVivo(simulado.id) // realtime: painel "Ao Vivo" (Fase 2)
-      await dispararWebhook(simulado.tenant_id, 'estudante.iniciou', {
+      // fire-and-forget: não bloqueia o início da prova pela entrega/retry do webhook (container persistente).
+      void dispararWebhook(simulado.tenant_id, 'estudante.iniciou', {
         contact: contatoEstudante(estudante),
         simulado: { id: simulado.id, name: tituloSimulado },
         sessao_id: sessaoId,

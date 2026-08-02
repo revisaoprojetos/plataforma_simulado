@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     await registrarRelatorioEvento(admin, {
       tenantId: sessao.tenant_id, simuladoId: sessao.simulado_id, estudanteId: sessao.estudante_id, sessaoId: sessao.id, tipo: 'visualizou',
     })
-    await dispararWebhook(sessao.tenant_id, 'estudante.visualizou_relatorio', await dadosProgressao(admin, sessao as any))
+    void dispararWebhook(sessao.tenant_id, 'estudante.visualizou_relatorio', await dadosProgressao(admin, sessao as any))
   }
 
   // Total de participantes (alunos distintos finalizados, exceto testes) — contexto do ranking.

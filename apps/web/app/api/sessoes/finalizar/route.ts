@@ -125,8 +125,9 @@ export async function POST(request: NextRequest) {
     await rankearSimulado(supabase, sessao.simulado_id)
     void publicarAoVivo(sessao.simulado_id) // realtime: painel "Ao Vivo" (Fase 2)
 
-    // Notifica sistemas externos (webhooks/n8n): estudante finalizou.
-    await dispararWebhook(sessao.tenant_id, 'estudante.finalizou',
+    // Notifica sistemas externos (webhooks/n8n): estudante finalizou. Fire-and-forget: não segura
+    // a resposta ao aluno pela entrega/retry do webhook (só o dadosProgressao, um read rápido, é aguardado).
+    void dispararWebhook(sessao.tenant_id, 'estudante.finalizou',
       await dadosProgressao(supabase, sessao, { nota: Math.round(nota * 100) / 100, acertos, total: totalQ }))
   }
 
