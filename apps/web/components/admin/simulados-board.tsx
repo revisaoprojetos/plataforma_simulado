@@ -9,8 +9,6 @@ import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
 import { excluirPastaFolder } from '@/app/admin/banco-questoes/actions'
-import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
-import { FileiraHorizontal } from '@/components/fileira-horizontal'
 import type { TipoSimulado } from '@/lib/simulado/tipo'
 import {
   DropdownMenu,
@@ -37,6 +35,7 @@ import {
   FolderPlus,
   Folder,
   FolderOpen,
+  FolderCog,
   ChevronLeft,
   ChevronDown,
   FolderInput,
@@ -44,16 +43,17 @@ import {
   X,
   Check,
   Loader2,
-  LayoutGrid,
+  Plus,
+  BarChart3,
+  FolderTree,
   Rows3,
+  Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { abrirLinkTemado } from '@/lib/hud/abrir-temado'
-import { formatBrt } from '@/lib/brt'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { isoParaBrtLocal } from '@/lib/brt'
 import { toast } from 'sonner'
 import {
   encerrarSimuladoAction,
@@ -75,6 +75,7 @@ export interface SimuladoCard {
   tempo_limite_min: number | null
   embed_token: string | null
   created_at: string
+  pasta_id?: string | null
   regras?: { nota_liberada?: boolean; gabarito_liberado?: boolean; caderno_liberado?: boolean } | null
   tipo?: TipoSimulado | null
   vis?: { cor: string | null; icone: string | null; capa: string | null } | null
@@ -94,10 +95,6 @@ const secoes = [
   { chave: 'encerrado', titulo: 'Encerrado', cor: 'bg-red-500' },
 ] as const
 
-function iniciais(titulo: string) {
-  return titulo.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
-}
-
 function formatDur(min: number | null) {
   if (!min) return 'Sem limite'
   const h = Math.floor(min / 60)
@@ -107,40 +104,67 @@ function formatDur(min: number | null) {
   return `${m}min`
 }
 
-function formatData(s: SimuladoCard) {
-  return format(new Date(s.data_inicio ?? s.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })
+/** "DD/MM HH:mm" em horário de Brasília — versão compacta para os cards. */
+function compactoBrt(iso?: string | null): string {
+  const s = isoParaBrtLocal(iso)
+  if (!s) return ''
+  const [d, t] = s.split('T')
+  const [, mo, da] = d.split('-')
+  return `${da}/${mo} ${t}`
 }
 
-const coverClass: Record<string, string> = {
-  publicado: 'bg-gradient-to-br from-amber-400 to-orange-500',
-  rascunho: 'bg-gradient-to-br from-sky-400 to-blue-500',
-  encerrado: 'bg-gradient-to-br from-slate-400 to-slate-600',
-}
 const dotClass: Record<string, string> = {
-  publicado: 'bg-amber-400',
-  rascunho: 'bg-sky-400',
+  publicado: 'bg-amber-500',
+  rascunho: 'bg-sky-500',
   encerrado: 'bg-red-500',
 }
 const statusLabel: Record<string, string> = {
   publicado: 'Em andamento',
-  rascunho: 'Rascunho',
+  rascunho: 'Agendado',
   encerrado: 'Encerrado',
 }
-const statusText: Record<string, string> = {
-  publicado: 'text-amber-600 dark:text-amber-400',
-  rascunho: 'text-sky-600 dark:text-sky-400',
-  encerrado: 'text-red-600 dark:text-red-400',
+const statusChipClass: Record<string, string> = {
+  publicado: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  rascunho: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
+  encerrado: 'bg-red-500/15 text-red-600 dark:text-red-400',
 }
 
-function SeloLib({ label }: { label: string }) {
+/** Rótulo-resumo do estado de uma pasta (mostrado ao lado do nome da seção). */
+function statusPasta(sims: SimuladoCard[]): { label: string; cls: string } | null {
+  if (!sims.length) return null
+  if (sims.every((s) => s.modo_aplicacao === 'aberto' && s.status === 'publicado'))
+    return { label: 'Aberto ao público', cls: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400' }
+  if (sims.some((s) => s.status === 'publicado')) return { label: 'Em andamento', cls: statusChipClass.publicado }
+  if (sims.some((s) => s.status === 'rascunho')) return { label: 'A iniciar', cls: statusChipClass.rascunho }
+  return { label: 'Encerrado', cls: statusChipClass.encerrado }
+}
+
+/** Chip clicável de liberação (Nota / Gabarito / Caderno): verde quando liberado, neutro quando bloqueado. */
+function LiberacaoChip({ label, on, pending, onClick }: { label: string; on: boolean; pending: boolean; onClick: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur" title={`${label} liberado(a) para os alunos`}>
-      <Unlock className="h-3 w-3" /> {label}
-    </span>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={pending}
+      aria-pressed={on}
+      title={on ? `${label} liberado(a) — clique para bloquear` : `${label} bloqueado(a) — clique para liberar`}
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-colors disabled:opacity-50',
+        on
+          ? 'border-emerald-500/30 bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+          : 'border-border bg-muted/50 text-muted-foreground hover:text-foreground hover:border-primary/40',
+      )}
+    >
+      {on ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />} {label}
+    </button>
   )
 }
 
-function CardItem({ s, appUrl, online, onMover }: { s: SimuladoCard; appUrl: string; online: number; onMover?: () => void }) {
+/** Cartão de simulado (admin): capa em cima, corpo com chips, LIBERAÇÕES clicáveis e ações inline. */
+function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecionar }: {
+  s: SimuladoCard; appUrl: string; online: number
+  onMover?: () => void; selecionado: boolean; onSelecionar: (v: boolean) => void
+}) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   // Estado efetivo (modo configurado + override manual do admin).
@@ -153,8 +177,8 @@ function CardItem({ s, appUrl, online, onMover }: { s: SimuladoCard; appUrl: str
   }
 
   const linkAcesso = s.embed_token ? `${appUrl}/aluno/login?token=${s.embed_token}` : null
-
   const rotulo = { nota: 'Nota/desempenho', gabarito: 'Gabarito', caderno: 'Caderno (PDF)' }
+
   function toggleLib(item: 'nota' | 'gabarito' | 'caderno') {
     const novo = !estado[item]
     setOverride((p) => ({ ...p, [item]: novo }))
@@ -197,98 +221,138 @@ function CardItem({ s, appUrl, online, onMover }: { s: SimuladoCard; appUrl: str
   const cor = s.vis?.cor ?? '#6d28d9'
   const BancoIcon = iconeBanco(s.vis?.icone)
   const capa = s.vis?.capa
+  const detalhe = `/admin/simulados/${s.id}`
+
+  // Subtítulo (janela/disponibilidade) — horário de Brasília.
+  const subtitulo = s.modo_aplicacao === 'janela_fixa' && s.data_inicio
+    ? (s.data_fim ? `${compactoBrt(s.data_inicio)} — ${compactoBrt(s.data_fim)}` : `A partir de ${compactoBrt(s.data_inicio)}`)
+    : s.modo_aplicacao === 'aberto' ? 'Sempre disponível'
+      : s.modo_aplicacao === 'prazo_relativo' ? 'Prazo definido por aluno' : 'Sem data definida'
 
   return (
-    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
-      {/* Fundo: imagem do banco ou degradê da cor */}
-      {capa
-        ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
-      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
+    <div className={cn(
+      'group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md',
+      selecionado ? 'ring-2 ring-primary' : 'ring-1 ring-transparent',
+    )}>
+      {/* Capa */}
+      <div className="relative aspect-[16/9] overflow-hidden">
+        {capa
+          ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+          : <div className="absolute inset-0" style={{ background: `linear-gradient(140deg, ${cor} 0%, #0f172a 140%)` }} />}
+        {!capa && <BancoIcon className="absolute -right-4 -top-4 h-28 w-28 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
 
-      {/* Link cobre o card (abaixo do kebab) */}
-      <Link href={`/admin/simulados/${s.id}`} className="absolute inset-0 z-10" aria-label={s.titulo} />
+        {/* Link cobre a capa (abaixo dos controles) */}
+        <Link href={detalhe} className="absolute inset-0 z-0" aria-label={s.titulo} />
 
-      {/* Chip do ícone */}
-      <span className="pointer-events-none absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: cor }}>
-        <BancoIcon className="h-4 w-4" />
-      </span>
-
-      {/* Ações (kebab) */}
-      <div className="absolute right-2 top-2 z-30 rounded-lg bg-black/40 backdrop-blur [&_button:hover]:!bg-white/20 [&_button]:!text-white/90">
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/50" title="Mais ações">
-            <MoreHorizontal className="h-4 w-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-52">
-            <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}/ao-vivo`)}><Radio className="mr-2 h-4 w-4" /> Ao vivo (online/progresso)</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}`)}><Pencil className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}`)}><Trophy className="mr-2 h-4 w-4" /> Ranking</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={copiarLink}><Copy className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
-            <DropdownMenuItem onClick={abrirSimulado}><ExternalLink className="mr-2 h-4 w-4" /> Abrir simulado</DropdownMenuItem>
-            {onMover && <DropdownMenuItem onClick={onMover}><FolderInput className="mr-2 h-4 w-4" /> Mover para pasta</DropdownMenuItem>}
-            <DropdownMenuSeparator />
-            {s.status === 'publicado' && <DropdownMenuItem onClick={() => acao(encerrarSimuladoAction, 'Simulado encerrado')}><Square className="mr-2 h-4 w-4" /> Encerrar</DropdownMenuItem>}
-            {s.status === 'encerrado' && <DropdownMenuItem onClick={() => acao(reabrirSimuladoAction, 'Simulado reaberto')}><Play className="mr-2 h-4 w-4" /> Reabrir</DropdownMenuItem>}
-            {s.status === 'rascunho' && <DropdownMenuItem onClick={() => acao(publishSimuladoAction, 'Simulado publicado')}><Send className="mr-2 h-4 w-4" /> Publicar</DropdownMenuItem>}
-            {s.status !== 'rascunho' && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => toggleLib('nota')}>{estado.nota ? <Unlock className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />} {estado.nota ? 'Bloquear nota' : 'Liberar nota'}</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toggleLib('gabarito')}>{estado.gabarito ? <Unlock className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />} {estado.gabarito ? 'Bloquear gabarito' : 'Liberar gabarito'}</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toggleLib('caderno')}>{estado.caderno ? <Unlock className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />} {estado.caderno ? 'Bloquear caderno' : 'Liberar caderno'}</DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
+        {/* Faixa superior: "fazendo agora" + seleção/kebab */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between p-2">
+          <div className="pointer-events-auto">
+            {online > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur" title={`${online} aluno(s) fazendo agora`}>
+                <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-white" /></span>
+                {online} fazendo agora
+              </span>
             )}
-            <DropdownMenuItem onClick={excluir} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </div>
+          <div className="pointer-events-auto flex items-center gap-1">
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={selecionado}
+              aria-label={selecionado ? 'Desmarcar simulado' : 'Selecionar simulado'}
+              onClick={() => onSelecionar(!selecionado)}
+              className={cn('flex h-6 w-6 items-center justify-center rounded-md border backdrop-blur transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
+                selecionado ? 'border-primary bg-primary text-primary-foreground' : 'border-white/40 bg-black/35 text-transparent hover:bg-black/50')}>
+              <Check className="h-4 w-4" />
+            </button>
+            <div className="rounded-lg bg-black/40 backdrop-blur [&_button:hover]:!bg-white/20 [&_button]:!text-white/90">
+              <DropdownMenu>
+                <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/50" title="Mais ações">
+                  <MoreHorizontal className="h-4 w-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}/ao-vivo`)}><Radio className="mr-2 h-4 w-4" /> Ao vivo (online/progresso)</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push(detalhe)}><Pencil className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push(detalhe)}><Trophy className="mr-2 h-4 w-4" /> Ranking</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={copiarLink}><Copy className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
+                  <DropdownMenuItem onClick={abrirSimulado}><ExternalLink className="mr-2 h-4 w-4" /> Abrir aplicação</DropdownMenuItem>
+                  {onMover && <DropdownMenuItem onClick={onMover}><FolderInput className="mr-2 h-4 w-4" /> Mover para pasta</DropdownMenuItem>}
+                  <DropdownMenuSeparator />
+                  {s.status === 'publicado' && <DropdownMenuItem onClick={() => acao(encerrarSimuladoAction, 'Simulado encerrado')}><Square className="mr-2 h-4 w-4" /> Encerrar</DropdownMenuItem>}
+                  {s.status === 'encerrado' && <DropdownMenuItem onClick={() => acao(reabrirSimuladoAction, 'Simulado reaberto')}><Play className="mr-2 h-4 w-4" /> Reabrir</DropdownMenuItem>}
+                  {s.status === 'rascunho' && <DropdownMenuItem onClick={() => acao(publishSimuladoAction, 'Simulado publicado')}><Send className="mr-2 h-4 w-4" /> Publicar</DropdownMenuItem>}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={excluir} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </div>
+
+        {/* Chip do ícone da marca */}
+        <span className="pointer-events-none absolute bottom-2 left-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-sm ring-1 ring-white/20" style={{ background: cor }}>
+          <BancoIcon className="h-4 w-4" />
+        </span>
       </div>
 
-      {/* Rodapé */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
-        <div className="mb-1 flex flex-wrap items-center gap-1">
-          <span className="inline-flex items-center gap-1 rounded-md bg-black/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/85 backdrop-blur">
-            <span className={cn('h-1.5 w-1.5 rounded-full', dotClass[s.status])} /> {statusLabel[s.status]}
+      {/* Corpo */}
+      <div className="flex flex-1 flex-col gap-2 p-3.5">
+        <div className="flex items-center gap-1.5">
+          <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide', statusChipClass[s.status])}>
+            <span className={cn('h-1.5 w-1.5 rounded-full', dotClass[s.status])} /> {statusLabel[s.status] ?? s.status}
           </span>
-          {/* "Fazendo agora" ao vivo — só na visão do admin (o aluno não vê isto). */}
-          {online > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white backdrop-blur" title={`${online} aluno(s) fazendo agora`}>
-              <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-white" /></span>
-              {online} fazendo agora
-            </span>
-          )}
         </div>
-        <h3 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{s.titulo}</h3>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">{tipoLabel(s.tipo)}</span>
-          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">{modoLabel[s.modo_aplicacao] ?? s.modo_aplicacao}</span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur"><Clock className="h-3 w-3" /> {formatDur(s.tempo_limite_min)}</span>
+
+        <h3 className="line-clamp-2 text-sm font-bold leading-snug">
+          <Link href={detalhe} className="transition-colors hover:text-primary">{s.titulo}</Link>
+        </h3>
+        <p className="flex items-center gap-1 text-xs text-muted-foreground"><Calendar className="h-3 w-3 shrink-0" /> {subtitulo}</p>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{tipoLabel(s.tipo)}</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"><Clock className="h-3 w-3" /> {formatDur(s.tempo_limite_min)}</span>
         </div>
-        {/* Janela do simulado (horário de Brasília): início e fim; só início quando não há fim. */}
-        {s.modo_aplicacao === 'janela_fixa' && s.data_inicio ? (
-          <div className="mt-1.5 space-y-0.5 text-[11px] font-medium text-white/85">
-            <p className="flex items-center gap-1"><Calendar className="h-3 w-3 shrink-0" /> Início: {formatBrt(s.data_inicio)}</p>
-            {s.data_fim && <p className="flex items-center gap-1"><Square className="h-3 w-3 shrink-0" /> Encerra: {formatBrt(s.data_fim)}</p>}
+
+        {/* Liberações (clicáveis) */}
+        <div className="mt-0.5">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Liberações</p>
+          <div className="flex flex-wrap gap-1.5">
+            <LiberacaoChip label="Nota" on={estado.nota} pending={pending} onClick={() => toggleLib('nota')} />
+            <LiberacaoChip label="Gabarito" on={estado.gabarito} pending={pending} onClick={() => toggleLib('gabarito')} />
+            <LiberacaoChip label="Caderno" on={estado.caderno} pending={pending} onClick={() => toggleLib('caderno')} />
           </div>
-        ) : (
-          <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-white/85">
-            <Calendar className="h-3 w-3 shrink-0" />
-            {s.modo_aplicacao === 'aberto' ? 'Sempre disponível' : s.modo_aplicacao === 'prazo_relativo' ? 'Prazo definido por aluno' : 'Sem data definida'}
-          </p>
-        )}
-        {(estado.nota || estado.gabarito || estado.caderno) && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {estado.nota && <SeloLib label="Nota" />}
-            {estado.gabarito && <SeloLib label="Gabarito" />}
-            {estado.caderno && <SeloLib label="Caderno" />}
-          </div>
-        )}
+        </div>
+
+        {/* Ações inline */}
+        <div className="mt-auto flex items-center gap-1.5 pt-1.5">
+          <button type="button" onClick={abrirSimulado} disabled={!linkAcesso}
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50">
+            <ExternalLink className="h-4 w-4" /> Abrir aplicação
+          </button>
+          <button type="button" onClick={copiarLink} title="Copiar link de acesso"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+            <Copy className="h-4 w-4" />
+          </button>
+          <Link href={`/admin/simulados/${s.id}/ao-vivo`} title="Ranking e desempenho ao vivo"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+            <BarChart3 className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
     </div>
+  )
+}
+
+/** Tile "adicionar" no fim de cada seção. */
+function NovoTile({ pastaNome }: { pastaNome?: string }) {
+  return (
+    <Link href="/admin/simulados/novo"
+      className="group flex min-h-[240px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed bg-muted/20 p-4 text-center text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/[0.04] hover:text-primary">
+      <span className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-dashed transition-colors group-hover:border-primary"><Plus className="h-5 w-5" /></span>
+      <span className="text-sm font-medium">{pastaNome ? 'Novo simulado nesta pasta' : 'Novo simulado'}</span>
+    </Link>
   )
 }
 
@@ -308,22 +372,25 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   const [movendo, setMovendo] = useState<SimuladoCard | null>(null)
   const [editandoPasta, setEditandoPasta] = useState<PastaSim | null>(null)
   const [criandoPasta, setCriandoPasta] = useState(false)
-  // View: "quadro" (por status, atual) ou "catálogo" (fileiras por pasta, estilo Netflix). Catálogo é o
-  // padrão; a escolha do usuário persiste no localStorage. Sem catálogo disponível, cai no Quadro (render abaixo).
-  const temCatalogo = !!catalogo && catalogo.sims.length > 0
-  const [vista, setVista] = useState<'quadro' | 'catalogo'>('catalogo')
-  useEffect(() => { const v = localStorage.getItem('simulados-vista'); if ((v === 'catalogo' || v === 'quadro')) setVista(v) }, [])
-  useEffect(() => { localStorage.setItem('simulados-vista', vista) }, [vista])
-  // Seções (Rascunho/Em andamento/Encerrado) recolhidas — começa tudo expandido.
+  const [selecao, setSelecao] = useState<Set<string>>(new Set())
+
+  // Fonte de dados: quando estamos numa pasta (?pasta=id) usamos os simulados daquele nível;
+  // na raiz usamos o catálogo completo (todos os simulados) para montar as seções por pasta.
+  const todos = useMemo(() => (atual ? simulados : (catalogo?.sims ?? simulados)) as SimuladoCard[], [atual, simulados, catalogo])
+
+  // Vista: "pastas" (seções por pasta, padrão) ou "status" (grade por Em andamento/A iniciar/Encerrado).
+  const [vista, setVista] = useState<'pastas' | 'status'>('pastas')
+  useEffect(() => { const v = localStorage.getItem('simulados-vista-2'); if (v === 'pastas' || v === 'status') setVista(v) }, [])
+  useEffect(() => { localStorage.setItem('simulados-vista-2', vista) }, [vista])
+
+  // Seções recolhidas.
   const [recolhidas, setRecolhidas] = useState<Set<string>>(new Set())
   const toggleSecao = (chave: string) =>
     setRecolhidas((prev) => { const n = new Set(prev); if (n.has(chave)) n.delete(chave); else n.add(chave); return n })
-  // "Fazendo agora" por simulado, atualizado sozinho (polling) — igual ao painel "Ao vivo".
+
+  // "Fazendo agora" por simulado, atualizado sozinho (SSE → polling).
   const [online, setOnline] = useState<Record<string, number>>(onlineInicial)
-  const idsMonitor = useMemo(
-    () => (vista === 'catalogo' && catalogo ? catalogo.sims : simulados).map((s) => s.id),
-    [vista, catalogo, simulados],
-  )
+  const idsMonitor = useMemo(() => todos.map((s) => s.id), [todos])
   useEffect(() => {
     const ids = idsMonitor
     if (!ids.length) return
@@ -332,8 +399,6 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
     let poll: ReturnType<typeof setInterval> | null = null
     const tick = async () => { try { const r = await onlinePorSimulado(ids); if (vivo) setOnline(r) } catch { /* silencioso */ } }
     const iniciarPolling = () => { if (!poll) { void tick(); poll = setInterval(tick, 12_000) } }
-
-    // Realtime via SSE (Fase 2, follow-up); em erro (proxy sem SSE / Redis fora) cai no polling.
     try {
       es = new EventSource(`/api/stream/online?ids=${encodeURIComponent(ids.join(','))}`)
       es.onmessage = (ev) => { try { const r = JSON.parse(ev.data) as Record<string, number>; if (vivo) setOnline(r) } catch { /* frame inválido */ } }
@@ -344,22 +409,26 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
     return () => { vivo = false; try { es?.close() } catch { /* */ } if (poll) clearInterval(poll) }
   }, [idsMonitor])
 
+  // Filtro (busca + modo) aplicado a todos os simulados.
   const filtrados = useMemo(() => {
-    return simulados.filter((s) => {
-      const okBusca = s.titulo.toLowerCase().includes(busca.toLowerCase())
-      const okModo = modo === 'todos' || s.modo_aplicacao === modo
-      return okBusca && okModo
-    })
-  }, [simulados, busca, modo])
-  const foldersF = useMemo(() => {
     const q = busca.trim().toLowerCase()
-    return q ? folders.filter((f) => f.nome.toLowerCase().includes(q)) : folders
-  }, [folders, busca])
-  // Catálogo: mesmos filtros (busca + modo) aplicados a TODOS os simulados. Ordem já é created_at DESC.
-  const catalogoFiltrado = useMemo(() => {
-    const sims = catalogo?.sims ?? []
-    return sims.filter((s) => s.titulo.toLowerCase().includes(busca.toLowerCase()) && (modo === 'todos' || s.modo_aplicacao === modo))
-  }, [catalogo, busca, modo])
+    return todos.filter((s) => (!q || s.titulo.toLowerCase().includes(q)) && (modo === 'todos' || s.modo_aplicacao === modo))
+  }, [todos, busca, modo])
+
+  // Agrupamento por pasta (Aplicação de Simulado). Ordem: pastas na ordem recebida + "Sem pasta" no fim.
+  // Dentro de uma pasta (atual != null) não agrupamos: tudo cai em "semPasta" (uma única seção).
+  const secoesPasta = useMemo(() => {
+    const porPasta = new Map<string, SimuladoCard[]>()
+    const semPasta: SimuladoCard[] = []
+    for (const s of filtrados) {
+      if (!atual && s.pasta_id) { const arr = porPasta.get(s.pasta_id) ?? []; arr.push(s); porPasta.set(s.pasta_id, arr) }
+      else semPasta.push(s)
+    }
+    const comFolder = folders.map((f) => ({ folder: f as PastaSim | null, sims: porPasta.get(f.id) ?? [] }))
+    // Só mostra pastas vazias quando não há busca ativa (senão a busca "some" mas deixa pastas vazias).
+    const visiveis = busca.trim() ? comFolder.filter((x) => x.sims.length > 0) : comFolder
+    return { pastas: visiveis, semPasta }
+  }, [filtrados, folders, busca, atual])
 
   const filtros = [
     { v: 'todos', label: 'Todos' },
@@ -368,15 +437,34 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
     { v: 'aberto', label: 'Aberto' },
   ]
 
-  // O diálogo abre FORA da transition (senão o setState que mostra o pop-up é adiado).
+  const podeMover = destinos.length > 0 || !!atual
+  const simById = useMemo(() => new Map(todos.map((s) => [s.id, s])), [todos])
+  const setSel = (id: string, v: boolean) => setSelecao((p) => { const n = new Set(p); if (v) n.add(id); else n.delete(id); return n })
+
   async function excluirPasta(f: PastaSim) {
     if (!(await confirmar({ mensagem: `Excluir a pasta "${f.nome}"? Os simulados dentro dela voltam para a raiz (não são apagados).`, destrutivo: true }))) return
     start(async () => { const r = await excluirPastaFolder(f.id); if (r.ok) { toast.success('Pasta excluída'); router.refresh() } else toast.error(r.error ?? 'Erro') })
   }
-  const podeMover = destinos.length > 0 || !!atual
+
+  // Alternar (em massa) uma liberação para TODOS os simulados de uma pasta.
+  function alternarPasta(sims: SimuladoCard[], item: 'nota' | 'gabarito') {
+    const alvos = sims.filter((s) => s.status !== 'rascunho')
+    if (!alvos.length) return toast.error('Nenhum simulado publicado/encerrado nesta pasta.')
+    const flag = item === 'nota' ? 'notaLiberada' : 'gabaritoLiberado'
+    const liberados = alvos.filter((s) => resolverLiberacoes(s.regras, { status: s.status, data_fim: s.data_fim })[flag]).length
+    const liberar = liberados < alvos.length // se nem todos liberados → libera todos; senão bloqueia todos
+    start(async () => {
+      await Promise.all(alvos.map((s) => liberarItemAction(s.id, item, liberar)))
+      toast.success(`${item === 'nota' ? 'Notas' : 'Gabaritos'} ${liberar ? 'liberados' : 'bloqueados'} em ${alvos.length} simulado(s)`)
+      router.refresh()
+    })
+  }
+
+  const totalFiltrado = filtrados.length
 
   return (
     <div className="space-y-6">
+      {/* Barra de ferramentas */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-1 flex-wrap items-center gap-2">
           {atual ? (
@@ -387,12 +475,12 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
           <Input placeholder={atual ? `Buscar em “${atual.nome}”…` : 'Buscar simulado…'} value={busca} onChange={(e) => setBusca(e.target.value)} className="min-w-[180px] flex-1 lg:max-w-md" />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {temCatalogo && (
+          {!atual && (
             <div className="flex gap-1 rounded-lg bg-muted p-1">
-              {([['quadro', 'Quadro', LayoutGrid], ['catalogo', 'Catálogo', Rows3]] as const).map(([v, label, Icon]) => (
+              {([['pastas', 'Pastas', FolderTree], ['status', 'Status', Rows3]] as const).map(([v, label, Icon]) => (
                 <button key={v} type="button" onClick={() => setVista(v)} aria-pressed={vista === v}
                   className={cn('inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors',
-                    vista === v ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                    vista === v ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
                   <Icon className="h-4 w-4" /> {label}
                 </button>
               ))}
@@ -410,28 +498,44 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
         </div>
       </div>
 
-      {vista === 'catalogo' && temCatalogo ? (
-        <CatalogoSimulados sims={catalogoFiltrado} grupos={catalogo!.grupos} appUrl={appUrl} online={online} onMover={podeMover ? (s) => setMovendo(s) : undefined} recolhidas={recolhidas} toggleSecao={toggleSecao} />
-      ) : (
-      <>
       {atual && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <FolderOpen className="h-4 w-4" /> <span className="font-medium text-foreground">{atual.nome}</span> — {simulados.length} simulado(s)
+          <FolderOpen className="h-4 w-4" /> <span className="font-medium text-foreground">{atual.nome}</span> — {totalFiltrado} simulado(s)
         </div>
       )}
 
-      {/* Pastas (só na raiz) + divisória entre pastas e simulados */}
-      {!atual && foldersF.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2"><Folder className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">Pastas</h2><span className="text-sm text-muted-foreground">({foldersF.length})</span></div>
-          <div className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {foldersF.map((f) => <FolderCardSim key={f.id} f={f} onExcluir={() => excluirPasta(f)} onPersonalizar={() => setEditandoPasta(f)} />)}
-          </div>
+      {/* Conteúdo */}
+      {vista === 'status' && !atual ? (
+        <SecoesStatus sims={filtrados} online={online} appUrl={appUrl} onMover={podeMover ? (s) => setMovendo(s) : undefined}
+          recolhidas={recolhidas} toggleSecao={toggleSecao} selecao={selecao} onSelecionar={setSel} />
+      ) : (
+        <div className="space-y-8">
+          {secoesPasta.pastas.map(({ folder, sims }) => (
+            folder && <PastaSection key={folder.id} folder={folder} sims={sims} online={online} appUrl={appUrl}
+              aberto={!recolhidas.has(`p:${folder.id}`)} toggle={() => toggleSecao(`p:${folder.id}`)}
+              onGerenciar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)}
+              onAlternar={(item) => alternarPasta(sims, item)} pendingBulk={pending}
+              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} />
+          ))}
+
+          {/* Sem pasta (ou o conteúdo de dentro de uma pasta aberta) */}
+          {(atual || secoesPasta.semPasta.length > 0) && (
+            <SecaoSimples titulo={atual ? atual.nome : 'Sem pasta'} icone={atual ? FolderOpen : FolderInput}
+              sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
+              aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
+              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel}
+              mostrarNovo={!!atual} />
+          )}
+
+          {folders.length === 0 && secoesPasta.semPasta.length === 0 && !atual && (
+            <p className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">Nenhum simulado ainda. Crie o primeiro em “Novo simulado”.</p>
+          )}
         </div>
       )}
 
-      <SecoesStatus sims={filtrados} online={online} appUrl={appUrl} onMover={podeMover ? (s) => setMovendo(s) : undefined} recolhidas={recolhidas} toggleSecao={toggleSecao} />
-      </>
+      {/* Barra de seleção em massa */}
+      {selecao.size > 0 && (
+        <BarraSelecao ids={[...selecao]} simById={simById} onLimpar={() => setSelecao(new Set())} onRefresh={() => router.refresh()} />
       )}
 
       {movendo && <MoverSimuladoDialog simulado={movendo} destinos={destinos} atualId={atual?.id ?? null} onClose={() => setMovendo(null)} />}
@@ -449,53 +553,100 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   )
 }
 
-/** Card de PASTA da Aplicação de Simulado — imagem/cor + nome + nº de simulados. Clicar abre. */
-function FolderCardSim({ f, onExcluir, onPersonalizar }: { f: PastaSim; onExcluir: () => void; onPersonalizar: () => void }) {
-  const c = f.cor ?? '#6d28d9'
-  const Icon = iconeBanco(f.icone)
+/** Uma seção de PASTA: cabeçalho (nome + contagem + status + ações em massa) e grade de cards. */
+function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerenciar, onExcluir, onAlternar, pendingBulk, onMover, selecao, onSelecionar }: {
+  folder: PastaSim; sims: SimuladoCard[]; online: Record<string, number>; appUrl: string
+  aberto: boolean; toggle: () => void; onGerenciar: () => void; onExcluir: () => void
+  onAlternar: (item: 'nota' | 'gabarito') => void; pendingBulk: boolean
+  onMover?: (s: SimuladoCard) => void; selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void
+}) {
+  const st = statusPasta(sims)
+  const cor = folder.cor ?? '#6d28d9'
+  const Icon = iconeBanco(folder.icone)
   return (
-    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
-      {f.capa ? (
-        <img src={f.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-      ) : (
-        <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button type="button" onClick={toggle} aria-expanded={aberto} className="group flex min-w-0 items-center gap-2 text-left">
+          <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:text-foreground', !aberto && '-rotate-90')} />
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white shadow-sm" style={{ background: cor }}><Icon className="h-3.5 w-3.5" /></span>
+          <span className="truncate font-semibold">{folder.nome}</span>
+          <span className="shrink-0 text-sm text-muted-foreground">{sims.length} simulado(s)</span>
+          {st && <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide', st.cls)}>{st.label}</span>}
+        </button>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button type="button" onClick={() => onAlternar('nota')} disabled={pendingBulk}
+            className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary disabled:opacity-50">
+            <Unlock className="h-3.5 w-3.5" /> Alternar notas
+          </button>
+          <button type="button" onClick={() => onAlternar('gabarito')} disabled={pendingBulk}
+            className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary disabled:opacity-50">
+            <Unlock className="h-3.5 w-3.5" /> Alternar gabaritos
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-semibold shadow-sm outline-none transition-colors hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
+              <FolderCog className="h-3.5 w-3.5" /> Gerenciar pasta
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onClick={onGerenciar}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
+              <DropdownMenuItem render={<Link href={`/admin/simulados?pasta=${folder.id}`} />}><FolderOpen className="mr-2 h-4 w-4" /> Abrir pasta</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onExcluir} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir pasta</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      {aberto && (
+        <div className="grid items-stretch gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {sims.map((s) => (
+            <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0}
+              onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
+          ))}
+          <NovoTile pastaNome={folder.nome} />
+        </div>
       )}
-      {!f.capa && <Icon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${c}, transparent)` }} />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
-      <Link href={`/admin/simulados?pasta=${f.id}`} className="absolute inset-0 z-10" aria-label={f.nome} />
-      <div className="pointer-events-none absolute left-3 top-3 z-20">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: c }}><Icon className="h-4 w-4" /></span>
-      </div>
-      <div className="absolute right-2 top-2 z-30">
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 outline-none transition-colors hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Ações da pasta">
-            <MoreHorizontal className="h-4 w-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem render={<Link href={`/admin/simulados?pasta=${f.id}`} />}><FolderOpen className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
-            <DropdownMenuItem onClick={onPersonalizar}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onExcluir} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir pasta</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
-        <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">Pasta</p>
-        <h3 className="mt-0.5 line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{f.nome}</h3>
-        <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur"><Folder className="h-3 w-3" /> {f.count} simulado(s)</span>
-      </div>
-    </div>
+    </section>
   )
 }
 
-/** Seções por status (Em andamento / A iniciar / Encerrado) em grid — o modelo "Quadro". Reutilizável. */
-function SecoesStatus({ sims, online, appUrl, onMover, recolhidas, toggleSecao }: {
-  sims: SimuladoCard[]; online: Record<string, number>; appUrl: string
-  onMover?: (s: SimuladoCard) => void; recolhidas: Set<string>; toggleSecao: (chave: string) => void
+/** Seção simples (sem ações de pasta) — usada para "Sem pasta" e para o nível de dentro de uma pasta. */
+function SecaoSimples({ titulo, icone: Icone, sims, online, appUrl, aberto, toggle, onMover, selecao, onSelecionar, mostrarNovo }: {
+  titulo: string; icone: any; sims: SimuladoCard[]; online: Record<string, number>; appUrl: string
+  aberto: boolean; toggle: () => void; onMover?: (s: SimuladoCard) => void
+  selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void; mostrarNovo?: boolean
 }) {
   return (
-    <>
+    <section className="space-y-3">
+      <button type="button" onClick={toggle} aria-expanded={aberto} className="group flex items-center gap-2 text-left">
+        <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:text-foreground', !aberto && '-rotate-90')} />
+        <Icone className="h-4 w-4 text-muted-foreground" />
+        <span className="font-semibold">{titulo}</span>
+        <span className="text-sm text-muted-foreground">{sims.length} simulado(s)</span>
+      </button>
+      {aberto && (
+        sims.length === 0 && !mostrarNovo ? (
+          <p className="rounded-2xl border border-dashed py-10 text-center text-sm text-muted-foreground">Nenhum simulado aqui.</p>
+        ) : (
+          <div className="grid items-stretch gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {sims.map((s) => (
+              <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0}
+                onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
+            ))}
+            {mostrarNovo && <NovoTile pastaNome={titulo} />}
+          </div>
+        )
+      )}
+    </section>
+  )
+}
+
+/** Seções por status (Em andamento / A iniciar / Encerrado) em grade — vista "Status". */
+function SecoesStatus({ sims, online, appUrl, onMover, recolhidas, toggleSecao, selecao, onSelecionar }: {
+  sims: SimuladoCard[]; online: Record<string, number>; appUrl: string
+  onMover?: (s: SimuladoCard) => void; recolhidas: Set<string>; toggleSecao: (chave: string) => void
+  selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void
+}) {
+  return (
+    <div className="space-y-8">
       {secoes.map((sec) => {
         const itens = sims.filter((s) => s.status === sec.chave)
         const aberto = !recolhidas.has(sec.chave)
@@ -503,84 +654,21 @@ function SecoesStatus({ sims, online, appUrl, onMover, recolhidas, toggleSecao }
           <div key={sec.chave} className="space-y-3">
             <button type="button" onClick={() => toggleSecao(sec.chave)} aria-expanded={aberto}
               className="group flex w-full items-center gap-2 rounded-lg py-0.5 text-left transition-colors">
-              <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:text-foreground', aberto && 'rotate-180')} />
+              <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:text-foreground', !aberto && '-rotate-90')} />
               <span className={cn('h-2.5 w-2.5 rounded-full', sec.cor)} />
               <span className="font-semibold">{sec.titulo}</span>
               <span className="text-sm text-muted-foreground">({itens.length})</span>
             </button>
             {aberto && (itens.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">
+              <p className="text-sm italic text-muted-foreground">
                 {sec.chave === 'rascunho' ? 'Nenhum simulado aguardando início' : sec.chave === 'publicado' ? 'Nenhum simulado em andamento' : 'Nenhum simulado encerrado'}
               </p>
             ) : (
               <div className="grid items-stretch gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {itens.map((s) => <CardItem key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} onMover={onMover ? () => onMover(s) : undefined} />)}
-              </div>
-            ))}
-          </div>
-        )
-      })}
-    </>
-  )
-}
-
-/** Uma fileira do catálogo (um grupo): cards completos em rolagem horizontal com seta estilo Netflix. */
-function FileiraCatalogo({ titulo, sims, appUrl, online, onMover }: {
-  titulo: string; sims: SimuladoCatalogo[]
-  appUrl: string; online: Record<string, number>; onMover?: (s: SimuladoCard) => void
-}) {
-  return (
-    <FileiraHorizontal titulo={titulo} count={sims.length}>
-      {sims.map((s) => (
-        // ~5 cards por vez, mas um pouco mais estreitos para espiar um PEDAÇO do próximo (indica que há mais).
-        <div key={s.id} className="shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-3rem)/4.3)] xl:basis-[calc((100%-4rem)/5.3)]">
-          <CardItem s={s} appUrl={appUrl} online={online[s.id] ?? 0} onMover={onMover ? () => onMover(s) : undefined} />
-        </div>
-      ))}
-    </FileiraHorizontal>
-  )
-}
-
-/** Catálogo: agrupa por STATUS (Em andamento / A iniciar / Encerrado). Dentro de cada status, os simulados
- *  de um mesmo GRUPO (pasta do banco) viram uma fileira horizontal; os sem grupo ficam no grid normal. */
-function CatalogoSimulados({ sims, grupos, appUrl, online, onMover, recolhidas, toggleSecao }: {
-  sims: SimuladoCatalogo[]; grupos: PastaSim[]; appUrl: string; online: Record<string, number>
-  onMover?: (s: SimuladoCard) => void; recolhidas: Set<string>; toggleSecao: (chave: string) => void
-}) {
-  return (
-    <div className="space-y-6">
-      {secoes.map((sec) => {
-        const doStatus = sims.filter((s) => s.status === sec.chave)
-        const aberto = !recolhidas.has(sec.chave)
-        const fileiras = grupos
-          .map((g) => ({ g, itens: doStatus.filter((s) => s.grupoId === g.id) }))
-          .filter((x) => x.itens.length > 0)
-        const avulsos = doStatus.filter((s) => !s.grupoId)
-        return (
-          <div key={sec.chave} className="space-y-4">
-            <button type="button" onClick={() => toggleSecao(sec.chave)} aria-expanded={aberto}
-              className="group flex w-full items-center gap-2 rounded-lg py-0.5 text-left transition-colors">
-              <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:text-foreground', aberto && 'rotate-180')} />
-              <span className={cn('h-2.5 w-2.5 rounded-full', sec.cor)} />
-              <span className="font-semibold">{sec.titulo}</span>
-              <span className="text-sm text-muted-foreground">({doStatus.length})</span>
-            </button>
-            {aberto && (doStatus.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">
-                {sec.chave === 'rascunho' ? 'Nenhum simulado aguardando início' : sec.chave === 'publicado' ? 'Nenhum simulado em andamento' : 'Nenhum simulado encerrado'}
-              </p>
-            ) : (
-              <div className="space-y-5">
-                {/* Grupos deste status → fileiras horizontais */}
-                {fileiras.map(({ g, itens }) => (
-                  <FileiraCatalogo key={g.id} titulo={g.nome} sims={itens} appUrl={appUrl} online={online} onMover={onMover} />
+                {itens.map((s) => (
+                  <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0}
+                    onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
                 ))}
-                {/* Sem grupo → grid normal (mesmo modelo do Quadro) */}
-                {avulsos.length > 0 && (
-                  <div className="grid items-stretch gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                    {avulsos.map((s) => <CardItem key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} onMover={onMover ? () => onMover(s) : undefined} />)}
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -590,10 +678,55 @@ function CatalogoSimulados({ sims, grupos, appUrl, online, onMover, recolhidas, 
   )
 }
 
+/** Barra flutuante de seleção em massa: liberar nota/gabarito/caderno, encerrar, limpar. */
+function BarraSelecao({ ids, simById, onLimpar, onRefresh }: {
+  ids: string[]; simById: Map<string, SimuladoCard>; onLimpar: () => void; onRefresh: () => void
+}) {
+  const [pending, start] = useTransition()
+  const acionaveis = ids.map((id) => simById.get(id)).filter(Boolean) as SimuladoCard[]
+
+  function liberar(item: 'nota' | 'gabarito' | 'caderno') {
+    const alvos = acionaveis.filter((s) => s.status !== 'rascunho')
+    if (!alvos.length) return toast.error('Selecione simulados publicados/encerrados.')
+    start(async () => {
+      await Promise.all(alvos.map((s) => liberarItemAction(s.id, item, true)))
+      toast.success(`${item === 'nota' ? 'Nota' : item === 'gabarito' ? 'Gabarito' : 'Caderno'} liberado(a) em ${alvos.length} simulado(s)`)
+      onLimpar(); onRefresh()
+    })
+  }
+  function encerrar() {
+    const alvos = acionaveis.filter((s) => s.status === 'publicado')
+    if (!alvos.length) return toast.error('Nenhum simulado em andamento na seleção.')
+    start(async () => {
+      await Promise.all(alvos.map((s) => encerrarSimuladoAction(s.id)))
+      toast.success(`${alvos.length} simulado(s) encerrado(s)`)
+      onLimpar(); onRefresh()
+    })
+  }
+
+  return createPortal(
+    <div className="fixed inset-x-0 bottom-4 z-[120] flex justify-center px-4">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-card/95 px-3 py-2 shadow-xl backdrop-blur">
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-2.5 py-1 text-sm font-semibold text-primary">
+          <Users className="h-4 w-4" /> {ids.length} selecionado(s)
+        </span>
+        <span className="hidden text-xs text-muted-foreground sm:inline">Liberar:</span>
+        <button type="button" onClick={() => liberar('nota')} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors hover:border-primary hover:text-primary disabled:opacity-50"><Unlock className="h-3.5 w-3.5" /> Nota</button>
+        <button type="button" onClick={() => liberar('gabarito')} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors hover:border-primary hover:text-primary disabled:opacity-50"><Unlock className="h-3.5 w-3.5" /> Gabarito</button>
+        <button type="button" onClick={() => liberar('caderno')} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors hover:border-primary hover:text-primary disabled:opacity-50"><Unlock className="h-3.5 w-3.5" /> Caderno</button>
+        <button type="button" onClick={encerrar} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors hover:border-amber-500 hover:text-amber-600 disabled:opacity-50"><Square className="h-3.5 w-3.5" /> Encerrar</button>
+        {pending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        <button type="button" onClick={onLimpar} className="ml-1 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Limpar seleção"><X className="h-4 w-4" /></button>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 function MoverSimuladoDialog({ simulado, destinos, atualId, onClose }: { simulado: SimuladoCard; destinos: DestinoSim[]; atualId: string | null; onClose: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [sel, setSel] = useState<string | null>(atualId)
+  const [sel, setSel] = useState<string | null>(simulado.pasta_id ?? atualId)
 
   function salvar() {
     start(async () => {
@@ -619,7 +752,7 @@ function MoverSimuladoDialog({ simulado, destinos, atualId, onClose }: { simulad
         </div>
         <div className="flex items-center justify-end gap-2 border-t px-5 py-3">
           <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
-          <button type="button" onClick={salvar} disabled={pending || sel === atualId}
+          <button type="button" onClick={salvar} disabled={pending || sel === (simulado.pasta_id ?? atualId)}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Mover
           </button>
