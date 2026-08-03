@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { SimuladoWizard } from '@/components/admin/simulado-wizard'
-import { createSimuladoAction } from '../actions'
+import { createSimuladoAction, listarDisciplinasWizard } from '../actions'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 
@@ -11,19 +11,14 @@ export default async function NovoSimuladoPage() {
   const svc = createAdminClient()
   const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
 
-  // Todas as varreduras usam fetchAll — o PostgREST corta em 1000 linhas por resposta;
-  // sem paginar, as contagens de alunos/questões por banco e a lista do seletor ficam
-  // truncadas (era o motivo de o banco mostrar 436 em vez dos ~3 mil reais).
-  // Estudantes NÃO são pré-carregados: o passo "Estudantes" do wizard busca sob demanda no servidor
-  // (buscarEstudantesSimulado) — evitava serializar ~10k alunos no load da página.
-  const [questoesRaw, vinculos, pastaEst] = await Promise.all([
-    fetchAll<any>(() => svc.from('simulado_questoes')
-      .select('id, enunciado, tipo, nivel_dificuldade, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)')
-      .eq('tenant_id', tid)
-      // Ordem de leitura (1ª questão importada primeiro) — casa com a listagem do banco.
-      .order('created_at', { ascending: true })),
+  // NÃO pré-carregamos as questões nem os estudantes (podem ser dezenas de milhares): o wizard
+  // busca sob demanda no servidor — questões via buscarQuestoesWizard/listarQuestoesDoBanco,
+  // estudantes via buscarEstudantesSimulado. Aqui só ficam as contagens por banco (id-pairs leves)
+  // e as disciplinas (tabela pequena) para os filtros. fetchAll = evita o corte de 1000 do PostgREST.
+  const [vinculos, pastaEst, disciplinas] = await Promise.all([
     fetchAll<any>(() => svc.from('simulado_questao_pasta').select('questao_id, pasta_id').eq('tenant_id', tid).order('questao_id')),
     fetchAll<any>(() => svc.from('simulado_pasta_estudantes').select('pasta_id, estudante_id').eq('tenant_id', tid).order('estudante_id')),
+    listarDisciplinasWizard(),
   ])
 
   // Bancos: tolerante à coluna `tipo` (migration pode não ter rodado).
@@ -36,15 +31,9 @@ export default async function NovoSimuladoPage() {
     } else bancos = r.data
   }
 
-  // Mapa questão -> bancos a que pertence + contagens por banco.
-  const bancosPorQuestao = new Map<string, string[]>()
+  // Contagens por banco (questões e estudantes) — a partir dos vínculos leves.
   const qCount = new Map<string, number>()
-  for (const v of vinculos ?? []) {
-    const arr = bancosPorQuestao.get((v as any).questao_id) ?? []
-    arr.push((v as any).pasta_id)
-    bancosPorQuestao.set((v as any).questao_id, arr)
-    qCount.set((v as any).pasta_id, (qCount.get((v as any).pasta_id) ?? 0) + 1)
-  }
+  for (const v of vinculos ?? []) qCount.set((v as any).pasta_id, (qCount.get((v as any).pasta_id) ?? 0) + 1)
   const eCount = new Map<string, Set<string>>()
   for (const pe of pastaEst ?? []) {
     const s = eCount.get((pe as any).pasta_id) ?? new Set<string>()
@@ -57,26 +46,6 @@ export default async function NovoSimuladoPage() {
     nQuestoes: qCount.get(b.id) ?? 0, nEstudantes: eCount.get(b.id)?.size ?? 0,
   }))
 
-  // Ordem manual das questões por banco (arrastar) — para o simulado herdar exatamente
-  // a mesma ordem exibida no banco. Tolerante: a coluna pode não existir até a migration.
-  const ordemPorBanco: Record<string, string[]> = {}
-  {
-    const { data: ord } = await svc.from('simulado_pastas').select('id, ordem_questoes').eq('tenant_id', tid)
-    for (const p of ord ?? []) {
-      if (Array.isArray((p as any).ordem_questoes)) ordemPorBanco[(p as any).id] = (p as any).ordem_questoes
-    }
-  }
-
-  const questoes = (questoesRaw ?? []).map((q: any) => ({
-    id: q.id,
-    enunciado: q.enunciado ?? '',
-    tipo: q.tipo,
-    nivel_dificuldade: q.nivel_dificuldade,
-    disciplina: q.disciplinas?.nome ?? null,
-    banca: q.bancas?.nome ?? null,
-    bancoIds: bancosPorQuestao.get(q.id) ?? [],
-  }))
-
   return (
     <div className="space-y-6">
       <div>
@@ -86,7 +55,7 @@ export default async function NovoSimuladoPage() {
         <h1 className="text-2xl font-bold tracking-tight">Novo Simulado</h1>
       </div>
 
-      <SimuladoWizard bancos={bancosDetalhe} questoes={questoes} ordemPorBanco={ordemPorBanco} onSubmit={createSimuladoAction} />
+      <SimuladoWizard bancos={bancosDetalhe} disciplinas={disciplinas} onSubmit={createSimuladoAction} />
     </div>
   )
 }

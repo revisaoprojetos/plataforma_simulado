@@ -626,6 +626,64 @@ export async function buscarQuestoesForaSimulado(simuladoId: string, busca: stri
   return { ok: true, itens }
 }
 
+/**
+ * IDs das questões de um banco na ORDEM exibida (ordem manual do banco → senão created_at ASC),
+ * filtradas pelo tipo. Usado pelo wizard (modo "banco") para herdar as questões sem carregar todas
+ * as questões do tenant no load. Espelha a lógica client-side antiga de `questoesDoBanco`.
+ */
+export async function listarQuestoesDoBanco(bancoId: string, tipo: string): Promise<{ ok: boolean; ids?: string[]; error?: string }> {
+  if (!(await checkPermission('simulados:create'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const tipoQ = (tipo === 'discursivo' || tipo === 'discursiva') ? 'discursiva' : 'objetiva'
+  const vinc = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', tenantId).order('questao_id', { ascending: true }))
+  const pastaIds = vinc.map((v) => v.questao_id)
+  let ordenadas: { id: string; created_at: string | null }[] = []
+  if (pastaIds.length) {
+    ordenadas = await fetchAllByIn<{ id: string; created_at: string | null }>(pastaIds, (chunk) =>
+      svc.from('simulado_questoes').select('id, created_at').eq('tenant_id', tenantId).eq('tipo', tipoQ).eq('deletado', false).in('id', chunk))
+    ordenadas.sort((a, b) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')))
+  }
+  let ids = ordenadas.map((r) => r.id)
+  const { data: pRow } = await svc.from('simulado_pastas').select('ordem_questoes').eq('id', bancoId).eq('tenant_id', tenantId).maybeSingle()
+  const om = (pRow as any)?.ordem_questoes
+  if (Array.isArray(om) && om.length) {
+    const pos = new Map<string, number>(om.map((qid: string, i: number) => [qid, i]))
+    const FIM = Number.MAX_SAFE_INTEGER
+    ids = [...ids].sort((a, b) => (pos.get(a) ?? FIM) - (pos.get(b) ?? FIM))
+  }
+  return { ok: true, ids }
+}
+
+export type QuestaoWizardItem = { id: string; enunciado: string; disciplina: string | null; banca: string | null }
+
+/** Busca questões do tenant (do tipo escolhido) para o picker do modo "do zero", limitada. */
+export async function buscarQuestoesWizard(filtros: { busca?: string; tipo?: string; disciplinaId?: string }, limite = 40): Promise<{ ok: boolean; itens?: QuestaoWizardItem[]; error?: string }> {
+  if (!(await checkPermission('simulados:create'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const tipoQ = filtros.tipo === 'discursivo' ? 'discursiva' : 'objetiva'
+  const safe = (filtros.busca ?? '').replace(/[,()%*]/g, ' ').trim()
+  let q = svc.from('simulado_questoes').select('id, enunciado, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)').eq('tenant_id', tenantId).eq('deletado', false).eq('tipo', tipoQ)
+  if (filtros.disciplinaId && filtros.disciplinaId !== 'all') q = q.eq('disciplina_id', filtros.disciplinaId)
+  if (safe) q = q.ilike('enunciado', `%${safe}%`)
+  const { data, error } = await q.order('created_at', { ascending: true }).limit(Math.min(100, limite))
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, itens: (data ?? []).map((r: any) => ({ id: r.id, enunciado: r.enunciado ?? '', disciplina: r.disciplinas?.nome ?? null, banca: r.bancas?.nome ?? null })) }
+}
+
+/** Disciplinas do tenant (id+nome) para o filtro do wizard. */
+export async function listarDisciplinasWizard(): Promise<{ id: string; nome: string }[]> {
+  if (!(await checkPermission('simulados:create'))) return []
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return []
+  const svc = createAdminClient()
+  const rows = await fetchAll<{ id: string; nome: string }>(() => svc.from('simulado_disciplinas').select('id, nome').eq('tenant_id', tenantId).order('nome', { ascending: true }))
+  return rows.map((d) => ({ id: d.id, nome: d.nome ?? '—' }))
+}
+
 export async function removeQuestaoFromSimulado(simuladoQuestaoId: string, simuladoId: string) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
   const tenantId = await getCurrentTenantId()

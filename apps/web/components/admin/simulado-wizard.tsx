@@ -13,10 +13,9 @@ import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { BRT_LABEL } from '@/lib/brt'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
-import { buscarEstudantesSimulado, listarEstudanteIdsSimulado } from '@/app/admin/simulados/actions'
+import { buscarEstudantesSimulado, listarEstudanteIdsSimulado, buscarQuestoesWizard, listarQuestoesDoBanco, type QuestaoWizardItem } from '@/app/admin/simulados/actions'
 import { toast } from 'sonner'
 
-interface Questao { id: string; enunciado: string; tipo: string; nivel_dificuldade?: string | null; disciplina?: string | null; banca?: string | null; bancoIds: string[] }
 interface Banco { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null; nQuestoes?: number; nEstudantes?: number }
 interface Estudante { id: string; nome: string; email: string | null }
 
@@ -26,14 +25,12 @@ const PASSOS_ZERO = ['Banco', 'Tipo', 'Informações', 'Questões', 'Estudantes'
 
 export function SimuladoWizard({
   bancos,
-  questoes,
-  ordemPorBanco = {},
+  disciplinas,
   onSubmit,
 }: {
   bancos: Banco[]
-  questoes: Questao[]
-  /** Ordem manual das questões por banco (id do banco → lista de questao_id na ordem exibida). */
-  ordemPorBanco?: Record<string, string[]>
+  /** Disciplinas do tenant (id + nome) para o filtro do picker. */
+  disciplinas: { id: string; nome: string }[]
   onSubmit: (data: any) => Promise<{ error?: string } | void>
 }) {
   const [step, setStep] = useState(0)
@@ -63,8 +60,13 @@ export function SimuladoWizard({
   const [estBuscando, setEstBuscando] = useState(false)
   const [estTotal, setEstTotal] = useState(0)
   const [buscaBanco, setBuscaBanco] = useState('')
-  const [fBanco, setFBanco] = useState('all')
   const [fDisc, setFDisc] = useState('all')
+  // Questões buscadas SOB DEMANDA (não pré-carregadas). Modo "banco" herda os ids do banco escolhido;
+  // modo "do zero" usa o picker paginado por busca/disciplina.
+  const [bancoQids, setBancoQids] = useState<string[]>([])
+  const [bancoQCarregando, setBancoQCarregando] = useState(false)
+  const [qDisp, setQDisp] = useState<QuestaoWizardItem[]>([])
+  const [qBuscando, setQBuscando] = useState(false)
 
   const bancosFiltrados = useMemo(() => {
     const s = buscaBanco.toLowerCase().trim()
@@ -75,35 +77,37 @@ export function SimuladoWizard({
   const atual = passos[step]
 
   const tipoQuestao = tipo === 'discursivo' ? 'discursiva' : 'objetiva'
-  const disponiveis = useMemo(() => questoes.filter((q) => q.tipo === tipoQuestao), [questoes, tipoQuestao])
-  const disciplinas = useMemo(() => [...new Set(disponiveis.map((q) => q.disciplina).filter(Boolean))].sort() as string[], [disponiveis])
-
-  // Questões do banco base (do tipo escolhido) — usadas no modo "banco".
-  // Respeita a ordem manual do banco (arrastar); o restante segue a ordem de leitura
-  // (created_at ASC, já vinda do servidor). Assim a prova herda a mesma ordem do banco.
-  const questoesDoBanco = useMemo(() => {
-    if (!bancoBase) return []
-    const doBanco = disponiveis.filter((q) => q.bancoIds.includes(bancoBase))
-    const ordem = ordemPorBanco[bancoBase]
-    if (ordem?.length) {
-      const pos = new Map(ordem.map((qid, i) => [qid, i]))
-      const FIM = Number.MAX_SAFE_INTEGER
-      return [...doBanco].sort((a, b) => (pos.get(a.id) ?? FIM) - (pos.get(b.id) ?? FIM))
-    }
-    return doBanco
-  }, [disponiveis, bancoBase, ordemPorBanco])
-  const qtdQuestoes = modo === 'banco' ? questoesDoBanco.length : sel.size
+  const qtdQuestoes = modo === 'banco' ? bancoQids.length : sel.size
   const bancoAtual = bancos.find((b) => b.id === bancoBase)
 
-  const filtradas = useMemo(() => {
-    const s = busca.toLowerCase().trim()
-    return disponiveis.filter((q) => {
-      if (fBanco !== 'all' && !q.bancoIds.includes(fBanco)) return false
-      if (fDisc !== 'all' && q.disciplina !== fDisc) return false
-      if (s && !(`${q.enunciado} ${q.disciplina ?? ''} ${q.banca ?? ''}`.toLowerCase().includes(s))) return false
-      return true
-    })
-  }, [disponiveis, busca, fBanco, fDisc])
+  // Modo "banco": herda os ids das questões do banco escolhido (na ordem do banco) — sob demanda.
+  useEffect(() => {
+    if (modo !== 'banco' || !bancoBase) { setBancoQids([]); return }
+    let vivo = true
+    setBancoQCarregando(true)
+    ;(async () => {
+      const r = await listarQuestoesDoBanco(bancoBase, tipo ?? 'objetivo')
+      if (!vivo) return
+      setBancoQids(r.ok ? (r.ids ?? []) : [])
+      if (!r.ok) toast.error(r.error ?? 'Falha ao carregar as questões do banco.')
+      setBancoQCarregando(false)
+    })()
+    return () => { vivo = false }
+  }, [modo, bancoBase, tipo])
+
+  // Modo "do zero": picker de questões sob demanda (debounce 300ms). Só busca no passo Questões.
+  useEffect(() => {
+    if (atual !== 'Questões') return
+    let vivo = true
+    setQBuscando(true)
+    const t = setTimeout(async () => {
+      const r = await buscarQuestoesWizard({ busca, tipo: tipo ?? 'objetivo', disciplinaId: fDisc })
+      if (!vivo) return
+      setQDisp(r.ok ? (r.itens ?? []) : [])
+      setQBuscando(false)
+    }, 300)
+    return () => { vivo = false; clearTimeout(t) }
+  }, [busca, fDisc, tipo, atual])
 
   // Busca de estudantes sob demanda (debounce 300ms). Só dispara quando o passo Estudantes está ativo.
   useEffect(() => {
@@ -141,7 +145,7 @@ export function SimuladoWizard({
 
   function finalizar() {
     start(async () => {
-      const questaoIds = modo === 'banco' ? questoesDoBanco.map((q) => q.id) : [...sel]
+      const questaoIds = modo === 'banco' ? bancoQids : [...sel]
       const data = {
         titulo: info.titulo.trim(),
         descricao: info.descricao.trim() || undefined,
@@ -203,8 +207,8 @@ export function SimuladoWizard({
                   Próximo <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
               ) : (
-                <Button onClick={finalizar} disabled={pending}>
-                  {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />} Criar simulado
+                <Button onClick={finalizar} disabled={pending || (modo === 'banco' && bancoQCarregando)}>
+                  {pending || (modo === 'banco' && bancoQCarregando) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />} Criar simulado
                 </Button>
               )}
             </div>
@@ -303,7 +307,7 @@ export function SimuladoWizard({
                 ))}
               </div>
               {modo === 'banco' && (
-                <p className="text-xs text-muted-foreground">Serão herdadas as questões <b>{tipoQuestao}s</b> do banco {bancoAtual?.nome} ({questoesDoBanco.length}).</p>
+                <p className="text-xs text-muted-foreground">Serão herdadas as questões <b>{tipoQuestao}s</b> do banco {bancoAtual?.nome} ({bancoQCarregando ? '…' : bancoQids.length}).</p>
               )}
             </div>
           )}
@@ -409,26 +413,21 @@ export function SimuladoWizard({
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar questão…" className="pl-8" />
                 </div>
-                <Select value={fBanco} onValueChange={(v) => setFBanco(v ?? '')} items={{ all: 'Todos bancos', ...Object.fromEntries(bancos.map((b) => [b.id, b.nome])) }}>
-                  <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos bancos</SelectItem>
-                    {bancos.map((b) => <SelectItem key={b.id} value={b.id}>{b.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={fDisc} onValueChange={(v) => setFDisc(v ?? '')} items={{ all: 'Todas matérias', ...Object.fromEntries(disciplinas.map((d) => [d, d])) }}>
+                <Select value={fDisc} onValueChange={(v) => setFDisc(v ?? '')} items={{ all: 'Todas matérias', ...Object.fromEntries(disciplinas.map((d) => [d.id, d.nome])) }}>
                   <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas matérias</SelectItem>
-                    {disciplinas.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    {disciplinas.map((d) => <SelectItem key={d.id} value={d.id}>{d.nome}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              <p className="text-xs text-muted-foreground">{filtradas.length} questão(ões) {tipo === 'discursivo' ? 'discursivas' : 'objetivas'} disponíveis · {sel.size} selecionada(s)</p>
+              <p className="text-xs text-muted-foreground">{qBuscando ? 'Buscando…' : `${qDisp.length} questão(ões) ${tipo === 'discursivo' ? 'discursivas' : 'objetivas'}${qDisp.length >= 40 ? '+' : ''}`} · {sel.size} selecionada(s)</p>
               <div className="max-h-[45vh] overflow-auto rounded-lg border">
-                {filtradas.length === 0 ? (
-                  <p className="py-10 text-center text-sm text-muted-foreground">Nenhuma questão {tipo === 'discursivo' ? 'discursiva' : 'objetiva'} encontrada nos bancos.</p>
-                ) : filtradas.map((q) => {
+                {qBuscando ? (
+                  <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Buscando…</p>
+                ) : qDisp.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-muted-foreground">Nenhuma questão {tipo === 'discursivo' ? 'discursiva' : 'objetiva'} encontrada.</p>
+                ) : qDisp.map((q) => {
                   const on = sel.has(q.id)
                   const enun = q.enunciado.length > 110 ? q.enunciado.slice(0, 110) + '…' : q.enunciado
                   return (
