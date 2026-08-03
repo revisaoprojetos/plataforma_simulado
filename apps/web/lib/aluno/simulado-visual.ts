@@ -2,7 +2,9 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 
-export type VisualSim = { cor: string | null; icone: string | null; capa: string | null }
+// `capa` = pôster 4:5 (capa_card_url) para os cards retrato do aluno; `capaBanner` = banner largo
+// (capa_url) para cards paisagem (ex.: board admin), onde o pôster cortaria fora do meio.
+export type VisualSim = { cor: string | null; icone: string | null; capa: string | null; capaBanner: string | null }
 
 /**
  * Resolve a imagem/visual de cada simulado a partir do banco (pasta) de origem:
@@ -51,7 +53,7 @@ export async function resolverVisualSimulados(svc: SupabaseClient, simulados: { 
       const r2 = await svc.from('simulado_pastas').select('id, cor, icone, capa_url').in('id', pastaIds)
       pastas = r2.data ?? []
     } else if (!r.error) pastas = r.data ?? []
-    const vis = new Map<string, VisualSim>(pastas.map((p: any) => [p.id, { cor: p.cor ?? null, icone: p.icone ?? null, capa: (p.capa_card_url ?? p.capa_url) ?? null }]))
+    const vis = new Map<string, VisualSim>(pastas.map((p: any) => [p.id, { cor: p.cor ?? null, icone: p.icone ?? null, capa: (p.capa_card_url ?? p.capa_url) ?? null, capaBanner: p.capa_url ?? null }]))
     for (const [sim, pid] of pastaDeSim) { const v = vis.get(pid); if (v) visual.set(sim, v) }
   }
   return visual

@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
+import { FileiraHorizontal } from '@/components/fileira-horizontal'
 import { excluirPastaFolder } from '@/app/admin/banco-questoes/actions'
 import type { TipoSimulado } from '@/lib/simulado/tipo'
 import {
@@ -20,6 +21,7 @@ import {
 import {
   Clock,
   Calendar,
+  Info,
   MoreHorizontal,
   Pencil,
   Trophy,
@@ -78,7 +80,7 @@ export interface SimuladoCard {
   pasta_id?: string | null
   regras?: { nota_liberada?: boolean; gabarito_liberado?: boolean; caderno_liberado?: boolean } | null
   tipo?: TipoSimulado | null
-  vis?: { cor: string | null; icone: string | null; capa: string | null } | null
+  vis?: { cor: string | null; icone: string | null; capa: string | null; capaBanner?: string | null } | null
 }
 
 const tipoLabel = (t?: TipoSimulado | null) => (t === 'discursiva' ? 'Discursiva' : t === 'mista' ? 'Mista' : 'Objetiva')
@@ -94,6 +96,9 @@ const secoes = [
   { chave: 'rascunho', titulo: 'A iniciar', cor: 'bg-sky-500' },
   { chave: 'encerrado', titulo: 'Encerrado', cor: 'bg-red-500' },
 ] as const
+
+// Largura de cada card nas fileiras horizontais (deixa espiar um pedaço do próximo).
+const CARD_BASIS = 'shrink-0 basis-[calc((100%-1rem)/1.6)] sm:basis-[calc((100%-2rem)/2.6)] md:basis-[calc((100%-3rem)/3.4)] lg:basis-[calc((100%-4rem)/4.3)] xl:basis-[calc((100%-5rem)/5.3)]'
 
 function formatDur(min: number | null) {
   if (!min) return 'Sem limite'
@@ -139,6 +144,14 @@ function statusPasta(sims: SimuladoCard[]): { label: string; cls: string } | nul
   return { label: 'Encerrado', cls: statusChipClass.encerrado }
 }
 
+/** Subtítulo do simulado (janela/disponibilidade) — horário de Brasília. */
+function subtituloSim(s: SimuladoCard): string {
+  return s.modo_aplicacao === 'janela_fixa' && s.data_inicio
+    ? (s.data_fim ? `${compactoBrt(s.data_inicio)} — ${compactoBrt(s.data_fim)}` : `A partir de ${compactoBrt(s.data_inicio)}`)
+    : s.modo_aplicacao === 'aberto' ? 'Sempre disponível'
+      : s.modo_aplicacao === 'prazo_relativo' ? 'Prazo definido por aluno' : 'Sem data definida'
+}
+
 /** Chip clicável de liberação (Nota / Gabarito / Caderno): verde quando liberado, neutro quando bloqueado. */
 function LiberacaoChip({ label, on, pending, onClick }: { label: string; on: boolean; pending: boolean; onClick: () => void }) {
   return (
@@ -167,6 +180,7 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
+  const [detalhes, setDetalhes] = useState(false)
   // Estado efetivo (modo configurado + override manual do admin).
   const efetivo = resolverLiberacoes(s.regras, { status: s.status, data_fim: s.data_fim })
   const [override, setOverride] = useState<Partial<Record<'nota' | 'gabarito' | 'caderno', boolean>>>({})
@@ -220,128 +234,161 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
 
   const cor = s.vis?.cor ?? '#6d28d9'
   const BancoIcon = iconeBanco(s.vis?.icone)
-  const capa = s.vis?.capa
+  // Card pôster (4:5) → prefere o recorte pôster (capa_card_url) e cai no banner.
+  const capa = s.vis?.capa ?? s.vis?.capaBanner
   const detalhe = `/admin/simulados/${s.id}`
 
-  // Subtítulo (janela/disponibilidade) — horário de Brasília.
-  const subtitulo = s.modo_aplicacao === 'janela_fixa' && s.data_inicio
-    ? (s.data_fim ? `${compactoBrt(s.data_inicio)} — ${compactoBrt(s.data_fim)}` : `A partir de ${compactoBrt(s.data_inicio)}`)
-    : s.modo_aplicacao === 'aberto' ? 'Sempre disponível'
-      : s.modo_aplicacao === 'prazo_relativo' ? 'Prazo definido por aluno' : 'Sem data definida'
-
   return (
+    <>
     <div className={cn(
-      'group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md',
-      selecionado ? 'ring-2 ring-primary' : 'ring-1 ring-transparent',
+      'group relative flex aspect-[4/5] flex-col overflow-hidden rounded-2xl border shadow-sm transition-all duration-300',
+      selecionado ? 'ring-2 ring-primary' : 'ring-1 ring-black/5 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25',
     )}>
-      {/* Capa */}
-      <div className="relative aspect-[16/9] overflow-hidden">
-        {capa
-          ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-          : <div className="absolute inset-0" style={{ background: `linear-gradient(140deg, ${cor} 0%, #0f172a 140%)` }} />}
-        {!capa && <BancoIcon className="absolute -right-4 -top-4 h-28 w-28 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
+      {/* Fundo: imagem preenchendo o card inteiro (ou degradê da marca) */}
+      {capa
+        ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
+        : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
+      {/* glow da cor da marca + escurecimento p/ legibilidade do texto */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
 
-        {/* Link cobre a capa (abaixo dos controles) */}
-        <Link href={detalhe} className="absolute inset-0 z-0" aria-label={s.titulo} />
+      {/* Link cobre o card (abaixo dos controles) */}
+      <Link href={detalhe} className="absolute inset-0 z-10" aria-label={s.titulo} />
 
-        {/* Faixa superior: "fazendo agora" + seleção/kebab */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between p-2">
-          <div className="pointer-events-auto">
-            {online > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur" title={`${online} aluno(s) fazendo agora`}>
-                <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-white" /></span>
-                {online} fazendo agora
-              </span>
-            )}
-          </div>
-          <div className="pointer-events-auto flex items-center gap-1">
-            <button
-              type="button"
-              role="checkbox"
-              aria-checked={selecionado}
-              aria-label={selecionado ? 'Desmarcar simulado' : 'Selecionar simulado'}
-              onClick={() => onSelecionar(!selecionado)}
-              className={cn('flex h-6 w-6 items-center justify-center rounded-md border backdrop-blur transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
-                selecionado ? 'border-primary bg-primary text-primary-foreground' : 'border-white/40 bg-black/35 text-transparent hover:bg-black/50')}>
-              <Check className="h-4 w-4" />
-            </button>
-            <div className="rounded-lg bg-black/40 backdrop-blur [&_button:hover]:!bg-white/20 [&_button]:!text-white/90">
-              <DropdownMenu>
-                <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/50" title="Mais ações">
-                  <MoreHorizontal className="h-4 w-4" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}/ao-vivo`)}><Radio className="mr-2 h-4 w-4" /> Ao vivo (online/progresso)</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push(detalhe)}><Pencil className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push(detalhe)}><Trophy className="mr-2 h-4 w-4" /> Ranking</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={copiarLink}><Copy className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
-                  <DropdownMenuItem onClick={abrirSimulado}><ExternalLink className="mr-2 h-4 w-4" /> Abrir aplicação</DropdownMenuItem>
-                  {onMover && <DropdownMenuItem onClick={onMover}><FolderInput className="mr-2 h-4 w-4" /> Mover para pasta</DropdownMenuItem>}
-                  <DropdownMenuSeparator />
-                  {s.status === 'publicado' && <DropdownMenuItem onClick={() => acao(encerrarSimuladoAction, 'Simulado encerrado')}><Square className="mr-2 h-4 w-4" /> Encerrar</DropdownMenuItem>}
-                  {s.status === 'encerrado' && <DropdownMenuItem onClick={() => acao(reabrirSimuladoAction, 'Simulado reaberto')}><Play className="mr-2 h-4 w-4" /> Reabrir</DropdownMenuItem>}
-                  {s.status === 'rascunho' && <DropdownMenuItem onClick={() => acao(publishSimuladoAction, 'Simulado publicado')}><Send className="mr-2 h-4 w-4" /> Publicar</DropdownMenuItem>}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={excluir} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+      {/* Topo: "fazendo agora" (esq) + seleção/kebab (dir) */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between p-2.5">
+        <div className="pointer-events-auto">
+          {online > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur" title={`${online} aluno(s) fazendo agora`}>
+              <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-white" /></span>
+              {online} fazendo agora
+            </span>
+          )}
+        </div>
+        <div className="pointer-events-auto flex items-center gap-1">
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={selecionado}
+            aria-label={selecionado ? 'Desmarcar simulado' : 'Selecionar simulado'}
+            onClick={() => onSelecionar(!selecionado)}
+            className={cn('flex h-6 w-6 items-center justify-center rounded-md border backdrop-blur transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
+              selecionado ? 'border-primary bg-primary text-primary-foreground' : 'border-white/40 bg-black/35 text-transparent hover:bg-black/50')}>
+            <Check className="h-4 w-4" />
+          </button>
+          <div className="rounded-lg bg-black/40 backdrop-blur [&_button:hover]:!bg-white/20 [&_button]:!text-white/90">
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/50" title="Mais ações">
+                <MoreHorizontal className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onClick={() => setDetalhes(true)}><Info className="mr-2 h-4 w-4" /> Detalhes</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}/ao-vivo`)}><Radio className="mr-2 h-4 w-4" /> Ao vivo (online/progresso)</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push(detalhe)}><Pencil className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push(detalhe)}><Trophy className="mr-2 h-4 w-4" /> Ranking</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={copiarLink}><Copy className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
+                <DropdownMenuItem onClick={abrirSimulado}><ExternalLink className="mr-2 h-4 w-4" /> Abrir aplicação</DropdownMenuItem>
+                {onMover && <DropdownMenuItem onClick={onMover}><FolderInput className="mr-2 h-4 w-4" /> Mover para pasta</DropdownMenuItem>}
+                <DropdownMenuSeparator />
+                {s.status === 'publicado' && <DropdownMenuItem onClick={() => acao(encerrarSimuladoAction, 'Simulado encerrado')}><Square className="mr-2 h-4 w-4" /> Encerrar</DropdownMenuItem>}
+                {s.status === 'encerrado' && <DropdownMenuItem onClick={() => acao(reabrirSimuladoAction, 'Simulado reaberto')}><Play className="mr-2 h-4 w-4" /> Reabrir</DropdownMenuItem>}
+                {s.status === 'rascunho' && <DropdownMenuItem onClick={() => acao(publishSimuladoAction, 'Simulado publicado')}><Send className="mr-2 h-4 w-4" /> Publicar</DropdownMenuItem>}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={excluir} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-
-        {/* Chip do ícone da marca */}
-        <span className="pointer-events-none absolute bottom-2 left-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-sm ring-1 ring-white/20" style={{ background: cor }}>
-          <BancoIcon className="h-4 w-4" />
-        </span>
       </div>
 
-      {/* Corpo */}
-      <div className="flex flex-1 flex-col gap-2 p-3.5">
-        <div className="flex items-center gap-1.5">
-          <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide', statusChipClass[s.status])}>
-            <span className={cn('h-1.5 w-1.5 rounded-full', dotClass[s.status])} /> {statusLabel[s.status] ?? s.status}
-          </span>
-        </div>
-
-        <h3 className="line-clamp-2 text-sm font-bold leading-snug">
-          <Link href={detalhe} className="transition-colors hover:text-primary">{s.titulo}</Link>
+      {/* Rodapé sobreposto: status + título + ações */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
+        <span className={cn('mb-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur', dotClass[s.status])}>
+          {statusLabel[s.status] ?? s.status}
+        </span>
+        <h3 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">
+          <Link href={detalhe} className="pointer-events-auto transition-opacity hover:opacity-90">{s.titulo}</Link>
         </h3>
-        <p className="flex items-center gap-1 text-xs text-muted-foreground"><Calendar className="h-3 w-3 shrink-0" /> {subtitulo}</p>
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{tipoLabel(s.tipo)}</span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"><Clock className="h-3 w-3" /> {formatDur(s.tempo_limite_min)}</span>
-        </div>
-
-        {/* Liberações (clicáveis) */}
-        <div className="mt-0.5">
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Liberações</p>
-          <div className="flex flex-wrap gap-1.5">
-            <LiberacaoChip label="Nota" on={estado.nota} pending={pending} onClick={() => toggleLib('nota')} />
-            <LiberacaoChip label="Gabarito" on={estado.gabarito} pending={pending} onClick={() => toggleLib('gabarito')} />
-            <LiberacaoChip label="Caderno" on={estado.caderno} pending={pending} onClick={() => toggleLib('caderno')} />
-          </div>
-        </div>
-
-        {/* Ações inline */}
-        <div className="mt-auto flex items-center gap-1.5 pt-1.5">
+        <div className="pointer-events-auto mt-3 flex items-center gap-1.5">
           <button type="button" onClick={abrirSimulado} disabled={!linkAcesso}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50">
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all hover:brightness-110 disabled:opacity-50"
+            style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
             <ExternalLink className="h-4 w-4" /> Abrir aplicação
           </button>
           <button type="button" onClick={copiarLink} title="Copiar link de acesso"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 text-white ring-1 ring-white/15 backdrop-blur transition-colors hover:bg-white/25">
             <Copy className="h-4 w-4" />
           </button>
           <Link href={`/admin/simulados/${s.id}/ao-vivo`} title="Ranking e desempenho ao vivo"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 text-white ring-1 ring-white/15 backdrop-blur transition-colors hover:bg-white/25">
             <BarChart3 className="h-4 w-4" />
           </Link>
         </div>
       </div>
     </div>
+    {detalhes && <DetalhesSimuladoDialog s={s} online={online} estado={estado} pending={pending} onToggle={toggleLib} onCopiar={copiarLink} onClose={() => setDetalhes(false)} />}
+    </>
+  )
+}
+
+/** Pop-up "Detalhes" do simulado: infos que saíram da frente do card + edição das liberações. */
+function DetalhesSimuladoDialog({ s, online, estado, pending, onToggle, onCopiar, onClose }: {
+  s: SimuladoCard; online: number; estado: { nota: boolean; gabarito: boolean; caderno: boolean }
+  pending: boolean; onToggle: (item: 'nota' | 'gabarito' | 'caderno') => void; onCopiar: () => void; onClose: () => void
+}) {
+  const linhas = [
+    { icon: Radio, label: 'Status', valor: statusLabel[s.status] ?? s.status },
+    { icon: s.tipo === 'discursiva' ? Pencil : ExternalLink, label: 'Tipo', valor: tipoLabel(s.tipo) },
+    { icon: Clock, label: 'Duração', valor: formatDur(s.tempo_limite_min) },
+    { icon: Folder, label: 'Aplicação', valor: modoLabel[s.modo_aplicacao] ?? s.modo_aplicacao },
+    { icon: Calendar, label: 'Janela / disponibilidade', valor: subtituloSim(s) },
+  ]
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+      <div role="dialog" aria-modal="true" className="animate-pop relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b p-5">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Detalhes do simulado</p>
+            <h3 className="mt-0.5 text-base font-bold leading-snug">{s.titulo}</h3>
+          </div>
+          <button type="button" onClick={onClose} className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-3 overflow-auto p-5">
+          {online > 0 && (
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+              <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" /></span>
+              {online} aluno(s) fazendo agora
+            </div>
+          )}
+          <div className="divide-y rounded-xl border">
+            {linhas.map((l) => (
+              <div key={l.label} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                <span className="flex items-center gap-2 text-sm text-muted-foreground"><l.icon className="h-4 w-4 shrink-0" /> {l.label}</span>
+                <span className="text-right text-sm font-semibold">{l.valor}</span>
+              </div>
+            ))}
+          </div>
+          <div>
+            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Liberações para o aluno</p>
+            <div className="flex flex-wrap gap-1.5">
+              <LiberacaoChip label="Nota" on={estado.nota} pending={pending} onClick={() => onToggle('nota')} />
+              <LiberacaoChip label="Gabarito" on={estado.gabarito} pending={pending} onClick={() => onToggle('gabarito')} />
+              <LiberacaoChip label="Caderno" on={estado.caderno} pending={pending} onClick={() => onToggle('caderno')} />
+            </div>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">Clique para liberar ou bloquear cada item para os alunos.</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t p-4">
+          <button type="button" onClick={onCopiar} className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:border-primary hover:text-primary"><Copy className="h-4 w-4" /> Copiar link</button>
+          <Link href={`/admin/simulados/${s.id}`} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"><Pencil className="h-4 w-4" /> Editar simulado</Link>
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -349,7 +396,7 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
 function NovoTile({ pastaNome }: { pastaNome?: string }) {
   return (
     <Link href="/admin/simulados/novo"
-      className="group flex min-h-[240px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed bg-muted/20 p-4 text-center text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/[0.04] hover:text-primary">
+      className="group flex h-full min-h-[240px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed bg-muted/20 p-4 text-center text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/[0.04] hover:text-primary">
       <span className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-dashed transition-colors group-hover:border-primary"><Plus className="h-5 w-5" /></span>
       <span className="text-sm font-medium">{pastaNome ? 'Novo simulado nesta pasta' : 'Novo simulado'}</span>
     </Link>
@@ -535,7 +582,9 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
 
       {/* Barra de seleção em massa */}
       {selecao.size > 0 && (
-        <BarraSelecao ids={[...selecao]} simById={simById} onLimpar={() => setSelecao(new Set())} onRefresh={() => router.refresh()} />
+        <BarraSelecao ids={[...selecao]} simById={simById} destinos={destinos} totalVisiveis={filtrados.length}
+          onSelecionarTodos={() => setSelecao(new Set(filtrados.map((s) => s.id)))}
+          onLimpar={() => setSelecao(new Set())} onRefresh={() => router.refresh()} />
       )}
 
       {movendo && <MoverSimuladoDialog simulado={movendo} destinos={destinos} atualId={atual?.id ?? null} onClose={() => setMovendo(null)} />}
@@ -596,13 +645,15 @@ function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerencia
         </div>
       </div>
       {aberto && (
-        <div className="grid items-stretch gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <FileiraHorizontal>
           {sims.map((s) => (
-            <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0}
-              onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
+            <div key={s.id} className={CARD_BASIS}>
+              <CardSimuladoAdmin s={s} appUrl={appUrl} online={online[s.id] ?? 0}
+                onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
+            </div>
           ))}
-          <NovoTile pastaNome={folder.nome} />
-        </div>
+          <div className={CARD_BASIS}><NovoTile pastaNome={folder.nome} /></div>
+        </FileiraHorizontal>
       )}
     </section>
   )
@@ -626,13 +677,15 @@ function SecaoSimples({ titulo, icone: Icone, sims, online, appUrl, aberto, togg
         sims.length === 0 && !mostrarNovo ? (
           <p className="rounded-2xl border border-dashed py-10 text-center text-sm text-muted-foreground">Nenhum simulado aqui.</p>
         ) : (
-          <div className="grid items-stretch gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <FileiraHorizontal>
             {sims.map((s) => (
-              <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0}
-                onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
+              <div key={s.id} className={CARD_BASIS}>
+                <CardSimuladoAdmin s={s} appUrl={appUrl} online={online[s.id] ?? 0}
+                  onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
+              </div>
             ))}
-            {mostrarNovo && <NovoTile pastaNome={titulo} />}
-          </div>
+            {mostrarNovo && <div className={CARD_BASIS}><NovoTile pastaNome={titulo} /></div>}
+          </FileiraHorizontal>
         )
       )}
     </section>
@@ -678,11 +731,13 @@ function SecoesStatus({ sims, online, appUrl, onMover, recolhidas, toggleSecao, 
   )
 }
 
-/** Barra flutuante de seleção em massa: liberar nota/gabarito/caderno, encerrar, limpar. */
-function BarraSelecao({ ids, simById, onLimpar, onRefresh }: {
-  ids: string[]; simById: Map<string, SimuladoCard>; onLimpar: () => void; onRefresh: () => void
+/** Barra flutuante de seleção em massa: selecionar todos, liberar nota/gabarito/caderno, mover, encerrar, limpar. */
+function BarraSelecao({ ids, simById, destinos, totalVisiveis, onSelecionarTodos, onLimpar, onRefresh }: {
+  ids: string[]; simById: Map<string, SimuladoCard>; destinos: DestinoSim[]; totalVisiveis: number
+  onSelecionarTodos: () => void; onLimpar: () => void; onRefresh: () => void
 }) {
   const [pending, start] = useTransition()
+  const [movendo, setMovendo] = useState(false)
   const acionaveis = ids.map((id) => simById.get(id)).filter(Boolean) as SimuladoCard[]
 
   function liberar(item: 'nota' | 'gabarito' | 'caderno') {
@@ -704,22 +759,73 @@ function BarraSelecao({ ids, simById, onLimpar, onRefresh }: {
     })
   }
 
+  const faltam = totalVisiveis - ids.length
+
   return createPortal(
-    <div className="fixed inset-x-0 bottom-4 z-[120] flex justify-center px-4">
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-card/95 px-3 py-2 shadow-xl backdrop-blur">
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-2.5 py-1 text-sm font-semibold text-primary">
-          <Users className="h-4 w-4" /> {ids.length} selecionado(s)
-        </span>
-        <span className="hidden text-xs text-muted-foreground sm:inline">Liberar:</span>
-        <button type="button" onClick={() => liberar('nota')} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors hover:border-primary hover:text-primary disabled:opacity-50"><Unlock className="h-3.5 w-3.5" /> Nota</button>
-        <button type="button" onClick={() => liberar('gabarito')} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors hover:border-primary hover:text-primary disabled:opacity-50"><Unlock className="h-3.5 w-3.5" /> Gabarito</button>
-        <button type="button" onClick={() => liberar('caderno')} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors hover:border-primary hover:text-primary disabled:opacity-50"><Unlock className="h-3.5 w-3.5" /> Caderno</button>
-        <button type="button" onClick={encerrar} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors hover:border-amber-500 hover:text-amber-600 disabled:opacity-50"><Square className="h-3.5 w-3.5" /> Encerrar</button>
-        {pending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-        <button type="button" onClick={onLimpar} className="ml-1 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Limpar seleção"><X className="h-4 w-4" /></button>
+    <>
+      <div className="fixed inset-x-0 bottom-4 z-[120] flex justify-center px-4">
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-card/95 px-3 py-2 shadow-xl backdrop-blur">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-2.5 py-1 text-sm font-semibold text-primary">
+            <Users className="h-4 w-4" /> {ids.length} selecionado(s)
+          </span>
+          {faltam > 0 && (
+            <button type="button" onClick={onSelecionarTodos} className="rounded-lg px-1.5 py-1 text-xs font-semibold text-primary underline-offset-2 hover:underline">Selecionar todos ({totalVisiveis})</button>
+          )}
+          <span className="hidden h-5 w-px bg-border sm:block" />
+          <span className="hidden text-xs text-muted-foreground sm:inline">Liberar:</span>
+          <button type="button" onClick={() => liberar('nota')} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors hover:border-primary hover:text-primary disabled:opacity-50"><Unlock className="h-3.5 w-3.5" /> Nota</button>
+          <button type="button" onClick={() => liberar('gabarito')} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors hover:border-primary hover:text-primary disabled:opacity-50"><Unlock className="h-3.5 w-3.5" /> Gabarito</button>
+          <button type="button" onClick={() => liberar('caderno')} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors hover:border-primary hover:text-primary disabled:opacity-50"><Unlock className="h-3.5 w-3.5" /> Caderno</button>
+          <span className="hidden h-5 w-px bg-border sm:block" />
+          <button type="button" onClick={() => setMovendo(true)} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors hover:border-primary hover:text-primary disabled:opacity-50"><FolderInput className="h-3.5 w-3.5" /> Mover</button>
+          <button type="button" onClick={encerrar} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors hover:border-amber-500 hover:text-amber-600 disabled:opacity-50"><Square className="h-3.5 w-3.5" /> Encerrar</button>
+          {pending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          <button type="button" onClick={onLimpar} className="ml-1 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Limpar seleção"><X className="h-4 w-4" /></button>
+        </div>
       </div>
-    </div>,
+      {movendo && <MoverEmMassaDialog ids={acionaveis.map((s) => s.id)} destinos={destinos} onClose={() => setMovendo(false)} onDone={() => { onLimpar(); onRefresh() }} />}
+    </>,
     document.body,
+  )
+}
+
+/** Move vários simulados de uma vez para uma pasta (ou raiz). */
+function MoverEmMassaDialog({ ids, destinos, onClose, onDone }: { ids: string[]; destinos: DestinoSim[]; onClose: () => void; onDone: () => void }) {
+  const [pending, start] = useTransition()
+  const [sel, setSel] = useState<string | null>(null)
+  function salvar() {
+    start(async () => {
+      const res = await Promise.all(ids.map((id) => moverSimuladoParaPasta(id, sel)))
+      const err = res.find((r) => !r.ok)
+      if (err) toast.error(err.error ?? 'Erro ao mover')
+      else toast.success(`${ids.length} simulado(s) ${sel ? 'movido(s) para a pasta' : 'movido(s) para a raiz'}`)
+      onDone(); onClose()
+    })
+  }
+  return (
+    <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+      <div role="dialog" aria-modal="true" className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b px-5 py-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold"><FolderInput className="h-4 w-4" /> Mover {ids.length} simulado(s)</h3>
+          <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-1.5 overflow-auto p-4">
+          <OpcaoSim ativo={sel === null} onClick={() => setSel(null)} icon={<Radio className="h-4 w-4 text-muted-foreground" />} label="Raiz (sem pasta)" />
+          {destinos.length === 0 && <p className="px-1 py-2 text-center text-xs text-muted-foreground">Nenhuma pasta criada ainda.</p>}
+          {destinos.map((d) => (
+            <OpcaoSim key={d.id} ativo={sel === d.id} onClick={() => setSel(d.id)} icon={<Folder className="h-4 w-4 text-muted-foreground" />} label={d.nome} />
+          ))}
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t px-5 py-3">
+          <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
+          <button type="button" onClick={salvar} disabled={pending}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Mover
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

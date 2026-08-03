@@ -42,7 +42,9 @@ export default async function NovoSimuladoPage() {
   }
 
   const bancosDetalhe = (bancos ?? []).map((b: any) => ({
-    id: b.id, nome: b.nome, cor: b.cor ?? null, icone: b.icone ?? null, capa: (b.capa_card_url ?? b.capa_url) ?? null, tipo: b.tipo ?? 'objetiva',
+    // Card do wizard é paisagem (aspect-16/10) → prefere o BANNER (capa_url, largo) e cai no
+    // recorte pôster (capa_card_url, 4:5) só quando não há banner. Assim a capa centraliza no meio.
+    id: b.id, nome: b.nome, cor: b.cor ?? null, icone: b.icone ?? null, capa: (b.capa_url ?? b.capa_card_url) ?? null, tipo: b.tipo ?? 'objetiva',
     nQuestoes: qCount.get(b.id) ?? 0, nEstudantes: eCount.get(b.id)?.size ?? 0,
   }))
 
