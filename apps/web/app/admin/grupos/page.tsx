@@ -30,6 +30,7 @@ export default async function GruposPage() {
     is_mestre: g.is_mestre,
     pai_id: g.pai_id,
     codigo: g.codigo_externo ?? null,
+    criado_em: g.criado_em ?? null,
   }))
 
   return <GruposClient grupos={rows} />
