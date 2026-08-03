@@ -116,7 +116,7 @@ export function SimuladoQuestoesManager({ simuladoId, questoesNoSimulado }: Prop
                       </TableCell>
                       <TableCell className="w-[120px]">
                         <Badge variant={q.status === 'publicada' ? 'default' : 'outline'} className="text-[10px]">
-                          {q.status}
+                          {q.status ?? 'rascunho'}
                         </Badge>
                       </TableCell>
                       <TableCell className="w-[110px] text-right">
