@@ -183,17 +183,18 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
   const [detalhes, setDetalhes] = useState(false)
   // Estado efetivo (modo configurado + override manual do admin).
   const efetivo = resolverLiberacoes(s.regras, { status: s.status, data_fim: s.data_fim })
-  const [override, setOverride] = useState<Partial<Record<'nota' | 'gabarito' | 'caderno', boolean>>>({})
+  const [override, setOverride] = useState<Partial<Record<'nota' | 'gabarito' | 'caderno' | 'enunciado', boolean>>>({})
   const estado = {
     nota: override.nota ?? efetivo.notaLiberada,
     gabarito: override.gabarito ?? efetivo.gabaritoLiberado,
     caderno: override.caderno ?? efetivo.cadernoLiberado,
+    enunciado: override.enunciado ?? efetivo.enunciadoLiberado,
   }
 
   const linkAcesso = s.embed_token ? `${appUrl}/aluno/login?token=${s.embed_token}` : null
-  const rotulo = { nota: 'Nota/desempenho', gabarito: 'Gabarito', caderno: 'Caderno (PDF)' }
+  const rotulo = { nota: 'Nota/desempenho', gabarito: 'Gabarito', caderno: 'Caderno (PDF)', enunciado: 'Caderno de questões' }
 
-  function toggleLib(item: 'nota' | 'gabarito' | 'caderno') {
+  function toggleLib(item: 'nota' | 'gabarito' | 'caderno' | 'enunciado') {
     const novo = !estado[item]
     setOverride((p) => ({ ...p, [item]: novo }))
     startTransition(async () => {
@@ -319,11 +320,11 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
             <ExternalLink className="h-4 w-4" /> Abrir aplicação
           </button>
           <button type="button" onClick={copiarLink} title="Copiar link de acesso"
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 text-white ring-1 ring-white/15 backdrop-blur transition-colors hover:bg-white/25">
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-black/45 text-white ring-1 ring-white/15 transition-colors hover:bg-black/65">
             <Copy className="h-4 w-4" />
           </button>
           <Link href={`/admin/simulados/${s.id}/ao-vivo`} title="Ranking e desempenho ao vivo"
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 text-white ring-1 ring-white/15 backdrop-blur transition-colors hover:bg-white/25">
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-black/45 text-white ring-1 ring-white/15 transition-colors hover:bg-black/65">
             <BarChart3 className="h-4 w-4" />
           </Link>
         </div>
@@ -336,8 +337,8 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
 
 /** Pop-up "Detalhes" do simulado: infos que saíram da frente do card + edição das liberações. */
 function DetalhesSimuladoDialog({ s, online, estado, pending, onToggle, onCopiar, onClose }: {
-  s: SimuladoCard; online: number; estado: { nota: boolean; gabarito: boolean; caderno: boolean }
-  pending: boolean; onToggle: (item: 'nota' | 'gabarito' | 'caderno') => void; onCopiar: () => void; onClose: () => void
+  s: SimuladoCard; online: number; estado: { nota: boolean; gabarito: boolean; caderno: boolean; enunciado: boolean }
+  pending: boolean; onToggle: (item: 'nota' | 'gabarito' | 'caderno' | 'enunciado') => void; onCopiar: () => void; onClose: () => void
 }) {
   const linhas = [
     { icon: Radio, label: 'Status', valor: statusLabel[s.status] ?? s.status },
@@ -378,8 +379,9 @@ function DetalhesSimuladoDialog({ s, online, estado, pending, onToggle, onCopiar
               <LiberacaoChip label="Nota" on={estado.nota} pending={pending} onClick={() => onToggle('nota')} />
               <LiberacaoChip label="Gabarito" on={estado.gabarito} pending={pending} onClick={() => onToggle('gabarito')} />
               <LiberacaoChip label="Caderno" on={estado.caderno} pending={pending} onClick={() => onToggle('caderno')} />
+              <LiberacaoChip label="Caderno de questões" on={estado.enunciado} pending={pending} onClick={() => onToggle('enunciado')} />
             </div>
-            <p className="mt-1.5 text-[11px] text-muted-foreground">Clique para liberar ou bloquear cada item para os alunos.</p>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">Clique para liberar ou bloquear cada item para os alunos. “Caderno de questões” = download da prova sem gabarito, antes de iniciar.</p>
           </div>
         </div>
         <div className="flex items-center justify-end gap-2 border-t p-4">

@@ -3,14 +3,14 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Award, ClipboardCheck, FileStack, Lock, Unlock, Users } from 'lucide-react'
+import { Award, ClipboardCheck, FileStack, FileDown, Lock, Unlock, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { resolverLiberacoes, type RegrasLiberacao } from '@/lib/simulado/liberacao'
 import { liberarItemAction } from '@/app/admin/simulados/actions'
 
 const MODO_LABEL: Record<string, string> = { imediato: 'Imediato', apos_janela: 'Após janela', manual: 'Manual' }
 
-type Item = 'nota' | 'gabarito' | 'caderno'
+type Item = 'nota' | 'gabarito' | 'caderno' | 'enunciado'
 
 export function SimuladoLiberacoes({
   simuladoId, regras, status, dataFim,
@@ -30,9 +30,10 @@ export function SimuladoLiberacoes({
     nota: override.nota ?? efetivo.notaLiberada,
     gabarito: override.gabarito ?? efetivo.gabaritoLiberado,
     caderno: override.caderno ?? efetivo.cadernoLiberado,
+    enunciado: override.enunciado ?? efetivo.enunciadoLiberado,
   }
 
-  const rotulo: Record<Item, string> = { nota: 'Nota/desempenho', gabarito: 'Gabarito', caderno: 'Caderno (PDF)' }
+  const rotulo: Record<Item, string> = { nota: 'Nota/desempenho', gabarito: 'Gabarito', caderno: 'Caderno (PDF)', enunciado: 'Caderno de questões' }
   function toggle(item: Item) {
     const novo = !estado[item]
     setOverride((p) => ({ ...p, [item]: novo }))
@@ -47,6 +48,7 @@ export function SimuladoLiberacoes({
     { item: 'nota', icon: Award, titulo: 'Nota e desempenho', desc: 'Nota, acertos e comparativo com a turma.', modo: r.liberar_nota ?? 'imediato' },
     { item: 'gabarito', icon: ClipboardCheck, titulo: 'Gabarito', desc: 'Alternativas corretas e comentário do professor.', modo: r.liberar_gabarito ?? 'apos_janela' },
     { item: 'caderno', icon: FileStack, titulo: 'Caderno em PDF', desc: 'Downloads de gabarito e caderno completo.', modo: r.liberar_caderno ?? 'apos_janela' },
+    { item: 'enunciado', icon: FileDown, titulo: 'Caderno de questões (sem respostas)', desc: 'Download da prova sem gabarito, antes de iniciar.' },
   ]
   const publico = r.caderno_publico ?? 'todos'
 
@@ -62,7 +64,7 @@ export function SimuladoLiberacoes({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm font-semibold">{titulo}</p>
-                <span className="rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{MODO_LABEL[modo ?? ''] ?? modo}</span>
+                {modo && <span className="rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{MODO_LABEL[modo] ?? modo}</span>}
                 {item === 'caderno' && (
                   <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                     <Users className="h-3 w-3" /> {publico === 'passaporte' ? 'Só passaporte' : 'Todos'}

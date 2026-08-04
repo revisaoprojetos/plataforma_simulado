@@ -55,6 +55,7 @@ export function SimuladoWizard({
     embaralhar_questoes: false, embaralhar_alternativas: false, revisao_antes_enviar: true,
     retentativas: 1, retentativas_ilimitadas: false, politica_nota: 'ultima',
     liberar_nota: 'manual', liberar_gabarito: 'manual', liberar_caderno: 'manual', caderno_publico: 'todos',
+    enunciado_liberado: true,
     iniciar_atrasado: false, tolerancia_atraso_min: '', tempo_por_questao_seg: '', exibir_nota: false, mostrar_comentario: false, peso_padrao: 1,
   })
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -612,6 +613,9 @@ export function SimuladoWizard({
                   <SegCard label="Liberar gabarito" hint="Respostas corretas e justificativas." value={regras.liberar_gabarito} onChange={(v) => setR('liberar_gabarito', v)} options={LIB_OPTS} />
                   <SegCard label="Liberar caderno (PDF)" hint="Download da prova completa." value={regras.liberar_caderno} onChange={(v) => setR('liberar_caderno', v)} options={LIB_OPTS} />
                   <SegCard label="Público do caderno" hint="Quem consegue baixar o caderno." value={regras.caderno_publico} onChange={(v) => setR('caderno_publico', v)} options={[{ v: 'todos', label: 'Todos' }, { v: 'passaporte', label: 'Passaporte' }]} />
+                </div>
+                <div className="mt-3">
+                  <ToggleRow label="Caderno de questões (sem respostas)" desc="Deixa o aluno baixar a prova sem gabarito antes de iniciar (aparece ao lado do botão de iniciar)." v={regras.enunciado_liberado} on={(v) => setR('enunciado_liberado', v)} />
                 </div>
               </section>
             </div>

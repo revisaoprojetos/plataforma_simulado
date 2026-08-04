@@ -54,7 +54,9 @@ export function FileiraHorizontal({ titulo, count, children }: {
             <ChevronLeft className="h-7 w-7" />
           </button>
         )}
-        <div ref={ref} className="flex gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* py-2 dá folga vertical: overflow-x-auto também recorta na vertical, então sem isso o
+            card cortaria no topo ao subir no hover (-translate-y). O -my-2 mantém o alinhamento. */}
+        <div ref={ref} className="-my-2 flex gap-4 overflow-x-auto px-0.5 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {children}
         </div>
         {canR && (

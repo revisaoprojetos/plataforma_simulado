@@ -15,6 +15,9 @@ export type RegrasLiberacao = {
   liberar_caderno?: ModoLiberacao
   caderno_liberado?: boolean
   caderno_publico?: 'todos' | 'passaporte'
+  // "Caderno de questões" (sem respostas / Enunciado de Questões): download ANTES de iniciar.
+  // Boolean simples (não tem "após janela" — é pré-prova). Default liberado quando indefinido.
+  enunciado_liberado?: boolean
   exibir_nota?: boolean
 } & Record<string, unknown>
 
@@ -26,6 +29,7 @@ export type Liberacoes = {
   cadernoLiberado: boolean          // liberado no simulado (sem considerar o público)
   cadernoParaAluno: boolean         // liberado E o aluno atual tem direito (público)
   cadernoPublico: 'todos' | 'passaporte'
+  enunciadoLiberado: boolean        // caderno de questões (sem respostas) para download
 }
 
 const janelaFechada = (s: SimuladoLiberavel) =>
@@ -67,5 +71,8 @@ export function resolverLiberacoes(
   const cadernoPublico = r.caderno_publico ?? 'todos'
   const cadernoParaAluno = cadernoLiberado && (cadernoPublico === 'todos' || opts?.classificacao === 'passaporte')
 
-  return { notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoParaAluno, cadernoPublico }
+  // Caderno de questões (enunciado): pré-prova, default liberado; admin pode bloquear (=== false).
+  const enunciadoLiberado = r.enunciado_liberado !== false
+
+  return { notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoParaAluno, cadernoPublico, enunciadoLiberado }
 }

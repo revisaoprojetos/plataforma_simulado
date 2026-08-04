@@ -768,10 +768,10 @@ export async function reabrirSimuladoAction(id: string) {
   revalidatePath('/admin/simulados')
 }
 
-/** Libera (ou bloqueia) manualmente um item do simulado (nota, gabarito ou caderno). */
-export async function liberarItemAction(id: string, item: 'nota' | 'gabarito' | 'caderno', liberado: boolean) {
+/** Libera (ou bloqueia) manualmente um item do simulado (nota, gabarito, caderno ou caderno de questões). */
+export async function liberarItemAction(id: string, item: 'nota' | 'gabarito' | 'caderno' | 'enunciado', liberado: boolean) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
-  const flag = { nota: 'nota_liberada', gabarito: 'gabarito_liberado', caderno: 'caderno_liberado' }[item]
+  const flag = { nota: 'nota_liberada', gabarito: 'gabarito_liberado', caderno: 'caderno_liberado', enunciado: 'enunciado_liberado' }[item]
   const tenantId = await getCurrentTenantId()
   const supabase = await createClient()
   const { data: s } = await supabase.from('simulado_simulados').select('regras, titulo').eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT).maybeSingle()

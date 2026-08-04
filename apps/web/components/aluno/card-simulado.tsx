@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Radio, Play, RotateCcw, Clock, CalendarClock, Hourglass, CircleCheck, Infinity as InfinityIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
-import { EnunciadoDownloadMenu } from '@/components/aluno/enunciado-download-menu'
+import { EnunciadoDownloadBotao } from '@/components/aluno/enunciado-download-menu'
 import type { ItemSimulado } from '@/lib/aluno/simulado-item'
 
 // "emerald" = simulado disponível para o aluno (dentro da janela). Ícone neutro (não "ao vivo").
@@ -29,9 +29,9 @@ export function CardSimulado({ s }: { s: ItemSimulado }) {
   const BancoIcon = iconeBanco(s.vis?.icone)
   const capa = s.vis?.capa
   return (
-    <div className={cn('group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300', s.podeFazer && 'hover:-translate-y-1 hover:shadow-xl hover:ring-white/25')}>
+    <div className={cn('group relative aspect-[4/5] transform-gpu overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition duration-300', s.podeFazer && 'hover:-translate-y-1 hover:shadow-xl hover:ring-white/25')}>
       {capa
-        ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        ? <img src={capa} alt="" className="absolute inset-0 h-full w-full transform-gpu object-cover transition-transform duration-500 group-hover:scale-105" />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
       {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
       {/* glow da cor da marca no rodapé — dá profundidade e identidade */}
@@ -42,36 +42,32 @@ export function CardSimulado({ s }: { s: ItemSimulado }) {
       {s.novo && <FitaNovo />}
       {(s.podeFazer || s.podeAguardar) && <Link href={`/simulado/${s.embed_token}`} className="absolute inset-0 z-10" aria-label={s.titulo} />}
 
-      {/* Canto superior esquerdo: menu de 3 pontos (baixar enunciado) no lugar do antigo ícone.
-          Só aparece quando há Enunciado de Questões (PDF importado) para baixar. */}
-      {s.enunciadoUrl && (
-        <div className="absolute left-3 top-3 z-30">
-          <EnunciadoDownloadMenu url={s.enunciadoUrl} />
-        </div>
-      )}
-      <span className={cn('pointer-events-none absolute right-3 z-20 inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur', s.novo ? 'top-11' : 'top-3')}>
+      <span className={cn('pointer-events-none absolute right-3 z-20 inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white', s.novo ? 'top-11' : 'top-3')}>
         <StatusIcon className="h-3.5 w-3.5" />
         {s.statusLabel}
       </span>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
-        {s.emAndamento && <span className="mb-1 inline-block rounded-md bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white backdrop-blur">Em andamento</span>}
+        {s.emAndamento && <span className="mb-1 inline-block rounded-md bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Em andamento</span>}
         <h3 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{s.titulo}</h3>
         {s.quando && <p className="mt-1 flex items-start gap-1 text-xs leading-snug text-white/80"><Clock className="mt-0.5 h-3 w-3 shrink-0" /> <span>{s.quando}</span></p>}
         {s.refazer && !s.emAndamento && <p className="text-[11px] text-white/70">Já feito {s.finalizadas}x{Number.isFinite(s.restantes) ? ` · ${s.restantes} restante(s)` : ''}</p>}
-        {s.podeFazer ? (
-          <span className="mt-2.5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-lg"
-            style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
-            {s.emAndamento ? <><RotateCcw className="h-4 w-4" /> Continuar</> : s.refazer ? <><RotateCcw className="h-4 w-4" /> Refazer</> : <><Play className="h-4 w-4" /> Fazer agora</>}
-          </span>
-        ) : s.podeAguardar ? (
-          <span className="mt-2.5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-lg"
-            style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
-            <Clock className="h-4 w-4" /> Entrar e aguardar início
-          </span>
-        ) : (
-          <span className="mt-2 block rounded-lg bg-black/45 px-3 py-2 text-center text-xs text-white/80 backdrop-blur">{s.statusLabel === 'Agendado' ? 'Ainda não abriu' : s.statusLabel === 'Em manutenção' ? '🔧 Em manutenção' : 'Indisponível'}</span>
-        )}
+        <div className="mt-2.5 flex items-stretch gap-1.5">
+          {s.podeFazer ? (
+            <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-lg"
+              style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
+              {s.emAndamento ? <><RotateCcw className="h-4 w-4" /> Continuar</> : s.refazer ? <><RotateCcw className="h-4 w-4" /> Refazer</> : <><Play className="h-4 w-4" /> Fazer agora</>}
+            </span>
+          ) : s.podeAguardar ? (
+            <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-lg"
+              style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
+              <Clock className="h-4 w-4" /> Entrar e aguardar início
+            </span>
+          ) : (
+            <span className="flex flex-1 items-center justify-center rounded-lg bg-black/55 px-3 py-2 text-center text-xs text-white/80">{s.statusLabel === 'Agendado' ? 'Ainda não abriu' : s.statusLabel === 'Em manutenção' ? '🔧 Em manutenção' : 'Indisponível'}</span>
+          )}
+          {s.enunciadoUrl && <EnunciadoDownloadBotao url={s.enunciadoUrl} />}
+        </div>
       </div>
     </div>
   )

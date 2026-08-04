@@ -88,7 +88,17 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   // Grupo (pasta) + enunciado de cada simulado.
   const { grupoPorSim, grupos } = await resolverGruposCatalogo(svc, itensAll.map((i) => ({ id: i.id, regras: i.regras })))
   const enunUrls = await resolverEnunciadoUrls(svc, itensAll.map((i) => ({ id: i.id, regras: i.regras })))
-  const itensCat: ItemSimuladoCat[] = itensAll.map((i) => ({ ...i, grupoId: grupoPorSim.get(i.id) ?? null, enunciadoUrl: enunUrls.get(i.id) ?? null }))
+  // Caderno de questões (sem respostas) para download antes de iniciar. Só quando o admin não
+  // bloqueou (regras.enunciado_liberado !== false). Prioriza o PDF "Enunciado de Questões" importado;
+  // na falta dele, usa o caderno GERADO (endpoint) quando o simulado tem caderno vinculado.
+  const itensCat: ItemSimuladoCat[] = itensAll.map((i) => {
+    const info = enunUrls.get(i.id)
+    const liberado = (i.regras as any)?.enunciado_liberado !== false
+    const url = !liberado ? null
+      : info?.pdf ? info.pdf
+      : (info?.temCaderno && i.embed_token) ? `/api/aluno/caderno-questoes?token=${encodeURIComponent(i.embed_token)}` : null
+    return { ...i, grupoId: grupoPorSim.get(i.id) ?? null, enunciadoUrl: url }
+  })
 
   // Progresso por pasta (concluídos / total dos acessíveis).
   const progresso: ProgressoGrupo = {}

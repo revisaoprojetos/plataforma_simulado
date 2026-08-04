@@ -1,16 +1,16 @@
 import { enunciadoQuestoesPdf } from '@/lib/caderno-designer/material'
 
 /**
- * URL de download do "Enunciado de Questões" (2º PDF importado) de cada simulado, para o aluno
- * baixar ANTES de iniciar (menu de 3 pontos do card). Resolve o caderno do simulado
- * (regras.caderno_id → banco_base_id → banco.caderno_id) em lote e aplica enunciadoQuestoesPdf.
- * Tolerante ao schema; retorna null quando não há PDF (aí o botão de 3 pontos não aparece).
+ * Resolve o "Caderno de questões (sem respostas)" de cada simulado, para o aluno baixar ANTES de
+ * iniciar. Retorna, por simulado: `pdf` = URL do 2º PDF importado ("Enunciado de Questões") quando
+ * existe; `temCaderno` = true quando há um caderno vinculado (regras.caderno_id → banco_base_id →
+ * banco.caderno_id) — nesse caso o card usa o caderno GERADO como fallback. Tolerante ao schema.
  */
 export async function resolverEnunciadoUrls(
   svc: any,
   sims: { id: string; regras: any }[],
-): Promise<Map<string, string | null>> {
-  const out = new Map<string, string | null>()
+): Promise<Map<string, { pdf: string | null; temCaderno: boolean }>> {
+  const out = new Map<string, { pdf: string | null; temCaderno: boolean }>()
   const cadernoPorSim = new Map<string, string | null>()
   const bancoBasePorSim = new Map<string, string>()
   for (const s of sims) {
@@ -41,7 +41,7 @@ export async function resolverEnunciadoUrls(
   }
   for (const s of sims) {
     const cid = cadernoPorSim.get(s.id) ?? null
-    out.set(s.id, cid ? (urlPorCaderno.get(cid) ?? null) : null)
+    out.set(s.id, { pdf: cid ? (urlPorCaderno.get(cid) ?? null) : null, temCaderno: !!cid })
   }
   return out
 }
