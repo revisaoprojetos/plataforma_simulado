@@ -5,6 +5,7 @@ import { tipoDoSimulado } from '@/lib/simulado/tipo'
 import type { DadosRelatorioSimulado, LinhaExportSimulado } from './relatorio-simulado-view'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { rotuloClassificacao } from '@/lib/estudante/classificacao'
+import { simuladoSessoesAggSql, simuladoRespostasRepSql } from 'data'
 
 const fmtDur = (min: number) => { const h = Math.floor(min / 60), m = Math.round(min % 60); return h > 0 ? `${h}h ${String(m).padStart(2, '0')}min` : `${m}min` }
 const fmtSeg = (seg: number) => { const s = Math.round(seg); const m = Math.floor(s / 60), r = s % 60; return m > 0 ? `${m}min ${String(r).padStart(2, '0')}s` : `${r}s` }
@@ -81,23 +82,26 @@ async function _montarRelatorioSimulado(svc: SupabaseClient, simId: string, tena
   for (const [qid, disc] of discDeQ) { const o = ordemDeQ.get(qid) ?? 0; if (!discOrdem.has(disc) || o < discOrdem.get(disc)!) discOrdem.set(disc, o) }
   const disciplinas = [...discOrdem.entries()].sort((a, b) => a[1] - b[1]).map(([d]) => d)
 
-  // Respostas de TODAS as tentativas finalizadas (1º passo: contagem por sessão).
+  // Contagem por sessão (ac/tt) de TODAS as finalizadas: SQL AGREGADO (1 query, agrega no banco)
+  // → fallback PostgREST (transfere todas as respostas). No caminho SQL, as respostas por questão
+  // são buscadas depois SÓ das sessões representativas (bem menos dados).
   const acPorSess = new Map<string, number>(), ttPorSess = new Map<string, number>()
   const allFinIds = finalizadasAll.map((s) => s.id)
-  let respAll: any[] = []
-  if (allFinIds.length) {
-    // Lotes + paginação: evita URL gigante e o teto de 1000 do PostgREST
-    // (simulado grande = dezenas de milhares de respostas).
+  const tid2 = tenantId ?? '00000000-0000-0000-0000-000000000000'
+  let respAll: any[] | null = null // null = caminho SQL (busca só as representativas mais tarde)
+  const sessAgg = allFinIds.length ? await simuladoSessoesAggSql(simId, tid2) : []
+  if (sessAgg) {
+    for (const s of sessAgg) { ttPorSess.set(s.id, Number(s.tt)); const ac = Number(s.ac); if (ac) acPorSess.set(s.id, ac) }
+  } else if (allFinIds.length) {
     respAll = await fetchAllByIn<any>(allFinIds, (chunk) =>
       svc.from('simulado_respostas_objetivas')
         .select('sessao_id, questao_id, alternativa_id, correta, snapshot_gabarito, tempo_resposta_seg')
-        .in('sessao_id', chunk)
-        .order('id'))
+        .in('sessao_id', chunk).order('id'))
     for (const r of respAll) {
       ttPorSess.set(r.sessao_id, (ttPorSess.get(r.sessao_id) ?? 0) + 1)
       if (r.correta) acPorSess.set(r.sessao_id, (acPorSess.get(r.sessao_id) ?? 0) + 1)
     }
-  }
+  } else { respAll = [] }
 
   // Escolhe a tentativa representativa de cada aluno: prioriza tentativas COM respostas
   // (ignora abandonadas/vazias que distorcem nota/acerto/tempo), depois aplica a política de nota.
@@ -121,6 +125,9 @@ async function _montarRelatorioSimulado(svc: SupabaseClient, simId: string, tena
   }
   const sessIds = finalizadas.map((s) => s.id)
   const repSet = new Set(sessIds)
+
+  // Caminho SQL: agora que temos as sessões REPRESENTATIVAS, busca só as respostas delas (1 query).
+  if (respAll === null) respAll = (await simuladoRespostasRepSql(sessIds, tid2)) ?? []
 
   // 2º passo: estatísticas por questão só das tentativas representativas.
   const acPorDisc = new Map<string, { ac: number; tt: number }>()

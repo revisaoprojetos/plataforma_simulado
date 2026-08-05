@@ -237,8 +237,12 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
     const linhas = (view === 'sessoes' ? sessoes : eventos) ?? []
     const eIds = [...new Set(linhas.map((l: any) => l.estudante_id).filter(isUuid))] as string[]
     const sIds = [...new Set(linhas.map((l: any) => l.simulado_id).filter(isUuid))] as string[]
-    if (eIds.length) { const { data } = await supabase.from('simulado_estudantes').select('id, nome, email').in('id', eIds); for (const e of data ?? []) nomesEst.set((e as any).id, { nome: (e as any).nome, email: (e as any).email }) }
-    if (sIds.length) { const { data } = await supabase.from('simulado_simulados').select('id, titulo').in('id', sIds); for (const s of data ?? []) nomesSim.set((s as any).id, (s as any).titulo) }
+    const [estRes, simRes] = await Promise.all([
+      eIds.length ? supabase.from('simulado_estudantes').select('id, nome, email').in('id', eIds) : Promise.resolve({ data: [] as any[] }),
+      sIds.length ? supabase.from('simulado_simulados').select('id, titulo').in('id', sIds) : Promise.resolve({ data: [] as any[] }),
+    ])
+    for (const e of estRes.data ?? []) nomesEst.set((e as any).id, { nome: (e as any).nome, email: (e as any).email })
+    for (const s of simRes.data ?? []) nomesSim.set((s as any).id, (s as any).titulo)
   }
 
   const totalPages = Math.ceil((count ?? 0) / ITEMS_PER_PAGE)

@@ -99,10 +99,12 @@ export function NotificacaoBellAluno() {
     if (i.link) router.push(i.link)
   }
 
+  const temNaoLidas = naoLidas > 0
   return (
     <>
+      <style>{`@keyframes sinoToca{0%{transform:rotate(0)}8%{transform:rotate(14deg)}16%{transform:rotate(-12deg)}24%{transform:rotate(9deg)}32%{transform:rotate(-6deg)}40%{transform:rotate(3deg)}48%,100%{transform:rotate(0)}}.sino-toca{animation:sinoToca 2.4s ease-in-out infinite;transform-origin:50% 2px}@media (prefers-reduced-motion:reduce){.sino-toca{animation:none}}`}</style>
       <button ref={btnRef} onClick={toggle} aria-label="Notificações" className="relative flex h-9 w-9 items-center justify-center rounded-lg outline-none hover:bg-[color:var(--sidebar-accent)] focus-visible:ring-2 focus-visible:ring-ring">
-        <Bell className="h-[1.15rem] w-[1.15rem]" />
+        <Bell className={cn('h-[1.15rem] w-[1.15rem]', temNaoLidas && 'sino-toca')} fill={temNaoLidas ? 'currentColor' : 'none'} />
         {naoLidas > 0 && (
           <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] animate-in zoom-in items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-[color:var(--sidebar)]">{naoLidas > 9 ? '9+' : naoLidas}</span>
         )}

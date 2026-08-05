@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export const runtime = 'nodejs'
 
 /** GET /api/pdf/publico/[id]?sessao=... — status do job iniciado pelo aluno.

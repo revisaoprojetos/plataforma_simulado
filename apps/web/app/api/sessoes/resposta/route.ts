@@ -3,6 +3,9 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { sessaoExpirada } from '@/lib/simulado/sessao-expiry'
 
 // POST /api/sessoes/resposta — auto-save idempotente de uma resposta.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   let body: { sessao_id?: string; questao_id?: string; alternativa_id?: string }
   try {

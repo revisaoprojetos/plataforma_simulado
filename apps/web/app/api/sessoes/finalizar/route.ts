@@ -12,6 +12,9 @@ import { publicarAoVivo } from '@/lib/realtime/pubsub'
 // (questao_id -> alternativa_id). Antes de corrigir, o servidor RECONCILIA esse
 // mapa com o que está no banco e grava o que faltou/divergiu — assim nenhuma
 // questão marcada fica de fora se um auto-save falhou no meio da prova.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   let body: { sessao_id?: string; respostas?: Record<string, string> }
   try {

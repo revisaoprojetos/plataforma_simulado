@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentAccess } from '@/lib/auth/permissions'
+import { registrarAudit } from '@/lib/audit'
+import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { matricularEmSimuladosDoBanco } from '@/lib/simulado/matricular-banco'
 
 async function guard() {
@@ -63,7 +65,7 @@ export async function criarGrupo(
 
   for (let i = 0; i < 4; i++) {
     const r = await svc.from('simulado_grupos').insert(attempt).select('id').single()
-    if (!r.error) { revalidar(); return { ok: true, id: r.data!.id } }
+    if (!r.error) { await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_grupos', entidadeId: r.data!.id, depois: { nome: titulo, is_mestre: !!opts?.isMestre } }); revalidar(); return { ok: true, id: r.data!.id } }
     const m = r.error.message
     const faltando = /pai_id/i.test(m) ? 'pai_id' : /is_mestre/i.test(m) ? 'is_mestre' : /\bcor\b/i.test(m) ? 'cor' : null
     if (!faltando) return { ok: false, error: m }
@@ -88,9 +90,10 @@ export async function moverGrupo(grupoId: string, paiId: string | null): Promise
   const g = await guard(); if (!g.ok) return g
   const svc = createAdminClient()
 
-  const grp = await svc.from('simulado_grupos').select('id, is_mestre').eq('id', grupoId).eq('tenant_id', g.tenantId).eq('deletado', false).maybeSingle()
+  const grp = await svc.from('simulado_grupos').select('id, is_mestre, pai_id').eq('id', grupoId).eq('tenant_id', g.tenantId).eq('deletado', false).maybeSingle()
   if (grp.error && /is_mestre/i.test(grp.error.message)) return { ok: false, error: 'Grupo mestre indisponível no banco. Aplique a migração de grupo mestre.' }
   if (!grp.data) return { ok: false, error: 'Grupo não encontrado.' }
+  if (((grp.data as any).pai_id ?? null) === paiId) { revalidar(grupoId); return { ok: true } } // sem mudança → não audita
 
   if (paiId) {
     if (paiId === grupoId) return { ok: false, error: 'Uma pasta não pode entrar em si mesma.' }
@@ -117,6 +120,9 @@ export async function moverGrupo(grupoId: string, paiId: string | null): Promise
 
   const { error } = await svc.from('simulado_grupos').update({ pai_id: paiId }).eq('id', grupoId).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: /pai_id/i.test(error.message) ? 'Grupo mestre indisponível no banco. Aplique a migração de grupo mestre.' : error.message }
+  let paiNome: string | null = null
+  if (paiId) { const { data: p } = await svc.from('simulado_grupos').select('nome').eq('id', paiId).maybeSingle(); paiNome = (p as any)?.nome ?? null }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_grupos', entidadeId: grupoId, depois: { pai_id: paiId, pai_nome: paiNome } })
   revalidar(grupoId)
   return { ok: true }
 }
@@ -147,6 +153,7 @@ export async function excluirGrupo(id: string): Promise<{ ok: boolean; error?: s
   if (solta.error && !/pai_id/i.test(solta.error.message)) return { ok: false, error: solta.error.message }
   const { error } = await svc.from('simulado_grupos').update({ deletado: true }).eq('id', id).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_grupos', entidadeId: id })
   revalidar()
   return { ok: true }
 }
@@ -188,6 +195,8 @@ export async function adicionarMembros(grupoId: string, estudanteIds: string[]):
   const { error } = await svc.from('simulado_grupo_membros').insert(idsNovos.map((e) => ({ tenant_id: g.tenantId, grupo_id: grupoId, estudante_id: e })))
   if (error) return { ok: false, error: error.message }
   await sincronizarBancosDoGrupo(svc, g.tenantId, grupoId, idsNovos)
+  const { data: nrows } = await svc.from('simulado_estudantes').select('nome').in('id', idsNovos.slice(0, 15))
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_grupos', entidadeId: grupoId, depois: { membros_adicionados: idsNovos.length, nomes: (nrows ?? []).map((r: any) => r.nome).filter(Boolean) } })
   revalidar(grupoId)
   return { ok: true }
 }
@@ -281,12 +290,70 @@ export async function importarMembros(formData: FormData): Promise<{ ok: boolean
   return { ok: true, adicionados: idsAdicionados.length, jaEram: encontrados.length - idsAdicionados.length, naoEncontrados }
 }
 
+/** Esvazia o grupo: remove TODOS os vínculos de membros (sem excluir o grupo). */
+export async function esvaziarGrupo(grupoId: string): Promise<{ ok: boolean; removidos?: number; error?: string }> {
+  const g = await guard(); if (!g.ok) return g
+  const svc = createAdminClient()
+  const { data, error } = await svc.from('simulado_grupo_membros').delete().eq('grupo_id', grupoId).eq('tenant_id', g.tenantId).select('estudante_id')
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_grupos', entidadeId: grupoId, depois: { esvaziado: data?.length ?? 0 } })
+  revalidar(grupoId)
+  return { ok: true, removidos: data?.length ?? 0 }
+}
+
+/** Salva os dados do grupo (nome, descrição e pasta-pai). Reusa moverGrupo p/ a validação anti-ciclo. */
+export async function salvarConfigGrupo(id: string, nome: string, descricao: string | null, paiId: string | null): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard(); if (!g.ok) return g
+  const titulo = nome.trim(); if (!titulo) return { ok: false, error: 'Informe um nome.' }
+  const svc = createAdminClient()
+  const { data: antes } = await svc.from('simulado_grupos').select('nome, descricao').eq('id', id).eq('tenant_id', g.tenantId).maybeSingle()
+  let { error } = await svc.from('simulado_grupos').update({ nome: titulo, descricao: descricao || null }).eq('id', id).eq('tenant_id', g.tenantId)
+  if (error && /descricao/i.test(error.message)) ({ error } = await svc.from('simulado_grupos').update({ nome: titulo }).eq('id', id).eq('tenant_id', g.tenantId))
+  if (error) return { ok: false, error: error.message }
+  const mv = await moverGrupo(id, paiId) // valida pasta destino + anti-ciclo + audita a movimentação
+  if (!mv.ok) return mv
+  const nomeAntigo = (antes as any)?.nome ?? null, descAntiga = (antes as any)?.descricao ?? null
+  if (nomeAntigo !== titulo || (descAntiga ?? '') !== (descricao || ''))
+    await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_grupos', entidadeId: id, antes: { nome: nomeAntigo, descricao: descAntiga }, depois: { nome: titulo, descricao: descricao || null } })
+  revalidar(id)
+  return { ok: true }
+}
+
+/**
+ * Engajamento por aluno do grupo (último acesso + simulados finalizados). Pesado (varre as sessões
+ * dos membros) → é buscado SOB DEMANDA pelo cliente, fora do load da página, e cacheado no Redis
+ * por grupo (TTL curto). Retorna um mapa estudante_id → { last, feitos }.
+ */
+export async function engajamentoGrupo(grupoId: string): Promise<{ ok: boolean; mapa?: Record<string, { last: string | null; feitos: number }>; error?: string }> {
+  const g = await guard(); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const gm = await fetchAll<{ estudante_id: string }>(() => svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id', { ascending: true }))
+  const ids = [...new Set(gm.map((r) => r.estudante_id).filter(Boolean))]
+  if (!ids.length) return { ok: true, mapa: {} }
+  const mapa = await remember(chaveRelatorio(g.tenantId, 'grupo-engaj', grupoId, String(ids.length)), TTL_RELATORIO, async () => {
+    const sess = await fetchAllByIn<any>(ids, (chunk) =>
+      svc.from('simulado_sessoes_prova').select('estudante_id, iniciado_em, status, is_teste, deletado').in('estudante_id', chunk).order('estudante_id', { ascending: true }))
+    const m: Record<string, { last: string | null; feitos: number }> = {}
+    for (const s of sess) {
+      if (s.deletado || s.is_teste || !s.estudante_id) continue
+      const cur = m[s.estudante_id] ?? { last: null, feitos: 0 }
+      if (s.status === 'finalizada') cur.feitos++
+      if (s.iniciado_em && (!cur.last || s.iniciado_em > cur.last)) cur.last = s.iniciado_em
+      m[s.estudante_id] = cur
+    }
+    return m
+  })
+  return { ok: true, mapa }
+}
+
 /** Remove um estudante do grupo. */
 export async function removerMembro(grupoId: string, estudanteId: string): Promise<{ ok: boolean; error?: string }> {
   const g = await guard(); if (!g.ok) return g
   const svc = createAdminClient()
+  const { data: est } = await svc.from('simulado_estudantes').select('nome').eq('id', estudanteId).maybeSingle()
   const { error } = await svc.from('simulado_grupo_membros').delete().eq('grupo_id', grupoId).eq('estudante_id', estudanteId).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_grupos', entidadeId: grupoId, depois: { membros_removidos: 1, nome: (est as any)?.nome ?? null } })
   revalidar(grupoId)
   return { ok: true }
 }

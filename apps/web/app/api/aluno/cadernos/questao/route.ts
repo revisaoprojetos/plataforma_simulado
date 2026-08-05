@@ -9,6 +9,9 @@ async function donoDoCaderno(svc: any, cadernoId: string, estudanteId: string) {
 }
 
 // POST — adiciona questão ao caderno.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   const sessao = await getSessaoAluno()
   if (!sessao) return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })

@@ -81,13 +81,20 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   }
   const feitosSet = new Set(sims.filter((s) => (sessoesPorSim.get(s.id) ?? []).some((x) => x.status === 'finalizada')).map((s) => s.id))
 
-  const visual = await resolverVisualSimulados(svc, sims.map((s: any) => ({ id: s.id, regras: s.regras })))
+  // Visual dos simulados + mapa pasta→simulado de TODOS os sims (usado nos banners de vitrine):
+  // ambos só dependem de `sims`, então rodam em paralelo.
+  const [visual, { grupoPorSim: grupoPorSimAll }] = await Promise.all([
+    resolverVisualSimulados(svc, sims.map((s: any) => ({ id: s.id, regras: s.regras }))),
+    resolverGruposCatalogo(svc, sims.map((s: any) => ({ id: s.id, regras: s.regras }))),
+  ])
   const itensAll = montarItensSimulado(sims, sessoesPorSim, expiraPorSim, visual)
     .filter((i) => i.podeFazer || i.emAndamento || i.refazer || i.statusLabel === 'Agendado')
 
-  // Grupo (pasta) + enunciado de cada simulado.
-  const { grupoPorSim, grupos } = await resolverGruposCatalogo(svc, itensAll.map((i) => ({ id: i.id, regras: i.regras })))
-  const enunUrls = await resolverEnunciadoUrls(svc, itensAll.map((i) => ({ id: i.id, regras: i.regras })))
+  // Grupo (pasta) + enunciado de cada simulado — independentes entre si, buscados em paralelo.
+  const [{ grupoPorSim, grupos }, enunUrls] = await Promise.all([
+    resolverGruposCatalogo(svc, itensAll.map((i) => ({ id: i.id, regras: i.regras }))),
+    resolverEnunciadoUrls(svc, itensAll.map((i) => ({ id: i.id, regras: i.regras }))),
+  ])
   // Caderno de questões (sem respostas) para download antes de iniciar. Só quando o admin não
   // bloqueou (regras.enunciado_liberado !== false). Prioriza o PDF "Enunciado de Questões" importado;
   // na falta dele, usa o caderno GERADO (endpoint) quando o simulado tem caderno vinculado.
@@ -117,8 +124,8 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   // pasta e a descrição — pra mostrar que há mais conteúdo. O bloqueio real acontece ao clicar
   // (destino sem acesso → pop-up "sem acesso"). Contagem é tenant-wide (não depende do acesso do aluno).
   // KPIs por-slide: estatísticas do aluno ESPECÍFICAS do simulado/pasta de cada banner
-  // (antes era um agregado global repetido em todos os slides).
-  const { grupoPorSim: grupoPorSimAll } = await resolverGruposCatalogo(svc, sims.map((s: any) => ({ id: s.id, regras: s.regras })))
+  // (antes era um agregado global repetido em todos os slides). `grupoPorSimAll` já foi
+  // resolvido em paralelo acima (junto com `visual`).
   const finalizadasAll = ((sessAll ?? []) as any[]).filter((x) => x.status === 'finalizada')
   const statsDe = (pred: (simId: string) => boolean): BannerStats => {
     const fs = finalizadasAll.filter((x) => pred(x.simulado_id))

@@ -10,6 +10,9 @@ const comoLogo = (v: unknown) => (typeof v === 'string' && /^(https?:|data:image
 // = navegar pro subdomínio da outra plataforma e RE-IDENTIFICAR (/aluno/entrar).
 // Match de e-mail por `.ilike` para espelhar exatamente o que o identify (embed/identify) faz —
 // assim listamos só plataformas onde o identify de fato reconheceria este aluno.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const sessao = await getSessaoAluno()
   if (!sessao?.email) return NextResponse.json({ plataformas: [] })

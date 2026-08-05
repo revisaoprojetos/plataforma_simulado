@@ -4,6 +4,9 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { rateLimit } from '@/lib/rate-limit'
 
 // GET /api/aluno/comentarios?questao_id=X — comentários do professor + de alunos aprovados.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const sessao = await getSessaoAluno()
   if (!sessao) return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })

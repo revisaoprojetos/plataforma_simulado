@@ -41,39 +41,48 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
-  // Banco + personalização (cor/ícone/capa) — tolerante caso a migration ainda não tenha rodado.
-  let banco: any = null
-  {
-    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, capa_card_url, pai_id').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
-    if (r.error && /cor|icone|capa_url|capa_card_url|pai_id|column/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_pastas').select('id, nome').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
-      banco = r2.data
-    } else banco = r.data
-  }
-  if (!banco) notFound()
-
-  // fetchAll: banco com >1000 questões truncava os vínculos → banco aparecia incompleto.
   const tidB = tenantId ?? '00000000-0000-0000-0000-000000000000'
-  const vinculos = await fetchAll<{ questao_id: string }>(() =>
-    svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', id).eq('tenant_id', tidB).order('questao_id', { ascending: true }))
+
+  // Batch inicial: banco (colunas de personalização tolerantes), vínculos de questões, ordem manual,
+  // grupos de disciplinas e disciplinas do filtro — tudo depende só de (id, tenant), então roda em
+  // paralelo. Cada leitura opcional fica isolada porque a coluna pode não ter migrado (degrada sem quebrar).
+  const [banco, vinculos, ordemQuestoes, gruposIniciais, disciplinasFiltro] = await Promise.all([
+    (async (): Promise<any> => {
+      const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, capa_card_url, pai_id').eq('id', id).eq('tenant_id', tidB).maybeSingle()
+      if (r.error && /cor|icone|capa_url|capa_card_url|pai_id|column/i.test(r.error.message)) {
+        return (await svc.from('simulado_pastas').select('id, nome').eq('id', id).eq('tenant_id', tidB).maybeSingle()).data
+      }
+      return r.data
+    })(),
+    // fetchAll: banco com >1000 questões truncava os vínculos → banco aparecia incompleto.
+    fetchAll<{ questao_id: string }>(() =>
+      svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', id).eq('tenant_id', tidB).order('questao_id', { ascending: true })),
+    // Ordem manual das questões (tolerante: coluna pode não existir até a migration).
+    (async (): Promise<string[]> => {
+      const { data: oRow, error: oErr } = await svc.from('simulado_pastas').select('ordem_questoes').eq('id', id).eq('tenant_id', tidB).maybeSingle()
+      return (!oErr && Array.isArray((oRow as any)?.ordem_questoes)) ? (oRow as any).ordem_questoes as string[] : []
+    })(),
+    // Grupos de disciplinas do banco (tolerante: coluna pode não existir até a migration).
+    (async (): Promise<GrupoBanco[]> => {
+      const { data: gRow, error: gErr } = await svc.from('simulado_pastas').select('grupos').eq('id', id).maybeSingle()
+      return (!gErr && Array.isArray((gRow as any)?.grupos)) ? (gRow as any).grupos as GrupoBanco[] : []
+    })(),
+    // Disciplinas do tenant (id+nome) p/ o filtro do pop-up. Questões candidatas vêm SOB DEMANDA.
+    listarDisciplinasFiltro(),
+  ])
+  if (!banco) notFound()
   const ids = vinculos.map((v) => v.questao_id)
 
   let questoes: any[] = []
   if (ids.length) {
     // fetchAllByIn: além de não truncar em 1000, evita estourar a URL do .in() com muitos ids.
-    // Ordem de leitura preservada abaixo por `ordem_questoes` (reordenação manual do admin).
     questoes = await fetchAllByIn<any>(ids, (chunk) =>
       svc.from('simulado_questoes')
         .select('id, enunciado, tipo, nivel_dificuldade, status, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
         .in('id', chunk).eq('tenant_id', tidB).order('created_at', { ascending: true }))
   }
 
-  // Ordem manual das questões no banco (tolerante: coluna pode não existir até a migration).
-  let ordemQuestoes: string[] = []
-  {
-    const { data: oRow, error: oErr } = await svc.from('simulado_pastas').select('ordem_questoes').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
-    if (!oErr && Array.isArray((oRow as any)?.ordem_questoes)) ordemQuestoes = (oRow as any).ordem_questoes
-  }
+  // Ordem manual (reordenação do admin) aplicada às questões.
   if (ordemQuestoes.length && questoes.length) {
     const pos = new Map(ordemQuestoes.map((qid, i) => [qid, i]))
     const FIM = Number.MAX_SAFE_INTEGER
@@ -94,16 +103,7 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
   const maxDisc = disc[0]?.[1] ?? 1
   const maxAss = ass[0]?.[1] ?? 1
 
-  // Grupos de disciplinas do banco (tolerante: coluna pode não existir até rodar a migration).
-  let gruposIniciais: GrupoBanco[] = []
-  {
-    const { data: gRow, error: gErr } = await svc.from('simulado_pastas').select('grupos').eq('id', id).maybeSingle()
-    if (!gErr && Array.isArray((gRow as any)?.grupos)) gruposIniciais = (gRow as any).grupos
-  }
-
-  // Disciplinas do tenant (id+nome) para o filtro do pop-up. As questões candidatas são buscadas
-  // SOB DEMANDA no servidor (buscarQuestoesForaBanco) — não carregamos mais 500 no load da página.
-  const disciplinasFiltro = await listarDisciplinasFiltro()
+  // (grupos de disciplinas e disciplinas do filtro já resolvidos no batch inicial acima)
 
   const IconeBanco = iconeBanco(banco.icone)
   const corBanco = banco.cor ?? '#6d28d9'

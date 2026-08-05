@@ -22,13 +22,14 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
   const svc = await createServiceClient()
   const estId = sessao!.estudanteId
 
-  const { data: sim } = await svc.from('simulado_simulados').select('id, titulo, regras, status, data_fim, embed_token').eq('id', id).maybeSingle()
+  // Simulado + sessões finalizadas do aluno em paralelo (as sessões definem o early-return).
+  const [{ data: sim }, { data: sess }] = await Promise.all([
+    svc.from('simulado_simulados').select('id, titulo, regras, status, data_fim, embed_token').eq('id', id).maybeSingle(),
+    svc.from('simulado_sessoes_prova')
+      .select('id, status, nota, iniciado_em, finalizado_em, posicao_ranking, tentativa_num')
+      .eq('estudante_id', estId).eq('simulado_id', id).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada'),
+  ])
   if (!sim) notFound()
-
-  const { data: sess } = await svc
-    .from('simulado_sessoes_prova')
-    .select('id, status, nota, iniciado_em, finalizado_em, posicao_ranking, tentativa_num')
-    .eq('estudante_id', estId).eq('simulado_id', id).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada')
   const finalizadas = (sess ?? []) as any[]
   if (!finalizadas.length) {
     return (
@@ -41,57 +42,58 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
   // Melhor tentativa (nota; desempate pela mais recente) — usada no hero e no comparativo.
   const melhor = [...finalizadas].sort((a, b) => (Number(b.nota ?? -1) - Number(a.nota ?? -1)) || (new Date(b.finalizado_em ?? 0).getTime() - new Date(a.finalizado_em ?? 0).getTime()))[0]
 
-  // Liberações independentes (nota / gabarito / caderno) — considerando a classificação do aluno.
-  const { data: estRow } = await svc.from('simulado_estudantes').select('classificacao').eq('id', estId).maybeSingle()
+  // Independentes: classificação (p/ liberações), tipo do simulado e avaliação NPS — em paralelo.
+  const [{ data: estRow }, tipo, avResult] = await Promise.all([
+    svc.from('simulado_estudantes').select('classificacao').eq('id', estId).maybeSingle(),
+    tiposDeSimulados(svc, [id]).then((m) => m.get(id) ?? null),
+    // NPS: tolerante — se a tabela simulado_avaliacoes ainda não foi migrada (avErr), não mostra o card.
+    svc.from('simulado_avaliacoes').select('id').eq('estudante_id', estId).eq('simulado_id', id).maybeSingle()
+      .then((r) => ({ avRow: r.data, avErr: r.error })),
+  ])
   const { notaLiberada, gabaritoLiberado, cadernoParaAluno } = resolverLiberacoes(sim.regras as any, sim, { classificacao: (estRow as any)?.classificacao ?? null })
-  // Caderno do designer: regras.caderno_id → banco_base_id → banco das questões.
-  // O último caso espelha o admin (simulado → prova_questoes → questao_pasta →
-  // pastas.caderno_id, o banco que mais cobre a prova e tem caderno) para achar o
-  // caderno mesmo quando o vínculo não está em `regras`.
-  let cadernoId = ((sim.regras as any)?.caderno_id as string | undefined) ?? null
-  const bancoBaseId = (sim.regras as any)?.banco_base_id as string | undefined
-  if (!cadernoId && bancoBaseId) {
-    const { data: banco } = await svc.from('simulado_pastas').select('caderno_id').eq('id', bancoBaseId).maybeSingle()
-    cadernoId = ((banco as any)?.caderno_id as string | undefined) ?? null
-  }
-  if (!cadernoId) {
-    const { data: pq } = await svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', id)
-    const qIds = [...new Set((pq ?? []).map((r: any) => r.questao_id).filter(Boolean))]
-    if (qIds.length) {
-      const { data: qp } = await svc.from('simulado_questao_pasta').select('questao_id, pasta_id').in('questao_id', qIds)
-      const pastaIds = [...new Set((qp ?? []).map((r: any) => r.pasta_id))]
-      const { data: pastas } = pastaIds.length ? await svc.from('simulado_pastas').select('id, caderno_id').in('id', pastaIds) : { data: [] as any[] }
-      const cadDaPasta = new Map<string, string>((pastas ?? []).filter((p: any) => p.caderno_id).map((p: any) => [p.id, p.caderno_id]))
-      const cont = new Map<string, number>()
-      for (const r of qp ?? []) if (cadDaPasta.has((r as any).pasta_id)) cont.set((r as any).pasta_id, (cont.get((r as any).pasta_id) ?? 0) + 1)
-      const melhor = [...cont.entries()].sort((a, b) => b[1] - a[1])[0]
-      if (melhor) cadernoId = cadDaPasta.get(melhor[0])!
-    }
-  }
+  const mostrarNps = !avResult.avErr && !avResult.avRow
 
   const sessoesInput: SessaoInput[] = finalizadas.map((s) => ({
     id: s.id, tentativa_num: s.tentativa_num, nota: s.nota, iniciado_em: s.iniciado_em, finalizado_em: s.finalizado_em, posicao_ranking: s.posicao_ranking,
   }))
 
-  const [{ tentativas, questoes }, comparativo, desempenho] = await Promise.all([
+  // Resultado + comparativo + desempenho + caderno do aluno, TODOS em paralelo. A resolução do
+  // caderno (regras.caderno_id → banco_base_id → banco das questões que mais cobre a prova e tem
+  // caderno) e suas modalidades rodam junto do resultado pesado, em vez de depois dele.
+  const [{ tentativas, questoes }, comparativo, desempenho, cadernoInfo] = await Promise.all([
     montarResultadoAluno(svc, id, sessoesInput, gabaritoLiberado),
     montarComparativo(svc, id, { minhaNota: melhor.nota != null ? Number(melhor.nota) : null, minhaSessaoId: melhor.id }),
     montarDesempenhoAluno(svc, estId),
+    (async (): Promise<{ cadernoId: string | null; modalidades: ModalidadeAluno[] }> => {
+      let cadernoId = ((sim.regras as any)?.caderno_id as string | undefined) ?? null
+      const bancoBaseId = (sim.regras as any)?.banco_base_id as string | undefined
+      if (!cadernoId && bancoBaseId) {
+        const { data: banco } = await svc.from('simulado_pastas').select('caderno_id').eq('id', bancoBaseId).maybeSingle()
+        cadernoId = ((banco as any)?.caderno_id as string | undefined) ?? null
+      }
+      if (!cadernoId) {
+        const { data: pq } = await svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', id)
+        const qIds = [...new Set((pq ?? []).map((r: any) => r.questao_id).filter(Boolean))]
+        if (qIds.length) {
+          const { data: qp } = await svc.from('simulado_questao_pasta').select('questao_id, pasta_id').in('questao_id', qIds)
+          const pastaIds = [...new Set((qp ?? []).map((r: any) => r.pasta_id))]
+          const { data: pastas } = pastaIds.length ? await svc.from('simulado_pastas').select('id, caderno_id').in('id', pastaIds) : { data: [] as any[] }
+          const cadDaPasta = new Map<string, string>((pastas ?? []).filter((p: any) => p.caderno_id).map((p: any) => [p.id, p.caderno_id]))
+          const cont = new Map<string, number>()
+          for (const r of qp ?? []) if (cadDaPasta.has((r as any).pasta_id)) cont.set((r as any).pasta_id, (cont.get((r as any).pasta_id) ?? 0) + 1)
+          const escolha = [...cont.entries()].sort((a, b) => b[1] - a[1])[0]
+          if (escolha) cadernoId = cadDaPasta.get(escolha[0])!
+        }
+      }
+      let modalidades: ModalidadeAluno[] = []
+      if (cadernoId) {
+        const { data: cad } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoId).maybeSingle()
+        modalidades = modalidadesDoAluno((cad as any)?.config, tipo)
+      }
+      return { cadernoId, modalidades }
+    })(),
   ])
-
-  // Cadernos que o aluno recebe ao finalizar (fonte única: modalidadesDoAluno):
-  // Folha de Respostas, Caderno de questões, Diagnóstico e o Enunciado (PDF importado).
-  const tipo = (await tiposDeSimulados(svc, [id])).get(id) ?? null
-  let modalidades: ModalidadeAluno[] = []
-  if (cadernoId) {
-    const { data: cad } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoId).maybeSingle()
-    modalidades = modalidadesDoAluno((cad as any)?.config, tipo)
-  }
-
-  // NPS: mostra o card se o aluno ainda não avaliou este simulado. Tolerante: se a tabela
-  // simulado_avaliacoes ainda não foi migrada (avErr), não mostra (não quebra a página).
-  const { data: avRow, error: avErr } = await svc.from('simulado_avaliacoes').select('id').eq('estudante_id', estId).eq('simulado_id', id).maybeSingle()
-  const mostrarNps = !avErr && !avRow
+  const { cadernoId, modalidades } = cadernoInfo
 
   return (
     <div className="animate-page space-y-5">

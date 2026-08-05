@@ -3,6 +3,9 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 
 // POST /api/aluno/favoritos — alterna (toggle) o favorito da questão para o aluno logado.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   const sessao = await getSessaoAluno()
   if (!sessao) return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })

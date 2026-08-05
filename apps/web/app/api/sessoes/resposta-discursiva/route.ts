@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
 // POST /api/sessoes/resposta-discursiva — auto-save da resposta discursiva na prova.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   let body: { sessao_id?: string; questao_id?: string; texto?: string }
   try {

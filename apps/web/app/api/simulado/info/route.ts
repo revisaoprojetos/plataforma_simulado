@@ -3,6 +3,9 @@ import { createServiceClient } from '@/lib/supabase/server'
 
 // GET /api/simulado/info?token={embed_token}
 // Informações públicas mínimas do simulado para a tela de acesso do aluno.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const token = searchParams.get('token')

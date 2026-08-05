@@ -22,8 +22,9 @@ function FitaNovo() {
   )
 }
 
-/** Card (pôster) de um simulado disponível — usado na home e na página "Simulados". */
-export function CardSimulado({ s }: { s: ItemSimulado }) {
+/** Card (pôster) de um simulado disponível — usado na home e na página "Simulados".
+ *  `dica` = mostra um balão apontando o botão de baixar o caderno de questões (usado no 1º recente). */
+export function CardSimulado({ s, dica = false }: { s: ItemSimulado; dica?: boolean }) {
   const StatusIcon = ICON[s.tom] ?? Radio
   const cor = s.vis?.cor ?? '#6d28d9'
   const BancoIcon = iconeBanco(s.vis?.icone)
@@ -52,17 +53,26 @@ export function CardSimulado({ s }: { s: ItemSimulado }) {
         <h3 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{s.titulo}</h3>
         {s.quando && <p className="mt-1 flex items-start gap-1 text-xs leading-snug text-white/80"><Clock className="mt-0.5 h-3 w-3 shrink-0" /> <span>{s.quando}</span></p>}
         {s.refazer && !s.emAndamento && <p className="text-[11px] text-white/70">Já feito {s.finalizadas}x{Number.isFinite(s.restantes) ? ` · ${s.restantes} restante(s)` : ''}</p>}
-        <div className="mt-2.5 flex items-stretch gap-1.5">
+        <div className="relative mt-2.5 flex items-stretch gap-1.5">
+          {/* Balão de dica apontando o botão de baixar o caderno de questões. */}
+          {dica && s.enunciadoUrl && (
+            <div className="pointer-events-none absolute -top-9 right-0 z-30 animate-bounce">
+              <span className="relative block whitespace-nowrap rounded-lg bg-white px-2.5 py-1 text-[11px] font-bold text-slate-900 shadow-lg ring-1 ring-black/5">
+                Baixe o caderno de questões
+                <span className="absolute -bottom-1 right-4 h-2.5 w-2.5 rotate-45 bg-white" />
+              </span>
+            </div>
+          )}
           {s.podeFazer ? (
-            <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-lg"
-              style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
-              {s.emAndamento ? <><RotateCcw className="h-4 w-4" /> Continuar</> : s.refazer ? <><RotateCcw className="h-4 w-4" /> Refazer</> : <><Play className="h-4 w-4" /> Fazer agora</>}
-            </span>
+            <Link href={`/simulado/${s.embed_token}`} className="group/btn pointer-events-auto relative inline-flex flex-1 items-center justify-center overflow-hidden rounded-lg border-[1.5px] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-lg" style={{ borderColor: cor }}>
+              <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }} />
+              <span className="relative z-10 inline-flex items-center gap-1.5">{s.emAndamento ? <><RotateCcw className="h-4 w-4" /> Continuar</> : s.refazer ? <><RotateCcw className="h-4 w-4" /> Refazer</> : <><Play className="h-4 w-4" /> Fazer agora</>}</span>
+            </Link>
           ) : s.podeAguardar ? (
-            <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-lg"
-              style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
-              <Clock className="h-4 w-4" /> Entrar e aguardar início
-            </span>
+            <Link href={`/simulado/${s.embed_token}`} className="group/btn pointer-events-auto relative inline-flex flex-1 items-center justify-center overflow-hidden rounded-lg border-[1.5px] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-lg" style={{ borderColor: cor }}>
+              <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }} />
+              <span className="relative z-10 inline-flex items-center gap-1.5"><Clock className="h-4 w-4" /> Entrar e aguardar início</span>
+            </Link>
           ) : (
             <span className="flex flex-1 items-center justify-center rounded-lg bg-black/55 px-3 py-2 text-center text-xs text-white/80">{s.statusLabel === 'Agendado' ? 'Ainda não abriu' : s.statusLabel === 'Em manutenção' ? '🔧 Em manutenção' : 'Indisponível'}</span>
           )}

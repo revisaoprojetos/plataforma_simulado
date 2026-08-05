@@ -5,6 +5,9 @@ import { rateLimit } from '@/lib/rate-limit'
 const TIPOS = ['erro_gabarito', 'enunciado_confuso', 'desatualizada', 'outro']
 
 // POST /api/sessoes/reportar-erro — aluno reporta problema numa questão.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   let body: { sessao_id?: string; questao_id?: string; tipo?: string; mensagem?: string }
   try {

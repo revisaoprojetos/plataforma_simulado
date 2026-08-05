@@ -17,10 +17,11 @@ import {
   Search, ArrowUpDown, ChevronsUpDown, Hash, Download, FolderTree,
 } from 'lucide-react'
 
-type Grupo = { id: string; nome: string; membros: number; cor: string | null; is_mestre: boolean; pai_id: string | null; codigo?: string | null; criado_em?: string | null }
+type Origem = 'guru' | 'curseduca' | null
+type Grupo = { id: string; nome: string; membros: number; cor: string | null; is_mestre: boolean; pai_id: string | null; codigo?: string | null; origem?: Origem }
 type Destino = { id: string; nome: string; cor: string | null; depth: number }
 type Ordem = 'nome' | 'nome_desc' | 'membros' | 'membros_asc' | 'codigo'
-type Filtro = 'todos' | 'grupos' | 'pastas' | 'vazios'
+type Filtro = 'todos' | 'grupos' | 'pastas' | 'guru' | 'curseduca' | 'vazios'
 type Escopo = 'all' | 'orphan' | 'imported' | string // string = id de pasta
 
 const ORDENS: { v: Ordem; label: string }[] = [
@@ -33,21 +34,7 @@ const ORDENS: { v: Ordem; label: string }[] = [
 
 const nf = (n: number) => n.toLocaleString('pt-BR')
 // Grade das colunas da tabela (px + fr) — casa cabeçalho e linhas.
-const GRID = '32px 22px minmax(0,1fr) 120px 108px 104px 96px'
-
-/** Tempo relativo curto em pt-BR a partir de um ISO (client-side). */
-function tempoRel(iso?: string | null): string {
-  if (!iso) return '—'
-  const t = new Date(iso).getTime()
-  if (isNaN(t)) return '—'
-  const s = Math.floor((Date.now() - t) / 1000)
-  if (s < 60) return 'agora'
-  const m = Math.floor(s / 60); if (m < 60) return `há ${m} min`
-  const h = Math.floor(m / 60); if (h < 24) return `há ${h}h`
-  const d = Math.floor(h / 24); if (d < 30) return `há ${d} dia${d > 1 ? 's' : ''}`
-  const me = Math.floor(d / 30); if (me < 12) return `há ${me} ${me > 1 ? 'meses' : 'mês'}`
-  const a = Math.floor(me / 12); return `há ${a} ano${a > 1 ? 's' : ''}`
-}
+const GRID = '32px 22px minmax(0,1fr) 128px 110px 96px'
 
 export function GruposClient({ grupos }: { grupos: Grupo[] }) {
   const router = useRouter()
@@ -116,7 +103,7 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
   const comuns = useMemo(() => grupos.filter((g) => !g.is_mestre), [grupos])
   const totalMembros = useMemo(() => comuns.reduce((a, g) => a + g.membros, 0), [comuns])
   const orfaos = useMemo(() => comuns.filter(semPai), [comuns, byId])
-  const importados = useMemo(() => comuns.filter((g) => g.codigo), [comuns])
+  const importados = useMemo(() => comuns.filter((g) => g.origem), [comuns])
 
   // Escopo (painel de navegação) ativo → há filtro/busca também? Então lista plana.
   const flatAtivo = escopo !== 'all' || filtro !== 'todos' || busca.trim() !== ''
@@ -135,6 +122,8 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
     return baseDoEscopo.filter((g) => {
       if (filtro === 'grupos' && g.is_mestre) return false
       if (filtro === 'pastas' && !g.is_mestre) return false
+      if (filtro === 'guru' && g.origem !== 'guru') return false
+      if (filtro === 'curseduca' && g.origem !== 'curseduca') return false
       if (filtro === 'vazios' && (g.is_mestre ? membrosDe(g.id) > 0 : g.membros > 0)) return false
       if (q && !(g.nome.toLowerCase().includes(q) || String(g.codigo ?? '').toLowerCase().includes(q))) return false
       return true
@@ -196,8 +185,9 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
     })
   }
   function exportarCsv() {
-    const linhasCsv = [['Nome', 'Tipo', 'Membros', 'Código', 'Criado em'],
-      ...selecionados.map((g) => [g.nome, g.is_mestre ? 'Pasta' : 'Grupo', String(g.is_mestre ? membrosDe(g.id) : g.membros), g.codigo ?? '', g.criado_em ?? ''])]
+    const org = (o?: Origem) => (o === 'guru' ? 'Guru' : o === 'curseduca' ? 'Curseduca' : 'Criado')
+    const linhasCsv = [['Nome', 'Tipo', 'Membros', 'Código', 'Origem'],
+      ...selecionados.map((g) => [g.nome, g.is_mestre ? 'Pasta' : 'Grupo', String(g.is_mestre ? membrosDe(g.id) : g.membros), g.codigo ?? '', g.is_mestre ? '' : org(g.origem)])]
     const csv = linhasCsv.map((l) => l.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
     const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a'); a.href = url; a.download = 'grupos.csv'; a.click(); URL.revokeObjectURL(url)
@@ -242,6 +232,8 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
     { key: 'todos', label: 'Todos', count: baseDoEscopo.length },
     { key: 'grupos', label: 'Grupos', count: baseDoEscopo.filter((g) => !g.is_mestre).length },
     { key: 'pastas', label: 'Pastas', count: baseDoEscopo.filter((g) => g.is_mestre).length },
+    { key: 'guru', label: 'Guru', count: baseDoEscopo.filter((g) => g.origem === 'guru').length },
+    { key: 'curseduca', label: 'Curseduca', count: baseDoEscopo.filter((g) => g.origem === 'curseduca').length },
     { key: 'vazios', label: 'Sem membros', count: baseDoEscopo.filter((g) => (g.is_mestre ? membrosDe(g.id) === 0 : g.membros === 0)).length },
   ]
 
@@ -311,9 +303,9 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
             </div>
             <div className="mt-2 space-y-1.5 border-t pt-3">
               <span className="px-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Legenda</span>
-              <div className="flex items-center gap-2 px-1.5 text-xs text-muted-foreground"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Ativo com matrículas</div>
-              <div className="flex items-center gap-2 px-1.5 text-xs text-muted-foreground"><span className="h-2 w-2 rounded-full bg-amber-500" /> Ativo sem membros</div>
-              <div className="flex items-center gap-2 px-1.5 text-xs text-muted-foreground"><span className="h-2 w-2 rounded-full bg-muted-foreground" /> Importado</div>
+              <div className="flex items-center gap-2 px-1.5 text-xs text-muted-foreground"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Com matrículas</div>
+              <div className="flex items-center gap-2 px-1.5 text-xs text-muted-foreground"><span className="h-2 w-2 rounded-full bg-amber-500" /> Sem membros</div>
+              <div className="flex items-center gap-2 px-1.5 text-xs text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary" /> Guru · <span className="h-2 w-2 rounded-full bg-emerald-500" /> Curseduca</div>
             </div>
           </aside>
 
@@ -358,7 +350,7 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
 
             {/* Cabeçalho da tabela */}
             <div className="overflow-x-auto">
-              <div className="min-w-[860px]">
+              <div className="min-w-[720px]">
                 <div style={{ gridTemplateColumns: GRID }}
                   className="grid items-center gap-2 border-b bg-muted/40 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                   <div className="flex justify-center">
@@ -369,7 +361,6 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
                   <div>Grupo / Pasta</div>
                   <div>Origem</div>
                   <div>Membros</div>
-                  <div>Criado</div>
                   <div className="pr-1 text-right">Ações</div>
                 </div>
 
@@ -387,7 +378,6 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
                     alvoAtivo={alvo === g.id}
                     nGrupos={g.is_mestre ? comunsDentro(g.id) : 0}
                     nMembros={g.is_mestre ? membrosDe(g.id) : g.membros}
-                    criado={tempoRel(g.criado_em)}
                     dragProps={arvore ? dragProps(g) : undefined}
                     arrastandoId={arrastando?.id ?? null}
                     dropHandlers={arvore && g.is_mestre ? {
@@ -467,10 +457,15 @@ function Kpi({ label, valor, hint, destaque }: { label: string; valor: string; h
   )
 }
 
-function OrigemBadge({ codigo }: { codigo?: string | null }) {
-  if (codigo) return (
+function OrigemBadge({ origem }: { origem?: Origem }) {
+  if (origem === 'guru') return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/12 py-0.5 pl-1 pr-2.5 text-[11px] font-bold text-primary">
+      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary font-mono text-[9px] text-primary-foreground">G</span> Guru
+    </span>
+  )
+  if (origem === 'curseduca') return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/12 py-0.5 pl-1 pr-2.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 font-mono text-[9px] text-white">I</span> Importado
+      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 font-mono text-[9px] text-white">C</span> Curseduca
     </span>
   )
   return (
@@ -481,18 +476,18 @@ function OrigemBadge({ codigo }: { codigo?: string | null }) {
 }
 
 function LinhaGrupo({
-  g, depth, arvore, marcado, onSel, aberto, onToggle, alvoAtivo, nGrupos, nMembros, criado,
+  g, depth, arvore, marcado, onSel, aberto, onToggle, alvoAtivo, nGrupos, nMembros,
   dragProps, arrastandoId, dropHandlers, onNovaSub, onEdit, onMove, onDelete,
 }: {
   g: Grupo; depth: number; arvore: boolean; marcado: boolean; onSel: () => void
-  aberto: boolean; onToggle: () => void; alvoAtivo: boolean; nGrupos: number; nMembros: number; criado: string
+  aberto: boolean; onToggle: () => void; alvoAtivo: boolean; nGrupos: number; nMembros: number
   dragProps?: React.HTMLAttributes<HTMLDivElement> & { draggable: boolean }
   arrastandoId: string | null
   dropHandlers?: Pick<React.HTMLAttributes<HTMLDivElement>, 'onDragOver' | 'onDragLeave' | 'onDrop'>
   onNovaSub: () => void; onEdit: () => void; onMove: () => void; onDelete: () => void
 }) {
   const cor = g.cor ?? 'var(--muted-foreground)'
-  const dotCor = g.is_mestre ? '' : (nMembros > 0 ? 'bg-emerald-500' : g.codigo ? 'bg-muted-foreground' : 'bg-amber-500')
+  const dotCor = g.is_mestre ? '' : (nMembros > 0 ? 'bg-emerald-500' : 'bg-amber-500')
   return (
     <div {...dropHandlers} className={cn('transition-colors', alvoAtivo && 'bg-primary/10 ring-2 ring-inset ring-primary')}>
       <div {...(dragProps ?? {})} style={{ gridTemplateColumns: GRID }}
@@ -532,16 +527,13 @@ function LinhaGrupo({
         </div>
 
         {/* Origem */}
-        <div className="min-w-0">{!g.is_mestre && <OrigemBadge codigo={g.codigo} />}</div>
+        <div className="min-w-0">{!g.is_mestre && <OrigemBadge origem={g.origem} />}</div>
 
         {/* Membros */}
         <div className="flex items-center gap-1.5">
           <Users className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="font-mono text-[12.5px] font-medium text-foreground/80">{nf(nMembros)}</span>
         </div>
-
-        {/* Criado */}
-        <div className="text-xs text-muted-foreground">{criado}</div>
 
         {/* Ações */}
         <div className="flex items-center justify-end gap-0.5">

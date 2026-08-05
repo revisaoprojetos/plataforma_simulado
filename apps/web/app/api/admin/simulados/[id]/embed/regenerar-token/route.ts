@@ -6,6 +6,9 @@ interface Params {
   params: Promise<{ id: string }>
 }
 
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function POST(_request: NextRequest, { params }: Params) {
   const { id } = await params
 

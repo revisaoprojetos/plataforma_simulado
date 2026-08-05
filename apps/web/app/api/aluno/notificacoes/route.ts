@@ -3,6 +3,9 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
 
 // GET /api/aluno/notificacoes — notificações do aluno logado (30 mais recentes) + contagem não lidas.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const s = await getSessaoAluno()
   if (!s) return NextResponse.json({ items: [], naoLidas: 0 })

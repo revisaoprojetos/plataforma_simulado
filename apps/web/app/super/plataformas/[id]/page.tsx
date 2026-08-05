@@ -36,13 +36,20 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
   const salvarTema = salvarTemaSuperAction.bind(null, id)
   const salvarEmbed = salvarEmbedConfigAction.bind(null, id)
 
-  const [{ count: usuarios }, { count: estudantes }, { count: simulados }, rbac, bannersRes, embedRow] = await Promise.all([
+  // Contagens, RBAC, banners, embed e destinos de banner — tudo depende só de `id`, num só round-trip.
+  const [
+    { count: usuarios }, { count: estudantes }, { count: simulados }, rbac, bannersRes, embedRow,
+    pastasDest, simsDest,
+  ] = await Promise.all([
     svc.from('simulado_tenant_acessos').select('user_id', { count: 'exact', head: true }).eq('tenant_id', id),
     svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('tenant_id', id),
     svc.from('simulado_simulados').select('id', { count: 'exact', head: true }).eq('tenant_id', id),
     listarAdministradores(id),
     svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor, ativo, ordem').eq('tenant_id', id).order('ordem', { ascending: true }).order('criado_em', { ascending: false }).then((r) => r.data ?? [], () => []),
     svc.from('simulado_embed_config').select('ativo, origens_permitidas, metodo_identificacao, otp_email').eq('tenant_id', id).maybeSingle().then((r) => r.data, () => null),
+    // Destinos rápidos para linkar um banner: pastas (folders) + simulados publicados. Tolerante ao schema.
+    svc.from('simulado_pastas').select('id, nome, folder_area').eq('tenant_id', id).eq('is_folder', true).eq('deletado', false).order('nome', { ascending: true }).then((r: any) => (r.data ?? []).filter((f: any) => f.folder_area !== 'caderno'), () => []),
+    svc.from('simulado_simulados').select('id, titulo, embed_token').eq('tenant_id', id).eq('deletado', false).eq('status', 'publicado').order('created_at', { ascending: false }).limit(60).then((r: any) => r.data ?? [], () => []),
   ])
 
   const embedConfig = {
@@ -51,12 +58,6 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
     metodo_identificacao: ((embedRow as any)?.metodo_identificacao as string | null) ?? 'email_cpf',
     otp_email: (embedRow as any)?.otp_email ?? false,
   }
-
-  // Destinos rápidos para linkar um banner: pastas (folders) + simulados publicados. Tolerante ao schema.
-  const [pastasDest, simsDest] = await Promise.all([
-    svc.from('simulado_pastas').select('id, nome, folder_area').eq('tenant_id', id).eq('is_folder', true).eq('deletado', false).order('nome', { ascending: true }).then((r: any) => (r.data ?? []).filter((f: any) => f.folder_area !== 'caderno'), () => []),
-    svc.from('simulado_simulados').select('id, titulo, embed_token').eq('tenant_id', id).eq('deletado', false).eq('status', 'publicado').order('created_at', { ascending: false }).limit(60).then((r: any) => r.data ?? [], () => []),
-  ])
   const destinosBanner = dedupePorLabel([
     ...(pastasDest as any[]).map((f) => ({ label: f.nome as string, href: `/aluno/simulado?pasta=${f.id}`, grupo: 'Pastas' })),
     ...(simsDest as any[]).filter((s) => s.embed_token).map((s) => ({ label: s.titulo as string, href: `/simulado/${s.embed_token}`, grupo: 'Simulados' })),

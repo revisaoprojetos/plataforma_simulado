@@ -128,6 +128,8 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
   const avulsos = itens.filter((s) => !s.grupoId)
   const contar = (gid: string) => itens.filter((s) => s.grupoId === gid).length
   const recent = recentes ?? []
+  // 1º recente que tem caderno de questões → recebe o balão de dica do botão de download.
+  const dicaId = recent.find((s) => s.enunciadoUrl)?.id
 
   return (
     <div className="space-y-6">
@@ -135,7 +137,7 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold"><Play className="h-4 w-4 text-primary" /> Simulados recentes</h2>
           <FileiraHorizontal>
-            {recent.map((s) => <div key={s.id} className={FILEIRA_BASIS}><CardSimulado s={s} /></div>)}
+            {recent.map((s) => <div key={s.id} className={FILEIRA_BASIS}><CardSimulado s={s} dica={s.id === dicaId} /></div>)}
           </FileiraHorizontal>
         </section>
       )}

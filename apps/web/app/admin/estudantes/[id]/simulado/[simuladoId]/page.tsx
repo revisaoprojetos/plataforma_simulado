@@ -20,40 +20,39 @@ export default async function EstudanteSimuladoPage({ params }: { params: Promis
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
-  const [{ data: est }, { data: sim }] = await Promise.all([
-    svc.from('simulado_estudantes').select('id, nome').eq('id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle(),
-    svc.from('simulado_simulados').select('id, titulo, status, regras').eq('id', simuladoId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle(),
-  ])
-  if (!est || !sim) notFound()
+  const TID = tenantId ?? '00000000-0000-0000-0000-000000000000'
+  type Visual = { cor: string | null; icone: string | null; capa: string | null; bancoId: string | null }
 
-  // Tentativas (sessões finalizadas, exceto teste) em ordem cronológica.
-  const { data: sessoes } = await svc
-    .from('simulado_sessoes_prova')
-    .select('id, tentativa_num, nota, posicao_ranking, iniciado_em, finalizado_em')
-    .eq('estudante_id', id).eq('simulado_id', simuladoId).eq('is_teste', false).eq('status', 'finalizada').eq('deletado', false)
-    .order('iniciado_em', { ascending: true })
-  const finalizadas = (sessoes ?? []) as any[]
-
-  // Banco (capa/cor/ícone) do simulado — mesma imagem do card do banco de questões.
-  let visual = { cor: null as string | null, icone: null as string | null, capa: null as string | null, bancoId: null as string | null }
-  {
-    const { data: pq } = await svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', simuladoId)
-    const qIds = [...new Set((pq ?? []).map((r: any) => r.questao_id).filter(Boolean))]
-    if (qIds.length) {
+  // Batch único: estudante, simulado, tentativas, visual do banco e tipo — tudo depende só de
+  // (id, simuladoId, tenant), então roda em paralelo (o `visual` é um encadeamento próprio).
+  const [{ data: est }, { data: sim }, { data: sessoes }, visual, tipo] = await Promise.all([
+    svc.from('simulado_estudantes').select('id, nome').eq('id', id).eq('tenant_id', TID).maybeSingle(),
+    svc.from('simulado_simulados').select('id, titulo, status, regras').eq('id', simuladoId).eq('tenant_id', TID).maybeSingle(),
+    svc.from('simulado_sessoes_prova')
+      .select('id, tentativa_num, nota, posicao_ranking, iniciado_em, finalizado_em')
+      .eq('estudante_id', id).eq('simulado_id', simuladoId).eq('is_teste', false).eq('status', 'finalizada').eq('deletado', false)
+      .order('iniciado_em', { ascending: true }),
+    // Banco (capa/cor/ícone) do simulado — mesma imagem do card do banco de questões.
+    (async (): Promise<Visual> => {
+      const vazio: Visual = { cor: null, icone: null, capa: null, bancoId: null }
+      const { data: pq } = await svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', simuladoId)
+      const qIds = [...new Set((pq ?? []).map((r: any) => r.questao_id).filter(Boolean))]
+      if (!qIds.length) return vazio
       const { data: qp } = await svc.from('simulado_questao_pasta').select('pasta_id').in('questao_id', qIds)
       const cont = new Map<string, number>()
       for (const r of qp ?? []) cont.set((r as any).pasta_id, (cont.get((r as any).pasta_id) ?? 0) + 1)
       const melhor = [...cont.entries()].sort((a, b) => b[1] - a[1])[0]
-      if (melhor) {
-        try {
-          const { data: p } = await svc.from('simulado_pastas').select('id, cor, icone, capa_url').eq('id', melhor[0]).maybeSingle()
-          if (p) visual = { cor: (p as any).cor ?? null, icone: (p as any).icone ?? null, capa: (p as any).capa_url ?? null, bancoId: (p as any).id }
-        } catch { /* colunas podem não existir */ }
-      }
-    }
-  }
-
-  const tipo = (await tiposDeSimulados(svc, [simuladoId])).get(simuladoId) ?? null
+      if (!melhor) return vazio
+      try {
+        const { data: p } = await svc.from('simulado_pastas').select('id, cor, icone, capa_url').eq('id', melhor[0]).maybeSingle()
+        if (p) return { cor: (p as any).cor ?? null, icone: (p as any).icone ?? null, capa: (p as any).capa_url ?? null, bancoId: (p as any).id }
+      } catch { /* colunas podem não existir */ }
+      return vazio
+    })(),
+    tiposDeSimulados(svc, [simuladoId]).then((m) => m.get(simuladoId) ?? null),
+  ])
+  if (!est || !sim) notFound()
+  const finalizadas = (sessoes ?? []) as any[]
   const Icon = iconeBanco(visual.icone)
   const c = visual.cor ?? '#6d28d9'
 

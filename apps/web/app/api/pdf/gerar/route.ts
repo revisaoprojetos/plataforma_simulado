@@ -7,6 +7,9 @@ import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
 
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export const runtime = 'nodejs'
 
 // Base interna que o Gotenberg usa p/ buscar a página. Em produção (docker) é

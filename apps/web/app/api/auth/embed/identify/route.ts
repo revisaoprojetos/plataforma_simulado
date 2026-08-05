@@ -51,6 +51,9 @@ async function bloqueio(
   )
 }
 
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   let body: RequestBody
 

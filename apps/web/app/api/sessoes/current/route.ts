@@ -5,6 +5,9 @@ import { resolverHudConfig } from '@/lib/hud/resolve-hud'
 
 // GET /api/sessoes/current?token={embed_token}&st={sessao_id}
 // Carrega o estado da sessão para o runner do aluno.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const st = searchParams.get('st') // sessao_id (UUID)

@@ -30,7 +30,6 @@ import {
   Trophy,
   Star,
   HelpCircle,
-  DownloadCloud,
   Webhook,
   Share2,
   Plug,
@@ -63,6 +62,8 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { NotificationBell } from '@/components/admin/notification-bell'
 import { AjudaButton } from '@/components/admin/ajuda-center'
 import { logoutAction } from '@/app/login/actions'
+import { LoginLoading } from '@/components/aluno/login-loading'
+import { LOGIN_DEFAULT, type LoginConfig } from '@/lib/login-config'
 
 type IconType = React.ComponentType<{ className?: string; style?: React.CSSProperties }>
 
@@ -129,7 +130,6 @@ const navGroups: NavGroup[] = [
       { label: 'Relatório Simulado', href: '/admin/relatorios/simulados', icon: ClipboardList, perm: 'relatorios:view' },
       { label: 'Relatório Disciplina', href: '/admin/relatorios/disciplinas', icon: BookOpen, perm: 'relatorios:view' },
       { label: 'Relatório Estudantes', href: '/admin/relatorios/estudantes', icon: GraduationCap, perm: 'relatorios:view' },
-      { label: 'Cadernos baixados', href: '/admin/relatorios/cadernos', icon: DownloadCloud, perm: 'relatorios:view' },
       { label: 'Ranking', href: '/admin/relatorios/ranking', icon: Trophy, perm: 'relatorios:view' },
       { label: 'NPS / Satisfação', href: '/admin/relatorios/nps', icon: Star, perm: 'relatorios:view' },
     ],
@@ -196,8 +196,9 @@ function filtroLogo(f?: string): string | undefined {
   return undefined
 }
 
-export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', isSuperAdmin = false, userName = 'Administrador', userEmail }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; isSuperAdmin?: boolean; userName?: string; userEmail?: string | null }) {
+export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', isSuperAdmin = false, userName = 'Administrador', userEmail, loginConfig }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; isSuperAdmin?: boolean; userName?: string; userEmail?: string | null; loginConfig?: LoginConfig }) {
   const pathname = usePathname()
+  const [saindo, setSaindo] = useState(false)
   const search = useSearchParams()
   const can = useCan()
   const iniciais = userName.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || 'A'
@@ -220,6 +221,12 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
   }
 
   return (
+    <>
+    {saindo && (
+      <div className="fixed inset-0 z-[200]">
+        <LoginLoading config={loginConfig ?? LOGIN_DEFAULT} plataforma={nome} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} />
+      </div>
+    )}
     <Sidebar className="border-sidebar-border">
       <SidebarHeader className="flex h-14 flex-row items-center border-b border-sidebar-border px-4">
         <Link href="/admin" className="flex min-w-0 items-center gap-2">
@@ -314,11 +321,12 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
             className="inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[color:var(--sidebar-accent)]">
             <Building2 className="h-4 w-4" />
           </button>
-          <button type="button" onClick={() => { toast.success('Saindo… logout realizado.'); logoutAction() }} className={cn(btnFooter, 'flex items-center justify-center gap-1.5')}>
+          <button type="button" onClick={() => { setSaindo(true); setTimeout(() => { void logoutAction() }, 1100) }} className={cn(btnFooter, 'flex items-center justify-center gap-1.5')}>
             <LogOut className="h-3.5 w-3.5" /> Sair
           </button>
         </div>
       </SidebarFooter>
     </Sidebar>
+    </>
   )
 }

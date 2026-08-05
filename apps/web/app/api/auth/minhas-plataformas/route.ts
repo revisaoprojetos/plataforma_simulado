@@ -7,6 +7,9 @@ const comoLogo = (v: unknown) => (typeof v === 'string' && /^(https?:|data:image
 // GET /api/auth/minhas-plataformas — plataformas que o ADMIN logado pode acessar
 // (para o seletor "Trocar de plataforma"). Super-admin global vê todas as ativas.
 // Com o cookie compartilhado (Fase 0), trocar = navegar pro subdomínio já autenticado.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

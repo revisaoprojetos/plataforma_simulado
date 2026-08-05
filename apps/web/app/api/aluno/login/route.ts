@@ -7,6 +7,9 @@ import { registrarAudit } from '@/lib/audit'
 import { getManutencaoSistema, emManutencaoAgora } from '@/lib/sistema/manutencao'
 
 // POST /api/aluno/login — login leve persistente do aluno (sem senha).
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   let body: { email?: string; cpf?: string; telefone?: string }
   try {

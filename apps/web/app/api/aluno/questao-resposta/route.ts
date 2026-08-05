@@ -4,6 +4,9 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 
 // POST /api/aluno/questao-resposta — registra UMA tentativa avulsa (prática no Banco de Questões).
 // Cada tentativa vira um registro (histórico) — o aluno pode refazer quantas vezes quiser.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   const sessao = await getSessaoAluno()
   if (!sessao) return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })

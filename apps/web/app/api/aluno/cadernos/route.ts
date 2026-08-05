@@ -3,6 +3,9 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 
 // GET /api/aluno/cadernos — lista os cadernos do aluno com contagem de questões.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const sessao = await getSessaoAluno()
   if (!sessao) return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })

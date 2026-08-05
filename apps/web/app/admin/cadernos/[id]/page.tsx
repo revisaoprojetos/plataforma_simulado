@@ -16,28 +16,29 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
   const svc = createAdminClient()
 
   const tid = access.tenantId ?? '00000000-0000-0000-0000-000000000000'
-  // Tolerante à coluna pasta_id (pode não ter migrado ainda).
-  let caderno: any = null
-  {
-    const r = await svc.from('simulado_cadernos_designer').select('id, nome, config, pasta_id').eq('id', id).eq('tenant_id', tid).maybeSingle()
-    if (r.error && /pasta_id|column/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_cadernos_designer').select('id, nome, config').eq('id', id).eq('tenant_id', tid).maybeSingle()
-      caderno = r2.data
-    } else caderno = r.data
-  }
+
+  // Caderno (tolerante à coluna pasta_id), lista de bancos do tenant e tema — independentes entre si.
+  const [caderno, bancos, temaRes] = await Promise.all([
+    (async (): Promise<any> => {
+      const r = await svc.from('simulado_cadernos_designer').select('id, nome, config, pasta_id').eq('id', id).eq('tenant_id', tid).maybeSingle()
+      if (r.error && /pasta_id|column/i.test(r.error.message)) {
+        const r2 = await svc.from('simulado_cadernos_designer').select('id, nome, config').eq('id', id).eq('tenant_id', tid).maybeSingle()
+        return r2.data
+      }
+      return r.data
+    })(),
+    // Bancos (pastas is_folder=false) para o seletor do header — exclui as pastas-folder.
+    (async (): Promise<{ id: string; nome: string }[]> => {
+      const r = await svc.from('simulado_pastas').select('id, nome, is_folder').eq('tenant_id', tid).order('nome')
+      if (r.error) return ((await svc.from('simulado_pastas').select('id, nome').eq('tenant_id', tid).order('nome')).data ?? []) as any
+      return (r.data ?? []).filter((b: any) => !b.is_folder).map((b: any) => ({ id: b.id, nome: b.nome }))
+    })(),
+    getTenantTheme(),
+  ])
   if (!caderno) notFound()
   const pastaId: string | null = (caderno as any).pasta_id ?? null
-
   const config = (caderno.config ?? {}) as any
   const bancoId: string | null = config.bancoId ?? null
-
-  // Bancos (pastas is_folder=false) do tenant para o seletor do header — exclui as pastas-folder.
-  let bancos: { id: string; nome: string }[] = []
-  {
-    const r = await svc.from('simulado_pastas').select('id, nome, is_folder').eq('tenant_id', tid).order('nome')
-    if (r.error) bancos = ((await svc.from('simulado_pastas').select('id, nome').eq('tenant_id', tid).order('nome')).data ?? []) as any
-    else bancos = (r.data ?? []).filter((b: any) => !b.is_folder).map((b: any) => ({ id: b.id, nome: b.nome }))
-  }
   const bancoNome = bancoId ? bancos.find((b) => b.id === bancoId)?.nome ?? null : null
 
   // Questões: do banco vinculado (se houver) ou publicadas do tenant.
@@ -58,11 +59,15 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
       .order('created_at', { ascending: false }))
   }
 
-  // Alternativas de TODAS as questões do preview (para navegar por elas no repetidor).
+  // Alternativas do preview + mala direta (alunos do banco) em paralelo — independentes entre si.
+  // Preview do editor: só os primeiros alunos populam o seletor (não os milhares do banco).
   const amostraIds = (questoes ?? []).map((q: any) => q.id)
-  const alts = amostraIds.length
-    ? await fetchAllByIn<any>(amostraIds, (chunk) => svc.from('simulado_alternativas').select('questao_id, texto, ordem, correta, comentario, lei').in('questao_id', chunk).eq('tenant_id', tid).order('questao_id', { ascending: true }))
-    : []
+  const [alts, registros] = await Promise.all([
+    amostraIds.length
+      ? fetchAllByIn<any>(amostraIds, (chunk) => svc.from('simulado_alternativas').select('questao_id, texto, ordem, correta, comentario, lei').in('questao_id', chunk).eq('tenant_id', tid).order('questao_id', { ascending: true }))
+      : Promise.resolve([] as any[]),
+    bancoId ? carregarRegistros(svc, tid, bancoId, bancoNome ?? caderno.nome, undefined, undefined, 500) : Promise.resolve([] as any[]),
+  ])
   const altMap = new Map<string, any[]>()
   for (const a of alts ?? []) { const arr = altMap.get(a.questao_id) ?? []; arr.push(a); altMap.set(a.questao_id, arr) }
 
@@ -81,9 +86,7 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
     },
   }
 
-  // Mala direta: alunos do banco vinculado, com suas variáveis reais.
-  // Preview do editor: só os primeiros alunos populam o seletor (não os milhares do banco).
-  const registros = bancoId ? await carregarRegistros(svc, access.tenantId ?? '00000000-0000-0000-0000-000000000000', bancoId, bancoNome ?? caderno.nome, undefined, undefined, 500) : []
+  // Mala direta (registros) já resolvida acima em paralelo com as alternativas.
   if (registros.length) previewData.vars = { ...previewData.vars, ...registros[0].vars }
 
   previewData.gabaritoLiberado = true // no editor a correção sempre aparece (para desenhar)
@@ -96,8 +99,8 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
     previewData.questaoAtual = base.questaoAtual
   }
 
-  // Branding do sistema (logo + nome) para o preview do HUD refletir a config.
-  const { tema, tenantNome } = await getTenantTheme()
+  // Branding do sistema (logo + nome) para o preview do HUD refletir a config. Tema já resolvido acima.
+  const { tema, tenantNome } = temaRes
   const ti = (tema ?? {}) as any
   const branding = {
     nome: ti.nome_site ?? tenantNome ?? 'Simulado',

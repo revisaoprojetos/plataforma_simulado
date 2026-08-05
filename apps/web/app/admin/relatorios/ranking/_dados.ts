@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { normalizarCriterios, idadeEmAnos, type CriteriosRanking, type EntradaRanking } from '@/lib/simulado/ranking'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
+import { rankingAgregadoSql } from 'data'
 
 type GrupoBanco = { id: string; nome: string; disciplinas: string[] }
 export type DadosRanking = {
@@ -56,43 +57,44 @@ async function _montarRankingSimulado(svc: SupabaseClient, simId: string, tid: s
   for (const qid of qIds) { const gid = grupoDaDisc(discDeQ.get(qid) ?? ''); if (gid) contGrupo.set(gid, (contGrupo.get(gid) ?? 0) + 1) }
   const gruposView = grupos.map((g) => ({ id: g.id, nome: g.nome, count: contGrupo.get(g.id) ?? 0 }))
 
-  // Sessões finalizadas (uma por aluno: a de maior nota). fetchAll: sem isso, simulados com
-  // 1000+ finalizadas truncariam o ranking (teto de ~1000 do PostgREST).
-  const sess = await fetchAll<any>(() => svc.from('simulado_sessoes_prova')
-    .select('id, estudante_id, nota, status, iniciado_em, finalizado_em')
-    .eq('simulado_id', simId).eq('tenant_id', tid).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada').order('id'))
-  const melhorSess = new Map<string, any>()
-  for (const s of sess) {
-    const cur = melhorSess.get(s.estudante_id)
-    if (!cur || (Number(s.nota ?? -1) > Number(cur.nota ?? -1))) melhorSess.set(s.estudante_id, s)
-  }
-  const sessEscolhidas = [...melhorSess.values()]
-  const sessIds = sessEscolhidas.map((s) => s.id)
+  // Aluno unificado (uma linha por aluno = melhor sessão). Preferimos o SQL AGREGADO (1 query,
+  // agrega acertos/disciplina no banco) e caímos no PostgREST (sessões+respostas+estudantes) se
+  // o SQL direto não estiver disponível.
+  type Aluno = { estId: string; nome: string; email: string | null; classificacao: string | null; nasc: string | null; nota: number | null; dataIso: string | null; tempoSeg: number | null; acertos: number; total: number; porGrupo: Record<string, number> }
+  const tempoDe = (ini: any, fim: any): number | null => { const a = ini ? new Date(ini).getTime() : null; const b = fim ? new Date(fim).getTime() : null; return a != null && b != null && b >= a ? Math.round((b - a) / 1000) : null }
+  const isoDe = (v: any): string | null => (v == null ? null : v instanceof Date ? v.toISOString() : String(v))
 
-  // Respostas dessas sessões → acerto por grupo + total.
-  const acTotal = new Map<string, number>(), ttTotal = new Map<string, number>()
-  const acGrupo = new Map<string, Record<string, number>>()
-  if (sessIds.length) {
-    const resp = await fetchAllByIn<any>(sessIds, (chunk) =>
-      svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).eq('tenant_id', tid).order('id'))
-    const estDaSess = new Map<string, string>(sessEscolhidas.map((s) => [s.id, s.estudante_id]))
-    for (const r of resp as any[]) {
-      const est = estDaSess.get(r.sessao_id); if (!est) continue
-      ttTotal.set(est, (ttTotal.get(est) ?? 0) + 1)
-      if (r.correta) {
-        acTotal.set(est, (acTotal.get(est) ?? 0) + 1)
-        const gid = grupoDaDisc(discDeQ.get(r.questao_id) ?? '')
-        if (gid) { const g = acGrupo.get(est) ?? {}; g[gid] = (g[gid] ?? 0) + 1; acGrupo.set(est, g) }
+  let alunos: Aluno[]
+  const sqlRows = await rankingAgregadoSql(simId, tid)
+  if (sqlRows) {
+    alunos = sqlRows.map((r) => {
+      const porGrupo: Record<string, number> = {}
+      for (const [disc, ac] of Object.entries(r.por_disc ?? {})) { const gid = grupoDaDisc(disc); if (gid) porGrupo[gid] = (porGrupo[gid] ?? 0) + Number(ac) }
+      return { estId: r.estudante_id, nome: r.nome ?? 'Estudante', email: r.email ?? null, classificacao: r.classificacao ?? null, nasc: r.data_nascimento ?? null, nota: r.nota != null ? Number(r.nota) : null, dataIso: isoDe(r.iniciado_em), tempoSeg: tempoDe(r.iniciado_em, r.finalizado_em), acertos: Number(r.acertos), total: Number(r.total), porGrupo }
+    })
+  } else {
+    const sess = await fetchAll<any>(() => svc.from('simulado_sessoes_prova')
+      .select('id, estudante_id, nota, status, iniciado_em, finalizado_em')
+      .eq('simulado_id', simId).eq('tenant_id', tid).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada').order('id'))
+    const melhorSess = new Map<string, any>()
+    for (const s of sess) { const cur = melhorSess.get(s.estudante_id); if (!cur || (Number(s.nota ?? -1) > Number(cur.nota ?? -1))) melhorSess.set(s.estudante_id, s) }
+    const sessEscolhidas = [...melhorSess.values()]
+    const sessIds = sessEscolhidas.map((s) => s.id)
+    const acTotal = new Map<string, number>(), ttTotal = new Map<string, number>(), acGrupo = new Map<string, Record<string, number>>()
+    if (sessIds.length) {
+      const resp = await fetchAllByIn<any>(sessIds, (chunk) =>
+        svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).eq('tenant_id', tid).order('id'))
+      const estDaSess = new Map<string, string>(sessEscolhidas.map((s) => [s.id, s.estudante_id]))
+      for (const r of resp as any[]) {
+        const est = estDaSess.get(r.sessao_id); if (!est) continue
+        ttTotal.set(est, (ttTotal.get(est) ?? 0) + 1)
+        if (r.correta) { acTotal.set(est, (acTotal.get(est) ?? 0) + 1); const gid = grupoDaDisc(discDeQ.get(r.questao_id) ?? ''); if (gid) { const g = acGrupo.get(est) ?? {}; g[gid] = (g[gid] ?? 0) + 1; acGrupo.set(est, g) } }
       }
     }
-  }
-
-  // Estudantes (nome, e-mail, classificação, nascimento).
-  const estIds = sessEscolhidas.map((s) => s.estudante_id)
-  const infoEst = new Map<string, { nome: string; email: string | null; classificacao: string | null; passaporte: boolean; nasc: string | null }>()
-  if (estIds.length) {
-    const ests = await fetchAllByIn<any>(estIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, classificacao, data_nascimento').in('id', chunk).eq('tenant_id', tid))
-    for (const e of ests) infoEst.set(e.id, { nome: e.nome ?? 'Estudante', email: e.email ?? null, classificacao: e.classificacao ?? null, passaporte: e.classificacao === 'passaporte', nasc: e.data_nascimento ?? null })
+    const estIds = sessEscolhidas.map((s) => s.estudante_id)
+    const infoEst = new Map<string, any>()
+    if (estIds.length) { const ests = await fetchAllByIn<any>(estIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, classificacao, data_nascimento').in('id', chunk).eq('tenant_id', tid)); for (const e of ests) infoEst.set(e.id, e) }
+    alunos = sessEscolhidas.map((s) => { const info = infoEst.get(s.estudante_id); return { estId: s.estudante_id, nome: info?.nome ?? 'Estudante', email: info?.email ?? null, classificacao: info?.classificacao ?? null, nasc: info?.data_nascimento ?? null, nota: s.nota != null ? Number(s.nota) : null, dataIso: isoDe(s.iniciado_em), tempoSeg: tempoDe(s.iniciado_em, s.finalizado_em), acertos: acTotal.get(s.estudante_id) ?? 0, total: ttTotal.get(s.estudante_id) ?? 0, porGrupo: acGrupo.get(s.estudante_id) ?? {} } })
   }
 
   // Impactos de anulação/troca (re-correção): nota_antes por estudante. Tabelas podem estar vazias.
@@ -105,25 +107,16 @@ async function _montarRankingSimulado(svc: SupabaseClient, simId: string, tid: s
     for (const im of (imps ?? []) as any[]) { if (im.nota_antes != null && !impacto.has(im.estudante_id)) { impacto.set(im.estudante_id, Number(im.nota_antes)); afetados++ } }
   }
 
-  const sessInfo = new Map<string, { data: string | null; tempoSeg: number | null }>(sessEscolhidas.map((s) => {
-    const ini = s.iniciado_em ? new Date(s.iniciado_em).getTime() : null
-    const fim = s.finalizado_em ? new Date(s.finalizado_em).getTime() : null
-    const tempoSeg = ini != null && fim != null && fim >= ini ? Math.round((fim - ini) / 1000) : null
-    return [s.estudante_id, { data: s.iniciado_em ?? null, tempoSeg }]
-  }))
-  const entradas: EntradaRanking[] = sessEscolhidas.map((s) => {
-    const est = s.estudante_id
-    const info = infoEst.get(est)
-    const pont = s.nota != null ? Number(s.nota) : (acTotal.get(est) ?? 0)
-    const afetado = impacto.has(est)
-    const si = sessInfo.get(est)
+  const entradas: EntradaRanking[] = alunos.map((al) => {
+    const pont = al.nota != null ? al.nota : al.acertos
+    const afetado = impacto.has(al.estId)
     return {
-      estudanteId: est, nome: info?.nome ?? 'Estudante', email: info?.email ?? null, data: si?.data ?? null,
-      classificacao: info?.classificacao ?? null,
-      pontuacao: pont, pontuacaoSem: afetado ? impacto.get(est)! : pont, afetado,
-      acertos: acTotal.get(est) ?? 0, total: ttTotal.get(est) ?? 0,
-      porGrupo: acGrupo.get(est) ?? {}, passaporte: !!info?.passaporte, idade: idadeEmAnos(info?.nasc, agoraIso),
-      tempoSeg: si?.tempoSeg ?? null,
+      estudanteId: al.estId, nome: al.nome, email: al.email, data: al.dataIso,
+      classificacao: al.classificacao,
+      pontuacao: pont, pontuacaoSem: afetado ? impacto.get(al.estId)! : pont, afetado,
+      acertos: al.acertos, total: al.total,
+      porGrupo: al.porGrupo, passaporte: al.classificacao === 'passaporte', idade: idadeEmAnos(al.nasc, agoraIso),
+      tempoSeg: al.tempoSeg,
     }
   })
 

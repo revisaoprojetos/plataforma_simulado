@@ -2,6 +2,7 @@
 // editável no console. Vale para a tela do aluno e a do admin (mesma linguagem visual).
 
 export type LoginTemplate = 'split' | 'central' | 'hero' | 'vitrine' | 'cartao'
+export type LoginEntrada = 'nenhuma' | 'fade' | 'subir' | 'descer' | 'zoom' | 'deslizar' | 'mola' | 'giro'
 export type LoginFundo = 'gradiente' | 'cor' | 'imagem'
 export type LoginLado = 'esquerda' | 'direita'
 export type CardEstilo = 'solido' | 'vidro'
@@ -13,10 +14,12 @@ export type CarModelo = 'spinner' | 'anel' | 'barra' | 'pulso' | 'pontos' | 'orb
 
 export type LoginConfig = {
   template: LoginTemplate     // estilo/layout da tela
+  animacaoEntrada: LoginEntrada // animação de aparecimento do card/formulário de login
   painelLado: LoginLado       // lado do painel da marca (só no template split)
   fundo: LoginFundo           // gradiente da marca | cor sólida | imagem
   fundoCor: string | null     // usado quando fundo = 'cor'
   fundoImagem: string | null  // usado quando fundo = 'imagem'
+  fundoImagemCores: boolean   // brilhos (auroras) da primária/destaque SOBRE a imagem de fundo
   corPrimaria: string | null  // OVERRIDE da cor primária do login (botões/acento); null = usa o tema
   corAccent: string | null    // OVERRIDE da cor de destaque (kicker/checks); null = usa o tema
   corTextoMarca: string | null // cor do TEXTO do painel da marca (separada do fundo); null = branco
@@ -67,10 +70,12 @@ export type LoginConfig = {
 
 export const LOGIN_DEFAULT: LoginConfig = {
   template: 'split',
+  animacaoEntrada: 'nenhuma',
   painelLado: 'esquerda',
   fundo: 'gradiente',
   fundoCor: null,
   fundoImagem: null,
+  fundoImagemCores: true,
   corPrimaria: null,
   corAccent: null,
   corTextoMarca: null,
@@ -127,12 +132,15 @@ export function resolverLoginConfig(raw: unknown): LoginConfig {
   if (!template && c.layout) template = c.layout === 'centro' ? 'central' : c.layout === 'full' ? 'hero' : 'split'
   const tpl: LoginTemplate = TEMPLATES.includes(template as LoginTemplate) ? (template as LoginTemplate) : 'split'
   const fundo: LoginFundo = c.fundo === 'cor' || c.fundo === 'imagem' ? c.fundo : 'gradiente'
+  const ent = (['nenhuma', 'fade', 'subir', 'descer', 'zoom', 'deslizar', 'mola', 'giro'] as LoginEntrada[])
   return {
     template: tpl,
+    animacaoEntrada: ent.includes(c.animacaoEntrada as LoginEntrada) ? (c.animacaoEntrada as LoginEntrada) : 'nenhuma',
     painelLado: c.painelLado === 'direita' ? 'direita' : 'esquerda',
     fundo,
     fundoCor: typeof c.fundoCor === 'string' ? c.fundoCor : null,
     fundoImagem: typeof c.fundoImagem === 'string' ? c.fundoImagem : null,
+    fundoImagemCores: c.fundoImagemCores !== false,
     corPrimaria: typeof c.corPrimaria === 'string' && c.corPrimaria ? c.corPrimaria : null,
     corAccent: typeof c.corAccent === 'string' && c.corAccent ? c.corAccent : null,
     corTextoMarca: typeof c.corTextoMarca === 'string' && c.corTextoMarca ? c.corTextoMarca : null,
@@ -179,6 +187,19 @@ export function resolverLoginConfig(raw: unknown): LoginConfig {
     carLogoTamanho: c.carLogoTamanho === 'p' || c.carLogoTamanho === 'g' ? c.carLogoTamanho : 'm',
   }
 }
+
+// Animações de aparecimento do card de login (classe CSS definida no <style> do formulário).
+const ENTRADA_CLASSE: Record<LoginEntrada, string> = {
+  nenhuma: '', fade: 'lge-fade', subir: 'lge-up', descer: 'lge-down',
+  zoom: 'lge-zoom', deslizar: 'lge-slide', mola: 'lge-pop', giro: 'lge-giro',
+}
+/** Classe da animação de entrada do card (vazio = nenhuma). */
+export const entradaClasse = (e: LoginEntrada): string => ENTRADA_CLASSE[e] ?? ''
+/** Opções (valor + rótulo) para o seletor no console. */
+export const ENTRADAS: [LoginEntrada, string][] = [
+  ['nenhuma', 'Nenhuma'], ['fade', 'Fade'], ['subir', 'Subir'], ['descer', 'Descer'],
+  ['zoom', 'Zoom'], ['deslizar', 'Deslizar'], ['mola', 'Mola'], ['giro', 'Giro 3D'],
+]
 
 /** Cor primária/accent efetivas (override do login OU token do tema). */
 export const corPrimariaLogin = (c: LoginConfig) => c.corPrimaria ?? 'var(--primary)'

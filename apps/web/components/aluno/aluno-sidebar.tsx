@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { toast } from 'sonner'
+import { LoginLoading } from '@/components/aluno/login-loading'
+import { type LoginConfig } from '@/lib/login-config'
 import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, LogOut } from 'lucide-react'
 import {
   Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -46,28 +48,35 @@ function iniciais(nome: string) {
 
 export function AlunoSidebar({
   logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none',
-  usuarioNome = 'Aluno', usuarioEmail, counts,
+  usuarioNome = 'Aluno', usuarioEmail, counts, loginConfig,
 }: {
   logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string
-  usuarioNome?: string; usuarioEmail?: string | null; counts?: Record<string, number>
+  usuarioNome?: string; usuarioEmail?: string | null; counts?: Record<string, number>; loginConfig: LoginConfig
 }) {
   const pathname = usePathname()
   const router = useRouter()
+  const [saindo, setSaindo] = useState(false)
   const ativo = (n: (typeof NAV)[number]) => (n.exact ? pathname === n.href : pathname.startsWith(n.href))
   const nav = NAV.filter((n) => !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(n.href)))
 
   async function sair() {
-    toast.success('Saindo… logout realizado.')
+    // Mostra a tela de carregamento (branded) na SAÍDA — dá tempo do login (imagem + animações)
+    // entrar já pronto, sem "pular" as animações.
+    setSaindo(true)
     await fetch('/api/aluno/logout', { method: 'POST' }).catch(() => {})
-    // Volta para a MESMA tela de login desta plataforma (mesmo host/subdomínio), não a entrada neutra.
-    router.push('/aluno/entrar')
-    router.refresh()
+    setTimeout(() => { router.push('/aluno/entrar'); router.refresh() }, 1100)
   }
 
   const btnFooter = 'flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-medium text-sidebar-foreground/70 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-[color:var(--sidebar-text-active)]'
 
   return (
-    <Sidebar collapsible="icon" className="border-sidebar-border">
+    <>
+    {saindo && (
+      <div className="fixed inset-0 z-[200]">
+        <LoginLoading config={loginConfig} plataforma={nome} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} />
+      </div>
+    )}
+    <Sidebar collapsible="icon" className="group-data-[side=left]:border-r-0">
       <SidebarHeader className="flex h-14 flex-row items-center border-b border-sidebar-border px-4 group-data-[collapsible=icon]:px-2">
         <Link href="/aluno" className="flex min-w-0 items-center gap-2">
           <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden', frameLogo(logoEstilo), !logo && 'bg-primary text-primary-foreground')} style={logo ? { background: logoBg } : undefined}>
@@ -111,14 +120,18 @@ export function AlunoSidebar({
       {/* RODAPÉ: perfil + notificações + tema + ajuda + sair (absorveu a antiga topbar).
           Colapsado → coluna centrada de ícones; o texto some com fade+colapso suave. */}
       <SidebarFooter className="gap-2 border-t border-sidebar-border p-3 transition-[padding] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:p-2 [&_svg]:text-[color:var(--sidebar-icon)] [&_button:hover_svg]:text-[color:var(--sidebar-icon-active)]">
-        <div className="flex w-full items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
-          <Link href="/aluno/perfil" title="Meu perfil" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-primary shadow-sm ring-1 ring-black/10 transition-transform hover:scale-105 hover:ring-primary/40">{iniciais(usuarioNome)}</Link>
-          {/* nome/email: colapsam largura + opacidade (não somem de golpe) */}
-          <div className="min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:opacity-0">
-            <p className="truncate text-sm font-medium leading-tight">{usuarioNome}</p>
-            {usuarioEmail && <p className="truncate text-[11px] leading-tight text-sidebar-foreground/55">{usuarioEmail}</p>}
-          </div>
-          <div className="shrink-0 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0"><NotificacaoBellAluno /></div>
+        <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
+          {/* Card do perfil (avatar + nome + email) — todo clicável, no estilo dos botões Ajuda/Sair. */}
+          <Link href="/aluno/perfil" title="Meu perfil" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1.5 pr-2.5 transition-colors hover:bg-white/10 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:p-0">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais(usuarioNome)}</span>
+            {/* nome/email: colapsam largura + opacidade (não somem de golpe) */}
+            <div className="min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:opacity-0">
+              <p className="truncate text-sm font-medium leading-tight">{usuarioNome}</p>
+              {usuarioEmail && <p className="truncate text-[11px] leading-tight text-sidebar-foreground/55">{usuarioEmail}</p>}
+            </div>
+          </Link>
+          {/* sem overflow-hidden: o badge do sino (-top/-right) precisa aparecer inteiro; o recolher usa w-0 + opacity-0. */}
+          <div className="shrink-0 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0"><NotificacaoBellAluno /></div>
         </div>
 
         <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2">
@@ -140,5 +153,6 @@ export function AlunoSidebar({
         </div>
       </SidebarFooter>
     </Sidebar>
+    </>
   )
 }

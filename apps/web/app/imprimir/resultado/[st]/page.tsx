@@ -21,12 +21,21 @@ export default async function ResultadoImprimirPage({ params, searchParams }: { 
     .maybeSingle()
   if (!sessao || sessao.status !== 'finalizada') notFound()
 
-  const [{ data: simulado }, { data: estudante }, { data: partRows }] = await Promise.all([
+  // Simulado, estudante, participantes, questões da prova e respostas (objetivas + discursivas) —
+  // tudo depende só da sessão já carregada, então vai num único round-trip paralelo.
+  const [{ data: simulado }, { data: estudante }, { data: partRows }, { data: sq }, { data: respostas }, { data: discResp }] = await Promise.all([
     svc.from('simulado_simulados').select('titulo, status, data_fim, regras').eq('id', sessao.simulado_id).single(),
     svc.from('simulado_estudantes').select('nome').eq('id', sessao.estudante_id).maybeSingle(),
     svc.from('simulado_sessoes_prova').select('estudante_id').eq('simulado_id', sessao.simulado_id).eq('is_teste', false).eq('status', 'finalizada'),
+    svc.from('simulado_prova_questoes')
+      .select('ordem, questoes:simulado_questoes(id, tipo, enunciado, comentario_professor, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, correta))')
+      .eq('simulado_id', sessao.simulado_id).eq('anulada', false).order('ordem'),
+    svc.from('simulado_respostas_objetivas').select('questao_id, alternativa_id, correta').eq('sessao_id', st),
+    svc.from('simulado_respostas_discursivas').select('questao_id, texto, status, nota, feedback').eq('sessao_id', st),
   ])
   const totalParticipantes = new Set((partRows ?? []).map((p: any) => p.estudante_id)).size
+  const respMap = new Map((respostas ?? []).map((r: any) => [r.questao_id, r]))
+  const discMap = new Map((discResp ?? []).map((d: any) => [d.questao_id, d]))
 
   const regras = (simulado?.regras as { liberar_gabarito?: string }) ?? {}
   const liberar = regras.liberar_gabarito ?? 'apos_janela'
@@ -37,25 +46,6 @@ export default async function ResultadoImprimirPage({ params, searchParams }: { 
   if (sem === '1') gabaritoLiberado = false
   // ?mod=completo → caderno completo (com comentário do professor, quando há gabarito).
   const completo = mod === 'completo'
-
-  const { data: sq } = await svc
-    .from('simulado_prova_questoes')
-    .select('ordem, questoes:simulado_questoes(id, tipo, enunciado, comentario_professor, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, correta))')
-    .eq('simulado_id', sessao.simulado_id)
-    .eq('anulada', false)
-    .order('ordem')
-
-  const { data: respostas } = await svc
-    .from('simulado_respostas_objetivas')
-    .select('questao_id, alternativa_id, correta')
-    .eq('sessao_id', st)
-  const respMap = new Map((respostas ?? []).map((r: any) => [r.questao_id, r]))
-
-  const { data: discResp } = await svc
-    .from('simulado_respostas_discursivas')
-    .select('questao_id, texto, status, nota, feedback')
-    .eq('sessao_id', st)
-  const discMap = new Map((discResp ?? []).map((d: any) => [d.questao_id, d]))
 
   const total = (sq ?? []).length
   const acertos = (respostas ?? []).filter((r: any) => r.correta).length

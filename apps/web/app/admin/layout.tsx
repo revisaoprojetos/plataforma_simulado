@@ -7,6 +7,7 @@ import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
 import { CanProvider } from '@/components/auth/can-provider'
 import { getCurrentAccess, isSuperAdmin, accessCan } from '@/lib/auth/permissions'
 import { getTenantTheme } from '@/lib/tenant-theme'
+import { resolverLoginConfig } from '@/lib/login-config'
 import { SplashSistema } from '@/components/admin/splash-sistema'
 import { TourProvider } from '@/components/admin/tour-guiado'
 import { NavProgress } from '@/components/admin/nav-progress'
@@ -119,7 +120,7 @@ export default async function AdminLayout({
       />
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
-          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none'} isSuperAdmin={superAdmin} userName={userName} userEmail={userEmail} />
+          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none'} isSuperAdmin={superAdmin} userName={userName} userEmail={userEmail} loginConfig={resolverLoginConfig(ti.login)} />
           <TourProvider>
             <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
               <SidebarEdgeToggle mode="offcanvas" />

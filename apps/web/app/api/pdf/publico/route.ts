@@ -3,6 +3,9 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { assinarRenderToken } from '@/lib/pdf/render-token'
 import { enfileirarPdfCaderno } from '@/lib/queue/pdf-queue'
 
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export const runtime = 'nodejs'
 
 // Base interna que o Gotenberg usa p/ buscar a página (mesma do endpoint admin).

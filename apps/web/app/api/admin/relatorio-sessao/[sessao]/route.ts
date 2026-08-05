@@ -13,6 +13,9 @@ function dur(ms: number) {
   return h > 0 ? `${h}h ${m}m ${sec}s` : m > 0 ? `${m}m ${sec}s` : `${sec}s`
 }
 
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function GET(_req: Request, { params }: { params: Promise<{ sessao: string }> }) {
   const { sessao } = await params
   const access = await getCurrentAccess()

@@ -54,61 +54,61 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
-  const { data: est } = await svc
-    .from('simulado_estudantes')
-    .select('id, nome, email, cpf, telefone, data_nascimento, classificacao, matricula_externa, created_at')
-    .eq('id', id)
-    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
-    .maybeSingle()
+  const TID = tenantId ?? '00000000-0000-0000-0000-000000000000'
+
+  // ── Batch inicial: tudo que depende só de id/tenant vai num único round-trip paralelo
+  // (perfil, sessões, vínculos de banco/grupo, matrículas e acessos avulsos). ──
+  const [estRes, sessoesRes, peRes, gmRes, matsRes, acesRes] = await Promise.all([
+    svc.from('simulado_estudantes')
+      .select('id, nome, email, cpf, telefone, data_nascimento, classificacao, matricula_externa, created_at')
+      .eq('id', id).eq('tenant_id', TID).maybeSingle(),
+    svc.from('simulado_sessoes_prova')
+      .select('id, status, nota, posicao_ranking, iniciado_em, finalizado_em, tentativa_num, is_teste, simulado_id, simulados:simulado_simulados(titulo)')
+      .eq('estudante_id', id).eq('deletado', false).order('iniciado_em', { ascending: false }),
+    svc.from('simulado_pasta_estudantes').select('pasta_id').eq('estudante_id', id),
+    svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', id),
+    svc.from('simulado_matriculas').select('simulado_id').eq('estudante_id', id).eq('tenant_id', TID),
+    svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', id).eq('tenant_id', TID),
+  ])
+  const est = estRes.data
   if (!est) notFound()
+  const sessoes = sessoesRes.data
 
-  // Histórico de simulados (sessões) do aluno.
-  const { data: sessoes } = await svc
-    .from('simulado_sessoes_prova')
-    .select('id, status, nota, posicao_ranking, iniciado_em, finalizado_em, tentativa_num, is_teste, simulado_id, simulados:simulado_simulados(titulo)')
-    .eq('estudante_id', id)
-    .eq('deletado', false)
-    .order('iniciado_em', { ascending: false })
-
-  // Acertos / total por sessão.
+  // ── Segundo batch (paralelo): respostas do aluno + bancos + grupos — independentes entre si. ──
   const sessIds = (sessoes ?? []).map((s: any) => s.id)
   const acertos = new Map<string, number>()
   const totais = new Map<string, number>()
-  let respAll: { sessao_id: string; questao_id: string; correta: boolean }[] = []
-  if (sessIds.length) {
-    // fetchAllByIn: um aluno com muito histórico passa de 1000 respostas → `.in()` cortaria
-    // em 1000 e subestimaria acertos/totais dos KPIs. Pagina por lista de sessões.
-    respAll = await fetchAllByIn<{ sessao_id: string; questao_id: string; correta: boolean }>(sessIds, (chunk) =>
-      svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).order('sessao_id'))
-    for (const r of respAll) {
-      totais.set(r.sessao_id, (totais.get(r.sessao_id) ?? 0) + 1)
-      if (r.correta) acertos.set(r.sessao_id, (acertos.get(r.sessao_id) ?? 0) + 1)
-    }
-  }
-
-  // Bancos vinculados (tolerante caso a tabela não exista).
-  let bancos: { id: string; nome: string }[] = []
-  const { data: pe, error: peErr } = await svc.from('simulado_pasta_estudantes').select('pasta_id').eq('estudante_id', id)
-  if (!peErr && pe?.length) {
-    const ids = pe.map((p: any) => p.pasta_id)
-    const { data } = await svc.from('simulado_pastas').select('id, nome').in('id', ids)
-    bancos = (data ?? []) as any
-  }
-
-  // Grupos vinculados (de que o aluno é membro) — grupos comuns, sem pastas mestres. Tolerante ao schema.
-  let grupos: { id: string; nome: string; cor: string | null }[] = []
-  {
-    const { data: gm, error: gmErr } = await svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', id)
-    if (!gmErr && gm?.length) {
+  const [respAll, bancos, grupos] = await Promise.all([
+    // Respostas (fetchAllByIn: aluno com muito histórico passa de 1000 → `.in()` cortaria e subestimaria os KPIs).
+    sessIds.length
+      ? fetchAllByIn<{ sessao_id: string; questao_id: string; correta: boolean }>(sessIds, (chunk) =>
+          svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).order('sessao_id'))
+      : Promise.resolve([] as { sessao_id: string; questao_id: string; correta: boolean }[]),
+    // Bancos vinculados (tolerante caso a tabela não exista).
+    (async (): Promise<{ id: string; nome: string }[]> => {
+      const { data: pe, error: peErr } = peRes
+      if (peErr || !pe?.length) return []
+      const ids = pe.map((p: any) => p.pasta_id)
+      const { data } = await svc.from('simulado_pastas').select('id, nome').in('id', ids)
+      return (data ?? []) as any
+    })(),
+    // Grupos vinculados (de que o aluno é membro) — sem pastas mestres. Tolerante ao schema.
+    (async (): Promise<{ id: string; nome: string; cor: string | null }[]> => {
+      const { data: gm, error: gmErr } = gmRes
+      if (gmErr || !gm?.length) return []
       const gids = [...new Set(gm.map((r: any) => r.grupo_id).filter(Boolean))]
       const sel = (cols: string) => svc.from('simulado_grupos').select(cols).in('id', gids).eq('deletado', false)
       let r = await sel('id, nome, cor, is_mestre')
       if (r.error) r = await sel('id, nome')
-      grupos = (r.data ?? [])
+      return (r.data ?? [])
         .filter((g: any) => !g.is_mestre)
         .map((g: any) => ({ id: g.id, nome: g.nome, cor: g.cor ?? null }))
         .sort((a: any, b: any) => a.nome.localeCompare(b.nome, 'pt-BR'))
-    }
+    })(),
+  ])
+  for (const r of respAll) {
+    totais.set(r.sessao_id, (totais.get(r.sessao_id) ?? 0) + 1)
+    if (r.correta) acertos.set(r.sessao_id, (acertos.get(r.sessao_id) ?? 0) + 1)
   }
 
   const classLabel = est.classificacao === 'vitalicio' ? 'Vitalício' : est.classificacao === 'passaporte' ? 'Passaporte' : est.classificacao === 'normal' ? 'Normal' : (est.classificacao ?? '—')
@@ -131,10 +131,14 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
     if (allQ.length) {
       // Tipo de cada questão → tipo de cada simulado (para o selo e o filtro de cadernos).
       const tipoDeQ = new Map<string, string>()
-      const { data: qTipos } = await svc.from('simulado_questoes').select('id, tipo').in('id', allQ)
+      // Tipos das questões e vínculo questão→banco são independentes: buscamos em paralelo.
+      const [qTiposRes, qpRes] = await Promise.all([
+        svc.from('simulado_questoes').select('id, tipo').in('id', allQ),
+        svc.from('simulado_questao_pasta').select('questao_id, pasta_id').in('questao_id', allQ),
+      ])
+      const qTipos = qTiposRes.data, qp = qpRes.data
       for (const q of qTipos ?? []) tipoDeQ.set((q as any).id, (q as any).tipo)
       for (const [sim, qs] of qPorSim) tipoSimPorSim.set(sim, tipoDoSimulado(qs.map((q) => tipoDeQ.get(q))))
-      const { data: qp } = await svc.from('simulado_questao_pasta').select('questao_id, pasta_id').in('questao_id', allQ)
       const pastaIds = [...new Set((qp ?? []).map((r: any) => r.pasta_id))]
       const { data: pastas } = pastaIds.length ? await svc.from('simulado_pastas').select('id, caderno_id').in('id', pastaIds) : { data: [] as any[] }
       const cadernoDaPasta = new Map<string, string>((pastas ?? []).filter((p: any) => p.caderno_id).map((p: any) => [p.id, p.caderno_id]))
@@ -197,16 +201,13 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
   const feitosSimIds = new Set(reais.filter((s: any) => s.status === 'finalizada').map((s: any) => s.simulado_id).filter(Boolean))
   const emAndamentoSimIds = new Set((sessoes ?? []).filter((s: any) => s.status === 'em_andamento').map((s: any) => s.simulado_id).filter(Boolean))
   const atribuidos = new Map<string, string | null>() // simulado_id → expira_em (acesso avulso)
-  const [{ data: mats }, { data: aces }] = await Promise.all([
-    svc.from('simulado_matriculas').select('simulado_id').eq('estudante_id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000'),
-    svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000'),
-  ])
+  const mats = matsRes.data, aces = acesRes.data // já buscados no batch inicial
   for (const m of mats ?? []) if ((m as any).simulado_id) atribuidos.set((m as any).simulado_id, atribuidos.get((m as any).simulado_id) ?? null)
   for (const a of aces ?? []) if ((a as any).simulado_id) atribuidos.set((a as any).simulado_id, (a as any).expira_em ?? null)
   const pendentesIds = [...atribuidos.keys()].filter((sid) => !feitosSimIds.has(sid))
   let pendentes: { id: string; titulo: string; status: string; expira: string | null; iniciado: boolean }[] = []
   if (pendentesIds.length) {
-    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, status').in('id', pendentesIds).eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, status').in('id', pendentesIds).eq('deletado', false).eq('tenant_id', TID)
     pendentes = (sims ?? []).map((s: any) => ({ id: s.id, titulo: s.titulo, status: s.status, expira: atribuidos.get(s.id) ?? null, iniciado: emAndamentoSimIds.has(s.id) }))
       .sort((a, b) => Number(b.iniciado) - Number(a.iniciado))
   }

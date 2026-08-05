@@ -8,6 +8,9 @@ import { getCurrentAccess } from '@/lib/auth/permissions'
  * simulado_notificacoes, que é escopada por estudante e usada quando houver
  * portal/e-mail do aluno.)
  */
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const access = await getCurrentAccess()
   if (!access.tenantId || !(access.isAdmin || access.permissions.includes('simulados:view'))) {

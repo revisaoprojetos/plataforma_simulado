@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetch-all'
+import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { Voltar } from '@/components/admin/relatorios/voltar'
 import { RelatorioEstudanteView, type DadosRelatorioEstudante } from './relatorio-estudante-view'
@@ -20,30 +21,37 @@ export default async function RelatorioEstudantesPage({ searchParams }: { search
   // Lista: primeiros estudantes (rápido) + mapa de agregados de sessão; o resto carrega no cliente.
   let inicial: EstudanteBase[] = []
   let total = 0
-  const agregados: Record<string, AgregadoEstudante> = {}
+  let agregados: Record<string, AgregadoEstudante> = {}
 
   if (estId) {
     dados = await montarRelatorioEstudante(svc, estId, tenantId)
   } else {
-    const [batch, sess] = await Promise.all([
+    // Agregado por estudante = varredura de TODAS as sessões finalizadas do tenant. Antes rodava
+    // a cada visita à lista; agora fica MEMOIZADO no Redis (TTL) — no cache-hit não toca no banco.
+    // Degrada sozinho sem Redis (computa direto). Mesma cadeia dos demais relatórios.
+    const [batch, agg] = await Promise.all([
       carregarLoteEstudantes(0, PRIMEIRA_PAGINA),
-      // Sessões finalizadas (sem teste) do tenant — poucas linhas; agregado calculado 1 vez.
-      fetchAll<any>(() => svc.from('simulado_sessoes_prova')
-        .select('estudante_id, nota, iniciado_em')
-        .eq('tenant_id', tid).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada')
-        .order('estudante_id')),
+      remember<Record<string, AgregadoEstudante>>(chaveRelatorio(tenantId, 'estudantes', 'agregados'), TTL_RELATORIO, async () => {
+        const sess = await fetchAll<any>(() => svc.from('simulado_sessoes_prova')
+          .select('estudante_id, nota, iniciado_em')
+          .eq('tenant_id', tid).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada')
+          .order('estudante_id'))
+        const acc = new Map<string, { n: number; soma: number; cnt: number; ult: string | null }>()
+        for (const s of sess) {
+          const a = acc.get(s.estudante_id) ?? { n: 0, soma: 0, cnt: 0, ult: null }
+          a.n++
+          if (s.nota != null) { a.soma += Number(s.nota); a.cnt++ }
+          if (s.iniciado_em && (!a.ult || s.iniciado_em > a.ult)) a.ult = s.iniciado_em
+          acc.set(s.estudante_id, a)
+        }
+        const out: Record<string, AgregadoEstudante> = {}
+        for (const [id, a] of acc) out[id] = { simulados: a.n, notaMedia: a.cnt ? a.soma / a.cnt : null, ultima: a.ult }
+        return out
+      }),
     ])
     inicial = batch.rows
     total = batch.total
-    const agg = new Map<string, { n: number; soma: number; cnt: number; ult: string | null }>()
-    for (const s of sess) {
-      const a = agg.get(s.estudante_id) ?? { n: 0, soma: 0, cnt: 0, ult: null }
-      a.n++
-      if (s.nota != null) { a.soma += Number(s.nota); a.cnt++ }
-      if (s.iniciado_em && (!a.ult || s.iniciado_em > a.ult)) a.ult = s.iniciado_em
-      agg.set(s.estudante_id, a)
-    }
-    for (const [id, a] of agg) agregados[id] = { simulados: a.n, notaMedia: a.cnt ? a.soma / a.cnt : null, ultima: a.ult }
+    agregados = agg
   }
 
   return (

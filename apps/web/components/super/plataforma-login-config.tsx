@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { redimensionarImagem } from '@/lib/imagem'
 import { salvarTemaSuperAction } from '@/app/admin/tenants/actions'
-import { LOGIN_DEFAULT, type LoginConfig, type LoginTemplate, type LoginFundo, type CardEstilo, type LogoEstilo, type LogoFiltro, type LogoTam, type BotaoEstilo, type CarModelo } from '@/lib/login-config'
+import { LOGIN_DEFAULT, ENTRADAS, type LoginConfig, type LoginTemplate, type LoginFundo, type CardEstilo, type LogoEstilo, type LogoFiltro, type LogoTam, type BotaoEstilo, type CarModelo } from '@/lib/login-config'
 import { AlunoEntrarForm } from '@/components/aluno/aluno-entrar-form'
 import { LoginLoading } from '@/components/aluno/login-loading'
 
@@ -212,6 +212,14 @@ export function PlataformaLoginConfig({
           {c.template !== 'central' && c.template !== 'cartao' && (
             <label className="flex items-center justify-between pt-1 text-sm"><span className="text-muted-foreground">Mostrar painel da marca</span><Switch checked={c.mostrarMarca} onCheckedChange={(v) => set('mostrarMarca', v)} /></label>
           )}
+          <div className="space-y-1 border-t pt-2">
+            <label className="text-xs text-muted-foreground">Animação de entrada do card</label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {ENTRADAS.map(([v, r]) => (
+                <button key={v} type="button" onClick={() => set('animacaoEntrada', v)} className={cn('rounded-lg border py-1.5 text-[11px] font-medium transition', c.animacaoEntrada === v ? on : off)}>{r}</button>
+              ))}
+            </div>
+          </div>
         </Bloco>
 
         <Bloco titulo="Cores">
@@ -220,9 +228,13 @@ export function PlataformaLoginConfig({
             <ColorField rotulo="Primária (botões)" valor={c.corPrimaria} fallback={corPrimaria} onChange={(v) => set('corPrimaria', v)} />
             <ColorField rotulo="Destaque" valor={c.corAccent} fallback={corAccent} onChange={(v) => set('corAccent', v)} />
           </div>
+          {c.fundo === 'imagem' && (
+            <label className="flex items-center justify-between border-t pt-2 text-sm">
+              <span className="text-muted-foreground">Cores sobre a imagem <span className="text-muted-foreground/70">(brilho primária/destaque)</span></span>
+              <Switch checked={c.fundoImagemCores !== false} onCheckedChange={(v) => set('fundoImagemCores', v)} />
+            </label>
+          )}
         </Bloco>
-
-        {blocoLogo}
 
         <Bloco titulo="Fundo & card">
           <div className="flex gap-2">
@@ -247,6 +259,8 @@ export function PlataformaLoginConfig({
           </div>
         </Bloco>
 
+        {blocoLogo}
+
         <Bloco titulo="Textos">
           <div className="space-y-1.5">
             <label className="text-xs text-muted-foreground">Marca (painel/carregamento) <span className="text-muted-foreground/70">(vazio = oculto)</span></label>
@@ -269,8 +283,8 @@ export function PlataformaLoginConfig({
 
           <div className="space-y-1.5 border-t pt-2">
             <label className="text-xs text-muted-foreground">Textos do formulário <span className="text-muted-foreground/70">(vazio = oculto)</span></label>
-            <div className="flex gap-2"><Input value={c.textoKicker} onChange={(e) => set('textoKicker', e.target.value)} placeholder="Rótulo (aluno) — ex.: Área do aluno" className="flex-1" /><SwatchInline valor={c.corTextoForm} fallback={corAccent} onChange={(v) => set('corTextoForm', v)} title="Cor do rótulo “Área do aluno”" /></div>
-            <div className="flex gap-2"><Input value={c.textoKickerAdmin} onChange={(e) => set('textoKickerAdmin', e.target.value)} placeholder="Rótulo (admin) — ex.: Área administrativa" className="flex-1" /><SwatchInline valor={c.corTextoFormAdmin} fallback={corAccent} onChange={(v) => set('corTextoFormAdmin', v)} title="Cor do rótulo admin" /></div>
+            <div className="flex gap-2"><Input value={c.textoKicker} onChange={(e) => set('textoKicker', e.target.value)} placeholder="Rótulo (aluno) — ex.: Área do aluno" className="flex-1" /><SwatchInline valor={c.corTextoForm} fallback={corPrimaria} onChange={(v) => set('corTextoForm', v)} title="Cor do rótulo “Área do aluno” (independente do Destaque)" /></div>
+            <div className="flex gap-2"><Input value={c.textoKickerAdmin} onChange={(e) => set('textoKickerAdmin', e.target.value)} placeholder="Rótulo (admin) — ex.: Área administrativa" className="flex-1" /><SwatchInline valor={c.corTextoFormAdmin} fallback={corPrimaria} onChange={(v) => set('corTextoFormAdmin', v)} title="Cor do rótulo admin (independente do Destaque)" /></div>
             <Input value={c.textoEntrar} onChange={(e) => set('textoEntrar', e.target.value)} placeholder="Título — ex.: Entrar" />
             <Input value={c.textoPlataforma === null ? plataforma : c.textoPlataforma} onChange={(e) => set('textoPlataforma', e.target.value)} placeholder="Nome exibido — ex.: Revisão" />
             <p className="text-[11px] text-muted-foreground">O rótulo <strong>admin</strong> e o campo de <strong>senha</strong> aparecem quando o aluno clica em “Admin” no canto da tela.</p>

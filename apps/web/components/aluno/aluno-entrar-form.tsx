@@ -6,12 +6,12 @@ import { AlertBox } from '@/components/ui/alert-box'
 import { cn } from '@/lib/utils'
 import { GraduationCap, Loader2, Wrench, Mail, IdCard, Phone, Lock, ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { LOGIN_DEFAULT, fundoLoginStyle, loginVars, corPrimariaLogin, corAccentLogin, type LoginConfig } from '@/lib/login-config'
+import { LOGIN_DEFAULT, fundoLoginStyle, loginVars, corPrimariaLogin, corAccentLogin, entradaClasse, type LoginConfig } from '@/lib/login-config'
 import { LoginLoading } from '@/components/aluno/login-loading'
 
 type Metodo = 'email' | 'email_cpf' | 'email_telefone'
 
-const KF = `@keyframes lgDriftA{0%,100%{transform:translate(0,0) scale(1);opacity:.7}50%{transform:translate(8%,-6%) scale(1.12);opacity:1}}@keyframes lgDriftB{0%,100%{transform:translate(0,0) scale(1.08);opacity:.7}50%{transform:translate(-8%,6%) scale(1);opacity:1}}@keyframes lgUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}.lg-aurora{animation:lgDriftA 18s ease-in-out infinite}.lg-aurora2{animation:lgDriftB 22s ease-in-out infinite}.lg-up{animation:lgUp .55s cubic-bezier(.2,.7,.2,1) both}@media (prefers-reduced-motion:reduce){.lg-aurora,.lg-aurora2,.lg-up{animation:none}}`
+const KF = `@keyframes lgDriftA{0%,100%{transform:translate(0,0) scale(1);opacity:.7}50%{transform:translate(8%,-6%) scale(1.12);opacity:1}}@keyframes lgDriftB{0%,100%{transform:translate(0,0) scale(1.08);opacity:.7}50%{transform:translate(-8%,6%) scale(1);opacity:1}}@keyframes lgUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}.lg-aurora{animation:lgDriftA 18s ease-in-out infinite}.lg-aurora2{animation:lgDriftB 22s ease-in-out infinite}.lg-up{animation:lgUp .55s cubic-bezier(.2,.7,.2,1) both}@keyframes lgeFade{from{opacity:0}to{opacity:1}}@keyframes lgeUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}@keyframes lgeDown{from{opacity:0;transform:translateY(-26px)}to{opacity:1;transform:none}}@keyframes lgeZoom{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}@keyframes lgeSlide{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:none}}@keyframes lgePop{0%{opacity:0;transform:scale(.8)}60%{opacity:1;transform:scale(1.04)}100%{transform:scale(1)}}@keyframes lgeGiro{from{opacity:0;transform:perspective(900px) rotateX(14deg) translateY(18px)}to{opacity:1;transform:none}}.lge-fade{animation:lgeFade .5s ease both}.lge-up{animation:lgeUp .55s cubic-bezier(.2,.7,.2,1) both}.lge-down{animation:lgeDown .55s cubic-bezier(.2,.7,.2,1) both}.lge-zoom{animation:lgeZoom .5s cubic-bezier(.2,.7,.2,1) both}.lge-slide{animation:lgeSlide .55s cubic-bezier(.2,.7,.2,1) both}.lge-pop{animation:lgePop .6s cubic-bezier(.2,.8,.2,1) both}.lge-giro{animation:lgeGiro .6s ease both}@media (prefers-reduced-motion:reduce){.lg-aurora,.lg-aurora2,.lg-up,[class*="lge-"]{animation:none}}`
 
 export function AlunoEntrarForm({
   metodo, plataforma, logo = null, subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', config = LOGIN_DEFAULT, preview = false, modoInicial = 'aluno',
@@ -97,7 +97,12 @@ export function AlunoEntrarForm({
     )
   }
 
-  const Blobs = c.animacao ? (
+  // Brilhos (primária/destaque): "Animação" é o interruptor master (desligou → some sempre).
+  // Com imagem de fundo, o toggle "Cores sobre a imagem" (fundoImagemCores) desliga ADICIONALMENTE.
+  // Ou seja: qualquer um dos dois desativa os brilhos sobre a imagem.
+  const temImg = c.fundo === 'imagem' && !!c.fundoImagem
+  const mostrarGlow = c.animacao && (!temImg || c.fundoImagemCores !== false)
+  const Blobs = mostrarGlow ? (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
       <div className="lg-aurora absolute -left-24 top-4 h-96 w-96 rounded-full blur-[130px]" style={{ background: `color-mix(in oklab, ${accent} 42%, transparent)` }} />
       <div className="lg-aurora2 absolute -bottom-24 right-0 h-96 w-96 rounded-full blur-[130px]" style={{ background: `color-mix(in oklab, ${primaria} 70%, transparent)` }} />
@@ -106,7 +111,9 @@ export function AlunoEntrarForm({
 
   const textoMarca = c.corTextoMarca ?? '#ffffff'
   const mix = (pct: number) => `color-mix(in oklab, ${textoMarca} ${pct}%, transparent)`
-  const kickerCor = ehAdmin ? (c.corTextoFormAdmin ?? c.corTextoForm ?? accent) : (c.corTextoForm ?? accent)
+  // Rótulo "Área do aluno/administrativa": tem cor PRÓPRIA (corTextoForm). Fallback = primária,
+  // NÃO o destaque — assim mudar a "Cor de destaque" não altera este texto (ficam desvinculados).
+  const kickerCor = ehAdmin ? (c.corTextoFormAdmin ?? c.corTextoForm ?? primaria) : (c.corTextoForm ?? primaria)
   const kickerTexto = ehAdmin ? (c.textoKickerAdmin || 'Área administrativa') : c.textoKicker
   const rodapeTexto = ehAdmin ? c.textoRodapeAdmin : c.textoRodape
   const marcaNome = c.marcaNome ?? plataforma
@@ -178,9 +185,9 @@ export function AlunoEntrarForm({
     )
   }
 
-  function FormBloco({ comEmblema = true, centro = false }: { comEmblema?: boolean; centro?: boolean }) {
+  function FormBloco({ comEmblema = true, centro = false, className = '' }: { comEmblema?: boolean; centro?: boolean; className?: string }) {
     return (
-      <div className="w-full max-w-sm space-y-6">
+      <div className={cn('w-full max-w-sm space-y-6', className)}>
         <div className={cn('flex flex-col gap-3', centro ? 'items-center text-center' : 'items-start text-left')}>
           {comEmblema && Emblema({})}
           {(kickerTexto || c.textoEntrar || plataformaLabel) && (
@@ -199,9 +206,14 @@ export function AlunoEntrarForm({
     )
   }
 
-  const cardCls = c.cardEstilo === 'vidro'
-    ? 'rounded-2xl border border-white/15 bg-white/95 p-7 shadow-2xl backdrop-blur-md dark:bg-slate-900/90'
-    : 'rounded-2xl border bg-card p-7 shadow-xl'
+  // Animação de aparecimento do card (classe entra no cardCls e na versão card-less do split).
+  const entrada = entradaClasse(c.animacaoEntrada)
+  const cardCls = cn(
+    c.cardEstilo === 'vidro'
+      ? 'rounded-2xl border border-white/15 bg-white/95 p-7 shadow-2xl backdrop-blur-md dark:bg-slate-900/90'
+      : 'rounded-2xl border bg-card p-7 shadow-xl',
+    entrada,
+  )
 
   const style = { ...rootVars } as React.CSSProperties
 
@@ -209,9 +221,11 @@ export function AlunoEntrarForm({
 
   // ---------------- TEMPLATE: SPLIT ----------------
   if (c.template === 'split' && c.mostrarMarca) {
+    // Fundo em imagem → a imagem cobre a TELA TODA (container), painel e formulário ficam por cima;
+    // o formulário ganha um card para continuar legível sobre a imagem.
+    const ehImg = c.fundo === 'imagem' && !!c.fundoImagem
     const marca = (
-      <aside className="relative hidden flex-col justify-between overflow-hidden p-12 text-white lg:flex" style={fundoLoginStyle(c)}>
-        {c.fundo === 'imagem' && <div className="absolute inset-0 bg-black/45" />}
+      <aside className="relative hidden flex-col justify-between overflow-hidden p-12 text-white lg:flex" style={ehImg ? undefined : fundoLoginStyle(c)}>
         {Blobs}
         <div className="relative flex items-center gap-3">
           {Emblema({})}
@@ -221,10 +235,15 @@ export function AlunoEntrarForm({
         <div className="relative text-xs" style={{ color: mix(45) }}>© {new Date().getFullYear()} {plataforma}</div>
       </aside>
     )
-    const form = <main className={cn('relative flex items-center justify-center bg-background p-6', screen)}>{FormBloco({})}</main>
+    const form = (
+      <main className={cn('relative flex items-center justify-center p-6', screen, !ehImg && 'bg-background')}>
+        {ehImg ? <div className={cn('w-full max-w-sm text-foreground', cardCls)}>{FormBloco({})}</div> : FormBloco({ className: entrada })}
+      </main>
+    )
     tela = (
-      <div className={cn('lg:grid lg:grid-cols-[1.05fr_1fr]', screen)} style={style}>
+      <div className={cn('relative lg:grid lg:grid-cols-[1.05fr_1fr]', screen)} style={ehImg ? { ...style, ...fundoLoginStyle(c) } : style}>
         <style>{KF}</style>
+        {ehImg && <div className="pointer-events-none absolute inset-0 bg-black/45" />}
         {c.painelLado === 'direita' ? <>{form}{marca}</> : <>{marca}{form}</>}
       </div>
     )
@@ -246,12 +265,14 @@ export function AlunoEntrarForm({
 
   // ---------------- TEMPLATE: VITRINE (faixa da marca no topo + card) ----------------
   else if (c.template === 'vitrine') {
+    // Fundo em imagem → cobre a tela inteira (atrás da faixa e do card).
+    const ehImg = c.fundo === 'imagem' && !!c.fundoImagem
     tela = (
-      <div className={cn('relative flex flex-col bg-background', screen)} style={style}>
+      <div className={cn('relative flex flex-col', screen, !ehImg && 'bg-background')} style={ehImg ? { ...style, ...fundoLoginStyle(c) } : style}>
         <style>{KF}</style>
+        {ehImg && <div className="pointer-events-none absolute inset-0 bg-black/45" />}
         {c.mostrarMarca && (
-          <div className="relative flex flex-col items-center gap-4 overflow-hidden px-6 py-12 text-center text-white" style={fundoLoginStyle(c)}>
-            {c.fundo === 'imagem' && <div className="absolute inset-0 bg-black/45" />}
+          <div className="relative flex flex-col items-center gap-4 overflow-hidden px-6 py-12 text-center text-white" style={ehImg ? undefined : fundoLoginStyle(c)}>
             {Blobs}
             <div className="relative">{Emblema({ tam: 'lg' })}</div>
             <div className="relative">{MarcaTexto()}</div>

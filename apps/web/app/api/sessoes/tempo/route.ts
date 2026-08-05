@@ -4,6 +4,9 @@ import { createServiceClient } from '@/lib/supabase/server'
 // GET /api/sessoes/tempo?st={sessao_id}
 // Endpoint LEVE: devolve o tempo limite ATUAL do simulado da sessão (em minutos).
 // Usado pelo runner para pegar mudanças de tempo feitas durante a prova, sem recarregar.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const st = new URL(request.url).searchParams.get('st')
   if (!st) return NextResponse.json({ message: 'Sessão ausente.' }, { status: 400 })

@@ -720,7 +720,7 @@ export async function publishSimuladoAction(id: string) {
   // no modo janela fixa, datas válidas (fim depois do início).
   const { data: sim } = await supabase
     .from('simulado_simulados')
-    .select('modo_aplicacao, data_inicio, data_fim')
+    .select('modo_aplicacao, data_inicio, data_fim, status, titulo')
     .eq('id', id)
     .eq('tenant_id', tenantId ?? SEM_TENANT)
     .maybeSingle()
@@ -742,6 +742,10 @@ export async function publishSimuladoAction(id: string) {
   const { error } = await supabase.from('simulado_simulados').update(patch).eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT)
   if (error) return { error: error.message }
   await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_simulados', entidadeId: id, depois: { status: 'publicado' } })
+  // 1ª publicação (rascunho → publicado): avisa os alunos matriculados que há um novo simulado.
+  if ((sim as any).status !== 'publicado') {
+    await notificarNovoSimulado(id, (sim as any).titulo ?? 'Novo simulado', tenantId)
+  }
   revalidatePath(`/admin/simulados/${id}`)
   revalidatePath('/admin/simulados')
   return { ok: true }
@@ -801,6 +805,21 @@ async function notificarLiberacao(simuladoId: string, item: 'nota' | 'gabarito',
     tipo: 'liberacao',
     titulo: item === 'gabarito' ? 'Gabarito liberado' : 'Resultado liberado',
     mensagem: `O ${item === 'gabarito' ? 'gabarito' : 'resultado'} do simulado "${titulo}" já está disponível.`,
+    link: `/aluno/simulados/${simuladoId}`,
+  })
+}
+
+/** Notifica os alunos matriculados quando um NOVO simulado é publicado (fica disponível). */
+async function notificarNovoSimulado(simuladoId: string, titulo: string, tenantId: string | null) {
+  const svc = createAdminClient()
+  const mats = await fetchAll<{ estudante_id: string }>(() =>
+    svc.from('simulado_matriculas').select('estudante_id')
+      .eq('simulado_id', simuladoId).eq('tenant_id', tenantId ?? SEM_TENANT).order('estudante_id'))
+  const ids = [...new Set(mats.map((m) => m.estudante_id).filter(Boolean))]
+  await criarNotificacoesEmMassa(svc, tenantId, ids, {
+    tipo: 'novo_simulado',
+    titulo: 'Novo simulado disponível',
+    mensagem: `"${titulo}" já está disponível para você fazer.`,
     link: `/aluno/simulados/${simuladoId}`,
   })
 }

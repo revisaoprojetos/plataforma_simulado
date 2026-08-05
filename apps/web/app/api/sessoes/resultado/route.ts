@@ -11,6 +11,9 @@ import { tipoDoSimulado } from '@/lib/simulado/tipo'
 // GET /api/sessoes/resultado?st={sessao_id}
 // Dados da central de revisão: resumo + questões com resposta do aluno.
 // O gabarito (alternativa correta) só é revelado se liberado pela config do simulado.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const st = searchParams.get('st')

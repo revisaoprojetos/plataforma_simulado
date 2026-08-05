@@ -6,6 +6,9 @@ import { HUD_CORES_PADRAO } from '@/lib/caderno-designer/types'
 // GET /api/simulado/hud?token={embed_token}
 // Retorna o HUD (cores + estilos por página) do caderno vinculado ao simulado,
 // para temar as telas de carregamento antes da sessão carregar.
+// Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const token = new URL(request.url).searchParams.get('token')
   if (!token) return NextResponse.json({ base: HUD_CORES_PADRAO, porPagina: {} }, { status: 200 })

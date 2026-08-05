@@ -47,25 +47,42 @@ export function chaveRelatorio(tenantId: string | null, ...partes: (string | num
   return `relatorio:${tenantId ?? 'none'}:${partes.join(':')}`
 }
 
+// Fallback de cache EM MEMÓRIA (por processo) — usado SÓ quando o Redis está fora do ar
+// (ex.: dev sem docker). Em produção o Redis é o cache e este mapa nunca é usado, então não há
+// mudança de comportamento nem risco de defasagem entre réplicas. TTL curto p/ bounded staleness.
+const mem = new Map<string, { v: unknown; exp: number }>()
+const MEM_MAX = 300
+
 /**
- * Memoização com TTL no Redis. Em qualquer instabilidade (miss, Redis fora,
- * JSON inválido), computa direto via `calcular()`. Só serializa valores
- * JSON — os loaders de relatório já devolvem objetos planos.
+ * Memoização com TTL no Redis (produção). Se o Redis estiver fora, cai num cache em memória do
+ * processo (dev) — assim os relatórios pesados não recomputam a cada acesso. Em qualquer
+ * instabilidade, computa direto. Só serializa valores JSON.
  */
 export async function remember<T>(chave: string, ttlSeg: number, calcular: () => Promise<T>): Promise<T> {
   const r = redis()
+  let redisOk = false
   if (r) {
     try {
       const hit = await r.get(chave)
+      redisOk = true
       if (hit != null) return JSON.parse(hit) as T
-    } catch { /* miss silencioso → computa */ }
+    } catch { redisOk = false /* Redis fora → usa memória abaixo */ }
+  }
+  // Sem Redis: tenta o cache em memória.
+  if (!redisOk) {
+    const m = mem.get(chave)
+    if (m && m.exp > Date.now()) return m.v as T
   }
   const t0 = Date.now()
   const valor = await calcular()
   const ms = Date.now() - t0
   if (ms > 3000) console.warn(`[relatorio lento] ${chave} computou em ${ms}ms (cache-miss)`) // observabilidade (Fase 4)
-  if (r && valor !== undefined) {
-    try { await r.set(chave, JSON.stringify(valor), 'EX', ttlSeg) } catch { /* best-effort */ }
+  if (valor !== undefined) {
+    if (redisOk && r) { try { await r.set(chave, JSON.stringify(valor), 'EX', ttlSeg) } catch { /* best-effort */ } }
+    else {
+      if (mem.size >= MEM_MAX) { const k = mem.keys().next().value; if (k) mem.delete(k) }
+      mem.set(chave, { v: valor, exp: Date.now() + Math.min(ttlSeg, 120) * 1000 }) // memória: no máx. 2 min
+    }
   }
   return valor
 }
