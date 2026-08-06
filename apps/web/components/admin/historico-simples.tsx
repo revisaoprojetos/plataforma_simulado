@@ -18,7 +18,7 @@ export function HistoricoSimples({ rows, estudanteId }: { rows: SessaoRow[]; est
         ) : (
           <div className="scroll-claro max-h-[520px] divide-y overflow-y-auto">
             {rows.map((r) => (
-              <Link key={r.id} href={`/admin/estudantes/${estudanteId}/simulado/${r.simuladoId}`}
+              <Link key={r.id} href={`/admin/estudantes/${estudanteId}/simulado/${r.simuladoId}?tentativa=${r.id}`}
                 className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{r.titulo}</p>
