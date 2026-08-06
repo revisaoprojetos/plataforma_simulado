@@ -65,7 +65,7 @@ export default async function RelatorioEstudantesPage({ searchParams }: { search
       {!estId ? (
         <EstudantesLista inicial={inicial} agregados={agregados} total={total} />
       ) : dados ? (
-        <RelatorioEstudanteView d={dados} />
+        <RelatorioEstudanteView d={dados} historicoHrefBase={`/admin/estudantes/${estId}/simulado`} />
       ) : (
         <p className="text-sm text-muted-foreground">Estudante não encontrado.</p>
       )}

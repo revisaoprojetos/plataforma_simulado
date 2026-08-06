@@ -16,7 +16,7 @@ export type DadosRelatorioEstudante = {
   historico: { simulado: string; quando: string; nota: number | null; acerto: number; tempo: string; simuladoId?: string; sessaoId?: string }[]
 }
 
-export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, semTurma, semTendencia }: { d: DadosRelatorioEstudante; print?: boolean; semCabecalho?: boolean; historicoLink?: boolean; semTurma?: boolean; semTendencia?: boolean }) {
+export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, historicoHrefBase, semTurma, semTendencia }: { d: DadosRelatorioEstudante; print?: boolean; semCabecalho?: boolean; historicoLink?: boolean; historicoHrefBase?: string; semTurma?: boolean; semTendencia?: boolean }) {
   const nota = (n: number | null) => (n == null ? '—' : n.toFixed(1).replace('.', ','))
   const sobe = d.evolucao.length >= 2 && d.evolucao[d.evolucao.length - 1].nota >= d.evolucao[0].nota
   const temTend = d.evolucao.length >= 2
@@ -93,8 +93,16 @@ export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, 
         <ListaBusca itens={d.historico} placeholder="Buscar simulado pelo título…" vazio="Sem simulados finalizados ainda." print={print}
           filtro={(h, t) => h.simulado.toLowerCase().includes(t)}>
           {(h, i) => {
-            // Aluno: linka para o resultado do simulado com aquela tentativa marcada.
-            const href = historicoLink && h.simuladoId ? `/aluno/simulados/${h.simuladoId}${h.sessaoId ? `?tentativa=${h.sessaoId}` : ''}` : null
+            // Link para o resultado do simulado com aquela tentativa marcada (?tentativa=<sessaoId>).
+            // Admin: `historicoHrefBase` = /admin/estudantes/<id>/simulado; Aluno: /aluno/simulados.
+            const tent = h.sessaoId ? `?tentativa=${h.sessaoId}` : ''
+            const href = h.simuladoId
+              ? historicoHrefBase
+                ? `${historicoHrefBase}/${h.simuladoId}${tent}`
+                : historicoLink
+                  ? `/aluno/simulados/${h.simuladoId}${tent}`
+                  : null
+              : null
             const conteudo = (
               <>
                 <div className="min-w-0 flex-1">
