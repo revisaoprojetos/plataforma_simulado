@@ -18,7 +18,11 @@ const TETO = 20 // nº máx de passos antes de estabilizar (o passo em ms fica n
 function coletarCards(root: HTMLElement): HTMLElement[] {
   const raiz = root.firstElementChild as HTMLElement | null
   if (!raiz) return []
+  const MAX = 6            // profundidade de descida (para em card visual/linha de cards/folha)
+  const ALTURA_CARD = 64   // px: separa CARDS/posters (altos) de toolbars/abas/textos (baixos)
 
+  // Container "de layout" (só espaçamento): sem borda, fundo, sombra ou cantos → dá p/ desembrulhar
+  // e animar as seções internas. Um card VISUAL (tem borda/fundo/sombra/cantos) NÃO é desmembrado.
   const transparente = (el: HTMLElement): boolean => {
     const s = getComputedStyle(el)
     const semBorda = ['top', 'right', 'bottom', 'left'].every((l) => parseFloat(s.getPropertyValue(`border-${l}-width`)) === 0)
@@ -26,25 +30,34 @@ function coletarCards(root: HTMLElement): HTMLElement[] {
     return semBorda && semFundo && s.boxShadow === 'none' && s.borderRadius === '0px'
   }
 
-  const cards: HTMLElement[] = []
-  const adicionar = (el: HTMLElement, prof: number): void => {
+  // "Linha de cards": GRID, ou FLEX em linha (ex.: FileiraHorizontal), com vários filhos ALTOS
+  // (cards/posters) → cada filho vira um card e escalona sozinho (L→R). Toolbars/abas (filhos baixos)
+  // NÃO contam como linha de cards, então continuam como uma unidade só.
+  const linhaDeCards = (el: HTMLElement, filhos: HTMLElement[]): boolean => {
     const s = getComputedStyle(el)
-    const disp = s.display
-    const filhos = Array.from(el.children) as HTMLElement[]
-
-    if (disp === 'grid' && filhos.length > 1) { for (const it of filhos) cards.push(it); return }
-
-    const empilhado = disp === 'block' || (disp === 'flex' && s.flexDirection === 'column')
-    const temSubsecao = filhos.some((c) => c.childElementCount > 0)
-    if (prof < 2 && filhos.length > 1 && empilhado && temSubsecao && transparente(el)) {
-      for (const it of filhos) adicionar(it, prof + 1)
-      return
-    }
-
-    cards.push(el)
+    const ehLinha = s.display === 'grid' || (s.display === 'flex' && s.flexDirection !== 'column')
+    if (!ehLinha || filhos.length < 2) return false
+    const altos = filhos.filter((c) => c.offsetHeight >= ALTURA_CARD).length
+    return altos >= Math.ceil(filhos.length / 2)
   }
 
-  for (const filho of Array.from(raiz.children) as HTMLElement[]) adicionar(filho, 0)
+  const cards: HTMLElement[] = []
+  const classificar = (el: HTMLElement, prof: number): void => {
+    const filhos = Array.from(el.children) as HTMLElement[]
+    if (filhos.length === 0) { cards.push(el); return }                              // folha
+    if (linhaDeCards(el, filhos)) { for (const c of filhos) cards.push(c); return }  // linha de cards → cada um
+    // Só descemos por containers de LAYOUT transparentes (cards visuais param aqui, viram 1 card).
+    if (prof < MAX && transparente(el)) {
+      if (filhos.length === 1) { classificar(filhos[0], prof + 1); return }          // desembrulha camada única
+      const s = getComputedStyle(el)
+      const empilhado = s.display === 'block' || (s.display === 'flex' && s.flexDirection === 'column')
+      const temSubsecao = filhos.some((c) => c.childElementCount > 0)               // não fragmenta título+subtítulo
+      if (empilhado && temSubsecao) { for (const c of filhos) classificar(c, prof + 1); return }
+    }
+    cards.push(el)                                                                   // card/seção (unidade)
+  }
+
+  for (const filho of Array.from(raiz.children) as HTMLElement[]) classificar(filho, 0)
   return cards
 }
 
