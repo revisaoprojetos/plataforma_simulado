@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { RemoverQuestaoBanco } from '@/components/admin/remover-questao-banco'
 import { BancoEstudantes } from '@/components/admin/banco-estudantes'
+import { BancoTabsShell } from '@/components/admin/banco-tabs-shell'
 import { BancoCaderno } from '@/components/admin/banco-caderno'
 import { BancoRelatorio } from '@/components/admin/banco-relatorio'
 import { AdicionarQuestoesDialog } from '@/components/admin/adicionar-questoes-dialog'
@@ -151,7 +152,7 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
         </div>
       </div>
 
-      <Tabs defaultValue={abaInicial}>
+      <BancoTabsShell value={abaInicial}>
         <TabsList>
           <TabsTrigger value="visao">Visão geral</TabsTrigger>
           <TabsTrigger value="questoes">Questões</TabsTrigger>
@@ -267,27 +268,33 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
             enviar qualquer HTML → página em branco por >1min. Assim o shell aparece na hora e cada aba
             streama seu conteúdo quando pronto (mostrando um esqueleto enquanto carrega). */}
         <TabsContent value="estudantes">
-          <Suspense fallback={<AbaCarregando />}>
-            <BancoEstudantes bancoId={id} cor={corBanco} />
-          </Suspense>
+          {abaInicial === 'estudantes' ? (
+            <Suspense fallback={<AbaCarregando />}>
+              <BancoEstudantes bancoId={id} cor={corBanco} />
+            </Suspense>
+          ) : <AbaCarregando />}
         </TabsContent>
 
         <TabsContent value="caderno">
-          <Suspense fallback={<AbaCarregando />}>
-            <BancoCaderno bancoId={id} cor={corBanco} />
-          </Suspense>
+          {abaInicial === 'caderno' ? (
+            <Suspense fallback={<AbaCarregando />}>
+              <BancoCaderno bancoId={id} cor={corBanco} />
+            </Suspense>
+          ) : <AbaCarregando />}
         </TabsContent>
 
         <TabsContent value="relatorio">
-          <Suspense fallback={<AbaCarregando />}>
-            <BancoRelatorio bancoId={id} cor={corBanco} />
-          </Suspense>
+          {abaInicial === 'relatorio' ? (
+            <Suspense fallback={<AbaCarregando />}>
+              <BancoRelatorio bancoId={id} cor={corBanco} />
+            </Suspense>
+          ) : <AbaCarregando />}
         </TabsContent>
 
         <TabsContent value="personalizar">
           <BancoPersonalizar banco={{ id: banco.id, nome: banco.nome, cor: banco.cor ?? null, icone: banco.icone ?? null, capa_url: banco.capa_url ?? null, capa_card_url: banco.capa_card_url ?? null, total: questoes.length }} />
         </TabsContent>
-      </Tabs>
+      </BancoTabsShell>
     </div>
   )
 }
