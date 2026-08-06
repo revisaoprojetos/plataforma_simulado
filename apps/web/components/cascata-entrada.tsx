@@ -3,7 +3,12 @@
 import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 
-const TETO = 20 // nº máx de passos antes de estabilizar (o passo em ms fica no CSS: 75ms)
+// Passo por card (sensação "normal") e JANELA máxima de escalonamento. TODOS os cards entram na
+// sequência (mais simulados/cadernos/banco → mais cards animando, sem teto). O passo em ms se
+// AUTO-AJUSTA: fica em PASSO_MS para páginas típicas e comprime só quando há muitos cards, para o
+// total nunca passar de ~JANELA_MS (evita arrastar). O passo é publicado em `--cascata-step`.
+const PASSO_MS = 75
+const JANELA_MS = 1800
 
 /**
  * Coleta os "cards" na ORDEM DE LEITURA para escalonar a entrada, com a MESMA granularidade em
@@ -104,8 +109,12 @@ export function CascataEntrada({ children, ativa = true }: { children: React.Rea
       // então não brigam com o className/style dos cards (evita erro de hidratação/reconciliação).
       cards.forEach((el) => { el.removeAttribute('data-cascata'); el.style.removeProperty('--cascata-i') })
       void root.offsetWidth // reflow: garante que remover+readicionar REINICIE a animação
+      // Passo auto-ajustável: normal (PASSO_MS) até caber em JANELA_MS; comprime se houver muitos
+      // cards. Assim a cascata SEMPRE percorre todos os cards, sem arrastar quando há muitos.
+      const passo = cards.length > 1 ? Math.min(PASSO_MS, Math.round(JANELA_MS / (cards.length - 1))) : PASSO_MS
+      root.style.setProperty('--cascata-step', `${passo}ms`)
       cards.forEach((el, i) => {
-        el.style.setProperty('--cascata-i', String(Math.min(i, TETO)))
+        el.style.setProperty('--cascata-i', String(i))
         el.setAttribute('data-cascata', '')
       })
       return true
