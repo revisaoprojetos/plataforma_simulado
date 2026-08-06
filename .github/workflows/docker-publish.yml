@@ -3,6 +3,9 @@ name: Build e Push para GHCR
 on:
   push:
     branches: [main]
+  # Permite disparar o build manualmente pela aba Actions (Run workflow) — útil quando um push
+  # nao dispara o CI (ex.: push via URL antigo apos o repo ser renomeado).
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
