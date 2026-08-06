@@ -23,7 +23,11 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
   // SOB DEMANDA por página no client (detalhesVinculadosBanco). Aplique scripts/sql/banco-vinculados-rpc.sql.
   let vinculados: any[] | null = null
   try {
-    vinculados = await fetchAll<any>(() => svc.rpc('simulado_banco_vinculados', { p_banco: bancoId, p_tenant: tid }) as any)
+    const rpc = await fetchAll<any>(() => svc.rpc('simulado_banco_vinculados', { p_banco: bancoId, p_tenant: tid }) as any)
+    // Dedup por id (defensivo): se houver linhas repetidas em pasta_estudantes/estudantes, o JOIN
+    // pode trazer o mesmo aluno mais de uma vez; o fallback deduplicava via Set — aqui garantimos igual.
+    const visto = new Set<string>()
+    vinculados = rpc.filter((r: any) => r?.id && !visto.has(r.id) && visto.add(r.id))
   } catch {
     vinculados = null // função ausente (SQL não aplicado) → fallback abaixo
   }
