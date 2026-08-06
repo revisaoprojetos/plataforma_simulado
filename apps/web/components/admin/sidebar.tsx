@@ -285,11 +285,18 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                           aria-label={group.label}
                           title={group.label}
                           data-active={ativo ? 'true' : undefined}
-                          className={cn('mx-auto flex h-8 w-8 items-center justify-center rounded-md outline-none transition-colors', NAV_STATES, ativo && 'bg-[color:var(--sidebar-accent)]')}
+                          className={cn(
+                            'mx-auto flex h-8 w-8 items-center justify-center rounded-md outline-none transition-colors',
+                            NAV_STATES,
+                            // Aberto: ícone fica SELECIONADO (bg + cor ativa) — "ligado" ao flyout.
+                            'data-[popup-open]:bg-[color:var(--sidebar-accent)] data-[popup-open]:text-[color:var(--sidebar-text-active)] [&[data-popup-open]>svg]:text-[color:var(--sidebar-icon-active)]',
+                            ativo && 'bg-[color:var(--sidebar-accent)]',
+                          )}
                         >
                           <group.icon className="h-4 w-4" />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent side="right" align="start" sideOffset={8} className="w-auto min-w-52">
+                        {/* sideOffset baixo = flyout encostado no ícone (parece uma extensão dele). */}
+                        <DropdownMenuContent side="right" align="start" sideOffset={4} alignOffset={-4} className="w-auto min-w-52">
                           <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{group.label}</div>
                           {group.items.map((item) => (
                             <DropdownMenuItem
