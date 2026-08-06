@@ -189,7 +189,10 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
 
       <CardContent className="p-0">
         <div className="max-h-[60vh] overflow-auto">
-          <table className="w-full caption-bottom text-sm">
+          {/* table-fixed: a tabela nunca excede o container (as colunas seguem as larguras do
+              cabeçalho; a de Enunciado pega o resto). Sem isto, o conteúdo longo (ex.: detalhe
+              expandido) fazia a tabela crescer e gerava scroll horizontal. */}
+          <table className="w-full table-fixed caption-bottom text-sm">
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 <TableHead className="w-10">
@@ -264,15 +267,18 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs font-medium uppercase text-muted-foreground">{q.disciplina ?? '—'}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{q.assunto ?? '—'}</TableCell>
+                      <TableCell className="whitespace-normal break-words text-xs font-medium uppercase text-muted-foreground">{q.disciplina ?? '—'}</TableCell>
+                      <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{q.assunto ?? '—'}</TableCell>
                       <TableCell className="text-center font-bold">{d ? <span className={d.cls}>{d.letra}</span> : '—'}</TableCell>
                       <TableCell><span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', st.cls)}>{st.label}</span></TableCell>
                     </TableRow>
                     {open && (
                       <TableRow className="bg-muted/20 hover:bg-muted/20">
-                        <TableCell colSpan={8} className="p-0">
-                          <div className="max-w-[900px] space-y-2 px-6 py-3">
+                        <TableCell colSpan={8} className="whitespace-normal p-0">
+                          {/* A célula herda `whitespace-nowrap` (base do TableCell) → o comentário virava
+                              UMA linha gigante e esticava a tabela (overflow horizontal). `whitespace-normal`
+                              volta a quebrar; `max-w` limita a largura de leitura sem esticar a tabela. */}
+                          <div className="max-w-[900px] space-y-2 break-words px-6 py-3">
                             {det === 'loading' && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</p>}
                             {det === 'erro' && <p className="text-sm text-rose-600 dark:text-rose-400">Não foi possível carregar os detalhes.</p>}
                             {det && det !== 'loading' && det !== 'erro' && (
