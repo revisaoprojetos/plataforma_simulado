@@ -61,7 +61,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
@@ -291,7 +290,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                           <group.icon className="h-4 w-4" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent side="right" align="start" sideOffset={8} className="w-auto min-w-52">
-                          <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{group.label}</div>
                           {group.items.map((item) => (
                             <DropdownMenuItem
                               key={item.href}
