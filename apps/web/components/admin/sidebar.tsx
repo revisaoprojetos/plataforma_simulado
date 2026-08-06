@@ -288,6 +288,9 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                           className={cn(
                             'mx-auto flex h-8 w-8 items-center justify-center rounded-md outline-none transition-colors',
                             NAV_STATES,
+                            // Hover PRECISA de fundo: NAV_STATES pinta o ícone com a cor "ativa"
+                            // no hover; sem fundo, ela fica igual ao sidebar escuro e o ícone some.
+                            'hover:bg-[color:var(--sidebar-accent)]',
                             // Aberto: ícone fica SELECIONADO (bg + cor ativa) — "ligado" ao flyout.
                             'data-[popup-open]:bg-[color:var(--sidebar-accent)] data-[popup-open]:text-[color:var(--sidebar-text-active)] [&[data-popup-open]>svg]:text-[color:var(--sidebar-icon-active)]',
                             ativo && 'bg-[color:var(--sidebar-accent)]',
