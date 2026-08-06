@@ -298,6 +298,9 @@
    visível antes da cascata. `cascata-pronta` revela; se não houver JS, o @media revela. */
 .cascata-root:not(.cascata-pronta) { opacity: 0; }
 @media (scripting: none) { .cascata-root:not(.cascata-pronta) { opacity: 1; } }
+/* O container-RAIZ da página NÃO anima como bloco — várias páginas têm `animate-page` na raiz,
+   que faria tudo aparecer de uma vez e mascararia a cascata dos cards. Quem entra são os cards. */
+.cascata-root > * { animation: none !important; }
 
 .stagger > *, .cascata-item { animation: riseIn 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .stagger > *:nth-child(1)  { animation-delay: 0ms; }
