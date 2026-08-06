@@ -113,6 +113,10 @@ export default async function AdminLayout({
 
   return (
     <CanProvider isAdmin={access.isAdmin} permissions={access.permissions}>
+      {/* Síncrono, ANTES do 1º paint: se o splash vai aparecer (não visto nesta sessão), pausa a
+          animação de entrada para ela não rodar escondida atrás dele. Rede de segurança de 2s
+          garante que a página nunca fica presa invisível. O SplashSistema tira antes (no fade). */}
+      <script dangerouslySetInnerHTML={{ __html: "try{if(!sessionStorage.getItem('splash_sistema_visto')){document.documentElement.classList.add('splash-ativo');setTimeout(function(){document.documentElement.classList.remove('splash-ativo')},2000)}}catch(e){}" }} />
       <SplashSistema
         estilo={ti.splash_estilo ?? 'spinner'}
         logo={ti.splash_logo ?? ti.logo_url ?? null}

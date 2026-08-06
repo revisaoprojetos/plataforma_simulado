@@ -317,6 +317,15 @@
    página hidrata (não fica travando no main thread). */
 .stagger > *, .page-rise > * > *, .animate-rise { will-change: transform, opacity; }
 
+/* Enquanto a tela de imersão (splash) cobre a tela, PAUSA a entrada — senão a cascata
+   roda escondida atrás do splash e, quando ele some, os elementos já estão parados.
+   O SplashSistema tira `splash-ativo` do <html> quando começa a sumir → a cascata
+   dispara enquanto o splash dissolve (revelação suave). */
+html.splash-ativo .page-rise > * > *,
+html.splash-ativo .stagger > *,
+html.splash-ativo .animate-rise,
+html.splash-ativo .animate-pop { animation-play-state: paused !important; }
+
 /* Respeita quem pediu menos movimento. */
 @media (prefers-reduced-motion: reduce) {
   .animate-page, .animate-rise, .animate-pop, .grow-w, .grow-h, .bar-fill,

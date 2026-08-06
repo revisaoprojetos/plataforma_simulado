@@ -14,14 +14,18 @@ export function SplashSistema({ estilo, logo, nome, mensagem }: { estilo: Estilo
     try { visto = !!sessionStorage.getItem('splash_sistema_visto') } catch { /* ignore */ }
     if (visto) return
     setShow(true)
-    const t1 = setTimeout(() => setFade(true), 1100)
+    // A pausa da animação (`splash-ativo` no <html>) é ligada por um script síncrono no layout,
+    // ANTES do 1º paint. Aqui só a LIBERAMOS quando o fade começa → os cards sobem em cascata
+    // enquanto o splash dissolve (revelação suave).
+    const html = document.documentElement
+    const t1 = setTimeout(() => { setFade(true); html.classList.remove('splash-ativo') }, 1100)
     // Marca como visto só ao FINAL (StrictMode-safe: o 2º efeito reagenda os timers
     // em vez de sair cedo, evitando a splash presa).
     const t2 = setTimeout(() => {
       setShow(false)
       try { sessionStorage.setItem('splash_sistema_visto', '1') } catch { /* ignore */ }
     }, 1450)
-    return () => { clearTimeout(t1); clearTimeout(t2) }
+    return () => { clearTimeout(t1); clearTimeout(t2); html.classList.remove('splash-ativo') }
   }, [])
 
   if (!show) return null
