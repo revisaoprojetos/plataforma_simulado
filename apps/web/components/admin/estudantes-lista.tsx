@@ -82,7 +82,7 @@ export function EstudantesLista({ inicial, agregados, total, kpis, adminEmails =
     ;(async () => {
       let off = inicial.length
       while (!cancel && off < total) {
-        const { rows: lote } = await carregarLoteEstudantes(off, LOTE)
+        const { rows: lote } = await carregarLoteEstudantes(off, LOTE, false)
         if (cancel || !lote.length) break
         setRows((prev) => [...prev, ...lote.map(aplicar)])
         off += lote.length

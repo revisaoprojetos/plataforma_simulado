@@ -24,13 +24,15 @@ export type EstudanteBase = {
  * enquanto o usuário já vê os primeiros. Traz só colunas da tabela (leve); os agregados de sessão
  * (feitos/média) vêm de um mapa único calculado uma vez na página. Tenant vem da sessão.
  */
-export async function carregarLoteEstudantes(offset: number, limit: number): Promise<{ rows: EstudanteBase[]; total: number }> {
+export async function carregarLoteEstudantes(offset: number, limit: number, comContagem = true): Promise<{ rows: EstudanteBase[]; total: number }> {
   const svc = await createServiceClient()
   const tenantId = (await getCurrentTenantId()) ?? TENANT_VAZIO
   const lim = Math.min(Math.max(limit, 1), 1000) // teto do PostgREST
+  // `count: 'exact'` faz o Postgres varrer a tabela inteira p/ contar — caro (~1s em 11k+).
+  // Só o 1º lote precisa do total; os demais (loop de fundo) já o conhecem e pedem `comContagem=false`.
   const { data, count } = await svc
     .from('simulado_estudantes')
-    .select('id, nome, email, cpf, telefone, classificacao, created_at', { count: 'exact' })
+    .select('id, nome, email, cpf, telefone, classificacao, created_at', comContagem ? { count: 'exact' } : undefined)
     .eq('deletado', false)
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
