@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useTransition, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, Check, Eye, Trash2, Loader2, Users, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { desvincularEstudantesEmMassa } from '@/app/admin/banco-questoes/estudantes-actions'
+import { desvincularEstudantesEmMassa, detalhesVinculadosBanco } from '@/app/admin/banco-questoes/estudantes-actions'
 import { AdicionarEstudantesDialog } from '@/components/admin/adicionar-estudantes-dialog'
 import { AdicionarGrupoBancoDialog } from '@/components/admin/adicionar-grupo-banco-dialog'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
@@ -45,14 +45,22 @@ function fmtAcesso(d?: string | null) {
 }
 
 type GrupoVinc = { id: string; nome: string; cor: string | null }
-// `alunos` (todos do tenant) e `grupos` (com contagens) NÃO chegam mais por prop — os diálogos os
-// carregam SOB DEMANDA (busca/abrir), tirando >30k linhas do 1º render da aba.
-export function BancoEstudantesClient({ bancoId, vinculados, gruposPorEstudante = {}, cor = '#6d28d9' }: { bancoId: string; vinculados: Aluno[]; gruposPorEstudante?: Record<string, GrupoVinc[]>; cor?: string }) {
+const POR_PAGINA = 50
+// `alunos`, `grupos` e os detalhes (último acesso/grupos) NÃO chegam por prop — os diálogos buscam
+// sob demanda e a lista é PAGINADA (50/página): o servidor manda só os campos de exibição dos
+// vinculados; último acesso + grupos carregam por página (detalhesVinculadosBanco). Antes buscava
+// sessões/filiações de TODOS (~4,9k) e renderizava tudo → aba lentíssima.
+export function BancoEstudantesClient({ bancoId, vinculados, cor = '#6d28d9' }: { bancoId: string; vinculados: Aluno[]; cor?: string }) {
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
   const [ordCampo, setOrdCampo] = useState<'nome' | 'email' | 'cpf' | 'ultimo_acesso'>('nome')
   const [ordDir, setOrdDir] = useState<'asc' | 'desc'>('asc')
+  const [pagina, setPagina] = useState(0)
+  const [detUltimo, setDetUltimo] = useState<Record<string, string>>({})
+  const [detGrupos, setDetGrupos] = useState<Record<string, GrupoVinc[]>>({})
+  const [carregandoDet, setCarregandoDet] = useState(false)
+  const [carregadosSet, setCarregadosSet] = useState<Set<string>>(new Set())
   const router = useRouter()
 
   function ordenar(campo: 'nome' | 'email' | 'cpf' | 'ultimo_acesso') {
@@ -65,7 +73,7 @@ export function BancoEstudantesClient({ bancoId, vinculados, gruposPorEstudante 
     const base = q ? vinculados.filter((a) => a.nome.toLowerCase().includes(q) || (a.email ?? '').toLowerCase().includes(q)) : vinculados
     const dir = ordDir === 'asc' ? 1 : -1
     const val = (a: Aluno) => {
-      if (ordCampo === 'ultimo_acesso') return a.ultimo_acesso ? new Date(a.ultimo_acesso).getTime() : -1
+      if (ordCampo === 'ultimo_acesso') { const d = detUltimo[a.id]; return d ? new Date(d).getTime() : -1 }
       return (a[ordCampo] ?? '').toString().toLowerCase()
     }
     return [...base].sort((a, b) => {
@@ -73,7 +81,31 @@ export function BancoEstudantesClient({ bancoId, vinculados, gruposPorEstudante 
       if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir
       return String(va).localeCompare(String(vb), 'pt-BR') * dir
     })
-  }, [busca, vinculados, ordCampo, ordDir])
+  }, [busca, vinculados, ordCampo, ordDir, detUltimo])
+
+  const totalPag = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
+  const paginaItens = useMemo(() => filtrados.slice(pagina * POR_PAGINA, pagina * POR_PAGINA + POR_PAGINA), [filtrados, pagina])
+  // Volta à 1ª página quando muda busca/ordenação; e não deixa a página passar do total.
+  useEffect(() => { setPagina(0) }, [busca, ordCampo, ordDir])
+  useEffect(() => { if (pagina > totalPag - 1) setPagina(0) }, [totalPag, pagina])
+
+  // Carrega detalhes (último acesso + grupos) SÓ dos itens visíveis ainda não buscados.
+  useEffect(() => {
+    const ids = paginaItens.map((a) => a.id).filter((id) => !carregadosSet.has(id))
+    if (!ids.length) return
+    let vivo = true
+    setCarregandoDet(true)
+    detalhesVinculadosBanco(bancoId, ids).then((r) => {
+      if (!vivo) return
+      setCarregadosSet((p) => { const n = new Set(p); ids.forEach((id) => n.add(id)); return n })
+      if (r.ok) {
+        if (r.ultimo) setDetUltimo((p) => ({ ...p, ...r.ultimo }))
+        if (r.grupos) setDetGrupos((p) => ({ ...p, ...r.grupos }))
+      }
+      setCarregandoDet(false)
+    })
+    return () => { vivo = false }
+  }, [paginaItens, bancoId, carregadosSet])
 
   function toggle(id: string) {
     setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -144,8 +176,9 @@ export function BancoEstudantesClient({ bancoId, vinculados, gruposPorEstudante 
               {filtrados.length === 0 ? (
                 <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">Nenhum aluno vinculado. Clique em “Adicionar estudantes”.</TableCell></TableRow>
               ) : (
-                filtrados.map((a) => {
+                paginaItens.map((a) => {
                   const on = sel.has(a.id)
+                  const detCarregado = carregadosSet.has(a.id)
                   return (
                     <TableRow key={a.id} className={cn(on && 'bg-primary/5')}>
                       <TableCell onClick={() => toggle(a.id)} className="cursor-pointer">
@@ -167,9 +200,11 @@ export function BancoEstudantesClient({ bancoId, vinculados, gruposPorEstudante 
                       <TableCell className="text-muted-foreground">{a.email ?? '—'}</TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">{a.cpf ?? '—'}</TableCell>
                       <TableCell>
-                        {(gruposPorEstudante[a.id] ?? []).length ? (
+                        {!detCarregado ? (
+                          <span className="text-xs text-muted-foreground/60">…</span>
+                        ) : (detGrupos[a.id] ?? []).length ? (
                           <div className="flex flex-wrap gap-1">
-                            {(gruposPorEstudante[a.id] ?? []).map((g) => (
+                            {(detGrupos[a.id] ?? []).map((g) => (
                               <Link key={g.id} href={`/admin/grupos/${g.id}`} title={g.nome}
                                 className="inline-flex max-w-[160px] items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors hover:border-primary hover:bg-primary/5">
                                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: g.cor ?? 'var(--muted-foreground)' }} />
@@ -181,7 +216,7 @@ export function BancoEstudantesClient({ bancoId, vinculados, gruposPorEstudante 
                           <span className="text-xs text-muted-foreground" title="Adicionado diretamente ao banco (sem grupo)">Direto</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{fmtAcesso(a.ultimo_acesso)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{detCarregado ? fmtAcesso(detUltimo[a.id]) : <span className="text-muted-foreground/60">…</span>}</TableCell>
                       <TableCell className="text-center">
                         <Link href={`/admin/estudantes/${a.id}`} className="inline-flex text-muted-foreground hover:text-primary" title="Ver perfil">
                           <Eye className="h-4 w-4" />
@@ -194,7 +229,21 @@ export function BancoEstudantesClient({ bancoId, vinculados, gruposPorEstudante 
             </TableBody>
           </table>
         </div>
-        <div className="border-t px-4 py-2 text-right text-xs text-muted-foreground">{vinculados.length} membro(s)</div>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2 text-xs text-muted-foreground">
+          <span>
+            {filtrados.length.toLocaleString('pt-BR')} de {vinculados.length.toLocaleString('pt-BR')} membro(s)
+            {carregandoDet && <span className="ml-1 inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> detalhes…</span>}
+          </span>
+          {totalPag > 1 && (
+            <div className="flex items-center gap-1.5">
+              <button type="button" onClick={() => setPagina((p) => Math.max(0, p - 1))} disabled={pagina === 0}
+                className="rounded-md border px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">Anterior</button>
+              <span className="px-1 tabular-nums">Pág. {pagina + 1}/{totalPag}</span>
+              <button type="button" onClick={() => setPagina((p) => Math.min(totalPag - 1, p + 1))} disabled={pagina >= totalPag - 1}
+                className="rounded-md border px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">Próxima</button>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   )

@@ -444,6 +444,46 @@ export async function buscarEstudantesPlataforma(bancoId: string, query: string)
   return { ok: true, estudantes: (data ?? []).map((r: any) => ({ id: r.id, nome: r.nome, email: r.email ?? null, telefone: r.telefone ?? null, classificacao: r.classificacao ?? null, jaVinculado: vinc.has(r.id) })) }
 }
 
+export interface DetalhesVinc { ultimo: Record<string, string>; grupos: Record<string, { id: string; nome: string; cor: string | null }[]> }
+
+/**
+ * Detalhes SÓ dos estudantes da PÁGINA visível (último acesso + grupos pelos quais chegaram ao banco).
+ * A lista de vinculados é paginada no client (50/página) → aqui recebemos ~50 ids e uma única
+ * requisição por tabela, em vez de varrer as sessões/filiações de milhares de alunos no 1º render.
+ */
+export async function detalhesVinculadosBanco(bancoId: string, ids: string[]): Promise<{ ok: boolean; ultimo?: Record<string, string>; grupos?: Record<string, { id: string; nome: string; cor: string | null }[]>; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+  const lista = [...new Set((ids ?? []).filter(Boolean))]
+  if (!lista.length) return { ok: true, ultimo: {}, grupos: {} }
+
+  // Último acesso = sessão mais recente de cada um (1 requisição p/ ~50 ids).
+  const { data: sess } = await svc.from('simulado_sessoes_prova')
+    .select('estudante_id, iniciado_em').in('estudante_id', lista)
+    .eq('deletado', false).eq('is_teste', false).order('iniciado_em', { ascending: false })
+  const ultimo: Record<string, string> = {}
+  for (const s of (sess ?? []) as any[]) if (!ultimo[s.estudante_id]) ultimo[s.estudante_id] = s.iniciado_em
+
+  // Grupos LIGADOS ao banco de que cada um (dos ~50) é membro.
+  const grupos: Record<string, { id: string; nome: string; cor: string | null }[]> = {}
+  const { data: links } = await svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', bancoId)
+  const linked = [...new Set((links ?? []).map((l: any) => l.grupo_id))]
+  if (linked.length) {
+    const gruposRaw = await selecionarGrupos(svc, g.tenantId)
+    const info = new Map<string, { id: string; nome: string; cor: string | null }>(gruposRaw.map((x: any) => [x.id, { id: x.id, nome: x.nome, cor: x.cor ?? null }]))
+    const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id, estudante_id').in('grupo_id', linked).in('estudante_id', lista)
+    const seen: Record<string, Set<string>> = {}
+    for (const m of (gm ?? []) as any[]) {
+      const gi = info.get(m.grupo_id); if (!gi) continue
+      const s = (seen[m.estudante_id] ??= new Set()); if (s.has(gi.id)) continue
+      s.add(gi.id); (grupos[m.estudante_id] ??= []).push(gi)
+    }
+    for (const k of Object.keys(grupos)) grupos[k].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }
+  return { ok: true, ultimo, grupos }
+}
+
 export interface GrupoBancoOpc { id: string; nome: string; cor: string | null; membros: number; vinculado: boolean; pai_id: string | null; is_mestre: boolean }
 
 /**

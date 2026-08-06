@@ -1,7 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { selecionarGrupos } from '@/lib/simulado/grupos'
 import { BancoEstudantesClient } from '@/components/admin/banco-estudantes-client'
 import { AlertTriangle } from 'lucide-react'
 
@@ -29,56 +28,14 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
   } catch {
     return <SqlPendente />
   }
-  const vincSet = new Set(vincIds)
+  // SÓ os campos de EXIBIÇÃO dos vinculados (por id, chunk 400). Último acesso e grupos NÃO são
+  // buscados aqui (custavam ~7s p/ 4.9k) — o client os carrega SOB DEMANDA, só da PÁGINA visível
+  // (detalhesVinculadosBanco). Sem embed: as FKs do esqueleto simulado_* estão quebradas → sem JOIN.
+  const vincRecs: any[] = vincIds.length
+    ? await fetchAllByIn<any>(vincIds, (ids) => svc
+        .from('simulado_estudantes').select('id, nome, email, telefone, cpf, classificacao').in('id', ids), { chunk: 300 })
+    : []
+  const vinculados = vincRecs.sort((a: any, b: any) => (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR'))
 
-  // SÓ os registros dos VINCULADOS (por id) + suas sessões. ANTES a aba buscava TODOS os estudantes
-  // do tenant (>11 mil) só para o pop-up de adicionar → aba lentíssima. Agora o pop-up busca sob
-  // demanda (buscarEstudantesPlataforma) e aqui pegamos apenas os vinculados por id.
-  // chunk: 300 (não 80): o `.in()` por id fazia ~61 requisições sequenciais p/ 4.9k ids (o gargalo
-  // real dos ~80s). Com 300 por vez são ~17 (URL ainda dentro do limite). Sem embed: as FKs do
-  // esqueleto simulado_* estão quebradas → PostgREST não faz o JOIN.
-  const [vincRecs, sess] = await Promise.all([
-    vincIds.length
-      ? fetchAllByIn<any>(vincIds, (ids) => svc
-          .from('simulado_estudantes').select('id, nome, email, telefone, cpf, classificacao').in('id', ids), { chunk: 300 })
-      : Promise.resolve([] as any[]),
-    vincIds.length
-      ? fetchAllByIn<{ estudante_id: string; iniciado_em: string }>(vincIds, (ids) => svc
-          .from('simulado_sessoes_prova').select('estudante_id, iniciado_em')
-          .in('estudante_id', ids).eq('deletado', false).eq('is_teste', false).order('iniciado_em', { ascending: false }), { chunk: 300 })
-      : Promise.resolve([] as { estudante_id: string; iniciado_em: string }[]),
-  ])
-  const ultimoPorAluno = new Map<string, string>()
-  for (const s of sess) if (!ultimoPorAluno.has(s.estudante_id)) ultimoPorAluno.set(s.estudante_id, s.iniciado_em)
-  const vinculados = vincRecs
-    .map((a: any) => ({ ...a, ultimo_acesso: ultimoPorAluno.get(a.id) ?? null }))
-    .sort((a: any, b: any) => (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR'))
-
-  // Grupo(s) pelo(s) qual(is) cada aluno chegou a este banco (grupos vinculados de que ele é membro).
-  // A contagem de membros de TODOS os grupos (>22 mil filiações) saiu daqui → agora é sob demanda no
-  // diálogo "Adicionar grupo" (carregarGruposDoBanco). Aqui só varremos os grupos LIGADOS ao banco.
-  const gruposPorEstudante: Record<string, { id: string; nome: string; cor: string | null }[]> = {}
-  const { data: links } = await svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', bancoId)
-  const linkedGroupIds = [...new Set((links ?? []).map((l: any) => l.grupo_id))]
-  if (linkedGroupIds.length) {
-    const gruposRaw = await selecionarGrupos(svc, tid)
-    const infoGrupo = new Map<string, { id: string; nome: string; cor: string | null }>(
-      gruposRaw.map((x) => [x.id, { id: x.id, nome: x.nome, cor: x.cor ?? null }]),
-    )
-    const gm2 = await fetchAll<{ grupo_id: string; estudante_id: string }>(() =>
-      svc.from('simulado_grupo_membros').select('grupo_id, estudante_id').in('grupo_id', linkedGroupIds).order('id', { ascending: true }))
-    const jaTem: Record<string, Set<string>> = {}
-    for (const m of gm2) {
-      if (!vincSet.has(m.estudante_id)) continue
-      const g = infoGrupo.get(m.grupo_id)
-      if (!g) continue
-      const seen = (jaTem[m.estudante_id] ??= new Set())
-      if (seen.has(g.id)) continue
-      seen.add(g.id)
-      ;(gruposPorEstudante[m.estudante_id] ??= []).push(g)
-    }
-    for (const k of Object.keys(gruposPorEstudante)) gruposPorEstudante[k].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-  }
-
-  return <BancoEstudantesClient bancoId={bancoId} vinculados={vinculados as any} gruposPorEstudante={gruposPorEstudante} cor={cor} />
+  return <BancoEstudantesClient bancoId={bancoId} vinculados={vinculados as any} cor={cor} />
 }
