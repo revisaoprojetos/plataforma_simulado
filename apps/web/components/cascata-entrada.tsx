@@ -6,23 +6,45 @@ import { usePathname } from 'next/navigation'
 const TETO = 20 // nº máx de passos antes de estabilizar (o passo em ms fica no CSS: 75ms)
 
 /**
- * Coleta os "cards" na ORDEM DE LEITURA para escalonar a entrada:
- * - filhos diretos da raiz da página (seções empilhadas → de cima para baixo);
- * - se um filho é um GRID com vários itens, entram os ITENS dele — que no DOM já vêm da
- *   esquerda para a direita, linha a linha → a cascata fica "linha por linha, L→R".
+ * Coleta os "cards" na ORDEM DE LEITURA para escalonar a entrada, com a MESMA granularidade em
+ * todas as páginas (o dashboard tinha os grids como filhos diretos e ficava granular; outras páginas
+ * embrulham tudo num wrapper de layout a mais e animavam como 1 bloco só). Regras:
+ * - GRID com vários itens → cada ITEM é um card (no DOM já vêm L→R, linha a linha).
+ * - Container de LAYOUT transparente (só espaçamento: sem borda/fundo/sombra/cantos), empilhado
+ *   (block ou flex-column), com vários filhos e ao menos uma sub-seção → DESCE e anima as seções
+ *   internas (evita "1 bloco só"). Cabeçalhos (flex-row) e blocos de texto (filhos sem filhos) e
+ *   cards visuais (com borda/fundo/cantos) NÃO são desmembrados. Cap de profundidade = 2.
  */
 function coletarCards(root: HTMLElement): HTMLElement[] {
   const raiz = root.firstElementChild as HTMLElement | null
   if (!raiz) return []
-  const cards: HTMLElement[] = []
-  for (const filho of Array.from(raiz.children) as HTMLElement[]) {
-    const disp = getComputedStyle(filho).display
-    if (disp === 'grid' && filho.childElementCount > 1) {
-      for (const item of Array.from(filho.children) as HTMLElement[]) cards.push(item)
-    } else {
-      cards.push(filho)
-    }
+
+  const transparente = (el: HTMLElement): boolean => {
+    const s = getComputedStyle(el)
+    const semBorda = ['top', 'right', 'bottom', 'left'].every((l) => parseFloat(s.getPropertyValue(`border-${l}-width`)) === 0)
+    const semFundo = s.backgroundColor === 'rgba(0, 0, 0, 0)' || s.backgroundColor === 'transparent'
+    return semBorda && semFundo && s.boxShadow === 'none' && s.borderRadius === '0px'
   }
+
+  const cards: HTMLElement[] = []
+  const adicionar = (el: HTMLElement, prof: number): void => {
+    const s = getComputedStyle(el)
+    const disp = s.display
+    const filhos = Array.from(el.children) as HTMLElement[]
+
+    if (disp === 'grid' && filhos.length > 1) { for (const it of filhos) cards.push(it); return }
+
+    const empilhado = disp === 'block' || (disp === 'flex' && s.flexDirection === 'column')
+    const temSubsecao = filhos.some((c) => c.childElementCount > 0)
+    if (prof < 2 && filhos.length > 1 && empilhado && temSubsecao && transparente(el)) {
+      for (const it of filhos) adicionar(it, prof + 1)
+      return
+    }
+
+    cards.push(el)
+  }
+
+  for (const filho of Array.from(raiz.children) as HTMLElement[]) adicionar(filho, 0)
   return cards
 }
 
