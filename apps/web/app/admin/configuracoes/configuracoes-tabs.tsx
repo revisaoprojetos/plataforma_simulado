@@ -12,6 +12,7 @@ import type { EstiloLoader } from '@/components/admin/loaders'
 
 export function ConfiguracoesTabs({ tema, salvarTema }: { tema: any; salvarTema: (t: Record<string, unknown>) => Promise<{ ok?: boolean } | void> }) {
   const estiloInicial = ((tema?.loading_estilo as EstiloLoader) ?? 'skeleton') as EstiloLoader
+  const animacaoInicial = (tema?.animacao_entrada as boolean | undefined) !== false
   return (
     <Tabs defaultValue="identidade">
       <TabsList className="flex-wrap">
@@ -42,7 +43,7 @@ export function ConfiguracoesTabs({ tema, salvarTema }: { tema: any; salvarTema:
             <TabsTrigger value="splash"><MonitorPlay /> Tela cheia (splash)</TabsTrigger>
           </TabsList>
           <TabsContent value="loader" className="pt-4">
-            <CarregamentoForm estiloInicial={estiloInicial} salvarTema={salvarTema} />
+            <CarregamentoForm estiloInicial={estiloInicial} animacaoInicial={animacaoInicial} salvarTema={salvarTema} />
           </TabsContent>
           <TabsContent value="splash" className="pt-4">
             <ImersaoForm tema={tema} salvarTema={salvarTema} />

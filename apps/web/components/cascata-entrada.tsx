@@ -33,7 +33,7 @@ function coletarCards(root: HTMLElement): HTMLElement[] {
  * evitando o "flash" de tudo visível antes da cascata; `cascata-pronta` sempre é aplicada (mesmo
  * em erro/reduced-motion) para nunca deixar a tela presa invisível.
  */
-export function CascataEntrada({ children }: { children: React.ReactNode }) {
+export function CascataEntrada({ children, ativa = true }: { children: React.ReactNode; ativa?: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
   // useEffect (não useLayoutEffect): roda DEPOIS do commit/hidratação — mutar o DOM durante a
@@ -42,6 +42,8 @@ export function CascataEntrada({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const root = ref.current
     if (!root) return
+    // Desligada no console (tema.animacao_entrada = false): não anima, não esconde — só mostra.
+    if (!ativa) { root.classList.add('cascata-pronta'); return }
     root.classList.remove('cascata-pronta') // re-esconde para reanimar nesta navegação
 
     let semMovimento = false
@@ -88,6 +90,7 @@ export function CascataEntrada({ children }: { children: React.ReactNode }) {
       if (ric && cic) cic(idle)
       else clearTimeout(idle)
     }
-  }, [pathname])
-  return <div ref={ref} className="cascata-root">{children}</div>
+  }, [pathname, ativa])
+  // Sem `cascata-root` quando desligada → o CSS não esconde (opacity:0) nem anima nada.
+  return <div ref={ref} className={ativa ? 'cascata-root' : undefined}>{children}</div>
 }
