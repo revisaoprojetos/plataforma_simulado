@@ -17,74 +17,54 @@ function SqlPendente() {
 export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: string; cor?: string }) {
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
+  const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
 
-  // PAGINADO (fetchAll): pode haver >1000 vínculos/estudantes e o PostgREST corta em ~1000.
+  // Vínculos do banco (ids). Tolerante: a tabela pode não existir → SqlPendente.
   let vincIds: string[]
   try {
     const pe = await fetchAll<{ estudante_id: string }>(() => svc
-      .from('simulado_pasta_estudantes')
-      .select('estudante_id')
-      .eq('pasta_id', bancoId)
-      .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
-      .order('estudante_id', { ascending: true }))
+      .from('simulado_pasta_estudantes').select('estudante_id')
+      .eq('pasta_id', bancoId).eq('tenant_id', tid).order('estudante_id', { ascending: true }))
     vincIds = pe.map((r) => r.estudante_id)
   } catch {
     return <SqlPendente />
   }
   const vincSet = new Set(vincIds)
 
-  // Todos os estudantes da plataforma (tenant) — para o pop-up de adicionar. `.limit(2000)`
-  // NÃO burla o teto de 1000 do PostgREST; por isso fetchAll.
-  const lista = await fetchAll<any>(() => svc
-    .from('simulado_estudantes')
-    .select('id, nome, email, telefone, cpf, classificacao')
-    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
-    .order('nome', { ascending: true })
-    .order('id', { ascending: true }))
-  const alunos = lista.map((a: any) => ({ ...a, jaVinculado: vincSet.has(a.id) }))
-
-  // Último acesso de cada vinculado = sessão mais recente.
+  // SÓ os registros dos VINCULADOS (por id) + suas sessões. ANTES a aba buscava TODOS os estudantes
+  // do tenant (>11 mil) só para o pop-up de adicionar → aba lentíssima. Agora o pop-up busca sob
+  // demanda (buscarEstudantesPlataforma) e aqui pegamos apenas os vinculados por id.
+  // chunk: 300 (não 80): o `.in()` por id fazia ~61 requisições sequenciais p/ 4.9k ids (o gargalo
+  // real dos ~80s). Com 300 por vez são ~17 (URL ainda dentro do limite). Sem embed: as FKs do
+  // esqueleto simulado_* estão quebradas → PostgREST não faz o JOIN.
+  const [vincRecs, sess] = await Promise.all([
+    vincIds.length
+      ? fetchAllByIn<any>(vincIds, (ids) => svc
+          .from('simulado_estudantes').select('id, nome, email, telefone, cpf, classificacao').in('id', ids), { chunk: 300 })
+      : Promise.resolve([] as any[]),
+    vincIds.length
+      ? fetchAllByIn<{ estudante_id: string; iniciado_em: string }>(vincIds, (ids) => svc
+          .from('simulado_sessoes_prova').select('estudante_id, iniciado_em')
+          .in('estudante_id', ids).eq('deletado', false).eq('is_teste', false).order('iniciado_em', { ascending: false }), { chunk: 300 })
+      : Promise.resolve([] as { estudante_id: string; iniciado_em: string }[]),
+  ])
   const ultimoPorAluno = new Map<string, string>()
-  if (vincIds.length) {
-    // fetchAllByIn: vincIds pode ter centenas/milhares → `.in()` estoura URL e corta em 1000.
-    const sess = await fetchAllByIn<{ estudante_id: string; iniciado_em: string }>(vincIds, (chunk) => svc
-      .from('simulado_sessoes_prova')
-      .select('estudante_id, iniciado_em')
-      .in('estudante_id', chunk)
-      .eq('deletado', false)
-      .eq('is_teste', false)
-      .order('iniciado_em', { ascending: false }))
-    for (const s of sess) if (!ultimoPorAluno.has(s.estudante_id)) ultimoPorAluno.set(s.estudante_id, s.iniciado_em)
-  }
-  const vinculados = lista.filter((a: any) => vincSet.has(a.id)).map((a: any) => ({ ...a, ultimo_acesso: ultimoPorAluno.get(a.id) ?? null }))
+  for (const s of sess) if (!ultimoPorAluno.has(s.estudante_id)) ultimoPorAluno.set(s.estudante_id, s.iniciado_em)
+  const vinculados = vincRecs
+    .map((a: any) => ({ ...a, ultimo_acesso: ultimoPorAluno.get(a.id) ?? null }))
+    .sort((a: any, b: any) => (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR'))
 
-  // Grupos do tenant (para o botão "Adicionar grupo"), com contagem de membros e vínculo atual.
-  // Tolerante a cor/pai_id/is_mestre ausentes; pastas (mestre) agrupam sub-grupos no diálogo.
-  const gruposRaw = await selecionarGrupos(svc, tenantId ?? '00000000-0000-0000-0000-000000000000')
-  const gids = gruposRaw.filter((x) => !x.is_mestre).map((x) => x.id)
-  const contMembros = new Map<string, number>()
-  if (gids.length) {
-    // fetchAll: há >1000 vínculos no total → sem paginar, a contagem por grupo é cortada em 1000
-    // (era o bug do "teste simulado" aparecer com 0 membros no diálogo de vincular grupo).
-    const gm = await fetchAll<{ grupo_id: string }>(() =>
-      svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', gids).order('id', { ascending: true }))
-    for (const m of gm) contMembros.set(m.grupo_id, (contMembros.get(m.grupo_id) ?? 0) + 1)
-  }
-  let vinculadosSet = new Set<string>()
-  {
-    const { data: links, error: linkErr } = await svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', bancoId)
-    if (!linkErr) vinculadosSet = new Set((links ?? []).map((l: any) => l.grupo_id))
-  }
-  const grupos = gruposRaw.map((x) => ({ id: x.id, nome: x.nome, cor: x.cor, membros: contMembros.get(x.id) ?? 0, vinculado: vinculadosSet.has(x.id), pai_id: x.pai_id, is_mestre: x.is_mestre }))
-
-  // Grupo(s) pelo(s) qual(is) cada aluno chegou a este banco: grupos vinculados ao banco
-  // (simulado_pasta_grupos) de que o aluno é membro (simulado_grupo_membros). Sem grupo = vínculo direto.
-  const linkedGroupIds = [...vinculadosSet]
-  const infoGrupo = new Map<string, { id: string; nome: string; cor: string | null }>(
-    gruposRaw.map((x) => [x.id, { id: x.id, nome: x.nome, cor: x.cor ?? null }]),
-  )
+  // Grupo(s) pelo(s) qual(is) cada aluno chegou a este banco (grupos vinculados de que ele é membro).
+  // A contagem de membros de TODOS os grupos (>22 mil filiações) saiu daqui → agora é sob demanda no
+  // diálogo "Adicionar grupo" (carregarGruposDoBanco). Aqui só varremos os grupos LIGADOS ao banco.
   const gruposPorEstudante: Record<string, { id: string; nome: string; cor: string | null }[]> = {}
+  const { data: links } = await svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', bancoId)
+  const linkedGroupIds = [...new Set((links ?? []).map((l: any) => l.grupo_id))]
   if (linkedGroupIds.length) {
+    const gruposRaw = await selecionarGrupos(svc, tid)
+    const infoGrupo = new Map<string, { id: string; nome: string; cor: string | null }>(
+      gruposRaw.map((x) => [x.id, { id: x.id, nome: x.nome, cor: x.cor ?? null }]),
+    )
     const gm2 = await fetchAll<{ grupo_id: string; estudante_id: string }>(() =>
       svc.from('simulado_grupo_membros').select('grupo_id, estudante_id').in('grupo_id', linkedGroupIds).order('id', { ascending: true }))
     const jaTem: Record<string, Set<string>> = {}
@@ -100,5 +80,5 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
     for (const k of Object.keys(gruposPorEstudante)) gruposPorEstudante[k].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   }
 
-  return <BancoEstudantesClient bancoId={bancoId} vinculados={vinculados as any} alunos={alunos as any} grupos={grupos} gruposPorEstudante={gruposPorEstudante} cor={cor} />
+  return <BancoEstudantesClient bancoId={bancoId} vinculados={vinculados as any} gruposPorEstudante={gruposPorEstudante} cor={cor} />
 }

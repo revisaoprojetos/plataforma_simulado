@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -262,22 +263,47 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
           )}
         </TabsContent>
 
+        {/* Suspense por aba pesada: sem isto o page (server) espera TODAS as abas resolverem antes de
+            enviar qualquer HTML → página em branco por >1min. Assim o shell aparece na hora e cada aba
+            streama seu conteúdo quando pronto (mostrando um esqueleto enquanto carrega). */}
         <TabsContent value="estudantes">
-          <BancoEstudantes bancoId={id} cor={corBanco} />
+          <Suspense fallback={<AbaCarregando />}>
+            <BancoEstudantes bancoId={id} cor={corBanco} />
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="caderno">
-          <BancoCaderno bancoId={id} cor={corBanco} />
+          <Suspense fallback={<AbaCarregando />}>
+            <BancoCaderno bancoId={id} cor={corBanco} />
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="relatorio">
-          <BancoRelatorio bancoId={id} cor={corBanco} />
+          <Suspense fallback={<AbaCarregando />}>
+            <BancoRelatorio bancoId={id} cor={corBanco} />
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="personalizar">
           <BancoPersonalizar banco={{ id: banco.id, nome: banco.nome, cor: banco.cor ?? null, icone: banco.icone ?? null, capa_url: banco.capa_url ?? null, capa_card_url: banco.capa_card_url ?? null, total: questoes.length }} />
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+/** Esqueleto exibido enquanto a aba (Suspense) carrega seus dados. */
+function AbaCarregando() {
+  return (
+    <div className="animate-pulse space-y-4 py-4">
+      <div className="flex items-center justify-between">
+        <div className="h-6 w-56 rounded-md bg-muted" />
+        <div className="h-9 w-40 rounded-lg bg-muted" />
+      </div>
+      <div className="h-10 w-full rounded-lg bg-muted/70" />
+      <div className="space-y-2 rounded-xl border p-3">
+        {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-10 w-full rounded-md bg-muted/60" />)}
+      </div>
     </div>
   )
 }

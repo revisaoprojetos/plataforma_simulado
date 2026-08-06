@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { desvincularEstudantesEmMassa } from '@/app/admin/banco-questoes/estudantes-actions'
 import { AdicionarEstudantesDialog } from '@/components/admin/adicionar-estudantes-dialog'
-import { AdicionarGrupoBancoDialog, type GrupoOpc } from '@/components/admin/adicionar-grupo-banco-dialog'
+import { AdicionarGrupoBancoDialog } from '@/components/admin/adicionar-grupo-banco-dialog'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 
 interface Aluno { id: string; nome: string; email?: string | null; telefone?: string | null; cpf?: string | null; classificacao?: string | null; ultimo_acesso?: string | null }
@@ -20,7 +20,6 @@ interface Aluno { id: string; nome: string; email?: string | null; telefone?: st
 function iniciais(n: string) {
   return n.split(' ').filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join('')
 }
-interface AlunoSel { id: string; nome: string; email?: string | null; telefone?: string | null; classificacao?: string | null; jaVinculado: boolean }
 
 type OrdCampo = 'nome' | 'email' | 'cpf' | 'ultimo_acesso'
 function SortHead({ label, campo, ordCampo, ordDir, onSort }: { label: string; campo: OrdCampo; ordCampo: OrdCampo; ordDir: 'asc' | 'desc'; onSort: (c: OrdCampo) => void }) {
@@ -46,7 +45,9 @@ function fmtAcesso(d?: string | null) {
 }
 
 type GrupoVinc = { id: string; nome: string; cor: string | null }
-export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = [], gruposPorEstudante = {}, cor = '#6d28d9' }: { bancoId: string; vinculados: Aluno[]; alunos: AlunoSel[]; grupos?: GrupoOpc[]; gruposPorEstudante?: Record<string, GrupoVinc[]>; cor?: string }) {
+// `alunos` (todos do tenant) e `grupos` (com contagens) NÃO chegam mais por prop — os diálogos os
+// carregam SOB DEMANDA (busca/abrir), tirando >30k linhas do 1º render da aba.
+export function BancoEstudantesClient({ bancoId, vinculados, gruposPorEstudante = {}, cor = '#6d28d9' }: { bancoId: string; vinculados: Aluno[]; gruposPorEstudante?: Record<string, GrupoVinc[]>; cor?: string }) {
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
@@ -116,8 +117,8 @@ export function BancoEstudantesClient({ bancoId, vinculados, alunos, grupos = []
             Desvincular {sel.size}
           </Button>
         )}
-        <AdicionarGrupoBancoDialog bancoId={bancoId} grupos={grupos} />
-        <AdicionarEstudantesDialog bancoId={bancoId} alunos={alunos} />
+        <AdicionarGrupoBancoDialog bancoId={bancoId} />
+        <AdicionarEstudantesDialog bancoId={bancoId} />
       </div>
 
       <CardContent className="p-0">

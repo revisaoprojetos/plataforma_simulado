@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useMemo, useRef } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { UserPlus, Upload, Download, Search, Check, Loader2, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { vincularEstudantes, importarEstudantesLote } from '@/app/admin/banco-questoes/estudantes-actions'
+import { vincularEstudantes, importarEstudantesLote, buscarEstudantesPlataforma } from '@/app/admin/banco-questoes/estudantes-actions'
 
 interface Aluno { id: string; nome: string; email?: string | null; telefone?: string | null; classificacao?: string | null; jaVinculado: boolean }
 
@@ -40,18 +40,28 @@ function parseCsv(text: string): Record<string, string>[] {
 
 const MODELO = 'email,nome,telefone,documento,classificacao\njoao@exemplo.com,João Silva,11999990000,12345678900,normal\n'
 
-export function AdicionarEstudantesDialog({ bancoId, alunos }: { bancoId: string; alunos: Aluno[] }) {
+export function AdicionarEstudantesDialog({ bancoId }: { bancoId: string }) {
   const [open, setOpen] = useState(false)
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
+  const [resultados, setResultados] = useState<Aluno[]>([])
+  const [carregando, setCarregando] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
-  const filtrados = useMemo(() => {
-    const q = busca.toLowerCase().trim()
-    return q ? alunos.filter((a) => a.nome.toLowerCase().includes(q) || (a.email ?? '').toLowerCase().includes(q)) : alunos
-  }, [busca, alunos])
+  // Busca SOB DEMANDA (server-side, máx. 50, com debounce). ANTES recebia TODOS os alunos do tenant
+  // por prop (>11 mil) → o 1º render da aba ficava lentíssimo.
+  useEffect(() => {
+    if (!open) return
+    setCarregando(true)
+    const t = setTimeout(async () => {
+      const r = await buscarEstudantesPlataforma(bancoId, busca)
+      setResultados(r.ok ? (r.estudantes ?? []) : [])
+      setCarregando(false)
+    }, 250)
+    return () => clearTimeout(t)
+  }, [open, busca, bancoId])
 
   function toggle(a: Aluno) {
     if (a.jaVinculado) return
@@ -118,7 +128,7 @@ export function AdicionarEstudantesDialog({ bancoId, alunos }: { bancoId: string
 
         {/* Tabela de estudantes existentes */}
         <div className="flex items-center justify-between gap-3 px-6 pb-2 pt-4">
-          <p className="text-sm font-medium">Estudantes da plataforma ({alunos.length})</p>
+          <p className="text-sm font-medium">Estudantes da plataforma <span className="text-xs font-normal text-muted-foreground">(máx. 50 por busca)</span></p>
           <div className="relative w-56">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar…" className="pl-8" />
@@ -135,10 +145,12 @@ export function AdicionarEstudantesDialog({ bancoId, alunos }: { bancoId: string
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtrados.length === 0 ? (
-                <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground">Nenhum estudante.</TableCell></TableRow>
+              {carregando ? (
+                <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground"><Loader2 className="mx-auto h-4 w-4 animate-spin" /></TableCell></TableRow>
+              ) : resultados.length === 0 ? (
+                <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground">{busca.trim() ? 'Nenhum estudante encontrado.' : 'Nenhum estudante cadastrado.'}</TableCell></TableRow>
               ) : (
-                filtrados.map((a) => {
+                resultados.map((a) => {
                   const on = sel.has(a.id)
                   return (
                     <TableRow key={a.id} onClick={() => toggle(a)} className={cn(!a.jaVinculado && 'cursor-pointer', on && 'bg-primary/5')}>

@@ -7,6 +7,7 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { matricularEmSimuladosDoBanco } from '@/lib/simulado/matricular-banco'
+import { selecionarGrupos } from '@/lib/simulado/grupos'
 
 async function guard() {
   if (!(await checkPermission('questoes:view'))) return { ok: false as const, error: 'Sem permissão.' }
@@ -409,4 +410,61 @@ export async function removerMaterialPdf(cadernoId: string, bancoId: string, slo
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: cadernoId, depois: { [`${configKey}_pdf`]: null } })
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return { ok: true }
+}
+
+// ── Buscas SOB DEMANDA (evitam carregar TODOS os alunos/filiações no 1º render da aba) ──────────
+
+export interface AlunoBusca { id: string; nome: string; email: string | null; telefone: string | null; classificacao: string | null; jaVinculado: boolean }
+
+/**
+ * Busca estudantes da plataforma por nome/e-mail (máx. 50) para o diálogo "Adicionar estudantes".
+ * ANTES a aba carregava TODOS (>11 mil) só para preencher esse picker → aba lentíssima. Agora a
+ * busca é server-side e paginada. `jaVinculado` marca quem já está no banco.
+ */
+export async function buscarEstudantesPlataforma(bancoId: string, query: string): Promise<{ ok: boolean; estudantes?: AlunoBusca[]; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+  // Sanitiza p/ não quebrar a sintaxe do .or()/ilike do PostgREST (vírgulas, parênteses, curingas).
+  const term = (query ?? '').trim().replace(/[%,()*\\]/g, ' ').replace(/\s+/g, ' ').slice(0, 60)
+  let q = svc.from('simulado_estudantes')
+    .select('id, nome, email, telefone, classificacao')
+    .eq('tenant_id', g.tenantId)
+    .order('nome', { ascending: true })
+    .limit(50)
+  if (term) q = q.or(`nome.ilike.*${term}*,email.ilike.*${term}*`)
+  const { data, error } = await q
+  if (error) return { ok: false, error: error.message }
+  const ids = (data ?? []).map((r: any) => r.id)
+  let vinc = new Set<string>()
+  if (ids.length) {
+    const { data: pv } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).in('estudante_id', ids)
+    vinc = new Set((pv ?? []).map((r: any) => r.estudante_id))
+  }
+  return { ok: true, estudantes: (data ?? []).map((r: any) => ({ id: r.id, nome: r.nome, email: r.email ?? null, telefone: r.telefone ?? null, classificacao: r.classificacao ?? null, jaVinculado: vinc.has(r.id) })) }
+}
+
+export interface GrupoBancoOpc { id: string; nome: string; cor: string | null; membros: number; vinculado: boolean; pai_id: string | null; is_mestre: boolean }
+
+/**
+ * Carrega os grupos do tenant (com contagem de membros e vínculo ao banco) para o diálogo
+ * "Adicionar grupo". A contagem varre TODAS as filiações (>22 mil) — por isso agora é SOB DEMANDA
+ * (só ao abrir o diálogo), fora do caminho de render da aba.
+ */
+export async function carregarGruposDoBanco(bancoId: string): Promise<{ ok: boolean; grupos?: GrupoBancoOpc[]; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+  const gruposRaw = await selecionarGrupos(svc, g.tenantId)
+  const gids = gruposRaw.filter((x: any) => !x.is_mestre).map((x: any) => x.id)
+  const contMembros = new Map<string, number>()
+  if (gids.length) {
+    const gm = await fetchAll<{ grupo_id: string }>(() =>
+      svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', gids).order('id', { ascending: true }))
+    for (const m of gm) contMembros.set(m.grupo_id, (contMembros.get(m.grupo_id) ?? 0) + 1)
+  }
+  const { data: links } = await svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', bancoId)
+  const vinculadosSet = new Set((links ?? []).map((l: any) => l.grupo_id))
+  const grupos = gruposRaw.map((x: any) => ({ id: x.id, nome: x.nome, cor: x.cor ?? null, membros: contMembros.get(x.id) ?? 0, vinculado: vinculadosSet.has(x.id), pai_id: x.pai_id ?? null, is_mestre: !!x.is_mestre }))
+  return { ok: true, grupos }
 }

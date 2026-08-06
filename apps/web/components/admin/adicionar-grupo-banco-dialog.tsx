@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import type React from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { UsersRound, X, Search, Check, Minus, Loader2, Link2, Unlink, Folder, FolderOpen, ChevronRight, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { vincularGrupoAoBanco, desvincularGrupoDoBanco, contarEstudantesUnicosGrupos, contarOrfaosDesvincular } from '@/app/admin/banco-questoes/estudantes-actions'
+import { vincularGrupoAoBanco, desvincularGrupoDoBanco, contarEstudantesUnicosGrupos, contarOrfaosDesvincular, carregarGruposDoBanco } from '@/app/admin/banco-questoes/estudantes-actions'
 import { confirmar } from '@/components/ui/confirm-dialog'
 
 // Ramo da árvore (estilo explorador de arquivos): desenha o segmento vertical + o tick
@@ -34,8 +34,10 @@ export interface GrupoOpc {
   is_mestre?: boolean
 }
 
-export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string; grupos: GrupoOpc[] }) {
+export function AdicionarGrupoBancoDialog({ bancoId }: { bancoId: string }) {
   const [open, setOpen] = useState(false)
+  const [grupos, setGrupos] = useState<GrupoOpc[]>([])
+  const [carregandoGrupos, setCarregandoGrupos] = useState(false)
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [aberto, setAberto] = useState<Set<string>>(new Set()) // pastas recolhidas por padrão; clicar expande
@@ -64,6 +66,16 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [open])
+
+  // Carrega grupos + contagem de membros SOB DEMANDA ao abrir (a contagem varre >22 mil filiações;
+  // antes vinha por prop no 1º render da aba, deixando-a lentíssima).
+  const recarregarGrupos = useCallback(async () => {
+    setCarregandoGrupos(true)
+    const r = await carregarGruposDoBanco(bancoId)
+    setGrupos(r.ok ? (r.grupos ?? []) : [])
+    setCarregandoGrupos(false)
+  }, [bancoId])
+  useEffect(() => { if (open) recarregarGrupos() }, [open, recarregarGrupos])
 
   const byId = useMemo(() => new Map(grupos.map((g) => [g.id, g])), [grupos])
   const { children, top } = useMemo(() => {
@@ -113,7 +125,7 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
       if (!ok) return
       const r = await desvincularGrupoDoBanco(bancoId, id)
       if (!r.ok) { toast.error(r.error ?? 'Erro ao desvincular'); return }
-      toast.success(`Grupo "${nome}" desvinculado${r.removidos ? ` · ${r.removidos.toLocaleString('pt-BR')} aluno(s) removido(s)` : ''}`); router.refresh()
+      toast.success(`Grupo "${nome}" desvinculado${r.removidos ? ` · ${r.removidos.toLocaleString('pt-BR')} aluno(s) removido(s)` : ''}`); recarregarGrupos(); router.refresh()
     })
   }
   function vincular() {
@@ -213,7 +225,9 @@ export function AdicionarGrupoBancoDialog({ bancoId, grupos }: { bancoId: string
             </div>
 
             <div className="scroll-claro mt-3 min-h-0 flex-1 space-y-2 overflow-auto px-5 pb-2">
-              {grupos.length === 0 ? (
+              {carregandoGrupos ? (
+                <p className="flex items-center justify-center gap-2 py-8 text-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando grupos…</p>
+              ) : grupos.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">Nenhum grupo cadastrado.</p>
               ) : q ? (
                 // Busca: lista plana só de grupos comuns que casam.
