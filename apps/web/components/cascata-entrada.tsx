@@ -51,9 +51,15 @@ export function CascataEntrada({ children, ativa = true }: { children: React.Rea
     const revelar = () => root.classList.add('cascata-pronta')
     if (semMovimento) { revelar(); return }
 
-    // Loader de ROTA (loading.tsx) ainda na tela? O CSS já o mostra (via :has); a cascata NÃO roda
-    // agora — senão ela é consumida pelo esqueleto do loader e o conteúdo real entra sem animação.
+    // Loader de ROTA (loading.tsx) ainda na tela? A cascata NÃO roda agora — senão ela é consumida
+    // pelo esqueleto do loader e o conteúdo real entra sem animação.
     const carregando = () => !!root.querySelector('[data-app-loading]')
+
+    // REVELA o container JÁ se o loader está na tela: por padrão `.cascata-root` fica opacity:0
+    // (esconde p/ evitar flash antes da cascata) — mas isso também esconderia o LOADER (tela em
+    // branco). Feito aqui em JS porque a regra CSS com `:has` é derrubada pelo pipeline. Síncrono
+    // (fora do requestIdleCallback) p/ o loader aparecer no 1º frame, sem atraso.
+    if (carregando()) revelar()
 
     const aplicar = (): boolean => {
       if (carregando()) return false // espera o conteúdo REAL substituir o loader
@@ -79,7 +85,10 @@ export function CascataEntrada({ children, ativa = true }: { children: React.Rea
       // Ou o loader de rota está na tela (o CSS já o exibe via :has), ou o conteúdo async/streaming
       // ainda vai chegar. Observa até o loader SAIR e o conteúdo real aparecer → então a cascata roda
       // (data-cascata é aplicado na MESMA callback do observer, antes do paint → sem "flash").
-      obs = new MutationObserver(() => { if (aplicar()) { obs?.disconnect(); clearTimeout(seguranca); revelar() } })
+      obs = new MutationObserver(() => {
+        if (carregando()) { revelar(); return } // loader (ainda) na tela → mantém VISÍVEL e espera o conteúdo real
+        if (aplicar()) { obs?.disconnect(); clearTimeout(seguranca); revelar() }
+      })
       obs.observe(root, { childList: true, subtree: true })
       // Backstop generoso (cobre páginas pesadas com loader); nunca deixa a tela presa invisível.
       seguranca = window.setTimeout(() => { obs?.disconnect(); aplicar(); revelar() }, 6000)
