@@ -54,7 +54,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
           <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
             <SidebarEdgeToggle />
             <Suspense fallback={null}><NavProgress /></Suspense>
-            <main className="flex-1 overflow-y-auto p-6">
+            <main className="page-rise flex-1 overflow-y-auto p-6">
               {children}
             </main>
           </div>

@@ -127,7 +127,7 @@ export default async function AdminLayout({
               <SidebarEdgeToggle mode="icon" />
               <Suspense fallback={null}><NavProgress /></Suspense>
               <Suspense fallback={null}><AvisoSemAcesso /></Suspense>
-              <main className="flex-1 overflow-y-auto p-6">
+              <main className="page-rise flex-1 overflow-y-auto p-6">
                 {children}
               </main>
             </div>
