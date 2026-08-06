@@ -96,6 +96,9 @@ const NAV_STATES =
   'hover:text-[color:var(--sidebar-text-active)] data-active:text-[color:var(--sidebar-text-active)] ' +
   '[&>svg]:text-[color:var(--sidebar-icon)] [&:hover>svg]:text-[color:var(--sidebar-icon-active)] [&[data-active]>svg]:text-[color:var(--sidebar-icon-active)]'
 
+// Cores dos "pontos" dos itens no flyout em leque (giram por posição).
+const FAN_CORES = ['#7c3aed', '#f59e0b', '#10b981', '#f97316', '#0ea5e9', '#e11d48', '#db2777']
+
 // Item solto no topo (sem filhos).
 const dashboard: NavItem = { label: 'Dashboard', href: '/admin', icon: LayoutDashboard, exact: true }
 
@@ -298,19 +301,35 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                         >
                           <group.icon className="h-4 w-4" />
                         </DropdownMenuTrigger>
-                        {/* sideOffset baixo = flyout encostado no ícone (parece uma extensão dele). */}
-                        <DropdownMenuContent side="right" align="start" sideOffset={4} alignOffset={-4} className="w-auto min-w-52">
-                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{group.label}</div>
-                          {group.items.map((item) => (
-                            <DropdownMenuItem
-                              key={item.href}
-                              render={<Link href={item.href} />}
-                              className={cn('gap-2', itemAtivo(item, pathname, search) && 'bg-accent text-accent-foreground')}
-                            >
-                              <item.icon className="h-4 w-4" />
-                              <span>{item.label}</span>
-                            </DropdownMenuItem>
-                          ))}
+                        {/* Flyout em LEQUE para a direita: cada item é um "comprimido" arredondado,
+                            com recuos alternados e entrada em cascata (sem caixa de fundo). */}
+                        <DropdownMenuContent
+                          side="right" align="start" sideOffset={6} alignOffset={-6}
+                          className="w-auto min-w-0 overflow-visible border-0 bg-transparent p-0 shadow-none ring-0"
+                        >
+                          <div className="flex flex-col gap-2 py-1 pl-1 pr-8">
+                            {group.items.map((item, i) => {
+                              const cor = FAN_CORES[i % FAN_CORES.length]
+                              const recuo = (i % 2 === 0 ? 0 : 18) + i * 10
+                              const itemOn = itemAtivo(item, pathname, search)
+                              return (
+                                <DropdownMenuItem
+                                  key={item.href}
+                                  render={<Link href={item.href} />}
+                                  style={{ marginLeft: recuo, animationDelay: `${i * 45}ms`, animationFillMode: 'both' }}
+                                  className={cn(
+                                    'w-52 gap-2.5 rounded-2xl bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-md ring-1 ring-black/5',
+                                    'animate-in fade-in slide-in-from-left-3',
+                                    'transition-shadow hover:shadow-lg focus:bg-card focus:shadow-lg',
+                                    itemOn && 'ring-2 ring-primary/40',
+                                  )}
+                                >
+                                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: cor }} />
+                                  <span className="truncate">{item.label}</span>
+                                </DropdownMenuItem>
+                              )
+                            })}
+                          </div>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </SidebarMenuItem>
