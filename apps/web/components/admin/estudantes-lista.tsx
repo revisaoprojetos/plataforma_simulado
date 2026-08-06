@@ -74,23 +74,35 @@ export function EstudantesLista({ inicial, agregados, total, kpis, adminEmails =
   }, [q, aplicar])
 
   // Carrega o restante dos estudantes em segundo plano (em lotes), sem travar a primeira exibição.
-  const rodouRef = useRef(false)
+  // Robusto a: React Strict Mode (double-invoke do dev), mudança de identidade de props e falha
+  // transitória de um lote. Refs compartilhadas SOBREVIVEM ao remount simulado do Strict Mode, então
+  // o 2º efeito retoma de onde o 1º (cancelado pela limpeza) parou — em vez de um "rodouRef" que
+  // bloqueava o restart e deixava a lista travada no 1º lote (30/N). Dedup por id evita duplicar.
+  const offsetRef = useRef(inicial.length)
+  const doneRef = useRef(inicial.length >= total)
+  const totalRef = useRef(total); totalRef.current = total
+  const aplicarRef = useRef(aplicar); aplicarRef.current = aplicar
   useEffect(() => {
-    if (rodouRef.current) return
-    rodouRef.current = true
+    if (doneRef.current) return
     let cancel = false
     ;(async () => {
-      let off = inicial.length
-      while (!cancel && off < total) {
-        const { rows: lote } = await carregarLoteEstudantes(off, LOTE, false)
-        if (cancel || !lote.length) break
-        setRows((prev) => [...prev, ...lote.map(aplicar)])
-        off += lote.length
+      while (!cancel && offsetRef.current < totalRef.current) {
+        let lote: EstudanteBase[]
+        try { lote = (await carregarLoteEstudantes(offsetRef.current, LOTE, false)).rows }
+        catch { await new Promise((r) => setTimeout(r, 600)); continue } // hiccup transitório → retenta
+        if (cancel) return
+        if (!lote.length) break
+        offsetRef.current += lote.length
+        setRows((prev) => {
+          const vistos = new Set(prev.map((r) => r.id))
+          const novos = lote.filter((r) => !vistos.has(r.id)).map(aplicarRef.current)
+          return novos.length ? [...prev, ...novos] : prev
+        })
       }
-      if (!cancel) setCarregando(false)
+      if (!cancel) { doneRef.current = true; setCarregando(false) }
     })()
     return () => { cancel = true }
-  }, [inicial, total, aplicar])
+  }, [])
 
   function ordenarPor(key: SortKey) {
     setSort((prev) => (prev?.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }))
