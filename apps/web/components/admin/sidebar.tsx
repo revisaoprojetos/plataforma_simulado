@@ -301,30 +301,34 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                         >
                           <group.icon className="h-4 w-4" />
                         </DropdownMenuTrigger>
-                        {/* Flyout em LEQUE para a direita: cada item é um "comprimido" arredondado,
-                            com recuos alternados e entrada em cascata (sem caixa de fundo). */}
+                        {/* Flyout em LEQUE que ENVOLVE o ícone: align=center põe o leque na altura
+                            do ícone; o recuo em ARCO (meio mais à direita, pontas recuadas para junto
+                            do ícone) faz os comprimidos abraçarem o ícone. Fundo dourado = cor do ícone. */}
                         <DropdownMenuContent
-                          side="right" align="start" sideOffset={6} alignOffset={-6}
+                          side="right" align="center" sideOffset={6}
                           className="w-auto min-w-0 overflow-visible border-0 bg-transparent p-0 shadow-none ring-0"
                         >
                           <div className="flex flex-col gap-2 py-1 pl-1 pr-8">
                             {group.items.map((item, i) => {
                               const cor = FAN_CORES[i % FAN_CORES.length]
-                              const recuo = (i % 2 === 0 ? 0 : 18) + i * 10
+                              const nSub = group.items.length
+                              const mid = (nSub - 1) / 2
+                              // Arco: meio = recuo máximo (mais à direita), pontas = 0 (juntas ao ícone).
+                              const recuo = Math.round(46 * (1 - Math.abs(i - mid) / (mid || 1)))
                               const itemOn = itemAtivo(item, pathname, search)
                               return (
                                 <DropdownMenuItem
                                   key={item.href}
                                   render={<Link href={item.href} />}
-                                  style={{ marginLeft: recuo, animationDelay: `${i * 45}ms`, animationFillMode: 'both' }}
+                                  style={{ marginLeft: recuo, animationDelay: `${i * 45}ms`, animationFillMode: 'both', background: 'var(--sidebar-icon, #eab308)' }}
                                   className={cn(
-                                    'w-52 gap-2.5 rounded-2xl bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-md ring-1 ring-black/5',
+                                    'w-52 cursor-pointer gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-semibold text-neutral-900 shadow-md ring-1 ring-black/10',
                                     'animate-in fade-in slide-in-from-left-3',
-                                    'transition-shadow hover:shadow-lg focus:bg-card focus:shadow-lg',
-                                    itemOn && 'ring-2 ring-primary/40',
+                                    'transition-shadow hover:shadow-lg focus:shadow-lg',
+                                    itemOn && 'ring-2 ring-black/40',
                                   )}
                                 >
-                                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: cor }} />
+                                  <span className="h-2 w-2 shrink-0 rounded-full ring-1 ring-black/10" style={{ background: cor }} />
                                   <span className="truncate">{item.label}</span>
                                 </DropdownMenuItem>
                               )
