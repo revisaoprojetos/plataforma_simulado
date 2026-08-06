@@ -323,7 +323,9 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                                   render={<Link href={item.href} />}
                                   style={{ marginLeft: recuo, animationDelay: `${i * 45}ms`, animationFillMode: 'both' }}
                                   className={cn(
-                                    'w-56 cursor-pointer gap-2.5 rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-neutral-900 shadow-md ring-1 ring-black/10',
+                                    'w-56 cursor-pointer gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-semibold shadow-md ring-1',
+                                    // Claro: comprimido branco / texto escuro. Escuro: card escuro / texto claro.
+                                    'bg-white text-neutral-900 ring-black/10 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-white/10 dark:shadow-black/40',
                                     'animate-in fade-in slide-in-from-left-3',
                                     'transition-shadow hover:shadow-lg focus:shadow-lg',
                                     itemOn && 'ring-2 ring-primary/50',
@@ -331,7 +333,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                                 >
                                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: cor }} />
                                   <span className="truncate">{item.label}</span>
-                                  {cnt != null && <span className="ml-auto shrink-0 pl-2 text-xs font-semibold tabular-nums text-neutral-400">{cnt.toLocaleString('pt-BR')}</span>}
+                                  {cnt != null && <span className="ml-auto shrink-0 pl-2 text-xs font-semibold tabular-nums text-neutral-400 dark:text-neutral-500">{cnt.toLocaleString('pt-BR')}</span>}
                                 </DropdownMenuItem>
                               )
                             })}
@@ -358,18 +360,18 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                       />
                     </SidebarMenuButton>
 
-                    {/* Acordeão animado: grid-rows 0fr↔1fr anima a altura (sem medir); a sub fica
-                        sempre montada para o recolher também animar. Fade acompanha. */}
-                    <div className={cn('grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]', aberto ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')} aria-hidden={!aberto}>
-                      <div className={cn('overflow-hidden transition-opacity duration-200', aberto ? 'opacity-100' : 'opacity-0')}>
-                        <SidebarMenuSub className="mr-0 pr-0">
+                    {/* Acordeão: abre com animação (fade + deslize de cima). Renderiza os sub-itens
+                        SÓ quando aberto — mantê-los sempre montados (todos os grupos) fazia a barra
+                        travar ao recolher/expandir (reflow de dezenas de itens por frame). */}
+                    {aberto && (
+                      <div className="overflow-hidden">
+                        <SidebarMenuSub className="mr-0 pr-0 duration-200 animate-in fade-in slide-in-from-top-1">
                           {group.items.map((item) => (
                             <SidebarMenuSubItem key={item.href}>
                               <SidebarMenuSubButton
                                 className={NAV_STATES}
                                 render={<Link href={item.href} />}
                                 isActive={itemAtivo(item, pathname, search)}
-                                tabIndex={aberto ? undefined : -1}
                               >
                                 <item.icon className="h-4 w-4" />
                                 <span>{item.label}</span>
@@ -378,7 +380,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                           ))}
                         </SidebarMenuSub>
                       </div>
-                    </div>
+                    )}
                   </SidebarMenuItem>
                 )
               })}
