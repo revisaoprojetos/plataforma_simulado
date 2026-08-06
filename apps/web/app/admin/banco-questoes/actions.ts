@@ -333,6 +333,35 @@ export async function listarDisciplinasFiltro(): Promise<{ id: string; nome: str
   return rows.map((d) => ({ id: d.id, nome: d.nome ?? '—' }))
 }
 
+/** Detalhe de uma questão (enunciado + alternativas + comentários) para o expandir da tabela do
+ * banco. Carregado SOB DEMANDA ao abrir a linha (bancos grandes não carregam tudo no load). */
+export interface DetalheQuestao {
+  enunciado: string
+  comentario_professor: string | null
+  tipo: string | null
+  alternativas: { ordem: number; texto: string; correta: boolean; comentario: string | null; lei: string | null }[]
+}
+export async function carregarDetalheQuestao(questaoId: string): Promise<{ ok: boolean; detalhe?: DetalheQuestao; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+  const [{ data: q }, { data: alts }] = await Promise.all([
+    svc.from('simulado_questoes').select('enunciado, comentario_professor, tipo').eq('id', questaoId).eq('tenant_id', g.tenantId).maybeSingle(),
+    // Escopada por questao_id (que já é do tenant, validado pela query acima); evita gap de tenant_id nulo em alternativas antigas.
+    svc.from('simulado_alternativas').select('ordem, texto, correta, comentario, lei').eq('questao_id', questaoId).order('ordem', { ascending: true }),
+  ])
+  if (!q) return { ok: false, error: 'Questão não encontrada.' }
+  return {
+    ok: true,
+    detalhe: {
+      enunciado: (q as any).enunciado ?? '',
+      comentario_professor: (q as any).comentario_professor ?? null,
+      tipo: (q as any).tipo ?? null,
+      alternativas: (alts ?? []).map((a: any) => ({ ordem: a.ordem ?? 0, texto: a.texto ?? '', correta: !!a.correta, comentario: a.comentario ?? null, lei: a.lei ?? null })),
+    },
+  }
+}
+
 /** Remove várias questões de um banco de uma vez (as questões continuam existindo). */
 export async function removerQuestoes(bancoId: string, questaoIds: string[]): Promise<{ ok: boolean; error?: string }> {
   const g = await guard()

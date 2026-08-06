@@ -51,6 +51,24 @@ export async function grupoAtividadeSql(grupoId: string, tenantId: string): Prom
   )
 }
 
+export type GrupoContagemRow = { grupo_id: string; total: string | number }
+
+/**
+ * Contagem de membros de VÁRIOS grupos em UMA query (substitui o fan-out de N counts HEAD,
+ * um por grupo, da lista de grupos do admin). Filtra tenant_id explicitamente. Devolve `null`
+ * quando o SQL direto não está disponível — o chamador cai no caminho PostgREST (N+1).
+ */
+export async function grupoContagensSql(grupoIds: string[], tenantId: string): Promise<GrupoContagemRow[] | null> {
+  if (!grupoIds.length) return []
+  return sqlQuery<GrupoContagemRow>(
+    `SELECT grupo_id, COUNT(*) AS total
+       FROM simulado_grupo_membros
+      WHERE grupo_id = ANY($1) AND tenant_id = $2
+      GROUP BY grupo_id`,
+    [grupoIds, tenantId],
+  )
+}
+
 export type SubgrupoRow = { id: string; nome: string; cor: string | null; membros: string | number }
 
 /** Subgrupos (filhos) de uma pasta com contagem de membros, em UMA query. */

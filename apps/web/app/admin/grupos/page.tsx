@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { selecionarGrupos } from '@/lib/simulado/grupos'
+import { grupoContagensSql } from 'data'
 import { GruposClient } from '@/components/admin/grupos-client'
 
 // Sempre fresco: a contagem de participantes muda por import/vínculo (não pode ficar em cache).
@@ -14,14 +15,21 @@ export default async function GruposPage() {
   // Grupos (tolerante a cor/pai_id/is_mestre ausentes) já ordenados por nome.
   const grupos = await selecionarGrupos(svc, tenantId, { comData: true })
 
-  // Contagem de membros por grupo — count exato por grupo, em paralelo (HEAD, sem trazer linhas).
-  // Evita paginar todos os vínculos (simulado_grupo_membros pode ter dezenas de milhares de linhas).
+  // Contagem de membros por grupo — UMA agregação SQL direta (GROUP BY) no lugar de N counts HEAD,
+  // um por grupo (N+1). Fallback ao caminho antigo (count exato por grupo, em paralelo) quando o
+  // SQL direto não está disponível. Evita paginar os vínculos (podem ser dezenas de milhares).
   const ids = grupos.map((g) => g.id)
   const membros = new Map<string, number>()
-  await Promise.all(ids.map(async (id) => {
-    const { count } = await svc.from('simulado_grupo_membros').select('*', { count: 'exact', head: true }).eq('grupo_id', id)
-    membros.set(id, count ?? 0)
-  }))
+  const contagens = await grupoContagensSql(ids, tenantId)
+  if (contagens) {
+    for (const id of ids) membros.set(id, 0) // grupos sem membros não aparecem no GROUP BY
+    for (const c of contagens) membros.set(c.grupo_id, Number(c.total) || 0)
+  } else {
+    await Promise.all(ids.map(async (id) => {
+      const { count } = await svc.from('simulado_grupo_membros').select('*', { count: 'exact', head: true }).eq('grupo_id', id)
+      membros.set(id, count ?? 0)
+    }))
+  }
 
   // Origem REAL do grupo: grupos gerenciados por integração ficam referenciados em
   // simulado_integracao_mapeamentos (provider = guru/curseduca). Curseduca "por canal" grava

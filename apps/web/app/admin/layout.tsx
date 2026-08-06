@@ -123,7 +123,7 @@ export default async function AdminLayout({
           <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none'} isSuperAdmin={superAdmin} userName={userName} userEmail={userEmail} loginConfig={resolverLoginConfig(ti.login)} />
           <TourProvider>
             <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-              <SidebarEdgeToggle mode="offcanvas" />
+              <SidebarEdgeToggle mode="icon" />
               <Suspense fallback={null}><NavProgress /></Suspense>
               <Suspense fallback={null}><AvisoSemAcesso /></Suspense>
               <main className="flex-1 overflow-y-auto p-6">

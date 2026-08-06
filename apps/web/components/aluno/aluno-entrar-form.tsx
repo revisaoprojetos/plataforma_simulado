@@ -221,11 +221,13 @@ export function AlunoEntrarForm({
 
   // ---------------- TEMPLATE: SPLIT ----------------
   if (c.template === 'split' && c.mostrarMarca) {
-    // Fundo em imagem → a imagem cobre a TELA TODA (container), painel e formulário ficam por cima;
-    // o formulário ganha um card para continuar legível sobre a imagem.
+    // O "fundo" do Split é o PAINEL DA MARCA. Qualquer fundo (gradiente/cor/imagem) fica SÓ nesse
+    // painel — a imagem não invade o lado do formulário (senão viraria um Hero). O lado do form usa
+    // o fundo normal do sistema. Com imagem, um overlay escuro no painel mantém o texto branco legível.
     const ehImg = c.fundo === 'imagem' && !!c.fundoImagem
     const marca = (
-      <aside className="relative hidden flex-col justify-between overflow-hidden p-12 text-white lg:flex" style={ehImg ? undefined : fundoLoginStyle(c)}>
+      <aside className="relative hidden flex-col justify-between overflow-hidden p-12 text-white lg:flex" style={fundoLoginStyle(c)}>
+        {ehImg && <div className="pointer-events-none absolute inset-0 bg-black/45" />}
         {Blobs}
         <div className="relative flex items-center gap-3">
           {Emblema({})}
@@ -236,14 +238,13 @@ export function AlunoEntrarForm({
       </aside>
     )
     const form = (
-      <main className={cn('relative flex items-center justify-center p-6', screen, !ehImg && 'bg-background')}>
-        {ehImg ? <div className={cn('w-full max-w-sm text-foreground', cardCls)}>{FormBloco({})}</div> : FormBloco({ className: entrada })}
+      <main className={cn('relative flex items-center justify-center bg-background p-6', screen)}>
+        {FormBloco({ className: entrada })}
       </main>
     )
     tela = (
-      <div className={cn('relative lg:grid lg:grid-cols-[1.05fr_1fr]', screen)} style={ehImg ? { ...style, ...fundoLoginStyle(c) } : style}>
+      <div className={cn('relative lg:grid lg:grid-cols-[1.05fr_1fr]', screen)} style={style}>
         <style>{KF}</style>
-        {ehImg && <div className="pointer-events-none absolute inset-0 bg-black/45" />}
         {c.painelLado === 'direita' ? <>{form}{marca}</> : <>{marca}{form}</>}
       </div>
     )
@@ -265,14 +266,15 @@ export function AlunoEntrarForm({
 
   // ---------------- TEMPLATE: VITRINE (faixa da marca no topo + card) ----------------
   else if (c.template === 'vitrine') {
-    // Fundo em imagem → cobre a tela inteira (atrás da faixa e do card).
+    // O "fundo" do Vitrine é a FAIXA da marca (topo). Qualquer fundo — inclusive imagem — fica SÓ
+    // nessa faixa; o resto da tela usa o fundo normal do sistema (não cobre a tela toda).
     const ehImg = c.fundo === 'imagem' && !!c.fundoImagem
     tela = (
-      <div className={cn('relative flex flex-col', screen, !ehImg && 'bg-background')} style={ehImg ? { ...style, ...fundoLoginStyle(c) } : style}>
+      <div className={cn('relative flex flex-col bg-background', screen)} style={style}>
         <style>{KF}</style>
-        {ehImg && <div className="pointer-events-none absolute inset-0 bg-black/45" />}
         {c.mostrarMarca && (
-          <div className="relative flex flex-col items-center gap-4 overflow-hidden px-6 py-12 text-center text-white" style={ehImg ? undefined : fundoLoginStyle(c)}>
+          <div className="relative flex flex-col items-center gap-4 overflow-hidden px-6 py-12 text-center text-white" style={fundoLoginStyle(c)}>
+            {ehImg && <div className="pointer-events-none absolute inset-0 bg-black/45" />}
             {Blobs}
             <div className="relative">{Emblema({ tam: 'lg' })}</div>
             <div className="relative">{MarcaTexto()}</div>

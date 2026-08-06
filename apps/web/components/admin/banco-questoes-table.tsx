@@ -1,22 +1,24 @@
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useTransition, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Search, Check, Trash2, Loader2, GripVertical, ChevronUp, ChevronDown, ListChecks } from 'lucide-react'
+import { Search, Check, Trash2, Loader2, GripVertical, ChevronUp, ChevronDown, ChevronRight, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { removerQuestoes, reordenarQuestoesBanco } from '@/app/admin/banco-questoes/actions'
+import { removerQuestoes, reordenarQuestoesBanco, carregarDetalheQuestao, type DetalheQuestao } from '@/app/admin/banco-questoes/actions'
 import { CopiarCodigo } from '@/components/admin/copiar-codigo'
+import { MarkdownContent } from '@/components/markdown-content'
 import { codigoQuestao } from '@/lib/codigo-questao'
 import { useOrdenacao, SortButton } from '@/components/admin/th-ordenavel'
 
 const difRank: Record<string, number> = { facil: 0, medio: 1, dificil: 2 }
 const stRank: Record<string, number> = { publicada: 0, rascunho: 1, arquivada: 2 }
+const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
 
 interface Q { id: string; enunciado: string; tipo?: string | null; nivel_dificuldade?: string | null; status?: string | null; disciplina?: string | null; assunto?: string | null }
 
@@ -45,6 +47,20 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [overIdx, setOverIdx] = useState<number | null>(null)
   const [savingOrder, startOrder] = useTransition()
+
+  // Expandir/recolher a linha (mostra enunciado completo + alternativas + comentários, formatados).
+  // Carrega o detalhe SOB DEMANDA ao abrir (bancos grandes não trazem tudo no load) e memoiza.
+  const [aberto, setAberto] = useState<Set<string>>(new Set())
+  const [detalhes, setDetalhes] = useState<Map<string, 'loading' | 'erro' | DetalheQuestao>>(new Map())
+  async function toggleExpand(id: string) {
+    const estaAberta = aberto.has(id)
+    setAberto((p) => { const n = new Set(p); estaAberta ? n.delete(id) : n.add(id); return n })
+    if (!estaAberta && !detalhes.has(id)) {
+      setDetalhes((p) => new Map(p).set(id, 'loading'))
+      const r = await carregarDetalheQuestao(id)
+      setDetalhes((p) => new Map(p).set(id, r.ok && r.detalhe ? r.detalhe : 'erro'))
+    }
+  }
 
   const disciplinas = useMemo(() => [...new Set(ordered.map((q) => q.disciplina).filter(Boolean))].sort() as string[], [ordered])
   const discItems = useMemo(() => ({ all: 'Todas matérias', ...Object.fromEntries(disciplinas.map((d) => [d, d])) }), [disciplinas])
@@ -200,9 +216,11 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
                   const d = difCfg[q.nivel_dificuldade ?? '']
                   const st = statusCfg[q.status ?? ''] ?? { label: q.status ?? '—', cls: 'bg-muted text-muted-foreground' }
                   const enun = q.enunciado.length > 70 ? q.enunciado.slice(0, 70) + '…' : q.enunciado
+                  const open = aberto.has(q.id)
+                  const det = detalhes.get(q.id)
                   return (
+                    <Fragment key={q.id}>
                     <TableRow
-                      key={q.id}
                       draggable={!filtroAtivo}
                       onDragStart={() => !filtroAtivo && setDragIdx(i)}
                       onDragOver={(e) => { if (!filtroAtivo && dragIdx !== null) { e.preventDefault(); setOverIdx(i) } }}
@@ -231,14 +249,63 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="text-sm">
-                        <div className="mb-1"><CopiarCodigo codigo={codigoQuestao(q.id)} /></div>
-                        {enun}
+                        <div className="flex items-start gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); toggleExpand(q.id) }}
+                            className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                            title={open ? 'Recolher' : 'Expandir'} aria-label={open ? 'Recolher' : 'Expandir'}
+                          >
+                            <ChevronRight className={cn('h-4 w-4 transition-transform', open && 'rotate-90')} />
+                          </button>
+                          <div className="min-w-0">
+                            <div className="mb-1"><CopiarCodigo codigo={codigoQuestao(q.id)} /></div>
+                            {enun}
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell className="text-xs font-medium uppercase text-muted-foreground">{q.disciplina ?? '—'}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{q.assunto ?? '—'}</TableCell>
                       <TableCell className="text-center font-bold">{d ? <span className={d.cls}>{d.letra}</span> : '—'}</TableCell>
                       <TableCell><span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', st.cls)}>{st.label}</span></TableCell>
                     </TableRow>
+                    {open && (
+                      <TableRow className="bg-muted/20 hover:bg-muted/20">
+                        <TableCell colSpan={8} className="p-0">
+                          <div className="max-w-[900px] space-y-2 px-6 py-3">
+                            {det === 'loading' && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</p>}
+                            {det === 'erro' && <p className="text-sm text-rose-600 dark:text-rose-400">Não foi possível carregar os detalhes.</p>}
+                            {det && det !== 'loading' && det !== 'erro' && (
+                              <>
+                                {det.enunciado && (
+                                  <div className="rounded-md border bg-background p-2.5 text-sm leading-relaxed">
+                                    <MarkdownContent>{det.enunciado}</MarkdownContent>
+                                  </div>
+                                )}
+                                <p className="text-xs font-medium text-muted-foreground">{det.alternativas.length} alternativa(s)</p>
+                                {det.alternativas.length === 0 && <p className="text-xs text-muted-foreground">Sem alternativas.</p>}
+                                {det.alternativas.map((a) => (
+                                  <div key={a.ordem} className="rounded-md border bg-background p-2 text-sm">
+                                    <p className={cn('font-semibold', a.correta && 'text-emerald-600 dark:text-emerald-400')}>
+                                      {LETRAS[a.ordem] ?? '?'}){a.correta ? ' ✓ correta' : ''} <MarkdownContent inline className="font-normal text-foreground">{a.texto}</MarkdownContent>
+                                    </p>
+                                    {a.lei && <p className="mt-1 text-xs text-muted-foreground"><span className="font-semibold text-foreground">Lei:</span> {a.lei}</p>}
+                                    {a.comentario && <div className="mt-0.5 text-xs text-muted-foreground"><span className="font-semibold text-foreground">Comentário:</span> <MarkdownContent inline>{a.comentario}</MarkdownContent></div>}
+                                  </div>
+                                ))}
+                                {det.comentario_professor && (
+                                  <div className="rounded-md border bg-background p-2 text-sm">
+                                    <span className="font-semibold">Comentário do professor:</span>{' '}
+                                    <MarkdownContent inline className="text-muted-foreground">{det.comentario_professor}</MarkdownContent>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    </Fragment>
                   )
                 })
               )}

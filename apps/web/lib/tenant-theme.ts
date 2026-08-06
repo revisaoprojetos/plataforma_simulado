@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { createAdminClient } from '@/lib/supabase/server'
+import { getCurrentTenant } from '@/lib/tenant'
 
 export interface TenantTema {
   logo_url?: string
@@ -213,18 +213,13 @@ export const getTenantTheme = cache(async (): Promise<TenantThemeResult> => {
   }
 
   try {
-    // Service role real: leitura do tema (branding público por subdomínio) não pode depender
-    // do RLS do banco — em bancos com RLS incompleto (migrados) a leitura seria bloqueada.
-    const supabase = createAdminClient()
-
-    const { data, error } = await supabase
-      .from('simulado_tenants')
-      .select('id, nome, tema')
-      .eq('ativo', true)
-      .limit(1)
-      .single()
-
-    if (error || !data) return empty
+    // Resolve o tenant do SUBDOMÍNIO atual. `getCurrentTenant` já acerta pelo host (slug) e é
+    // memoizado por request — então reaproveita a MESMA leitura de simulado_tenants (sem 2ª query).
+    // ANTES: pegava o PRIMEIRO tenant ativo da tabela (`.eq('ativo',true).limit(1)`), o que fazia
+    // TODA plataforma exibir a marca/nome/textos do mesmo tenant — quebrando a independência.
+    const tenant = await getCurrentTenant()
+    if (!tenant) return empty
+    const data = { id: tenant.id, nome: tenant.nome, tema: tenant.tema }
 
     const tema = (data.tema ?? {}) as TenantTema
     const modoPadrao: 'light' | 'dark' = (tema as any).modo_padrao === 'dark' ? 'dark' : 'light'

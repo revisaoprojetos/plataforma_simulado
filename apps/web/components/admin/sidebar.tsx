@@ -54,7 +54,15 @@ import {
   SidebarMenuSubItem,
   SidebarHeader,
   SidebarFooter,
+  useSidebar,
 } from '@/components/ui/sidebar'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { useCan } from '@/components/auth/can-provider'
@@ -201,6 +209,9 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
   const [saindo, setSaindo] = useState(false)
   const search = useSearchParams()
   const can = useCan()
+  const { state, isMobile } = useSidebar()
+  // Recolhida (rail de ícones, fora do mobile): grupos com sub-itens abrem em flyout ao lado.
+  const recolhida = state === 'collapsed' && !isMobile
   const iniciais = userName.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || 'A'
   const btnFooter = 'flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-medium text-sidebar-foreground/70 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-[color:var(--sidebar-text-active)]'
 
@@ -227,8 +238,8 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
         <LoginLoading config={loginConfig ?? LOGIN_DEFAULT} plataforma={nome} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} />
       </div>
     )}
-    <Sidebar className="border-sidebar-border">
-      <SidebarHeader className="flex h-14 flex-row items-center border-b border-sidebar-border px-4">
+    <Sidebar collapsible="icon" className="group-data-[side=left]:border-r-0">
+      <SidebarHeader className="flex h-14 flex-row items-center border-b border-sidebar-border px-4 group-data-[collapsible=icon]:px-2">
         <Link href="/admin" className="flex min-w-0 items-center gap-2">
           <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden', frameLogo(logoEstilo), !logo && 'bg-primary text-primary-foreground')}
             style={logo ? { background: logoBg } : undefined}>
@@ -239,7 +250,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
               <BookOpen className="h-4 w-4" />
             )}
           </div>
-          <div className="flex min-w-0 flex-col">
+          <div className="flex min-w-0 flex-col group-data-[collapsible=icon]:hidden">
             <span className="truncate font-semibold text-sm leading-tight">{nome}</span>
             {subtitulo && (
               <span className="truncate text-[11px] leading-tight text-sidebar-foreground/60">{subtitulo}</span>
@@ -249,12 +260,12 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup className="px-3">
+        <SidebarGroup className="px-3 group-data-[collapsible=icon]:px-2">
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
               {/* Dashboard (item solto) */}
               <SidebarMenuItem>
-                <SidebarMenuButton className={NAV_STATES} render={<Link href={dashboard.href} />} isActive={itemAtivo(dashboard, pathname, search)}>
+                <SidebarMenuButton className={NAV_STATES} render={<Link href={dashboard.href} />} isActive={itemAtivo(dashboard, pathname, search)} tooltip={dashboard.label}>
                   <dashboard.icon className="h-4 w-4" />
                   <span>{dashboard.label}</span>
                 </SidebarMenuButton>
@@ -264,6 +275,39 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
               {gruposVisiveis.map((group) => {
                 const aberto = abertos.includes(group.label)
                 const ativo = grupoAtivo(group)
+
+                // Recolhida: clicar no ícone do grupo abre um flyout AO LADO (DropdownMenu, com
+                // animação de abrir/fechar); clicar num sub-item navega para a área e fecha o flyout.
+                if (recolhida) {
+                  return (
+                    <SidebarMenuItem key={group.label}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          aria-label={group.label}
+                          title={group.label}
+                          data-active={ativo ? 'true' : undefined}
+                          className={cn('mx-auto flex h-8 w-8 items-center justify-center rounded-md outline-none transition-colors', NAV_STATES, ativo && 'bg-[color:var(--sidebar-accent)]')}
+                        >
+                          <group.icon className="h-4 w-4" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent side="right" align="start" sideOffset={8} className="w-auto min-w-52">
+                          <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                          {group.items.map((item) => (
+                            <DropdownMenuItem
+                              key={item.href}
+                              render={<Link href={item.href} />}
+                              className={cn('gap-2', itemAtivo(item, pathname, search) && 'bg-accent text-accent-foreground')}
+                            >
+                              <item.icon className="h-4 w-4" />
+                              <span>{item.label}</span>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </SidebarMenuItem>
+                  )
+                }
+
                 return (
                   <SidebarMenuItem key={group.label}>
                     <SidebarMenuButton
@@ -271,11 +315,12 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                       onClick={() => toggle(group.label)}
                       isActive={ativo}
                       aria-expanded={aberto}
+                      tooltip={group.label}
                     >
                       <group.icon className="h-4 w-4" />
                       <span>{group.label}</span>
                       <ChevronDown
-                        className={cn('ml-auto h-4 w-4 transition-transform', aberto && 'rotate-180')}
+                        className={cn('ml-auto h-4 w-4 transition-transform group-data-[collapsible=icon]:hidden', aberto && 'rotate-180')}
                       />
                     </SidebarMenuButton>
 
@@ -304,25 +349,26 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
       </SidebarContent>
 
       {/* RODAPÉ: perfil + notificações + ajuda + tema + trocar/sair (absorveu a antiga topbar). */}
-      <SidebarFooter className="gap-2 border-t border-sidebar-border p-3 [&_svg]:text-[color:var(--sidebar-icon)] [&_button:hover_svg]:text-[color:var(--sidebar-icon-active)]">
-        <div className="flex items-center gap-2.5">
+      <SidebarFooter className="gap-2 border-t border-sidebar-border p-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:p-2 [&_svg]:text-[color:var(--sidebar-icon)] [&_button:hover_svg]:text-[color:var(--sidebar-icon-active)]">
+        <div className="flex items-center gap-2.5 group-data-[collapsible=icon]:justify-center">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais}</span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
             <p className="truncate text-sm font-medium leading-tight">{userName}</p>
             {userEmail && <p className="truncate text-[11px] leading-tight text-sidebar-foreground/55">{userEmail}</p>}
           </div>
-          <NotificationBell />
+          <span className="group-data-[collapsible=icon]:hidden"><NotificationBell /></span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1.5">
           <ThemeToggle />
           <AjudaButton />
           <button type="button" onClick={() => { window.location.href = '/login' }} title="Trocar de plataforma" aria-label="Trocar de plataforma"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[color:var(--sidebar-accent)]">
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[color:var(--sidebar-accent)]">
             <Building2 className="h-4 w-4" />
           </button>
-          <button type="button" onClick={() => { setSaindo(true); setTimeout(() => { void logoutAction() }, 1100) }} className={cn(btnFooter, 'flex items-center justify-center gap-1.5')}>
-            <LogOut className="h-3.5 w-3.5" /> Sair
+          <button type="button" onClick={() => { setSaindo(true); setTimeout(() => { void logoutAction() }, 1100) }} title="Sair" aria-label="Sair"
+            className={cn(btnFooter, 'flex items-center justify-center gap-1.5 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:px-0')}>
+            <LogOut className="h-3.5 w-3.5" /> <span className="group-data-[collapsible=icon]:hidden">Sair</span>
           </button>
         </div>
       </SidebarFooter>
