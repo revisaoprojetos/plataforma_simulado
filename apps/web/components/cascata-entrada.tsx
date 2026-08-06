@@ -2,8 +2,8 @@
 
 import { useLayoutEffect, useRef } from 'react'
 
-const PASSO = 55 // ms entre cards (ordem de leitura)
-const TETO = 22 // nº máx de passos antes de estabilizar (páginas com muitos cards)
+const PASSO = 75 // ms entre cards (ordem de leitura) — ritmo um pouco mais lento/gracioso
+const TETO = 20 // nº máx de passos antes de estabilizar (páginas com muitos cards)
 
 /**
  * Coleta os "cards" na ORDEM DE LEITURA para escalonar a entrada:
