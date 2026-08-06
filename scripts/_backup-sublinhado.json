@@ -1,0 +1,39 @@
+{
+  "quando": "pre-patch",
+  "questoes": [
+    {
+      "id": "31023af2-e167-4285-bf64-d7c1d6557608",
+      "enunciado": "Considerando o correto emprego dos sinais de pontuação, analise as assertivas a seguir sobre trechos retirados do texto:\nI. Em \"A questão é que**,** na vida dos outros**,** na maioria das vezes, a gente é só figurante\", a dupla vírgula hachurada não poderia, em nenhuma circunstância, ser substituída por duplo travessão.\nII. Em \"E de fato**:** a vida é uma eterna performance\", pode-se substituir os dois-pontos por vírgula.\nIII. Em \"Há reação, há métrica **–** há sempre algum número medindo nossa existência\", pode-se substituir o travessão por dois-pontos sem causar prejuízo à correção do período.\nQuais estão corretas?"
+    },
+    {
+      "id": "a5e28f47-fa7f-4b09-b4b4-03813895b428",
+      "enunciado": "Considerando os trechos a seguir, retirados do texto, relacione a Coluna 1 à Coluna 2, associando as expressões sublinhadas ao tipo de sentido que elas carregam no contexto apresentado.\nColuna 1\nModo.\nCausa.\nConclusão.\nColuna 2\n() \"A Psicologia chama isso de 'efeito holofote': a tendência de acreditar que há sempre um foco apontado para nós, **por isso** superestimamos o quanto os outros estão nos julgando e nos assistindo\".\n() \"nem todo mundo está interessado no que a gente veste, escolhe fazer, diz ou em **como** nos desempenhamos\".\n() \"Afinal, se o mundo não para por causa dos nossos constrangimentos, ele certamente também não irá parar **por conta dos** nossos fracassos\".\nA ordem correta de preenchimento dos parênteses, de cima para baixo, é:"
+    },
+    {
+      "id": "caac6470-a89b-40e7-9028-80313c6a97c2",
+      "enunciado": "Considerando o trecho a seguir, retirado do texto, assinale a alternativa que apresenta, correta e respectivamente, a função sintática dos termos sublinhados.\n\"Nós, **pessoas de pensamento acelerado** (1), tendemos a acreditar que a catástrofe é uma certeza que eventualmente vai **nos** (2) encontrar\"."
+    }
+  ],
+  "alternativas": [
+    {
+      "id": "9ee0a594-c62f-4277-a7ea-6b1259830d97",
+      "texto": "\"perguntaram a ele quantas pessoas haviam **reparado** na vestimenta\"."
+    },
+    {
+      "id": "e4aa5da9-a324-41dc-8b36-5307242b260c",
+      "texto": "\"Nós, pessoas de pensamento acelerado, tendemos a **acreditar** que a catástrofe é uma certeza\"."
+    },
+    {
+      "id": "e2aa99f8-3c32-4645-a3a4-1d4ffa30bf45",
+      "texto": "\"na maioria das vezes, a gente **é** só figurante\"."
+    },
+    {
+      "id": "4a9ff889-29ef-4497-844d-35f6bec0e14f",
+      "texto": "\"Funciona quase como uma redenção, um **desprender**-se\"."
+    },
+    {
+      "id": "ab6e7418-a41a-478e-885d-5ea377ce996c",
+      "texto": "\"É quase mágico esse momento em que percebemos o alívio de não **ser** tão importante\"."
+    }
+  ]
+}

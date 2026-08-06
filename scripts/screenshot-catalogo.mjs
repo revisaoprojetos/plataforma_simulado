@@ -1,0 +1,21 @@
+import { chromium } from 'playwright'
+import { mkdirSync } from 'node:fs'
+const OUT='docs/progresso/catalogo'; mkdirSync(OUT,{recursive:true})
+const BASE='http://localhost:3000'
+const b=await chromium.launch({channel:'msedge',headless:true})
+const ctx=await b.newContext({viewport:{width:1440,height:900}}); const p=await ctx.newPage()
+await p.goto(`${BASE}/login`,{waitUntil:'domcontentloaded'}); await p.waitForTimeout(1000)
+await p.getByRole('button',{name:'Admin',exact:true}).click({timeout:8000}).catch(()=>{})
+await p.waitForTimeout(600)
+await p.locator('input[type=email]').first().fill('admin@teste.com').catch(()=>{})
+await p.locator('input[type=password]').first().fill('Admin@2026').catch(()=>{})
+await p.getByRole('button',{name:/Entrar no painel/i}).click({timeout:8000}).catch(()=>{})
+await p.waitForURL(/\/admin/,{timeout:20000}).catch(()=>{})
+await p.goto(`${BASE}/admin/simulados`,{waitUntil:'domcontentloaded'}); await p.waitForTimeout(3000)
+await p.screenshot({path:`${OUT}/1-quadro.png`,fullPage:false})
+const cat=p.getByRole('button',{name:/Catálogo/i})
+if(await cat.count()){await cat.first().click().catch(()=>{}); await p.waitForTimeout(2000)
+  await p.screenshot({path:`${OUT}/2-catalogo.png`,fullPage:false})
+  console.log('catálogo capturado')
+}else console.log('⚠️ botão Catálogo não encontrado — url:',p.url())
+await b.close(); console.log('OK →',OUT)
