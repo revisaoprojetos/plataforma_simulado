@@ -1,4 +1,5 @@
-// Re-montado a cada navegação no portal do aluno → anima a entrada de cada tela.
+// Re-montado a cada navegação no portal do aluno → dispara a entrada em cascata (riseIn) das
+// seções de topo da página (page-stagger ancora `.page-stagger > * > *`).
 export default function AlunoTemplate({ children }: { children: React.ReactNode }) {
-  return <div className="animate-page">{children}</div>
+  return <div className="page-stagger">{children}</div>
 }
