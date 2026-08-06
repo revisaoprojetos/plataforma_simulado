@@ -206,7 +206,7 @@ function filtroLogo(f?: string): string | undefined {
   return undefined
 }
 
-export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', isSuperAdmin = false, userName = 'Administrador', userEmail, loginConfig }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; isSuperAdmin?: boolean; userName?: string; userEmail?: string | null; loginConfig?: LoginConfig }) {
+export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', isSuperAdmin = false, userName = 'Administrador', userEmail, loginConfig, counts }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; isSuperAdmin?: boolean; userName?: string; userEmail?: string | null; loginConfig?: LoginConfig; counts?: Record<string, number> }) {
   const pathname = usePathname()
   const [saindo, setSaindo] = useState(false)
   const search = useSearchParams()
@@ -316,20 +316,22 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                               // Arco: meio = recuo máximo (mais à direita), pontas = 0 (juntas ao ícone).
                               const recuo = Math.round(46 * (1 - Math.abs(i - mid) / (mid || 1)))
                               const itemOn = itemAtivo(item, pathname, search)
+                              const cnt = counts?.[item.href]
                               return (
                                 <DropdownMenuItem
                                   key={item.href}
                                   render={<Link href={item.href} />}
-                                  style={{ marginLeft: recuo, animationDelay: `${i * 45}ms`, animationFillMode: 'both', background: 'var(--sidebar-icon, #eab308)' }}
+                                  style={{ marginLeft: recuo, animationDelay: `${i * 45}ms`, animationFillMode: 'both' }}
                                   className={cn(
-                                    'w-52 cursor-pointer gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-semibold text-neutral-900 shadow-md ring-1 ring-black/10',
+                                    'w-56 cursor-pointer gap-2.5 rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-neutral-900 shadow-md ring-1 ring-black/10',
                                     'animate-in fade-in slide-in-from-left-3',
                                     'transition-shadow hover:shadow-lg focus:shadow-lg',
-                                    itemOn && 'ring-2 ring-black/40',
+                                    itemOn && 'ring-2 ring-primary/50',
                                   )}
                                 >
-                                  <span className="h-2 w-2 shrink-0 rounded-full ring-1 ring-black/10" style={{ background: cor }} />
+                                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: cor }} />
                                   <span className="truncate">{item.label}</span>
+                                  {cnt != null && <span className="ml-auto shrink-0 pl-2 text-xs font-semibold tabular-nums text-neutral-400">{cnt.toLocaleString('pt-BR')}</span>}
                                 </DropdownMenuItem>
                               )
                             })}
@@ -356,22 +358,27 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                       />
                     </SidebarMenuButton>
 
-                    {aberto && (
-                      <SidebarMenuSub className="mr-0 pr-0">
-                        {group.items.map((item) => (
-                          <SidebarMenuSubItem key={item.href}>
-                            <SidebarMenuSubButton
-                              className={NAV_STATES}
-                              render={<Link href={item.href} />}
-                              isActive={itemAtivo(item, pathname, search)}
-                            >
-                              <item.icon className="h-4 w-4" />
-                              <span>{item.label}</span>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    )}
+                    {/* Acordeão animado: grid-rows 0fr↔1fr anima a altura (sem medir); a sub fica
+                        sempre montada para o recolher também animar. Fade acompanha. */}
+                    <div className={cn('grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]', aberto ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')} aria-hidden={!aberto}>
+                      <div className={cn('overflow-hidden transition-opacity duration-200', aberto ? 'opacity-100' : 'opacity-0')}>
+                        <SidebarMenuSub className="mr-0 pr-0">
+                          {group.items.map((item) => (
+                            <SidebarMenuSubItem key={item.href}>
+                              <SidebarMenuSubButton
+                                className={NAV_STATES}
+                                render={<Link href={item.href} />}
+                                isActive={itemAtivo(item, pathname, search)}
+                                tabIndex={aberto ? undefined : -1}
+                              >
+                                <item.icon className="h-4 w-4" />
+                                <span>{item.label}</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </div>
+                    </div>
                   </SidebarMenuItem>
                 )
               })}
