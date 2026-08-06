@@ -40,6 +40,8 @@ export default async function EstudantesPage() {
     feitos.set(id, (feitos.get(id) ?? 0) + 1)
     if ((s as any).nota != null) { soma.set(id, (soma.get(id) ?? 0) + Number((s as any).nota)); cont.set(id, (cont.get(id) ?? 0) + 1) }
   }
+  // Alunos ATIVOS = distintos que fizeram ≥1 simulado (chaves do mapa `feitos`).
+  const ativos = feitos.size
   const agregados: Record<string, { feitos: number; media: number | null }> = {}
   for (const [id, f] of feitos) agregados[id] = { feitos: f, media: cont.get(id) ? Math.round(((soma.get(id) ?? 0) / (cont.get(id) ?? 1)) * 10) / 10 : null }
 
@@ -82,7 +84,7 @@ export default async function EstudantesPage() {
         agregados={agregados}
         total={total}
         adminEmails={adminEmails}
-        kpis={{ total: totalReal, passaporte: totalPass ?? 0, feitos: totalFeitos ?? 0 }}
+        kpis={{ total: totalReal, passaporte: totalPass ?? 0, feitos: totalFeitos ?? 0, ativos }}
       />
     </div>
   )

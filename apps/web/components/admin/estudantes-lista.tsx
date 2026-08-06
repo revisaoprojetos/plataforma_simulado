@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Search, Users, Crown, ClipboardCheck, X, ArrowUpRight, GraduationCap, ArrowUp, ArrowDown, ChevronsUpDown, Loader2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react'
+import { Search, Users, Crown, ClipboardCheck, UserCheck, X, ArrowUpRight, GraduationCap, ArrowUp, ArrowDown, ChevronsUpDown, Loader2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { ExcluirEstudanteButton } from '@/components/admin/excluir-estudante-button'
@@ -40,7 +40,7 @@ export function EstudantesLista({ inicial, agregados, total, kpis, adminEmails =
   inicial: EstudanteBase[]
   agregados: Agregados
   total: number
-  kpis: { total: number; passaporte: number; feitos: number }
+  kpis: { total: number; passaporte: number; feitos: number; ativos: number }
   adminEmails?: string[]
 }) {
   const adminSet = useMemo(() => new Set(adminEmails.map((e) => e.toLowerCase())), [adminEmails])
@@ -149,11 +149,12 @@ export function EstudantesLista({ inicial, agregados, total, kpis, adminEmails =
   return (
     <div className="space-y-4">
       {/* KPIs (contagens do servidor — independem do carregamento em segundo plano) */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Kpi icon={<Users className="h-5 w-5" />} tom="primary" rotulo="Estudantes" valor={kpis.total} />
         <Kpi icon={<Crown className="h-5 w-5" />} tom="violet" rotulo="Passaporte" valor={kpis.passaporte} />
         <Kpi icon={<GraduationCap className="h-5 w-5" />} tom="slate" rotulo="Padrão" valor={Math.max(0, kpis.total - kpis.passaporte)} />
         <Kpi icon={<ClipboardCheck className="h-5 w-5" />} tom="emerald" rotulo="Simulados feitos" valor={kpis.feitos} />
+        <Kpi icon={<UserCheck className="h-5 w-5" />} tom="sky" rotulo="Alunos ativos" valor={kpis.ativos} />
       </div>
 
       <div className="overflow-hidden rounded-2xl border bg-card">
@@ -285,12 +286,13 @@ function Th({ label, k, sort, onSort, align = 'left', className }: {
   )
 }
 
-function Kpi({ icon, tom, rotulo, valor }: { icon: React.ReactNode; tom: 'primary' | 'violet' | 'slate' | 'emerald'; rotulo: string; valor: number }) {
+function Kpi({ icon, tom, rotulo, valor }: { icon: React.ReactNode; tom: 'primary' | 'violet' | 'slate' | 'emerald' | 'sky'; rotulo: string; valor: number }) {
   const cores: Record<string, string> = {
     primary: 'bg-primary/10 text-primary',
     violet: 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
     slate: 'bg-slate-500/15 text-slate-600 dark:text-slate-400',
     emerald: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+    sky: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
   }
   return (
     <div className="flex items-center gap-3 rounded-2xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
