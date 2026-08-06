@@ -18,24 +18,33 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
   const svc = createAdminClient()
   const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
 
-  // Vínculos do banco (ids). Tolerante: a tabela pode não existir → SqlPendente.
-  let vincIds: string[]
+  // CAMINHO RÁPIDO: função SQL faz o JOIN (pasta_estudantes × estudantes) e o PostgREST pagina o
+  // resultado (~5 req vs ~34 por id). Só os campos de EXIBIÇÃO — último acesso e grupos são carregados
+  // SOB DEMANDA por página no client (detalhesVinculadosBanco). Aplique scripts/sql/banco-vinculados-rpc.sql.
+  let vinculados: any[] | null = null
   try {
-    const pe = await fetchAll<{ estudante_id: string }>(() => svc
-      .from('simulado_pasta_estudantes').select('estudante_id')
-      .eq('pasta_id', bancoId).eq('tenant_id', tid).order('estudante_id', { ascending: true }))
-    vincIds = pe.map((r) => r.estudante_id)
+    vinculados = await fetchAll<any>(() => svc.rpc('simulado_banco_vinculados', { p_banco: bancoId, p_tenant: tid }) as any)
   } catch {
-    return <SqlPendente />
+    vinculados = null // função ausente (SQL não aplicado) → fallback abaixo
   }
-  // SÓ os campos de EXIBIÇÃO dos vinculados (por id, chunk 400). Último acesso e grupos NÃO são
-  // buscados aqui (custavam ~7s p/ 4.9k) — o client os carrega SOB DEMANDA, só da PÁGINA visível
-  // (detalhesVinculadosBanco). Sem embed: as FKs do esqueleto simulado_* estão quebradas → sem JOIN.
-  const vincRecs: any[] = vincIds.length
-    ? await fetchAllByIn<any>(vincIds, (ids) => svc
-        .from('simulado_estudantes').select('id, nome, email, telefone, cpf, classificacao').in('id', ids), { chunk: 300 })
-    : []
-  const vinculados = vincRecs.sort((a: any, b: any) => (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR'))
+
+  // FALLBACK (sem a função): ids dos vinculados + registros por id (chunk 300). Tolerante à tabela ausente.
+  if (vinculados === null) {
+    let vincIds: string[]
+    try {
+      const pe = await fetchAll<{ estudante_id: string }>(() => svc
+        .from('simulado_pasta_estudantes').select('estudante_id')
+        .eq('pasta_id', bancoId).eq('tenant_id', tid).order('estudante_id', { ascending: true }))
+      vincIds = pe.map((r) => r.estudante_id)
+    } catch {
+      return <SqlPendente />
+    }
+    const vincRecs: any[] = vincIds.length
+      ? await fetchAllByIn<any>(vincIds, (ids) => svc
+          .from('simulado_estudantes').select('id, nome, email, telefone, cpf, classificacao').in('id', ids), { chunk: 300 })
+      : []
+    vinculados = vincRecs.sort((a: any, b: any) => (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR'))
+  }
 
   return <BancoEstudantesClient bancoId={bancoId} vinculados={vinculados as any} cor={cor} />
 }
