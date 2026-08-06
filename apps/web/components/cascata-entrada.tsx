@@ -51,7 +51,12 @@ export function CascataEntrada({ children, ativa = true }: { children: React.Rea
     const revelar = () => root.classList.add('cascata-pronta')
     if (semMovimento) { revelar(); return }
 
+    // Loader de ROTA (loading.tsx) ainda na tela? O CSS já o mostra (via :has); a cascata NÃO roda
+    // agora — senão ela é consumida pelo esqueleto do loader e o conteúdo real entra sem animação.
+    const carregando = () => !!root.querySelector('[data-app-loading]')
+
     const aplicar = (): boolean => {
+      if (carregando()) return false // espera o conteúdo REAL substituir o loader
       const cards = coletarCards(root)
       if (!cards.length) return false
       // data-cascata (atributo) + --cascata-i (custom property): NÃO são gerenciados pelo React,
@@ -71,10 +76,13 @@ export function CascataEntrada({ children, ativa = true }: { children: React.Rea
     const tentar = () => {
       if (cancelado) return
       if (aplicar()) { revelar(); return }
-      // Conteúdo async/streaming ainda não presente → espera aparecer.
+      // Ou o loader de rota está na tela (o CSS já o exibe via :has), ou o conteúdo async/streaming
+      // ainda vai chegar. Observa até o loader SAIR e o conteúdo real aparecer → então a cascata roda
+      // (data-cascata é aplicado na MESMA callback do observer, antes do paint → sem "flash").
       obs = new MutationObserver(() => { if (aplicar()) { obs?.disconnect(); clearTimeout(seguranca); revelar() } })
       obs.observe(root, { childList: true, subtree: true })
-      seguranca = window.setTimeout(() => { obs?.disconnect(); revelar() }, 1500)
+      // Backstop generoso (cobre páginas pesadas com loader); nunca deixa a tela presa invisível.
+      seguranca = window.setTimeout(() => { obs?.disconnect(); aplicar(); revelar() }, 6000)
     }
 
     // Espera o main thread ficar OCIOSO (hidratação concorrente do React CONCLUÍDA) antes de mutar

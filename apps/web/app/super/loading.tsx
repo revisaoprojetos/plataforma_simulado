@@ -1,7 +1,8 @@
-/** Tela de carregamento do console (super-admin) — skeleton enquanto os dados chegam. */
+/** Tela de carregamento do console (super-admin) — skeleton enquanto os dados chegam.
+ *  `data-app-loading`: LOADER DE ROTA (a cascata só entra depois que o conteúdo real o substitui). */
 export default function ConsoleLoading() {
   return (
-    <div className="animate-pulse space-y-6">
+    <div data-app-loading className="animate-pulse space-y-6">
       {/* Cabeçalho */}
       <div className="space-y-2">
         <div className="h-7 w-56 rounded-lg bg-muted" />

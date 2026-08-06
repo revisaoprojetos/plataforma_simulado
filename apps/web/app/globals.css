@@ -298,9 +298,14 @@
    visível antes da cascata. `cascata-pronta` revela; se não houver JS, o @media revela. */
 .cascata-root:not(.cascata-pronta) { opacity: 0; }
 @media (scripting: none) { .cascata-root:not(.cascata-pronta) { opacity: 1; } }
+/* EXCEÇÃO: enquanto o LOADER DE ROTA (`[data-app-loading]`) está na tela, o container fica VISÍVEL
+   para o loader aparecer normalmente. A cascata só é liberada quando o conteúdo REAL substitui o
+   loader (o JS aplica `cascata-pronta` aí). Especificidade maior que a regra acima → vence. */
+.cascata-root:not(.cascata-pronta):has([data-app-loading]) { opacity: 1; }
 /* O container-RAIZ da página NÃO anima como bloco — várias páginas têm `animate-page` na raiz,
-   que faria tudo aparecer de uma vez e mascararia a cascata dos cards. Quem entra são os cards. */
-.cascata-root > * { animation: none !important; }
+   que faria tudo aparecer de uma vez e mascararia a cascata dos cards. Quem entra são os cards.
+   Loaders de rota são poupados p/ manterem a própria animação (pulse/shimmer/page-enter). */
+.cascata-root > *:not([data-app-loading]) { animation: none !important; }
 
 .stagger > *, [data-cascata] { animation: riseIn 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 /* Delay do card = índice (custom property setada no JS) × 75ms. Atributo + var em vez de classe
