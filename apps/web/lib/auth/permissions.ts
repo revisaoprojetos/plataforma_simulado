@@ -27,14 +27,24 @@ async function consultarSuperAdmin(svc: ReturnType<typeof createAdminClient>, us
 }
 
 /**
+ * getUser() memoizado por REQUEST. O layout do /admin + getCurrentAccess + isSuperAdmin chamam
+ * isto no mesmo render; sem cache seriam 3 validações de token (ida à rede) por navegação.
+ */
+export const getAuthUser = cache(async () => {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+})
+
+/** Checagem de super-admin memoizada por userId/request (isSuperAdmin e getCurrentAccess batem nos dois). */
+const superAdminMemo = cache((userId: string): Promise<boolean> => consultarSuperAdmin(createAdminClient(), userId))
+
+/**
  * Resolve o acesso do usuário atual: papel (de tenant_acessos) + permissões
  * (roles → role_permissions → permissions). Papel "admin" tem acesso total.
  */
 export const getCurrentAccess = cache(async (): Promise<Access> => {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   const tenantId = await getCurrentTenantId()
 
   if (!user || !tenantId) return { ...EMPTY, userId: user?.id ?? null, tenantId }
@@ -46,7 +56,7 @@ export const getCurrentAccess = cache(async (): Promise<Access> => {
 
   // Super-admin GLOBAL: acesso TOTAL a qualquer plataforma (acima dos tenants), mesmo sem
   // papel no tenant atual. Checado ANTES do papel por-tenant — é o topo da hierarquia.
-  if (await consultarSuperAdmin(svc, user.id)) {
+  if (await superAdminMemo(user.id)) {
     return { userId: user.id, tenantId, role: 'super_admin', isAdmin: true, permissions: ['*'] }
   }
 
@@ -95,12 +105,9 @@ export const getCurrentAccess = cache(async (): Promise<Access> => {
  * retorna false (ninguém é super-admin) — seguro por padrão.
  */
 export const isSuperAdmin = cache(async (): Promise<boolean> => {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user) return false
-  return consultarSuperAdmin(createAdminClient(), user.id)
+  return superAdminMemo(user.id)
 })
 
 /** Verifica uma permissão sobre um Access já resolvido. */

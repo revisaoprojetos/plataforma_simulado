@@ -1,11 +1,11 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { AdminSidebar } from '@/components/admin/sidebar'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
 import { CanProvider } from '@/components/auth/can-provider'
-import { getCurrentAccess, isSuperAdmin, accessCan } from '@/lib/auth/permissions'
+import { getCurrentAccess, isSuperAdmin, accessCan, getAuthUser } from '@/lib/auth/permissions'
 import { getTenantTheme } from '@/lib/tenant-theme'
 import { resolverLoginConfig } from '@/lib/login-config'
 import { SplashSistema } from '@/components/admin/splash-sistema'
@@ -47,8 +47,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
 
   if (!user) redirect('/login')
 
