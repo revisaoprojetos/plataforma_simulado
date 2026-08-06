@@ -1,10 +1,9 @@
 'use client'
 
-import { useLayoutEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 
-const PASSO = 75 // ms entre cards (ordem de leitura) — ritmo um pouco mais lento/gracioso
-const TETO = 20 // nº máx de passos antes de estabilizar (páginas com muitos cards)
+const TETO = 20 // nº máx de passos antes de estabilizar (o passo em ms fica no CSS: 75ms)
 
 /**
  * Coleta os "cards" na ORDEM DE LEITURA para escalonar a entrada:
@@ -37,10 +36,10 @@ function coletarCards(root: HTMLElement): HTMLElement[] {
 export function CascataEntrada({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
-  // Depende do pathname → RE-DISPARA em TODA navegação (não só no 1º load). Páginas async: o
-  // conteúdo (server component) pode entrar no DOM DEPOIS do efeito → um MutationObserver aplica a
-  // cascata assim que os cards aparecem. reset + reflow reinicia a animação ao voltar a uma página.
-  useLayoutEffect(() => {
+  // useEffect (não useLayoutEffect): roda DEPOIS do commit/hidratação — mutar o DOM durante a
+  // hidratação concorrente do React 19 dá erro "didn't match". Depende do pathname → re-dispara em
+  // TODA navegação. Páginas async: MutationObserver aplica assim que os cards aparecem.
+  useEffect(() => {
     const root = ref.current
     if (!root) return
     root.classList.remove('cascata-pronta') // re-esconde para reanimar nesta navegação
@@ -53,22 +52,42 @@ export function CascataEntrada({ children }: { children: React.ReactNode }) {
     const aplicar = (): boolean => {
       const cards = coletarCards(root)
       if (!cards.length) return false
-      cards.forEach((el) => { el.classList.remove('cascata-item'); el.style.animationDelay = '' })
+      // data-cascata (atributo) + --cascata-i (custom property): NÃO são gerenciados pelo React,
+      // então não brigam com o className/style dos cards (evita erro de hidratação/reconciliação).
+      cards.forEach((el) => { el.removeAttribute('data-cascata'); el.style.removeProperty('--cascata-i') })
       void root.offsetWidth // reflow: garante que remover+readicionar REINICIE a animação
       cards.forEach((el, i) => {
-        el.style.animationDelay = Math.min(i, TETO) * PASSO + 'ms'
-        el.classList.add('cascata-item')
+        el.style.setProperty('--cascata-i', String(Math.min(i, TETO)))
+        el.setAttribute('data-cascata', '')
       })
       return true
     }
 
-    // Conteúdo já presente (caso comum) → aplica e revela na hora.
-    if (aplicar()) { revelar(); return }
-    // Conteúdo async/streaming → espera aparecer; segurança revela em 1.2s de qualquer forma.
-    const obs = new MutationObserver(() => { if (aplicar()) { obs.disconnect(); clearTimeout(t); revelar() } })
-    obs.observe(root, { childList: true, subtree: true })
-    const t = setTimeout(() => { obs.disconnect(); revelar() }, 1200)
-    return () => { obs.disconnect(); clearTimeout(t) }
+    let cancelado = false
+    let obs: MutationObserver | null = null
+    let seguranca = 0
+    const tentar = () => {
+      if (cancelado) return
+      if (aplicar()) { revelar(); return }
+      // Conteúdo async/streaming ainda não presente → espera aparecer.
+      obs = new MutationObserver(() => { if (aplicar()) { obs?.disconnect(); clearTimeout(seguranca); revelar() } })
+      obs.observe(root, { childList: true, subtree: true })
+      seguranca = window.setTimeout(() => { obs?.disconnect(); revelar() }, 1500)
+    }
+
+    // Espera o main thread ficar OCIOSO (hidratação concorrente do React CONCLUÍDA) antes de mutar
+    // o DOM — mutar durante a hidratação é o que gerava o erro "didn't match".
+    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback
+    const cic = (window as unknown as { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback
+    const idle = ric ? ric(tentar, { timeout: 500 }) : window.setTimeout(tentar, 180)
+
+    return () => {
+      cancelado = true
+      obs?.disconnect()
+      clearTimeout(seguranca)
+      if (ric && cic) cic(idle)
+      else clearTimeout(idle)
+    }
   }, [pathname])
   return <div ref={ref} className="cascata-root">{children}</div>
 }
