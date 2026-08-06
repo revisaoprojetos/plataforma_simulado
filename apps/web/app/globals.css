@@ -308,6 +308,15 @@
 .stagger > *:nth-child(12), .page-rise > * > *:nth-child(12) { animation-delay: 605ms; }
 .stagger > *:nth-child(n + 13), .page-rise > * > *:nth-child(n + 13) { animation-delay: 660ms; }
 
+/* Dentro de .page-rise o container-RAIZ da página NÃO anima como bloco (senão o
+   animate-page da raiz briga com a cascata e "come" o escalonamento) — quem entra
+   é cada SEÇÃO, uma após a outra. */
+.page-rise > * { animation: none !important; }
+
+/* Compositor: transform + opacity animam na GPU → entrada fluida mesmo enquanto a
+   página hidrata (não fica travando no main thread). */
+.stagger > *, .page-rise > * > *, .animate-rise { will-change: transform, opacity; }
+
 /* Respeita quem pediu menos movimento. */
 @media (prefers-reduced-motion: reduce) {
   .animate-page, .animate-rise, .animate-pop, .grow-w, .grow-h, .bar-fill,
