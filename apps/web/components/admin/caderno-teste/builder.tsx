@@ -102,13 +102,13 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const alunoAtual = registros[Math.min(alunoIdx, Math.max(0, registros.length - 1))] ?? null
   const varsPrevia = alunoAtual?.vars ?? (builder.bancoId ? {} : {})
   const exportUrl = (fmt: 'word' | 'html') => `/api/admin/caderno-teste/exportar?caderno=${cadernoId}&grupo=${ativo.id}&formato=${fmt}${alunoAtual ? `&aluno=${alunoAtual.id}` : ''}`
-  // Pilares para o editor de cores (adaptável): padrão + os do modelo + os presentes nas disciplinas do banco.
+  // Pilares para o editor de cores: SÓ os realmente presentes nas disciplinas do banco selecionado.
+  // Sem banco, cai para os pilares do próprio modelo (para dar o que editar no template).
   const pilaresParaCor = useMemo(() => {
     const human = (s: string) => s.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
     const map = new Map<string, string>()
-    Object.keys(CORES_PILAR_PADRAO).forEach((s) => map.set(s, human(s)))
-    for (const p of ativo.conteudo?.pilares ?? []) if (p.chave) map.set(p.chave, p.nome || human(p.chave))
     for (const d of disciplinasBanco) if (d.pilar) map.set(d.pilar, human(d.pilar))
+    if (!map.size) for (const p of ativo.conteudo?.pilares ?? []) if (p.chave) map.set(p.chave, p.nome || human(p.chave))
     return [...map.entries()]
   }, [ativo, disciplinasBanco])
   function salvar() {
