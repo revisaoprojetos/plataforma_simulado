@@ -55,7 +55,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const [gruposAberto, setGruposAberto] = useState(false)
   const [importando, setImportando] = useState(false)
   const [baixarAberto, setBaixarAberto] = useState(false)
-  const [pickerCor, setPickerCor] = useState<{ parte: string; label: string; cor: string; x: number; y: number } | null>(null)
+  const [pickerCor, setPickerCor] = useState<{ parte: string; label: string; cor: string } | null>(null)
   const importRef = useRef<HTMLInputElement>(null)
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
@@ -308,7 +308,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           {builder.bancoId ? (
             <div className="mx-auto" style={{ zoom } as any}>
               <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} selParte={pickerCor?.parte}
-                onPick={(parte, label, cor, anchor) => setPickerCor({ parte, label, cor, x: Math.min(anchor.right + 8, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 240), y: anchor.top })} />
+                onPick={(parte, label, cor) => setPickerCor({ parte, label, cor })} />
             </div>
           ) : (
             <div className="flex h-full items-center justify-center p-8 text-center">
@@ -326,45 +326,42 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       <BancoPicker open={bancoPickerOpen} onClose={() => setBancoPickerOpen(false)} bancos={bancos} atual={builder.bancoId} onSelecionar={trocarBanco} />
       {pickerCor && (() => {
         const campos = camposDoBloco(ativo, pickerCor.parte)
+        const onCampo = (campo: (typeof campos)[number], v: string) => campo.alvo === 'titulo' ? setAjuste({ titulo: v }) : setConteudo(aplicarCampoBloco(ativo.conteudo, pickerCor.parte, campo.id, v))
         return (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setPickerCor(null)} />
-          <div className="fixed z-50 w-72 overflow-y-auto rounded-lg border bg-background p-3 shadow-xl" style={{ left: pickerCor.x, top: pickerCor.y, maxHeight: '78vh' }}>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="truncate text-xs font-semibold" title={pickerCor.label}>{pickerCor.label}</span>
-              <button onClick={() => setPickerCor(null)} className="shrink-0 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
-            </div>
-            <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cor</div>
-            <HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />
-            {a.coresParte?.[pickerCor.parte] && (
-              <button onClick={() => { const cp = { ...(a.coresParte ?? {}) }; delete cp[pickerCor.parte]; setAjuste({ coresParte: cp }) }} className="mt-2 text-[11px] text-muted-foreground hover:underline">Restaurar cor padrão</button>
-            )}
-            {campos.length > 0 && (
-              <div className="mt-3 space-y-2 border-t pt-3">
-                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Texto</div>
-                {campos.map((campo) => (
-                  <label key={campo.id} className="block">
-                    <span className="mb-0.5 block text-[11px] text-muted-foreground">{campo.label}</span>
-                    {campo.multiline ? (
-                      <textarea
-                        value={campo.valor}
-                        onChange={(e) => campo.alvo === 'titulo' ? setAjuste({ titulo: e.target.value }) : setConteudo(aplicarCampoBloco(ativo.conteudo, pickerCor.parte, campo.id, e.target.value))}
-                        rows={3}
-                        className="w-full resize-y rounded border bg-background px-2 py-1 text-xs leading-snug outline-none focus:border-primary"
-                      />
-                    ) : (
-                      <input
-                        value={campo.valor}
-                        onChange={(e) => campo.alvo === 'titulo' ? setAjuste({ titulo: e.target.value }) : setConteudo(aplicarCampoBloco(ativo.conteudo, pickerCor.parte, campo.id, e.target.value))}
-                        className="w-full rounded border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
-                      />
-                    )}
-                  </label>
-                ))}
+          <div className="fixed inset-0 z-40 bg-black/10" onClick={() => setPickerCor(null)} />
+          <aside className="fixed inset-y-0 right-0 z-50 flex w-80 max-w-[85vw] flex-col border-l bg-background shadow-2xl duration-200 animate-in slide-in-from-right">
+            <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+              <div className="min-w-0">
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Editar bloco</div>
+                <div className="truncate text-sm font-semibold" title={pickerCor.label}>{pickerCor.label}</div>
               </div>
-            )}
-            <p className="mt-3 text-[10px] leading-snug text-muted-foreground">Personaliza só este bloco. Clique em qualquer bloco da prévia para editá-lo.</p>
-          </div>
+              <button onClick={() => setPickerCor(null)} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="scroll-claro min-h-0 flex-1 overflow-y-auto px-4 py-4">
+              <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cor</div>
+              <HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />
+              {a.coresParte?.[pickerCor.parte] && (
+                <button onClick={() => { const cp = { ...(a.coresParte ?? {}) }; delete cp[pickerCor.parte]; setAjuste({ coresParte: cp }) }} className="mt-2 text-[11px] text-muted-foreground hover:underline">Restaurar cor padrão</button>
+              )}
+              {campos.length > 0 && (
+                <div className="mt-4 space-y-2.5 border-t pt-4">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Texto</div>
+                  {campos.map((campo) => (
+                    <label key={campo.id} className="block">
+                      <span className="mb-0.5 block text-[11px] text-muted-foreground">{campo.label}</span>
+                      {campo.multiline ? (
+                        <textarea value={campo.valor} onChange={(e) => onCampo(campo, e.target.value)} rows={3} className="w-full resize-y rounded border bg-background px-2 py-1 text-xs leading-snug outline-none focus:border-primary" />
+                      ) : (
+                        <input value={campo.valor} onChange={(e) => onCampo(campo, e.target.value)} className="w-full rounded border bg-background px-2 py-1 text-xs outline-none focus:border-primary" />
+                      )}
+                    </label>
+                  ))}
+                </div>
+              )}
+              <p className="mt-4 text-[10px] leading-snug text-muted-foreground">Personaliza só este bloco. Clique em qualquer bloco da prévia para editá-lo.</p>
+            </div>
+          </aside>
         </>
         )
       })()}
