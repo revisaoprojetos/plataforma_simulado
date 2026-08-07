@@ -58,24 +58,36 @@ export function EstudantesLista({ inicial, agregados, total }: {
     else { setOrdCampo(campo); setOrdDir(campo === 'nome' ? 'asc' : 'desc') }
   }
 
-  // Carrega o restante em segundo plano (lotes), sem travar a primeira exibição.
-  const rodou = useRef(false)
+  // Carrega o restante em segundo plano (em lotes), sem travar a primeira exibição.
+  // Robusto ao React Strict Mode (double-invoke do dev): refs compartilhadas SOBREVIVEM ao remount
+  // simulado, então o 2º efeito retoma de onde o 1º (cancelado pela limpeza) parou — em vez de um
+  // "rodouRef" que bloqueava o restart e deixava a lista travada no 1º lote (30/N). Dedup por id,
+  // retry em hiccup e `comContagem=false` nos lotes de fundo (só o 1º precisa do total).
+  const offsetRef = useRef(inicial.length)
+  const doneRef = useRef(inicial.length >= total)
+  const totalRef = useRef(total); totalRef.current = total
+  const aplicarRef = useRef(aplicar); aplicarRef.current = aplicar
   useEffect(() => {
-    if (rodou.current) return
-    rodou.current = true
+    if (doneRef.current) return
     let cancel = false
     ;(async () => {
-      let off = inicial.length
-      while (!cancel && off < total) {
-        const { rows: lote } = await carregarLoteEstudantes(off, LOTE)
-        if (cancel || !lote.length) break
-        setRows((prev) => [...prev, ...lote.map(aplicar)])
-        off += lote.length
+      while (!cancel && offsetRef.current < totalRef.current) {
+        let lote: EstudanteBase[]
+        try { lote = (await carregarLoteEstudantes(offsetRef.current, LOTE, false)).rows }
+        catch { await new Promise((r) => setTimeout(r, 600)); continue } // hiccup transitório → retenta
+        if (cancel) return
+        if (!lote.length) break
+        offsetRef.current += lote.length
+        setRows((prev) => {
+          const vistos = new Set(prev.map((r) => r.id))
+          const novos = lote.filter((r) => !vistos.has(r.id)).map(aplicarRef.current)
+          return novos.length ? [...prev, ...novos] : prev
+        })
       }
-      if (!cancel) setCarregando(false)
+      if (!cancel) { doneRef.current = true; setCarregando(false) }
     })()
     return () => { cancel = true }
-  }, [inicial, total, aplicar])
+  }, [])
 
   const lista = useMemo(() => {
     const termo = q.trim().toLowerCase()
