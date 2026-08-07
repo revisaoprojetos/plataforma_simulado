@@ -266,7 +266,8 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             </div>
           </div>
 
-          {/* Ajustes (2 colunas) */}
+          {/* Ajustes (2 colunas) — só com banco selecionado */}
+          {builder.bancoId && (<>
           <div className="col-span-2 mt-1"><p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Pencil className="h-3.5 w-3.5" /> Ajustes do grupo</p></div>
           <label className="col-span-2 block text-xs text-muted-foreground">
             <span className="mb-1 block">Título</span>
@@ -296,6 +297,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
               💡 Cor das disciplinas por pilar: <strong>clique no card de uma disciplina na prévia</strong> (à direita) e escolha a cor ao lado.
             </div>
           )}
+          </>)}
         </div>
 
         {/* Direita: prévia A4 do grupo ativo (padding lateral menor) */}
