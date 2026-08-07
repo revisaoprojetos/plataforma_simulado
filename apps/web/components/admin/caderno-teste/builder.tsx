@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil, Plus, X, Layers } from 'lucide-react'
+import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil, Plus, X, Layers, FileUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { HexColorField } from '@/components/admin/hex-color-field'
@@ -43,6 +43,8 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const [pickerMode, setPickerMode] = useState<'add' | 'trocar'>('trocar')
   const [bancoPickerOpen, setBancoPickerOpen] = useState(false)
   const [editandoGrupos, setEditandoGrupos] = useState(false)
+  const [importando, setImportando] = useState(false)
+  const importRef = useRef<HTMLInputElement>(null)
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
 
@@ -92,6 +94,23 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       if (r.ok) toast.success('Caderno de teste salvo'); else toast.error(r.error ?? 'Erro ao salvar')
     })
   }
+  /** Importa um caderno (Word/HTML) → cria um novo grupo de Diagnóstico já mapeado. */
+  async function importar(file: File) {
+    setImportando(true)
+    try {
+      const fd = new FormData(); fd.append('file', file)
+      const resp = await fetch('/api/admin/caderno-teste/importar', { method: 'POST', body: fd })
+      const r = await resp.json().catch(() => ({ ok: false, error: 'Resposta inválida do servidor.' }))
+      if (!resp.ok || !r.ok || !r.conteudo) { toast.error(r.error ?? 'Falha ao importar.'); return }
+      const it = novoItem('diagnostico', 'padrao')
+      it.conteudo = r.conteudo
+      it.ajustes = { ...it.ajustes, corPrimaria: '#2d254f', corSecundaria: '#f6b420', titulo: 'Diagnóstico de Desempenho' }
+      setBuilder((b) => ({ ...b, itens: [...b.itens, it], ativo: it.id }))
+      if (Array.isArray(r.avisos) && r.avisos.length) toast.warning(`Importado com ${r.avisos.length} aviso(s) — revise a prévia.`)
+      toast.success('Caderno importado como novo grupo de Diagnóstico. Revise e salve.')
+    } catch (e) { toast.error('Erro ao enviar o arquivo.'); console.error(e) }
+    finally { setImportando(false) }
+  }
 
   const Tog = ({ campo, label }: { campo: keyof BuilderAjustes; label: string }) => (
     <label className="flex cursor-pointer items-center justify-between gap-2 rounded-md border bg-background px-2 py-1.5 text-[13px]">
@@ -118,7 +137,13 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             <p className="text-xs text-muted-foreground">Vários grupos (modalidades) num caderno. Escolha o modelo e o banco nos pop-ups e ajuste à esquerda.</p>
           </div>
         </div>
-        <Button onClick={salvar} disabled={pending} size="sm">{pending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />} Salvar</Button>
+        <div className="flex items-center gap-2">
+          <input ref={importRef} type="file" accept=".docx,.html,.htm,.pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importar(f); e.target.value = '' }} />
+          <Button variant="outline" size="sm" onClick={() => importRef.current?.click()} disabled={importando} title="Importar um caderno (Word .docx ou HTML) — mapeia como Diagnóstico">
+            {importando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileUp className="mr-1.5 h-4 w-4" />} Importar
+          </Button>
+          <Button onClick={salvar} disabled={pending} size="sm">{pending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />} Salvar</Button>
+        </div>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[380px_1fr]">
