@@ -43,14 +43,18 @@ export type CapaConfig = {
   titulo: string
   cor: string
   tamanho: number
+  /** Id da fonte (FONTES_CADERNO); vazio = fonte do tema. */
+  fonte: string
   negrito: boolean
   italico: boolean
   sublinhado: boolean
   alinhamento: 'left' | 'center' | 'right'
   /** Posição vertical do título na capa: 0 (topo) … 100 (base). */
   posV: number
+  /** Posição horizontal do título na capa: 0 (esquerda) … 100 (direita). */
+  posH: number
 }
-export const CAPA_PADRAO: CapaConfig = { titulo: 'CADERNO DE QUESTÕES', cor: '#ffffff', tamanho: 44, negrito: true, italico: false, sublinhado: false, alinhamento: 'center', posV: 68 }
+export const CAPA_PADRAO: CapaConfig = { titulo: 'CADERNO DE QUESTÕES', cor: '#ffffff', tamanho: 44, fonte: 'montserrat', negrito: true, italico: false, sublinhado: false, alinhamento: 'center', posV: 68, posH: 50 }
 
 /** Um grupo do caderno: uma modalidade+modelo com seus ajustes (+ conteúdo, no diagnóstico). */
 export type ItemCaderno = {

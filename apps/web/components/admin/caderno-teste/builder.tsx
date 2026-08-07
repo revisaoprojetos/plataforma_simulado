@@ -16,6 +16,7 @@ import { camposDoBloco, aplicarCampoBloco, type CampoTexto } from '@/lib/caderno
 import type { DiagConteudo } from '@/lib/caderno-teste/diagnostico'
 import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
 import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
+import { FONTES_CADERNO } from '@/lib/caderno-designer/theme'
 import { Users, ChevronRight, Download } from 'lucide-react'
 
 const ICONE_MOD: Record<Modalidade, any> = { caderno_questoes: FileText, folha_respostas: ClipboardList, diagnostico: BarChart3 }
@@ -394,7 +395,18 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
               <button onClick={() => setPickerCapa(false)} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
             <div className="scroll-claro min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-              <CampoFormatavel campo={{ id: 'titulo', label: 'Texto', valor: capaEfetiva.titulo, multiline: true }} onChange={(v) => setCapa({ titulo: v })} />
+              <div>
+                <div className="mb-1 text-[11px] text-muted-foreground">Texto</div>
+                <textarea value={capaEfetiva.titulo} onChange={(e) => setCapa({ titulo: e.target.value })} rows={3} className="w-full resize-y rounded border bg-background px-2 py-1 text-xs leading-snug outline-none focus:border-primary" />
+              </div>
+
+              <div>
+                <div className="mb-1 text-[11px] text-muted-foreground">Fonte</div>
+                <select value={capaEfetiva.fonte} onChange={(e) => setCapa({ fonte: e.target.value })} className="w-full rounded border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary">
+                  <option value="">Padrão do tema</option>
+                  {FONTES_CADERNO.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                </select>
+              </div>
 
               <div>
                 <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cor</div>
@@ -417,7 +429,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
               </div>
 
               <div>
-                <div className="mb-1 text-[11px] text-muted-foreground">Alinhamento</div>
+                <div className="mb-1 text-[11px] text-muted-foreground">Alinhamento do texto</div>
                 <div className="flex overflow-hidden rounded-md border">
                   {(['left', 'center', 'right'] as const).map((al) => (
                     <button key={al} type="button" onClick={() => setCapa({ alinhamento: al })}
@@ -429,12 +441,16 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
               </div>
 
               <div>
+                <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground"><span>Posição horizontal</span><span className="font-semibold text-foreground">{capaEfetiva.posH}%</span></div>
+                <input type="range" min={0} max={100} step={1} value={capaEfetiva.posH} onChange={(e) => setCapa({ posH: Number(e.target.value) })} className="w-full accent-primary" />
+                <p className="mt-1 text-[10px] leading-snug text-muted-foreground">0% = esquerda · 100% = direita.</p>
+              </div>
+
+              <div>
                 <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground"><span>Posição vertical</span><span className="font-semibold text-foreground">{capaEfetiva.posV}%</span></div>
                 <input type="range" min={0} max={100} step={1} value={capaEfetiva.posV} onChange={(e) => setCapa({ posV: Number(e.target.value) })} className="w-full accent-primary" />
                 <p className="mt-1 text-[10px] leading-snug text-muted-foreground">0% = topo · 100% = base da página.</p>
               </div>
-
-              <p className="text-[10px] leading-snug text-muted-foreground">Selecione um trecho no texto e use <b>B</b>/<i>I</i>/<u>U</u> para formatar só parte do título.</p>
             </div>
           </aside>
         </>

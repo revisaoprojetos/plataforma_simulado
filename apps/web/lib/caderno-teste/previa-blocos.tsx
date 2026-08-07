@@ -6,7 +6,7 @@
 // tela de app/imprimir/caderno/[id]/page.tsx (ramo não-rawImg).
 
 import { BlockRender, dataComQuestao } from '@/lib/caderno-designer/blocks'
-import { resolveTheme, type CadernoTheme } from '@/lib/caderno-designer/theme'
+import { resolveTheme, cssDaFonte, type CadernoTheme } from '@/lib/caderno-designer/theme'
 import { PRESETS_CADERNO } from '@/lib/caderno-designer/presets'
 import { faixaNaPagina, RUNNING_PADRAO, type CadernoData, type CadernoDoc, type QuestaoData } from '@/lib/caderno-designer/types'
 import { CAPA_PADRAO, type CapaConfig, type PreviewQuestao } from './tipos'
@@ -81,26 +81,25 @@ function Folha({ page, pi, data, theme, doc }: { page: CadernoDoc['pages'][numbe
   )
 }
 
-/** Folha de CAPA: imagem full-bleed + título sobreposto, posicionável e clicável (abre o editor). */
+/** Folha de CAPA: imagem full-bleed + título sobreposto, posicionável (x/y) e clicável (abre o editor). */
 function FolhaCapa({ capaUrl, capa, theme, onPick, sel }: { capaUrl: string; capa: CapaConfig; theme: CadernoTheme; onPick?: () => void; sel?: boolean }) {
-  const justify = capa.alinhamento === 'left' ? 'flex-start' : capa.alinhamento === 'right' ? 'flex-end' : 'center'
   return (
     <div style={{ width: A4_W, minHeight: A4_H, position: 'relative', overflow: 'hidden', background: theme.cores.fundo, boxShadow: '0 2px 20px rgba(0,0,0,.16)', fontFamily: theme.tipografia.familia }}>
       <img src={capaUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-      <div style={{ position: 'absolute', left: '8%', right: '8%', top: `${capa.posV}%`, transform: 'translateY(-50%)', display: 'flex', justifyContent: justify }}>
-        <div
-          onClick={onPick ? (e) => { e.stopPropagation(); onPick() } : undefined}
-          title={onPick ? 'Clique para editar o título da capa' : undefined}
-          style={{
-            cursor: onPick ? 'pointer' : 'default', color: capa.cor, fontSize: capa.tamanho,
-            fontWeight: capa.negrito ? 800 : 400, fontStyle: capa.italico ? 'italic' : 'normal',
-            textDecoration: capa.sublinhado ? 'underline' : 'none', textAlign: capa.alinhamento,
-            lineHeight: 1.1, maxWidth: '100%', whiteSpace: 'pre-wrap', padding: '6px 10px',
-            ...(sel ? { outline: `2px solid ${capa.cor}`, outlineOffset: 4 } : {}),
-          }}
-          dangerouslySetInnerHTML={{ __html: formatarInline(capa.titulo) }}
-        />
-      </div>
+      <div
+        onClick={onPick ? (e) => { e.stopPropagation(); onPick() } : undefined}
+        title={onPick ? 'Clique para editar o título da capa' : undefined}
+        style={{
+          position: 'absolute', left: `${capa.posH}%`, top: `${capa.posV}%`, transform: 'translate(-50%, -50%)', maxWidth: '84%',
+          cursor: onPick ? 'pointer' : 'default', color: capa.cor, fontSize: capa.tamanho,
+          fontFamily: cssDaFonte(capa.fonte) || theme.tipografia.familia,
+          fontWeight: capa.negrito ? 800 : 400, fontStyle: capa.italico ? 'italic' : 'normal',
+          textDecoration: capa.sublinhado ? 'underline' : 'none', textAlign: capa.alinhamento,
+          lineHeight: 1.1, whiteSpace: 'pre-wrap', padding: '6px 10px',
+          ...(sel ? { outline: `2px solid ${capa.cor}`, outlineOffset: 4 } : {}),
+        }}
+        dangerouslySetInnerHTML={{ __html: formatarInline(capa.titulo) }}
+      />
     </div>
   )
 }
