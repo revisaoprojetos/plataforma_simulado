@@ -251,16 +251,16 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             <div className="col-span-1"><Segment label="Colunas" valor={a.colunas} opcoes={[2, 3, 4, 5]} onChange={(n) => setAjuste({ colunas: n })} /></div>
           )}
           <div className="col-span-1"><Tog campo="compacto" label="Compacto" /></div>
-          <div className="col-span-2"><CampoImagem label="Imagem de capa (topo)" valor={a.capaUrl} onChange={(url) => setAjuste({ capaUrl: url })} /></div>
-          <div className="col-span-2"><CampoImagem label="Imagem de folha (fundo)" valor={a.folhaUrl} onChange={(url) => setAjuste({ folhaUrl: url })} /></div>
+          <div className="col-span-2"><CampoImagem label="Capa (página inteira)" valor={a.capaUrl} onChange={(url) => setAjuste({ capaUrl: url })} /></div>
+          <div className="col-span-2"><CampoImagem label="Folha (fundo de cada página)" valor={a.folhaUrl} onChange={(url) => setAjuste({ folhaUrl: url })} /></div>
+          <div className="col-span-2"><CampoImagem label="Cabeçalho (faixa no topo)" valor={a.cabecalhoUrl} onChange={(url) => setAjuste({ cabecalhoUrl: url })} /></div>
+          <div className="col-span-2"><CampoImagem label="Rodapé (faixa na base)" valor={a.rodapeUrl} onChange={(url) => setAjuste({ rodapeUrl: url })} /></div>
         </div>
 
         {/* Direita: prévia A4 do grupo ativo (padding lateral menor) */}
         <div ref={ref} className="scroll-claro min-h-0 overflow-auto bg-[radial-gradient(circle,theme(colors.slate.300)_1px,transparent_1px)] [background-size:18px_18px] px-3 py-5 dark:bg-[radial-gradient(circle,theme(colors.slate.700)_1px,transparent_1px)]">
-          <div className="mx-auto" style={{ width: 794 * zoom }}>
-            <div style={{ width: 794, transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
-              <Previa item={ativo} questoes={questoes} />
-            </div>
+          <div className="mx-auto" style={{ zoom } as any}>
+            <Previa item={ativo} questoes={questoes} />
           </div>
         </div>
       </div>
