@@ -286,7 +286,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           <div className="col-span-2 mt-1"><p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Pencil className="h-3.5 w-3.5" /> Ajustes do grupo</p></div>
           {presetAtivo && (
             <div className="col-span-2 rounded-md border border-dashed px-2.5 py-2 text-[11px] leading-snug text-muted-foreground">
-              📄 Modelo pronto (layout do v1), idêntico ao Caderno de Prova. A capa aparece ao enviar uma imagem de <strong>Capa</strong> abaixo. Ajustes de cor/toggles ainda não se aplicam a este modelo.
+              📄 Modelo pronto (layout do v1), idêntico ao Caderno de Prova. A <strong>Capa</strong> e o fundo de cada página (<strong>Folha</strong>) aparecem ao enviar as imagens abaixo. Ajustes de cor/toggles ainda não se aplicam a este modelo.
             </div>
           )}
           <label className="col-span-2 block text-xs text-muted-foreground">
@@ -325,7 +325,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           {builder.bancoId ? (
             <div className="mx-auto" style={{ zoom } as any}>
               {presetAtivo ? (
-                <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl}
+                <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} folhaUrl={a.folhaUrl}
                   capa={ativo.capa} onPickCapa={() => setPickerCapa(true)} selCapa={pickerCapa} />
               ) : (
                 <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} selParte={pickerCor?.parte}
