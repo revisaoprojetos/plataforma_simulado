@@ -38,6 +38,20 @@ export const CORES_PILAR_PADRAO: Record<string, string> = {
   lingua_portuguesa: '#1a7a4a',
 }
 
+/** Título sobreposto à imagem de capa (modelos prontos): texto, estilo e posição livre. */
+export type CapaConfig = {
+  titulo: string
+  cor: string
+  tamanho: number
+  negrito: boolean
+  italico: boolean
+  sublinhado: boolean
+  alinhamento: 'left' | 'center' | 'right'
+  /** Posição vertical do título na capa: 0 (topo) … 100 (base). */
+  posV: number
+}
+export const CAPA_PADRAO: CapaConfig = { titulo: 'CADERNO DE QUESTÕES', cor: '#ffffff', tamanho: 44, negrito: true, italico: false, sublinhado: false, alinhamento: 'center', posV: 68 }
+
 /** Um grupo do caderno: uma modalidade+modelo com seus ajustes (+ conteúdo, no diagnóstico). */
 export type ItemCaderno = {
   id: string
@@ -46,6 +60,8 @@ export type ItemCaderno = {
   ajustes: BuilderAjustes
   /** Conteúdo estruturado — usado pela modalidade "diagnostico". */
   conteudo?: DiagConteudo
+  /** Título da capa (modelos prontos doc-backed) — sobreposto à imagem de capa. */
+  capa?: CapaConfig
 }
 
 export type { DiagConteudo }
@@ -180,6 +196,7 @@ function normalizarItem(raw: any): ItemCaderno {
   const modelo = meta.modelos.some((m) => m.id === raw?.modelo) ? raw.modelo : meta.modelos[0].id
   const item: ItemCaderno = { id: typeof raw?.id === 'string' ? raw.id : novoId(), modalidade, modelo, ajustes: { ...AJUSTES_BASE, ...(raw?.ajustes ?? {}) } }
   if (modalidade === 'diagnostico') item.conteudo = (raw?.conteudo && typeof raw.conteudo === 'object') ? raw.conteudo : clonar(DIAG_PADRAO)
+  if (raw?.capa && typeof raw.capa === 'object') item.capa = { ...CAPA_PADRAO, ...raw.capa }
   return item
 }
 

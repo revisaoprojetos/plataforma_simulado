@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { HexColorField } from '@/components/admin/hex-color-field'
 import { Previa } from '@/lib/caderno-teste/previa'
-import { PreviaBlocos } from '@/lib/caderno-teste/previa-blocos'
+import { PreviaBlocos, capaPadraoDoPreset } from '@/lib/caderno-teste/previa-blocos'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
-import { metaDaModalidade, itemAtivo, novoItem, presetDoItem, type BuilderV3, type BuilderAjustes, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
+import { metaDaModalidade, itemAtivo, novoItem, presetDoItem, CAPA_PADRAO, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { camposDoBloco, aplicarCampoBloco, type CampoTexto } from '@/lib/caderno-teste/edicao'
 import type { DiagConteudo } from '@/lib/caderno-teste/diagnostico'
 import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
@@ -57,6 +57,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const [importando, setImportando] = useState(false)
   const [baixarAberto, setBaixarAberto] = useState(false)
   const [pickerCor, setPickerCor] = useState<{ parte: string; label: string; cor: string } | null>(null)
+  const [pickerCapa, setPickerCapa] = useState(false)
   const importRef = useRef<HTMLInputElement>(null)
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
@@ -70,6 +71,14 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const bancoAtual = bancos.find((b) => b.id === builder.bancoId) ?? null
   const setAjuste = (patch: Partial<BuilderAjustes>) => setBuilder((b) => ({ ...b, itens: b.itens.map((it) => it.id === b.ativo ? { ...it, ajustes: { ...it.ajustes, ...patch } } : it) }))
   const setConteudo = (conteudo: DiagConteudo) => setBuilder((b) => ({ ...b, itens: b.itens.map((it) => it.id === b.ativo ? { ...it, conteudo } : it) }))
+  // Título da capa (modelos prontos): config efetiva (item.capa OU default do preset) + patch.
+  const capaEfetiva: CapaConfig = ativo.capa ?? (presetAtivo ? capaPadraoDoPreset(presetAtivo) : CAPA_PADRAO)
+  const setCapa = (patch: Partial<CapaConfig>) => setBuilder((b) => ({ ...b, itens: b.itens.map((it) => {
+    if (it.id !== b.ativo) return it
+    const preset = presetDoItem(it)
+    const base = it.capa ?? (preset ? capaPadraoDoPreset(preset) : CAPA_PADRAO)
+    return { ...it, capa: { ...base, ...patch } }
+  }) }))
 
   function adicionarGrupo() { setPickerMode('add'); setPickerOpen(true) }
   function trocarModelo() { setPickerMode('trocar'); setPickerOpen(true) }
@@ -315,7 +324,8 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           {builder.bancoId ? (
             <div className="mx-auto" style={{ zoom } as any}>
               {presetAtivo ? (
-                <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} />
+                <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl}
+                  capa={ativo.capa} onPickCapa={() => setPickerCapa(true)} selCapa={pickerCapa} />
               ) : (
                 <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} selParte={pickerCor?.parte}
                   onPick={(parte, label, cor) => setPickerCor({ parte, label, cor })} />
@@ -370,6 +380,65 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
         </>
         )
       })()}
+
+      {/* Barra lateral direita — editar o TÍTULO DA CAPA (modelos prontos) */}
+      {pickerCapa && presetAtivo && a.capaUrl && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/10" onClick={() => setPickerCapa(false)} />
+          <aside className="fixed inset-y-0 right-0 z-50 flex w-80 max-w-[85vw] flex-col border-l bg-background shadow-2xl duration-200 animate-in slide-in-from-right">
+            <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+              <div className="min-w-0">
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Editar capa</div>
+                <div className="truncate text-sm font-semibold">Título sobre a capa</div>
+              </div>
+              <button onClick={() => setPickerCapa(false)} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="scroll-claro min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+              <CampoFormatavel campo={{ id: 'titulo', label: 'Texto', valor: capaEfetiva.titulo, multiline: true }} onChange={(v) => setCapa({ titulo: v })} />
+
+              <div>
+                <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cor</div>
+                <HexColorField value={capaEfetiva.cor} onChange={(v) => setCapa({ cor: v })} />
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground"><span>Tamanho</span><span className="font-semibold text-foreground">{capaEfetiva.tamanho}px</span></div>
+                <input type="range" min={16} max={96} step={1} value={capaEfetiva.tamanho} onChange={(e) => setCapa({ tamanho: Number(e.target.value) })} className="w-full accent-primary" />
+              </div>
+
+              <div>
+                <div className="mb-1 text-[11px] text-muted-foreground">Estilo</div>
+                <div className="flex gap-1.5">
+                  {([['negrito', <b key="b">B</b>], ['italico', <i key="i">I</i>], ['sublinhado', <u key="u">U</u>]] as const).map(([k, ic]) => (
+                    <button key={k} type="button" onClick={() => setCapa({ [k]: !capaEfetiva[k] } as Partial<CapaConfig>)}
+                      className={cn('flex h-7 w-8 items-center justify-center rounded border text-[13px]', capaEfetiva[k] ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted')}>{ic}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-1 text-[11px] text-muted-foreground">Alinhamento</div>
+                <div className="flex overflow-hidden rounded-md border">
+                  {(['left', 'center', 'right'] as const).map((al) => (
+                    <button key={al} type="button" onClick={() => setCapa({ alinhamento: al })}
+                      className={cn('flex-1 py-1 text-xs capitalize', capaEfetiva.alinhamento === al ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-muted')}>
+                      {al === 'left' ? 'Esq.' : al === 'center' ? 'Centro' : 'Dir.'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground"><span>Posição vertical</span><span className="font-semibold text-foreground">{capaEfetiva.posV}%</span></div>
+                <input type="range" min={0} max={100} step={1} value={capaEfetiva.posV} onChange={(e) => setCapa({ posV: Number(e.target.value) })} className="w-full accent-primary" />
+                <p className="mt-1 text-[10px] leading-snug text-muted-foreground">0% = topo · 100% = base da página.</p>
+              </div>
+
+              <p className="text-[10px] leading-snug text-muted-foreground">Selecione um trecho no texto e use <b>B</b>/<i>I</i>/<u>U</u> para formatar só parte do título.</p>
+            </div>
+          </aside>
+        </>
+      )}
     </div>
   )
 }
