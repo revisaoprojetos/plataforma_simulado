@@ -47,6 +47,29 @@ function ehBold(el: HTMLElement): boolean {
   return fortes.length >= t.length - 2
 }
 
+/**
+ * Extrai o texto de um elemento PRESERVANDO negrito/itálico/sublinhado inline como <b>/<i>/<u>
+ * (consumidos por `renderInline` no BlockRender). Retorna `rich=true` quando há alguma marcação —
+ * aí o bloco ganha `rich: true`; sem marcação, o texto é puro e o render antigo segue idêntico.
+ */
+function inlineDe(el: HTMLElement): { texto: string; rich: boolean } {
+  let rich = false
+  const walk = (node: any): string => {
+    if (node.nodeType === 3) return mapearVars(String(node.rawText ?? node.text ?? '').replace(/ /g, ' '))
+    const tag = (node.rawTagName || '').toLowerCase()
+    const inner = (node.childNodes || []).map(walk).join('')
+    const marca = (t: 'b' | 'i' | 'u' | 's') => { if (inner.trim()) { rich = true; return `<${t}>${inner}</${t}>` } return inner }
+    if (tag === 'strong' || tag === 'b') return marca('b')
+    if (tag === 'em' || tag === 'i') return marca('i')
+    if (tag === 'u') return marca('u')
+    if (tag === 's' || tag === 'strike' || tag === 'del') return marca('s')
+    if (tag === 'br') return '\n'
+    return inner
+  }
+  const texto = walk(el).replace(/[ \t]*\n[ \t]*/g, '\n').replace(/ {2,}/g, ' ').trim()
+  return { texto, rich }
+}
+
 /** Extrai o texto do Word em LINHAS ordenadas (achata tabelas nos parágrafos internos). */
 function extrairLinhas(root: HTMLElement): Linha[] {
   const linhas: Linha[] = []
@@ -215,25 +238,45 @@ function converterDiagnostico(linhas: Linha[]): CadernoDoc {
   }
 }
 
-/** Conversão genérica (qualquer Word) → blocos fiéis. */
+/** Conversão genérica (qualquer Word) → blocos fiéis (formatação inline + tabelas estruturadas). */
 function converterGenerico(root: HTMLElement): { blocks: Block[]; imagens: number } {
   const blocks: Block[] = []
   let imagens = 0
   const push = (b: Block | null) => { if (b) { blocks.push(b); if (b.type === 'imagem') imagens++ } }
+  const imgBloco = (el: HTMLElement): Block | null => {
+    const url = el.querySelector('img')?.getAttribute('src') || ''
+    return url ? bloco('imagem', { url, largura: 100, align: 'left' }) : null
+  }
   const el2b = (el: HTMLElement, prefixo = ''): Block | null => {
-    const img = el.querySelector('img')
-    const texto = limpar(el.text)
-    if (img && !texto) { const url = img.getAttribute('src') || ''; return url ? bloco('imagem', { url, largura: 100, align: 'left' }) : null }
-    if (!texto) return null
+    const { texto, rich } = inlineDe(el)
+    if (!texto) return imgBloco(el)
     const tag = (el.rawTagName || '').toLowerCase()
-    if (HEADINGS.has(tag)) return bloco('titulo-secao', { texto: prefixo + texto, nivel: Math.min(3, Number(tag[1]) || 2), align: 'left', cor: '', mostrarLinha: false, fonte: '', italico: false, sublinhado: false, espacamento: 4 })
-    return txt(prefixo + texto, { bold: ehBold(el) })
+    if (HEADINGS.has(tag)) return bloco('titulo-secao', { texto: prefixo + texto, nivel: Math.min(3, Number(tag[1]) || 2), align: 'left', cor: '', mostrarLinha: false, fonte: '', italico: false, sublinhado: false, espacamento: 4, rich })
+    return txt(prefixo + texto, rich ? { rich: true } : { bold: ehBold(el) })
+  }
+  // Célula → coluna com (imagem?) + texto inline; vazia mantém a estrutura da tabela.
+  const celula = (cell: HTMLElement): Block => {
+    const filhos: Block[] = []
+    const im = imgBloco(cell); if (im) { filhos.push(im); imagens++ }
+    const { texto, rich } = inlineDe(cell)
+    if (texto) filhos.push(txt(texto, { espacamento: 0, ...(rich ? { rich: true } : {}) }))
+    return { id: genId('coluna'), type: 'coluna', attributes: {}, innerBlocks: filhos.length ? filhos : [txt('')] }
+  }
+  // Tabela → moldura (card com borda) + uma linha de `colunas` por <tr> (divisórias entre células).
+  const tabela = (table: HTMLElement): Block | null => {
+    const linhas: Block[] = []
+    for (const tr of table.querySelectorAll('tr')) {
+      const cells = tr.querySelectorAll('th, td')
+      if (!cells.length) continue
+      linhas.push({ id: genId('colunas'), type: 'colunas', attributes: { gap: 8, divisoria: true, divisoriaCor: '#cbd5e1' }, innerBlocks: cells.map(celula) })
+    }
+    return linhas.length ? bloco('card', { corFundo: '', bordaLargura: 1, bordaCor: '#cbd5e1', bordaRaio: 6, padding: 8, largura: 100, alinhamento: 'left' }, linhas) : null
   }
   for (const node of root.childNodes as any[]) {
     const el = node as HTMLElement
     const tag = (el.rawTagName || '').toLowerCase()
     if (!tag) continue
-    if (tag === 'table') { for (const p of el.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li')) push(el2b(p)); push(bloco('separador', { espessura: 1, estilo: 'solido', cor: '' })); continue }
+    if (tag === 'table') { push(tabela(el)); continue }
     if (tag === 'ul' || tag === 'ol') { el.querySelectorAll('li').forEach((li, i) => push(el2b(li, tag === 'ol' ? `${i + 1}. ` : '• '))); continue }
     if (HEADINGS.has(tag) || tag === 'p') push(el2b(el))
   }
@@ -249,7 +292,9 @@ export async function converterWordParaDoc(buffer: Buffer): Promise<ResultadoImp
   const erros: string[] = []
   let html = ''
   try {
-    const res = await mammoth.convertToHtml({ buffer })
+    // styleMap: por padrão o mammoth IGNORA sublinhado/tachado. Mapeamos para <u>/<s> e assim a
+    // formatação inline (negrito já vira <strong>, itálico <em>) é preservada na importação.
+    const res = await mammoth.convertToHtml({ buffer }, { styleMap: ['u => u', 'strike => s'] })
     html = res.value
     // Separa erros (perda de conteúdo/corrupção) de avisos (estilos ignorados etc.) — antes só os
     // warnings eram lidos e os erros ficavam invisíveis ("Falha ao ler o Word" genérico).

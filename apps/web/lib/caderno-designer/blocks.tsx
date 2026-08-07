@@ -211,6 +211,36 @@ export function applyVars(texto: string, vars: Record<string, string>): string {
     .replace(/\{\s*([\w-]+)\s*\}/g, (m, k) => (k in vars ? vars[k] : m))
 }
 
+/**
+ * Renderiza marcação INLINE leve — <b>/<i>/<u> (tolera <strong>/<em>/<s>) — preservada na
+ * importação do Word. Constrói spans React (nunca HTML cru → sem XSS). Só é usada quando o bloco
+ * tem `rich: true`; blocos sem esse flag renderizam o texto puro, idêntico ao comportamento antigo.
+ */
+export function renderInline(texto: string): ReactNode {
+  if (!texto || !/<\/?(?:b|strong|i|em|u|s)>/i.test(texto)) return texto
+  const re = /<\/?(?:b|strong|i|em|u|s)>/gi
+  const nodes: ReactNode[] = []
+  const stack = { b: 0, i: 0, u: 0, s: 0 }
+  let last = 0, key = 0
+  const push = (t: string) => {
+    if (!t) return
+    if (!(stack.b || stack.i || stack.u || stack.s)) { nodes.push(t); return }
+    const deco = [stack.u ? 'underline' : '', stack.s ? 'line-through' : ''].filter(Boolean).join(' ')
+    nodes.push(<span key={key++} style={{ fontWeight: stack.b ? 700 : undefined, fontStyle: stack.i ? 'italic' : undefined, textDecoration: deco || undefined }}>{t}</span>)
+  }
+  let m: RegExpExecArray | null
+  while ((m = re.exec(texto))) {
+    push(texto.slice(last, m.index))
+    const raw = m[0].toLowerCase()
+    const name = raw.replace(/[<>/]/g, '')
+    const k = (name === 'strong' ? 'b' : name === 'em' ? 'i' : name) as 'b' | 'i' | 'u' | 's'
+    stack[k] = raw[1] === '/' ? Math.max(0, stack[k] - 1) : stack[k] + 1
+    last = re.lastIndex
+  }
+  push(texto.slice(last))
+  return nodes
+}
+
 const ALIN = { left: 'left', center: 'center', right: 'right', justify: 'justify' } as const
 
 /** Envolve o bloco numa caixa de largura % com posição horizontal (só quando < 100%). */
@@ -246,7 +276,7 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
         <div style={{ minHeight: a.alturaMin || undefined, display: a.alturaMin ? 'flex' : undefined, flexDirection: 'column', justifyContent: a.valignV === 'center' ? 'center' : a.valignV === 'bottom' ? 'flex-end' : 'flex-start' }}>
           <div style={{ textAlign: ALIN[a.align as keyof typeof ALIN] ?? 'left', ...(temFundo ? { background: a.corFundo, padding: `${a.fundoPad ?? 10}px ${(a.fundoPad ?? 10) + 4}px`, borderRadius: a.fundoRaio ?? 6 } : {}) }}>
             <span style={{ fontSize: sizes[a.nivel] ?? 22, fontWeight: 700, color: corTexto, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia, fontStyle: a.italico ? 'italic' : 'normal', textDecoration: a.sublinhado ? 'underline' : 'none', letterSpacing: a.espacamento ? `${a.espacamento}px` : undefined }}>
-              {applyVars(a.texto ?? '', data.vars)}
+              {a.rich ? renderInline(applyVars(a.texto ?? '', data.vars)) : applyVars(a.texto ?? '', data.vars)}
             </span>
             {a.subtitulo && <div style={{ fontSize: 11, fontWeight: 600, color: corTexto, opacity: temFundo ? 0.85 : 0.7, marginTop: 2 }}>{applyVars(a.subtitulo, data.vars)}</div>}
             {!temFundo && a.mostrarLinha && <div style={{ height: 2, background: a.cor || c.acento, marginTop: 4, borderRadius: 2 }} />}
@@ -258,7 +288,7 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
       return comLargura(full ? undefined : a.largura, a.alinhamentoBloco, (
         <div style={{ minHeight: a.alturaMin || undefined, display: a.alturaMin ? 'flex' : undefined, flexDirection: 'column', justifyContent: a.valignV === 'center' ? 'center' : a.valignV === 'bottom' ? 'flex-end' : 'flex-start' }}>
           <p style={{ textAlign: ALIN[a.align as keyof typeof ALIN] ?? 'left', fontSize: a.size ?? 12, fontWeight: a.bold ? 700 : 400, fontStyle: a.italico ? 'italic' : 'normal', textDecoration: a.sublinhado ? 'underline' : 'none', color: a.color || c.texto, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia, whiteSpace: 'pre-wrap', lineHeight: a.lineHeight ?? 1.5, letterSpacing: a.espacamento ? `${a.espacamento}px` : undefined, margin: 0 }}>
-            {applyVars(a.texto ?? '', data.vars)}
+            {a.rich ? renderInline(applyVars(a.texto ?? '', data.vars)) : applyVars(a.texto ?? '', data.vars)}
           </p>
         </div>
       ))
