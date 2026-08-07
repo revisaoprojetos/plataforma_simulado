@@ -3,6 +3,8 @@
 // própria (como as "modalidades" do editor antigo). Config isolado em
 // simulado_cadernos_teste.config.builderV3.
 
+import { DIAG_PADRAO, DIAG_AGU_2023, type DiagConteudo } from './diagnostico'
+
 export type Modalidade = 'folha_respostas' | 'caderno_questoes' | 'diagnostico'
 
 export type BuilderAjustes = {
@@ -18,13 +20,17 @@ export type BuilderAjustes = {
   compacto: boolean       // espaçamento/fonte menores
 }
 
-/** Um grupo do caderno: uma modalidade+modelo com seus ajustes. */
+/** Um grupo do caderno: uma modalidade+modelo com seus ajustes (+ conteúdo, no diagnóstico). */
 export type ItemCaderno = {
   id: string
   modalidade: Modalidade
   modelo: string
   ajustes: BuilderAjustes
+  /** Conteúdo estruturado — usado pela modalidade "diagnostico". */
+  conteudo?: DiagConteudo
 }
+
+export type { DiagConteudo }
 
 export type BuilderV3 = {
   v: 3
@@ -54,7 +60,7 @@ export const AJUSTES_BASE: BuilderAjustes = {
   compacto: false,
 }
 
-export type Modelo = { id: string; nome: string; descricao: string; ajustes: Partial<BuilderAjustes> }
+export type Modelo = { id: string; nome: string; descricao: string; ajustes: Partial<BuilderAjustes>; conteudo?: DiagConteudo }
 export type ModalidadeMeta = { id: Modalidade; nome: string; descricao: string; modelos: Modelo[] }
 
 export const MODALIDADES: ModalidadeMeta[] = [
@@ -74,9 +80,10 @@ export const MODALIDADES: ModalidadeMeta[] = [
     ],
   },
   {
-    id: 'diagnostico', nome: 'Diagnóstico', descricao: 'Relatório de desempenho do aluno.',
+    id: 'diagnostico', nome: 'Diagnóstico', descricao: 'Relatório de desempenho do aluno (pilares, disciplinas, sugestões).',
     modelos: [
-      { id: 'padrao', nome: 'Padrão', descricao: 'Nota + desempenho por matéria.', ajustes: { mostrarGabarito: true } },
+      { id: 'padrao', nome: 'Em branco', descricao: 'Estrutura vazia para preencher.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_PADRAO },
+      { id: 'agu_2023', nome: 'Completo (AGU 2023)', descricao: 'Pré-preenchido com o diagnóstico da AGU 2023.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_AGU_2023 },
     ],
   },
 ]
@@ -101,11 +108,15 @@ export function ajustesDeModelo(modalidade: Modalidade, modeloId: string): Build
   return { ...AJUSTES_BASE, ...modelo.ajustes }
 }
 
+function clonar<T>(v: T): T { try { return structuredClone(v) } catch { return JSON.parse(JSON.stringify(v)) } }
+
 /** Cria um item (grupo) de modalidade+modelo. */
 export function novoItem(modalidade: Modalidade, modeloId: string): ItemCaderno {
   const meta = metaDaModalidade(modalidade)
   const modelo = meta.modelos.find((m) => m.id === modeloId) ?? meta.modelos[0]
-  return { id: novoId(), modalidade, modelo: modelo.id, ajustes: ajustesDeModelo(modalidade, modelo.id) }
+  const item: ItemCaderno = { id: novoId(), modalidade, modelo: modelo.id, ajustes: ajustesDeModelo(modalidade, modelo.id) }
+  if (modalidade === 'diagnostico') item.conteudo = clonar(modelo.conteudo ?? DIAG_PADRAO)
+  return item
 }
 
 /** Builder padrão: um único grupo (Caderno de Questões / Clássico). */
@@ -123,7 +134,9 @@ function normalizarItem(raw: any): ItemCaderno {
   const modalidade: Modalidade = ['folha_respostas', 'caderno_questoes', 'diagnostico'].includes(raw?.modalidade) ? raw.modalidade : 'caderno_questoes'
   const meta = metaDaModalidade(modalidade)
   const modelo = meta.modelos.some((m) => m.id === raw?.modelo) ? raw.modelo : meta.modelos[0].id
-  return { id: typeof raw?.id === 'string' ? raw.id : novoId(), modalidade, modelo, ajustes: { ...AJUSTES_BASE, ...(raw?.ajustes ?? {}) } }
+  const item: ItemCaderno = { id: typeof raw?.id === 'string' ? raw.id : novoId(), modalidade, modelo, ajustes: { ...AJUSTES_BASE, ...(raw?.ajustes ?? {}) } }
+  if (modalidade === 'diagnostico') item.conteudo = (raw?.conteudo && typeof raw.conteudo === 'object') ? raw.conteudo : clonar(DIAG_PADRAO)
+  return item
 }
 
 /** Lê o builder do config (tolerante). Migra o formato antigo (1 item por caderno) → itens[]. */

@@ -2,6 +2,7 @@
 // questões e desenha a folha conforme modalidade + modelo + ajustes. Renderizado no painel direito.
 
 import type { ItemCaderno, PreviewQuestao } from './tipos'
+import { DIAG_PADRAO } from './diagnostico'
 
 const A4_W = 794 // 210mm @96dpi
 const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -32,14 +33,14 @@ export function Previa({ item, questoes }: { item: ItemCaderno; questoes: Previe
 
   return (
     <div style={{ width: A4_W, minHeight: 1123, background: '#fff', color: '#1a202c', boxShadow: '0 2px 20px rgba(0,0,0,.14)', padding: a.compacto ? 40 : 56, fontFamily: 'Inter, system-ui, sans-serif', boxSizing: 'border-box' }}>
-      {a.mostrarCabecalho && (
+      {a.mostrarCabecalho && item.modalidade !== 'diagnostico' && (
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontSize: a.compacto ? 20 : 26, fontWeight: 800, color: a.corPrimaria, letterSpacing: 0.3 }}>{a.titulo || 'Simulado'}</div>
           <div style={{ height: 3, background: a.corSecundaria, borderRadius: 2, marginTop: 6, width: 120 }} />
         </div>
       )}
 
-      {a.mostrarDadosAluno && (
+      {a.mostrarDadosAluno && item.modalidade !== 'diagnostico' && (
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 0, border: `1px solid ${a.corPrimaria}33`, borderRadius: 8, overflow: 'hidden', marginBottom: 18 }}>
           {[['Nome', 'João da Silva'], ['CPF', '000.000.000-00'], ['Data', '__/__/____']].map(([r, v], i) => (
             <div key={r} style={{ padding: '8px 12px', borderLeft: i ? `1px solid ${a.corPrimaria}22` : 'none' }}>
@@ -99,37 +100,83 @@ export function Previa({ item, questoes }: { item: ItemCaderno; questoes: Previe
       })()}
 
       {item.modalidade === 'diagnostico' && (() => {
-        const total = qs.length || 20
-        const acertos = Math.round(total * 0.7)
-        const pct = Math.round((acertos / total) * 100)
-        const materias = [
-          { nome: 'Direito Administrativo', ac: 6, tt: 8 },
-          { nome: 'Direito Constitucional', ac: 5, tt: 7 },
-          { nome: 'Português', ac: 3, tt: 5 },
-        ]
+        const c = item.conteudo ?? DIAG_PADRAO
+        const prim = a.corPrimaria
+        const amar = a.corSecundaria
+        const SecHeader = ({ t }: { t: string }) => <div style={{ background: prim, color: '#fff', fontWeight: 700, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', padding: '6px 12px', borderRadius: 2, margin: '16px 0 10px' }}>{t}</div>
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'stretch', border: `1px solid ${a.corPrimaria}33`, borderRadius: 8, overflow: 'hidden' }}>
-              <div style={{ background: a.corPrimaria, color: '#fff', padding: '14px 22px', display: 'flex', alignItems: 'baseline', gap: 2 }}>
-                <span style={{ fontSize: 34, fontWeight: 800, lineHeight: 1 }}>{acertos}</span>
-                <span style={{ fontSize: 18, fontWeight: 700 }}>/{total}</span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {a.mostrarCabecalho && (
+              <div style={{ background: prim, color: '#fff', padding: '12px 16px', borderRadius: 6, marginBottom: 12 }}>
+                <div style={{ fontSize: 20, fontWeight: 800 }}>{a.titulo || 'Diagnóstico de Desempenho'}</div>
+                {c.subtitulo && <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{c.subtitulo}</div>}
               </div>
-              <div style={{ background: a.corSecundaria, color: '#3b2f00', padding: '14px 18px', flex: 1, display: 'flex', alignItems: 'center', fontSize: 13, fontWeight: 600 }}>
-                {acertos} acertos de {total} questões — {pct}% de aproveitamento
+            )}
+            {a.mostrarDadosAluno && (
+              <div style={{ display: 'flex', border: `1px solid ${prim}`, borderRadius: 6, overflow: 'hidden', marginBottom: 12 }}>
+                <div style={{ background: prim, color: '#fff', fontWeight: 800, fontSize: 14, padding: '8px 14px' }}>NOME:</div>
+                <div style={{ background: amar, color: '#3b2f00', flex: 1, padding: '8px 14px', fontSize: 12, fontWeight: 600 }}>[NOME COMPLETO ALUNO]</div>
               </div>
+            )}
+            <div style={{ display: 'flex', border: `1px solid ${prim}33`, borderRadius: 6, overflow: 'hidden', marginBottom: 12 }}>
+              <div style={{ background: '#9b6800', color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 32, fontWeight: 800 }}>X</span><span style={{ fontSize: 16, fontWeight: 700 }}>/{c.notaTotal}</span>
+              </div>
+              <div style={{ background: amar, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: 12, fontWeight: 600 }}>{c.notaTexto}</div>
             </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: a.corPrimaria, marginBottom: 8 }}>Desempenho por matéria</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {materias.map((m) => { const p = Math.round((m.ac / m.tt) * 100); return (
-                  <div key={m.nome}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}><span>{m.nome}</span><span style={{ fontWeight: 700 }}>{m.ac}/{m.tt} · {p}%</span></div>
-                    <div style={{ height: 8, background: '#eef1f5', borderRadius: 4, overflow: 'hidden' }}><div style={{ width: `${p}%`, height: '100%', background: a.corSecundaria }} /></div>
+            {c.intro.map((p, i) => <p key={i} style={{ fontSize: base, lineHeight: 1.5, textAlign: 'justify', margin: '0 0 8px' }}>{p}</p>)}
+
+            {c.pilares.length > 0 && <><SecHeader t="Desempenho por pilar" />
+              <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
+                {c.pilares.map((pl, i) => (
+                  <div key={i} style={{ flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${prim}22`, borderRadius: 4, padding: 10 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: prim, letterSpacing: 0.5 }}>{pl.nome}</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: prim, lineHeight: 1.1 }}>X%</div>
+                    <div style={{ fontSize: 9, color: '#5a5570', marginBottom: 6 }}>{pl.totalTxt}</div>
+                    {pl.bandas.map((b, j) => (
+                      <div key={j} style={{ marginBottom: 6 }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: prim }}>{b.faixa}</div>
+                        {b.texto && <div style={{ fontSize: 8.5, color: '#243b53', lineHeight: 1.4, textAlign: 'justify' }}>{b.texto}</div>}
+                      </div>
+                    ))}
                   </div>
-                ) })}
-              </div>
-            </div>
-            {usandoExemplo && <div style={{ fontSize: 10, color: '#94a3b8', fontStyle: 'italic' }}>Prévia com dados de exemplo — vincule um banco para ver os números reais.</div>}
+                ))}
+              </div></>}
+
+            {c.disciplinas.length > 0 && <><SecHeader t="Desempenho por disciplina" />
+              {c.disciplinasIntro && <p style={{ fontSize: base - 1, color: '#5a5570', margin: '0 0 8px', lineHeight: 1.4 }}>{c.disciplinasIntro}</p>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {c.disciplinas.map((d, i) => (
+                  <div key={i} style={{ background: '#f5f3ff', borderTop: `2px solid ${amar}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                    <div style={{ minWidth: 0 }}><div style={{ fontSize: 11, fontWeight: 700, color: prim }}>{d.nome}</div><div style={{ fontSize: 9, color: '#5a5570', fontStyle: 'italic' }}>- Categoria: {d.categoria}</div></div>
+                    <div style={{ fontSize: 11, whiteSpace: 'nowrap' }}><span style={{ color: '#9590b0' }}>{d.total}</span> <span style={{ fontWeight: 800, color: '#9a6e00' }}>x%</span></div>
+                  </div>
+                ))}
+              </div></>}
+
+            {c.sugestoes.length > 0 && <><SecHeader t="Sugestões de estudo" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {c.sugestoes.map((s, i) => (
+                  <div key={i}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fdf3d0', padding: '5px 12px' }}>
+                      <span style={{ fontWeight: 800, fontSize: 11, color: '#9a6e00' }}>{s.titulo}</span>
+                      {s.prioridade && <span style={{ fontWeight: 700, fontSize: 9, color: '#9a6e00' }}>[!] {s.prioridade}</span>}
+                    </div>
+                    <div style={{ background: '#f0eeff', padding: '8px 12px' }}>
+                      {s.intro && <p style={{ fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify' }}>{s.intro}</p>}
+                      {s.itens.map((it, j) => (
+                        <div key={j} style={{ fontSize: base - 1, lineHeight: 1.4, marginBottom: 2, display: 'flex', gap: 5 }}>
+                          <span style={{ fontWeight: 700, color: it.forte ? '#e8850c' : '#3b5bdb' }}>{it.forte ? '>>' : '>'}</span><span>{it.texto}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div></>}
+
+            {(c.gabaritoObs.length > 0 || c.gabaritoIntro.length > 0) && <><SecHeader t={c.gabaritoTitulo || 'Gabarito oficial desatualizado'} />
+              {c.gabaritoIntro.map((p, i) => <p key={i} style={{ fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify' }}>{p}</p>)}
+              {c.gabaritoObs.length > 0 && <div style={{ background: '#f5f3ff', borderTop: '2px solid #a32d2d', padding: '8px 12px' }}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: 9, color: '#5a5570' }}>{o}</div>)}</div>}</>}
           </div>
         )
       })()}
