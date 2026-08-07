@@ -11,6 +11,8 @@ import { Previa } from '@/lib/caderno-teste/previa'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
 import { metaDaModalidade, itemAtivo, novoItem, type BuilderV3, type BuilderAjustes, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
+import { camposDoBloco, aplicarCampoBloco } from '@/lib/caderno-teste/edicao'
+import type { DiagConteudo } from '@/lib/caderno-teste/diagnostico'
 import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
 import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
 import { Users, ChevronRight, Download } from 'lucide-react'
@@ -65,6 +67,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const a = ativo.ajustes
   const bancoAtual = bancos.find((b) => b.id === builder.bancoId) ?? null
   const setAjuste = (patch: Partial<BuilderAjustes>) => setBuilder((b) => ({ ...b, itens: b.itens.map((it) => it.id === b.ativo ? { ...it, ajustes: { ...it.ajustes, ...patch } } : it) }))
+  const setConteudo = (conteudo: DiagConteudo) => setBuilder((b) => ({ ...b, itens: b.itens.map((it) => it.id === b.ativo ? { ...it, conteudo } : it) }))
 
   function adicionarGrupo() { setPickerMode('add'); setPickerOpen(true) }
   function trocarModelo() { setPickerMode('trocar'); setPickerOpen(true) }
@@ -321,22 +324,50 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
 
       <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: ativo.modalidade, modelo: ativo.modelo }} onSelecionar={onPicker} />
       <BancoPicker open={bancoPickerOpen} onClose={() => setBancoPickerOpen(false)} bancos={bancos} atual={builder.bancoId} onSelecionar={trocarBanco} />
-      {pickerCor && (
+      {pickerCor && (() => {
+        const campos = camposDoBloco(ativo, pickerCor.parte)
+        return (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setPickerCor(null)} />
-          <div className="fixed z-50 w-56 rounded-lg border bg-background p-3 shadow-xl" style={{ left: pickerCor.x, top: pickerCor.y }}>
+          <div className="fixed z-50 w-72 overflow-y-auto rounded-lg border bg-background p-3 shadow-xl" style={{ left: pickerCor.x, top: pickerCor.y, maxHeight: '78vh' }}>
             <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="truncate text-xs font-semibold" title={pickerCor.label}>Cor · {pickerCor.label}</span>
+              <span className="truncate text-xs font-semibold" title={pickerCor.label}>{pickerCor.label}</span>
               <button onClick={() => setPickerCor(null)} className="shrink-0 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
+            <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cor</div>
             <HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />
             {a.coresParte?.[pickerCor.parte] && (
               <button onClick={() => { const cp = { ...(a.coresParte ?? {}) }; delete cp[pickerCor.parte]; setAjuste({ coresParte: cp }) }} className="mt-2 text-[11px] text-muted-foreground hover:underline">Restaurar cor padrão</button>
             )}
-            <p className="mt-2 text-[10px] leading-snug text-muted-foreground">Cor só deste bloco. Clique em qualquer bloco da prévia para personalizá-lo.</p>
+            {campos.length > 0 && (
+              <div className="mt-3 space-y-2 border-t pt-3">
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Texto</div>
+                {campos.map((campo) => (
+                  <label key={campo.id} className="block">
+                    <span className="mb-0.5 block text-[11px] text-muted-foreground">{campo.label}</span>
+                    {campo.multiline ? (
+                      <textarea
+                        value={campo.valor}
+                        onChange={(e) => campo.alvo === 'titulo' ? setAjuste({ titulo: e.target.value }) : setConteudo(aplicarCampoBloco(ativo.conteudo, pickerCor.parte, campo.id, e.target.value))}
+                        rows={3}
+                        className="w-full resize-y rounded border bg-background px-2 py-1 text-xs leading-snug outline-none focus:border-primary"
+                      />
+                    ) : (
+                      <input
+                        value={campo.valor}
+                        onChange={(e) => campo.alvo === 'titulo' ? setAjuste({ titulo: e.target.value }) : setConteudo(aplicarCampoBloco(ativo.conteudo, pickerCor.parte, campo.id, e.target.value))}
+                        className="w-full rounded border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
+                      />
+                    )}
+                  </label>
+                ))}
+              </div>
+            )}
+            <p className="mt-3 text-[10px] leading-snug text-muted-foreground">Personaliza só este bloco. Clique em qualquer bloco da prévia para editá-lo.</p>
           </div>
         </>
-      )}
+        )
+      })()}
     </div>
   )
 }
