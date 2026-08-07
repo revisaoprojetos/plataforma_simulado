@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
-import { fetchAll } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { carregarRegistros } from '@/lib/caderno-designer/merge'
 import { slugDiag } from '@/lib/caderno-teste/diagnostico'
 import type { BuilderV3, PreviewQuestao } from '@/lib/caderno-teste/tipos'
@@ -76,11 +76,25 @@ export async function dadosBancoTeste(bancoId: string): Promise<{ ok: boolean; r
     registros = regs.map((r) => ({ id: r.id, nome: r.nome, vars: r.vars }))
   } catch { /* base sem sessões/respostas — segue sem alunos */ }
 
-  // Disciplinas: dos grupos do banco (nomes) ou, em fallback, das variáveis (total_<slug>).
-  const nomes = new Set<string>()
-  const grupos = Array.isArray((pasta as any)?.grupos) ? (pasta as any).grupos : []
-  for (const g of grupos) for (const d of (g?.disciplinas ?? [])) if (typeof d === 'string' && d.trim()) nomes.add(d.trim())
-  let disciplinas: DiscBancoTeste[] = [...nomes].map((nome) => ({ nome, chave: slugDiag(nome) }))
+  // Disciplinas AUTORITATIVAS: nomes reais das disciplinas das questões DO BANCO selecionado —
+  // slug igual ao das variáveis (merge.ts), então nome/quantidade/% adaptam a qualquer banco.
+  let disciplinas: DiscBancoTeste[] = []
+  try {
+    const vinc = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', access.tenantId!).order('questao_id', { ascending: true }))
+    const ids = vinc.map((v) => v.questao_id)
+    const nomes = new Set<string>()
+    if (ids.length) {
+      const qs = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_questoes').select('disciplinas:simulado_disciplinas(nome)').in('id', chunk).eq('tenant_id', access.tenantId!))
+      for (const q of qs) { const n = (q as any).disciplinas?.nome as string | undefined; if (n && n.trim()) nomes.add(n.trim()) }
+    }
+    disciplinas = [...nomes].sort((a, b) => a.localeCompare(b)).map((nome) => ({ nome, chave: slugDiag(nome) }))
+  } catch { /* fallback abaixo */ }
+  // Fallback 1: grupos configurados no banco. Fallback 2: variáveis do 1º aluno (total_<slug>).
+  if (!disciplinas.length) {
+    const nomes = new Set<string>()
+    for (const g of (Array.isArray((pasta as any)?.grupos) ? (pasta as any).grupos : [])) for (const d of (g?.disciplinas ?? [])) if (typeof d === 'string' && d.trim()) nomes.add(d.trim())
+    disciplinas = [...nomes].map((nome) => ({ nome, chave: slugDiag(nome) }))
+  }
   if (!disciplinas.length && registros[0]) {
     const v = registros[0].vars
     const human = (s: string) => s.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
