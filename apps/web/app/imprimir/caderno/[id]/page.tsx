@@ -21,10 +21,10 @@ export default async function CadernoImprimirPage({
   params, searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ gabarito?: string; mod?: string; aluno?: string; todos?: string; sessao?: string; pdftoken?: string; semgab?: string; rawimg?: string; embed?: string }>
+  searchParams: Promise<{ gabarito?: string; mod?: string; aluno?: string; todos?: string; sessao?: string; pdftoken?: string; semgab?: string; rawimg?: string; embed?: string; banco?: string }>
 }) {
   const { id } = await params
-  const { gabarito: g, mod, aluno, todos, sessao, pdftoken, semgab, rawimg, embed: embedParam } = await searchParams
+  const { gabarito: g, mod, aluno, todos, sessao, pdftoken, semgab, rawimg, embed: embedParam, banco: bancoParam } = await searchParams
   const gabarito = g === '1'
   const embed = embedParam === '1' // preview embutido (iframe): oculta a barra de controles de impressão
   const forcarSemGabarito = semgab === '1' // "como você fez": mostra marcações, oculta a correção
@@ -62,6 +62,14 @@ export default async function CadernoImprimirPage({
   const modalidadesV2: { id: string; nome: string }[] = config.modalidadesV2 ?? []
   const theme = resolveTheme(config.cores)
   let bancoId: string | null = config.bancoId ?? null
+  // Banco explícito (?banco=): o chamador (ex.: download do caderno de questões do aluno) passa o
+  // banco do SIMULADO para as questões baterem com o simulado, mesmo que o `config.bancoId` interno
+  // do caderno esteja divergente. Só honramos via token de render assinado (URL server-side) e
+  // dentro do tenant, para não permitir dump de outro banco por URL forjada.
+  if (bancoParam && tokenPayload && tokenPayload.r === 'caderno') {
+    const { data: bOk } = await svc.from('simulado_pastas').select('id').eq('id', bancoParam).eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
+    if (bOk) bancoId = bancoParam
+  }
   // Diagnóstico individual: o banco vem do SIMULADO da sessão (não o fixo do caderno) — assim
   // o MESMO caderno serve a vários simulados/disciplinas e cada aluno vê os dados do SEU simulado.
   if (sessao) {

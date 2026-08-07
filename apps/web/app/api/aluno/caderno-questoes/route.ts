@@ -62,6 +62,11 @@ export async function GET(request: NextRequest) {
   }
   if (!cadernoId) return NextResponse.json({ message: 'Este simulado não tem caderno de questões.' }, { status: 404 })
 
+  // Banco AUTORITATIVO das questões = o banco DESTE simulado (banco_base_id), não o `config.bancoId`
+  // interno do caderno — que pode divergir (ex.: caderno reaproveitado/copiado) e fazer o aluno
+  // baixar as questões de OUTRO simulado. Passamos esse banco explicitamente para o /imprimir.
+  const bancoDoSimulado: string | null = regras.banco_base_id ?? null
+
   const exec = acharNavegador()
   if (!exec) return NextResponse.json({ message: 'Nenhum navegador (Edge/Chrome) encontrado para gerar o PDF.' }, { status: 503 })
 
@@ -74,6 +79,7 @@ export async function GET(request: NextRequest) {
   }
 
   const qs = new URLSearchParams({ mod: 'caderno_perguntas', semgab: '1', rawimg: '1', pdftoken })
+  if (bancoDoSimulado) qs.set('banco', bancoDoSimulado) // força as questões do banco DESTE simulado
   const url = `${WEB_INTERNAL}/imprimir/caderno/${cadernoId}?${qs.toString()}`
   const nomeArquivo = `Caderno de questoes - ${((sim as any).titulo || 'simulado')}`.replace(/[\\/:*?"<>|]+/g, '').slice(0, 120)
 
