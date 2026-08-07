@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { pdfStoragePath } from '@/lib/caderno-designer/material'
 
 // Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
 export const dynamic = 'force-dynamic'
@@ -58,9 +59,17 @@ export async function POST(req: NextRequest) {
   const padrao = slot === 'enunciado' ? 'Enunciado de Questões' : 'Material completo'
   const nome = ((file.name || padrao).replace(/\.pdf$/i, '').trim()) || padrao
   const config = (cad.config ?? {}) as Record<string, unknown>
+  const urlAntiga = (config[configKey] as any)?.pdfUrl as string | undefined
   const material = { fonte: 'pdf', pdfUrl: url, pdfNome: nome }
   const { error } = await svc.from('simulado_cadernos_designer').update({ config: { ...config, [configKey]: material } }).eq('id', cadernoId).eq('tenant_id', access.tenantId)
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  if (error) {
+    // Rollback: o config não persistiu → remove o objeto recém-subido para não deixar órfão no storage.
+    try { await svc.storage.from('pdfs').remove([path]) } catch { /* ignora */ }
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  }
+  // Substituição: apaga o PDF anterior (hash diferente = path diferente) para não acumular órfãos.
+  const pathAntigo = pdfStoragePath(urlAntiga)
+  if (pathAntigo && pathAntigo !== path) { try { await svc.storage.from('pdfs').remove([pathAntigo]) } catch { /* ignora */ } }
 
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: cadernoId, depois: { [`${configKey}_pdf`]: nome } })
   if (bancoId) revalidatePath(`/admin/banco-questoes/${bancoId}`)

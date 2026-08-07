@@ -12,6 +12,18 @@ export interface MaterialCaderno {
 
 export const MATERIAL_PADRAO: MaterialCaderno = { fonte: 'sistema', pdfUrl: '', pdfNome: '' }
 
+/**
+ * Extrai o caminho do objeto DENTRO do bucket `pdfs` a partir da URL pública — para remover o
+ * arquivo do storage (evitar órfãos) ao trocar/remover o material. Tolera o `?download=` (que é
+ * acrescentado só na LEITURA por `enunciadoPdf`/`enunciadoQuestoesPdf`, não no valor gravado).
+ * Retorna null quando a URL não é do bucket `pdfs` (ex.: link externo antigo).
+ */
+export function pdfStoragePath(pdfUrl: string | undefined | null): string | null {
+  if (!pdfUrl) return null
+  const m = /\/storage\/v1\/object\/public\/pdfs\/(.+?)(?:\?|$)/.exec(pdfUrl)
+  return m ? decodeURIComponent(m[1]) : null
+}
+
 /** Lê `config.material` de forma tolerante (default = sistema). */
 export function materialDoConfig(config: unknown): MaterialCaderno {
   const m = (config as any)?.material
