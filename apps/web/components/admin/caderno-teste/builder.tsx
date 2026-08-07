@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil } from 'lucide-react'
+import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil, Plus, X, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { HexColorField } from '@/components/admin/hex-color-field'
 import { Previa } from '@/lib/caderno-teste/previa'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
-import { metaDaModalidade, builderDeModelo, type BuilderV3, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
+import { metaDaModalidade, itemAtivo, novoItem, type BuilderV3, type BuilderAjustes, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { salvarBuilderTeste, previewQuestoesBanco } from '@/app/admin/cadernos-teste/actions'
 
 const ICONE_MOD: Record<Modalidade, any> = { caderno_questoes: FileText, folha_respostas: ClipboardList, diagnostico: BarChart3 }
@@ -39,19 +39,42 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const [questoes, setQuestoes] = useState<PreviewQuestao[]>(questoesIniciais)
   const [carregandoQ, setCarregandoQ] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(abrirPickerInicial)
+  const [pickerMode, setPickerMode] = useState<'add' | 'trocar'>('trocar')
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
 
-  const meta = metaDaModalidade(builder.modalidade)
-  const modeloNome = meta.modelos.find((m) => m.id === builder.modelo)?.nome ?? meta.modelos[0].nome
-  const IconeMod = ICONE_MOD[builder.modalidade]
-  const a = builder.ajustes
-  const setAjuste = (patch: Partial<BuilderV3['ajustes']>) => setBuilder((b) => ({ ...b, ajustes: { ...b.ajustes, ...patch } }))
+  const ativo = itemAtivo(builder)
+  const meta = metaDaModalidade(ativo.modalidade)
+  const modeloNome = meta.modelos.find((m) => m.id === ativo.modelo)?.nome ?? meta.modelos[0].nome
+  const IconeMod = ICONE_MOD[ativo.modalidade]
+  const a = ativo.ajustes
+  const setAjuste = (patch: Partial<BuilderAjustes>) => setBuilder((b) => ({ ...b, itens: b.itens.map((it) => it.id === b.ativo ? { ...it, ajustes: { ...it.ajustes, ...patch } } : it) }))
 
-  /** Aplica modalidade+modelo do pop-up preservando título/cores/banco do usuário. */
-  function escolherModelo(m: Modalidade, modeloId: string) {
-    const base = builderDeModelo(m, modeloId, builder.bancoId)
-    setBuilder((b) => ({ ...base, ajustes: { ...base.ajustes, titulo: b.ajustes.titulo, corPrimaria: b.ajustes.corPrimaria, corSecundaria: b.ajustes.corSecundaria } }))
+  function adicionarGrupo() { setPickerMode('add'); setPickerOpen(true) }
+  function trocarModelo() { setPickerMode('trocar'); setPickerOpen(true) }
+  function selecionarGrupo(id: string) { setBuilder((b) => ({ ...b, ativo: id })) }
+  function removerGrupo(id: string) {
+    setBuilder((b) => {
+      if (b.itens.length <= 1) return b
+      const itens = b.itens.filter((it) => it.id !== id)
+      return { ...b, itens, ativo: b.ativo === id ? itens[0].id : b.ativo }
+    })
+  }
+  /** Aplica a escolha do pop-up: adiciona um grupo novo ou troca a modalidade+modelo do grupo ativo (mantém título/cores). */
+  function onPicker(m: Modalidade, modeloId: string) {
+    setBuilder((b) => {
+      if (pickerMode === 'add') {
+        const src = itemAtivo(b).ajustes
+        const it = novoItem(m, modeloId)
+        it.ajustes = { ...it.ajustes, titulo: src.titulo, corPrimaria: src.corPrimaria, corSecundaria: src.corSecundaria }
+        return { ...b, itens: [...b.itens, it], ativo: it.id }
+      }
+      return { ...b, itens: b.itens.map((it) => {
+        if (it.id !== b.ativo) return it
+        const novo = novoItem(m, modeloId)
+        return { ...novo, id: it.id, ajustes: { ...novo.ajustes, titulo: it.ajustes.titulo, corPrimaria: it.ajustes.corPrimaria, corSecundaria: it.ajustes.corSecundaria } }
+      }) }
+    })
     setPickerOpen(false)
   }
   function trocarBanco(bancoId: string | null) {
@@ -67,7 +90,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
     })
   }
 
-  const Tog = ({ campo, label }: { campo: keyof BuilderV3['ajustes']; label: string }) => (
+  const Tog = ({ campo, label }: { campo: keyof BuilderAjustes; label: string }) => (
     <label className="flex cursor-pointer items-center justify-between gap-2 py-1 text-sm">
       <span className="text-muted-foreground">{label}</span>
       <input type="checkbox" checked={!!a[campo]} onChange={(e) => setAjuste({ [campo]: e.target.checked } as any)} />
@@ -89,17 +112,45 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           <Link href="/admin/cadernos-teste" className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
           <div>
             <h1 className="text-lg font-bold leading-tight">Construtor de caderno (teste)</h1>
-            <p className="text-xs text-muted-foreground">Escolha o modelo no pop-up e ajuste à esquerda — a prévia atualiza à direita.</p>
+            <p className="text-xs text-muted-foreground">Vários grupos (modalidades) num caderno. Escolha o modelo no pop-up e ajuste à esquerda.</p>
           </div>
         </div>
         <Button onClick={salvar} disabled={pending} size="sm">{pending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />} Salvar</Button>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[320px_1fr]">
-        {/* Esquerda: modelo (pop-up) + banco + ajustes */}
+        {/* Esquerda: grupos (modalidades) → modelo → banco → ajustes */}
         <div className="scroll-claro flex min-h-0 flex-col gap-5 overflow-y-auto border-r bg-muted/20 p-4">
           <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Modelo</p>
+            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Layers className="h-3.5 w-3.5" /> Grupos deste caderno</p>
+            <div className="flex flex-col gap-1.5">
+              {builder.itens.map((it) => {
+                const m = metaDaModalidade(it.modalidade)
+                const Icon = ICONE_MOD[it.modalidade]
+                const ativoItem = it.id === builder.ativo
+                return (
+                  <div key={it.id} className={cn('group flex items-center gap-2 rounded-lg border px-2.5 py-2 transition-all', ativoItem ? 'border-primary bg-primary/5 shadow-sm' : 'bg-background hover:border-primary/50')}>
+                    <button type="button" onClick={() => selecionarGrupo(it.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                      <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md', ativoItem ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary')}><Icon className="h-4 w-4" /></span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium leading-tight">{m.nome}</span>
+                        <span className="block truncate text-[10px] text-muted-foreground">{m.modelos.find((x) => x.id === it.modelo)?.nome}</span>
+                      </span>
+                    </button>
+                    {builder.itens.length > 1 && (
+                      <button type="button" onClick={() => removerGrupo(it.id)} title="Remover grupo" className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"><X className="h-3.5 w-3.5" /></button>
+                    )}
+                  </div>
+                )
+              })}
+              <button type="button" onClick={adicionarGrupo} className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+                <Plus className="h-3.5 w-3.5" /> Adicionar grupo
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Modelo do grupo</p>
             <div className="rounded-xl border bg-background p-3 shadow-sm">
               <div className="flex items-start gap-2.5">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><IconeMod className="h-4.5 w-4.5" /></span>
@@ -108,8 +159,8 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                   <p className="text-[11px] text-muted-foreground">Modelo: {modeloNome}</p>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="mt-2.5 w-full" onClick={() => setPickerOpen(true)}>
-                <LayoutTemplate className="mr-1.5 h-4 w-4" /> Escolher modelo
+              <Button variant="outline" size="sm" className="mt-2.5 w-full" onClick={trocarModelo}>
+                <LayoutTemplate className="mr-1.5 h-4 w-4" /> Trocar modelo
               </Button>
             </div>
           </div>
@@ -125,7 +176,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           </div>
 
           <div className="space-y-1">
-            <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Pencil className="h-3.5 w-3.5" /> Ajustes</p>
+            <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Pencil className="h-3.5 w-3.5" /> Ajustes do grupo</p>
             <label className="block text-xs text-muted-foreground">
               <span className="mb-1 block">Título</span>
               <input value={a.titulo} onChange={(e) => setAjuste({ titulo: e.target.value })} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm text-foreground" />
@@ -134,31 +185,31 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             <label className="flex items-center justify-between gap-2 py-1 text-sm"><span className="text-muted-foreground">Cor secundária</span><HexColorField value={a.corSecundaria} onChange={(v) => setAjuste({ corSecundaria: v })} /></label>
             <Tog campo="mostrarCabecalho" label="Cabeçalho (título)" />
             <Tog campo="mostrarDadosAluno" label="Dados do aluno" />
-            {builder.modalidade === 'caderno_questoes' && <>
+            {ativo.modalidade === 'caderno_questoes' && <>
               <Tog campo="mostrarGabarito" label="Destacar gabarito" />
               <Tog campo="mostrarComentarios" label="Comentários" />
             </>}
-            {(builder.modalidade === 'caderno_questoes' || builder.modalidade === 'folha_respostas') && (
+            {(ativo.modalidade === 'caderno_questoes' || ativo.modalidade === 'folha_respostas') && (
               <Segment label="Nº de alternativas" valor={a.numAlternativas} opcoes={[4, 5]} onChange={(n) => setAjuste({ numAlternativas: n })} />
             )}
-            {builder.modalidade === 'folha_respostas' && (
+            {ativo.modalidade === 'folha_respostas' && (
               <Segment label="Colunas" valor={a.colunas} opcoes={[2, 3, 4, 5]} onChange={(n) => setAjuste({ colunas: n })} />
             )}
             <Tog campo="compacto" label="Compacto" />
           </div>
         </div>
 
-        {/* Direita: prévia A4 */}
+        {/* Direita: prévia A4 do grupo ativo */}
         <div ref={ref} className="scroll-claro min-h-0 overflow-auto bg-[radial-gradient(circle,theme(colors.slate.300)_1px,transparent_1px)] [background-size:18px_18px] p-6 dark:bg-[radial-gradient(circle,theme(colors.slate.700)_1px,transparent_1px)]">
           <div className="mx-auto" style={{ width: 794 * zoom }}>
             <div style={{ width: 794, transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
-              <Previa builder={builder} questoes={questoes} />
+              <Previa item={ativo} questoes={questoes} />
             </div>
           </div>
         </div>
       </div>
 
-      <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: builder.modalidade, modelo: builder.modelo }} onSelecionar={escolherModelo} />
+      <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: ativo.modalidade, modelo: ativo.modelo }} onSelecionar={onPicker} />
     </div>
   )
 }

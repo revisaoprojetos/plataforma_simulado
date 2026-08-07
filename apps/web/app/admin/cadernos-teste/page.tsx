@@ -29,8 +29,11 @@ export default async function CadernosTestePage() {
     cadernos = r.data ?? []
   }
   const lista = cadernos.map((c: any) => {
-    const mod = (c.config?.builderV3?.modalidade ?? 'caderno_questoes') as Modalidade
-    return { id: c.id, nome: c.nome, modalidade: mod, modalidadeNome: metaDaModalidade(mod).nome }
+    const b = c.config?.builderV3
+    const itens: any[] = Array.isArray(b?.itens) ? b.itens : (b?.modalidade ? [{ modalidade: b.modalidade }] : [])
+    const mod = (itens[0]?.modalidade ?? 'caderno_questoes') as Modalidade
+    const n = itens.length || 1
+    return { id: c.id, nome: c.nome, modalidade: mod, legenda: n > 1 ? `${n} modalidades` : metaDaModalidade(mod).nome }
   })
 
   return (
@@ -57,7 +60,7 @@ export default async function CadernosTestePage() {
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-5 w-5" /></div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold leading-tight" title={c.nome}>{c.nome}</p>
-                  <p className="text-xs text-muted-foreground">{c.modalidadeNome}</p>
+                  <p className="text-xs text-muted-foreground">{c.legenda}</p>
                 </div>
               </Link>
             )

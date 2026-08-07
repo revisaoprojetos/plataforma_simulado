@@ -1,7 +1,7 @@
 // Prévia A4 ao vivo do construtor de teste. Componente puro (sem estado): recebe o builder e as
 // questões e desenha a folha conforme modalidade + modelo + ajustes. Renderizado no painel direito.
 
-import type { BuilderV3, PreviewQuestao } from './tipos'
+import type { ItemCaderno, PreviewQuestao } from './tipos'
 
 const A4_W = 794 // 210mm @96dpi
 const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -23,8 +23,8 @@ const QUESTOES_EXEMPLO: PreviewQuestao[] = [
   ] },
 ]
 
-export function Previa({ builder, questoes }: { builder: BuilderV3; questoes: PreviewQuestao[] }) {
-  const a = builder.ajustes
+export function Previa({ item, questoes }: { item: ItemCaderno; questoes: PreviewQuestao[] }) {
+  const a = item.ajustes
   const qs = questoes.length ? questoes : QUESTOES_EXEMPLO
   const usandoExemplo = questoes.length === 0
   const base = a.compacto ? 10 : 12
@@ -50,7 +50,7 @@ export function Previa({ builder, questoes }: { builder: BuilderV3; questoes: Pr
         </div>
       )}
 
-      {builder.modalidade === 'caderno_questoes' && (
+      {item.modalidade === 'caderno_questoes' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap }}>
           {qs.map((q) => (
             <div key={q.id} style={{ breakInside: 'avoid' }}>
@@ -75,7 +75,7 @@ export function Previa({ builder, questoes }: { builder: BuilderV3; questoes: Pr
         </div>
       )}
 
-      {builder.modalidade === 'folha_respostas' && (() => {
+      {item.modalidade === 'folha_respostas' && (() => {
         const total = qs.length || 20
         const cols = Math.max(1, Math.min(6, a.colunas))
         const porCol = Math.ceil(total / cols)
@@ -98,7 +98,7 @@ export function Previa({ builder, questoes }: { builder: BuilderV3; questoes: Pr
         )
       })()}
 
-      {builder.modalidade === 'diagnostico' && (() => {
+      {item.modalidade === 'diagnostico' && (() => {
         const total = qs.length || 20
         const acertos = Math.round(total * 0.7)
         const pct = Math.round((acertos / total) * 100)
@@ -134,7 +134,7 @@ export function Previa({ builder, questoes }: { builder: BuilderV3; questoes: Pr
         )
       })()}
 
-      {usandoExemplo && builder.modalidade === 'caderno_questoes' && (
+      {usandoExemplo && item.modalidade === 'caderno_questoes' && (
         <div style={{ marginTop: 20, fontSize: 10, color: '#94a3b8', fontStyle: 'italic' }}>Prévia com questões de exemplo — selecione um banco à esquerda para usar as questões reais.</div>
       )}
     </div>

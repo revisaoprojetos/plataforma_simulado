@@ -19,12 +19,14 @@ export async function salvarBuilderTeste(id: string, builder: BuilderV3): Promis
   const { data: atual } = await svc.from(TABELA).select('config').eq('id', id).eq('tenant_id', access.tenantId).maybeSingle()
   if (!atual) return { ok: false, error: 'Caderno não encontrado.' }
   const config = { ...(((atual as any).config ?? {}) as Record<string, unknown>), builderV3: builder, bancoId: builder.bancoId }
-  const nome = (builder.ajustes.titulo || '').trim()
+  // Nome do caderno = título do grupo ativo (ou o 1º).
+  const at = builder.itens.find((i) => i.id === builder.ativo) ?? builder.itens[0]
+  const nome = (at?.ajustes.titulo || '').trim()
   const patch: Record<string, unknown> = { config, atualizado_em: new Date().toISOString() }
   if (nome) patch.nome = nome
   const { error } = await svc.from(TABELA).update(patch).eq('id', id).eq('tenant_id', access.tenantId)
   if (error) return { ok: false, error: error.message }
-  await registrarAudit({ operacao: 'UPDATE', entidade: TABELA, entidadeId: id, depois: { modalidade: builder.modalidade, modelo: builder.modelo } })
+  await registrarAudit({ operacao: 'UPDATE', entidade: TABELA, entidadeId: id, depois: { grupos: builder.itens.length } })
   revalidatePath('/admin/cadernos-teste')
   return { ok: true }
 }

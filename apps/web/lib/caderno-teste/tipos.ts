@@ -1,6 +1,7 @@
-// Novo construtor de cadernos (área de teste) — modelo "modelo pronto + ajustes".
-// Bem mais simples que o editor de blocos: escolhe MODALIDADE + MODELO e ajusta opções/cores;
-// a prévia A4 (direita) reflete tudo ao vivo. Config isolado em simulado_cadernos_teste.config.builderV3.
+// Construtor de cadernos (área de teste) — "modelo pronto + ajustes".
+// Um CADERNO tem VÁRIOS grupos (itens), cada um com sua modalidade + modelo + ajustes e prévia
+// própria (como as "modalidades" do editor antigo). Config isolado em
+// simulado_cadernos_teste.config.builderV3.
 
 export type Modalidade = 'folha_respostas' | 'caderno_questoes' | 'diagnostico'
 
@@ -17,12 +18,19 @@ export type BuilderAjustes = {
   compacto: boolean       // espaçamento/fonte menores
 }
 
-export type BuilderV3 = {
-  v: 3
+/** Um grupo do caderno: uma modalidade+modelo com seus ajustes. */
+export type ItemCaderno = {
+  id: string
   modalidade: Modalidade
   modelo: string
-  bancoId: string | null
   ajustes: BuilderAjustes
+}
+
+export type BuilderV3 = {
+  v: 3
+  bancoId: string | null
+  itens: ItemCaderno[]
+  ativo: string // id do item em edição
 }
 
 export type PreviewQuestao = {
@@ -77,30 +85,61 @@ export function metaDaModalidade(id: Modalidade): ModalidadeMeta {
   return MODALIDADES.find((m) => m.id === id) ?? MODALIDADES[0]
 }
 
-/** Ajustes de um modelo aplicados sobre uma base (preserva título/cores/banco do usuário). */
+function novoId(): string {
+  try { return crypto.randomUUID().slice(0, 8) } catch { return Math.random().toString(36).slice(2, 10) }
+}
+
+/** Ajustes de um modelo aplicados sobre uma base (preserva título/cores do usuário). */
 export function aplicarModelo(atual: BuilderAjustes, modelo: Modelo): BuilderAjustes {
   return { ...atual, ...modelo.ajustes }
 }
 
-/** Builder de uma modalidade+modelo específicos (para o seletor e a mini-prévia). */
-export function builderDeModelo(modalidade: Modalidade, modeloId: string, bancoId: string | null = null): BuilderV3 {
+/** Ajustes de uma modalidade+modelo (base + overrides do modelo). */
+export function ajustesDeModelo(modalidade: Modalidade, modeloId: string): BuilderAjustes {
   const meta = metaDaModalidade(modalidade)
   const modelo = meta.modelos.find((m) => m.id === modeloId) ?? meta.modelos[0]
-  return { v: 3, modalidade, modelo: modelo.id, bancoId, ajustes: { ...AJUSTES_BASE, ...modelo.ajustes } }
+  return { ...AJUSTES_BASE, ...modelo.ajustes }
 }
 
-/** Builder padrão para uma modalidade (1º modelo). */
-export function builderPadrao(modalidade: Modalidade = 'caderno_questoes', bancoId: string | null = null): BuilderV3 {
-  return builderDeModelo(modalidade, metaDaModalidade(modalidade).modelos[0].id, bancoId)
+/** Cria um item (grupo) de modalidade+modelo. */
+export function novoItem(modalidade: Modalidade, modeloId: string): ItemCaderno {
+  const meta = metaDaModalidade(modalidade)
+  const modelo = meta.modelos.find((m) => m.id === modeloId) ?? meta.modelos[0]
+  return { id: novoId(), modalidade, modelo: modelo.id, ajustes: ajustesDeModelo(modalidade, modelo.id) }
 }
 
-/** Lê o builder do config (tolerante) ou devolve o padrão. */
+/** Builder padrão: um único grupo (Caderno de Questões / Clássico). */
+export function builderPadrao(bancoId: string | null = null): BuilderV3 {
+  const item = novoItem('caderno_questoes', 'classico')
+  return { v: 3, bancoId, itens: [item], ativo: item.id }
+}
+
+/** Item em edição (ou o primeiro). */
+export function itemAtivo(builder: BuilderV3): ItemCaderno {
+  return builder.itens.find((i) => i.id === builder.ativo) ?? builder.itens[0]
+}
+
+function normalizarItem(raw: any): ItemCaderno {
+  const modalidade: Modalidade = ['folha_respostas', 'caderno_questoes', 'diagnostico'].includes(raw?.modalidade) ? raw.modalidade : 'caderno_questoes'
+  const meta = metaDaModalidade(modalidade)
+  const modelo = meta.modelos.some((m) => m.id === raw?.modelo) ? raw.modelo : meta.modelos[0].id
+  return { id: typeof raw?.id === 'string' ? raw.id : novoId(), modalidade, modelo, ajustes: { ...AJUSTES_BASE, ...(raw?.ajustes ?? {}) } }
+}
+
+/** Lê o builder do config (tolerante). Migra o formato antigo (1 item por caderno) → itens[]. */
 export function normalizarBuilder(config: unknown, nome?: string): BuilderV3 {
   const b = (config as any)?.builderV3
-  const bancoId = ((config as any)?.bancoId ?? null) as string | null
-  if (!b || typeof b !== 'object') { const d = builderPadrao('caderno_questoes', bancoId); if (nome) d.ajustes.titulo = nome; return d }
-  const modalidade: Modalidade = ['folha_respostas', 'caderno_questoes', 'diagnostico'].includes(b.modalidade) ? b.modalidade : 'caderno_questoes'
-  const meta = metaDaModalidade(modalidade)
-  const modelo = meta.modelos.some((m) => m.id === b.modelo) ? b.modelo : meta.modelos[0].id
-  return { v: 3, modalidade, modelo, bancoId: b.bancoId ?? bancoId ?? null, ajustes: { ...AJUSTES_BASE, ...(b.ajustes ?? {}) } }
+  const bancoId = (b?.bancoId ?? (config as any)?.bancoId ?? null) as string | null
+  if (b && Array.isArray(b.itens) && b.itens.length) {
+    const itens = b.itens.map(normalizarItem)
+    const ativo = itens.some((i: ItemCaderno) => i.id === b.ativo) ? b.ativo : itens[0].id
+    return { v: 3, bancoId, itens, ativo }
+  }
+  if (b && b.modalidade) { // formato antigo (single) → 1 grupo
+    const item = normalizarItem(b)
+    return { v: 3, bancoId, itens: [item], ativo: item.id }
+  }
+  const d = builderPadrao(bancoId)
+  if (nome) d.itens[0].ajustes.titulo = nome
+  return d
 }
