@@ -6,9 +6,10 @@
  * assets de UI com arquivos de PDF. Este ponto único permite migrar para um bucket
  * dedicado (`imagens`) sem caçar `from('pdfs')` espalhado pelo código.
  *
- * Default = 'pdfs' (comportamento histórico — merge sem efeito). Defina
- * `STORAGE_IMAGE_BUCKET=imagens` no ambiente para passar a gravar no bucket dedicado.
- * As URLs antigas em `pdfs/assets` continuam válidas (bucket público inalterado); a
- * migração dos objetos + reescrita das URLs é feita à parte, de forma coordenada.
+ * Default = 'imagens' (bucket dedicado). A migração já foi executada: todas as imagens
+ * existentes vivem em `imagens/{cadernos,logos,questoes,banners,bancos,fundos}/` e as URLs
+ * no banco já apontam para lá. Para reverter ao comportamento antigo, defina
+ * `STORAGE_IMAGE_BUCKET=pdfs` no ambiente. As URLs antigas em `pdfs/assets` foram removidas
+ * (backup local em scripts/_backup-pdfs-assets/).
  */
-export const BUCKET_IMAGENS = (process.env.STORAGE_IMAGE_BUCKET?.trim() || 'pdfs')
+export const BUCKET_IMAGENS = (process.env.STORAGE_IMAGE_BUCKET?.trim() || 'imagens')
