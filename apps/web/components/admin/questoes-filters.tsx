@@ -16,6 +16,26 @@ import { useCallback } from 'react'
 
 type Disciplina = { id: string; nome: string }
 
+const DIFICULDADES = [
+  { valor: 'all', rotulo: 'Toda dificuldade' },
+  { valor: 'facil', rotulo: 'Fácil' },
+  { valor: 'medio', rotulo: 'Médio' },
+  { valor: 'dificil', rotulo: 'Difícil' },
+]
+const TIPOS = [
+  { valor: 'all', rotulo: 'Todos os tipos' },
+  { valor: 'objetiva', rotulo: 'Objetiva' },
+  { valor: 'discursiva', rotulo: 'Discursiva' },
+]
+const STATUS = [
+  { valor: 'all', rotulo: 'Todos os status' },
+  { valor: 'rascunho', rotulo: 'Rascunho' },
+  { valor: 'publicada', rotulo: 'Publicada' },
+  { valor: 'arquivada', rotulo: 'Arquivada' },
+]
+const rotuloDe = (opts: { valor: string; rotulo: string }[], v: string) =>
+  opts.find((o) => o.valor === v)?.rotulo ?? opts[0].rotulo
+
 export function QuestoesFilters({ disciplinas = [] }: { disciplinas?: Disciplina[] }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -47,7 +67,7 @@ export function QuestoesFilters({ disciplinas = [] }: { disciplinas?: Disciplina
         value={searchParams.get('disciplina') ?? 'all'}
         onValueChange={(v) => updateParams('disciplina', (!v || v === 'all') ? '' : v)}
       >
-        <SelectTrigger className="w-[180px]"><SelectValue placeholder="Disciplina" /></SelectTrigger>
+        <SelectTrigger className="w-[180px]"><SelectValue placeholder="Disciplina">{(v: string) => v === 'all' ? 'Todas as disciplinas' : (disciplinas.find((d) => d.id === v)?.nome ?? 'Todas as disciplinas')}</SelectValue></SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Todas as disciplinas</SelectItem>
           {disciplinas.map((d) => (
@@ -60,12 +80,9 @@ export function QuestoesFilters({ disciplinas = [] }: { disciplinas?: Disciplina
         value={searchParams.get('dificuldade') ?? 'all'}
         onValueChange={(v) => updateParams('dificuldade', (!v || v === 'all') ? '' : v)}
       >
-        <SelectTrigger className="w-[150px]"><SelectValue placeholder="Dificuldade" /></SelectTrigger>
+        <SelectTrigger className="w-[150px]"><SelectValue placeholder="Dificuldade">{(v: string) => rotuloDe(DIFICULDADES, v)}</SelectValue></SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Toda dificuldade</SelectItem>
-          <SelectItem value="facil">Fácil</SelectItem>
-          <SelectItem value="medio">Médio</SelectItem>
-          <SelectItem value="dificil">Difícil</SelectItem>
+          {DIFICULDADES.map((o) => <SelectItem key={o.valor} value={o.valor}>{o.rotulo}</SelectItem>)}
         </SelectContent>
       </Select>
 
@@ -73,11 +90,11 @@ export function QuestoesFilters({ disciplinas = [] }: { disciplinas?: Disciplina
         value={searchParams.get('tipo') ?? 'all'}
         onValueChange={(v) => updateParams('tipo', (!v || v === 'all') ? '' : v)}
       >
-        <SelectTrigger className="w-[140px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+        <SelectTrigger className="w-[140px]"><SelectValue placeholder="Tipo">{(v: string) => rotuloDe(TIPOS, v)}</SelectValue></SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Todos os tipos</SelectItem>
-          <SelectItem value="objetiva">Objetiva</SelectItem>
-          {!OCULTAR_DISCURSIVA && <SelectItem value="discursiva">Discursiva</SelectItem>}
+          {TIPOS.filter((o) => o.valor !== 'discursiva' || !OCULTAR_DISCURSIVA).map((o) => (
+            <SelectItem key={o.valor} value={o.valor}>{o.rotulo}</SelectItem>
+          ))}
         </SelectContent>
       </Select>
 
@@ -85,12 +102,9 @@ export function QuestoesFilters({ disciplinas = [] }: { disciplinas?: Disciplina
         value={searchParams.get('status') ?? 'all'}
         onValueChange={(v) => updateParams('status', (!v || v === 'all') ? '' : v)}
       >
-        <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
+        <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status">{(v: string) => rotuloDe(STATUS, v)}</SelectValue></SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Todos os status</SelectItem>
-          <SelectItem value="rascunho">Rascunho</SelectItem>
-          <SelectItem value="publicada">Publicada</SelectItem>
-          <SelectItem value="arquivada">Arquivada</SelectItem>
+          {STATUS.map((o) => <SelectItem key={o.valor} value={o.valor}>{o.rotulo}</SelectItem>)}
         </SelectContent>
       </Select>
 

@@ -62,7 +62,7 @@ export function BancoQuestoesSearch({ bancas, disciplinas }: BancoQuestoesSearch
           onValueChange={(v) => update('banca', v ?? 'all')}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Todas as bancas" />
+            <SelectValue placeholder="Todas as bancas">{(v: string) => v === 'all' ? 'Todas as bancas' : (bancas.find((b) => b.id === v)?.nome ?? 'Todas as bancas')}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as bancas</SelectItem>
@@ -80,7 +80,7 @@ export function BancoQuestoesSearch({ bancas, disciplinas }: BancoQuestoesSearch
           onValueChange={(v) => update('disciplina', v ?? 'all')}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Todas as disciplinas" />
+            <SelectValue placeholder="Todas as disciplinas">{(v: string) => v === 'all' ? 'Todas as disciplinas' : (disciplinas.find((d) => d.id === v)?.nome ?? 'Todas as disciplinas')}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as disciplinas</SelectItem>
@@ -98,10 +98,10 @@ export function BancoQuestoesSearch({ bancas, disciplinas }: BancoQuestoesSearch
           onValueChange={(v) => update('dificuldade', v ?? 'all')}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Todas" />
+            <SelectValue placeholder="Todas">{(v: string) => v === 'facil' ? 'Fácil' : v === 'medio' ? 'Médio' : v === 'dificil' ? 'Difícil' : 'Todas as dificuldades'}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="all">Todas as dificuldades</SelectItem>
             <SelectItem value="facil">Fácil</SelectItem>
             <SelectItem value="medio">Médio</SelectItem>
             <SelectItem value="dificil">Difícil</SelectItem>

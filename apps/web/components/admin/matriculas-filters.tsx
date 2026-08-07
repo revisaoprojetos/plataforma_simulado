@@ -25,10 +25,10 @@ export function MatriculasFilters() {
         onValueChange={(v) => update('liberado', v ?? 'all')}
       >
         <SelectTrigger className="w-[160px]">
-          <SelectValue placeholder="Acesso" />
+          <SelectValue placeholder="Acesso">{(v: string) => v === 'true' ? 'Liberado' : v === 'false' ? 'Bloqueado' : 'Todos os acessos'}</SelectValue>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Todos</SelectItem>
+          <SelectItem value="all">Todos os acessos</SelectItem>
           <SelectItem value="true">Liberado</SelectItem>
           <SelectItem value="false">Bloqueado</SelectItem>
         </SelectContent>

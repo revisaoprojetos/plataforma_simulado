@@ -31,7 +31,7 @@ export function SimuladosFilters() {
         onValueChange={(v) => update('status', v ?? 'all')}
       >
         <SelectTrigger className="w-[160px]">
-          <SelectValue placeholder="Status" />
+          <SelectValue placeholder="Status">{(v: string) => v === 'rascunho' ? 'Rascunho' : v === 'publicado' ? 'Publicado' : v === 'encerrado' ? 'Encerrado' : 'Todos os status'}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Todos os status</SelectItem>

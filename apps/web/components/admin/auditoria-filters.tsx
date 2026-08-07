@@ -63,7 +63,7 @@ export function AuditoriaFilters({ mostrarAcao = true, mostrarTema = false, busc
 
       {mostrarTema && (
         <Select defaultValue={searchParams.get('entidade') ?? 'all'} onValueChange={(v) => update('entidade', v === 'all' ? '' : (v ?? ''))}>
-          <SelectTrigger className="h-9 w-[150px]"><SelectValue placeholder="Tema" /></SelectTrigger>
+          <SelectTrigger className="h-9 w-[150px]"><SelectValue placeholder="Tema">{(v: string) => v === 'all' ? 'Todos os temas' : (TEMAS.find((t) => t.valor === v)?.rotulo ?? 'Todos os temas')}</SelectValue></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os temas</SelectItem>
             {TEMAS.map((t) => <SelectItem key={t.valor} value={t.valor}>{t.rotulo}</SelectItem>)}
@@ -73,7 +73,7 @@ export function AuditoriaFilters({ mostrarAcao = true, mostrarTema = false, busc
 
       {mostrarAcao && (
         <Select defaultValue={searchParams.get('acao') ?? 'all'} onValueChange={(v) => update('acao', v === 'all' ? '' : (v ?? ''))}>
-          <SelectTrigger className="h-9 w-[140px]"><SelectValue placeholder="Ação" /></SelectTrigger>
+          <SelectTrigger className="h-9 w-[140px]"><SelectValue placeholder="Ação">{(v: string) => v === 'all' ? 'Todas as ações' : v}</SelectValue></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as ações</SelectItem>
             {ACOES.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
