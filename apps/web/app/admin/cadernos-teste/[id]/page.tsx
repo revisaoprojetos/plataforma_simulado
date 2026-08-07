@@ -24,10 +24,12 @@ export default async function CadernoTesteEditorPage({ params }: { params: Promi
   if (!caderno) notFound()
 
   const builder = normalizarBuilder((caderno as any).config, (caderno as any).nome)
+  // Caderno recém-criado (sem builder salvo) → abre o pop-up de modelos automaticamente.
+  const novo = !((caderno as any).config?.builderV3)
   let questoes: PreviewQuestao[] = []
   if (builder.bancoId) { const r = await previewQuestoesBanco(builder.bancoId); questoes = r.questoes ?? [] }
 
   return (
-    <CadernoTesteBuilder cadernoId={caderno.id} builderInicial={builder} bancos={(bancos ?? []) as { id: string; nome: string }[]} questoesIniciais={questoes} />
+    <CadernoTesteBuilder cadernoId={caderno.id} builderInicial={builder} bancos={(bancos ?? []) as { id: string; nome: string }[]} questoesIniciais={questoes} abrirPickerInicial={novo} />
   )
 }

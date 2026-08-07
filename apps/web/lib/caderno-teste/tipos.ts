@@ -82,11 +82,16 @@ export function aplicarModelo(atual: BuilderAjustes, modelo: Modelo): BuilderAju
   return { ...atual, ...modelo.ajustes }
 }
 
+/** Builder de uma modalidade+modelo específicos (para o seletor e a mini-prévia). */
+export function builderDeModelo(modalidade: Modalidade, modeloId: string, bancoId: string | null = null): BuilderV3 {
+  const meta = metaDaModalidade(modalidade)
+  const modelo = meta.modelos.find((m) => m.id === modeloId) ?? meta.modelos[0]
+  return { v: 3, modalidade, modelo: modelo.id, bancoId, ajustes: { ...AJUSTES_BASE, ...modelo.ajustes } }
+}
+
 /** Builder padrão para uma modalidade (1º modelo). */
 export function builderPadrao(modalidade: Modalidade = 'caderno_questoes', bancoId: string | null = null): BuilderV3 {
-  const meta = metaDaModalidade(modalidade)
-  const modelo = meta.modelos[0]
-  return { v: 3, modalidade, modelo: modelo.id, bancoId, ajustes: { ...AJUSTES_BASE, ...modelo.ajustes } }
+  return builderDeModelo(modalidade, metaDaModalidade(modalidade).modelos[0].id, bancoId)
 }
 
 /** Lê o builder do config (tolerante) ou devolve o padrão. */

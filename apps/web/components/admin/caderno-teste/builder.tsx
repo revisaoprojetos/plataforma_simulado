@@ -1,14 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3 } from 'lucide-react'
+import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { HexColorField } from '@/components/admin/hex-color-field'
 import { Previa } from '@/lib/caderno-teste/previa'
-import { MODALIDADES, metaDaModalidade, aplicarModelo, builderPadrao, type BuilderV3, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
+import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
+import { metaDaModalidade, builderDeModelo, type BuilderV3, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { salvarBuilderTeste, previewQuestoesBanco } from '@/app/admin/cadernos-teste/actions'
 
 const ICONE_MOD: Record<Modalidade, any> = { caderno_questoes: FileText, folha_respostas: ClipboardList, diagnostico: BarChart3 }
@@ -27,31 +28,31 @@ function useZoomAjustado(alvoLargura = 794) {
   return { ref, zoom }
 }
 
-export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoesIniciais }: {
+export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoesIniciais, abrirPickerInicial = false }: {
   cadernoId: string
   builderInicial: BuilderV3
   bancos: { id: string; nome: string }[]
   questoesIniciais: PreviewQuestao[]
+  abrirPickerInicial?: boolean
 }) {
   const [builder, setBuilder] = useState<BuilderV3>(builderInicial)
   const [questoes, setQuestoes] = useState<PreviewQuestao[]>(questoesIniciais)
   const [carregandoQ, setCarregandoQ] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(abrirPickerInicial)
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
 
   const meta = metaDaModalidade(builder.modalidade)
+  const modeloNome = meta.modelos.find((m) => m.id === builder.modelo)?.nome ?? meta.modelos[0].nome
+  const IconeMod = ICONE_MOD[builder.modalidade]
   const a = builder.ajustes
   const setAjuste = (patch: Partial<BuilderV3['ajustes']>) => setBuilder((b) => ({ ...b, ajustes: { ...b.ajustes, ...patch } }))
 
-  function trocarModalidade(m: Modalidade) {
-    if (m === builder.modalidade) return
-    const nova = builderPadrao(m, builder.bancoId)
-    // Preserva título, cores e banco do usuário; aplica os defaults do 1º modelo da modalidade.
-    setBuilder({ ...nova, ajustes: { ...nova.ajustes, titulo: a.titulo, corPrimaria: a.corPrimaria, corSecundaria: a.corSecundaria } })
-  }
-  function trocarModelo(id: string) {
-    const modelo = meta.modelos.find((x) => x.id === id); if (!modelo) return
-    setBuilder((b) => ({ ...b, modelo: id, ajustes: aplicarModelo(b.ajustes, modelo) }))
+  /** Aplica modalidade+modelo do pop-up preservando título/cores/banco do usuário. */
+  function escolherModelo(m: Modalidade, modeloId: string) {
+    const base = builderDeModelo(m, modeloId, builder.bancoId)
+    setBuilder((b) => ({ ...base, ajustes: { ...base.ajustes, titulo: b.ajustes.titulo, corPrimaria: b.ajustes.corPrimaria, corSecundaria: b.ajustes.corSecundaria } }))
+    setPickerOpen(false)
   }
   function trocarBanco(bancoId: string | null) {
     setBuilder((b) => ({ ...b, bancoId }))
@@ -88,50 +89,28 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           <Link href="/admin/cadernos-teste" className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
           <div>
             <h1 className="text-lg font-bold leading-tight">Construtor de caderno (teste)</h1>
-            <p className="text-xs text-muted-foreground">Escolha a modalidade e o modelo à esquerda — a prévia atualiza à direita.</p>
+            <p className="text-xs text-muted-foreground">Escolha o modelo no pop-up e ajuste à esquerda — a prévia atualiza à direita.</p>
           </div>
         </div>
         <Button onClick={salvar} disabled={pending} size="sm">{pending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />} Salvar</Button>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[320px_1fr]">
-        {/* Esquerda: seleção + modelos + ajustes */}
+        {/* Esquerda: modelo (pop-up) + banco + ajustes */}
         <div className="scroll-claro flex min-h-0 flex-col gap-5 overflow-y-auto border-r bg-muted/20 p-4">
           <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Modalidade</p>
-            <div className="grid grid-cols-1 gap-1.5">
-              {MODALIDADES.map((m) => {
-                const Icon = ICONE_MOD[m.id]
-                const ativo = builder.modalidade === m.id
-                return (
-                  <button key={m.id} type="button" onClick={() => trocarModalidade(m.id)}
-                    className={cn('flex items-start gap-2.5 rounded-lg border p-2.5 text-left transition-all', ativo ? 'border-primary bg-primary/5 shadow-sm' : 'bg-background hover:border-primary/50')}>
-                    <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-md', ativo ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary')}><Icon className="h-4 w-4" /></span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold leading-tight">{m.nome}</span>
-                      <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">{m.descricao}</span>
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div>
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Modelo</p>
-            <div className="flex flex-col gap-1.5">
-              {meta.modelos.map((mo) => {
-                const ativo = builder.modelo === mo.id
-                return (
-                  <button key={mo.id} type="button" onClick={() => trocarModelo(mo.id)}
-                    className={cn('rounded-lg border px-2.5 py-2 text-left transition-all', ativo ? 'border-primary bg-primary/5' : 'bg-background hover:border-primary/50')}>
-                    <span className="flex items-center gap-1.5 text-sm font-medium leading-tight">
-                      <span className={cn('h-2.5 w-2.5 rounded-full border', ativo ? 'border-primary bg-primary' : 'border-muted-foreground/40')} /> {mo.nome}
-                    </span>
-                    <span className="mt-0.5 block pl-4 text-[10px] leading-snug text-muted-foreground">{mo.descricao}</span>
-                  </button>
-                )
-              })}
+            <div className="rounded-xl border bg-background p-3 shadow-sm">
+              <div className="flex items-start gap-2.5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><IconeMod className="h-4.5 w-4.5" /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold leading-tight">{meta.nome}</p>
+                  <p className="text-[11px] text-muted-foreground">Modelo: {modeloNome}</p>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" className="mt-2.5 w-full" onClick={() => setPickerOpen(true)}>
+                <LayoutTemplate className="mr-1.5 h-4 w-4" /> Escolher modelo
+              </Button>
             </div>
           </div>
 
@@ -146,7 +125,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           </div>
 
           <div className="space-y-1">
-            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Ajustes</p>
+            <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Pencil className="h-3.5 w-3.5" /> Ajustes</p>
             <label className="block text-xs text-muted-foreground">
               <span className="mb-1 block">Título</span>
               <input value={a.titulo} onChange={(e) => setAjuste({ titulo: e.target.value })} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm text-foreground" />
@@ -178,6 +157,8 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           </div>
         </div>
       </div>
+
+      <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: builder.modalidade, modelo: builder.modelo }} onSelecionar={escolherModelo} />
     </div>
   )
 }
