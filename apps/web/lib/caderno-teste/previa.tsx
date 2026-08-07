@@ -8,6 +8,7 @@ import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'reac
 import type { ItemCaderno, PreviewQuestao } from './tipos'
 import { DIAG_PADRAO, slugDiag, type DiagPilar } from './diagnostico'
 import { CORES_PILAR_PADRAO } from './tipos'
+import { formatarInline } from './formato'
 
 const A4_W = 794
 const A4_H = 1123
@@ -71,7 +72,8 @@ type Interativo = { selParte?: string; onPick?: (parte: string, label: string, c
 function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<string, string>, discBanco: DiscBanco[], inter?: Interativo): ReactNode[] {
   const a = item.ajustes
   const base = a.compacto ? 10 : 12
-  const V = (t: string) => preencher(t, vars)
+  // Texto com formatação inline (**negrito**, *itálico*, <u>sublinhado</u>) já com variáveis aplicadas.
+  const V = (t: string): ReactNode => <span dangerouslySetInnerHTML={{ __html: formatarInline(preencher(t, vars)) }} />
   const out: ReactNode[] = []
 
   // Cor individual por PARTE (clique na prévia): coresParte[parte] sobrepõe a cor padrão do bloco.
@@ -182,7 +184,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
       <div {...atr('diag_nota_faixa', 'Faixa da nota', corFx, { background: corFx, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: 12, fontWeight: 600 })}>{V(c.notaTexto)}</div>
     </div>,
   ) }
-  for (const p of c.intro) out.push(<p style={{ fontSize: base, lineHeight: 1.5, textAlign: 'justify', margin: '0 0 8px' }}>{V(p)}</p>)
+  c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); out.push(<p key={`intro${i}`} {...atr(`intro:${i}`, `Parágrafo de abertura ${i + 1}`, cor, { fontSize: base, lineHeight: 1.5, textAlign: 'justify', margin: '0 0 8px', color: cor })}>{V(p)}</p>) })
   if (c.pilares.length) {
     out.push(<Sec t="Desempenho por pilar" />)
     out.push(
@@ -213,7 +215,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   const discs: DiscBanco[] = discBanco.length ? discBanco : c.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave || slugDiag(d.nome) }))
   if (discs.length) {
     out.push(<Sec t="Desempenho por disciplina" />)
-    if (c.disciplinasIntro) out.push(<p style={{ fontSize: base - 1, color: '#5a5570', margin: '0 0 8px', lineHeight: 1.4 }}>{V(c.disciplinasIntro)}</p>)
+    if (c.disciplinasIntro) { const cor = corP('disc_intro', '#5a5570'); out.push(<p {...atr('disc_intro', 'Introdução das disciplinas', cor, { fontSize: base - 1, color: cor, margin: '0 0 8px', lineHeight: 1.4 })}>{V(c.disciplinasIntro)}</p>) }
     for (const d of discs) {
       const assuntos = (vars[`assuntos_${d.chave}`] ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
       // cor da disciplina: parte (coresParte) → individual legado (coresDisc) → cor do pilar → secundária.

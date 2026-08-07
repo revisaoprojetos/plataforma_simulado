@@ -1,6 +1,7 @@
 import 'server-only'
 import { DIAG_PADRAO, slugDiag, type DiagPilar } from './diagnostico'
 import { CORES_PILAR_PADRAO, type ItemCaderno, type PreviewQuestao } from './tipos'
+import { formatarInline } from './formato'
 
 // Gera HTML do grupo (diagnóstico/caderno/folha) com as variáveis já aplicadas — usado no download
 // em HTML e em Word (.doc abre HTML com estilos/tabelas). Espelha a prévia, em layout fluido.
@@ -41,7 +42,7 @@ function bandaAdaptativa(pilar: DiagPilar, vars: Record<string, string>): { faix
 function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: DiscBanco[]): string {
   const a = item.ajustes
   const c = item.conteudo ?? DIAG_PADRAO
-  const V = (t: string) => esc(preencher(t, vars))
+  const V = (t: string) => formatarInline(preencher(t, vars)) // prose com **negrito**/*itálico*/<u>sublinhado</u>
   const prim = a.corPrimaria, amar = a.corSecundaria
   const corP = (parte: string, def: string) => (a.coresParte ?? {})[parte] || def // cor individual por bloco (clique na prévia)
   const sec = (t: string) => { const cor = corP(`sec:${t}`, prim); return `<div style="background:${cor};color:#fff;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:7px 12px;margin:18px 0 10px">${esc(t)}</div>` }
@@ -49,7 +50,7 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
   if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); h += `<div style="background:${cor};color:#fff;padding:14px 18px;margin-bottom:12px"><div style="font-size:22px;font-weight:800">${V(a.titulo || 'Diagnóstico de Desempenho')}</div>${c.subtitulo ? `<div style="font-size:12px;opacity:.85;margin-top:2px">${V(c.subtitulo)}</div>` : ''}</div>` }
   if (a.mostrarDadosAluno) { const cN = corP('diag_nome_rot', prim), cV = corP('diag_nome_val', amar); h += `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;border:1px solid ${cN}"><tr><td style="background:${cN};color:#fff;font-weight:800;font-size:15px;padding:8px 14px;width:90px">NOME:</td><td style="background:${cV};color:#3b2f00;padding:8px 14px;font-size:13px;font-weight:600">${V('{nome}')}</td></tr></table>` }
   { const cNum = corP('diag_nota_num', '#9b6800'), cFx = corP('diag_nota_faixa', amar); h += `<table style="width:100%;border-collapse:collapse;margin-bottom:14px;border:1px solid ${prim}33"><tr><td style="background:${cNum};color:#fff;padding:12px 22px;font-weight:800;width:120px;font-size:26px">${V('{acertos}')}<span style="font-size:16px">/${V(c.notaTotal)}</span></td><td style="background:${cFx};color:#3b2f00;padding:12px 18px;font-size:13px;font-weight:600">${V(c.notaTexto)}</td></tr></table>` }
-  for (const p of c.intro) h += `<p style="font-size:12px;line-height:1.5;text-align:justify;margin:0 0 8px">${V(p)}</p>`
+  c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); h += `<p style="font-size:12px;line-height:1.5;text-align:justify;margin:0 0 8px;color:${cor}">${V(p)}</p>` })
 
   if (c.pilares.length) {
     h += sec('Desempenho por pilar')
@@ -68,7 +69,7 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
   const discs: DiscBanco[] = disc.length ? disc : c.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave || slugDiag(d.nome) }))
   if (discs.length) {
     h += sec('Desempenho por disciplina')
-    if (c.disciplinasIntro) h += `<p style="font-size:11px;color:#5a5570;margin:0 0 8px;line-height:1.4">${V(c.disciplinasIntro)}</p>`
+    if (c.disciplinasIntro) h += `<p style="font-size:11px;color:${corP('disc_intro', '#5a5570')};margin:0 0 8px;line-height:1.4">${V(c.disciplinasIntro)}</p>`
     for (const d of discs) {
       const assuntos = (vars[`assuntos_${d.chave}`] ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
       const asHtml = assuntos.length ? assuntos.map((x) => `<div style="font-size:10px;color:#5a5570;font-style:italic">- ${esc(x)}</div>`).join('') : '<div style="font-size:10px;color:#5a5570;font-style:italic">- Assuntos das questões erradas</div>'

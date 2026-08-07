@@ -11,7 +11,7 @@ import { Previa } from '@/lib/caderno-teste/previa'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
 import { metaDaModalidade, itemAtivo, novoItem, type BuilderV3, type BuilderAjustes, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
-import { camposDoBloco, aplicarCampoBloco } from '@/lib/caderno-teste/edicao'
+import { camposDoBloco, aplicarCampoBloco, type CampoTexto } from '@/lib/caderno-teste/edicao'
 import type { DiagConteudo } from '@/lib/caderno-teste/diagnostico'
 import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
 import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
@@ -348,15 +348,9 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                 <div className="mt-4 space-y-2.5 border-t pt-4">
                   <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Texto</div>
                   {campos.map((campo) => (
-                    <label key={campo.id} className="block">
-                      <span className="mb-0.5 block text-[11px] text-muted-foreground">{campo.label}</span>
-                      {campo.multiline ? (
-                        <textarea value={campo.valor} onChange={(e) => onCampo(campo, e.target.value)} rows={3} className="w-full resize-y rounded border bg-background px-2 py-1 text-xs leading-snug outline-none focus:border-primary" />
-                      ) : (
-                        <input value={campo.valor} onChange={(e) => onCampo(campo, e.target.value)} className="w-full rounded border bg-background px-2 py-1 text-xs outline-none focus:border-primary" />
-                      )}
-                    </label>
+                    <CampoFormatavel key={campo.id} campo={campo} onChange={(v) => onCampo(campo, v)} />
                   ))}
+                  <p className="text-[10px] leading-snug text-muted-foreground">Selecione um trecho e use <b>B</b> / <i>I</i> / <u>U</u>, ou escreva <code>**negrito**</code>, <code>*itálico*</code>, <code>&lt;u&gt;sublinhado&lt;/u&gt;</code>.</p>
                 </div>
               )}
               <p className="mt-4 text-[10px] leading-snug text-muted-foreground">Personaliza só este bloco. Clique em qualquer bloco da prévia para editá-lo.</p>
@@ -365,6 +359,36 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
         </>
         )
       })()}
+    </div>
+  )
+}
+
+/** Campo de texto com barra de formatação (negrito/itálico/sublinhado) que envolve a seleção. */
+function CampoFormatavel({ campo, onChange }: { campo: CampoTexto; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLTextAreaElement & HTMLInputElement>(null)
+  function wrap(pre: string, suf: string) {
+    const el = ref.current
+    const val = campo.valor
+    const s = el?.selectionStart ?? val.length
+    const e = el?.selectionEnd ?? val.length
+    const sel = val.slice(s, e) || 'texto'
+    onChange(val.slice(0, s) + pre + sel + suf + val.slice(e))
+    requestAnimationFrame(() => { if (!el) return; el.focus(); const p = s + pre.length; try { el.setSelectionRange(p, p + sel.length) } catch {} })
+  }
+  const btn = 'flex h-5 w-6 items-center justify-center rounded border text-[11px] leading-none hover:bg-muted'
+  return (
+    <div>
+      <div className="mb-0.5 flex items-center justify-between gap-2">
+        <span className="truncate text-[11px] text-muted-foreground">{campo.label}</span>
+        <div className="flex shrink-0 gap-0.5">
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => wrap('**', '**')} className={btn} title="Negrito"><b>B</b></button>
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => wrap('*', '*')} className={btn} title="Itálico"><i>I</i></button>
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => wrap('<u>', '</u>')} className={btn} title="Sublinhado"><u>U</u></button>
+        </div>
+      </div>
+      {campo.multiline
+        ? <textarea ref={ref as any} value={campo.valor} onChange={(e) => onChange(e.target.value)} rows={3} className="w-full resize-y rounded border bg-background px-2 py-1 text-xs leading-snug outline-none focus:border-primary" />
+        : <input ref={ref as any} value={campo.valor} onChange={(e) => onChange(e.target.value)} className="w-full rounded border bg-background px-2 py-1 text-xs outline-none focus:border-primary" />}
     </div>
   )
 }
