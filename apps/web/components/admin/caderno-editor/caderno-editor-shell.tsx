@@ -41,9 +41,11 @@ export type ShellProps = {
   registros?: { id: string; nome: string; vars: Record<string, string>; respostas?: Record<string, string> }[]
   branding?: { nome?: string; logoUrl?: string | null; logoGrandeUrl?: string | null; logoBg?: string; logoEstilo?: string } | null
   pastaId?: string | null
+  /** Destino do botão "voltar" (default: lista de Cadernos de Prova). */
+  voltarHref?: string
 }
 
-export function CadernoEditorShell({ previewData, bancos = [], registros = [], branding = null, pastaId = null }: ShellProps) {
+export function CadernoEditorShell({ previewData, bancos = [], registros = [], branding = null, pastaId = null, voltarHref }: ShellProps) {
   const { state, dispatch } = useEditor()
   const [pending, start] = useTransition()
   const [importando, setImportando] = useState(false)
@@ -337,7 +339,7 @@ export function CadernoEditorShell({ previewData, bancos = [], registros = [], b
       {/* Topo */}
       <div className="flex min-w-0 items-center justify-between gap-3 border-b bg-card/60 px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-3">
-          <Link href={pastaId ? `/admin/cadernos?pasta=${pastaId}` : '/admin/cadernos'} className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
+          <Link href={voltarHref ?? (pastaId ? `/admin/cadernos?pasta=${pastaId}` : '/admin/cadernos')} className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
           <div className="min-w-0 max-w-[160px] xl:max-w-[240px]">
             <h1 className="truncate text-lg font-bold leading-tight" title={state.meta.nome}>{state.meta.nome}</h1>
             <p className="truncate text-xs text-muted-foreground">Editor unificado · {modsVis.length} modalidade(s)</p>

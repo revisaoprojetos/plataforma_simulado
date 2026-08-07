@@ -24,6 +24,7 @@ import {
   MessagesSquare,
   LogIn,
   FilePen,
+  FlaskConical,
   ChevronDown,
   Trash2,
   PieChart,
@@ -113,6 +114,7 @@ const navGroups: NavGroup[] = [
       { label: 'Banco de Simulado', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
       { label: 'Correção (discursivas)', href: '/admin/correcao', icon: PenLine, perm: 'questoes:view' },
       { label: 'Cadernos de Prova', href: '/admin/cadernos', icon: FileText, perm: 'questoes:view' },
+      { label: 'Cadernos (teste)', href: '/admin/cadernos-teste', icon: FlaskConical, perm: 'questoes:view' },
     ],
   },
   {
