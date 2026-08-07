@@ -95,6 +95,7 @@ export const MODALIDADES: ModalidadeMeta[] = [
       { id: 'classico', nome: 'Clássico', descricao: 'Questões com alternativas, espaçado.', ajustes: { mostrarGabarito: false, mostrarComentarios: false, compacto: false } },
       { id: 'com_gabarito', nome: 'Com gabarito', descricao: 'Destaca a correta e mostra o comentário.', ajustes: { mostrarGabarito: true, mostrarComentarios: true, compacto: false } },
       { id: 'compacto', nome: 'Compacto', descricao: 'Fonte e espaços menores (mais por página).', ajustes: { mostrarGabarito: false, mostrarComentarios: false, compacto: true } },
+      { id: 'agu', nome: 'Simulado AGU', descricao: 'Modelo pronto (Pré-Edital AGU): capa azul + dados do estudante + questões. Reenvie a capa/fundo.', ajustes: { corPrimaria: '#072c94', corSecundaria: '#fa9200', mostrarCabecalho: true, mostrarDadosAluno: true, mostrarGabarito: false, mostrarComentarios: false, numAlternativas: 5, compacto: false } },
     ],
   },
   {
@@ -102,6 +103,7 @@ export const MODALIDADES: ModalidadeMeta[] = [
     modelos: [
       { id: 'classico', nome: 'Clássico', descricao: '2 colunas de questões.', ajustes: { colunas: 2, compacto: false } },
       { id: 'compacto', nome: 'Compacto', descricao: '4 colunas (mais questões por página).', ajustes: { colunas: 4, compacto: true } },
+      { id: 'agu', nome: 'Simulado AGU', descricao: 'Modelo pronto (Pré-Edital AGU): grade azul/dourada, 5 alternativas, compacta. Reenvie a capa/fundo.', ajustes: { corPrimaria: '#072c94', corSecundaria: '#fa9200', mostrarCabecalho: true, mostrarDadosAluno: true, colunas: 5, numAlternativas: 5, compacto: true } },
     ],
   },
   {
