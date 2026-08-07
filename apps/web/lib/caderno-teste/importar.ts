@@ -1,6 +1,6 @@
 import 'server-only'
 import { parse, type HTMLElement } from 'node-html-parser'
-import { DIAG_PADRAO, type DiagConteudo, type DiagPilar, type DiagDisciplina, type DiagSugestao } from './diagnostico'
+import { DIAG_PADRAO, slugDiag, type DiagConteudo, type DiagPilar, type DiagDisciplina, type DiagSugestao } from './diagnostico'
 
 /**
  * Mapeia um Diagnóstico (Word→HTML ou HTML) para a estrutura DiagConteudo. Heurístico e tolerante:
@@ -54,13 +54,36 @@ export async function pdfParaHtml(buffer: Buffer): Promise<string> {
 
 const ehNomePilar = (t: string) => UP(t) && t.length <= 30 && /[A-ZÀ-Ú]{3,}/.test(t) && !/TEXTO MODULADO|DESEMPENHO|QUEST|PILAR|DISCIPLINA/i.test(t) && !/\d/.test(t.replace(/%/g, ''))
 
+/**
+ * Mapeia o NOME do pilar (como aparece no doc) para o slug canônico usado nas variáveis do banco
+ * (`{pct_pilar_<slug>}` etc., ver merge.ts). Sem isso, um pilar importado não teria `chave` e a prévia
+ * perderia a banda adaptativa + o percentual do aluno (mostraria "X%" e as 3 faixas). Aliases cobrem
+ * as grafias comuns do doc (LEGISLAÇÃO/LEI SECA → lei_seca, LÍNGUA PORTUGUESA → lingua_portuguesa…).
+ */
+const PILAR_ALIAS: Record<string, string> = {
+  lei_seca: 'lei_seca', legislacao: 'lei_seca', lei: 'lei_seca',
+  jurisprudencia: 'jurisprudencia', juris: 'jurisprudencia',
+  doutrina: 'doutrina',
+  lingua_portuguesa: 'lingua_portuguesa', portugues: 'lingua_portuguesa', lingua: 'lingua_portuguesa',
+}
+function chaveDoPilar(nome: string): string | undefined {
+  const s = slugDiag(nome)
+  if (PILAR_ALIAS[s]) return PILAR_ALIAS[s]
+  for (const [alias, slug] of Object.entries(PILAR_ALIAS)) if (s.includes(alias)) return slug
+  return undefined
+}
+
 function parsePilares(reg: string[]): DiagPilar[] {
   const pilares: DiagPilar[] = []
   for (let i = 0; i < reg.length; i++) {
     if (!ehNomePilar(reg[i])) continue
     const nome = reg[i]
+    const chave = chaveDoPilar(nome)
     const jan = reg.slice(i + 1, i + 80)
-    const totalTxt = jan.find((l) => /de\s+\d+\s+quest/i.test(l)) ?? 'X de N questões'
+    // Com chave conhecida, tokeniza o total para casar com os dados do aluno; senão mantém o texto do doc.
+    const totalTxt = chave
+      ? `{acerto_pilar_${chave}} de {total_pilar_${chave}} questões`
+      : (jan.find((l) => /de\s+\d+\s+quest/i.test(l)) ?? 'X de N questões')
     const bandas: { faixa: string; texto: string }[] = []
     for (let k = 0; k < jan.length; k++) {
       const m = jan[k].match(RE_FAIXA)
@@ -74,7 +97,7 @@ function parsePilares(reg: string[]): DiagPilar[] {
       }
       bandas.push({ faixa: `${m[1]}-${m[2]}`, texto: txt })
     }
-    if (bandas.length) pilares.push({ nome, totalTxt, bandas })
+    if (bandas.length) pilares.push({ nome, chave, totalTxt, bandas })
   }
   return pilares
 }
