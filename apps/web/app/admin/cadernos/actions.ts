@@ -203,24 +203,9 @@ export async function hospedarImagemCadernoAction(dataUri: string): Promise<{ ok
   return { ok: true, url }
 }
 
-/**
- * Converte um .docx (enviado em base64) em um documento do caderno (blocos).
- * NÃO grava nada — o editor insere o resultado no estado e o admin revisa e salva.
- * O mammoth é carregado sob demanda (dynamic import) e roda fora do bundle (serverExternalPackages).
- */
-export async function converterWordAction(base64: string): Promise<{ ok: boolean; doc?: unknown; avisos?: string[]; resumo?: { blocos: number; imagens: number; tipo: 'diagnostico' | 'generico' }; error?: string }> {
-  if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
-  try {
-    const b64 = base64.includes(',') ? base64.slice(base64.indexOf(',') + 1) : base64 // tolera "data:...;base64,"
-    const buffer = Buffer.from(b64, 'base64')
-    if (!buffer.length) return { ok: false, error: 'Arquivo vazio.' }
-    const { converterWordParaDoc } = await import('@/lib/caderno-designer/import-word')
-    const { doc, avisos, resumo } = await converterWordParaDoc(buffer)
-    return { ok: true, doc, avisos, resumo }
-  } catch (e) {
-    return { ok: false, error: (e as Error).message || 'Falha ao ler o Word.' }
-  }
-}
+// Import de Word migrado para a rota multipart POST /api/admin/caderno/importar-word
+// (streaming + hospedagem de imagens no servidor). A antiga converterWordAction (base64
+// via server action) foi removida: base64 de .docx com imagens estourava o bodySizeLimit.
 
 /** Atualiza nome + personalização (cor/ícone/capa) do caderno. Tolerante caso as colunas não existam. */
 export async function atualizarCaderno(id: string, nome: string, cor: string | null, icone: string | null, capaUrl?: string | null): Promise<{ ok: boolean; error?: string }> {

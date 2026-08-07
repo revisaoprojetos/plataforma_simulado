@@ -1,7 +1,7 @@
 import 'server-only'
 import mammoth from 'mammoth'
 import { parse, type HTMLElement } from 'node-html-parser'
-import { genId, RUNNING_PADRAO, type Block, type CadernoDoc } from './types'
+import { genId, novoDoc, RUNNING_PADRAO, type Block, type CadernoDoc } from './types'
 
 /**
  * Conversor de Word (.docx) → documento do caderno (CadernoDoc / blocos).
@@ -241,20 +241,34 @@ function converterGenerico(root: HTMLElement): { blocks: Block[]; imagens: numbe
   return { blocks, imagens }
 }
 
-export type ResultadoImportWord = { doc: CadernoDoc; avisos: string[]; resumo: { blocos: number; imagens: number; tipo: 'diagnostico' | 'generico' } }
+export type ResultadoImportWord = { doc: CadernoDoc; avisos: string[]; erros: string[]; resumo: { blocos: number; imagens: number; tipo: 'diagnostico' | 'generico' } }
 
 /** Converte o buffer de um .docx em um CadernoDoc. */
 export async function converterWordParaDoc(buffer: Buffer): Promise<ResultadoImportWord> {
   const avisos: string[] = []
-  const { value: html, messages } = await mammoth.convertToHtml({ buffer })
-  for (const m of messages) if (m.type === 'warning' && avisos.length < 20) avisos.push(m.message)
+  const erros: string[] = []
+  let html = ''
+  try {
+    const res = await mammoth.convertToHtml({ buffer })
+    html = res.value
+    // Separa erros (perda de conteúdo/corrupção) de avisos (estilos ignorados etc.) — antes só os
+    // warnings eram lidos e os erros ficavam invisíveis ("Falha ao ler o Word" genérico).
+    for (const m of res.messages) {
+      if (m.type === 'error') { if (erros.length < 10) erros.push(m.message) }
+      else if (m.type === 'warning' && avisos.length < 20) avisos.push(m.message)
+    }
+  } catch (e) {
+    // .docx corrompido/ilegível → devolve o motivo real em vez de estourar.
+    erros.push((e as Error).message || 'Não foi possível ler o arquivo .docx.')
+    return { doc: novoDoc(), avisos, erros, resumo: { blocos: 0, imagens: 0, tipo: 'generico' } }
+  }
   const root = parse(html)
 
   const linhas = extrairLinhas(root)
   if (ehDiagnostico(linhas)) {
     const doc = converterDiagnostico(linhas)
     const blocos = doc.pages.reduce((n, p) => n + p.blocks.length, 0)
-    return { doc, avisos, resumo: { blocos, imagens: linhas.filter((l) => l.img).length, tipo: 'diagnostico' } }
+    return { doc, avisos, erros, resumo: { blocos, imagens: linhas.filter((l) => l.img).length, tipo: 'diagnostico' } }
   }
 
   const { blocks, imagens } = converterGenerico(root)
@@ -263,5 +277,5 @@ export async function converterWordParaDoc(buffer: Buffer): Promise<ResultadoImp
     pages: [{ id: genId('page'), kind: 'conteudo', titulo: 'Importado do Word', blocks }],
     cabecalho: [], rodape: [], running: { ...RUNNING_PADRAO },
   }
-  return { doc, avisos, resumo: { blocos: blocks.length, imagens, tipo: 'generico' } }
+  return { doc, avisos, erros, resumo: { blocos: blocks.length, imagens, tipo: 'generico' } }
 }

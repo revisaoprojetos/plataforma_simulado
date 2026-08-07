@@ -15,7 +15,7 @@ import { HudSimuladoEditor } from '@/components/admin/hud-simulado-editor'
 import { HexColorField } from '@/components/admin/hex-color-field'
 import { GerarPdfServidor } from '@/components/admin/gerar-pdf-servidor'
 import { MonitorPlay, GitBranch } from 'lucide-react'
-import { salvarCadernoDesignerV2, hospedarImagemCadernoAction, getGruposBanco, getAssuntosBanco, converterWordAction } from '@/app/admin/cadernos/actions'
+import { salvarCadernoDesignerV2, hospedarImagemCadernoAction, getGruposBanco, getAssuntosBanco } from '@/app/admin/cadernos/actions'
 import { PRESETS_CADERNO, type CadernoPreset } from '@/lib/caderno-designer/presets'
 import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
@@ -699,14 +699,18 @@ export function CadernoEditorV2({
     if (!(await confirmar({ titulo: 'Importar Word (.docx)', mensagem: `Isso vai SUBSTITUIR o conteúdo de "${nomeMod}" pelo do arquivo "${file.name}". Você revisa no editor e salva depois. Continuar?`, confirmar: 'Importar', destrutivo: true }))) return
     setImportando(true)
     try {
-      const dataUri = await new Promise<string>((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(new Error('leitura')); fr.readAsDataURL(file) })
-      const r = await converterWordAction(dataUri)
-      if (!r.ok || !r.doc) { toast.error(r.error ?? 'Falha ao importar o Word.'); return }
+      // Envio multipart (streaming) — evita o base64 que estourava o limite das server actions
+      // com Word grande/com imagens. As imagens já voltam hospedadas (URL), o doc vem leve.
+      const fd = new FormData(); fd.append('file', file)
+      const resp = await fetch('/api/admin/caderno/importar-word', { method: 'POST', body: fd })
+      const r = await resp.json().catch(() => ({ ok: false, error: 'Resposta inválida do servidor.' }))
+      if (!resp.ok || !r.ok || !r.doc) { toast.error(r.error ?? 'Falha ao importar o Word.'); return }
       const imp = r.doc as CadernoDoc
       setDoc((d) => ({ ...d, pages: imp.pages.length ? imp.pages : d.pages }))
       setSelBlock(null); setSelPage(null)
+      if (Array.isArray(r.avisos) && r.avisos.length) toast.warning(`Importado com ${r.avisos.length} aviso(s) de formatação — revise o resultado.`)
       toast.success(`Word importado: ${r.resumo?.blocos ?? 0} bloco(s)${r.resumo?.imagens ? ` · ${r.resumo.imagens} imagem(ns)` : ''}. Revise e salve.`)
-    } catch (e) { toast.error('Erro ao ler o arquivo.'); console.error(e) }
+    } catch (e) { toast.error('Erro ao enviar o arquivo.'); console.error(e) }
     finally { setImportando(false) }
   }
 
