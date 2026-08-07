@@ -5,7 +5,12 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
+import { carregarRegistros } from '@/lib/caderno-designer/merge'
+import { slugDiag } from '@/lib/caderno-teste/diagnostico'
 import type { BuilderV3, PreviewQuestao } from '@/lib/caderno-teste/tipos'
+
+export type RegistroTeste = { id: string; nome: string; vars: Record<string, string> }
+export type DiscBancoTeste = { nome: string; chave: string }
 
 const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
 const TABELA = 'simulado_cadernos_teste'
@@ -52,4 +57,34 @@ export async function previewQuestoesBanco(bancoId: string): Promise<{ ok: boole
       alternativas: (altMap.get(q.id) ?? []).sort((m, n) => m.ordem - n.ordem).map((al, j) => ({ letra: LETRAS[j] ?? '?', texto: al.texto ?? '', correta: !!al.correta, comentario: al.comentario ?? '' })),
     }))
   return { ok: true, questoes }
+}
+
+/**
+ * Dados adaptativos do banco para o Diagnóstico: ALUNOS reais (com as variáveis de desempenho —
+ * nota, %, por pilar, por disciplina, assuntos das erradas) + as DISCIPLINAS do banco (nome+chave).
+ * Reusa `carregarRegistros` (mesmo motor da mala direta do editor real).
+ */
+export async function dadosBancoTeste(bancoId: string): Promise<{ ok: boolean; registros: RegistroTeste[]; disciplinas: DiscBancoTeste[] }> {
+  const access = await getCurrentAccess()
+  if (!access.tenantId || !bancoId) return { ok: true, registros: [], disciplinas: [] }
+  const svc = createAdminClient()
+  const { data: pasta } = await svc.from('simulado_pastas').select('nome, grupos').eq('id', bancoId).eq('tenant_id', access.tenantId).maybeSingle()
+  const bancoNome = ((pasta as any)?.nome ?? 'Simulado') as string
+  let registros: RegistroTeste[] = []
+  try {
+    const regs = await carregarRegistros(svc, access.tenantId, bancoId, bancoNome, undefined, undefined, 30)
+    registros = regs.map((r) => ({ id: r.id, nome: r.nome, vars: r.vars }))
+  } catch { /* base sem sessões/respostas — segue sem alunos */ }
+
+  // Disciplinas: dos grupos do banco (nomes) ou, em fallback, das variáveis (total_<slug>).
+  const nomes = new Set<string>()
+  const grupos = Array.isArray((pasta as any)?.grupos) ? (pasta as any).grupos : []
+  for (const g of grupos) for (const d of (g?.disciplinas ?? [])) if (typeof d === 'string' && d.trim()) nomes.add(d.trim())
+  let disciplinas: DiscBancoTeste[] = [...nomes].map((nome) => ({ nome, chave: slugDiag(nome) }))
+  if (!disciplinas.length && registros[0]) {
+    const v = registros[0].vars
+    const human = (s: string) => s.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
+    disciplinas = Object.keys(v).filter((k) => k.startsWith('total_') && !k.startsWith('total_pilar_') && k !== 'total_questoes').map((k) => { const c = k.slice('total_'.length); return { nome: human(c), chave: c } })
+  }
+  return { ok: true, registros, disciplinas }
 }

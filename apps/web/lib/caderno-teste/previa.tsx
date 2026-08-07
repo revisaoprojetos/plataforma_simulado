@@ -6,11 +6,41 @@
 
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ItemCaderno, PreviewQuestao } from './tipos'
-import { DIAG_PADRAO } from './diagnostico'
+import { DIAG_PADRAO, slugDiag, type DiagPilar } from './diagnostico'
 
 const A4_W = 794
 const A4_H = 1123
 const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
+
+export type DiscBanco = { nome: string; chave: string }
+
+/** Troca {token} pelos valores do aluno/banco. */
+function applyVars(t: string, vars: Record<string, string>): string {
+  return (t || '').replace(/\{\s*([\w-]+)\s*\}/g, (m, k) => (k in vars ? vars[k] : m))
+}
+/** applyVars + placeholders para variáveis ainda sem dado (modelo sem aluno mostra X/N). */
+function preencher(t: string, vars: Record<string, string>): string {
+  return applyVars(t, vars).replace(/\{\s*([\w-]+)\s*\}/g, (m, k) => {
+    if (k === 'total_questoes') return '100'
+    if (k === 'nome') return '[NOME COMPLETO ALUNO]'
+    if (k === 'simulado') return 'Simulado'
+    if (k === 'nota') return 'X,X'
+    if (/^pct/.test(k) || k === 'percentual') return 'X%'
+    if (/^total/.test(k)) return 'N'
+    if (/^acerto/.test(k) || k === 'acertos' || k === 'erros') return 'X'
+    if (/^assuntos/.test(k)) return ''
+    return m
+  })
+}
+/** Banda de texto que casa com o % do pilar (0-49/50-80/81-100). null quando não há dado (mostra todas). */
+function bandaAdaptativa(pilar: DiagPilar, vars: Record<string, string>): { faixa: string; texto: string } | null {
+  const raw = pilar.chave ? vars[`pct_pilar_${pilar.chave}`] : undefined
+  if (raw == null) return null
+  const n = parseFloat(String(raw).replace('%', '').replace(',', '.'))
+  if (isNaN(n)) return null
+  const faixa = n <= 49 ? '0-49' : n <= 80 ? '50-80' : '81-100'
+  return pilar.bandas.find((b) => b.faixa === faixa) ?? pilar.bandas[0] ?? null
+}
 
 const QUESTOES_EXEMPLO: PreviewQuestao[] = [
   { id: 'ex1', numero: 1, tipo: 'objetiva', enunciado: 'Exemplo: assinale a alternativa correta sobre o princípio da legalidade na Administração Pública.', alternativas: [
@@ -30,9 +60,10 @@ const QUESTOES_EXEMPLO: PreviewQuestao[] = [
 ]
 
 /** Monta os blocos (nós) do conteúdo do grupo, em ordem — a paginação distribui isso em folhas. */
-function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[]): ReactNode[] {
+function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<string, string>, discBanco: DiscBanco[]): ReactNode[] {
   const a = item.ajustes
   const base = a.compacto ? 10 : 12
+  const V = (t: string) => preencher(t, vars)
   const out: ReactNode[] = []
 
   const Cabecalho = () => (
@@ -105,66 +136,80 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[]): ReactNode[] {
   const Sec = ({ t }: { t: string }) => <div style={{ background: prim, color: '#fff', fontWeight: 700, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', padding: '6px 12px', borderRadius: 2, margin: '4px 0 10px' }}>{t}</div>
   if (a.mostrarCabecalho) out.push(
     <div style={{ background: prim, color: '#fff', padding: '12px 16px', borderRadius: 6, marginBottom: 12 }}>
-      <div style={{ fontSize: 20, fontWeight: 800 }}>{a.titulo || 'Diagnóstico de Desempenho'}</div>
-      {c.subtitulo && <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{c.subtitulo}</div>}
+      <div style={{ fontSize: 20, fontWeight: 800 }}>{V(a.titulo || 'Diagnóstico de Desempenho')}</div>
+      {c.subtitulo && <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{V(c.subtitulo)}</div>}
     </div>,
   )
   if (a.mostrarDadosAluno) out.push(
     <div style={{ display: 'flex', border: `1px solid ${prim}`, borderRadius: 6, overflow: 'hidden', marginBottom: 12 }}>
       <div style={{ background: prim, color: '#fff', fontWeight: 800, fontSize: 14, padding: '8px 14px' }}>NOME:</div>
-      <div style={{ background: amar, color: '#3b2f00', flex: 1, padding: '8px 14px', fontSize: 12, fontWeight: 600 }}>[NOME COMPLETO ALUNO]</div>
+      <div style={{ background: amar, color: '#3b2f00', flex: 1, padding: '8px 14px', fontSize: 12, fontWeight: 600 }}>{V('{nome}')}</div>
     </div>,
   )
   out.push(
     <div style={{ display: 'flex', border: `1px solid ${prim}33`, borderRadius: 6, overflow: 'hidden', marginBottom: 12 }}>
-      <div style={{ background: '#9b6800', color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'baseline' }}><span style={{ fontSize: 32, fontWeight: 800 }}>X</span><span style={{ fontSize: 16, fontWeight: 700 }}>/{c.notaTotal}</span></div>
-      <div style={{ background: amar, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: 12, fontWeight: 600 }}>{c.notaTexto}</div>
+      <div style={{ background: '#9b6800', color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'baseline' }}><span style={{ fontSize: 32, fontWeight: 800 }}>{V('{acertos}')}</span><span style={{ fontSize: 16, fontWeight: 700 }}>/{V(c.notaTotal)}</span></div>
+      <div style={{ background: amar, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: 12, fontWeight: 600 }}>{V(c.notaTexto)}</div>
     </div>,
   )
-  for (const p of c.intro) out.push(<p style={{ fontSize: base, lineHeight: 1.5, textAlign: 'justify', margin: '0 0 8px' }}>{p}</p>)
+  for (const p of c.intro) out.push(<p style={{ fontSize: base, lineHeight: 1.5, textAlign: 'justify', margin: '0 0 8px' }}>{V(p)}</p>)
   if (c.pilares.length) {
     out.push(<Sec t="Desempenho por pilar" />)
     out.push(
       <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', marginBottom: 4 }}>
-        {c.pilares.map((pl, i) => (
-          <div key={i} style={{ flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${prim}22`, borderRadius: 4, padding: 10 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: prim, letterSpacing: 0.5 }}>{pl.nome}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: prim, lineHeight: 1.1 }}>X%</div>
-            <div style={{ fontSize: 9, color: '#5a5570', marginBottom: 6 }}>{pl.totalTxt}</div>
-            {pl.bandas.map((b, j) => (
-              <div key={j} style={{ marginBottom: 6 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: prim }}>{b.faixa}</div>
-                {b.texto && <div style={{ fontSize: 8.5, color: '#243b53', lineHeight: 1.4, textAlign: 'justify' }}>{b.texto}</div>}
-              </div>
-            ))}
-          </div>
-        ))}
+        {c.pilares.map((pl, i) => {
+          const banda = bandaAdaptativa(pl, vars)
+          const bandas = banda ? [banda] : pl.bandas // com dado do aluno mostra só a faixa; sem dado, todas (modelo)
+          return (
+            <div key={i} style={{ flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${prim}22`, borderRadius: 4, padding: 10 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: prim, letterSpacing: 0.5 }}>{pl.nome}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: prim, lineHeight: 1.1 }}>{pl.chave ? V(`{pct_pilar_${pl.chave}}`) : 'X%'}</div>
+              <div style={{ fontSize: 9, color: '#5a5570', marginBottom: 6 }}>{V(pl.totalTxt)}</div>
+              {bandas.map((b, j) => (
+                <div key={j} style={{ marginBottom: 6 }}>
+                  {!banda && <div style={{ fontSize: 9, fontWeight: 700, color: prim }}>{b.faixa}</div>}
+                  {b.texto && <div style={{ fontSize: 8.5, color: '#243b53', lineHeight: 1.4, textAlign: 'justify' }}>{V(b.texto)}</div>}
+                </div>
+              ))}
+            </div>
+          )
+        })}
       </div>,
     )
   }
-  if (c.disciplinas.length) {
+  // Disciplinas: do BANCO quando houver (nome+chave reais); senão as do modelo. Assuntos/nº/pct vêm das variáveis.
+  const discs: DiscBanco[] = discBanco.length ? discBanco : c.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave || slugDiag(d.nome) }))
+  if (discs.length) {
     out.push(<Sec t="Desempenho por disciplina" />)
-    if (c.disciplinasIntro) out.push(<p style={{ fontSize: base - 1, color: '#5a5570', margin: '0 0 8px', lineHeight: 1.4 }}>{c.disciplinasIntro}</p>)
-    for (const d of c.disciplinas) out.push(
-      <div style={{ background: '#f5f3ff', borderTop: `2px solid ${amar}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5 }}>
-        <div style={{ minWidth: 0 }}><div style={{ fontSize: 11, fontWeight: 700, color: prim }}>{d.nome}</div><div style={{ fontSize: 9, color: '#5a5570', fontStyle: 'italic' }}>- Categoria: {d.categoria}</div></div>
-        <div style={{ fontSize: 11, whiteSpace: 'nowrap' }}><span style={{ color: '#9590b0' }}>{d.total}</span> <span style={{ fontWeight: 800, color: '#9a6e00' }}>x%</span></div>
-      </div>,
-    )
+    if (c.disciplinasIntro) out.push(<p style={{ fontSize: base - 1, color: '#5a5570', margin: '0 0 8px', lineHeight: 1.4 }}>{V(c.disciplinasIntro)}</p>)
+    for (const d of discs) {
+      const assuntos = (vars[`assuntos_${d.chave}`] ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
+      out.push(
+        <div style={{ background: '#f5f3ff', borderTop: `2px solid ${amar}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: prim }}>{d.nome}</div>
+            {assuntos.length
+              ? assuntos.map((as, k) => <div key={k} style={{ fontSize: 9, color: '#5a5570', fontStyle: 'italic' }}>- {as}</div>)
+              : <div style={{ fontSize: 9, color: '#5a5570', fontStyle: 'italic' }}>- Assuntos das questões erradas</div>}
+          </div>
+          <div style={{ fontSize: 11, whiteSpace: 'nowrap' }}><span style={{ color: '#9590b0' }}>{V(`{acerto_${d.chave}}`)}/{V(`{total_${d.chave}}`)}</span> <span style={{ fontWeight: 800, color: '#9a6e00' }}>{V(`{pct_${d.chave}}`)}</span></div>
+        </div>,
+      )
+    }
   }
   if (c.sugestoes.length) {
     out.push(<Sec t="Sugestões de estudo" />)
     for (const s of c.sugestoes) out.push(
       <div style={{ marginBottom: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fdf3d0', padding: '5px 12px' }}>
-          <span style={{ fontWeight: 800, fontSize: 11, color: '#9a6e00' }}>{s.titulo}</span>
-          {s.prioridade && <span style={{ fontWeight: 700, fontSize: 9, color: '#9a6e00' }}>[!] {s.prioridade}</span>}
+          <span style={{ fontWeight: 800, fontSize: 11, color: '#9a6e00' }}>{V(s.titulo)}</span>
+          {s.prioridade && <span style={{ fontWeight: 700, fontSize: 9, color: '#9a6e00' }}>[!] {V(s.prioridade)}</span>}
         </div>
         <div style={{ background: '#f0eeff', padding: '8px 12px' }}>
-          {s.intro && <p style={{ fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify' }}>{s.intro}</p>}
+          {s.intro && <p style={{ fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify' }}>{V(s.intro)}</p>}
           {s.itens.map((it, j) => (
             <div key={j} style={{ fontSize: base - 1, lineHeight: 1.4, marginBottom: 2, display: 'flex', gap: 5 }}>
-              <span style={{ fontWeight: 700, color: it.forte ? '#e8850c' : '#3b5bdb' }}>{it.forte ? '>>' : '>'}</span><span>{it.texto}</span>
+              <span style={{ fontWeight: 700, color: it.forte ? '#e8850c' : '#3b5bdb' }}>{it.forte ? '>>' : '>'}</span><span>{V(it.texto)}</span>
             </div>
           ))}
         </div>
@@ -173,8 +218,8 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[]): ReactNode[] {
   }
   if (c.gabaritoObs.length || c.gabaritoIntro.length) {
     out.push(<Sec t={c.gabaritoTitulo || 'Gabarito oficial desatualizado'} />)
-    for (const p of c.gabaritoIntro) out.push(<p style={{ fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify' }}>{p}</p>)
-    if (c.gabaritoObs.length) out.push(<div style={{ background: '#f5f3ff', borderTop: '2px solid #a32d2d', padding: '8px 12px' }}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: 9, color: '#5a5570' }}>{o}</div>)}</div>)
+    for (const p of c.gabaritoIntro) out.push(<p style={{ fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify' }}>{V(p)}</p>)
+    if (c.gabaritoObs.length) out.push(<div style={{ background: '#f5f3ff', borderTop: '2px solid #a32d2d', padding: '8px 12px' }}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: 9, color: '#5a5570' }}>{V(o)}</div>)}</div>)
   }
   return out
 }
@@ -203,7 +248,7 @@ function Folha({ item, num, total, pad, Ht, Hf, capa, children }: { item: ItemCa
   )
 }
 
-export function Previa({ item, questoes }: { item: ItemCaderno; questoes: PreviewQuestao[] }) {
+export function Previa({ item, questoes, vars = {}, discBanco = [] }: { item: ItemCaderno; questoes: PreviewQuestao[]; vars?: Record<string, string>; discBanco?: DiscBanco[] }) {
   const a = item.ajustes
   const qs = questoes.length ? questoes : QUESTOES_EXEMPLO
   const pad = a.compacto ? 40 : 56
@@ -212,7 +257,9 @@ export function Previa({ item, questoes }: { item: ItemCaderno; questoes: Previe
   const contentW = A4_W - 2 * pad
   const availH = A4_H - Ht - Hf - 16
 
-  const blocos = useMemo(() => blocosDoItem(item, qs), [item, qs])
+  const varsKey = useMemo(() => JSON.stringify(vars), [vars])
+  const discKey = useMemo(() => JSON.stringify(discBanco), [discBanco])
+  const blocos = useMemo(() => blocosDoItem(item, qs, vars, discBanco), [item, qs, varsKey, discKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const medRef = useRef<HTMLDivElement>(null)
   const [paginas, setPaginas] = useState<number[][] | null>(null)
   const chave = useMemo(() => JSON.stringify({ n: blocos.length, a }), [blocos, a])

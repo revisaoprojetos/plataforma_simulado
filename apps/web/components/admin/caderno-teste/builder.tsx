@@ -11,8 +11,9 @@ import { Previa } from '@/lib/caderno-teste/previa'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
 import { metaDaModalidade, itemAtivo, novoItem, type BuilderV3, type BuilderAjustes, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
-import { salvarBuilderTeste, previewQuestoesBanco } from '@/app/admin/cadernos-teste/actions'
+import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
 import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
+import { Users, ChevronRight } from 'lucide-react'
 
 const ICONE_MOD: Record<Modalidade, any> = { caderno_questoes: FileText, folha_respostas: ClipboardList, diagnostico: BarChart3 }
 
@@ -30,15 +31,20 @@ function useZoomAjustado(alvoLargura = 794) {
   return { ref, zoom }
 }
 
-export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoesIniciais, abrirPickerInicial = false }: {
+export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoesIniciais, registrosIniciais = [], disciplinasIniciais = [], abrirPickerInicial = false }: {
   cadernoId: string
   builderInicial: BuilderV3
   bancos: BancoOpcao[]
   questoesIniciais: PreviewQuestao[]
+  registrosIniciais?: RegistroTeste[]
+  disciplinasIniciais?: DiscBancoTeste[]
   abrirPickerInicial?: boolean
 }) {
   const [builder, setBuilder] = useState<BuilderV3>(builderInicial)
   const [questoes, setQuestoes] = useState<PreviewQuestao[]>(questoesIniciais)
+  const [registros, setRegistros] = useState<RegistroTeste[]>(registrosIniciais)
+  const [disciplinasBanco, setDisciplinasBanco] = useState<DiscBancoTeste[]>(disciplinasIniciais)
+  const [alunoIdx, setAlunoIdx] = useState(0)
   const [carregandoQ, setCarregandoQ] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(abrirPickerInicial)
   const [pickerMode, setPickerMode] = useState<'add' | 'trocar'>('trocar')
@@ -86,10 +92,14 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   }
   function trocarBanco(bancoId: string | null) {
     setBuilder((b) => ({ ...b, bancoId }))
-    if (!bancoId) { setQuestoes([]); return }
+    setAlunoIdx(0)
+    if (!bancoId) { setQuestoes([]); setRegistros([]); setDisciplinasBanco([]); return }
     setCarregandoQ(true)
     previewQuestoesBanco(bancoId).then((r) => { if (r.ok) setQuestoes(r.questoes ?? []) }).finally(() => setCarregandoQ(false))
+    dadosBancoTeste(bancoId).then((r) => { if (r.ok) { setRegistros(r.registros); setDisciplinasBanco(r.disciplinas) } })
   }
+  const alunoAtual = registros[Math.min(alunoIdx, Math.max(0, registros.length - 1))] ?? null
+  const varsPrevia = alunoAtual?.vars ?? (builder.bancoId ? {} : {})
   function salvar() {
     start(async () => {
       const r = await salvarBuilderTeste(cadernoId, builder)
@@ -140,6 +150,15 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {registros.length > 0 && (
+            <div className="flex items-center gap-1 rounded-lg border bg-muted/40 px-1.5 py-1 text-xs" title="Pré-visualizar com os dados reais de um aluno">
+              <Users className="ml-0.5 h-3.5 w-3.5 text-primary" />
+              <button onClick={() => setAlunoIdx((i) => Math.max(0, i - 1))} disabled={alunoIdx === 0} className="rounded p-0.5 hover:bg-muted disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
+              <span className="min-w-[110px] truncate text-center font-medium" title={alunoAtual?.nome}>{alunoAtual?.nome ?? '—'}</span>
+              <span className="text-muted-foreground">{Math.min(alunoIdx + 1, registros.length)}/{registros.length}</span>
+              <button onClick={() => setAlunoIdx((i) => Math.min(registros.length - 1, i + 1))} disabled={alunoIdx >= registros.length - 1} className="rounded p-0.5 hover:bg-muted disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
+            </div>
+          )}
           <input ref={importRef} type="file" accept=".docx,.html,.htm,.pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importar(f); e.target.value = '' }} />
           <Button variant="outline" size="sm" onClick={() => importRef.current?.click()} disabled={importando} title="Importar um caderno (Word .docx ou HTML) — mapeia como Diagnóstico">
             {importando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileUp className="mr-1.5 h-4 w-4" />} Importar
@@ -260,7 +279,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
         {/* Direita: prévia A4 do grupo ativo (padding lateral menor) */}
         <div ref={ref} className="scroll-claro min-h-0 overflow-auto bg-[radial-gradient(circle,theme(colors.slate.300)_1px,transparent_1px)] [background-size:18px_18px] px-3 py-5 dark:bg-[radial-gradient(circle,theme(colors.slate.700)_1px,transparent_1px)]">
           <div className="mx-auto" style={{ zoom } as any}>
-            <Previa item={ativo} questoes={questoes} />
+            <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} />
           </div>
         </div>
       </div>

@@ -2,8 +2,23 @@
 // importação (Word/HTML). Um item de diagnóstico guarda este objeto em `item.conteudo`.
 
 export type DiagBanda = { faixa: string; texto: string }
-export type DiagPilar = { nome: string; totalTxt: string; bandas: DiagBanda[] }
-export type DiagDisciplina = { nome: string; total: string; categoria: string }
+/** `chave` = slug do pilar (lei_seca/jurisprudencia/doutrina/lingua_portuguesa) → casa com {pct_pilar_<chave>} etc. */
+export type DiagPilar = { nome: string; chave?: string; totalTxt: string; bandas: DiagBanda[] }
+/** `chave` = slug da disciplina → casa com {pct_<chave>}/{acerto_<chave>}/{total_<chave>}/{assuntos_<chave>}. */
+export type DiagDisciplina = { nome: string; chave?: string; total: string; categoria: string }
+
+/** Slug igual ao de merge.ts (para as variáveis casarem com os dados do banco/aluno). */
+export function slugDiag(s: string): string {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+}
+
+/** Variáveis padronizadas do diagnóstico (documentação do formato adaptativo). */
+export const VARS_DIAGNOSTICO = {
+  aluno: ['{nome}', '{email}', '{telefone}', '{cpf}', '{classificacao}'],
+  simulado: ['{simulado}', '{acertos}', '{erros}', '{total_questoes}', '{nota}', '{percentual}'],
+  porPilar: ['{pct_pilar_<slug>}', '{acerto_pilar_<slug>}', '{total_pilar_<slug>}'],
+  porDisciplina: ['{pct_<slug>}', '{acerto_<slug>}', '{total_<slug>}', '{assuntos_<slug>}'],
+}
 export type DiagItemSugestao = { forte: boolean; texto: string }
 export type DiagSugestao = { titulo: string; prioridade: string; intro: string; itens: DiagItemSugestao[] }
 
@@ -24,16 +39,16 @@ export type DiagConteudo = {
 /** Diagnóstico genérico (default quando um item de diagnóstico não tem conteúdo salvo). */
 export const DIAG_PADRAO: DiagConteudo = {
   subtitulo: 'Nome do simulado / recorte',
-  notaTotal: '100',
-  notaTexto: 'X acertos de 100 questões — X% de aproveitamento',
+  notaTotal: '{total_questoes}',
+  notaTexto: '{acertos} acertos de {total_questoes} questões — {percentual} de aproveitamento',
   intro: ['Texto de abertura do diagnóstico. Explique o objetivo do relatório e como o aluno deve lê-lo.'],
   pilares: [
-    { nome: 'LEI SECA', totalTxt: 'X de N questões', bandas: [{ faixa: '0-49', texto: '' }, { faixa: '50-80', texto: '' }, { faixa: '81-100', texto: '' }] },
-    { nome: 'JURISPRUDÊNCIA', totalTxt: 'X de N questões', bandas: [{ faixa: '0-49', texto: '' }, { faixa: '50-80', texto: '' }, { faixa: '81-100', texto: '' }] },
-    { nome: 'DOUTRINA', totalTxt: 'X de N questões', bandas: [{ faixa: '0-49', texto: '' }, { faixa: '50-80', texto: '' }, { faixa: '81-100', texto: '' }] },
+    { nome: 'LEI SECA', chave: 'lei_seca', totalTxt: '{acerto_pilar_lei_seca} de {total_pilar_lei_seca} questões', bandas: [{ faixa: '0-49', texto: '' }, { faixa: '50-80', texto: '' }, { faixa: '81-100', texto: '' }] },
+    { nome: 'JURISPRUDÊNCIA', chave: 'jurisprudencia', totalTxt: '{acerto_pilar_jurisprudencia} de {total_pilar_jurisprudencia} questões', bandas: [{ faixa: '0-49', texto: '' }, { faixa: '50-80', texto: '' }, { faixa: '81-100', texto: '' }] },
+    { nome: 'DOUTRINA', chave: 'doutrina', totalTxt: '{acerto_pilar_doutrina} de {total_pilar_doutrina} questões', bandas: [{ faixa: '0-49', texto: '' }, { faixa: '50-80', texto: '' }, { faixa: '81-100', texto: '' }] },
   ],
   disciplinasIntro: 'A análise a seguir tem foco nos seus pontos de erros. Para cada disciplina, você encontra o desempenho por categoria (lei seca, jurisprudência e doutrina) e uma leitura personalizada.',
-  disciplinas: [{ nome: 'Disciplina', total: 'x/N', categoria: 'Assunto' }],
+  disciplinas: [{ nome: 'Disciplina', chave: 'disciplina', total: 'x/N', categoria: 'Assunto' }],
   sugestoes: [{ titulo: 'LEI SECA', prioridade: 'Prioridade Alta', intro: '', itens: [] }],
   gabaritoTitulo: 'GABARITO OFICIAL DESATUALIZADO',
   gabaritoIntro: ['Observações sobre questões que sofreram atualização legislativa ou jurisprudencial.'],
@@ -43,8 +58,8 @@ export const DIAG_PADRAO: DiagConteudo = {
 /** Preset pronto: Diagnóstico de Desempenho — AGU 2023 (base montada a partir do documento enviado). */
 export const DIAG_AGU_2023: DiagConteudo = {
   subtitulo: 'CONCURSOS ANTIGOS - AGU 2023 - ADVOGADO DA UNIÃO',
-  notaTotal: '100',
-  notaTexto: 'X acertos de 100 questões — X% de aproveitamento',
+  notaTotal: '{total_questoes}',
+  notaTexto: '{acertos} acertos de {total_questoes} questões — {percentual} de aproveitamento',
   intro: [
     'Este é o seu simulado com base na prova do concurso da AGU de 2023, no estilo CEBRASPE. Ele não foi pensado para medir se você "está pronto(a)", na verdade, isso pouco importa aqui, mas sim para colocar você diante da forma como a banca cobrava naquele certame e mostrar, com precisão, onde direcionar as próximas semanas de estudo.',
     'O número de acertos é a parte menos importante deste relatório. O que importa de verdade está no que vem a seguir: o desempenho por pilar (lei seca, jurisprudência e doutrina) e por disciplina, que revela exatamente que tipo de erro você está cometendo. Errar por não ter visto o assunto é diferente de errar por não dominar o texto de lei, que é diferente de errar por não acompanhar jurisprudência. Cada uma dessas lacunas se resolve de um jeito, com material e prioridade diferentes.',
@@ -52,17 +67,17 @@ export const DIAG_AGU_2023: DiagConteudo = {
     'Guarde este diagnóstico. Ele é o ponto de partida e o comparativo que você vai usar para medir sua evolução até o próximo simulado.',
   ],
   pilares: [
-    { nome: 'LEGISLAÇÃO', totalTxt: 'X de 69 questões', bandas: [
+    { nome: 'LEGISLAÇÃO', chave: 'lei_seca', totalTxt: '{acerto_pilar_lei_seca} de {total_pilar_lei_seca} questões', bandas: [
       { faixa: '0-49', texto: 'O seu desempenho em lei seca ficou abaixo de 50%, um resultado que pode ser considerado ruim. A CEBRASPE cobra texto literal de lei em muitas questões, sendo um dos principais fatores de reprovação entre nossos alunos. Você demonstrou dificuldade no ponto mais importante de uma prova objetiva, o que indica que o estudo precisa ir além do contato superficial com a legislação e chegar ao nível do detalhe que a banca exige.' },
       { faixa: '50-80', texto: 'O seu desempenho em lei seca foi intermediário. Ao que parece, você tem base, mas ainda está deixando pontos na mesa. A banca cobra o dispositivo exato, e questões que parecem simples se tornam armadilhas quando o candidato não domina o texto com precisão. O caminho agora é focar nos diplomas de maior incidência, com atenção aos detalhes que diferenciam uma alternativa da outra.' },
       { faixa: '81-100', texto: 'O seu desempenho em lei seca foi excelente! Esse pode ser o diferencial para sua aprovação. A grande maioria dos candidatos falha justamente em lei seca. Agora, você precisa manter esse resultado até a sua prova: mantenha-se firme no estudo da lei seca, foque em revisões periódicas e estude os novos conteúdos específicos da AGU.' },
     ] },
-    { nome: 'JURISPRUDÊNCIA', totalTxt: 'X de 15 questões', bandas: [
+    { nome: 'JURISPRUDÊNCIA', chave: 'jurisprudencia', totalTxt: '{acerto_pilar_jurisprudencia} de {total_pilar_jurisprudencia} questões', bandas: [
       { faixa: '0-49', texto: 'O seu desempenho em jurisprudência ficou abaixo de 50%, e isso é muito ruim. A CEBRASPE não abre mão de cobrar informativos. É uma forte característica da banca. Atente-se urgentemente para a necessidade de reforçar o estudo de jurisprudência, pelo DOD, pelo JurisClub ou mesmo pelos informativos do STF e STJ.' },
       { faixa: '50-80', texto: 'O seu desempenho em jurisprudência foi médio, o que indica que há espaço relevante para crescimento. As questões de jurisprudência refletem um valor qualitativo e diferenciam os primeiros colocados. Vale muito a pena reforçar, pelo DoD ou pelo JurisClub do Revisão.' },
       { faixa: '81-100', texto: 'O seu desempenho em jurisprudência foi maravilhoso! Isso demonstra que você acompanha os informativos e aplica os entendimentos dos tribunais com segurança. Mantenha esse hábito, com atenção especial à jurisprudência mais recente, sem esquecer dos julgados com teses mais emblemáticas e consolidadas.' },
     ] },
-    { nome: 'DOUTRINA', totalTxt: 'X de 16 questões', bandas: [
+    { nome: 'DOUTRINA', chave: 'doutrina', totalTxt: '{acerto_pilar_doutrina} de {total_pilar_doutrina} questões', bandas: [
       { faixa: '0-49', texto: 'O desempenho em doutrina ficou abaixo de 50%, o que merece atenção não apenas pelas questões eminentemente doutrinárias, mas porque a doutrina é a base que sustenta o raciocínio jurídico. Quem não domina classificações, distinções conceituais e princípios tende a errar também em questões de lei e jurisprudência. O investimento em doutrina tem retorno duplo.' },
       { faixa: '50-80', texto: 'O desempenho em doutrina foi intermediário. Você acerta nas questões mais diretas, mas perde quando a banca explora distinções mais finas ou classificações menos óbvias. Dominar doutrina ajuda a ganhar pontos também em questões de lei e jurisprudência com elemento conceitual de fundo.' },
       { faixa: '81-100', texto: 'O desempenho em doutrina foi excelente. Você demonstra domínio das classificações, distinções conceituais e fundamentos teóricos que a banca costuma explorar, e isso tende a se refletir positivamente também em questões de lei e jurisprudência com elemento conceitual de fundo. Mantenha a solidez.' },
