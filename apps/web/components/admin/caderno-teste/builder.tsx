@@ -53,7 +53,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const [gruposAberto, setGruposAberto] = useState(false)
   const [importando, setImportando] = useState(false)
   const [baixarAberto, setBaixarAberto] = useState(false)
-  const [pickerCor, setPickerCor] = useState<{ chave: string; label: string; cor: string; x: number; y: number } | null>(null)
+  const [pickerCor, setPickerCor] = useState<{ parte: string; label: string; cor: string; x: number; y: number } | null>(null)
   const importRef = useRef<HTMLInputElement>(null)
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
@@ -304,8 +304,8 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
         <div ref={ref} className="scroll-claro min-h-0 overflow-auto bg-[radial-gradient(circle,theme(colors.slate.300)_1px,transparent_1px)] [background-size:18px_18px] px-3 py-5 dark:bg-[radial-gradient(circle,theme(colors.slate.700)_1px,transparent_1px)]">
           {builder.bancoId ? (
             <div className="mx-auto" style={{ zoom } as any}>
-              <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} selKey={pickerCor?.chave}
-                onPickDisc={(chave, nome, cor, anchor) => setPickerCor({ chave, label: nome, cor, x: Math.min(anchor.right + 8, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 240), y: anchor.top })} />
+              <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} selParte={pickerCor?.parte}
+                onPick={(parte, label, cor, anchor) => setPickerCor({ parte, label, cor, x: Math.min(anchor.right + 8, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 240), y: anchor.top })} />
             </div>
           ) : (
             <div className="flex h-full items-center justify-center p-8 text-center">
@@ -329,11 +329,11 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
               <span className="truncate text-xs font-semibold" title={pickerCor.label}>Cor · {pickerCor.label}</span>
               <button onClick={() => setPickerCor(null)} className="shrink-0 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
-            <HexColorField value={a.coresDisc?.[pickerCor.chave] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresDisc: { ...(a.coresDisc ?? {}), [pickerCor.chave]: v } })} />
-            {a.coresDisc?.[pickerCor.chave] && (
-              <button onClick={() => { const cd = { ...(a.coresDisc ?? {}) }; delete cd[pickerCor.chave]; setAjuste({ coresDisc: cd }) }} className="mt-2 text-[11px] text-muted-foreground hover:underline">Restaurar cor do pilar</button>
+            <HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />
+            {a.coresParte?.[pickerCor.parte] && (
+              <button onClick={() => { const cp = { ...(a.coresParte ?? {}) }; delete cp[pickerCor.parte]; setAjuste({ coresParte: cp }) }} className="mt-2 text-[11px] text-muted-foreground hover:underline">Restaurar cor padrão</button>
             )}
-            <p className="mt-2 text-[10px] leading-snug text-muted-foreground">Cor só desta disciplina.</p>
+            <p className="mt-2 text-[10px] leading-snug text-muted-foreground">Cor só deste bloco. Clique em qualquer bloco da prévia para personalizá-lo.</p>
           </div>
         </>
       )}

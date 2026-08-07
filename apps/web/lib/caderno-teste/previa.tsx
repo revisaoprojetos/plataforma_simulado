@@ -65,7 +65,7 @@ const QUESTOES_EXEMPLO: PreviewQuestao[] = [
   ] },
 ]
 
-type Interativo = { selKey?: string; onPick?: (chave: string, nome: string, cor: string, anchor: DOMRect) => void }
+type Interativo = { selParte?: string; onPick?: (parte: string, label: string, cor: string, anchor: DOMRect) => void }
 
 /** Monta os blocos (nós) do conteúdo do grupo, em ordem — a paginação distribui isso em folhas. */
 function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<string, string>, discBanco: DiscBanco[], inter?: Interativo): ReactNode[] {
@@ -74,22 +74,40 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   const V = (t: string) => preencher(t, vars)
   const out: ReactNode[] = []
 
-  const Cabecalho = () => (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: a.compacto ? 20 : 26, fontWeight: 800, color: a.corPrimaria, letterSpacing: 0.3 }}>{a.titulo || 'Simulado'}</div>
-      <div style={{ height: 3, background: a.corSecundaria, borderRadius: 2, marginTop: 6, width: 120 }} />
-    </div>
-  )
-  const Dados = () => (
-    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', border: `1px solid ${a.corPrimaria}33`, overflow: 'hidden', marginBottom: 14 }}>
-      {[['Nome', 'João da Silva'], ['CPF', '000.000.000-00'], ['Data', '__/__/____']].map(([r, v], i) => (
-        <div key={r} style={{ padding: '8px 12px', borderLeft: i ? `1px solid ${a.corPrimaria}22` : 'none' }}>
-          <div style={{ fontSize: 8.5, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94a3b8' }}>{r}</div>
-          <div style={{ fontSize: 12, fontWeight: 600 }}>{v}</div>
-        </div>
-      ))}
-    </div>
-  )
+  // Cor individual por PARTE (clique na prévia): coresParte[parte] sobrepõe a cor padrão do bloco.
+  const corP = (parte: string, def: string) => (a.coresParte ?? {})[parte] || def
+  // Props (style + clique) para tornar qualquer bloco selecionável na prévia e destacá-lo quando ativo.
+  const atr = (parte: string, label: string, cor: string, baseStyle: any): { style: any; onClick?: (e: any) => void; title?: string } => {
+    if (!inter?.onPick) return { style: baseStyle }
+    return {
+      style: { ...baseStyle, cursor: 'pointer', ...(inter.selParte === parte ? { outline: `2px solid ${cor}`, outlineOffset: -1 } : {}) },
+      onClick: (e) => inter!.onPick!(parte, label, cor, (e.currentTarget as HTMLElement).getBoundingClientRect()),
+      title: 'Clique para mudar a cor deste bloco',
+    }
+  }
+
+  const Cabecalho = () => {
+    const corT = corP('cab_titulo', a.corPrimaria), corL = corP('cab_linha', a.corSecundaria)
+    return (
+      <div style={{ marginBottom: 14 }}>
+        <div {...atr('cab_titulo', 'Título', corT, { fontSize: a.compacto ? 20 : 26, fontWeight: 800, color: corT, letterSpacing: 0.3 })}>{a.titulo || 'Simulado'}</div>
+        <div {...atr('cab_linha', 'Linha do título', corL, { height: 3, background: corL, borderRadius: 2, marginTop: 6, width: 120 })} />
+      </div>
+    )
+  }
+  const Dados = () => {
+    const corB = corP('dados_borda', a.corPrimaria)
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', border: `1px solid ${corB}33`, overflow: 'hidden', marginBottom: 14 }}>
+        {[['Nome', 'João da Silva'], ['CPF', '000.000.000-00'], ['Data', '__/__/____']].map(([r, v], i) => (
+          <div key={r} {...atr('dados_borda', 'Dados do aluno', corB, { padding: '8px 12px', borderLeft: i ? `1px solid ${corB}22` : 'none' })}>
+            <div style={{ fontSize: 8.5, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94a3b8' }}>{r}</div>
+            <div style={{ fontSize: 12, fontWeight: 600 }}>{v}</div>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   if (item.modalidade === 'caderno_questoes') {
     if (a.mostrarCabecalho) out.push(<Cabecalho />)
@@ -141,25 +159,29 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   // Diagnóstico
   const c = item.conteudo ?? DIAG_PADRAO
   const prim = a.corPrimaria, amar = a.corSecundaria
-  const Sec = ({ t }: { t: string }) => <div style={{ background: prim, color: '#fff', fontWeight: 700, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', padding: '6px 12px', borderRadius: 2, margin: '4px 0 10px' }}>{t}</div>
-  if (a.mostrarCabecalho) out.push(
-    <div style={{ background: prim, color: '#fff', padding: '12px 16px', marginBottom: 12 }}>
+  // Cada faixa de seção é uma parte própria (sec:<t>) — dá para colorir cada uma individualmente.
+  const Sec = ({ t }: { t: string }) => {
+    const cor = corP(`sec:${t}`, prim)
+    return <div {...atr(`sec:${t}`, t, cor, { background: cor, color: '#fff', fontWeight: 700, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', padding: '6px 12px', borderRadius: 2, margin: '4px 0 10px' })}>{t}</div>
+  }
+  if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); out.push(
+    <div {...atr('diag_cab', 'Cabeçalho', cor, { background: cor, color: '#fff', padding: '12px 16px', marginBottom: 12 })}>
       <div style={{ fontSize: 20, fontWeight: 800 }}>{V(a.titulo || 'Diagnóstico de Desempenho')}</div>
       {c.subtitulo && <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{V(c.subtitulo)}</div>}
     </div>,
-  )
-  if (a.mostrarDadosAluno) out.push(
-    <div style={{ display: 'flex', border: `1px solid ${prim}`, overflow: 'hidden', marginBottom: 12 }}>
-      <div style={{ background: prim, color: '#fff', fontWeight: 800, fontSize: 14, padding: '8px 14px' }}>NOME:</div>
-      <div style={{ background: amar, color: '#3b2f00', flex: 1, padding: '8px 14px', fontSize: 12, fontWeight: 600 }}>{V('{nome}')}</div>
+  ) }
+  if (a.mostrarDadosAluno) { const corN = corP('diag_nome_rot', prim), corV = corP('diag_nome_val', amar); out.push(
+    <div style={{ display: 'flex', border: `1px solid ${corN}`, overflow: 'hidden', marginBottom: 12 }}>
+      <div {...atr('diag_nome_rot', 'Rótulo NOME', corN, { background: corN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '8px 14px' })}>NOME:</div>
+      <div {...atr('diag_nome_val', 'Faixa do nome', corV, { background: corV, color: '#3b2f00', flex: 1, padding: '8px 14px', fontSize: 12, fontWeight: 600 })}>{V('{nome}')}</div>
     </div>,
-  )
-  out.push(
+  ) }
+  { const corNum = corP('diag_nota_num', '#9b6800'), corFx = corP('diag_nota_faixa', amar); out.push(
     <div style={{ display: 'flex', border: `1px solid ${prim}33`, overflow: 'hidden', marginBottom: 12 }}>
-      <div style={{ background: '#9b6800', color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'baseline' }}><span style={{ fontSize: 32, fontWeight: 800 }}>{V('{acertos}')}</span><span style={{ fontSize: 16, fontWeight: 700 }}>/{V(c.notaTotal)}</span></div>
-      <div style={{ background: amar, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: 12, fontWeight: 600 }}>{V(c.notaTexto)}</div>
+      <div {...atr('diag_nota_num', 'Bloco da nota', corNum, { background: corNum, color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'baseline' })}><span style={{ fontSize: 32, fontWeight: 800 }}>{V('{acertos}')}</span><span style={{ fontSize: 16, fontWeight: 700 }}>/{V(c.notaTotal)}</span></div>
+      <div {...atr('diag_nota_faixa', 'Faixa da nota', corFx, { background: corFx, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: 12, fontWeight: 600 })}>{V(c.notaTexto)}</div>
     </div>,
-  )
+  ) }
   for (const p of c.intro) out.push(<p style={{ fontSize: base, lineHeight: 1.5, textAlign: 'justify', margin: '0 0 8px' }}>{V(p)}</p>)
   if (c.pilares.length) {
     out.push(<Sec t="Desempenho por pilar" />)
@@ -168,14 +190,16 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
         {c.pilares.map((pl, i) => {
           const banda = bandaAdaptativa(pl, vars)
           const bandas = banda ? [banda] : pl.bandas // com dado do aluno mostra só a faixa; sem dado, todas (modelo)
+          const parte = `pilar:${pl.chave || i}`
+          const cor = corP(parte, prim) // destaque do card (nome + %)
           return (
-            <div key={i} style={{ flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${prim}22`, padding: 10 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: prim, letterSpacing: 0.5 }}>{pl.nome}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: prim, lineHeight: 1.1 }}>{pl.chave ? V(`{pct_pilar_${pl.chave}}`) : 'X%'}</div>
+            <div key={i} {...atr(parte, pl.nome, cor, { flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${cor}22`, padding: 10 })}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{pl.nome}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1.1 }}>{pl.chave ? V(`{pct_pilar_${pl.chave}}`) : 'X%'}</div>
               <div style={{ fontSize: 9, color: '#5a5570', marginBottom: 6 }}>{V(pl.totalTxt)}</div>
               {bandas.map((b, j) => (
                 <div key={j} style={{ marginBottom: 6 }}>
-                  {!banda && <div style={{ fontSize: 9, fontWeight: 700, color: prim }}>{b.faixa}</div>}
+                  {!banda && <div style={{ fontSize: 9, fontWeight: 700, color: cor }}>{b.faixa}</div>}
                   {b.texto && <div style={{ fontSize: 8.5, color: '#243b53', lineHeight: 1.4, textAlign: 'justify' }}>{V(b.texto)}</div>}
                 </div>
               ))}
@@ -192,12 +216,10 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     if (c.disciplinasIntro) out.push(<p style={{ fontSize: base - 1, color: '#5a5570', margin: '0 0 8px', lineHeight: 1.4 }}>{V(c.disciplinasIntro)}</p>)
     for (const d of discs) {
       const assuntos = (vars[`assuntos_${d.chave}`] ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
-      const corDisc = (a.coresDisc ?? {})[d.chave] || corDoPilar(d.pilar, a.coresPilar ?? {}, amar)
-      const clicavel = !!inter?.onPick
-      const sel = !!(inter?.selKey && inter.selKey === d.chave)
+      // cor da disciplina: parte (coresParte) → individual legado (coresDisc) → cor do pilar → secundária.
+      const corDisc = corP(`disc:${d.chave}`, (a.coresDisc ?? {})[d.chave] || corDoPilar(d.pilar, a.coresPilar ?? {}, amar))
       out.push(
-        <div onClick={clicavel ? (e) => inter!.onPick!(d.chave, d.nome, corDisc, (e.currentTarget as HTMLElement).getBoundingClientRect()) : undefined}
-          style={{ background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5, cursor: clicavel ? 'pointer' : undefined, outline: sel ? `2px solid ${corDisc}` : undefined, outlineOffset: -1 }} title={clicavel ? 'Clique para mudar a cor desta disciplina' : undefined}>
+        <div {...atr(`disc:${d.chave}`, d.nome, corDisc, { background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5 })}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: prim }}>{d.nome}</div>
             {assuntos.length
@@ -211,9 +233,9 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   }
   if (c.sugestoes.length) {
     out.push(<Sec t="Sugestões de estudo" />)
-    for (const s of c.sugestoes) out.push(
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fdf3d0', padding: '5px 12px' }}>
+    c.sugestoes.forEach((s, si) => { const cor = corP(`sug:${si}`, '#fdf3d0'); out.push(
+      <div key={`sug${si}`} style={{ marginBottom: 10 }}>
+        <div {...atr(`sug:${si}`, `Sugestão · ${s.titulo}`, cor, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: cor, padding: '5px 12px' })}>
           <span style={{ fontWeight: 800, fontSize: 11, color: '#9a6e00' }}>{V(s.titulo)}</span>
           {s.prioridade && <span style={{ fontWeight: 700, fontSize: 9, color: '#9a6e00' }}>[!] {V(s.prioridade)}</span>}
         </div>
@@ -226,12 +248,12 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
           ))}
         </div>
       </div>,
-    )
+    ) })
   }
   if (c.gabaritoObs.length || c.gabaritoIntro.length) {
     out.push(<Sec t={c.gabaritoTitulo || 'Gabarito oficial desatualizado'} />)
     for (const p of c.gabaritoIntro) out.push(<p style={{ fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify' }}>{V(p)}</p>)
-    if (c.gabaritoObs.length) out.push(<div style={{ background: '#f5f3ff', borderTop: '2px solid #a32d2d', padding: '8px 12px' }}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: 9, color: '#5a5570' }}>{V(o)}</div>)}</div>)
+    if (c.gabaritoObs.length) { const cor = corP('diag_gab_obs', '#a32d2d'); out.push(<div {...atr('diag_gab_obs', 'Observação do gabarito', cor, { background: '#f5f3ff', borderTop: `2px solid ${cor}`, padding: '8px 12px' })}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: 9, color: '#5a5570' }}>{V(o)}</div>)}</div>) }
   }
   return out
 }
@@ -260,7 +282,7 @@ function Folha({ item, num, total, pad, Ht, Hf, capa, children }: { item: ItemCa
   )
 }
 
-export function Previa({ item, questoes, vars = {}, discBanco = [], onPickDisc, selKey }: { item: ItemCaderno; questoes: PreviewQuestao[]; vars?: Record<string, string>; discBanco?: DiscBanco[]; onPickDisc?: (chave: string, nome: string, cor: string, anchor: DOMRect) => void; selKey?: string }) {
+export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selParte }: { item: ItemCaderno; questoes: PreviewQuestao[]; vars?: Record<string, string>; discBanco?: DiscBanco[]; onPick?: (parte: string, label: string, cor: string, anchor: DOMRect) => void; selParte?: string }) {
   const a = item.ajustes
   const qs = questoes.length ? questoes : QUESTOES_EXEMPLO
   const pad = a.compacto ? 40 : 56
@@ -269,10 +291,10 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPickDisc, 
   const contentW = A4_W - 2 * pad
   const availH = A4_H - Ht - Hf - 16
 
-  const onPickRef = useRef(onPickDisc); onPickRef.current = onPickDisc
+  const onPickRef = useRef(onPick); onPickRef.current = onPick
   const varsKey = useMemo(() => JSON.stringify(vars), [vars])
   const discKey = useMemo(() => JSON.stringify(discBanco), [discBanco])
-  const blocos = useMemo(() => blocosDoItem(item, qs, vars, discBanco, { selKey, onPick: (c, n, cor, an) => onPickRef.current?.(c, n, cor, an) }), [item, qs, varsKey, discKey, selKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const blocos = useMemo(() => blocosDoItem(item, qs, vars, discBanco, { selParte, onPick: (p, n, cor, an) => onPickRef.current?.(p, n, cor, an) }), [item, qs, varsKey, discKey, selParte]) // eslint-disable-line react-hooks/exhaustive-deps
   const medRef = useRef<HTMLDivElement>(null)
   const [paginas, setPaginas] = useState<number[][] | null>(null)
   const chave = useMemo(() => JSON.stringify({ n: blocos.length, a }), [blocos, a])

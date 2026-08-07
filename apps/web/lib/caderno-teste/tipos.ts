@@ -26,6 +26,8 @@ export type BuilderAjustes = {
   coresPilar: Record<string, string>
   /** Cor individual por disciplina (chave/slug → hex) — sobrepõe a cor do pilar quando definida. */
   coresDisc: Record<string, string>
+  /** Cor individual por PARTE do preview (chave da parte → hex) — clique em qualquer bloco na prévia. */
+  coresParte: Record<string, string>
 }
 
 /** Cores padrão por pilar (adaptável: pilares novos herdam a cor secundária até serem configurados). */
@@ -80,6 +82,7 @@ export const AJUSTES_BASE: BuilderAjustes = {
   rodapeUrl: '',
   coresPilar: { ...CORES_PILAR_PADRAO },
   coresDisc: {},
+  coresParte: {},
 }
 
 export type Modelo = { id: string; nome: string; descricao: string; ajustes: Partial<BuilderAjustes>; conteudo?: DiagConteudo }
