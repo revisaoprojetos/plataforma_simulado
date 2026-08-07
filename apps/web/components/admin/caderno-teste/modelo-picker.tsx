@@ -8,6 +8,7 @@ import { PreviaBlocos } from '@/lib/caderno-teste/previa-blocos'
 import { MODALIDADES, metaDaModalidade, novoItem, presetDoModelo, type Modalidade } from '@/lib/caderno-teste/tipos'
 
 const ICONE: Record<Modalidade, any> = { caderno_questoes: FileText, folha_respostas: ClipboardList, diagnostico: BarChart3 }
+const SEM_QUESTOES: never[] = [] // referência estável (evita re-render em loop no PreviaBlocos)
 
 /** Miniatura "montada" do modelo — uma prévia A4 real, escalada e não-interativa. */
 function MiniPrevia({ modalidade, modeloId }: { modalidade: Modalidade; modeloId: string }) {
@@ -18,8 +19,8 @@ function MiniPrevia({ modalidade, modeloId }: { modalidade: Modalidade; modeloId
     <div style={{ width: LARG, height: 316, overflow: 'hidden', background: '#fff', borderRadius: 6 }} className="pointer-events-none border">
       <div style={{ width: 794, transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
         {preset
-          ? <PreviaBlocos presetId={preset} questoes={[]} titulo={metaDaModalidade(modalidade).nome} />
-          : <Previa item={novoItem(modalidade, modeloId)} questoes={[]} />}
+          ? <PreviaBlocos presetId={preset} questoes={SEM_QUESTOES} titulo={metaDaModalidade(modalidade).nome} />
+          : <Previa item={novoItem(modalidade, modeloId)} questoes={SEM_QUESTOES} />}
       </div>
     </div>
   )

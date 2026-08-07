@@ -169,7 +169,10 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
       atual.push(i); h += gap2 + alt
     }
     if (atual.length) grupos.push(atual)
-    setPaginas(grupos.length ? grupos : [[]])
+    const next = grupos.length ? grupos : [[]]
+    // Só atualiza se a distribuição REALMENTE mudou — evita loop de render caso as props
+    // (questoes/vars) venham como referência nova a cada render do pai.
+    setPaginas((prev) => (prev && JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
   }, [itens, availH])
 
   if (!doc) return null

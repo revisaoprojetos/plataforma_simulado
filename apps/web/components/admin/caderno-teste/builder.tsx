@@ -20,6 +20,7 @@ import { FONTES_CADERNO } from '@/lib/caderno-designer/theme'
 import { Users, ChevronRight, Download } from 'lucide-react'
 
 const ICONE_MOD: Record<Modalidade, any> = { caderno_questoes: FileText, folha_respostas: ClipboardList, diagnostico: BarChart3 }
+const SEM_VARS: Record<string, string> = {} // referência estável (evita re-render em loop no PreviaBlocos)
 
 /** Zoom da prévia para caber na largura do painel direito. */
 function useZoomAjustado(alvoLargura = 794) {
@@ -116,7 +117,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
     dadosBancoTeste(bancoId).then((r) => { if (r.ok) { setRegistros(r.registros); setDisciplinasBanco(r.disciplinas) } })
   }
   const alunoAtual = registros[Math.min(alunoIdx, Math.max(0, registros.length - 1))] ?? null
-  const varsPrevia = alunoAtual?.vars ?? (builder.bancoId ? {} : {})
+  const varsPrevia = alunoAtual?.vars ?? SEM_VARS
   const exportUrl = (fmt: 'word' | 'html') => `/api/admin/caderno-teste/exportar?caderno=${cadernoId}&grupo=${ativo.id}&formato=${fmt}${alunoAtual ? `&aluno=${alunoAtual.id}` : ''}`
   function salvar() {
     start(async () => {
