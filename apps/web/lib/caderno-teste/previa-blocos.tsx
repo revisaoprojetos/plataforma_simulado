@@ -68,20 +68,28 @@ function Folha({ page, pi, data, theme, doc }: { page: CadernoDoc['pages'][numbe
 }
 
 /** Prévia A4 de um modelo pronto (doc v1) com as questões do banco + variáveis do aluno. */
-export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores }: {
+export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl }: {
   presetId: string
   questoes: PreviewQuestao[]
   vars?: Record<string, string>
   titulo: string
   cores?: Partial<CadernoTheme['cores']> | null
+  /** Imagem de capa: quando vazia, a página de capa NÃO aparece; quando definida, entra como fundo da capa. */
+  capaUrl?: string
 }) {
   const doc = docDoPreset(presetId)
   if (!doc) return null
   const theme = resolveTheme(cores)
   const data = montarCadernoData(questoes, vars, titulo)
+  // Sem imagem de capa → omite a(s) página(s) de capa (evita capa em branco). Com imagem → injeta no plano-fundo.
+  const pages = capaUrl
+    ? doc.pages.map((p) => p.kind === 'capa'
+        ? { ...p, blocks: p.blocks.map((b: any) => b.type === 'plano-fundo' ? { ...b, attributes: { ...b.attributes, url: capaUrl } } : b) }
+        : p)
+    : doc.pages.filter((p) => p.kind !== 'capa')
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
-      {doc.pages.map((page, pi) => <Folha key={page.id} page={page} pi={pi} data={data} theme={theme} doc={doc} />)}
+      {pages.map((page, pi) => <Folha key={page.id} page={page} pi={pi} data={data} theme={theme} doc={doc} />)}
     </div>
   )
 }
