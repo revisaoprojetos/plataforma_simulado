@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { HexColorField } from '@/components/admin/hex-color-field'
 import { Previa } from '@/lib/caderno-teste/previa'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
+import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
 import { metaDaModalidade, itemAtivo, novoItem, type BuilderV3, type BuilderAjustes, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { salvarBuilderTeste, previewQuestoesBanco } from '@/app/admin/cadernos-teste/actions'
 
@@ -20,7 +21,7 @@ function useZoomAjustado(alvoLargura = 794) {
   const [zoom, setZoom] = useState(0.7)
   useEffect(() => {
     const el = ref.current; if (!el) return
-    const calc = () => setZoom(Math.min(1, Math.max(0.35, (el.clientWidth - 48) / alvoLargura)))
+    const calc = () => setZoom(Math.min(1, Math.max(0.35, (el.clientWidth - 32) / alvoLargura)))
     calc()
     const ro = new ResizeObserver(calc); ro.observe(el)
     return () => ro.disconnect()
@@ -31,7 +32,7 @@ function useZoomAjustado(alvoLargura = 794) {
 export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoesIniciais, abrirPickerInicial = false }: {
   cadernoId: string
   builderInicial: BuilderV3
-  bancos: { id: string; nome: string }[]
+  bancos: BancoOpcao[]
   questoesIniciais: PreviewQuestao[]
   abrirPickerInicial?: boolean
 }) {
@@ -40,6 +41,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const [carregandoQ, setCarregandoQ] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(abrirPickerInicial)
   const [pickerMode, setPickerMode] = useState<'add' | 'trocar'>('trocar')
+  const [bancoPickerOpen, setBancoPickerOpen] = useState(false)
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
 
@@ -48,6 +50,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const modeloNome = meta.modelos.find((m) => m.id === ativo.modelo)?.nome ?? meta.modelos[0].nome
   const IconeMod = ICONE_MOD[ativo.modalidade]
   const a = ativo.ajustes
+  const bancoAtual = bancos.find((b) => b.id === builder.bancoId) ?? null
   const setAjuste = (patch: Partial<BuilderAjustes>) => setBuilder((b) => ({ ...b, itens: b.itens.map((it) => it.id === b.ativo ? { ...it, ajustes: { ...it.ajustes, ...patch } } : it) }))
 
   function adicionarGrupo() { setPickerMode('add'); setPickerOpen(true) }
@@ -60,7 +63,6 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       return { ...b, itens, ativo: b.ativo === id ? itens[0].id : b.ativo }
     })
   }
-  /** Aplica a escolha do pop-up: adiciona um grupo novo ou troca a modalidade+modelo do grupo ativo (mantém título/cores). */
   function onPicker(m: Modalidade, modeloId: string) {
     setBuilder((b) => {
       if (pickerMode === 'add') {
@@ -91,16 +93,16 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   }
 
   const Tog = ({ campo, label }: { campo: keyof BuilderAjustes; label: string }) => (
-    <label className="flex cursor-pointer items-center justify-between gap-2 py-1 text-sm">
+    <label className="flex cursor-pointer items-center justify-between gap-2 rounded-md border bg-background px-2 py-1.5 text-[13px]">
       <span className="text-muted-foreground">{label}</span>
       <input type="checkbox" checked={!!a[campo]} onChange={(e) => setAjuste({ [campo]: e.target.checked } as any)} />
     </label>
   )
   const Segment = ({ label, valor, opcoes, onChange }: { label: string; valor: number; opcoes: number[]; onChange: (n: number) => void }) => (
-    <div className="flex items-center justify-between gap-2 py-1 text-sm">
-      <span className="text-muted-foreground">{label}</span>
+    <div className="rounded-md border bg-background px-2 py-1.5">
+      <div className="mb-1 text-[11px] text-muted-foreground">{label}</div>
       <div className="flex overflow-hidden rounded-md border">
-        {opcoes.map((o) => <button key={o} type="button" onClick={() => onChange(o)} className={cn('px-2.5 py-1 text-xs', valor === o ? 'bg-primary text-primary-foreground font-semibold' : 'hover:bg-muted')}>{o}</button>)}
+        {opcoes.map((o) => <button key={o} type="button" onClick={() => onChange(o)} className={cn('flex-1 py-1 text-xs', valor === o ? 'bg-primary text-primary-foreground font-semibold' : 'hover:bg-muted')}>{o}</button>)}
       </div>
     </div>
   )
@@ -112,29 +114,31 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           <Link href="/admin/cadernos-teste" className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
           <div>
             <h1 className="text-lg font-bold leading-tight">Construtor de caderno (teste)</h1>
-            <p className="text-xs text-muted-foreground">Vários grupos (modalidades) num caderno. Escolha o modelo no pop-up e ajuste à esquerda.</p>
+            <p className="text-xs text-muted-foreground">Vários grupos (modalidades) num caderno. Escolha o modelo e o banco nos pop-ups e ajuste à esquerda.</p>
           </div>
         </div>
         <Button onClick={salvar} disabled={pending} size="sm">{pending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />} Salvar</Button>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[320px_1fr]">
-        {/* Esquerda: grupos (modalidades) → modelo → banco → ajustes */}
-        <div className="scroll-claro flex min-h-0 flex-col gap-5 overflow-y-auto border-r bg-muted/20 p-4">
-          <div>
+      <div className="grid min-h-0 flex-1 grid-cols-[380px_1fr]">
+        {/* Esquerda: 2 colunas */}
+        <div className="scroll-claro grid min-h-0 grid-cols-2 content-start gap-x-2.5 gap-y-4 overflow-y-auto border-r bg-muted/20 p-3">
+          {/* Grupos (lista com informações) */}
+          <div className="col-span-2">
             <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Layers className="h-3.5 w-3.5" /> Grupos deste caderno</p>
             <div className="flex flex-col gap-1.5">
               {builder.itens.map((it) => {
                 const m = metaDaModalidade(it.modalidade)
                 const Icon = ICONE_MOD[it.modalidade]
-                const ativoItem = it.id === builder.ativo
+                const on = it.id === builder.ativo
+                const modNome = m.modelos.find((x) => x.id === it.modelo)?.nome
                 return (
-                  <div key={it.id} className={cn('group flex items-center gap-2 rounded-lg border px-2.5 py-2 transition-all', ativoItem ? 'border-primary bg-primary/5 shadow-sm' : 'bg-background hover:border-primary/50')}>
+                  <div key={it.id} className={cn('group flex items-center gap-2 rounded-lg border px-2.5 py-2 transition-all', on ? 'border-primary bg-primary/5 shadow-sm' : 'bg-background hover:border-primary/50')}>
                     <button type="button" onClick={() => selecionarGrupo(it.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                      <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md', ativoItem ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary')}><Icon className="h-4 w-4" /></span>
+                      <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-md', on ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary')}><Icon className="h-4 w-4" /></span>
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium leading-tight">{m.nome}</span>
-                        <span className="block truncate text-[10px] text-muted-foreground">{m.modelos.find((x) => x.id === it.modelo)?.nome}</span>
+                        <span className="block truncate text-sm font-semibold leading-tight">{it.ajustes.titulo || m.nome}</span>
+                        <span className="block truncate text-[11px] text-muted-foreground">{m.nome} · {modNome}</span>
                       </span>
                     </button>
                     {builder.itens.length > 1 && (
@@ -149,58 +153,57 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             </div>
           </div>
 
-          <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Modelo do grupo</p>
-            <div className="rounded-xl border bg-background p-3 shadow-sm">
-              <div className="flex items-start gap-2.5">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><IconeMod className="h-4.5 w-4.5" /></span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold leading-tight">{meta.nome}</p>
-                  <p className="text-[11px] text-muted-foreground">Modelo: {modeloNome}</p>
-                </div>
+          {/* Modelo do grupo */}
+          <div className="col-span-1">
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Modelo</p>
+            <div className="rounded-xl border bg-background p-2.5 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><IconeMod className="h-4 w-4" /></span>
+                <div className="min-w-0"><p className="truncate text-[13px] font-semibold leading-tight">{meta.nome}</p><p className="truncate text-[10px] text-muted-foreground">{modeloNome}</p></div>
               </div>
-              <Button variant="outline" size="sm" className="mt-2.5 w-full" onClick={trocarModelo}>
-                <LayoutTemplate className="mr-1.5 h-4 w-4" /> Trocar modelo
-              </Button>
+              <Button variant="outline" size="sm" className="mt-2 h-7 w-full text-xs" onClick={trocarModelo}><LayoutTemplate className="mr-1 h-3.5 w-3.5" /> Trocar</Button>
             </div>
           </div>
 
-          <div>
-            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Database className="h-3.5 w-3.5" /> Banco de questões</p>
-            <select value={builder.bancoId ?? ''} onChange={(e) => trocarBanco(e.target.value || null)} className="w-full rounded-lg border bg-background px-2.5 py-2 text-sm shadow-sm">
-              <option value="">Nenhum (exemplo)</option>
-              {bancos.map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}
-            </select>
-            {carregandoQ && <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> carregando questões…</p>}
-            {!carregandoQ && builder.bancoId && <p className="mt-1 text-[11px] text-muted-foreground">{questoes.length} questão(ões) na prévia.</p>}
+          {/* Banco (pop-up com capa) */}
+          <div className="col-span-1">
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Banco</p>
+            <div className="rounded-xl border bg-background p-2.5 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10 text-primary">
+                  {bancoAtual?.capa ? <img src={bancoAtual.capa} alt="" className="h-full w-full object-cover" /> : <Database className="h-4 w-4" />}
+                </span>
+                <div className="min-w-0"><p className="truncate text-[13px] font-semibold leading-tight">{bancoAtual?.nome ?? 'Nenhum'}</p><p className="truncate text-[10px] text-muted-foreground">{carregandoQ ? 'carregando…' : builder.bancoId ? `${questoes.length} questões` : 'exemplo'}</p></div>
+              </div>
+              <Button variant="outline" size="sm" className="mt-2 h-7 w-full text-xs" onClick={() => setBancoPickerOpen(true)}><Database className="mr-1 h-3.5 w-3.5" /> Escolher</Button>
+            </div>
           </div>
 
-          <div className="space-y-1">
-            <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Pencil className="h-3.5 w-3.5" /> Ajustes do grupo</p>
-            <label className="block text-xs text-muted-foreground">
-              <span className="mb-1 block">Título</span>
-              <input value={a.titulo} onChange={(e) => setAjuste({ titulo: e.target.value })} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm text-foreground" />
-            </label>
-            <label className="flex items-center justify-between gap-2 py-1 text-sm"><span className="text-muted-foreground">Cor primária</span><HexColorField value={a.corPrimaria} onChange={(v) => setAjuste({ corPrimaria: v })} /></label>
-            <label className="flex items-center justify-between gap-2 py-1 text-sm"><span className="text-muted-foreground">Cor secundária</span><HexColorField value={a.corSecundaria} onChange={(v) => setAjuste({ corSecundaria: v })} /></label>
-            <Tog campo="mostrarCabecalho" label="Cabeçalho (título)" />
-            <Tog campo="mostrarDadosAluno" label="Dados do aluno" />
-            {ativo.modalidade === 'caderno_questoes' && <>
-              <Tog campo="mostrarGabarito" label="Destacar gabarito" />
-              <Tog campo="mostrarComentarios" label="Comentários" />
-            </>}
-            {(ativo.modalidade === 'caderno_questoes' || ativo.modalidade === 'folha_respostas') && (
-              <Segment label="Nº de alternativas" valor={a.numAlternativas} opcoes={[4, 5]} onChange={(n) => setAjuste({ numAlternativas: n })} />
-            )}
-            {ativo.modalidade === 'folha_respostas' && (
-              <Segment label="Colunas" valor={a.colunas} opcoes={[2, 3, 4, 5]} onChange={(n) => setAjuste({ colunas: n })} />
-            )}
-            <Tog campo="compacto" label="Compacto" />
-          </div>
+          {/* Ajustes (2 colunas) */}
+          <div className="col-span-2 mt-1"><p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Pencil className="h-3.5 w-3.5" /> Ajustes do grupo</p></div>
+          <label className="col-span-2 block text-xs text-muted-foreground">
+            <span className="mb-1 block">Título</span>
+            <input value={a.titulo} onChange={(e) => setAjuste({ titulo: e.target.value })} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm text-foreground" />
+          </label>
+          <div className="col-span-1 rounded-md border bg-background px-2 py-1.5"><div className="mb-1 text-[11px] text-muted-foreground">Cor primária</div><HexColorField value={a.corPrimaria} onChange={(v) => setAjuste({ corPrimaria: v })} /></div>
+          <div className="col-span-1 rounded-md border bg-background px-2 py-1.5"><div className="mb-1 text-[11px] text-muted-foreground">Cor secundária</div><HexColorField value={a.corSecundaria} onChange={(v) => setAjuste({ corSecundaria: v })} /></div>
+          <div className="col-span-1"><Tog campo="mostrarCabecalho" label="Cabeçalho" /></div>
+          <div className="col-span-1"><Tog campo="mostrarDadosAluno" label="Dados aluno" /></div>
+          {ativo.modalidade === 'caderno_questoes' && <>
+            <div className="col-span-1"><Tog campo="mostrarGabarito" label="Gabarito" /></div>
+            <div className="col-span-1"><Tog campo="mostrarComentarios" label="Comentários" /></div>
+          </>}
+          {(ativo.modalidade === 'caderno_questoes' || ativo.modalidade === 'folha_respostas') && (
+            <div className="col-span-1"><Segment label="Nº alternativas" valor={a.numAlternativas} opcoes={[4, 5]} onChange={(n) => setAjuste({ numAlternativas: n })} /></div>
+          )}
+          {ativo.modalidade === 'folha_respostas' && (
+            <div className="col-span-1"><Segment label="Colunas" valor={a.colunas} opcoes={[2, 3, 4, 5]} onChange={(n) => setAjuste({ colunas: n })} /></div>
+          )}
+          <div className="col-span-1"><Tog campo="compacto" label="Compacto" /></div>
         </div>
 
-        {/* Direita: prévia A4 do grupo ativo */}
-        <div ref={ref} className="scroll-claro min-h-0 overflow-auto bg-[radial-gradient(circle,theme(colors.slate.300)_1px,transparent_1px)] [background-size:18px_18px] p-6 dark:bg-[radial-gradient(circle,theme(colors.slate.700)_1px,transparent_1px)]">
+        {/* Direita: prévia A4 do grupo ativo (padding lateral menor) */}
+        <div ref={ref} className="scroll-claro min-h-0 overflow-auto bg-[radial-gradient(circle,theme(colors.slate.300)_1px,transparent_1px)] [background-size:18px_18px] px-3 py-5 dark:bg-[radial-gradient(circle,theme(colors.slate.700)_1px,transparent_1px)]">
           <div className="mx-auto" style={{ width: 794 * zoom }}>
             <div style={{ width: 794, transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
               <Previa item={ativo} questoes={questoes} />
@@ -210,6 +213,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       </div>
 
       <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: ativo.modalidade, modelo: ativo.modelo }} onSelecionar={onPicker} />
+      <BancoPicker open={bancoPickerOpen} onClose={() => setBancoPickerOpen(false)} bancos={bancos} atual={builder.bancoId} onSelecionar={trocarBanco} />
     </div>
   )
 }

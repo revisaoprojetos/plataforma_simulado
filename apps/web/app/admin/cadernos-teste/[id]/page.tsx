@@ -15,10 +15,12 @@ export default async function CadernoTesteEditorPage({ params }: { params: Promi
 
   const [caderno, bancos] = await Promise.all([
     svc.from('simulado_cadernos_teste').select('id, nome, config').eq('id', id).eq('tenant_id', tid).maybeSingle().then((r) => r.data),
-    (async (): Promise<{ id: string; nome: string }[]> => {
-      const r = await svc.from('simulado_pastas').select('id, nome, is_folder').eq('tenant_id', tid).order('nome')
-      if (r.error) return ((await svc.from('simulado_pastas').select('id, nome').eq('tenant_id', tid).order('nome')).data ?? []) as any
-      return (r.data ?? []).filter((b: any) => !b.is_folder).map((b: any) => ({ id: b.id, nome: b.nome }))
+    (async (): Promise<{ id: string; nome: string; capa: string | null }[]> => {
+      const sel = (cols: string) => svc.from('simulado_pastas').select(cols).eq('tenant_id', tid).order('nome')
+      let r: { data: any[] | null; error: { message: string } | null } = await sel('id, nome, is_folder, capa_url, capa_card_url')
+      if (r.error) r = await sel('id, nome, is_folder, capa_url')
+      if (r.error) r = await sel('id, nome, is_folder')
+      return (r.data ?? []).filter((b: any) => !b.is_folder).map((b: any) => ({ id: b.id, nome: b.nome, capa: b.capa_card_url ?? b.capa_url ?? null }))
     })(),
   ])
   if (!caderno) notFound()
