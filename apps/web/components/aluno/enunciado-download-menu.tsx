@@ -9,10 +9,21 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
+/**
+ * Cache-buster: acrescenta `&v=<timestamp>` a cada clique. Garante uma URL única por download, o que
+ * derrota qualquer cache (navegador/CDN) de um caderno de questões baixado ANTES de uma correção do
+ * banco/gabarito — sem isso o aluno pode continuar baixando a versão velha mesmo com o servidor já
+ * gerando a nova. A rota/arquivo ignoram o parâmetro extra.
+ */
+function comCacheBuster(url: string): string {
+  const sep = url.includes('?') ? '&' : '?'
+  return `${url}${sep}v=${Date.now()}`
+}
+
 /** Baixa o "Enunciado de Questões" (PDF, já com ?download=<nome>.pdf) sem navegar/abrir inline. */
 function baixarEnunciado(url: string) {
   const a = document.createElement('a')
-  a.href = url
+  a.href = comCacheBuster(url)
   a.rel = 'noopener'
   document.body.appendChild(a)
   a.click()
@@ -53,7 +64,7 @@ export function EnunciadoDownloadMenu({ url }: { url: string }) {
   function baixar() {
     // A URL já vem com ?download=<nome>.pdf → o navegador baixa direto (sem abrir inline).
     const a = document.createElement('a')
-    a.href = url
+    a.href = comCacheBuster(url)
     a.rel = 'noopener'
     document.body.appendChild(a)
     a.click()
