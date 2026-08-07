@@ -90,7 +90,10 @@ function FolhaCapa({ capaUrl, capa, theme, onPick, sel }: { capaUrl: string; cap
         onClick={onPick ? (e) => { e.stopPropagation(); onPick() } : undefined}
         title={onPick ? 'Clique para editar o título da capa' : undefined}
         style={{
-          position: 'absolute', left: `${capa.posH}%`, top: `${capa.posV}%`, transform: 'translate(-50%, -50%)', maxWidth: '84%',
+          // width:max-content fixa a largura ao CONTEÚDO (não ao espaço restante à direita), senão a
+          // quebra de linha mudaria conforme a posição horizontal. maxWidth mantém um teto estável.
+          position: 'absolute', left: `${capa.posH}%`, top: `${capa.posV}%`, transform: 'translate(-50%, -50%)',
+          width: 'max-content', maxWidth: '84%',
           cursor: onPick ? 'pointer' : 'default', color: capa.cor, fontSize: capa.tamanho,
           fontFamily: cssDaFonte(capa.fonte) || theme.tipografia.familia,
           fontWeight: capa.negrito ? 800 : 400, fontStyle: capa.italico ? 'italic' : 'normal',
