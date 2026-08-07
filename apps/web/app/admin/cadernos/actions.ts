@@ -8,6 +8,7 @@ import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
 import { hospedarImagensDoc } from '@/lib/caderno-designer/hospedar-imagens'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
+import { BUCKET_IMAGENS } from '@/lib/storage/bucket-imagens'
 
 export interface CadernoBloco {
   id: string
@@ -199,10 +200,10 @@ export async function hospedarImagemCadernoAction(dataUri: string): Promise<{ ok
   const svc = createAdminClient()
   const hash = createHash('sha1').update(buf).digest('hex').slice(0, 24)
   const path = `assets/${hash}.${ext}`
-  try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
-  const { error } = await svc.storage.from('pdfs').upload(path, buf, { contentType: `image/${tipo}`, upsert: true })
+  try { await svc.storage.createBucket(BUCKET_IMAGENS, { public: true }) } catch { /* já existe */ }
+  const { error } = await svc.storage.from(BUCKET_IMAGENS).upload(path, buf, { contentType: `image/${tipo}`, upsert: true })
   if (error && !/exists/i.test(error.message)) return { ok: false, error: error.message }
-  const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
+  const url = svc.storage.from(BUCKET_IMAGENS).getPublicUrl(path).data.publicUrl as string
   return { ok: true, url }
 }
 

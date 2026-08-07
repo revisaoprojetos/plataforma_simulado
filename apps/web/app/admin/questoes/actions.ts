@@ -8,6 +8,7 @@ import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
+import { BUCKET_IMAGENS } from '@/lib/storage/bucket-imagens'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 interface AlternativaData {
@@ -220,7 +221,7 @@ async function buildQuestaoFields(supabase: SupabaseClient, tenantId: string, da
     status: data.status,
     // Normalmente já vem como URL (o form hospeda ao selecionar). Defensivo: se chegar base64
     // (ex.: import), sobe pro storage e grava a URL — hospedarBase64 no-op quando já é URL.
-    imagem_url: await hospedarBase64(data.imagem_url, createAdminClient()),
+    imagem_url: await hospedarBase64(data.imagem_url, createAdminClient(), { tenantId }),
   }
 }
 
@@ -242,10 +243,10 @@ export async function hospedarImagemQuestaoAction(dataUri: string): Promise<{ ok
   const svc = createAdminClient()
   const hash = createHash('sha1').update(buf).digest('hex').slice(0, 24)
   const path = `assets/${hash}.${ext}`
-  try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
-  const { error } = await svc.storage.from('pdfs').upload(path, buf, { contentType: `image/${tipo}`, upsert: true })
+  try { await svc.storage.createBucket(BUCKET_IMAGENS, { public: true }) } catch { /* já existe */ }
+  const { error } = await svc.storage.from(BUCKET_IMAGENS).upload(path, buf, { contentType: `image/${tipo}`, upsert: true })
   if (error && !/exists/i.test(error.message)) return { ok: false, error: error.message }
-  const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
+  const url = svc.storage.from(BUCKET_IMAGENS).getPublicUrl(path).data.publicUrl as string
   return { ok: true, url }
 }
 
