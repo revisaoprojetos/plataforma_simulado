@@ -22,7 +22,7 @@ function useZoomAjustado(alvoLargura = 794) {
   const [zoom, setZoom] = useState(0.7)
   useEffect(() => {
     const el = ref.current; if (!el) return
-    const calc = () => setZoom(Math.min(1, Math.max(0.35, (el.clientWidth - 32) / alvoLargura)))
+    const calc = () => setZoom(Math.min(0.8, Math.max(0.3, ((el.clientWidth - 32) / alvoLargura) * 0.8)))
     calc()
     const ro = new ResizeObserver(calc); ro.observe(el)
     return () => ro.disconnect()
