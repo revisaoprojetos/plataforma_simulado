@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, FileText, ClipboardList, BarChart3, Check } from 'lucide-react'
+import { X, FileText, ClipboardList, BarChart3, Check, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Previa } from '@/lib/caderno-teste/previa'
 import { MODALIDADES, metaDaModalidade, novoItem, type Modalidade } from '@/lib/caderno-teste/tipos'
@@ -69,18 +69,24 @@ export function ModeloPicker({ open, onClose, atual, onSelecionar }: {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {meta.modelos.map((mo) => {
               const sel = atual.modalidade === tab && atual.modelo === mo.id
+              const dl = (fmt: string) => `/api/admin/caderno-teste/exportar?modalidade=${tab}&modelo=${mo.id}&formato=${fmt}`
               return (
-                <button key={mo.id} type="button" onClick={() => onSelecionar(tab, mo.id)}
-                  className={cn('group flex flex-col overflow-hidden rounded-xl border bg-card text-left transition-all hover:-translate-y-0.5 hover:shadow-md', sel ? 'border-primary ring-2 ring-primary' : 'hover:border-primary/50')}>
-                  <div className="relative flex justify-center bg-muted/40 p-2">
-                    <MiniPrevia modalidade={tab} modeloId={mo.id} />
-                    {sel && <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow"><Check className="h-4 w-4" /></span>}
+                <div key={mo.id} className={cn('group flex flex-col overflow-hidden rounded-xl border bg-card transition-all hover:-translate-y-0.5 hover:shadow-md', sel ? 'border-primary ring-2 ring-primary' : 'hover:border-primary/50')}>
+                  <button type="button" onClick={() => onSelecionar(tab, mo.id)} className="block text-left">
+                    <div className="relative flex justify-center bg-muted/40 p-2">
+                      <MiniPrevia modalidade={tab} modeloId={mo.id} />
+                      {sel && <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow"><Check className="h-4 w-4" /></span>}
+                    </div>
+                    <div className="border-t px-3 py-2">
+                      <p className="text-sm font-semibold leading-tight">{mo.nome}</p>
+                      <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{mo.descricao}</p>
+                    </div>
+                  </button>
+                  <div className="flex border-t text-[11px]">
+                    <a href={dl('word')} onClick={(e) => e.stopPropagation()} className="flex flex-1 items-center justify-center gap-1 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Download className="h-3 w-3" /> Word</a>
+                    <a href={dl('html')} onClick={(e) => e.stopPropagation()} className="flex flex-1 items-center justify-center gap-1 border-l py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Download className="h-3 w-3" /> HTML</a>
                   </div>
-                  <div className="border-t px-3 py-2">
-                    <p className="text-sm font-semibold leading-tight">{mo.nome}</p>
-                    <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{mo.descricao}</p>
-                  </div>
-                </button>
+                </div>
               )
             })}
           </div>

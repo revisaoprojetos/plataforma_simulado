@@ -13,7 +13,7 @@ import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/b
 import { metaDaModalidade, itemAtivo, novoItem, type BuilderV3, type BuilderAjustes, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
 import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
-import { Users, ChevronRight } from 'lucide-react'
+import { Users, ChevronRight, Download } from 'lucide-react'
 
 const ICONE_MOD: Record<Modalidade, any> = { caderno_questoes: FileText, folha_respostas: ClipboardList, diagnostico: BarChart3 }
 
@@ -52,6 +52,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const [editandoGrupos, setEditandoGrupos] = useState(false)
   const [gruposAberto, setGruposAberto] = useState(false)
   const [importando, setImportando] = useState(false)
+  const [baixarAberto, setBaixarAberto] = useState(false)
   const importRef = useRef<HTMLInputElement>(null)
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
@@ -100,6 +101,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   }
   const alunoAtual = registros[Math.min(alunoIdx, Math.max(0, registros.length - 1))] ?? null
   const varsPrevia = alunoAtual?.vars ?? (builder.bancoId ? {} : {})
+  const exportUrl = (fmt: 'word' | 'html') => `/api/admin/caderno-teste/exportar?caderno=${cadernoId}&grupo=${ativo.id}&formato=${fmt}${alunoAtual ? `&aluno=${alunoAtual.id}` : ''}`
   function salvar() {
     start(async () => {
       const r = await salvarBuilderTeste(cadernoId, builder)
@@ -160,9 +162,23 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             </div>
           )}
           <input ref={importRef} type="file" accept=".docx,.html,.htm,.pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importar(f); e.target.value = '' }} />
-          <Button variant="outline" size="sm" onClick={() => importRef.current?.click()} disabled={importando} title="Importar um caderno (Word .docx ou HTML) — mapeia como Diagnóstico">
+          <Button variant="outline" size="sm" onClick={() => importRef.current?.click()} disabled={importando} title="Importar um caderno (Word .docx, HTML ou PDF) — mapeia como Diagnóstico">
             {importando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileUp className="mr-1.5 h-4 w-4" />} Importar
           </Button>
+          <div className="relative">
+            <Button variant="outline" size="sm" onClick={() => setBaixarAberto((o) => !o)} title="Baixar este grupo em Word ou HTML">
+              <Download className="mr-1.5 h-4 w-4" /> Baixar <ChevronDown className="ml-1 h-3.5 w-3.5" />
+            </Button>
+            {baixarAberto && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setBaixarAberto(false)} />
+                <div className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-lg border bg-background shadow-lg">
+                  <a href={exportUrl('word')} onClick={() => setBaixarAberto(false)} className="block px-3 py-2 text-sm hover:bg-muted">Word (.doc)</a>
+                  <a href={exportUrl('html')} onClick={() => setBaixarAberto(false)} className="block border-t px-3 py-2 text-sm hover:bg-muted">HTML (.html)</a>
+                </div>
+              </>
+            )}
+          </div>
           <Button onClick={salvar} disabled={pending} size="sm">{pending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />} Salvar</Button>
         </div>
       </div>
