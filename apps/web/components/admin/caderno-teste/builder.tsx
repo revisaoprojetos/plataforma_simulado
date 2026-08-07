@@ -42,6 +42,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const [pickerOpen, setPickerOpen] = useState(abrirPickerInicial)
   const [pickerMode, setPickerMode] = useState<'add' | 'trocar'>('trocar')
   const [bancoPickerOpen, setBancoPickerOpen] = useState(false)
+  const [editandoGrupos, setEditandoGrupos] = useState(false)
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
 
@@ -123,32 +124,34 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       <div className="grid min-h-0 flex-1 grid-cols-[380px_1fr]">
         {/* Esquerda: 2 colunas */}
         <div className="scroll-claro grid min-h-0 grid-cols-2 content-start gap-x-2.5 gap-y-4 overflow-y-auto border-r bg-muted/20 p-3">
-          {/* Grupos (lista com informações) */}
+          {/* Grupos: barra de seleção (pills) + Editar ao lado */}
           <div className="col-span-2">
-            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Layers className="h-3.5 w-3.5" /> Grupos deste caderno</p>
-            <div className="flex flex-col gap-1.5">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Layers className="h-3.5 w-3.5" /> Grupos deste caderno</p>
+              <button type="button" onClick={() => setEditandoGrupos((e) => !e)} className={cn('flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium', editandoGrupos ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground')}>
+                <Pencil className="h-3 w-3" /> {editandoGrupos ? 'Concluir' : 'Editar'}
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
               {builder.itens.map((it) => {
                 const m = metaDaModalidade(it.modalidade)
                 const Icon = ICONE_MOD[it.modalidade]
                 const on = it.id === builder.ativo
-                const modNome = m.modelos.find((x) => x.id === it.modelo)?.nome
                 return (
-                  <div key={it.id} className={cn('group flex items-center gap-2 rounded-lg border px-2.5 py-2 transition-all', on ? 'border-primary bg-primary/5 shadow-sm' : 'bg-background hover:border-primary/50')}>
-                    <button type="button" onClick={() => selecionarGrupo(it.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                      <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-md', on ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary')}><Icon className="h-4 w-4" /></span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold leading-tight">{it.ajustes.titulo || m.nome}</span>
-                        <span className="block truncate text-[11px] text-muted-foreground">{m.nome} · {modNome}</span>
-                      </span>
+                  <div key={it.id} className="relative">
+                    <button type="button" onClick={() => selecionarGrupo(it.id)} title={`${m.nome} · ${m.modelos.find((x) => x.id === it.modelo)?.nome}`}
+                      className={cn('flex max-w-[150px] items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[13px] transition-all', on ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'bg-background hover:border-primary/50')}>
+                      <Icon className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate font-medium">{it.ajustes.titulo || m.nome}</span>
                     </button>
-                    {builder.itens.length > 1 && (
-                      <button type="button" onClick={() => removerGrupo(it.id)} title="Remover grupo" className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"><X className="h-3.5 w-3.5" /></button>
+                    {editandoGrupos && builder.itens.length > 1 && (
+                      <button type="button" onClick={() => removerGrupo(it.id)} title="Remover grupo" className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border bg-background text-destructive shadow hover:bg-destructive hover:text-destructive-foreground"><X className="h-3 w-3" /></button>
                     )}
                   </div>
                 )
               })}
-              <button type="button" onClick={adicionarGrupo} className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">
-                <Plus className="h-3.5 w-3.5" /> Adicionar grupo
+              <button type="button" onClick={adicionarGrupo} title="Adicionar grupo" className="flex items-center gap-1 rounded-lg border border-dashed px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+                <Plus className="h-3.5 w-3.5" /> Grupo
               </button>
             </div>
           </div>
