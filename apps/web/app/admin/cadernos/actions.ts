@@ -154,27 +154,30 @@ export async function salvarCadernoConfig(id: string, config: CadernoConfig): Pr
 }
 
 /** Salva o documento do editor de blocos v2 (docsV2/modalidadesV2/cores), preservando campos legados. */
+export type TabelaCaderno = 'simulado_cadernos_designer' | 'simulado_cadernos_teste'
+
 export async function salvarCadernoDesignerV2(
   id: string,
   payload: { docsV2: Record<string, unknown>; modalidadesV2: unknown[]; cores: Record<string, string>; bancoId?: string | null; hudCores?: Record<string, string>; hudPorPagina?: Record<string, Record<string, string>> },
+  tabela: TabelaCaderno = 'simulado_cadernos_designer',
 ): Promise<{ ok: boolean; error?: string; docsV2?: Record<string, unknown> }> {
   if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
   const access = await getCurrentAccess()
   if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
-  const { data: atual } = await svc.from('simulado_cadernos_designer').select('config').eq('id', id).eq('tenant_id', access.tenantId).maybeSingle()
+  const { data: atual } = await svc.from(tabela).select('config').eq('id', id).eq('tenant_id', access.tenantId).maybeSingle()
   if (!atual) return { ok: false, error: 'Caderno não encontrado.' }
   // Sobe as imagens de fundo (base64) pro storage e troca por URL → o doc no banco fica LEVE
   // (evita config de vários MB, que estourava o limite do save e travava o editor).
   try { for (const d of Object.values(payload.docsV2 ?? {})) await hospedarImagensDoc(d, svc) } catch { /* se falhar, salva como está */ }
   const merged = { ...((atual.config as Record<string, unknown>) ?? {}), ...payload }
   const { error } = await svc
-    .from('simulado_cadernos_designer')
+    .from(tabela)
     .update({ config: merged, atualizado_em: new Date().toISOString() })
     .eq('id', id)
     .eq('tenant_id', access.tenantId)
   if (error) return { ok: false, error: error.message }
-  revalidatePath(`/admin/cadernos/${id}`)
+  revalidatePath(`${tabela === 'simulado_cadernos_teste' ? '/admin/cadernos-teste' : '/admin/cadernos'}/${id}`)
   // Devolve os docs já com URLs → o editor troca o estado e os próximos saves ficam leves.
   return { ok: true, docsV2: payload.docsV2 }
 }
@@ -208,7 +211,7 @@ export async function hospedarImagemCadernoAction(dataUri: string): Promise<{ ok
 // via server action) foi removida: base64 de .docx com imagens estourava o bodySizeLimit.
 
 /** Atualiza nome + personalização (cor/ícone/capa) do caderno. Tolerante caso as colunas não existam. */
-export async function atualizarCaderno(id: string, nome: string, cor: string | null, icone: string | null, capaUrl?: string | null): Promise<{ ok: boolean; error?: string }> {
+export async function atualizarCaderno(id: string, nome: string, cor: string | null, icone: string | null, capaUrl?: string | null, tabela: TabelaCaderno = 'simulado_cadernos_designer'): Promise<{ ok: boolean; error?: string }> {
   if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
   const access = await getCurrentAccess()
   const titulo = nome.trim()
@@ -218,18 +221,18 @@ export async function atualizarCaderno(id: string, nome: string, cor: string | n
   // Capa vem como base64 (redimensionar → toDataURL) → storage; grava só a URL (não infla a linha).
   const capa = capaUrl ? (await hospedarBase64(capaUrl, svc)) : null
   const { error } = await svc
-    .from('simulado_cadernos_designer')
+    .from(tabela)
     .update({ nome: titulo, cor: cor || null, icone: icone || null, capa_url: capa || null })
     .eq('id', id).eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
   if (error && /cor|icone|capa_url|column/i.test(error.message)) {
-    const { error: e2 } = await svc.from('simulado_cadernos_designer').update({ nome: titulo }).eq('id', id).eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
+    const { error: e2 } = await svc.from(tabela).update({ nome: titulo }).eq('id', id).eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
     if (e2) return { ok: false, error: e2.message }
   } else if (error) {
     return { ok: false, error: error.message }
   }
 
-  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: id, depois: { nome: titulo, cor, icone, capa: !!capaUrl } })
-  revalidatePath('/admin/cadernos')
+  await registrarAudit({ operacao: 'UPDATE', entidade: tabela, entidadeId: id, depois: { nome: titulo, cor, icone, capa: !!capaUrl } })
+  revalidatePath(tabela === 'simulado_cadernos_teste' ? '/admin/cadernos-teste' : '/admin/cadernos')
   return { ok: true }
 }
 
@@ -304,4 +307,18 @@ export async function linkagemCaderno(cadernoId: string): Promise<{ ok: boolean;
     }
   } catch { /* tolera schema */ }
   return { ok: true, bancos: bancosIds.length, simulados }
+}
+
+/** Cria um caderno VAZIO na ÁREA DE TESTE (tabela isolada simulado_cadernos_teste). Não toca nos cadernos reais. */
+export async function criarCadernoTeste(nome: string): Promise<{ ok: boolean; id?: string; error?: string }> {
+  if (!(await checkPermission('questoes:create')) && !(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  if (!nome.trim()) return { ok: false, error: 'Informe um nome.' }
+  const svc = createAdminClient()
+  const ins = await svc.from('simulado_cadernos_teste').insert({ tenant_id: access.tenantId, nome: nome.trim(), config: { blocos: [] } }).select('id').single()
+  if (ins.error || !ins.data) return { ok: false, error: ins.error?.message ?? 'Erro ao criar' }
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_cadernos_teste', entidadeId: ins.data.id, depois: { nome } })
+  revalidatePath('/admin/cadernos-teste')
+  return { ok: true, id: ins.data.id }
 }

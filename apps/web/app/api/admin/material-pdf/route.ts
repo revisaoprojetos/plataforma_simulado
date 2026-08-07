@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
   // slot: 'material' = Gabarito Comentado (padrão) | 'enunciado' = Enunciado de Questões (2º PDF).
   const slot = String(form.get('slot') ?? 'material') === 'enunciado' ? 'enunciado' : 'material'
   const configKey = slot === 'enunciado' ? 'material_enunciado' : 'material'
+  // Tabela alvo: designer (real) ou a isolada de teste. Whitelist — nunca aceita nome arbitrário.
+  const tabela = String(form.get('tabela') ?? '') === 'simulado_cadernos_teste' ? 'simulado_cadernos_teste' : 'simulado_cadernos_designer'
   if (!(file instanceof File) || !cadernoId) return NextResponse.json({ ok: false, error: 'Dados incompletos.' }, { status: 400 })
   if (file.size > 8 * 1024 * 1024) return NextResponse.json({ ok: false, error: 'PDF muito grande (máx. ~8 MB).' }, { status: 400 })
 
@@ -41,7 +43,7 @@ export async function POST(req: NextRequest) {
   if (buf.subarray(0, 4).toString('latin1') !== '%PDF') return NextResponse.json({ ok: false, error: 'O arquivo não é um PDF válido.' }, { status: 400 })
 
   const svc = createAdminClient()
-  const { data: cad } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoId).eq('tenant_id', access.tenantId).maybeSingle()
+  const { data: cad } = await svc.from(tabela).select('config').eq('id', cadernoId).eq('tenant_id', access.tenantId).maybeSingle()
   if (!cad) return NextResponse.json({ ok: false, error: 'Caderno não encontrado.' }, { status: 404 })
 
   const hash = createHash('sha1').update(buf).digest('hex').slice(0, 10)
@@ -61,7 +63,7 @@ export async function POST(req: NextRequest) {
   const config = (cad.config ?? {}) as Record<string, unknown>
   const urlAntiga = (config[configKey] as any)?.pdfUrl as string | undefined
   const material = { fonte: 'pdf', pdfUrl: url, pdfNome: nome }
-  const { error } = await svc.from('simulado_cadernos_designer').update({ config: { ...config, [configKey]: material } }).eq('id', cadernoId).eq('tenant_id', access.tenantId)
+  const { error } = await svc.from(tabela).update({ config: { ...config, [configKey]: material } }).eq('id', cadernoId).eq('tenant_id', access.tenantId)
   if (error) {
     // Rollback: o config não persistiu → remove o objeto recém-subido para não deixar órfão no storage.
     try { await svc.storage.from('pdfs').remove([path]) } catch { /* ignora */ }
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest) {
   const pathAntigo = pdfStoragePath(urlAntiga)
   if (pathAntigo && pathAntigo !== path) { try { await svc.storage.from('pdfs').remove([pathAntigo]) } catch { /* ignora */ } }
 
-  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: cadernoId, depois: { [`${configKey}_pdf`]: nome } })
+  await registrarAudit({ operacao: 'UPDATE', entidade: tabela, entidadeId: cadernoId, depois: { [`${configKey}_pdf`]: nome } })
   if (bancoId) revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return NextResponse.json({ ok: true, url, nome })
 }

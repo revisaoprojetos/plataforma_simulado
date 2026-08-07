@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { FlaskConical, FileText } from 'lucide-react'
+import { CriarCadernoTesteBtn } from './criar-btn'
 
 // Área de TESTE do novo editor unificado de cadernos. Não altera os cadernos existentes —
 // apenas abre os mesmos cadernos no editor NOVO (tela única) para validarmos na plataforma.
@@ -32,10 +33,10 @@ export default async function CadernosTestePage() {
   const svc = createAdminClient()
   const tid = access.tenantId ?? '00000000-0000-0000-0000-000000000000'
 
-  // Todos os cadernos do tenant (flat, sem pastas) — tolerante às colunas de personalização.
+  // Cadernos da ÁREA DE TESTE (tabela isolada simulado_cadernos_teste) — nunca os reais.
   let cadernos: any[] = []
   {
-    const sel = (cols: string) => svc.from('simulado_cadernos_designer').select(cols).eq('deletado', false).eq('tenant_id', tid).order('atualizado_em', { ascending: false })
+    const sel = (cols: string) => svc.from('simulado_cadernos_teste').select(cols).eq('deletado', false).eq('tenant_id', tid).order('atualizado_em', { ascending: false })
     let r: { data: any[] | null; error: { message: string } | null } = await sel('id, nome, config, cor, icone')
     if (r.error && /cor|icone|column/i.test(r.error.message)) r = await sel('id, nome, config')
     cadernos = r.data ?? []
@@ -45,17 +46,20 @@ export default async function CadernosTestePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><FlaskConical className="h-6 w-6 text-primary" /> Cadernos (teste)</h1>
-        <p className="text-muted-foreground">Área de teste do <strong>novo editor unificado</strong> (edição + seleção + configuração + material numa tela só). Abre os MESMOS cadernos, mas na tela nova — sem afetar &ldquo;Cadernos de Prova&rdquo;.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><FlaskConical className="h-6 w-6 text-primary" /> Cadernos (teste)</h1>
+          <p className="text-muted-foreground">Área de teste <strong>isolada</strong> do novo editor unificado. Cadernos e salvamentos próprios (tabela separada) — <strong>não</strong> afeta &ldquo;Cadernos de Prova&rdquo;.</p>
+        </div>
+        <CriarCadernoTesteBtn />
       </div>
 
       <div className="rounded-lg border border-amber-400/50 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
-        Em construção. Alterações salvas aqui usam o mesmo formato dos cadernos (docsV2), então valem também no editor atual. Teste à vontade — a impressão continua funcionando.
+        Em construção. Tudo aqui é isolado dos cadernos reais — crie, edite e salve à vontade para testar o editor novo.
       </div>
 
       {lista.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nenhum caderno ainda. Crie um em &ldquo;Cadernos de Prova&rdquo; e volte aqui para abri-lo no editor novo.</p>
+        <p className="text-sm text-muted-foreground">Nenhum caderno de teste ainda. Clique em <strong>&ldquo;Criar caderno&rdquo;</strong> para começar do zero.</p>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {lista.map((c) => (

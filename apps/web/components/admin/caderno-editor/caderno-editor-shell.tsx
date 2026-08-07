@@ -43,9 +43,11 @@ export type ShellProps = {
   pastaId?: string | null
   /** Destino do botão "voltar" (default: lista de Cadernos de Prova). */
   voltarHref?: string
+  /** Tabela de persistência: real (default) ou a isolada da área de teste. */
+  tabela?: 'simulado_cadernos_designer' | 'simulado_cadernos_teste'
 }
 
-export function CadernoEditorShell({ previewData, bancos = [], registros = [], branding = null, pastaId = null, voltarHref }: ShellProps) {
+export function CadernoEditorShell({ previewData, bancos = [], registros = [], branding = null, pastaId = null, voltarHref, tabela = 'simulado_cadernos_designer' }: ShellProps) {
   const { state, dispatch } = useEditor()
   const [pending, start] = useTransition()
   const [importando, setImportando] = useState(false)
@@ -232,10 +234,10 @@ export function CadernoEditorShell({ previewData, bancos = [], registros = [], b
       try {
         const docsLeves = await hospedarFundos(state.docs)
         dispatch({ t: 'setDocsAfterSave', docs: docsLeves })
-        const r = await salvarCadernoDesignerV2(cadernoId, { docsV2: docsLeves, modalidadesV2: state.modalidades, cores: state.cores, hudCores: state.hudCores, hudPorPagina: state.hudPorPagina, bancoId: state.bancoId })
+        const r = await salvarCadernoDesignerV2(cadernoId, { docsV2: docsLeves, modalidadesV2: state.modalidades, cores: state.cores, hudCores: state.hudCores, hudPorPagina: state.hudPorPagina, bancoId: state.bancoId }, tabela)
         if (!r.ok) { toast.error(r.error ?? 'Erro ao salvar'); return }
         if (r.docsV2) dispatch({ t: 'setDocsAfterSave', docs: r.docsV2 as Record<string, CadernoDoc> })
-        if (state.metaDirty) { const rm = await atualizarCaderno(cadernoId, state.meta.nome, state.meta.cor, state.meta.icone, state.meta.capa ?? undefined); if (rm.ok) dispatch({ t: 'metaSalvo' }); else toast.error(rm.error ?? 'Erro ao salvar a aparência') }
+        if (state.metaDirty) { const rm = await atualizarCaderno(cadernoId, state.meta.nome, state.meta.cor, state.meta.icone, state.meta.capa ?? undefined, tabela); if (rm.ok) dispatch({ t: 'metaSalvo' }); else toast.error(rm.error ?? 'Erro ao salvar a aparência') }
         toast.success('Caderno salvo')
       } catch (e) { console.error(e); toast.error('Não consegui salvar agora (caderno grande ou conexão instável). Seu trabalho NÃO foi perdido — tente de novo.') }
     })
@@ -260,7 +262,7 @@ export function CadernoEditorShell({ previewData, bancos = [], registros = [], b
   function vincularBanco(novoId: string | null) {
     dispatch({ t: 'setBanco', bancoId: novoId })
     start(async () => {
-      const r = await salvarCadernoDesignerV2(cadernoId, { docsV2: state.docs, modalidadesV2: state.modalidades, cores: state.cores, hudCores: state.hudCores, hudPorPagina: state.hudPorPagina, bancoId: novoId })
+      const r = await salvarCadernoDesignerV2(cadernoId, { docsV2: state.docs, modalidadesV2: state.modalidades, cores: state.cores, hudCores: state.hudCores, hudPorPagina: state.hudPorPagina, bancoId: novoId }, tabela)
       if (r.ok) window.location.reload() // refaz o preview com os dados do banco
       else toast.error(r.error ?? 'Erro ao vincular banco')
     })
@@ -273,7 +275,7 @@ export function CadernoEditorShell({ previewData, bancos = [], registros = [], b
     if (file.size > 8 * 1024 * 1024) { toast.error('PDF muito grande (máx. ~8 MB).'); return }
     setEnviandoMat(slot)
     try {
-      const fd = new FormData(); fd.append('file', file); fd.append('cadernoId', cadernoId); if (state.bancoId) fd.append('bancoId', state.bancoId); fd.append('slot', slot)
+      const fd = new FormData(); fd.append('file', file); fd.append('cadernoId', cadernoId); if (state.bancoId) fd.append('bancoId', state.bancoId); fd.append('slot', slot); fd.append('tabela', tabela)
       const resp = await fetch('/api/admin/material-pdf', { method: 'POST', body: fd })
       const r = await resp.json().catch(() => ({ ok: false, error: 'Resposta inválida do servidor.' }))
       if (!resp.ok || !r.ok) { toast.error(r.error ?? 'Falha no envio.'); return }
@@ -284,7 +286,7 @@ export function CadernoEditorShell({ previewData, bancos = [], registros = [], b
   }
   async function removerMaterial(slot: 'material' | 'enunciado') {
     if (!(await confirmar({ mensagem: 'Remover este PDF? O aluno volta a receber o caderno gerado pelo sistema.', destrutivo: true }))) return
-    const r = await removerMaterialPdf(cadernoId, state.bancoId ?? '', slot)
+    const r = await removerMaterialPdf(cadernoId, state.bancoId ?? '', slot, tabela)
     if (!r.ok) { toast.error(r.error ?? 'Erro ao remover.'); return }
     dispatch({ t: 'setMaterial', slot, material: { fonte: 'sistema', pdfUrl: '', pdfNome: '' } })
     toast.success('PDF removido.')

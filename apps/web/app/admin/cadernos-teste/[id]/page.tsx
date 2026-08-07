@@ -23,9 +23,9 @@ export default async function CadernoEditorTestePage({ params }: { params: Promi
 
   const [caderno, bancos, temaRes] = await Promise.all([
     (async (): Promise<any> => {
-      const r = await svc.from('simulado_cadernos_designer').select('id, nome, config, pasta_id, cor, icone, capa_url').eq('id', id).eq('tenant_id', tid).maybeSingle()
+      const r = await svc.from('simulado_cadernos_teste').select('id, nome, config, pasta_id, cor, icone, capa_url').eq('id', id).eq('tenant_id', tid).maybeSingle()
       if (r.error && /pasta_id|cor|icone|capa_url|column/i.test(r.error.message)) {
-        const r2 = await svc.from('simulado_cadernos_designer').select('id, nome, config').eq('id', id).eq('tenant_id', tid).maybeSingle()
+        const r2 = await svc.from('simulado_cadernos_teste').select('id, nome, config').eq('id', id).eq('tenant_id', tid).maybeSingle()
         return r2.data
       }
       return r.data
@@ -99,7 +99,7 @@ export default async function CadernoEditorTestePage({ params }: { params: Promi
   const { inicial, meta } = normalizarConfig(config, { nome: caderno.nome, cor: (caderno as any).cor ?? null, icone: (caderno as any).icone ?? null, capa: (caderno as any).capa_url ?? null })
   return (
     <EditorProvider cadernoId={caderno.id} inicial={inicial} meta={meta}>
-      <CadernoEditorShell previewData={previewData} bancos={(bancos ?? []) as { id: string; nome: string }[]} registros={registros} branding={branding} pastaId={pastaId} voltarHref="/admin/cadernos-teste" />
+      <CadernoEditorShell previewData={previewData} bancos={(bancos ?? []) as { id: string; nome: string }[]} registros={registros} branding={branding} pastaId={pastaId} voltarHref="/admin/cadernos-teste" tabela="simulado_cadernos_teste" />
     </EditorProvider>
   )
 }

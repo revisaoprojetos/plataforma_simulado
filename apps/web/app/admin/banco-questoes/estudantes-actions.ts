@@ -352,9 +352,11 @@ export async function associarCaderno(bancoId: string, cadernoId: string | null)
 // ── Material para download do aluno (Enunciados do sistema × PDF importado) ────────
 // Guardado em `simulado_cadernos_designer.config.material`. Requer um caderno associado.
 
+type TabelaCadernoMat = 'simulado_cadernos_designer' | 'simulado_cadernos_teste'
+
 /** Lê o config atual do caderno (para mesclar `material` sem sobrescrever o resto). */
-async function lerConfigCaderno(svc: ReturnType<typeof createAdminClient>, cadernoId: string, tenantId: string) {
-  const { data } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoId).eq('tenant_id', tenantId).maybeSingle()
+async function lerConfigCaderno(svc: ReturnType<typeof createAdminClient>, cadernoId: string, tenantId: string, tabela: TabelaCadernoMat = 'simulado_cadernos_designer') {
+  const { data } = await svc.from(tabela).select('config').eq('id', cadernoId).eq('tenant_id', tenantId).maybeSingle()
   return { config: (((data as any)?.config ?? {}) as Record<string, unknown>), existe: !!data }
 }
 
@@ -406,21 +408,21 @@ export async function subirMaterialPdf(cadernoId: string, bancoId: string, dataU
 }
 
 /** Remove o PDF importado e volta a mostrar o caderno gerado pelo sistema. */
-export async function removerMaterialPdf(cadernoId: string, bancoId: string, slot: 'material' | 'enunciado' = 'material'): Promise<{ ok: boolean; error?: string }> {
+export async function removerMaterialPdf(cadernoId: string, bancoId: string, slot: 'material' | 'enunciado' = 'material', tabela: TabelaCadernoMat = 'simulado_cadernos_designer'): Promise<{ ok: boolean; error?: string }> {
   const g = await guard()
   if (!g.ok) return g
   const svc = createAdminClient()
-  const { config, existe } = await lerConfigCaderno(svc, cadernoId, g.tenantId)
+  const { config, existe } = await lerConfigCaderno(svc, cadernoId, g.tenantId, tabela)
   if (!existe) return { ok: false, error: 'Caderno não encontrado.' }
   const configKey = slot === 'enunciado' ? 'material_enunciado' : 'material'
   // Apaga o arquivo do storage (evita órfão) antes de zerar a referência no config.
   const pathAntigo = pdfStoragePath((config[configKey] as any)?.pdfUrl as string | undefined)
   if (pathAntigo) { try { await svc.storage.from('pdfs').remove([pathAntigo]) } catch { /* ignora */ } }
   const material = { fonte: 'sistema', pdfUrl: '', pdfNome: '' }
-  const { error } = await svc.from('simulado_cadernos_designer').update({ config: { ...config, [configKey]: material } }).eq('id', cadernoId).eq('tenant_id', g.tenantId)
+  const { error } = await svc.from(tabela).update({ config: { ...config, [configKey]: material } }).eq('id', cadernoId).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
-  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: cadernoId, depois: { [`${configKey}_pdf`]: null } })
-  revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  await registrarAudit({ operacao: 'UPDATE', entidade: tabela, entidadeId: cadernoId, depois: { [`${configKey}_pdf`]: null } })
+  revalidatePath(bancoId ? `/admin/banco-questoes/${bancoId}` : (tabela === 'simulado_cadernos_teste' ? '/admin/cadernos-teste' : '/admin/cadernos'))
   return { ok: true }
 }
 
