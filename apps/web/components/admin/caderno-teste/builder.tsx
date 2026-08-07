@@ -12,6 +12,7 @@ import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
 import { metaDaModalidade, itemAtivo, novoItem, type BuilderV3, type BuilderAjustes, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { salvarBuilderTeste, previewQuestoesBanco } from '@/app/admin/cadernos-teste/actions'
+import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
 
 const ICONE_MOD: Record<Modalidade, any> = { caderno_questoes: FileText, folha_respostas: ClipboardList, diagnostico: BarChart3 }
 
@@ -250,6 +251,8 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             <div className="col-span-1"><Segment label="Colunas" valor={a.colunas} opcoes={[2, 3, 4, 5]} onChange={(n) => setAjuste({ colunas: n })} /></div>
           )}
           <div className="col-span-1"><Tog campo="compacto" label="Compacto" /></div>
+          <div className="col-span-2"><CampoImagem label="Imagem de capa (topo)" valor={a.capaUrl} onChange={(url) => setAjuste({ capaUrl: url })} /></div>
+          <div className="col-span-2"><CampoImagem label="Imagem de folha (fundo)" valor={a.folhaUrl} onChange={(url) => setAjuste({ folhaUrl: url })} /></div>
         </div>
 
         {/* Direita: prévia A4 do grupo ativo (padding lateral menor) */}
@@ -264,6 +267,37 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
 
       <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: ativo.modalidade, modelo: ativo.modelo }} onSelecionar={onPicker} />
       <BancoPicker open={bancoPickerOpen} onClose={() => setBancoPickerOpen(false)} bancos={bancos} atual={builder.bancoId} onSelecionar={trocarBanco} />
+    </div>
+  )
+}
+
+/** Upload/preview/remoção de uma imagem (capa/folha). Sobe base64→URL (bucket pdfs/assets). */
+function CampoImagem({ label, valor, onChange }: { label: string; valor: string; onChange: (url: string) => void }) {
+  const ref = useRef<HTMLInputElement>(null)
+  const [enviando, setEnviando] = useState(false)
+  async function enviar(file: File) {
+    if (!file.type.startsWith('image/')) { toast.error('Envie uma imagem.'); return }
+    if (file.size > 6 * 1024 * 1024) { toast.error('Imagem muito grande (máx. ~6 MB).'); return }
+    setEnviando(true)
+    try {
+      const dataUri = await new Promise<string>((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(new Error('leitura')); fr.readAsDataURL(file) })
+      const r = await hospedarImagemCadernoAction(dataUri)
+      if (r.ok && r.url) onChange(r.url); else toast.error(r.error ?? 'Falha ao enviar a imagem.')
+    } catch { toast.error('Erro ao ler a imagem.') } finally { setEnviando(false) }
+  }
+  return (
+    <div className="rounded-md border bg-background px-2 py-1.5">
+      <div className="mb-1 text-[11px] text-muted-foreground">{label}</div>
+      <input ref={ref} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) enviar(f); e.target.value = '' }} />
+      <div className="flex items-center gap-2">
+        <div className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded border bg-muted/40 text-muted-foreground">
+          {valor ? <img src={valor} alt="" className="h-full w-full object-cover" /> : <FileText className="h-4 w-4" />}
+        </div>
+        <div className="flex flex-1 gap-1.5">
+          <Button variant="outline" size="sm" className="h-7 flex-1 text-xs" onClick={() => ref.current?.click()} disabled={enviando}>{enviando ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <FileUp className="mr-1 h-3.5 w-3.5" />}{valor ? 'Trocar' : 'Enviar'}</Button>
+          {valor && <Button variant="outline" size="sm" className="h-7 text-xs text-destructive" onClick={() => onChange('')} disabled={enviando}><X className="h-3.5 w-3.5" /></Button>}
+        </div>
+      </div>
     </div>
   )
 }

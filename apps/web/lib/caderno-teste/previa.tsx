@@ -30,9 +30,14 @@ export function Previa({ item, questoes }: { item: ItemCaderno; questoes: Previe
   const usandoExemplo = questoes.length === 0
   const base = a.compacto ? 10 : 12
   const gap = a.compacto ? 10 : 16
+  const pad = a.compacto ? 40 : 56
 
   return (
-    <div style={{ width: A4_W, minHeight: 1123, background: '#fff', color: '#1a202c', boxShadow: '0 2px 20px rgba(0,0,0,.14)', padding: a.compacto ? 40 : 56, fontFamily: 'Inter, system-ui, sans-serif', boxSizing: 'border-box' }}>
+    <div style={{ width: A4_W, minHeight: 1123, background: '#fff', color: '#1a202c', boxShadow: '0 2px 20px rgba(0,0,0,.14)', fontFamily: 'Inter, system-ui, sans-serif', boxSizing: 'border-box', position: 'relative', overflow: 'hidden' }}>
+      {a.folhaUrl && <img src={a.folhaUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        {a.capaUrl && <img src={a.capaUrl} alt="" style={{ display: 'block', width: '100%' }} />}
+        <div style={{ padding: pad }}>
       {a.mostrarCabecalho && item.modalidade !== 'diagnostico' && (
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontSize: a.compacto ? 20 : 26, fontWeight: 800, color: a.corPrimaria, letterSpacing: 0.3 }}>{a.titulo || 'Simulado'}</div>
@@ -184,6 +189,8 @@ export function Previa({ item, questoes }: { item: ItemCaderno; questoes: Previe
       {usandoExemplo && item.modalidade === 'caderno_questoes' && (
         <div style={{ marginTop: 20, fontSize: 10, color: '#94a3b8', fontStyle: 'italic' }}>Prévia com questões de exemplo — selecione um banco à esquerda para usar as questões reais.</div>
       )}
+        </div>
+      </div>
     </div>
   )
 }

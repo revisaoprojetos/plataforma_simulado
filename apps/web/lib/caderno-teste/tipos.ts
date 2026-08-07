@@ -18,6 +18,8 @@ export type BuilderAjustes = {
   numAlternativas: number // 4 ou 5
   colunas: number         // colunas da folha de respostas (2..5)
   compacto: boolean       // espaçamento/fonte menores
+  capaUrl: string         // imagem de capa (banner full-bleed no topo)
+  folhaUrl: string        // imagem de fundo da folha (papel timbrado)
 }
 
 /** Um grupo do caderno: uma modalidade+modelo com seus ajustes (+ conteúdo, no diagnóstico). */
@@ -58,6 +60,8 @@ export const AJUSTES_BASE: BuilderAjustes = {
   numAlternativas: 5,
   colunas: 2,
   compacto: false,
+  capaUrl: '',
+  folhaUrl: '',
 }
 
 export type Modelo = { id: string; nome: string; descricao: string; ajustes: Partial<BuilderAjustes>; conteudo?: DiagConteudo }
