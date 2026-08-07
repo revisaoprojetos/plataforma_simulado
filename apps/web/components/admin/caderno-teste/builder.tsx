@@ -301,8 +301,8 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           <div className="col-span-2"><CampoImagem label="Rodapé (faixa na base)" valor={a.rodapeUrl} onChange={(url) => setAjuste({ rodapeUrl: url })} /></div>
           {ativo.modalidade === 'diagnostico' && (
             <div className="col-span-2">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Cores dos pilares</p>
-              <p className="mb-1.5 text-[10px] text-muted-foreground">Colore a linha superior das disciplinas de cada pilar.</p>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Cor das disciplinas por pilar</p>
+              <p className="mb-1.5 text-[10px] text-muted-foreground">Colore a linha superior de cada card de disciplina conforme o pilar dela.</p>
               <div className="space-y-1">
                 {pilaresParaCor.map(([slug, label]) => (
                   <label key={slug} className="flex items-center justify-between gap-2 text-sm">

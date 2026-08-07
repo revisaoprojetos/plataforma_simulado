@@ -166,15 +166,14 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
         {c.pilares.map((pl, i) => {
           const banda = bandaAdaptativa(pl, vars)
           const bandas = banda ? [banda] : pl.bandas // com dado do aluno mostra só a faixa; sem dado, todas (modelo)
-          const cor = corDoPilar(pl.chave, a.coresPilar ?? {}, prim)
           return (
-            <div key={i} style={{ flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${prim}22`, borderTop: `3px solid ${cor}`, padding: 10 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{pl.nome}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1.1 }}>{pl.chave ? V(`{pct_pilar_${pl.chave}}`) : 'X%'}</div>
+            <div key={i} style={{ flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${prim}22`, padding: 10 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: prim, letterSpacing: 0.5 }}>{pl.nome}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: prim, lineHeight: 1.1 }}>{pl.chave ? V(`{pct_pilar_${pl.chave}}`) : 'X%'}</div>
               <div style={{ fontSize: 9, color: '#5a5570', marginBottom: 6 }}>{V(pl.totalTxt)}</div>
               {bandas.map((b, j) => (
                 <div key={j} style={{ marginBottom: 6 }}>
-                  {!banda && <div style={{ fontSize: 9, fontWeight: 700, color: cor }}>{b.faixa}</div>}
+                  {!banda && <div style={{ fontSize: 9, fontWeight: 700, color: prim }}>{b.faixa}</div>}
                   {b.texto && <div style={{ fontSize: 8.5, color: '#243b53', lineHeight: 1.4, textAlign: 'justify' }}>{V(b.texto)}</div>}
                 </div>
               ))}

@@ -56,10 +56,9 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
     for (const pl of c.pilares) {
       const banda = bandaAdaptativa(pl, vars)
       const bandas = banda ? [banda] : pl.bandas
-      const cor = corDoPilar(pl.chave, a.coresPilar ?? {}, prim)
-      let card = `<div style="font-size:10px;font-weight:700;color:${cor};letter-spacing:.5px">${esc(pl.nome)}</div><div style="font-size:24px;font-weight:800;color:${cor}">${pl.chave ? V(`{pct_pilar_${pl.chave}}`) : 'X%'}</div><div style="font-size:10px;color:#5a5570;margin-bottom:6px">${V(pl.totalTxt)}</div>`
-      for (const b of bandas) card += `${!banda ? `<div style="font-size:10px;font-weight:700;color:${cor}">${esc(b.faixa)}</div>` : ''}${b.texto ? `<div style="font-size:10px;color:#243b53;line-height:1.4;text-align:justify;margin-bottom:6px">${V(b.texto)}</div>` : ''}`
-      h += `<td style="width:33%;background:#fff2cc;border:1px solid ${prim}22;border-top:3px solid ${cor};padding:10px">${card}</td>`
+      let card = `<div style="font-size:10px;font-weight:700;color:${prim};letter-spacing:.5px">${esc(pl.nome)}</div><div style="font-size:24px;font-weight:800;color:${prim}">${pl.chave ? V(`{pct_pilar_${pl.chave}}`) : 'X%'}</div><div style="font-size:10px;color:#5a5570;margin-bottom:6px">${V(pl.totalTxt)}</div>`
+      for (const b of bandas) card += `${!banda ? `<div style="font-size:10px;font-weight:700;color:${prim}">${esc(b.faixa)}</div>` : ''}${b.texto ? `<div style="font-size:10px;color:#243b53;line-height:1.4;text-align:justify;margin-bottom:6px">${V(b.texto)}</div>` : ''}`
+      h += `<td style="width:33%;background:#fff2cc;border:1px solid ${prim}22;padding:10px">${card}</td>`
     }
     h += '</tr></table>'
   }
