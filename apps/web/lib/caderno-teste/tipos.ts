@@ -22,6 +22,16 @@ export type BuilderAjustes = {
   folhaUrl: string        // imagem de fundo da folha (papel timbrado, por página)
   cabecalhoUrl: string    // imagem do cabeçalho (faixa no topo de cada página)
   rodapeUrl: string       // imagem do rodapé (faixa na base de cada página)
+  /** Cor por pilar (slug → hex) — usada na linha superior das disciplinas daquele pilar. Adaptável. */
+  coresPilar: Record<string, string>
+}
+
+/** Cores padrão por pilar (adaptável: pilares novos herdam a cor secundária até serem configurados). */
+export const CORES_PILAR_PADRAO: Record<string, string> = {
+  lei_seca: '#c9a227',
+  jurisprudencia: '#3b5bdb',
+  doutrina: '#e8850c',
+  lingua_portuguesa: '#1a7a4a',
 }
 
 /** Um grupo do caderno: uma modalidade+modelo com seus ajustes (+ conteúdo, no diagnóstico). */
@@ -66,6 +76,7 @@ export const AJUSTES_BASE: BuilderAjustes = {
   folhaUrl: '',
   cabecalhoUrl: '',
   rodapeUrl: '',
+  coresPilar: { ...CORES_PILAR_PADRAO },
 }
 
 export type Modelo = { id: string; nome: string; descricao: string; ajustes: Partial<BuilderAjustes>; conteudo?: DiagConteudo }

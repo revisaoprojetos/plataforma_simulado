@@ -7,12 +7,18 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ItemCaderno, PreviewQuestao } from './tipos'
 import { DIAG_PADRAO, slugDiag, type DiagPilar } from './diagnostico'
+import { CORES_PILAR_PADRAO } from './tipos'
 
 const A4_W = 794
 const A4_H = 1123
 const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
 
-export type DiscBanco = { nome: string; chave: string }
+export type DiscBanco = { nome: string; chave: string; pilar?: string }
+/** Cor de um pilar: config do grupo → padrão → cor secundária. */
+function corDoPilar(slug: string | undefined, coresPilar: Record<string, string>, fallback: string): string {
+  if (!slug) return fallback
+  return coresPilar?.[slug] || CORES_PILAR_PADRAO[slug] || fallback
+}
 
 /** Troca {token} pelos valores do aluno/banco. */
 function applyVars(t: string, vars: Record<string, string>): string {
@@ -73,7 +79,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     </div>
   )
   const Dados = () => (
-    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', border: `1px solid ${a.corPrimaria}33`, borderRadius: 8, overflow: 'hidden', marginBottom: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', border: `1px solid ${a.corPrimaria}33`, overflow: 'hidden', marginBottom: 14 }}>
       {[['Nome', 'João da Silva'], ['CPF', '000.000.000-00'], ['Data', '__/__/____']].map(([r, v], i) => (
         <div key={r} style={{ padding: '8px 12px', borderLeft: i ? `1px solid ${a.corPrimaria}22` : 'none' }}>
           <div style={{ fontSize: 8.5, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94a3b8' }}>{r}</div>
@@ -97,7 +103,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
             })}
           </div>
           {a.mostrarComentarios && q.alternativas.find((x) => x.correta)?.comentario && (
-            <div style={{ marginTop: 6, marginLeft: 14, padding: '6px 10px', background: `${a.corPrimaria}0d`, border: `1px solid ${a.corPrimaria}33`, borderRadius: 6, fontSize: base - 1, color: '#334155' }}>
+            <div style={{ marginTop: 6, marginLeft: 14, padding: '6px 10px', background: `${a.corPrimaria}0d`, border: `1px solid ${a.corPrimaria}33`, fontSize: base - 1, color: '#334155' }}>
               <strong style={{ color: a.corPrimaria }}>Comentário:</strong> {q.alternativas.find((x) => x.correta)?.comentario}
             </div>
           )}
@@ -135,19 +141,19 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   const prim = a.corPrimaria, amar = a.corSecundaria
   const Sec = ({ t }: { t: string }) => <div style={{ background: prim, color: '#fff', fontWeight: 700, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', padding: '6px 12px', borderRadius: 2, margin: '4px 0 10px' }}>{t}</div>
   if (a.mostrarCabecalho) out.push(
-    <div style={{ background: prim, color: '#fff', padding: '12px 16px', borderRadius: 6, marginBottom: 12 }}>
+    <div style={{ background: prim, color: '#fff', padding: '12px 16px', marginBottom: 12 }}>
       <div style={{ fontSize: 20, fontWeight: 800 }}>{V(a.titulo || 'Diagnóstico de Desempenho')}</div>
       {c.subtitulo && <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{V(c.subtitulo)}</div>}
     </div>,
   )
   if (a.mostrarDadosAluno) out.push(
-    <div style={{ display: 'flex', border: `1px solid ${prim}`, borderRadius: 6, overflow: 'hidden', marginBottom: 12 }}>
+    <div style={{ display: 'flex', border: `1px solid ${prim}`, overflow: 'hidden', marginBottom: 12 }}>
       <div style={{ background: prim, color: '#fff', fontWeight: 800, fontSize: 14, padding: '8px 14px' }}>NOME:</div>
       <div style={{ background: amar, color: '#3b2f00', flex: 1, padding: '8px 14px', fontSize: 12, fontWeight: 600 }}>{V('{nome}')}</div>
     </div>,
   )
   out.push(
-    <div style={{ display: 'flex', border: `1px solid ${prim}33`, borderRadius: 6, overflow: 'hidden', marginBottom: 12 }}>
+    <div style={{ display: 'flex', border: `1px solid ${prim}33`, overflow: 'hidden', marginBottom: 12 }}>
       <div style={{ background: '#9b6800', color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'baseline' }}><span style={{ fontSize: 32, fontWeight: 800 }}>{V('{acertos}')}</span><span style={{ fontSize: 16, fontWeight: 700 }}>/{V(c.notaTotal)}</span></div>
       <div style={{ background: amar, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: 12, fontWeight: 600 }}>{V(c.notaTexto)}</div>
     </div>,
@@ -160,14 +166,15 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
         {c.pilares.map((pl, i) => {
           const banda = bandaAdaptativa(pl, vars)
           const bandas = banda ? [banda] : pl.bandas // com dado do aluno mostra só a faixa; sem dado, todas (modelo)
+          const cor = corDoPilar(pl.chave, a.coresPilar ?? {}, prim)
           return (
-            <div key={i} style={{ flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${prim}22`, borderRadius: 4, padding: 10 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: prim, letterSpacing: 0.5 }}>{pl.nome}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: prim, lineHeight: 1.1 }}>{pl.chave ? V(`{pct_pilar_${pl.chave}}`) : 'X%'}</div>
+            <div key={i} style={{ flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${prim}22`, borderTop: `3px solid ${cor}`, padding: 10 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{pl.nome}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1.1 }}>{pl.chave ? V(`{pct_pilar_${pl.chave}}`) : 'X%'}</div>
               <div style={{ fontSize: 9, color: '#5a5570', marginBottom: 6 }}>{V(pl.totalTxt)}</div>
               {bandas.map((b, j) => (
                 <div key={j} style={{ marginBottom: 6 }}>
-                  {!banda && <div style={{ fontSize: 9, fontWeight: 700, color: prim }}>{b.faixa}</div>}
+                  {!banda && <div style={{ fontSize: 9, fontWeight: 700, color: cor }}>{b.faixa}</div>}
                   {b.texto && <div style={{ fontSize: 8.5, color: '#243b53', lineHeight: 1.4, textAlign: 'justify' }}>{V(b.texto)}</div>}
                 </div>
               ))}
@@ -184,8 +191,9 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     if (c.disciplinasIntro) out.push(<p style={{ fontSize: base - 1, color: '#5a5570', margin: '0 0 8px', lineHeight: 1.4 }}>{V(c.disciplinasIntro)}</p>)
     for (const d of discs) {
       const assuntos = (vars[`assuntos_${d.chave}`] ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
+      const corDisc = corDoPilar(d.pilar, a.coresPilar ?? {}, amar)
       out.push(
-        <div style={{ background: '#f5f3ff', borderTop: `2px solid ${amar}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5 }}>
+        <div style={{ background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: prim }}>{d.nome}</div>
             {assuntos.length

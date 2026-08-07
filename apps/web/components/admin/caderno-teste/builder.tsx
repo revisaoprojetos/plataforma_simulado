@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown, Check } from 'lucide-react'
@@ -10,7 +10,7 @@ import { HexColorField } from '@/components/admin/hex-color-field'
 import { Previa } from '@/lib/caderno-teste/previa'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
-import { metaDaModalidade, itemAtivo, novoItem, type BuilderV3, type BuilderAjustes, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
+import { metaDaModalidade, itemAtivo, novoItem, CORES_PILAR_PADRAO, type BuilderV3, type BuilderAjustes, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
 import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
 import { Users, ChevronRight, Download } from 'lucide-react'
@@ -102,6 +102,15 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const alunoAtual = registros[Math.min(alunoIdx, Math.max(0, registros.length - 1))] ?? null
   const varsPrevia = alunoAtual?.vars ?? (builder.bancoId ? {} : {})
   const exportUrl = (fmt: 'word' | 'html') => `/api/admin/caderno-teste/exportar?caderno=${cadernoId}&grupo=${ativo.id}&formato=${fmt}${alunoAtual ? `&aluno=${alunoAtual.id}` : ''}`
+  // Pilares para o editor de cores (adaptável): padrão + os do modelo + os presentes nas disciplinas do banco.
+  const pilaresParaCor = useMemo(() => {
+    const human = (s: string) => s.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
+    const map = new Map<string, string>()
+    Object.keys(CORES_PILAR_PADRAO).forEach((s) => map.set(s, human(s)))
+    for (const p of ativo.conteudo?.pilares ?? []) if (p.chave) map.set(p.chave, p.nome || human(p.chave))
+    for (const d of disciplinasBanco) if (d.pilar) map.set(d.pilar, human(d.pilar))
+    return [...map.entries()]
+  }, [ativo, disciplinasBanco])
   function salvar() {
     start(async () => {
       const r = await salvarBuilderTeste(cadernoId, builder)
@@ -290,6 +299,20 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           <div className="col-span-2"><CampoImagem label="Folha (fundo de cada página)" valor={a.folhaUrl} onChange={(url) => setAjuste({ folhaUrl: url })} /></div>
           <div className="col-span-2"><CampoImagem label="Cabeçalho (faixa no topo)" valor={a.cabecalhoUrl} onChange={(url) => setAjuste({ cabecalhoUrl: url })} /></div>
           <div className="col-span-2"><CampoImagem label="Rodapé (faixa na base)" valor={a.rodapeUrl} onChange={(url) => setAjuste({ rodapeUrl: url })} /></div>
+          {ativo.modalidade === 'diagnostico' && (
+            <div className="col-span-2">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Cores dos pilares</p>
+              <p className="mb-1.5 text-[10px] text-muted-foreground">Colore a linha superior das disciplinas de cada pilar.</p>
+              <div className="space-y-1">
+                {pilaresParaCor.map(([slug, label]) => (
+                  <label key={slug} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="text-muted-foreground">{label}</span>
+                    <HexColorField value={a.coresPilar?.[slug] ?? CORES_PILAR_PADRAO[slug] ?? a.corSecundaria} onChange={(v) => setAjuste({ coresPilar: { ...(a.coresPilar ?? {}), [slug]: v } })} />
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Direita: prévia A4 do grupo ativo (padding lateral menor) */}

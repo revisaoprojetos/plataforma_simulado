@@ -10,7 +10,17 @@ import { slugDiag } from '@/lib/caderno-teste/diagnostico'
 import type { BuilderV3, PreviewQuestao } from '@/lib/caderno-teste/tipos'
 
 export type RegistroTeste = { id: string; nome: string; vars: Record<string, string> }
-export type DiscBancoTeste = { nome: string; chave: string }
+export type DiscBancoTeste = { nome: string; chave: string; pilar?: string }
+
+/** Pilar canônico (slug) a partir da categoria/pilares da questão + nome da disciplina (igual merge.ts). */
+function pilarSlugDe(cats: unknown[], disc: string): string {
+  const t = [...cats, disc].map((x) => (x ?? '').toString()).join(' ').toLowerCase()
+  if (/portugu|l[ií]ngua/.test(t)) return 'lingua_portuguesa'
+  if (t.includes('lei seca') || t.includes('legisla')) return 'lei_seca'
+  if (t.includes('jurisprud')) return 'jurisprudencia'
+  if (t.includes('doutrina')) return 'doutrina'
+  return ''
+}
 
 const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
 const TABELA = 'simulado_cadernos_teste'
@@ -83,11 +93,21 @@ export async function dadosBancoTeste(bancoId: string): Promise<{ ok: boolean; r
     const vinc = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', access.tenantId!).order('questao_id', { ascending: true }))
     const ids = vinc.map((v) => v.questao_id)
     const nomes = new Set<string>()
+    const pilarPorDisc = new Map<string, Map<string, number>>() // nome → (pilarSlug → contagem)
     if (ids.length) {
-      const qs = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_questoes').select('disciplinas:simulado_disciplinas(nome)').in('id', chunk).eq('tenant_id', access.tenantId!))
-      for (const q of qs) { const n = (q as any).disciplinas?.nome as string | undefined; if (n && n.trim()) nomes.add(n.trim()) }
+      const qs = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_questoes').select('categoria, pilar_1, pilar_2, disciplinas:simulado_disciplinas(nome)').in('id', chunk).eq('tenant_id', access.tenantId!))
+      for (const q of qs) {
+        const n = ((q as any).disciplinas?.nome as string | undefined)?.trim(); if (!n) continue
+        nomes.add(n)
+        const pilar = pilarSlugDe([(q as any).categoria, (q as any).pilar_1, (q as any).pilar_2], n)
+        if (pilar) { const m = pilarPorDisc.get(n) ?? new Map(); m.set(pilar, (m.get(pilar) ?? 0) + 1); pilarPorDisc.set(n, m) }
+      }
     }
-    disciplinas = [...nomes].sort((a, b) => a.localeCompare(b)).map((nome) => ({ nome, chave: slugDiag(nome) }))
+    disciplinas = [...nomes].sort((a, b) => a.localeCompare(b)).map((nome) => {
+      const m = pilarPorDisc.get(nome)
+      const pilar = m ? [...m.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] : undefined // pilar predominante
+      return { nome, chave: slugDiag(nome), pilar }
+    })
   } catch { /* fallback abaixo */ }
   // Fallback 1: grupos configurados no banco. Fallback 2: variáveis do 1º aluno (total_<slug>).
   if (!disciplinas.length) {
