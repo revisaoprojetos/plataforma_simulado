@@ -65,7 +65,7 @@ const QUESTOES_EXEMPLO: PreviewQuestao[] = [
   ] },
 ]
 
-type Interativo = { selPilar?: string; onPick?: (pilar: string, anchor: DOMRect) => void }
+type Interativo = { selKey?: string; onPick?: (chave: string, nome: string, cor: string, anchor: DOMRect) => void }
 
 /** Monta os blocos (nós) do conteúdo do grupo, em ordem — a paginação distribui isso em folhas. */
 function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<string, string>, discBanco: DiscBanco[], inter?: Interativo): ReactNode[] {
@@ -192,12 +192,12 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     if (c.disciplinasIntro) out.push(<p style={{ fontSize: base - 1, color: '#5a5570', margin: '0 0 8px', lineHeight: 1.4 }}>{V(c.disciplinasIntro)}</p>)
     for (const d of discs) {
       const assuntos = (vars[`assuntos_${d.chave}`] ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
-      const corDisc = corDoPilar(d.pilar, a.coresPilar ?? {}, amar)
-      const clicavel = !!(inter?.onPick && d.pilar)
-      const sel = !!(inter?.selPilar && d.pilar && inter.selPilar === d.pilar)
+      const corDisc = (a.coresDisc ?? {})[d.chave] || corDoPilar(d.pilar, a.coresPilar ?? {}, amar)
+      const clicavel = !!inter?.onPick
+      const sel = !!(inter?.selKey && inter.selKey === d.chave)
       out.push(
-        <div onClick={clicavel ? (e) => inter!.onPick!(d.pilar!, (e.currentTarget as HTMLElement).getBoundingClientRect()) : undefined}
-          style={{ background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5, cursor: clicavel ? 'pointer' : undefined, outline: sel ? `2px solid ${corDisc}` : undefined, outlineOffset: -1 }} title={clicavel ? 'Clique para mudar a cor deste pilar' : undefined}>
+        <div onClick={clicavel ? (e) => inter!.onPick!(d.chave, d.nome, corDisc, (e.currentTarget as HTMLElement).getBoundingClientRect()) : undefined}
+          style={{ background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5, cursor: clicavel ? 'pointer' : undefined, outline: sel ? `2px solid ${corDisc}` : undefined, outlineOffset: -1 }} title={clicavel ? 'Clique para mudar a cor desta disciplina' : undefined}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: prim }}>{d.nome}</div>
             {assuntos.length
@@ -260,7 +260,7 @@ function Folha({ item, num, total, pad, Ht, Hf, capa, children }: { item: ItemCa
   )
 }
 
-export function Previa({ item, questoes, vars = {}, discBanco = [], onPickDisc, selPilar }: { item: ItemCaderno; questoes: PreviewQuestao[]; vars?: Record<string, string>; discBanco?: DiscBanco[]; onPickDisc?: (pilar: string, anchor: DOMRect) => void; selPilar?: string }) {
+export function Previa({ item, questoes, vars = {}, discBanco = [], onPickDisc, selKey }: { item: ItemCaderno; questoes: PreviewQuestao[]; vars?: Record<string, string>; discBanco?: DiscBanco[]; onPickDisc?: (chave: string, nome: string, cor: string, anchor: DOMRect) => void; selKey?: string }) {
   const a = item.ajustes
   const qs = questoes.length ? questoes : QUESTOES_EXEMPLO
   const pad = a.compacto ? 40 : 56
@@ -272,7 +272,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPickDisc, 
   const onPickRef = useRef(onPickDisc); onPickRef.current = onPickDisc
   const varsKey = useMemo(() => JSON.stringify(vars), [vars])
   const discKey = useMemo(() => JSON.stringify(discBanco), [discBanco])
-  const blocos = useMemo(() => blocosDoItem(item, qs, vars, discBanco, { selPilar, onPick: (p, an) => onPickRef.current?.(p, an) }), [item, qs, varsKey, discKey, selPilar]) // eslint-disable-line react-hooks/exhaustive-deps
+  const blocos = useMemo(() => blocosDoItem(item, qs, vars, discBanco, { selKey, onPick: (c, n, cor, an) => onPickRef.current?.(c, n, cor, an) }), [item, qs, varsKey, discKey, selKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const medRef = useRef<HTMLDivElement>(null)
   const [paginas, setPaginas] = useState<number[][] | null>(null)
   const chave = useMemo(() => JSON.stringify({ n: blocos.length, a }), [blocos, a])

@@ -70,7 +70,7 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
     for (const d of discs) {
       const assuntos = (vars[`assuntos_${d.chave}`] ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
       const asHtml = assuntos.length ? assuntos.map((x) => `<div style="font-size:10px;color:#5a5570;font-style:italic">- ${esc(x)}</div>`).join('') : '<div style="font-size:10px;color:#5a5570;font-style:italic">- Assuntos das questões erradas</div>'
-      const corDisc = corDoPilar(d.pilar, a.coresPilar ?? {}, amar)
+      const corDisc = (a.coresDisc ?? {})[d.chave] || corDoPilar(d.pilar, a.coresPilar ?? {}, amar)
       h += `<table style="width:100%;border-collapse:collapse;margin-bottom:5px;border-top:3px solid ${corDisc};background:#f5f3ff"><tr><td style="padding:6px 10px"><div style="font-size:11px;font-weight:700;color:${prim}">${esc(d.nome)}</div>${asHtml}</td><td style="padding:6px 10px;text-align:right;white-space:nowrap;font-size:11px"><span style="color:#9590b0">${V(`{acerto_${d.chave}}`)}/${V(`{total_${d.chave}}`)}</span> <span style="font-weight:800;color:#9a6e00">${V(`{pct_${d.chave}}`)}</span></td></tr></table>`
     }
   }
