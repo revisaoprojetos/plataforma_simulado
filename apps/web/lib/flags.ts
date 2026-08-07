@@ -18,3 +18,10 @@ export const OCULTAR_ALUNO_EXTRAS = true
 // Rotas do aluno ocultas enquanto OCULTAR_ALUNO_EXTRAS estiver ligado.
 // Banco de Questões reativado (área dedicada de prática com filtros + histórico).
 export const ROTAS_ALUNO_OCULTAS = ['/aluno/favoritos', '/aluno/cadernos']
+
+/**
+ * EDITOR_CADERNO_NOVO: usa o novo editor unificado de cadernos (tela única com edição +
+ * seleção de banco/questões + toda a configuração/aparência/material num só lugar). Em
+ * construção — liga via env NEXT_PUBLIC_EDITOR_CADERNO_NOVO=1 (default: editor atual).
+ */
+export const EDITOR_CADERNO_NOVO = process.env.NEXT_PUBLIC_EDITOR_CADERNO_NOVO === '1'

@@ -278,3 +278,30 @@ export async function getAssuntosBanco(bancoId: string): Promise<{ ok: boolean; 
   for (const k of Object.keys(porDisc)) out[k] = [...porDisc[k]].sort()
   return { ok: true, porDisciplina: out }
 }
+
+/**
+ * Onde este caderno é usado — para o editor avisar quando um material PDF importado NÃO chega ao
+ * aluno (caderno sem vínculo). Conta bancos que apontam para o caderno (simulado_pastas.caderno_id)
+ * e simulados que o referenciam (regras.caderno_id direto ou via regras.banco_base_id → banco).
+ * Tolerante ao schema (colunas/tabelas podem faltar em bases antigas).
+ */
+export async function linkagemCaderno(cadernoId: string): Promise<{ ok: boolean; bancos: number; simulados: number }> {
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, bancos: 0, simulados: 0 }
+  const svc = createAdminClient()
+  let bancosIds: string[] = []
+  try {
+    const { data } = await svc.from('simulado_pastas').select('id').eq('tenant_id', access.tenantId).eq('caderno_id', cadernoId)
+    bancosIds = (data ?? []).map((b: any) => b.id)
+  } catch { /* coluna caderno_id pode não existir */ }
+  let simulados = 0
+  try {
+    const { data } = await svc.from('simulado_simulados').select('id, regras').eq('tenant_id', access.tenantId)
+    for (const s of (data ?? []) as any[]) {
+      const cid = (s.regras as any)?.caderno_id
+      const bid = (s.regras as any)?.banco_base_id
+      if (cid === cadernoId || (bid && bancosIds.includes(bid))) simulados++
+    }
+  } catch { /* tolera schema */ }
+  return { ok: true, bancos: bancosIds.length, simulados }
+}
