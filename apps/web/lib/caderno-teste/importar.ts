@@ -28,37 +28,73 @@ function idxDe(linhas: string[], re: RegExp, from = 0): number {
   return -1
 }
 
+/** Extrai o texto de um PDF em linhas (agrupa por Y, ordena por X) — aproximado; colunas embaralham. */
+export async function pdfParaHtml(buffer: Buffer): Promise<string> {
+  const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buffer), isEvalSupported: false, useSystemFonts: true, disableFontFace: true }).promise
+  const linhas: string[] = []
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p)
+    const tc = await page.getTextContent()
+    const its = (tc.items as any[]).filter((i) => typeof i.str === 'string' && i.str.trim()).map((i) => ({ x: i.transform[4] as number, y: i.transform[5] as number, s: i.str as string }))
+    its.sort((a, b) => (b.y - a.y) || (a.x - b.x))
+    let lineY: number | null = null, cur = ''
+    const flush = () => { const t = lim(cur); if (t) linhas.push(t); cur = ''; lineY = null }
+    for (const it of its) {
+      if (lineY !== null && Math.abs(it.y - lineY) > 3) flush()
+      if (lineY === null) lineY = it.y
+      cur += (cur ? ' ' : '') + it.s
+    }
+    flush()
+    page.cleanup?.()
+  }
+  await doc.destroy?.()
+  return linhas.map((l) => `<p>${l.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`).join('')
+}
+
+const ehNomePilar = (t: string) => UP(t) && t.length <= 30 && /[A-ZÀ-Ú]{3,}/.test(t) && !/TEXTO MODULADO|DESEMPENHO|QUEST|PILAR|DISCIPLINA/i.test(t) && !/\d/.test(t.replace(/%/g, ''))
+
 function parsePilares(reg: string[]): DiagPilar[] {
   const pilares: DiagPilar[] = []
-  const ehNome = (t: string) => UP(t) && t.length <= 30 && /[A-ZÀ-Ú]{3,}/.test(t) && !/TEXTO MODULADO|DESEMPENHO|QUEST|PILAR|DISCIPLINA/i.test(t) && !/\d/.test(t.replace(/%/g, ''))
   for (let i = 0; i < reg.length; i++) {
-    if (!ehNome(reg[i])) continue
+    if (!ehNomePilar(reg[i])) continue
     const nome = reg[i]
-    const jan = reg.slice(i + 1, i + 40)
+    const jan = reg.slice(i + 1, i + 80)
     const totalTxt = jan.find((l) => /de\s+\d+\s+quest/i.test(l)) ?? 'X de N questões'
     const bandas: { faixa: string; texto: string }[] = []
     for (let k = 0; k < jan.length; k++) {
       const m = jan[k].match(RE_FAIXA)
       if (!m) continue
-      // texto da banda = próxima linha "longa" que não seja outra faixa/rótulo
-      const txt = jan.slice(k + 1).find((l) => !RE_FAIXA.test(l) && !/TEXTO MODULADO/i.test(l) && l.length > 30) ?? ''
+      // texto da banda = linhas seguintes até a próxima faixa/rótulo/pilar (junta multi-linha).
+      let txt = ''
+      for (let n = k + 1; n < jan.length; n++) {
+        const l = jan[n]
+        if (RE_FAIXA.test(l) || /TEXTO MODULADO/i.test(l) || /de\s+\d+\s+quest/i.test(l) || ehNomePilar(l)) break
+        txt += (txt ? ' ' : '') + l
+      }
       bandas.push({ faixa: `${m[1]}-${m[2]}`, texto: txt })
     }
-    if (bandas.length) pilares.push({ nome, totalTxt: totalTxt.replace(/^X\s+/i, 'X '), bandas })
+    if (bandas.length) pilares.push({ nome, totalTxt, bandas })
   }
   return pilares
 }
 
+const RE_SCORE = /([xX\d]+\s*\/\s*\d+)/
 function parseDisciplinas(reg: string[]): DiagDisciplina[] {
   const out: DiagDisciplina[] = []
   let cur: DiagDisciplina | null = null
-  const ehScore = (t: string) => /[xX\d]+\s*\/\s*\d+/.test(t) && t.length < 20
+  const push = () => { if (cur) out.push(cur) }
   for (const t of reg) {
     if (/^[-–]\s*Categoria/i.test(t)) { if (cur) cur.categoria = lim(t.replace(/^[-–]\s*Categoria:?\s*/i, '')) || 'Assunto'; continue }
-    if (ehScore(t)) { if (cur) cur.total = (t.match(/[xX\d]+\s*\/\s*\d+/)?.[0] ?? cur.total).replace(/\s+/g, ''); continue }
-    if (t.length >= 3 && !/^TEXTO|^\d+%$/i.test(t)) { if (cur) out.push(cur); cur = { nome: t, total: 'x/N', categoria: 'Assunto' } }
+    // Nome + nota na MESMA linha (ex.: "D. Eleitoral x/5 x%") — comum no PDF.
+    const inline = t.match(/^(.{2,}?)\s+([xX\d]+\s*\/\s*\d+)\b/)
+    if (inline && !/^[-–]/.test(t)) { push(); cur = { nome: lim(inline[1]), total: inline[2].replace(/\s+/g, ''), categoria: 'Assunto' }; continue }
+    // Só a nota (Word/HTML: nome e nota em células separadas).
+    if (RE_SCORE.test(t) && t.length < 20) { if (cur) cur.total = (t.match(RE_SCORE)?.[1] ?? cur.total).replace(/\s+/g, ''); continue }
+    // Nome sozinho.
+    if (t.length >= 3 && !/^TEXTO|^\d+%$/i.test(t) && !/DESEMPENHO|SUGEST|GABARITO/i.test(t)) { push(); cur = { nome: t, total: 'x/N', categoria: 'Assunto' } }
   }
-  if (cur) out.push(cur)
+  push()
   return out
 }
 
