@@ -7,10 +7,6 @@ import { carregarRegistros } from '@/lib/caderno-designer/merge'
 import { dataComQuestao } from '@/lib/caderno-designer/blocks'
 import { getTenantTheme } from '@/lib/tenant-theme'
 import type { CadernoData } from '@/lib/caderno-designer/types'
-import { EDITOR_CADERNO_NOVO } from '@/lib/flags'
-import { EditorProvider } from '@/components/admin/caderno-editor/store/use-editor-store'
-import { CadernoEditorShell } from '@/components/admin/caderno-editor/caderno-editor-shell'
-import { normalizarConfig } from '@/components/admin/caderno-editor/store/normalizar'
 
 const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
 
@@ -24,8 +20,8 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
   // Caderno (tolerante à coluna pasta_id), lista de bancos do tenant e tema — independentes entre si.
   const [caderno, bancos, temaRes] = await Promise.all([
     (async (): Promise<any> => {
-      const r = await svc.from('simulado_cadernos_designer').select('id, nome, config, pasta_id, cor, icone, capa_url').eq('id', id).eq('tenant_id', tid).maybeSingle()
-      if (r.error && /pasta_id|cor|icone|capa_url|column/i.test(r.error.message)) {
+      const r = await svc.from('simulado_cadernos_designer').select('id, nome, config, pasta_id').eq('id', id).eq('tenant_id', tid).maybeSingle()
+      if (r.error && /pasta_id|column/i.test(r.error.message)) {
         const r2 = await svc.from('simulado_cadernos_designer').select('id, nome, config').eq('id', id).eq('tenant_id', tid).maybeSingle()
         return r2.data
       }
@@ -112,16 +108,6 @@ export default async function CadernoEditorPage({ params }: { params: Promise<{ 
     logoGrandeUrl: ti.logo_grande_url ?? null,
     logoBg: ti.logo_png_bg ?? '#ffffff',
     logoEstilo: ti.logo_estilo ?? 'arredondado',
-  }
-
-  // Novo editor unificado (atrás de flag): tela única com edição + seleção + configuração/material.
-  if (EDITOR_CADERNO_NOVO) {
-    const { inicial, meta } = normalizarConfig(config, { nome: caderno.nome, cor: (caderno as any).cor ?? null, icone: (caderno as any).icone ?? null, capa: (caderno as any).capa_url ?? null })
-    return (
-      <EditorProvider cadernoId={caderno.id} inicial={inicial} meta={meta}>
-        <CadernoEditorShell previewData={previewData} bancos={(bancos ?? []) as { id: string; nome: string }[]} registros={registros} branding={branding} pastaId={pastaId} />
-      </EditorProvider>
-    )
   }
 
   return (
