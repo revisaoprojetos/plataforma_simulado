@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown } from 'lucide-react'
+import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { HexColorField } from '@/components/admin/hex-color-field'
@@ -158,43 +158,49 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                 <Pencil className="h-3 w-3" /> {editandoGrupos ? 'Concluir' : 'Editar'}
               </button>
             </div>
-            {/* Barra: grupo atual + seta */}
-            <button type="button" onClick={() => setGruposAberto((o) => !o)} className={cn('flex w-full items-center gap-2 rounded-lg border bg-background px-2.5 py-2 text-left shadow-sm transition-colors', gruposAberto && 'border-primary')}>
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"><IconeMod className="h-4 w-4" /></span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold leading-tight">{ativo.ajustes.titulo || meta.nome}</span>
-                <span className="block truncate text-[11px] text-muted-foreground">{meta.nome} · {modeloNome}</span>
-              </span>
-              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{builder.itens.length}</span>
-              <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', gruposAberto && 'rotate-180')} />
-            </button>
-            {/* Lista embaixo com descrições */}
-            {gruposAberto && (
-              <div className="mt-1.5 flex flex-col gap-1 rounded-lg border bg-background p-1 shadow-sm">
-                {builder.itens.map((it) => {
-                  const m = metaDaModalidade(it.modalidade)
-                  const Icon = ICONE_MOD[it.modalidade]
-                  const on = it.id === builder.ativo
-                  return (
-                    <div key={it.id} className={cn('group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors', on ? 'bg-primary/10' : 'hover:bg-muted')}>
-                      <button type="button" onClick={() => { selecionarGrupo(it.id); setGruposAberto(false) }} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                        <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md', on ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary')}><Icon className="h-4 w-4" /></span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-[13px] font-medium leading-tight">{it.ajustes.titulo || m.nome}</span>
-                          <span className="block truncate text-[10px] text-muted-foreground">{m.nome} · {m.modelos.find((x) => x.id === it.modelo)?.nome}</span>
-                        </span>
+            <div className="relative">
+              {/* Barra: grupo atual + seta */}
+              <button type="button" onClick={() => setGruposAberto((o) => !o)} className={cn('flex w-full items-center gap-2 rounded-lg border bg-background px-2.5 py-2 text-left shadow-sm transition-colors hover:border-primary/50', gruposAberto && 'border-primary')}>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"><IconeMod className="h-4 w-4" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold leading-tight">{ativo.ajustes.titulo || meta.nome}</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">{meta.nome} · {modeloNome}</span>
+                </span>
+                <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', gruposAberto && 'rotate-180')} />
+              </button>
+              {/* Menu flutuante (estilo select): divisórias + nome + descrição + check */}
+              {gruposAberto && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setGruposAberto(false)} />
+                  <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-lg border bg-background shadow-lg">
+                    <div className="divide-y">
+                      {builder.itens.map((it) => {
+                        const m = metaDaModalidade(it.modalidade)
+                        const Icon = ICONE_MOD[it.modalidade]
+                        const on = it.id === builder.ativo
+                        return (
+                          <div key={it.id} className={cn('group flex items-center gap-2 px-3 py-2 transition-colors', on ? 'bg-primary/5' : 'hover:bg-muted/60')}>
+                            <button type="button" onClick={() => { selecionarGrupo(it.id); setGruposAberto(false) }} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+                              <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-md', on ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary')}><Icon className="h-4 w-4" /></span>
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-medium leading-tight">{it.ajustes.titulo || m.nome}</span>
+                                <span className="block truncate text-[11px] text-muted-foreground">{m.nome} · {m.modelos.find((x) => x.id === it.modelo)?.nome}</span>
+                              </span>
+                            </button>
+                            {editandoGrupos && builder.itens.length > 1
+                              ? <button type="button" onClick={() => removerGrupo(it.id)} title="Remover grupo" className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"><X className="h-4 w-4" /></button>
+                              : on && <Check className="h-4 w-4 shrink-0 text-primary" />}
+                          </div>
+                        )
+                      })}
+                      <button type="button" onClick={() => { adicionarGrupo(); setGruposAberto(false) }} className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5">
+                        <Plus className="h-4 w-4" /> Adicionar grupo
                       </button>
-                      {editandoGrupos && builder.itens.length > 1 && (
-                        <button type="button" onClick={() => removerGrupo(it.id)} title="Remover grupo" className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"><X className="h-3.5 w-3.5" /></button>
-                      )}
                     </div>
-                  )
-                })}
-                <button type="button" onClick={() => { adicionarGrupo(); setGruposAberto(false) }} className="mt-0.5 flex items-center justify-center gap-1.5 rounded-md border border-dashed py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">
-                  <Plus className="h-3.5 w-3.5" /> Adicionar grupo
-                </button>
-              </div>
-            )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Modelo do grupo */}
