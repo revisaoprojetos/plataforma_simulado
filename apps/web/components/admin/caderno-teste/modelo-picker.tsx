@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { X, FileText, ClipboardList, BarChart3, Check, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Previa } from '@/lib/caderno-teste/previa'
-import { MODALIDADES, metaDaModalidade, novoItem, type Modalidade } from '@/lib/caderno-teste/tipos'
+import { PreviaBlocos } from '@/lib/caderno-teste/previa-blocos'
+import { MODALIDADES, metaDaModalidade, novoItem, presetDoModelo, type Modalidade } from '@/lib/caderno-teste/tipos'
 
 const ICONE: Record<Modalidade, any> = { caderno_questoes: FileText, folha_respostas: ClipboardList, diagnostico: BarChart3 }
 
@@ -12,10 +13,13 @@ const ICONE: Record<Modalidade, any> = { caderno_questoes: FileText, folha_respo
 function MiniPrevia({ modalidade, modeloId }: { modalidade: Modalidade; modeloId: string }) {
   const LARG = 240
   const zoom = LARG / 794
+  const preset = presetDoModelo(modalidade, modeloId) // modelo pronto → render por blocos (v1)
   return (
     <div style={{ width: LARG, height: 316, overflow: 'hidden', background: '#fff', borderRadius: 6 }} className="pointer-events-none border">
       <div style={{ width: 794, transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
-        <Previa item={novoItem(modalidade, modeloId)} questoes={[]} />
+        {preset
+          ? <PreviaBlocos presetId={preset} questoes={[]} titulo={metaDaModalidade(modalidade).nome} />
+          : <Previa item={novoItem(modalidade, modeloId)} questoes={[]} />}
       </div>
     </div>
   )

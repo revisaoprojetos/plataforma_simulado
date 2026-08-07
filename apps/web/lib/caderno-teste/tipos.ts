@@ -85,7 +85,12 @@ export const AJUSTES_BASE: BuilderAjustes = {
   coresParte: {},
 }
 
-export type Modelo = { id: string; nome: string; descricao: string; ajustes: Partial<BuilderAjustes>; conteudo?: DiagConteudo }
+export type Modelo = {
+  id: string; nome: string; descricao: string; ajustes: Partial<BuilderAjustes>; conteudo?: DiagConteudo
+  /** Modelo PRONTO renderizado pelo motor de blocos do v1 (id do preset em caderno-designer/presets.ts).
+   * Quando presente, a prévia usa PreviaBlocos (idêntico ao v1) em vez do render simples. */
+  docPreset?: string
+}
 export type ModalidadeMeta = { id: Modalidade; nome: string; descricao: string; modelos: Modelo[] }
 
 export const MODALIDADES: ModalidadeMeta[] = [
@@ -95,7 +100,8 @@ export const MODALIDADES: ModalidadeMeta[] = [
       { id: 'classico', nome: 'Clássico', descricao: 'Questões com alternativas, espaçado.', ajustes: { mostrarGabarito: false, mostrarComentarios: false, compacto: false } },
       { id: 'com_gabarito', nome: 'Com gabarito', descricao: 'Destaca a correta e mostra o comentário.', ajustes: { mostrarGabarito: true, mostrarComentarios: true, compacto: false } },
       { id: 'compacto', nome: 'Compacto', descricao: 'Fonte e espaços menores (mais por página).', ajustes: { mostrarGabarito: false, mostrarComentarios: false, compacto: true } },
-      { id: 'agu', nome: 'Simulado AGU', descricao: 'Modelo pronto (Pré-Edital AGU): capa azul + dados do estudante + questões. Reenvie a capa/fundo.', ajustes: { corPrimaria: '#072c94', corSecundaria: '#fa9200', mostrarCabecalho: true, mostrarDadosAluno: true, mostrarGabarito: false, mostrarComentarios: false, numAlternativas: 5, compacto: false } },
+      { id: 'agu_perguntas', nome: 'AGU · Caderno de questões', descricao: 'Modelo pronto (idêntico ao v1): capa + dados do estudante + enunciados e alternativas. Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-perguntas' },
+      { id: 'agu_completo', nome: 'AGU · Caderno completo', descricao: 'Modelo pronto (v1): + resposta marcada, correção (marcada × correta) e comentário.', ajustes: {}, docPreset: 'caderno-completo' },
     ],
   },
   {
@@ -103,7 +109,7 @@ export const MODALIDADES: ModalidadeMeta[] = [
     modelos: [
       { id: 'classico', nome: 'Clássico', descricao: '2 colunas de questões.', ajustes: { colunas: 2, compacto: false } },
       { id: 'compacto', nome: 'Compacto', descricao: '4 colunas (mais questões por página).', ajustes: { colunas: 4, compacto: true } },
-      { id: 'agu', nome: 'Simulado AGU', descricao: 'Modelo pronto (Pré-Edital AGU): grade azul/dourada, 5 alternativas, compacta. Reenvie a capa/fundo.', ajustes: { corPrimaria: '#072c94', corSecundaria: '#fa9200', mostrarCabecalho: true, mostrarDadosAluno: true, colunas: 5, numAlternativas: 5, compacto: true } },
+      { id: 'agu_folha', nome: 'AGU · Folha de respostas', descricao: 'Modelo pronto (idêntico ao v1): capa + dados do estudante + grade azul/dourada (marcado + oficial). Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-objetivo' },
     ],
   },
   {
@@ -117,6 +123,17 @@ export const MODALIDADES: ModalidadeMeta[] = [
 
 export function metaDaModalidade(id: Modalidade): ModalidadeMeta {
   return MODALIDADES.find((m) => m.id === id) ?? MODALIDADES[0]
+}
+
+/** Id do preset de blocos (v1) de um modelo, se ele for um "modelo pronto" doc-backed. */
+export function presetDoModelo(modalidade: Modalidade, modeloId: string): string | undefined {
+  const meta = metaDaModalidade(modalidade)
+  return meta.modelos.find((m) => m.id === modeloId)?.docPreset
+}
+
+/** Id do preset de blocos (v1) de um item já montado. */
+export function presetDoItem(item: ItemCaderno): string | undefined {
+  return presetDoModelo(item.modalidade, item.modelo)
 }
 
 function novoId(): string {

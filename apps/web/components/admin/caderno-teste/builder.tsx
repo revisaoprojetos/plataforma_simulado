@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { HexColorField } from '@/components/admin/hex-color-field'
 import { Previa } from '@/lib/caderno-teste/previa'
+import { PreviaBlocos } from '@/lib/caderno-teste/previa-blocos'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
-import { metaDaModalidade, itemAtivo, novoItem, type BuilderV3, type BuilderAjustes, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
+import { metaDaModalidade, itemAtivo, novoItem, presetDoItem, type BuilderV3, type BuilderAjustes, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { camposDoBloco, aplicarCampoBloco, type CampoTexto } from '@/lib/caderno-teste/edicao'
 import type { DiagConteudo } from '@/lib/caderno-teste/diagnostico'
 import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
@@ -61,6 +62,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const { ref, zoom } = useZoomAjustado()
 
   const ativo = itemAtivo(builder)
+  const presetAtivo = presetDoItem(ativo) // modelo pronto (render por blocos do v1)
   const meta = metaDaModalidade(ativo.modalidade)
   const modeloNome = meta.modelos.find((m) => m.id === ativo.modelo)?.nome ?? meta.modelos[0].nome
   const IconeMod = ICONE_MOD[ativo.modalidade]
@@ -272,6 +274,11 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           {/* Ajustes (2 colunas) — só com banco selecionado */}
           {builder.bancoId && (<>
           <div className="col-span-2 mt-1"><p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Pencil className="h-3.5 w-3.5" /> Ajustes do grupo</p></div>
+          {presetAtivo && (
+            <div className="col-span-2 rounded-md border border-dashed px-2.5 py-2 text-[11px] leading-snug text-muted-foreground">
+              📄 Modelo pronto (layout do v1). A prévia usa o motor de blocos — idêntico ao Caderno de Prova. Os ajustes de cor/toggles abaixo ainda não se aplicam a este modelo.
+            </div>
+          )}
           <label className="col-span-2 block text-xs text-muted-foreground">
             <span className="mb-1 block">Título</span>
             <input value={a.titulo} onChange={(e) => setAjuste({ titulo: e.target.value })} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm text-foreground" />
@@ -307,8 +314,12 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
         <div ref={ref} className="scroll-claro min-h-0 overflow-auto bg-[radial-gradient(circle,theme(colors.slate.300)_1px,transparent_1px)] [background-size:18px_18px] px-3 py-5 dark:bg-[radial-gradient(circle,theme(colors.slate.700)_1px,transparent_1px)]">
           {builder.bancoId ? (
             <div className="mx-auto" style={{ zoom } as any}>
-              <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} selParte={pickerCor?.parte}
-                onPick={(parte, label, cor) => setPickerCor({ parte, label, cor })} />
+              {presetAtivo ? (
+                <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} />
+              ) : (
+                <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} selParte={pickerCor?.parte}
+                  onPick={(parte, label, cor) => setPickerCor({ parte, label, cor })} />
+              )}
             </div>
           ) : (
             <div className="flex h-full items-center justify-center p-8 text-center">
