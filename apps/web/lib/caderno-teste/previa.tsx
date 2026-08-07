@@ -65,8 +65,10 @@ const QUESTOES_EXEMPLO: PreviewQuestao[] = [
   ] },
 ]
 
+type Interativo = { selPilar?: string; onPick?: (pilar: string, anchor: DOMRect) => void }
+
 /** Monta os blocos (nós) do conteúdo do grupo, em ordem — a paginação distribui isso em folhas. */
-function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<string, string>, discBanco: DiscBanco[]): ReactNode[] {
+function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<string, string>, discBanco: DiscBanco[], inter?: Interativo): ReactNode[] {
   const a = item.ajustes
   const base = a.compacto ? 10 : 12
   const V = (t: string) => preencher(t, vars)
@@ -191,8 +193,11 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     for (const d of discs) {
       const assuntos = (vars[`assuntos_${d.chave}`] ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
       const corDisc = corDoPilar(d.pilar, a.coresPilar ?? {}, amar)
+      const clicavel = !!(inter?.onPick && d.pilar)
+      const sel = !!(inter?.selPilar && d.pilar && inter.selPilar === d.pilar)
       out.push(
-        <div style={{ background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5 }}>
+        <div onClick={clicavel ? (e) => inter!.onPick!(d.pilar!, (e.currentTarget as HTMLElement).getBoundingClientRect()) : undefined}
+          style={{ background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5, cursor: clicavel ? 'pointer' : undefined, outline: sel ? `2px solid ${corDisc}` : undefined, outlineOffset: -1 }} title={clicavel ? 'Clique para mudar a cor deste pilar' : undefined}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: prim }}>{d.nome}</div>
             {assuntos.length
@@ -255,7 +260,7 @@ function Folha({ item, num, total, pad, Ht, Hf, capa, children }: { item: ItemCa
   )
 }
 
-export function Previa({ item, questoes, vars = {}, discBanco = [] }: { item: ItemCaderno; questoes: PreviewQuestao[]; vars?: Record<string, string>; discBanco?: DiscBanco[] }) {
+export function Previa({ item, questoes, vars = {}, discBanco = [], onPickDisc, selPilar }: { item: ItemCaderno; questoes: PreviewQuestao[]; vars?: Record<string, string>; discBanco?: DiscBanco[]; onPickDisc?: (pilar: string, anchor: DOMRect) => void; selPilar?: string }) {
   const a = item.ajustes
   const qs = questoes.length ? questoes : QUESTOES_EXEMPLO
   const pad = a.compacto ? 40 : 56
@@ -264,9 +269,10 @@ export function Previa({ item, questoes, vars = {}, discBanco = [] }: { item: It
   const contentW = A4_W - 2 * pad
   const availH = A4_H - Ht - Hf - 16
 
+  const onPickRef = useRef(onPickDisc); onPickRef.current = onPickDisc
   const varsKey = useMemo(() => JSON.stringify(vars), [vars])
   const discKey = useMemo(() => JSON.stringify(discBanco), [discBanco])
-  const blocos = useMemo(() => blocosDoItem(item, qs, vars, discBanco), [item, qs, varsKey, discKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const blocos = useMemo(() => blocosDoItem(item, qs, vars, discBanco, { selPilar, onPick: (p, an) => onPickRef.current?.(p, an) }), [item, qs, varsKey, discKey, selPilar]) // eslint-disable-line react-hooks/exhaustive-deps
   const medRef = useRef<HTMLDivElement>(null)
   const [paginas, setPaginas] = useState<number[][] | null>(null)
   const chave = useMemo(() => JSON.stringify({ n: blocos.length, a }), [blocos, a])

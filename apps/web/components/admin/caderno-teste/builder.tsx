@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown, Check } from 'lucide-react'
@@ -53,6 +53,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const [gruposAberto, setGruposAberto] = useState(false)
   const [importando, setImportando] = useState(false)
   const [baixarAberto, setBaixarAberto] = useState(false)
+  const [pickerCor, setPickerCor] = useState<{ pilar: string; label: string; x: number; y: number } | null>(null)
   const importRef = useRef<HTMLInputElement>(null)
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
@@ -102,15 +103,6 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const alunoAtual = registros[Math.min(alunoIdx, Math.max(0, registros.length - 1))] ?? null
   const varsPrevia = alunoAtual?.vars ?? (builder.bancoId ? {} : {})
   const exportUrl = (fmt: 'word' | 'html') => `/api/admin/caderno-teste/exportar?caderno=${cadernoId}&grupo=${ativo.id}&formato=${fmt}${alunoAtual ? `&aluno=${alunoAtual.id}` : ''}`
-  // Pilares para o editor de cores: SÓ os realmente presentes nas disciplinas do banco selecionado.
-  // Sem banco, cai para os pilares do próprio modelo (para dar o que editar no template).
-  const pilaresParaCor = useMemo(() => {
-    const human = (s: string) => s.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
-    const map = new Map<string, string>()
-    for (const d of disciplinasBanco) if (d.pilar) map.set(d.pilar, human(d.pilar))
-    if (!map.size) for (const p of ativo.conteudo?.pilares ?? []) if (p.chave) map.set(p.chave, p.nome || human(p.chave))
-    return [...map.entries()]
-  }, [ativo, disciplinasBanco])
   function salvar() {
     start(async () => {
       const r = await salvarBuilderTeste(cadernoId, builder)
@@ -300,17 +292,8 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           <div className="col-span-2"><CampoImagem label="Cabeçalho (faixa no topo)" valor={a.cabecalhoUrl} onChange={(url) => setAjuste({ cabecalhoUrl: url })} /></div>
           <div className="col-span-2"><CampoImagem label="Rodapé (faixa na base)" valor={a.rodapeUrl} onChange={(url) => setAjuste({ rodapeUrl: url })} /></div>
           {ativo.modalidade === 'diagnostico' && (
-            <div className="col-span-2">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Cor das disciplinas por pilar</p>
-              <p className="mb-1.5 text-[10px] text-muted-foreground">Colore a linha superior de cada card de disciplina conforme o pilar dela.</p>
-              <div className="space-y-1">
-                {pilaresParaCor.map(([slug, label]) => (
-                  <label key={slug} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="text-muted-foreground">{label}</span>
-                    <HexColorField value={a.coresPilar?.[slug] ?? CORES_PILAR_PADRAO[slug] ?? a.corSecundaria} onChange={(v) => setAjuste({ coresPilar: { ...(a.coresPilar ?? {}), [slug]: v } })} />
-                  </label>
-                ))}
-              </div>
+            <div className="col-span-2 rounded-md border border-dashed px-2.5 py-2 text-[11px] leading-snug text-muted-foreground">
+              💡 Cor das disciplinas por pilar: <strong>clique no card de uma disciplina na prévia</strong> (à direita) e escolha a cor ao lado.
             </div>
           )}
         </div>
@@ -318,13 +301,27 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
         {/* Direita: prévia A4 do grupo ativo (padding lateral menor) */}
         <div ref={ref} className="scroll-claro min-h-0 overflow-auto bg-[radial-gradient(circle,theme(colors.slate.300)_1px,transparent_1px)] [background-size:18px_18px] px-3 py-5 dark:bg-[radial-gradient(circle,theme(colors.slate.700)_1px,transparent_1px)]">
           <div className="mx-auto" style={{ zoom } as any}>
-            <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} />
+            <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} selPilar={pickerCor?.pilar}
+              onPickDisc={(pilar, anchor) => setPickerCor({ pilar, label: pilar.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()), x: Math.min(anchor.right + 8, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 240), y: anchor.top })} />
           </div>
         </div>
       </div>
 
       <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: ativo.modalidade, modelo: ativo.modelo }} onSelecionar={onPicker} />
       <BancoPicker open={bancoPickerOpen} onClose={() => setBancoPickerOpen(false)} bancos={bancos} atual={builder.bancoId} onSelecionar={trocarBanco} />
+      {pickerCor && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setPickerCor(null)} />
+          <div className="fixed z-50 w-56 rounded-lg border bg-background p-3 shadow-xl" style={{ left: pickerCor.x, top: pickerCor.y }}>
+            <div className="mb-2 flex items-center justify-between">
+              <span className="truncate text-xs font-semibold" title={pickerCor.label}>Cor · {pickerCor.label}</span>
+              <button onClick={() => setPickerCor(null)} className="shrink-0 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+            <HexColorField value={a.coresPilar?.[pickerCor.pilar] ?? CORES_PILAR_PADRAO[pickerCor.pilar] ?? a.corSecundaria} onChange={(v) => setAjuste({ coresPilar: { ...(a.coresPilar ?? {}), [pickerCor.pilar]: v } })} />
+            <p className="mt-2 text-[10px] leading-snug text-muted-foreground">Muda a cor da linha de todas as disciplinas deste pilar.</p>
+          </div>
+        </>
+      )}
     </div>
   )
 }
