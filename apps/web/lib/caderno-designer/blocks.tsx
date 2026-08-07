@@ -262,7 +262,20 @@ export function larguraDaColuna(col: Block): number | undefined {
 }
 
 /** Renderer único (sem hooks): usado no canvas do editor E na impressão/PDF. */
-export function BlockRender({ block, theme, data, full, editor }: { block: Block; theme: CadernoTheme; data: CadernoData; full?: boolean; editor?: boolean }) {
+type BlockRenderProps = { block: Block; theme: CadernoTheme; data: CadernoData; full?: boolean; editor?: boolean; selectable?: boolean; selectedId?: string | null }
+
+/**
+ * Render de um bloco. Em modo `selectable`, embrulha CADA bloco (recursivamente) num wrapper
+ * `display:contents` com `data-block-id` — permite selecionar blocos por delegação de clique
+ * (usado pelo construtor v2) sem afetar o layout nem a impressão (selectable=false por padrão).
+ */
+export function BlockRender(props: BlockRenderProps) {
+  const node = BlockRenderBody(props)
+  if (!props.selectable) return node
+  return <span data-block-id={props.block.id} data-sel={props.selectedId === props.block.id ? '1' : undefined} style={{ display: 'contents' }}>{node}</span>
+}
+
+function BlockRenderBody({ block, theme, data, full, editor, selectable, selectedId }: BlockRenderProps) {
   const a = block.attributes as any
   const c = theme.cores
 
@@ -496,7 +509,7 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
         <div style={{ display: 'flex', justifyContent: al === 'left' ? 'flex-start' : al === 'right' ? 'flex-end' : 'center' }}>
           <div style={cardStyle(cardA, theme)}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} />)}
+              {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} selectable={selectable} selectedId={selectedId} />)}
             </div>
           </div>
         </div>
@@ -511,7 +524,7 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
           {(block.innerBlocks ?? []).map((col, i) => {
             const cl = larguraDaColuna(col)
             const div = (temDiv && i > 0) ? { borderLeft: bordaDiv, paddingLeft: (a.gap ?? 16) / 2 } : {}
-            return <div key={col.id} style={{ flex: cl ? `0 0 ${cl}%` : '1 1 0%', minWidth: 0, ...div }}><BlockRender block={col} theme={theme} data={data} /></div>
+            return <div key={col.id} style={{ flex: cl ? `0 0 ${cl}%` : '1 1 0%', minWidth: 0, ...div }}><BlockRender block={col} theme={theme} data={data} selectable={selectable} selectedId={selectedId} /></div>
           })}
         </div>
       )
@@ -519,7 +532,7 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
     case 'coluna':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} full />)}
+          {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} full selectable={selectable} selectedId={selectedId} />)}
         </div>
       )
     case 'condicao': {
@@ -527,7 +540,7 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
       if (!avaliarCondicao(a, data.vars)) return null
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} full />)}
+          {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} full selectable={selectable} selectedId={selectedId} />)}
         </div>
       )
     }
@@ -701,7 +714,7 @@ export function BlockRender({ block, theme, data, full, editor }: { block: Block
             const d2 = dataComQuestao(data, q)
             return (
               <div key={q.id} style={{ breakInside: 'avoid', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={d2} />)}
+                {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={d2} selectable={selectable} selectedId={selectedId} />)}
               </div>
             )
           })}
