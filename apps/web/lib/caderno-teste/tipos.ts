@@ -3,7 +3,7 @@
 // própria (como as "modalidades" do editor antigo). Config isolado em
 // simulado_cadernos_teste.config.builderV3.
 
-import { DIAG_PADRAO, DIAG_AGU_2023, DIAG_PGE_RS, type DiagConteudo } from './diagnostico'
+import { DIAG_PADRAO, DIAG_AGU_2023, DIAG_PGE_RS, DIAG_BASE_4, type DiagConteudo } from './diagnostico'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
 
 export type Modalidade = 'folha_respostas' | 'caderno_questoes' | 'diagnostico'
@@ -151,6 +151,7 @@ export const MODALIDADES: ModalidadeMeta[] = [
     id: 'diagnostico', nome: 'Diagnóstico', descricao: 'Relatório de desempenho do aluno (pilares, disciplinas, sugestões).',
     modelos: [
       { id: 'padrao', nome: 'Em branco', descricao: 'Estrutura vazia para preencher.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_PADRAO },
+      { id: 'base_4', nome: 'Base — 4 disciplinas', descricao: 'Estrutura completa pronta (intro, pilar separado, 3 pilares, 4 disciplinas, sugestões e gabarito) com textos genéricos.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_BASE_4 },
       { id: 'agu_2023', nome: 'Completo (AGU 2023)', descricao: 'Pré-preenchido com o diagnóstico da AGU 2023.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_AGU_2023 },
       { id: 'pge_rs', nome: 'Completo (PGE/RS)', descricao: 'Estrutura base para o diagnóstico da PGE/RS — ajuste os textos/disciplinas.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_PGE_RS },
     ],

@@ -277,3 +277,71 @@ export const DIAG_PGE_RS: DiagConteudo = {
   ],
   gabaritoObs: [],
 }
+
+/** Preset BASE reutilizável: estrutura completa com 4 disciplinas e textos genéricos (sem citar banca/concurso).
+ * Serve de ponto de partida para qualquer simulado — edite textos, pilares e disciplinas conforme necessário. */
+export const DIAG_BASE_4: DiagConteudo = {
+  tituloCabecalho: 'Diagnóstico de Desempenho',
+  subtitulo: 'Adicionar Subtítulo',
+  notaTotal: '{total_questoes}',
+  notaTexto: '{acertos} acertos de {total_questoes} questões — {percentual} de aproveitamento',
+  intro: [
+    'Este é o seu diagnóstico de desempenho. Ele não foi pensado para medir se você "está pronto(a)", mas para mostrar, com precisão, onde direcionar as próximas semanas de estudo.',
+    'O número de acertos é a parte menos importante deste relatório. O que importa está no que vem a seguir: o desempenho por pilar (lei seca, jurisprudência e doutrina) e por disciplina, que revela que tipo de erro você está cometendo. Errar por não ter visto o assunto é diferente de errar por não dominar o texto de lei, que é diferente de errar por não acompanhar jurisprudência — cada lacuna se resolve de um jeito.',
+    'Ao final da leitura, você vai saber qual pilar merece reforço imediato, quais disciplinas concentram os pontos perdidos e quais assuntos precisa revisar. Esse é o objetivo: transformar um placar em rota de estudo.',
+    'Guarde este diagnóstico. Ele é o ponto de partida e o comparativo que você vai usar para medir sua evolução até o próximo simulado.',
+  ],
+  linguaPortuguesa: {
+    chave: 'secao_separada', tipoFonte: 'pilar',
+    secTitulo: 'Desempenho em Seção Separada',
+    secIntro: 'Use esta seção para uma frente que tem lógica própria e não se encaixa na lente de "lei seca x jurisprudência x doutrina" (ex.: Língua Portuguesa, Raciocínio Lógico, uma disciplina específica). Ajuste o título, o texto e a fonte de dados conforme o simulado — ou remova o bloco se não precisar.',
+    titulo: 'SEÇÃO SEPARADA',
+    totalTxt: '{acerto_pilar_secao_separada} de {total_pilar_secao_separada} questões',
+    bandas: [
+      { faixa: '0-49', texto: 'Seu desempenho nesta frente ficou abaixo do esperado e merece atenção. Retome os fundamentos e pratique com questões no mesmo padrão da prova para consolidar a base.' },
+      { faixa: '50-80', texto: 'Seu desempenho nesta frente foi intermediário: há base, mas ainda há espaço relevante para crescer. Reforce os pontos de maior incidência e mantenha a prática constante.' },
+      { faixa: '81-100', texto: 'Excelente desempenho nesta frente! Mantenha o ritmo com revisões periódicas para não perder o rendimento até a prova.' },
+    ],
+  },
+  pilares: [
+    { nome: 'LEI SECA', chave: 'lei_seca', totalTxt: '{acerto_pilar_lei_seca} de {total_pilar_lei_seca} questões', bandas: [
+      { faixa: '0-49', texto: 'Seu desempenho em lei seca ficou abaixo de 50%, um resultado que merece atenção. A cobrança do texto literal da lei costuma ser um dos principais fatores de reprovação. O estudo precisa ir além do contato superficial e chegar ao nível do detalhe.' },
+      { faixa: '50-80', texto: 'Seu desempenho em lei seca foi intermediário: você tem base, mas ainda deixa pontos na mesa. Questões que parecem simples viram armadilhas sem o domínio preciso do dispositivo. Foque nos diplomas de maior incidência.' },
+      { faixa: '81-100', texto: 'Seu desempenho em lei seca foi excelente — esse costuma ser o diferencial da aprovação. Mantenha o resultado com revisões periódicas e atenção às leis específicas do seu concurso.' },
+    ] },
+    { nome: 'JURISPRUDÊNCIA', chave: 'jurisprudencia', totalTxt: '{acerto_pilar_jurisprudencia} de {total_pilar_jurisprudencia} questões', bandas: [
+      { faixa: '0-49', texto: 'Seu desempenho em jurisprudência ficou abaixo de 50%. Reforce urgentemente o estudo de informativos e das principais teses dos tribunais superiores (STF e STJ).' },
+      { faixa: '50-80', texto: 'Seu desempenho em jurisprudência foi médio — há espaço relevante para crescer. As questões de jurisprudência costumam diferenciar os primeiros colocados. Vale reforçar com informativos recentes.' },
+      { faixa: '81-100', texto: 'Seu desempenho em jurisprudência foi ótimo! Você acompanha os informativos e aplica os entendimentos com segurança. Mantenha o hábito, com atenção à jurisprudência mais recente.' },
+    ] },
+    { nome: 'DOUTRINA', chave: 'doutrina', totalTxt: '{acerto_pilar_doutrina} de {total_pilar_doutrina} questões', bandas: [
+      { faixa: '0-49', texto: 'Seu desempenho em doutrina ficou abaixo de 50%. Doutrina é a base do raciocínio jurídico — quem não domina classificações, distinções e princípios erra também em lei e jurisprudência. O investimento tem retorno duplo.' },
+      { faixa: '50-80', texto: 'Seu desempenho em doutrina foi intermediário. Você acerta nas questões diretas, mas perde nas distinções mais finas. Dominar doutrina ajuda a ganhar pontos também em lei e jurisprudência com fundo conceitual.' },
+      { faixa: '81-100', texto: 'Seu desempenho em doutrina foi excelente. Você domina classificações, distinções conceituais e fundamentos teóricos — o que se reflete também nas demais frentes. Mantenha a solidez.' },
+    ] },
+  ],
+  disciplinasIntro: 'A análise a seguir tem foco nos seus pontos de erros. Para cada disciplina, você encontra o desempenho por categoria (lei seca, jurisprudência e doutrina) e uma leitura personalizada do que os erros revelam sobre as lacunas a priorizar.',
+  disciplinas: [
+    { nome: 'Disciplina 1', total: 'x/N', categoria: 'Assunto' },
+    { nome: 'Disciplina 2', total: 'x/N', categoria: 'Assunto' },
+    { nome: 'Disciplina 3', total: 'x/N', categoria: 'Assunto' },
+    { nome: 'Disciplina 4', total: 'x/N', categoria: 'Assunto' },
+  ],
+  sugestoes: [
+    { titulo: 'LEI SECA', prioridade: 'Prioridade Alta', intro: 'Priorize a legislação de maior incidência na prova. Liste aqui os dispositivos a reforçar, por disciplina:', itens: [
+      { forte: true, texto: 'Adicione aqui os principais diplomas/artigos cobrados (use > para item normal e >> para item de destaque).' },
+    ] },
+    { titulo: 'JURISPRUDÊNCIA', prioridade: 'Prioridade Alta', intro: 'Reforce os entendimentos consolidados dos tribunais superiores nos temas de maior recorrência:', itens: [
+      { forte: true, texto: 'Adicione aqui os temas/julgados de maior incidência.' },
+    ] },
+    { titulo: 'DOUTRINA', prioridade: 'Prioridade Alta', intro: 'Consolide os fundamentos teóricos mais cobrados:', itens: [
+      { forte: true, texto: 'Adicione aqui os temas doutrinários de maior recorrência.' },
+    ] },
+  ],
+  gabaritoTitulo: 'GABARITO OFICIAL DESATUALIZADO',
+  gabaritoIntro: [
+    'Caso este simulado reproduza uma prova aplicada, algumas questões — especialmente as de legislação e jurisprudência — podem estar desatualizadas por alterações legislativas e evolução do entendimento dos tribunais.',
+    'Abaixo, as questões que sofreram atualização (edite conforme o recorte do seu simulado):',
+  ],
+  gabaritoObs: [],
+}
