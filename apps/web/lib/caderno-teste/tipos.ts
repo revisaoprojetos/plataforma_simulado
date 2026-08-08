@@ -31,6 +31,8 @@ export type BuilderAjustes = {
   coresParte: Record<string, string>
   /** Alinhamento do texto por PARTE (parte → left/center/right/justify). */
   alinhamentoParte: Record<string, string>
+  /** Cor do TEXTO por PARTE (parte → hex) — para blocos com fundo colorido (nota, cabeçalho…). */
+  coresTextoParte: Record<string, string>
 }
 
 /** Cores padrão por pilar (adaptável: pilares novos herdam a cor secundária até serem configurados). */
@@ -109,6 +111,7 @@ export const AJUSTES_BASE: BuilderAjustes = {
   coresDisc: {},
   coresParte: {},
   alinhamentoParte: {},
+  coresTextoParte: {},
 }
 
 export type Modelo = {

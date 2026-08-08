@@ -83,10 +83,12 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   const corP = (parte: string, def: string) => (a.coresParte ?? {})[parte] || def
   // Alinhamento por PARTE (override sobre o padrão do bloco).
   const alignP = (parte: string, def: any) => ((a.alinhamentoParte ?? {})[parte] as any) || def
+  // Cor do TEXTO por PARTE (cascata para os filhos que não têm cor própria — ex.: "0/100").
+  const corTextoP = (parte: string, def: any) => (a.coresTextoParte ?? {})[parte] || def
   // Props (style + clique) para tornar qualquer bloco selecionável na prévia e destacá-lo quando ativo.
   // Aplica também o alinhamento por parte (herdado pelos textos filhos).
   const atr = (parte: string, label: string, cor: string, baseStyle: any): { style: any; onClick?: (e: any) => void; title?: string } => {
-    const style = { ...baseStyle, textAlign: alignP(parte, baseStyle?.textAlign) }
+    const style = { ...baseStyle, textAlign: alignP(parte, baseStyle?.textAlign), color: corTextoP(parte, baseStyle?.color) }
     if (!inter?.onPick) return { style }
     return {
       style: { ...style, cursor: 'pointer', ...(inter.selParte === parte ? { outline: `2px solid ${cor}`, outlineOffset: -1 } : {}) },

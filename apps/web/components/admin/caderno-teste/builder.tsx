@@ -412,6 +412,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       {pickerCor && (() => {
         const campos = camposDoBloco(ativo, pickerCor.parte, pickerCor.label)
         const onCampo = (campo: (typeof campos)[number], v: string) => campo.alvo === 'titulo' ? setAjuste({ titulo: v }) : setConteudo(aplicarCampoBloco(ativo.conteudo, pickerCor.parte, campo.id, v))
+        const temCorTexto = ['diag_nota_num', 'diag_nota_faixa', 'diag_cab', 'diag_nome_rot', 'diag_nome_val'].includes(pickerCor.parte) || pickerCor.parte.startsWith('sec_')
         return (
         <>
           <div className="fixed inset-0 z-40 bg-black/10" onClick={() => setPickerCor(null)} />
@@ -445,7 +446,18 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                     <p className="text-[10px] leading-snug text-muted-foreground">Nos Tópicos, comece a linha com <code>&gt;</code> ou <code>&gt;&gt;</code> para o marcador pegar a cor.</p>
                   </div>
                 )
-              })() : (
+              })() : temCorTexto ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="mb-1 text-[11px] text-muted-foreground">Cor</div>
+                    <HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />
+                  </div>
+                  <div>
+                    <div className="mb-1 text-[11px] text-muted-foreground">Cor do texto</div>
+                    <HexColorField value={a.coresTextoParte?.[pickerCor.parte] || '#ffffff'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [pickerCor.parte]: v } })} />
+                  </div>
+                </div>
+              ) : (
                 <>
                   <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cor</div>
                   <HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />
