@@ -6,9 +6,9 @@
 
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ItemCaderno, PreviewQuestao } from './tipos'
-import { DIAG_PADRAO, slugDiag, type DiagPilar } from './diagnostico'
+import { DIAG_PADRAO, slugDiag, topicosParaTexto, type DiagPilar } from './diagnostico'
 import { CORES_PILAR_PADRAO } from './tipos'
-import { formatarInline } from './formato'
+import { formatarInline, formatarMarcadores } from './formato'
 
 const A4_W = 794
 const A4_H = 1123
@@ -74,6 +74,9 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   const base = a.compacto ? 10 : 12
   // Texto com formatação inline (**negrito**, *itálico*, <u>sublinhado</u>) já com variáveis aplicadas.
   const V = (t: string): ReactNode => <span dangerouslySetInnerHTML={{ __html: formatarInline(preencher(t, vars)) }} />
+  // Vm = como V, mas colore os marcadores `>`/`>>` no início de cada linha (tópicos).
+  const corMk = item.conteudo?.corMarcador ?? '#3b5bdb', corMkF = item.conteudo?.corMarcadorForte ?? '#e8850c'
+  const Vm = (t: string): ReactNode => <span dangerouslySetInnerHTML={{ __html: formatarMarcadores(preencher(t, vars), corMk, corMkF) }} />
   const out: ReactNode[] = []
 
   // Cor individual por PARTE (clique na prévia): coresParte[parte] sobrepõe a cor padrão do bloco.
@@ -248,7 +251,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
         </div>
         <div style={{ background: '#f0eeff', padding: '8px 12px' }}>
           {s.intro && <p style={{ fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify' }}>{V(s.intro)}</p>}
-          {s.itens.length > 0 && <div style={{ fontSize: base - 1, lineHeight: 1.5, textAlign: 'justify' }}>{V(s.itens.map((it) => it.texto).join('\n'))}</div>}
+          {s.itens.length > 0 && <div style={{ fontSize: base - 1, lineHeight: 1.5, textAlign: 'justify' }}>{Vm(topicosParaTexto(s.itens))}</div>}
         </div>
       </div>,
     ) })

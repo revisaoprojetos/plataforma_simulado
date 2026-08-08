@@ -2,7 +2,7 @@
 // O popover de cor (builder) também mostra estes campos para o bloco selecionado.
 
 import type { ItemCaderno } from './tipos'
-import { DIAG_PADRAO, slugDiag, type DiagConteudo } from './diagnostico'
+import { DIAG_PADRAO, slugDiag, topicosParaTexto, type DiagConteudo } from './diagnostico'
 
 /** alvo 'titulo' edita ajustes.titulo; os demais editam item.conteudo. */
 export type CampoTexto = { id: string; label: string; valor: string; multiline?: boolean; alvo?: 'conteudo' | 'titulo' }
@@ -46,7 +46,7 @@ export function camposDoBloco(item: ItemCaderno, parte: string, nomeFallback?: s
       { id: 'titulo', label: 'Título', valor: s.titulo },
       { id: 'prioridade', label: 'Prioridade', valor: s.prioridade },
       { id: 'intro', label: 'Introdução', valor: s.intro, multiline: true },
-      { id: 'itens', label: 'Tópicos', valor: s.itens.map((it) => it.texto).join('\n'), multiline: true },
+      { id: 'itens', label: 'Tópicos (use > ou >> no início da linha)', valor: topicosParaTexto(s.itens), multiline: true },
     ]
   }
   if (parte.startsWith('disc:')) {

@@ -463,6 +463,22 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                   </div>
                 )
               })()}
+              {pickerCor.parte.startsWith('sug:') && (() => {
+                const cf = (ativo.conteudo ?? {}) as DiagConteudo
+                return (
+                  <div className="mt-4 grid grid-cols-2 gap-2 border-t pt-4">
+                    <div>
+                      <div className="mb-1 text-[11px] text-muted-foreground">Cor de <b>&gt;</b></div>
+                      <HexColorField value={cf.corMarcador || '#3b5bdb'} onChange={(v) => setConteudo({ ...cf, corMarcador: v })} />
+                    </div>
+                    <div>
+                      <div className="mb-1 text-[11px] text-muted-foreground">Cor de <b>&gt;&gt;</b></div>
+                      <HexColorField value={cf.corMarcadorForte || '#e8850c'} onChange={(v) => setConteudo({ ...cf, corMarcadorForte: v })} />
+                    </div>
+                    <p className="col-span-2 text-[10px] leading-snug text-muted-foreground">No campo Tópicos, comece a linha com <code>&gt;</code> ou <code>&gt;&gt;</code> para o marcador pegar essa cor.</p>
+                  </div>
+                )
+              })()}
               <p className="mt-4 text-[10px] leading-snug text-muted-foreground">Personaliza só este bloco. Clique em qualquer bloco da prévia para editá-lo.</p>
               {podeRemoverParte(pickerCor.parte) && (
                 <button type="button" onClick={() => { setConteudo(removerParteDiag(ativo.conteudo, pickerCor.parte)); setPickerCor(null) }} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-destructive/40 px-2 py-1.5 text-[12px] font-medium text-destructive transition-colors hover:bg-destructive/10">

@@ -4,16 +4,30 @@
 
 const escHtml = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
+/** Marcação inline (negrito/itálico/sublinhado) SEM converter quebras de linha. */
+function inlineSemBr(texto: string): string {
+  let h = escHtml(texto)
+  h = h.replace(/&lt;u&gt;([\s\S]*?)&lt;\/u&gt;/gi, '<u>$1</u>') // <u>…</u>
+  h = h.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>')     // **negrito**
+  h = h.replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>') // *itálico*
+  h = h.replace(/(^|[^\w_])_([^_\n]+?)_(?![\w_])/g, '$1<em>$2</em>') // _itálico_
+  return h
+}
+
 /** Converte o texto (com as marcações) em HTML seguro. Quebras de linha viram <br>. */
 export function formatarInline(texto: string): string {
-  let h = escHtml(texto)
-  // <u>...</u> (o usuário digita as tags; após o escape viram &lt;u&gt;)
-  h = h.replace(/&lt;u&gt;([\s\S]*?)&lt;\/u&gt;/gi, '<u>$1</u>')
-  // **negrito**
-  h = h.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>')
-  // *itálico* ou _itálico_
-  h = h.replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>')
-  h = h.replace(/(^|[^\w_])_([^_\n]+?)_(?![\w_])/g, '$1<em>$2</em>')
-  h = h.replace(/\n/g, '<br>')
-  return h
+  return inlineSemBr(texto).replace(/\n/g, '<br>')
+}
+
+/**
+ * Como formatarInline, mas quando uma LINHA começa com `>` ou `>>` o marcador ganha cor
+ * (padronização dos tópicos): `>>` = corForte, `>` = corNormal. O resto formata inline normal.
+ */
+export function formatarMarcadores(texto: string, corNormal = '#3b5bdb', corForte = '#e8850c'): string {
+  return String(texto ?? '').split('\n').map((linha) => {
+    let m: RegExpMatchArray | null
+    if ((m = linha.match(/^(\s*)>>\s?([\s\S]*)$/))) return `${m[1]}<span style="color:${corForte};font-weight:700">&gt;&gt;</span> ${inlineSemBr(m[2])}`
+    if ((m = linha.match(/^(\s*)>\s?([\s\S]*)$/))) return `${m[1]}<span style="color:${corNormal};font-weight:700">&gt;</span> ${inlineSemBr(m[2])}`
+    return inlineSemBr(linha)
+  }).join('<br>')
 }

@@ -22,6 +22,15 @@ export const VARS_DIAGNOSTICO = {
 export type DiagItemSugestao = { forte: boolean; texto: string }
 export type DiagSugestao = { titulo: string; prioridade: string; intro: string; itens: DiagItemSugestao[] }
 
+/** Junta os itens da sugestão num texto único (um por linha), preservando o marcador `>`/`>>`
+ * (dos itens antigos com `forte`) quando o texto ainda não começa com marcador. */
+export function topicosParaTexto(itens: DiagItemSugestao[]): string {
+  return (itens ?? []).map((it) => {
+    const t = it.texto ?? ''
+    return /^\s*>/.test(t) ? t : `${it.forte ? '>>' : '>'} ${t}`
+  }).join('\n')
+}
+
 export type DiagConteudo = {
   /** Título do cabeçalho do diagnóstico (independente do título do grupo). */
   tituloCabecalho?: string
@@ -41,6 +50,9 @@ export type DiagConteudo = {
   discOcultas?: string[]
   /** Blocos estruturais ocultados (nota/nome/pilares/disciplinas/sugestoes/gabarito). */
   partesOcultas?: string[]
+  /** Cor dos marcadores no início da linha: `>` (normal) e `>>` (forte). */
+  corMarcador?: string
+  corMarcadorForte?: string
   /** Cor do TEXTO (nome) por card de disciplina (chave → hex). */
   discCorTexto?: Record<string, string>
   /** Fonte dos dados por card (chave do card → chave da disciplina cujos assuntos/estatísticas exibir). */
