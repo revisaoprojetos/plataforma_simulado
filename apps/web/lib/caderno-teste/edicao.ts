@@ -54,10 +54,26 @@ export function camposDoBloco(item: ItemCaderno, parte: string): CampoTexto[] {
     return [{ id: 'nome', label: 'Nome da disciplina', valor: c.disciplinas[i].nome }]
   }
   if (parte === 'diag_gab_obs') return [
+    { id: 'titulo', label: 'Título da seção', valor: c.gabaritoTitulo },
     ...c.gabaritoIntro.map((t, k) => ({ id: `intro:${k}`, label: `Parágrafo ${k + 1}`, valor: t, multiline: true })),
     ...c.gabaritoObs.map((t, k) => ({ id: `obs:${k}`, label: `Observação ${k + 1}`, valor: t, multiline: true })),
   ]
   return []
+}
+
+/** Partes do diagnóstico que podem ser REMOVIDAS (itens de lista). */
+export function podeRemoverParte(parte: string): boolean {
+  return parte.startsWith('intro:') || parte.startsWith('pilar:') || parte.startsWith('sug:') || parte.startsWith('disc:')
+}
+
+/** Remove (retorna novo conteúdo) a parte de lista indicada. */
+export function removerParteDiag(conteudo: DiagConteudo | undefined, parte: string): DiagConteudo {
+  const c = clonar(conteudo ?? DIAG_PADRAO)
+  if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] != null) c.intro.splice(i, 1) }
+  else if (parte.startsWith('pilar:')) { const i = idxPilar(c, parte.slice('pilar:'.length)); if (i >= 0) c.pilares.splice(i, 1) }
+  else if (parte.startsWith('sug:')) { const i = Number(parte.slice('sug:'.length)); if (c.sugestoes[i]) c.sugestoes.splice(i, 1) }
+  else if (parte.startsWith('disc:')) { const i = idxDisc(c, parte.slice('disc:'.length)); if (i >= 0) c.disciplinas.splice(i, 1) }
+  return c
 }
 
 function clonar(c: DiagConteudo): DiagConteudo { try { return structuredClone(c) } catch { return JSON.parse(JSON.stringify(c)) } }
@@ -87,7 +103,8 @@ export function aplicarCampoBloco(conteudo: DiagConteudo | undefined, parte: str
   } else if (parte.startsWith('disc:')) {
     const i = idxDisc(c, parte.slice('disc:'.length)); if (i >= 0 && campoId === 'nome') c.disciplinas[i].nome = valor
   } else if (parte === 'diag_gab_obs') {
-    if (campoId.startsWith('intro:')) { const k = Number(campoId.slice('intro:'.length)); if (c.gabaritoIntro[k] != null) c.gabaritoIntro[k] = valor }
+    if (campoId === 'titulo') c.gabaritoTitulo = valor
+    else if (campoId.startsWith('intro:')) { const k = Number(campoId.slice('intro:'.length)); if (c.gabaritoIntro[k] != null) c.gabaritoIntro[k] = valor }
     else if (campoId.startsWith('obs:')) { const k = Number(campoId.slice('obs:'.length)); if (c.gabaritoObs[k] != null) c.gabaritoObs[k] = valor }
   }
   return c

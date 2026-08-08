@@ -254,7 +254,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   }
   if (c.gabaritoObs.length || c.gabaritoIntro.length) {
     out.push(<Sec t={c.gabaritoTitulo || 'Gabarito oficial desatualizado'} />)
-    for (const p of c.gabaritoIntro) out.push(<p style={{ fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify' }}>{V(p)}</p>)
+    c.gabaritoIntro.forEach((p, i) => { const cor = corP('diag_gab_obs', '#243b53'); out.push(<p key={`gabi${i}`} {...atr('diag_gab_obs', 'Observações do gabarito', cor, { fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify', color: cor })}>{V(p)}</p>) })
     if (c.gabaritoObs.length) { const cor = corP('diag_gab_obs', '#a32d2d'); out.push(<div {...atr('diag_gab_obs', 'Observação do gabarito', cor, { background: '#f5f3ff', borderTop: `2px solid ${cor}`, padding: '8px 12px' })}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: 9, color: '#5a5570' }}>{V(o)}</div>)}</div>) }
   }
   return out

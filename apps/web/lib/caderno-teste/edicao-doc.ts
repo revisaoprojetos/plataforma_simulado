@@ -29,6 +29,17 @@ export function atualizarBlocoAttrs(doc: CadernoDoc, id: string, patch: Record<s
   }
 }
 
+/** Remove (imutável) um bloco por id em qualquer nível da árvore. */
+export function removerBloco(doc: CadernoDoc, id: string): CadernoDoc {
+  const filt = (bs?: Block[]): Block[] => (bs ?? []).filter((b) => b.id !== id).map((b) => b.innerBlocks ? { ...b, innerBlocks: filt(b.innerBlocks) } : b)
+  return {
+    ...doc,
+    pages: doc.pages.map((p) => ({ ...p, blocks: filt(p.blocks) })),
+    cabecalho: doc.cabecalho ? filt(doc.cabecalho) : doc.cabecalho,
+    rodape: doc.rodape ? filt(doc.rodape) : doc.rodape,
+  }
+}
+
 /** Rótulo amigável do tipo de bloco (cabeçalho do editor lateral). */
 export const NOME_BLOCO: Record<string, string> = {
   'texto-livre': 'Texto', 'titulo-secao': 'Título de seção', instrucoes: 'Instruções', card: 'Card',

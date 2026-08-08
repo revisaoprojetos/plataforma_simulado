@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown, Check } from 'lucide-react'
+import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown, Check, Undo2, Redo2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { HexColorField } from '@/components/admin/hex-color-field'
@@ -12,8 +12,8 @@ import { PreviaBlocos, capaPadraoDoPreset, docDoPreset } from '@/lib/caderno-tes
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
 import { metaDaModalidade, itemAtivo, novoItem, presetDoItem, CAPA_PADRAO, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
-import { camposDoBloco, aplicarCampoBloco, type CampoTexto } from '@/lib/caderno-teste/edicao'
-import { acharBloco, atualizarBlocoAttrs, camposDoBlocoDoc, NOME_BLOCO, type CampoBlocoDoc } from '@/lib/caderno-teste/edicao-doc'
+import { camposDoBloco, aplicarCampoBloco, podeRemoverParte, removerParteDiag, type CampoTexto } from '@/lib/caderno-teste/edicao'
+import { acharBloco, atualizarBlocoAttrs, removerBloco, camposDoBlocoDoc, NOME_BLOCO, type CampoBlocoDoc } from '@/lib/caderno-teste/edicao-doc'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
 import type { DiagConteudo } from '@/lib/caderno-teste/diagnostico'
 import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
@@ -47,7 +47,29 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   disciplinasIniciais?: DiscBancoTeste[]
   abrirPickerInicial?: boolean
 }) {
-  const [builder, setBuilder] = useState<BuilderV3>(builderInicial)
+  // Histórico p/ desfazer/refazer (igual ao v1): `builder` = entrada atual da pilha.
+  const histRef = useRef<BuilderV3[]>([builderInicial])
+  const idxRef = useRef(0)
+  const lastTsRef = useRef(0)
+  const [, forceRender] = useState(0)
+  const bump = () => forceRender((x) => x + 1)
+  const builder = histRef.current[idxRef.current]
+  const setBuilder = (updater: BuilderV3 | ((b: BuilderV3) => BuilderV3)) => {
+    const prev = histRef.current[idxRef.current]
+    const next = typeof updater === 'function' ? (updater as (b: BuilderV3) => BuilderV3)(prev) : updater
+    if (next === prev) return
+    const now = performance.now()
+    const coalesce = now - lastTsRef.current < 500 && idxRef.current > 0 // agrupa edições rápidas (sliders)
+    lastTsRef.current = now
+    let h = histRef.current.slice(0, idxRef.current + 1)
+    if (coalesce) h[h.length - 1] = next; else h.push(next)
+    if (h.length > 80) h = h.slice(h.length - 80)
+    histRef.current = h; idxRef.current = h.length - 1; bump()
+  }
+  const undo = () => { if (idxRef.current > 0) { idxRef.current--; lastTsRef.current = 0; bump() } }
+  const redo = () => { if (idxRef.current < histRef.current.length - 1) { idxRef.current++; lastTsRef.current = 0; bump() } }
+  const podeUndo = idxRef.current > 0
+  const podeRedo = idxRef.current < histRef.current.length - 1
   const [questoes, setQuestoes] = useState<PreviewQuestao[]>(questoesIniciais)
   const [registros, setRegistros] = useState<RegistroTeste[]>(registrosIniciais)
   const [disciplinasBanco, setDisciplinasBanco] = useState<DiscBancoTeste[]>(disciplinasIniciais)
@@ -66,6 +88,18 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const importRef = useRef<HTMLInputElement>(null)
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
+
+  // Atalhos: Ctrl/Cmd+Z = desfazer, Ctrl/Cmd+Shift+Z ou Ctrl+Y = refazer.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      const k = e.key.toLowerCase()
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
+      else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }) // sem deps: undo/redo leem refs atuais
 
   const ativo = itemAtivo(builder)
   const presetAtivo = presetDoItem(ativo) // modelo pronto (render por blocos do v1)
@@ -94,6 +128,16 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
     if (!base) return it
     return { ...it, docEdit: atualizarBlocoAttrs(base, id, patch) }
   }) }))
+  const removerBlocoDoc = (id: string) => {
+    setBuilder((b) => ({ ...b, itens: b.itens.map((it) => {
+      if (it.id !== b.ativo) return it
+      const preset = presetDoItem(it)
+      const base = it.docEdit ?? (preset ? docDoPreset(preset) : null)
+      if (!base) return it
+      return { ...it, docEdit: removerBloco(base, id) }
+    }) }))
+    setPickerBloco(null)
+  }
 
   function adicionarGrupo() { setPickerMode('add'); setPickerOpen(true) }
   function trocarModelo() { setPickerMode('trocar'); setPickerOpen(true) }
@@ -191,6 +235,10 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
               <button onClick={() => setAlunoIdx((i) => Math.min(registros.length - 1, i + 1))} disabled={alunoIdx >= registros.length - 1} className="rounded p-0.5 hover:bg-muted disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
             </div>
           )}
+          <div className="flex items-center overflow-hidden rounded-lg border">
+            <button type="button" onClick={undo} disabled={!podeUndo} title="Desfazer (Ctrl+Z)" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"><Undo2 className="h-4 w-4" /></button>
+            <button type="button" onClick={redo} disabled={!podeRedo} title="Refazer (Ctrl+Shift+Z)" className="flex h-8 w-8 items-center justify-center border-l text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"><Redo2 className="h-4 w-4" /></button>
+          </div>
           <input ref={importRef} type="file" accept=".docx,.html,.htm,.pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importar(f); e.target.value = '' }} />
           <Button variant="outline" size="sm" onClick={() => importRef.current?.click()} disabled={importando} title="Importar um caderno (Word .docx, HTML ou PDF) — mapeia como Diagnóstico">
             {importando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileUp className="mr-1.5 h-4 w-4" />} Importar
@@ -391,6 +439,11 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                 </div>
               )}
               <p className="mt-4 text-[10px] leading-snug text-muted-foreground">Personaliza só este bloco. Clique em qualquer bloco da prévia para editá-lo.</p>
+              {podeRemoverParte(pickerCor.parte) && (
+                <button type="button" onClick={() => { setConteudo(removerParteDiag(ativo.conteudo, pickerCor.parte)); setPickerCor(null) }} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-destructive/40 px-2 py-1.5 text-[12px] font-medium text-destructive transition-colors hover:bg-destructive/10">
+                  <Trash2 className="h-3.5 w-3.5" /> Apagar este bloco
+                </button>
+              )}
             </div>
           </aside>
         </>
@@ -484,11 +537,36 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
               <button onClick={() => setPickerBloco(null)} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
             <div className="scroll-claro min-h-0 flex-1 space-y-3.5 overflow-y-auto px-4 py-4">
-              {camposDoBlocoDoc(blocoSel).length === 0 && <p className="text-[11px] text-muted-foreground">Este bloco não tem propriedades editáveis por aqui.</p>}
               {camposDoBlocoDoc(blocoSel).map((campo) => (
                 <CampoBlocoEditor key={campo.id} campo={campo} onChange={(v) => setBlocoAttr(pickerBloco!, { [campo.id]: v })} />
               ))}
+
+              {/* Card de dados/desempenho: editar os rótulos e valores das linhas */}
+              {blocoSel.type === 'identificacao' && (['destaque', 'campos', 'desempenho'] as const).map((chave) => {
+                const linhas = ((blocoSel!.attributes as any)[chave] ?? []) as { rotulo: string; valor: string }[]
+                if (!linhas.length) return null
+                const rotChave = chave === 'destaque' ? 'Destaques' : chave === 'campos' ? 'Campos' : 'Desempenho'
+                const setLinha = (i: number, patch: Partial<{ rotulo: string; valor: string }>) =>
+                  setBlocoAttr(pickerBloco!, { [chave]: linhas.map((l, j) => j === i ? { ...l, ...patch } : l) })
+                return (
+                  <div key={chave} className="space-y-2 border-t pt-3">
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{rotChave}</div>
+                    {linhas.map((l, i) => (
+                      <div key={i} className="flex items-center gap-1.5">
+                        <input value={l.rotulo} onChange={(e) => setLinha(i, { rotulo: e.target.value })} placeholder="Rótulo" className="w-1/2 rounded border bg-background px-2 py-1 text-xs outline-none focus:border-primary" />
+                        <input value={l.valor} onChange={(e) => setLinha(i, { valor: e.target.value })} placeholder="Valor" className="w-1/2 rounded border bg-background px-2 py-1 text-xs outline-none focus:border-primary" />
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+
+              {camposDoBlocoDoc(blocoSel).length === 0 && blocoSel.type !== 'identificacao' && <p className="text-[11px] text-muted-foreground">Este bloco não tem propriedades editáveis por aqui.</p>}
               <p className="pt-1 text-[10px] leading-snug text-muted-foreground">Edita este bloco do modelo. Nas questões, a mudança vale para todas (é o mesmo bloco repetido).</p>
+
+              <button type="button" onClick={() => removerBlocoDoc(pickerBloco!)} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-destructive/40 px-2 py-1.5 text-[12px] font-medium text-destructive transition-colors hover:bg-destructive/10">
+                <Trash2 className="h-3.5 w-3.5" /> Apagar este bloco
+              </button>
             </div>
           </aside>
         </>
