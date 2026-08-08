@@ -8,11 +8,13 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { HexColorField } from '@/components/admin/hex-color-field'
 import { Previa } from '@/lib/caderno-teste/previa'
-import { PreviaBlocos, capaPadraoDoPreset } from '@/lib/caderno-teste/previa-blocos'
+import { PreviaBlocos, capaPadraoDoPreset, docDoPreset } from '@/lib/caderno-teste/previa-blocos'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
 import { metaDaModalidade, itemAtivo, novoItem, presetDoItem, CAPA_PADRAO, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { camposDoBloco, aplicarCampoBloco, type CampoTexto } from '@/lib/caderno-teste/edicao'
+import { acharBloco, atualizarBlocoAttrs, camposDoBlocoDoc, NOME_BLOCO, type CampoBlocoDoc } from '@/lib/caderno-teste/edicao-doc'
+import type { CadernoDoc } from '@/lib/caderno-designer/types'
 import type { DiagConteudo } from '@/lib/caderno-teste/diagnostico'
 import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
 import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
@@ -60,6 +62,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const [baixarAberto, setBaixarAberto] = useState(false)
   const [pickerCor, setPickerCor] = useState<{ parte: string; label: string; cor: string } | null>(null)
   const [pickerCapa, setPickerCapa] = useState(false)
+  const [pickerBloco, setPickerBloco] = useState<string | null>(null)
   const importRef = useRef<HTMLInputElement>(null)
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
@@ -80,6 +83,16 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
     const preset = presetDoItem(it)
     const base = it.capa ?? (preset ? capaPadraoDoPreset(preset) : CAPA_PADRAO)
     return { ...it, capa: { ...base, ...patch } }
+  }) }))
+  // Edição por bloco (modelos prontos): doc efetivo = docEdit do item OU o preset original.
+  const docEfetivo: CadernoDoc | null = presetAtivo ? (ativo.docEdit ?? docDoPreset(presetAtivo)) : null
+  const blocoSel = pickerBloco && docEfetivo ? acharBloco(docEfetivo, pickerBloco) : null
+  const setBlocoAttr = (id: string, patch: Record<string, unknown>) => setBuilder((b) => ({ ...b, itens: b.itens.map((it) => {
+    if (it.id !== b.ativo) return it
+    const preset = presetDoItem(it)
+    const base = it.docEdit ?? (preset ? docDoPreset(preset) : null)
+    if (!base) return it
+    return { ...it, docEdit: atualizarBlocoAttrs(base, id, patch) }
   }) }))
 
   function adicionarGrupo() { setPickerMode('add'); setPickerOpen(true) }
@@ -327,7 +340,8 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             <div className="mx-auto" style={{ zoom } as any}>
               {presetAtivo ? (
                 <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} folhaUrl={a.folhaUrl}
-                  capa={ativo.capa} onPickCapa={() => setPickerCapa(true)} selCapa={pickerCapa} />
+                  capa={ativo.capa} onPickCapa={() => { setPickerCapa(true); setPickerBloco(null) }} selCapa={pickerCapa}
+                  docOverride={ativo.docEdit} onPickBloco={(id) => { setPickerBloco(id); setPickerCapa(false) }} selBlocoId={pickerBloco} />
               ) : (
                 <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} selParte={pickerCor?.parte}
                   onPick={(parte, label, cor) => setPickerCor({ parte, label, cor })} />
@@ -456,7 +470,58 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           </aside>
         </>
       )}
+
+      {/* Barra lateral direita — editar um BLOCO do modelo pronto (cor/fonte/texto individual) */}
+      {pickerBloco && blocoSel && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/10" onClick={() => setPickerBloco(null)} />
+          <aside className="fixed inset-y-0 right-0 z-50 flex w-80 max-w-[85vw] flex-col border-l bg-background shadow-2xl duration-200 animate-in slide-in-from-right">
+            <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+              <div className="min-w-0">
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Editar bloco</div>
+                <div className="truncate text-sm font-semibold">{NOME_BLOCO[blocoSel.type] ?? blocoSel.type}</div>
+              </div>
+              <button onClick={() => setPickerBloco(null)} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="scroll-claro min-h-0 flex-1 space-y-3.5 overflow-y-auto px-4 py-4">
+              {camposDoBlocoDoc(blocoSel).length === 0 && <p className="text-[11px] text-muted-foreground">Este bloco não tem propriedades editáveis por aqui.</p>}
+              {camposDoBlocoDoc(blocoSel).map((campo) => (
+                <CampoBlocoEditor key={campo.id} campo={campo} onChange={(v) => setBlocoAttr(pickerBloco!, { [campo.id]: v })} />
+              ))}
+              <p className="pt-1 text-[10px] leading-snug text-muted-foreground">Edita este bloco do modelo. Nas questões, a mudança vale para todas (é o mesmo bloco repetido).</p>
+            </div>
+          </aside>
+        </>
+      )}
     </div>
+  )
+}
+
+/** Editor de um campo de bloco (texto/cor/fonte/número/toggle). */
+function CampoBlocoEditor({ campo, onChange }: { campo: CampoBlocoDoc; onChange: (v: any) => void }) {
+  if (campo.tipo === 'cor') return (
+    <div><div className="mb-1 text-[11px] text-muted-foreground">{campo.label}</div><HexColorField value={campo.valor || '#000000'} onChange={onChange} /></div>
+  )
+  if (campo.tipo === 'fonte') return (
+    <div>
+      <div className="mb-1 text-[11px] text-muted-foreground">{campo.label}</div>
+      <select value={campo.valor || ''} onChange={(e) => onChange(e.target.value)} className="w-full rounded border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary">
+        <option value="">Padrão do tema</option>
+        {FONTES_CADERNO.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+      </select>
+    </div>
+  )
+  if (campo.tipo === 'num') return (
+    <div><div className="mb-1 text-[11px] text-muted-foreground">{campo.label}</div><input type="number" value={Number(campo.valor) || 0} onChange={(e) => onChange(Number(e.target.value))} className="w-full rounded border bg-background px-2 py-1 text-xs outline-none focus:border-primary" /></div>
+  )
+  if (campo.tipo === 'bool') return (
+    <label className="flex cursor-pointer items-center justify-between gap-2 rounded-md border bg-background px-2 py-1.5 text-[13px]">
+      <span className="text-muted-foreground">{campo.label}</span>
+      <input type="checkbox" checked={!!campo.valor} onChange={(e) => onChange(e.target.checked)} />
+    </label>
+  )
+  return (
+    <div><div className="mb-1 text-[11px] text-muted-foreground">{campo.label}</div><textarea value={campo.valor || ''} onChange={(e) => onChange(e.target.value)} rows={campo.id === 'texto' ? 3 : 2} className="w-full resize-y rounded border bg-background px-2 py-1 text-xs leading-snug outline-none focus:border-primary" /></div>
   )
 }
 

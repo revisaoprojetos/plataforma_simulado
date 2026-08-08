@@ -5,7 +5,7 @@
 // `repeticao` sobre as questões do banco; a prévia MEDE cada item e distribui em folhas A4 de
 // verdade (paginação como no `Previa`), aplicando o fundo de página (letterhead) em cada folha.
 
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { BlockRender, dataComQuestao } from '@/lib/caderno-designer/blocks'
 import { resolveTheme, cssDaFonte, type CadernoTheme } from '@/lib/caderno-designer/theme'
 import { PRESETS_CADERNO } from '@/lib/caderno-designer/presets'
@@ -18,10 +18,25 @@ const A4_H = 1123
 
 type Item = { key: string; gapTop: number; quebra?: boolean; node: ReactNode }
 
+/** Reatribui ids determinísticos (por posição) a páginas/blocos — o preset gera ids aleatórios a cada
+ * build(), o que faria o id clicado na prévia não bater com a busca no builder. Ids estáveis permitem
+ * casar seleção↔edição entre instâncias e persistir o docEdit de forma consistente. */
+function idsDeterministicos(doc: CadernoDoc): CadernoDoc {
+  const walk = (bs: any[] | undefined, prefix: string): any[] => (bs ?? []).map((b, i) => ({
+    ...b, id: `${prefix}b${i}`, innerBlocks: b.innerBlocks ? walk(b.innerBlocks, `${prefix}b${i}-`) : b.innerBlocks,
+  }))
+  return {
+    ...doc,
+    pages: doc.pages.map((p, pi) => ({ ...p, id: `p${pi}`, blocks: walk(p.blocks as any[], `p${pi}-`) })),
+    cabecalho: walk(doc.cabecalho as any[], 'cab-'),
+    rodape: walk(doc.rodape as any[], 'rod-'),
+  }
+}
+
 /** Doc pronto do v1 pelo id do preset (caderno-perguntas / caderno-completo / caderno-objetivo…). */
 export function docDoPreset(presetId: string): CadernoDoc | null {
   const p = PRESETS_CADERNO.find((x) => x.id === presetId)
-  return p ? p.build() : null
+  return p ? idsDeterministicos(p.build()) : null
 }
 
 /** Texto do título que o preset traz na capa (usado como default da CapaConfig). */
@@ -52,7 +67,7 @@ export function montarCadernoData(questoes: PreviewQuestao[], vars: Record<strin
 }
 
 /** Itens (nós medíveis) de UMA página do doc — expande o `repeticao` questão a questão. */
-function itensDaPagina(page: CadernoDoc['pages'][number], data: CadernoData, theme: CadernoTheme): Item[] {
+function itensDaPagina(page: CadernoDoc['pages'][number], data: CadernoData, theme: CadernoTheme, selectable?: boolean): Item[] {
   return (page.blocks as any[]).filter((b) => b.type !== 'plano-fundo').flatMap((block): Item[] => {
     if (block.type === 'quebra-pagina') return [{ key: `${page.id}-${block.id}`, gapTop: 0, quebra: true, node: null }]
     if (block.type === 'repeticao') {
@@ -64,17 +79,19 @@ function itensDaPagina(page: CadernoDoc['pages'][number], data: CadernoData, the
       // o resto (alternativas, correção, comentário) vira item solto → enche as folhas.
       let corte = inner.findIndex((ib) => ib.type === 'texto-livre'); if (corte < 0) corte = 0
       const head = inner.slice(0, corte + 1); const resto = inner.slice(corte + 1)
-      return qs.flatMap((q) => {
+      // Edita a 1ª questão como amostra (selectable só no head/resto da primeira) — muda o bloco no doc.
+      return qs.flatMap((q, qi) => {
         const dq = dataComQuestao(data, q)
+        const sel = selectable && qi === 0 // seleção só na 1ª questão (o bloco é o mesmo p/ todas)
         const itens: Item[] = [{
           key: `${page.id}-${q.id}-head`, gapTop: gapQ,
-          node: <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{head.map((ib: any) => <BlockRender key={ib.id} block={ib} theme={theme} data={dq} />)}</div>,
+          node: <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{head.map((ib: any) => <BlockRender key={ib.id} block={ib} theme={theme} data={dq} selectable={sel} />)}</div>,
         }]
-        for (const ib of resto) itens.push({ key: `${page.id}-${q.id}-${ib.id}`, gapTop: 6, node: <BlockRender block={ib} theme={theme} data={dq} /> })
+        for (const ib of resto) itens.push({ key: `${page.id}-${q.id}-${ib.id}`, gapTop: 6, node: <BlockRender block={ib} theme={theme} data={dq} selectable={sel} /> })
         return itens
       })
     }
-    return [{ key: `${page.id}-${block.id}`, gapTop: 0, node: <BlockRender block={block} theme={theme} data={data} /> }]
+    return [{ key: `${page.id}-${block.id}`, gapTop: 0, node: <BlockRender block={block} theme={theme} data={data} selectable={selectable} /> }]
   })
 }
 
@@ -117,7 +134,7 @@ function FolhaCapa({ capaUrl, capa, theme, onPick, sel }: { capaUrl: string; cap
 }
 
 /** Prévia A4 de um modelo pronto (doc v1) com as questões do banco + variáveis do aluno. */
-export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl, folhaUrl, capa, onPickCapa, selCapa }: {
+export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl, folhaUrl, capa, onPickCapa, selCapa, docOverride, onPickBloco, selBlocoId }: {
   presetId: string
   questoes: PreviewQuestao[]
   vars?: Record<string, string>
@@ -133,10 +150,17 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
   onPickCapa?: () => void
   /** Título da capa selecionado (destaque). */
   selCapa?: boolean
+  /** Doc editado (sobrepõe o preset) — edição por bloco. */
+  docOverride?: CadernoDoc | null
+  /** Clique num bloco do conteúdo → abre o editor lateral (habilita a seleção). */
+  onPickBloco?: (id: string) => void
+  /** Bloco selecionado (destaque). */
+  selBlocoId?: string | null
 }) {
-  const doc = useMemo(() => docDoPreset(presetId), [presetId])
+  const doc = useMemo(() => docOverride ?? docDoPreset(presetId), [docOverride, presetId])
   const theme = useMemo(() => resolveTheme(cores), [cores])
   const data = useMemo(() => montarCadernoData(questoes, vars, titulo), [questoes, vars, titulo])
+  const selectable = !!onPickBloco
   const running = doc?.running ?? RUNNING_PADRAO
   // Reserva de área segura (cabeçalho/rodapé) — a arte do letterhead já traz cabeçalho/rodapé.
   const cabH = running.cabecalhoAtivo ? (running.cabecalhoAltura || PAD_V) : PAD_V
@@ -150,9 +174,9 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
     const contentPages = doc.pages.filter((p) => p.kind !== 'capa')
     return contentPages.flatMap((page, i) => [
       ...(i > 0 ? [{ key: `brk-${page.id}`, gapTop: 0, quebra: true, node: null } as Item] : []),
-      ...itensDaPagina(page, data, theme),
+      ...itensDaPagina(page, data, theme, selectable),
     ])
-  }, [doc, data, theme])
+  }, [doc, data, theme, selectable])
 
   const medRef = useRef<HTMLDivElement>(null)
   const [paginas, setPaginas] = useState<number[][] | null>(null)
@@ -180,8 +204,17 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
   const capaPage = capaUrl ? doc.pages.find((p) => p.kind === 'capa') : null
   const pages = paginas ?? [itens.map((_, i) => i)]
 
+  // Delegação: clique em qualquer bloco (data-block-id) abre o editor daquele bloco.
+  const onClick = selectable ? (e: ReactMouseEvent) => {
+    const el = (e.target as HTMLElement).closest('[data-block-id]') as HTMLElement | null
+    if (el?.dataset.blockId) onPickBloco!(el.dataset.blockId)
+  } : undefined
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }} onClick={onClick}>
+      {/* destaque do bloco selecionado (CSS, sem rebake dos nós) */}
+      {selectable && selBlocoId && <style>{`[data-block-id="${selBlocoId}"] > *{outline:2px solid #6d28d9!important;outline-offset:2px;border-radius:2px}`}</style>}
+      {selectable && <style>{`[data-block-id]{cursor:pointer}[data-block-id]:hover > *{outline:1.5px dashed #6d28d966;outline-offset:2px}`}</style>}
       {/* passe de medição (escondido) */}
       <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: contentW, display: 'flex', flexDirection: 'column' }}>
         {itens.map((it, i) => <div key={it.key} style={{ marginTop: i === 0 ? 0 : (it.gapTop || 0) }}>{it.node}</div>)}

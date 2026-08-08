@@ -4,6 +4,7 @@
 // simulado_cadernos_teste.config.builderV3.
 
 import { DIAG_PADRAO, DIAG_AGU_2023, type DiagConteudo } from './diagnostico'
+import type { CadernoDoc } from '@/lib/caderno-designer/types'
 
 export type Modalidade = 'folha_respostas' | 'caderno_questoes' | 'diagnostico'
 
@@ -66,6 +67,8 @@ export type ItemCaderno = {
   conteudo?: DiagConteudo
   /** Título da capa (modelos prontos doc-backed) — sobreposto à imagem de capa. */
   capa?: CapaConfig
+  /** Doc editado do modelo pronto (edição por bloco). Quando ausente, usa o preset original. */
+  docEdit?: CadernoDoc
 }
 
 export type { DiagConteudo }
@@ -201,6 +204,7 @@ function normalizarItem(raw: any): ItemCaderno {
   const item: ItemCaderno = { id: typeof raw?.id === 'string' ? raw.id : novoId(), modalidade, modelo, ajustes: { ...AJUSTES_BASE, ...(raw?.ajustes ?? {}) } }
   if (modalidade === 'diagnostico') item.conteudo = (raw?.conteudo && typeof raw.conteudo === 'object') ? raw.conteudo : clonar(DIAG_PADRAO)
   if (raw?.capa && typeof raw.capa === 'object') item.capa = { ...CAPA_PADRAO, ...raw.capa }
+  if (raw?.docEdit && typeof raw.docEdit === 'object') item.docEdit = raw.docEdit as CadernoDoc
   return item
 }
 

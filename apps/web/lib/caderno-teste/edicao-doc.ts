@@ -1,0 +1,57 @@
+// Edição por bloco dos MODELOS PRONTOS (doc-backed) — casa com a seleção por clique na prévia
+// (PreviaBlocos + BlockRender selectable). Acha/atualiza um bloco por id na árvore do CadernoDoc
+// e lista os campos editáveis (texto/cor/fonte/…) de cada tipo.
+
+import type { Block, CadernoDoc } from '@/lib/caderno-designer/types'
+
+export type CampoBlocoDoc = { id: string; label: string; tipo: 'texto' | 'cor' | 'fonte' | 'num' | 'bool'; valor: any }
+
+/** Acha um bloco por id em qualquer nível (páginas + cabeçalho/rodapé). */
+export function acharBloco(doc: CadernoDoc, id: string): Block | null {
+  const walk = (bs?: Block[]): Block | null => {
+    for (const b of bs ?? []) { if (b.id === id) return b; const r = walk(b.innerBlocks); if (r) return r }
+    return null
+  }
+  for (const p of doc.pages) { const r = walk(p.blocks); if (r) return r }
+  return walk(doc.cabecalho) || walk(doc.rodape) || null
+}
+
+/** Atualiza (imutável) os atributos de um bloco por id em toda a árvore. */
+export function atualizarBlocoAttrs(doc: CadernoDoc, id: string, patch: Record<string, unknown>): CadernoDoc {
+  const upd = (b: Block): Block => b.id === id
+    ? { ...b, attributes: { ...b.attributes, ...patch } }
+    : (b.innerBlocks ? { ...b, innerBlocks: b.innerBlocks.map(upd) } : b)
+  return {
+    ...doc,
+    pages: doc.pages.map((p) => ({ ...p, blocks: p.blocks.map(upd) })),
+    cabecalho: doc.cabecalho?.map(upd),
+    rodape: doc.rodape?.map(upd),
+  }
+}
+
+/** Rótulo amigável do tipo de bloco (cabeçalho do editor lateral). */
+export const NOME_BLOCO: Record<string, string> = {
+  'texto-livre': 'Texto', 'titulo-secao': 'Título de seção', instrucoes: 'Instruções', card: 'Card',
+  identificacao: 'Dados do estudante', 'gabarito-grid': 'Grade de gabarito', 'gabarito-correcao': 'Correção',
+  'q-comentario': 'Comentário', separador: 'Separador', repeticao: 'Questões', colunas: 'Colunas',
+  coluna: 'Coluna', espacador: 'Espaçador', 'plano-fundo': 'Fundo', imagem: 'Imagem', assinatura: 'Assinatura',
+}
+
+/** Campos editáveis (texto/cor/fonte) de um bloco por tipo. [] quando não há o que editar. */
+export function camposDoBlocoDoc(block: Block): CampoBlocoDoc[] {
+  const a = block.attributes as any
+  const C = (id: string, label: string, tipo: CampoBlocoDoc['tipo']): CampoBlocoDoc => ({ id, label, tipo, valor: a[id] ?? (tipo === 'bool' ? false : tipo === 'num' ? 0 : '') })
+  switch (block.type) {
+    case 'texto-livre': return [C('texto', 'Texto', 'texto'), C('color', 'Cor', 'cor'), C('fonte', 'Fonte', 'fonte'), C('size', 'Tamanho', 'num'), C('bold', 'Negrito', 'bool'), C('italico', 'Itálico', 'bool'), C('sublinhado', 'Sublinhado', 'bool')]
+    case 'titulo-secao': return [C('texto', 'Texto', 'texto'), C('subtitulo', 'Subtítulo', 'texto'), C('cor', 'Cor do texto', 'cor'), C('corFundo', 'Cor de fundo', 'cor'), C('fonte', 'Fonte', 'fonte')]
+    case 'instrucoes': return [C('titulo', 'Título', 'texto'), C('texto', 'Texto', 'texto'), C('corFundo', 'Cor de fundo', 'cor'), C('corBorda', 'Cor da borda', 'cor')]
+    case 'card': return [C('corFundo', 'Cor de fundo', 'cor'), C('bordaCor', 'Cor da borda', 'cor')]
+    case 'identificacao': return [C('titulo', 'Título', 'texto'), C('corHeader', 'Cor do cabeçalho', 'cor'), C('corHeaderTexto', 'Texto do cabeçalho', 'cor'), C('corAcento', 'Cor de acento', 'cor'), C('fonte', 'Fonte', 'fonte')]
+    case 'gabarito-grid': return [C('titulo', 'Título', 'texto'), C('corHeader', 'Cor do cabeçalho', 'cor'), C('fundoPar', 'Fundo (par)', 'cor'), C('textoPar', 'Texto (par)', 'cor'), C('fundoImpar', 'Fundo (ímpar)', 'cor'), C('textoImpar', 'Texto (ímpar)', 'cor'), C('fonte', 'Fonte', 'fonte')]
+    case 'gabarito-correcao': return [C('rotulo', 'Rótulo', 'texto')]
+    case 'q-comentario': return [C('titulo', 'Título', 'texto'), C('corFundo', 'Cor de fundo', 'cor'), C('corBorda', 'Cor da borda', 'cor'), C('corTitulo', 'Cor do título', 'cor'), C('corTexto', 'Cor do texto', 'cor')]
+    case 'separador': return [C('cor', 'Cor', 'cor')]
+    case 'imagem': return [C('url', 'URL da imagem', 'texto'), C('largura', 'Largura (%)', 'num')]
+    default: return []
+  }
+}
