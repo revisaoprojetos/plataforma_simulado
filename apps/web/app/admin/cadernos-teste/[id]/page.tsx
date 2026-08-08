@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { CadernoTesteBuilder } from '@/components/admin/caderno-teste/builder'
 import { normalizarBuilder, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
-import { previewQuestoesBanco, dadosBancoTeste } from '../actions'
+import { previewQuestoesBanco, dadosBancoTeste, carregarPadraoDiag } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +26,7 @@ export default async function CadernoTesteEditorPage({ params }: { params: Promi
   if (!caderno) notFound()
 
   const builder = normalizarBuilder((caderno as any).config, (caderno as any).nome)
+  const padraoDiag = await carregarPadraoDiag()
   let questoes: PreviewQuestao[] = []
   let registros: any[] = []
   let disciplinas: any[] = []
@@ -36,6 +37,6 @@ export default async function CadernoTesteEditorPage({ params }: { params: Promi
   }
 
   return (
-    <CadernoTesteBuilder cadernoId={caderno.id} builderInicial={builder} bancos={(bancos ?? []) as { id: string; nome: string }[]} questoesIniciais={questoes} registrosIniciais={registros} disciplinasIniciais={disciplinas} />
+    <CadernoTesteBuilder cadernoId={caderno.id} builderInicial={builder} bancos={(bancos ?? []) as { id: string; nome: string }[]} questoesIniciais={questoes} registrosIniciais={registros} disciplinasIniciais={disciplinas} padraoDiag={padraoDiag} />
   )
 }

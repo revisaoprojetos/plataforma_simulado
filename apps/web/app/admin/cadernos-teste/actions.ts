@@ -7,7 +7,7 @@ import { registrarAudit } from '@/lib/audit'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { carregarRegistros } from '@/lib/caderno-designer/merge'
 import { slugDiag } from '@/lib/caderno-teste/diagnostico'
-import type { BuilderV3, PreviewQuestao } from '@/lib/caderno-teste/tipos'
+import type { BuilderV3, PadraoDiag, PreviewQuestao } from '@/lib/caderno-teste/tipos'
 
 export type RegistroTeste = { id: string; nome: string; vars: Record<string, string> }
 export type DiscBancoTeste = { nome: string; chave: string; pilar?: string }
@@ -24,6 +24,36 @@ function pilarSlugDe(cats: unknown[], disc: string): string {
 
 const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
 const TABELA = 'simulado_cadernos_teste'
+/** Nome sentinela da linha que guarda o PADRÃO de estilo (não aparece na listagem). */
+export const NOME_PADRAO_DIAG = '__padrao_diagnostico__'
+
+/** Salva o padrão de estilo (aplicado a novos diagnósticos criados/importados). */
+export async function salvarPadraoDiag(padrao: PadraoDiag): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const { data: existe } = await svc.from(TABELA).select('id').eq('tenant_id', access.tenantId).eq('nome', NOME_PADRAO_DIAG).eq('deletado', false).maybeSingle()
+  const config = { padraoDiag: padrao }
+  if (existe) {
+    const { error } = await svc.from(TABELA).update({ config, atualizado_em: new Date().toISOString() }).eq('id', (existe as any).id)
+    if (error) return { ok: false, error: error.message }
+  } else {
+    const { error } = await svc.from(TABELA).insert({ tenant_id: access.tenantId, nome: NOME_PADRAO_DIAG, config })
+    if (error) return { ok: false, error: error.message }
+  }
+  revalidatePath('/admin/cadernos-teste')
+  return { ok: true }
+}
+
+/** Lê o padrão de estilo do tenant (ou null). */
+export async function carregarPadraoDiag(): Promise<PadraoDiag | null> {
+  const access = await getCurrentAccess()
+  if (!access.tenantId) return null
+  const svc = createAdminClient()
+  const { data } = await svc.from(TABELA).select('config').eq('tenant_id', access.tenantId).eq('nome', NOME_PADRAO_DIAG).eq('deletado', false).maybeSingle()
+  return ((data as any)?.config?.padraoDiag ?? null) as PadraoDiag | null
+}
 
 /** Salva o builder do caderno de TESTE (config.builderV3 + bancoId). Sincroniza o nome com o título. */
 export async function salvarBuilderTeste(id: string, builder: BuilderV3): Promise<{ ok: boolean; error?: string }> {

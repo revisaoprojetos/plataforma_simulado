@@ -11,15 +11,15 @@ import { Previa } from '@/lib/caderno-teste/previa'
 import { PreviaBlocos, capaPadraoDoPreset, docDoPreset } from '@/lib/caderno-teste/previa-blocos'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
-import { metaDaModalidade, itemAtivo, novoItem, presetDoItem, CAPA_PADRAO, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
+import { metaDaModalidade, itemAtivo, novoItem, presetDoItem, CAPA_PADRAO, extrairPadraoDiag, aplicarPadraoDiag, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PadraoDiag, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { camposDoBloco, aplicarCampoBloco, podeRemoverParte, removerParteDiag, type CampoTexto } from '@/lib/caderno-teste/edicao'
 import { acharBloco, atualizarBlocoAttrs, removerBloco, camposDoBlocoDoc, NOME_BLOCO, type CampoBlocoDoc } from '@/lib/caderno-teste/edicao-doc'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
 import type { DiagConteudo } from '@/lib/caderno-teste/diagnostico'
-import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
+import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, salvarPadraoDiag, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
 import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
 import { FONTES_CADERNO } from '@/lib/caderno-designer/theme'
-import { Users, ChevronRight, Download } from 'lucide-react'
+import { Users, ChevronRight, Download, Star } from 'lucide-react'
 
 const ICONE_MOD: Record<Modalidade, any> = { caderno_questoes: FileText, folha_respostas: ClipboardList, diagnostico: BarChart3 }
 const SEM_VARS: Record<string, string> = {} // referência estável (evita re-render em loop no PreviaBlocos)
@@ -38,7 +38,7 @@ function useZoomAjustado(alvoLargura = 794) {
   return { ref, zoom }
 }
 
-export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoesIniciais, registrosIniciais = [], disciplinasIniciais = [], abrirPickerInicial = false }: {
+export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoesIniciais, registrosIniciais = [], disciplinasIniciais = [], abrirPickerInicial = false, padraoDiag = null }: {
   cadernoId: string
   builderInicial: BuilderV3
   bancos: BancoOpcao[]
@@ -46,6 +46,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   registrosIniciais?: RegistroTeste[]
   disciplinasIniciais?: DiscBancoTeste[]
   abrirPickerInicial?: boolean
+  padraoDiag?: PadraoDiag | null
 }) {
   // Histórico p/ desfazer/refazer (igual ao v1): `builder` = entrada atual da pilha.
   const histRef = useRef<BuilderV3[]>([builderInicial])
@@ -153,14 +154,16 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
     setBuilder((b) => {
       if (pickerMode === 'add') {
         const src = itemAtivo(b).ajustes
-        const it = novoItem(m, modeloId)
+        let it = novoItem(m, modeloId)
         it.ajustes = { ...it.ajustes, titulo: src.titulo, corPrimaria: src.corPrimaria, corSecundaria: src.corSecundaria }
+        if (m === 'diagnostico') it = aplicarPadraoDiag(it, padraoDiag) // novo diagnóstico já nasce com o estilo padrão
         return { ...b, itens: [...b.itens, it], ativo: it.id }
       }
       return { ...b, itens: b.itens.map((it) => {
         if (it.id !== b.ativo) return it
-        const novo = novoItem(m, modeloId)
-        return { ...novo, id: it.id, ajustes: { ...novo.ajustes, titulo: it.ajustes.titulo, corPrimaria: it.ajustes.corPrimaria, corSecundaria: it.ajustes.corSecundaria } }
+        let novo = novoItem(m, modeloId)
+        novo = { ...novo, id: it.id, ajustes: { ...novo.ajustes, titulo: it.ajustes.titulo, corPrimaria: it.ajustes.corPrimaria, corSecundaria: it.ajustes.corSecundaria } }
+        return m === 'diagnostico' ? aplicarPadraoDiag(novo, padraoDiag) : novo
       }) }
     })
     setPickerOpen(false)
@@ -182,6 +185,13 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       if (r.ok) toast.success('Caderno de teste salvo'); else toast.error(r.error ?? 'Erro ao salvar')
     })
   }
+  /** Salva o ESTILO do grupo atual como padrão — novos diagnósticos (criados/importados) já nascem com ele. */
+  function definirPadrao() {
+    start(async () => {
+      const r = await salvarPadraoDiag(extrairPadraoDiag(ativo))
+      if (r.ok) toast.success('Padrão salvo! Novos diagnósticos já virão com este estilo.'); else toast.error(r.error ?? 'Erro ao salvar o padrão')
+    })
+  }
   /** Importa um caderno (Word/HTML) → cria um novo grupo de Diagnóstico já mapeado. */
   async function importar(file: File) {
     setImportando(true)
@@ -190,9 +200,10 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       const resp = await fetch('/api/admin/caderno-teste/importar', { method: 'POST', body: fd })
       const r = await resp.json().catch(() => ({ ok: false, error: 'Resposta inválida do servidor.' }))
       if (!resp.ok || !r.ok || !r.conteudo) { toast.error(r.error ?? 'Falha ao importar.'); return }
-      const it = novoItem('diagnostico', 'padrao')
+      let it = novoItem('diagnostico', 'padrao')
       it.conteudo = r.conteudo
       it.ajustes = { ...it.ajustes, corPrimaria: '#2d254f', corSecundaria: '#f6b420', titulo: 'Diagnóstico de Desempenho' }
+      it = aplicarPadraoDiag(it, padraoDiag) // importado já herda o estilo padrão
       setBuilder((b) => ({ ...b, itens: [...b.itens, it], ativo: it.id }))
       if (Array.isArray(r.avisos) && r.avisos.length) toast.warning(`Importado com ${r.avisos.length} aviso(s) — revise a prévia.`)
       toast.success('Caderno importado como novo grupo de Diagnóstico. Revise e salve.')
@@ -257,6 +268,11 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
               </>
             )}
           </div>
+          {ativo.modalidade === 'diagnostico' && (
+            <Button variant="outline" size="sm" onClick={definirPadrao} disabled={pending} title="Salvar o estilo destes blocos como padrão — novos diagnósticos (criados ou importados) já virão assim">
+              <Star className="mr-1.5 h-4 w-4" /> Definir como padrão
+            </Button>
+          )}
           <Button onClick={salvar} disabled={pending} size="sm">{pending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />} Salvar</Button>
         </div>
       </div>

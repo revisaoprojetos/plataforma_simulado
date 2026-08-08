@@ -26,7 +26,7 @@ export default async function CadernosTestePage() {
     const sel = (cols: string) => svc.from('simulado_cadernos_teste').select(cols).eq('deletado', false).eq('tenant_id', tid).order('atualizado_em', { ascending: false })
     let r: { data: any[] | null; error: { message: string } | null } = await sel('id, nome, config')
     if (r.error) r = await sel('id, nome, config')
-    cadernos = r.data ?? []
+    cadernos = (r.data ?? []).filter((c: any) => c.nome !== '__padrao_diagnostico__') // esconde a linha do padrão
   }
   const lista = cadernos.map((c: any) => {
     const b = c.config?.builderV3
