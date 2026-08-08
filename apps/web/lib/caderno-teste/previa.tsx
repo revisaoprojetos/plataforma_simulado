@@ -183,19 +183,19 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     return <div {...atr(parte, t, cor, { background: cor, color: '#fff', fontWeight: 700, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', padding: '6px 12px', borderRadius: 2, margin: '3px 0 7px' })}>{V(t)}</div>
   }
   if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); out.push(
-    <div {...atr('diag_cab', 'Cabeçalho', cor, { background: cor, color: '#fff', padding: '12px 16px', marginBottom: 12 })}>
+    <div {...atr('diag_cab', 'Cabeçalho', cor, { background: cor, color: '#fff', padding: '12px 16px' })}>
       <div style={{ fontSize: 20, fontWeight: 800 }}>{V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>
       {c.subtitulo && <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{V(c.subtitulo)}</div>}
     </div>,
   ) }
   if (a.mostrarDadosAluno && !ocultasP.has('nome')) { const corN = corP('diag_nome_rot', prim), corV = corP('diag_nome_val', amar); out.push(
-    <div style={{ display: 'flex', overflow: 'hidden', marginBottom: 12 }}>
+    <div style={{ display: 'flex', overflow: 'hidden' }}>
       <div {...atr('diag_nome_rot', 'Rótulo NOME', corN, { background: corN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '8px 14px', whiteSpace: 'nowrap' })}>{V(c.rotuloNome ?? 'NOME:')}</div>
       <div {...atr('diag_nome_val', 'Faixa do nome', corV, { background: corV, color: '#3b2f00', flex: 1, padding: '8px 14px', fontSize: 12, fontWeight: 600 })}>{V('{nome}')}</div>
     </div>,
   ) }
   if (!ocultasP.has('nota')) { const corNum = corP('diag_nota_num', '#9b6800'), corFx = corP('diag_nota_faixa', amar); out.push(
-    <div style={{ display: 'flex', border: `1px solid ${prim}33`, overflow: 'hidden', marginBottom: 12 }}>
+    <div style={{ display: 'flex', border: `1px solid ${prim}33`, overflow: 'hidden' }}>
       <div {...atr('diag_nota_num', 'Bloco da nota', corNum, { background: corNum, color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'baseline' })}><span style={{ fontSize: 32, fontWeight: 800 }}>{V('{acertos}')}</span><span style={{ fontSize: 16, fontWeight: 700 }}>/{V(c.notaTotal)}</span></div>
       <div {...atr('diag_nota_faixa', 'Faixa da nota', corFx, { background: corFx, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: 12, fontWeight: 600 })}>{V(c.notaTexto)}</div>
     </div>,
@@ -343,13 +343,18 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
     let cancel = false
     const medir = () => {
       if (cancel || !medRef.current) return
-      const hs = (Array.from(medRef.current.children) as HTMLElement[]).map((el) => el.getBoundingClientRect().height)
-      const BUF = 8 // folga p/ sub-pixel e diferenças de medição — evita cortar o último card da folha
+      const kids = Array.from(medRef.current.children) as HTMLElement[]
+      if (!kids.length) { setPaginas([[]]); return }
+      // O div de medição espelha a folha (mesmos wrappers com marginBottom: GAP). Medimos o TOPO de
+      // cada bloco: o delta até o próximo é a altura REAL + espaçamento real (com colapso de margens),
+      // idêntico à renderização. Assim nada é empurrado com espaço sobrando nem cortado.
+      const tops = kids.map((el) => el.getBoundingClientRect().top)
+      const hs = kids.map((el, i) => (i < kids.length - 1 ? tops[i + 1] : el.getBoundingClientRect().bottom) - tops[i])
+      const BUF = 2 // folga mínima p/ sub-pixel (a medição já é fiel)
       const pages: number[][] = []; let cur: number[] = []; let h = 0
       for (let i = 0; i < hs.length; i++) {
-        const bh = hs[i] + (cur.length ? GAP : 0) // GAP só ENTRE blocos — não antes do 1º da folha (recupera espaço)
-        if (cur.length && h + bh > availH - BUF) { pages.push(cur); cur = [i]; h = hs[i] }
-        else { cur.push(i); h += bh }
+        if (cur.length && h + hs[i] > availH - BUF) { pages.push(cur); cur = [i]; h = hs[i] }
+        else { cur.push(i); h += hs[i] }
       }
       if (cur.length) pages.push(cur)
       setPaginas(pages.length ? pages : [[]])
@@ -368,8 +373,8 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
       {/* passe de medição (escondido) */}
-      <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: contentW, display: 'flex', flexDirection: 'column' }}>
-        {blocos.map((b, i) => <div key={i}>{b}</div>)}
+      <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: contentW }}>
+        {blocos.map((b, i) => <div key={i} style={{ marginBottom: GAP }}>{b}</div>)}
       </div>
       {temCapa && <Folha item={item} num={1} total={total} pad={pad} Ht={Ht} Hf={Hf} capa />}
       {pages.map((idxs, pi) => (
