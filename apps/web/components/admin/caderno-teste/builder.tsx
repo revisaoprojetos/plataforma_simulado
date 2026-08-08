@@ -424,30 +424,36 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
               <button onClick={() => setPickerCor(null)} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
             <div className="scroll-claro min-h-0 flex-1 overflow-y-auto px-4 py-4">
-              <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cor</div>
-              <HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />
-              {a.coresParte?.[pickerCor.parte] && (
-                <button onClick={() => { const cp = { ...(a.coresParte ?? {}) }; delete cp[pickerCor.parte]; setAjuste({ coresParte: cp }) }} className="mt-2 text-[11px] text-muted-foreground hover:underline">Restaurar cor padrão</button>
-              )}
-              {/* Sugestão: demais cores agrupadas no topo (título + marcadores) */}
-              {pickerCor.parte.startsWith('sug:') && (() => {
+              {pickerCor.parte.startsWith('sug:') ? (() => {
                 const i = Number(pickerCor.parte.slice('sug:'.length))
                 const cf = (ativo.conteudo ?? {}) as DiagConteudo
                 const s = cf.sugestoes?.[i]
                 return (
-                  <div className="mt-3 space-y-2.5">
-                    <div>
-                      <div className="mb-1 text-[11px] text-muted-foreground">Cor do título</div>
-                      <HexColorField value={s?.corTitulo || '#9a6e00'} onChange={(v) => setConteudo({ ...cf, sugestoes: (cf.sugestoes ?? []).map((x, j) => j === i ? { ...x, corTitulo: v } : x) })} />
-                    </div>
+                  <div className="space-y-2.5">
                     <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <div className="mb-1 text-[11px] text-muted-foreground">Cor</div>
+                        <HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />
+                      </div>
+                      <div>
+                        <div className="mb-1 text-[11px] text-muted-foreground">Cor do título</div>
+                        <HexColorField value={s?.corTitulo || '#9a6e00'} onChange={(v) => setConteudo({ ...cf, sugestoes: (cf.sugestoes ?? []).map((x, j) => j === i ? { ...x, corTitulo: v } : x) })} />
+                      </div>
                       <div><div className="mb-1 text-[11px] text-muted-foreground">Cor de <b>&gt;</b></div><HexColorField value={cf.corMarcador || '#3b5bdb'} onChange={(v) => setConteudo({ ...cf, corMarcador: v })} /></div>
                       <div><div className="mb-1 text-[11px] text-muted-foreground">Cor de <b>&gt;&gt;</b></div><HexColorField value={cf.corMarcadorForte || '#e8850c'} onChange={(v) => setConteudo({ ...cf, corMarcadorForte: v })} /></div>
                     </div>
-                    <p className="text-[10px] leading-snug text-muted-foreground">No campo Tópicos, comece a linha com <code>&gt;</code> ou <code>&gt;&gt;</code> para o marcador pegar a cor.</p>
+                    <p className="text-[10px] leading-snug text-muted-foreground">Nos Tópicos, comece a linha com <code>&gt;</code> ou <code>&gt;&gt;</code> para o marcador pegar a cor.</p>
                   </div>
                 )
-              })()}
+              })() : (
+                <>
+                  <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cor</div>
+                  <HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />
+                  {a.coresParte?.[pickerCor.parte] && (
+                    <button onClick={() => { const cp = { ...(a.coresParte ?? {}) }; delete cp[pickerCor.parte]; setAjuste({ coresParte: cp }) }} className="mt-2 text-[11px] text-muted-foreground hover:underline">Restaurar cor padrão</button>
+                  )}
+                </>
+              )}
               {campos.length > 0 && (
                 <div className="mt-4 space-y-2.5 border-t pt-4">
                   <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Texto</div>
