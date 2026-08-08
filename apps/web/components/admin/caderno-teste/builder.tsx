@@ -485,6 +485,13 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                   })}
                 </div>
               </div>
+              <div className="mt-3">
+                <div className="mb-1 text-[11px] text-muted-foreground">Fonte</div>
+                <select value={a.fonteParte?.[pickerCor.parte] ?? ''} onChange={(e) => setAjuste({ fonteParte: { ...(a.fonteParte ?? {}), [pickerCor.parte]: e.target.value } })} className="w-full rounded border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary">
+                  <option value="">Padrão</option>
+                  {FONTES_CADERNO.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                </select>
+              </div>
               {campos.length > 0 && (
                 <div className="mt-4 space-y-2.5 border-t pt-4">
                   <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Texto</div>

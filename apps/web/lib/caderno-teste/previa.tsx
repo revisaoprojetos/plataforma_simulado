@@ -9,6 +9,7 @@ import type { ItemCaderno, PreviewQuestao } from './tipos'
 import { DIAG_PADRAO, slugDiag, topicosParaTexto, type DiagPilar } from './diagnostico'
 import { CORES_PILAR_PADRAO } from './tipos'
 import { formatarInline, formatarMarcadores } from './formato'
+import { cssDaFonte } from '@/lib/caderno-designer/theme'
 
 const A4_W = 794
 const A4_H = 1123
@@ -89,7 +90,9 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   // Aplica também o alinhamento por parte (herdado pelos textos filhos).
   const atr = (parte: string, label: string, cor: string, baseStyle: any): { style: any; onClick?: (e: any) => void; title?: string } => {
     const est = (a.estiloParte ?? {})[parte] ?? {}
+    const fonte = cssDaFonte((a.fonteParte ?? {})[parte])
     const style = { ...baseStyle, textAlign: alignP(parte, baseStyle?.textAlign), color: corTextoP(parte, baseStyle?.color),
+      ...(fonte ? { fontFamily: fonte } : {}),
       ...(est.b ? { fontWeight: 700 } : {}), ...(est.i ? { fontStyle: 'italic' } : {}), ...(est.u ? { textDecoration: 'underline' } : {}) }
     if (!inter?.onPick) return { style }
     return {

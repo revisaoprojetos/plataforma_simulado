@@ -35,6 +35,8 @@ export type BuilderAjustes = {
   coresTextoParte: Record<string, string>
   /** Estilo (negrito/itálico/sublinhado) por PARTE — aplica ao bloco inteiro. */
   estiloParte: Record<string, { b?: boolean; i?: boolean; u?: boolean }>
+  /** Fonte por PARTE (parte → id de FONTES_CADERNO). Herdada pelos textos do bloco. */
+  fonteParte: Record<string, string>
 }
 
 /** Cores padrão por pilar (adaptável: pilares novos herdam a cor secundária até serem configurados). */
@@ -115,6 +117,7 @@ export const AJUSTES_BASE: BuilderAjustes = {
   alinhamentoParte: {},
   coresTextoParte: {},
   estiloParte: {},
+  fonteParte: {},
 }
 
 export type Modelo = {
