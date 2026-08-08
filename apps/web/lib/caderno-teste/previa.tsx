@@ -244,8 +244,8 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   if (c.sugestoes.length && !ocultasP.has('sugestoes')) {
     out.push(<Sec parte="sec_sugestoes" t={c.tituloSugestoes ?? 'Sugestões de estudo'} />)
     c.sugestoes.forEach((s, si) => { const cor = corP(`sug:${si}`, '#fdf3d0'); out.push(
-      <div key={`sug${si}`} style={{ marginBottom: 10 }}>
-        <div {...atr(`sug:${si}`, `Sugestão · ${s.titulo}`, cor, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: cor, padding: '5px 12px' })}>
+      <div key={`sug${si}`} {...atr(`sug:${si}`, `Sugestão · ${s.titulo}`, cor, { marginBottom: 10 })}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: cor, padding: '5px 12px' }}>
           <span style={{ fontWeight: 800, fontSize: 11, color: s.corTitulo || '#9a6e00' }}>{V(s.titulo)}</span>
           {s.prioridade && <span style={{ fontWeight: 700, fontSize: 9, color: '#9a6e00' }}>[!] {V(s.prioridade)}</span>}
         </div>
