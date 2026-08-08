@@ -81,11 +81,15 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
 
   // Cor individual por PARTE (clique na prévia): coresParte[parte] sobrepõe a cor padrão do bloco.
   const corP = (parte: string, def: string) => (a.coresParte ?? {})[parte] || def
+  // Alinhamento por PARTE (override sobre o padrão do bloco).
+  const alignP = (parte: string, def: any) => ((a.alinhamentoParte ?? {})[parte] as any) || def
   // Props (style + clique) para tornar qualquer bloco selecionável na prévia e destacá-lo quando ativo.
+  // Aplica também o alinhamento por parte (herdado pelos textos filhos).
   const atr = (parte: string, label: string, cor: string, baseStyle: any): { style: any; onClick?: (e: any) => void; title?: string } => {
-    if (!inter?.onPick) return { style: baseStyle }
+    const style = { ...baseStyle, textAlign: alignP(parte, baseStyle?.textAlign) }
+    if (!inter?.onPick) return { style }
     return {
-      style: { ...baseStyle, cursor: 'pointer', ...(inter.selParte === parte ? { outline: `2px solid ${cor}`, outlineOffset: -1 } : {}) },
+      style: { ...style, cursor: 'pointer', ...(inter.selParte === parte ? { outline: `2px solid ${cor}`, outlineOffset: -1 } : {}) },
       onClick: (e) => inter!.onPick!(parte, label, cor, (e.currentTarget as HTMLElement).getBoundingClientRect()),
       title: 'Clique para mudar a cor deste bloco',
     }
@@ -207,7 +211,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
               {bandas.map((b, j) => (
                 <div key={j} style={{ marginBottom: 6 }}>
                   {!banda && <div style={{ fontSize: 9, fontWeight: 700, color: cor }}>{b.faixa}</div>}
-                  {b.texto && <div style={{ fontSize: 8.5, color: '#243b53', lineHeight: 1.4, textAlign: 'justify' }}>{V(b.texto)}</div>}
+                  {b.texto && <div style={{ fontSize: 8.5, color: '#243b53', lineHeight: 1.4, textAlign: alignP(parte, 'justify') }}>{V(b.texto)}</div>}
                 </div>
               ))}
             </div>
@@ -250,8 +254,8 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
           {s.prioridade && <span style={{ fontWeight: 700, fontSize: 9, color: '#9a6e00' }}>[!] {V(s.prioridade)}</span>}
         </div>
         <div style={{ background: '#f0eeff', padding: '8px 12px' }}>
-          {s.intro && <p style={{ fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify' }}>{V(s.intro)}</p>}
-          {s.itens.length > 0 && <div style={{ fontSize: base - 1, lineHeight: 1.5, textAlign: 'justify' }}>{Vm(topicosParaTexto(s.itens))}</div>}
+          {s.intro && <p style={{ fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: alignP(`sug:${si}`, 'justify') }}>{V(s.intro)}</p>}
+          {s.itens.length > 0 && <div style={{ fontSize: base - 1, lineHeight: 1.5, textAlign: alignP(`sug:${si}`, 'justify') }}>{Vm(topicosParaTexto(s.itens))}</div>}
         </div>
       </div>,
     ) })

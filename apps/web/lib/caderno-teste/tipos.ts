@@ -29,6 +29,8 @@ export type BuilderAjustes = {
   coresDisc: Record<string, string>
   /** Cor individual por PARTE do preview (chave da parte → hex) — clique em qualquer bloco na prévia. */
   coresParte: Record<string, string>
+  /** Alinhamento do texto por PARTE (parte → left/center/right/justify). */
+  alinhamentoParte: Record<string, string>
 }
 
 /** Cores padrão por pilar (adaptável: pilares novos herdam a cor secundária até serem configurados). */
@@ -106,6 +108,7 @@ export const AJUSTES_BASE: BuilderAjustes = {
   coresPilar: { ...CORES_PILAR_PADRAO },
   coresDisc: {},
   coresParte: {},
+  alinhamentoParte: {},
 }
 
 export type Modelo = {

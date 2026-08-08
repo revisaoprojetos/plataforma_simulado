@@ -454,6 +454,15 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                   )}
                 </>
               )}
+              <div className="mt-3">
+                <div className="mb-1 text-[11px] text-muted-foreground">Alinhamento</div>
+                <div className="flex overflow-hidden rounded-md border">
+                  {([['left', 'Esq.'], ['center', 'Centro'], ['right', 'Dir.'], ['justify', 'Justif.']] as const).map(([v, lbl]) => (
+                    <button key={v} type="button" onClick={() => setAjuste({ alinhamentoParte: { ...(a.alinhamentoParte ?? {}), [pickerCor.parte]: v } })}
+                      className={cn('flex-1 py-1 text-[11px]', (a.alinhamentoParte?.[pickerCor.parte]) === v ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-muted')}>{lbl}</button>
+                  ))}
+                </div>
+              </div>
               {campos.length > 0 && (
                 <div className="mt-4 space-y-2.5 border-t pt-4">
                   <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Texto</div>
