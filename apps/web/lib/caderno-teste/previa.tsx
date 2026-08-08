@@ -88,7 +88,9 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   // Props (style + clique) para tornar qualquer bloco selecionável na prévia e destacá-lo quando ativo.
   // Aplica também o alinhamento por parte (herdado pelos textos filhos).
   const atr = (parte: string, label: string, cor: string, baseStyle: any): { style: any; onClick?: (e: any) => void; title?: string } => {
-    const style = { ...baseStyle, textAlign: alignP(parte, baseStyle?.textAlign), color: corTextoP(parte, baseStyle?.color) }
+    const est = (a.estiloParte ?? {})[parte] ?? {}
+    const style = { ...baseStyle, textAlign: alignP(parte, baseStyle?.textAlign), color: corTextoP(parte, baseStyle?.color),
+      ...(est.b ? { fontWeight: 700 } : {}), ...(est.i ? { fontStyle: 'italic' } : {}), ...(est.u ? { textDecoration: 'underline' } : {}) }
     if (!inter?.onPick) return { style }
     return {
       style: { ...style, cursor: 'pointer', ...(inter.selParte === parte ? { outline: `2px solid ${cor}`, outlineOffset: -1 } : {}) },
@@ -184,7 +186,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     </div>,
   ) }
   if (a.mostrarDadosAluno && !ocultasP.has('nome')) { const corN = corP('diag_nome_rot', prim), corV = corP('diag_nome_val', amar); out.push(
-    <div style={{ display: 'flex', border: `1px solid ${corN}`, overflow: 'hidden', marginBottom: 12 }}>
+    <div style={{ display: 'flex', overflow: 'hidden', marginBottom: 12 }}>
       <div {...atr('diag_nome_rot', 'Rótulo NOME', corN, { background: corN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '8px 14px' })}>NOME:</div>
       <div {...atr('diag_nome_val', 'Faixa do nome', corV, { background: corV, color: '#3b2f00', flex: 1, padding: '8px 14px', fontSize: 12, fontWeight: 600 })}>{V('{nome}')}</div>
     </div>,

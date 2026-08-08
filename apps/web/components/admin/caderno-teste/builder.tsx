@@ -475,6 +475,16 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                   ))}
                 </div>
               </div>
+              <div className="mt-3">
+                <div className="mb-1 text-[11px] text-muted-foreground">Estilo</div>
+                <div className="flex gap-1.5">
+                  {([['b', <b key="b">B</b>], ['i', <i key="i">I</i>], ['u', <u key="u">U</u>]] as const).map(([k, ic]) => {
+                    const cur = a.estiloParte?.[pickerCor.parte] ?? {}
+                    return <button key={k} type="button" onClick={() => setAjuste({ estiloParte: { ...(a.estiloParte ?? {}), [pickerCor.parte]: { ...cur, [k]: !(cur as any)[k] } } })}
+                      className={cn('flex h-7 w-8 items-center justify-center rounded border text-[13px]', (cur as any)[k] ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted')}>{ic}</button>
+                  })}
+                </div>
+              </div>
               {campos.length > 0 && (
                 <div className="mt-4 space-y-2.5 border-t pt-4">
                   <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Texto</div>
