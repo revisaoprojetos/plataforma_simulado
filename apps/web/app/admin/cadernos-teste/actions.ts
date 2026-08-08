@@ -25,7 +25,7 @@ function pilarSlugDe(cats: unknown[], disc: string): string {
 const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
 const TABELA = 'simulado_cadernos_teste'
 /** Nome sentinela da linha que guarda o PADRÃO de estilo (não aparece na listagem). */
-const NOME_PADRAO_DIAG = '__padrao_diagnostico__'
+export const NOME_PADRAO_DIAG = '__padrao_diagnostico__'
 
 /** Salva o padrão de estilo (aplicado a novos diagnósticos criados/importados). */
 export async function salvarPadraoDiag(padrao: PadraoDiag): Promise<{ ok: boolean; error?: string }> {
