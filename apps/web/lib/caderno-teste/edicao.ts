@@ -17,7 +17,7 @@ function idxDisc(c: DiagConteudo, chave: string): number {
 }
 
 /** Campos de texto editáveis do bloco `parte` do item. [] quando o bloco não tem texto editável. */
-export function camposDoBloco(item: ItemCaderno, parte: string): CampoTexto[] {
+export function camposDoBloco(item: ItemCaderno, parte: string, nomeFallback?: string): CampoTexto[] {
   if (item.modalidade !== 'diagnostico') {
     if (parte === 'cab_titulo') return [{ id: 'titulo', label: 'Título', valor: item.ajustes.titulo, alvo: 'titulo' }]
     return []
@@ -50,8 +50,10 @@ export function camposDoBloco(item: ItemCaderno, parte: string): CampoTexto[] {
     ]
   }
   if (parte.startsWith('disc:')) {
-    const i = idxDisc(c, parte.slice('disc:'.length)); if (i < 0) return []
-    return [{ id: 'nome', label: 'Nome da disciplina', valor: c.disciplinas[i].nome }]
+    const chave = parte.slice('disc:'.length)
+    const i = idxDisc(c, chave)
+    const nome = i >= 0 ? c.disciplinas[i].nome : (c.discNomes?.[chave] ?? nomeFallback ?? '')
+    return [{ id: 'nome', label: 'Nome da disciplina', valor: nome }]
   }
   if (parte === 'sec_pilares') return [{ id: 'tituloPilares', label: 'Título da seção', valor: c.tituloPilares ?? 'Desempenho por pilar' }]
   if (parte === 'sec_disciplinas') return [{ id: 'tituloDisciplinas', label: 'Título da seção', valor: c.tituloDisciplinas ?? 'Desempenho por disciplina' }]
@@ -76,7 +78,7 @@ export function removerParteDiag(conteudo: DiagConteudo | undefined, parte: stri
   if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] != null) c.intro.splice(i, 1) }
   else if (parte.startsWith('pilar:')) { const i = idxPilar(c, parte.slice('pilar:'.length)); if (i >= 0) c.pilares.splice(i, 1) }
   else if (parte.startsWith('sug:')) { const i = Number(parte.slice('sug:'.length)); if (c.sugestoes[i]) c.sugestoes.splice(i, 1) }
-  else if (parte.startsWith('disc:')) { const i = idxDisc(c, parte.slice('disc:'.length)); if (i >= 0) c.disciplinas.splice(i, 1) }
+  else if (parte.startsWith('disc:')) { const chave = parte.slice('disc:'.length); const i = idxDisc(c, chave); if (i >= 0) c.disciplinas.splice(i, 1); else c.discOcultas = [...(c.discOcultas ?? []), chave] }
   return c
 }
 
@@ -105,7 +107,8 @@ export function aplicarCampoBloco(conteudo: DiagConteudo | undefined, parte: str
       else if (campoId.startsWith('item:')) { const j = Number(campoId.slice('item:'.length)); if (s.itens[j]) s.itens[j].texto = valor }
     }
   } else if (parte.startsWith('disc:')) {
-    const i = idxDisc(c, parte.slice('disc:'.length)); if (i >= 0 && campoId === 'nome') c.disciplinas[i].nome = valor
+    const chave = parte.slice('disc:'.length); const i = idxDisc(c, chave)
+    if (campoId === 'nome') { if (i >= 0) c.disciplinas[i].nome = valor; else c.discNomes = { ...(c.discNomes ?? {}), [chave]: valor } }
   } else if (parte === 'sec_pilares') { c.tituloPilares = valor }
   else if (parte === 'sec_disciplinas') { c.tituloDisciplinas = valor }
   else if (parte === 'sec_sugestoes') { c.tituloSugestoes = valor }

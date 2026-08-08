@@ -213,7 +213,8 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     )
   }
   // Disciplinas: do BANCO quando houver (nome+chave reais); senão as do modelo. Assuntos/nº/pct vêm das variáveis.
-  const discs: DiscBanco[] = discBanco.length ? discBanco : c.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave || slugDiag(d.nome) }))
+  const ocultas = new Set(c.discOcultas ?? [])
+  const discs: DiscBanco[] = (discBanco.length ? discBanco : c.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave || slugDiag(d.nome) }))).filter((d) => !ocultas.has(d.chave))
   if (discs.length) {
     out.push(<Sec parte="sec_disciplinas" t={c.tituloDisciplinas ?? 'Desempenho por disciplina'} />)
     if (c.disciplinasIntro) { const cor = corP('disc_intro', '#5a5570'); out.push(<p {...atr('disc_intro', 'Introdução das disciplinas', cor, { fontSize: base - 1, color: cor, margin: '0 0 8px', lineHeight: 1.4 })}>{V(c.disciplinasIntro)}</p>) }
@@ -224,7 +225,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
       out.push(
         <div {...atr(`disc:${d.chave}`, d.nome, corDisc, { background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5 })}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: prim }}>{V(d.nome)}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: prim }}>{V(c.discNomes?.[d.chave] ?? d.nome)}</div>
             {assuntos.length
               ? assuntos.map((as, k) => <div key={k} style={{ fontSize: 9, color: '#5a5570', fontStyle: 'italic' }}>- {V(as)}</div>)
               : <div style={{ fontSize: 9, color: '#5a5570', fontStyle: 'italic' }}>- Assuntos das questões erradas</div>}

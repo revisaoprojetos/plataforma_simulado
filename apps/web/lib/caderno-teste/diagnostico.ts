@@ -34,6 +34,9 @@ export type DiagConteudo = {
   pilares: DiagPilar[]
   disciplinasIntro: string
   disciplinas: DiagDisciplina[]
+  /** Overrides por disciplina do BANCO (chave → nome editado) e disciplinas ocultadas (chaves). */
+  discNomes?: Record<string, string>
+  discOcultas?: string[]
   sugestoes: DiagSugestao[]
   gabaritoTitulo: string
   gabaritoIntro: string[]

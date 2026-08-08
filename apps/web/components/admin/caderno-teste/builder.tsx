@@ -410,7 +410,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: ativo.modalidade, modelo: ativo.modelo }} onSelecionar={onPicker} />
       <BancoPicker open={bancoPickerOpen} onClose={() => setBancoPickerOpen(false)} bancos={bancos} atual={builder.bancoId} onSelecionar={trocarBanco} />
       {pickerCor && (() => {
-        const campos = camposDoBloco(ativo, pickerCor.parte)
+        const campos = camposDoBloco(ativo, pickerCor.parte, pickerCor.label)
         const onCampo = (campo: (typeof campos)[number], v: string) => campo.alvo === 'titulo' ? setAjuste({ titulo: v }) : setConteudo(aplicarCampoBloco(ativo.conteudo, pickerCor.parte, campo.id, v))
         return (
         <>
