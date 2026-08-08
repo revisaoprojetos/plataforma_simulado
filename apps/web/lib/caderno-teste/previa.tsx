@@ -180,7 +180,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   // `parte` estável (sec_pilares/sec_disciplinas/…) → cor e TEXTO editáveis (o texto muda sem perder a seleção/cor).
   const Sec = ({ parte, t }: { parte: string; t: string }) => {
     const cor = corP(parte, prim)
-    return <div {...atr(parte, t, cor, { background: cor, color: '#fff', fontWeight: 700, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', padding: '6px 12px', borderRadius: 2, margin: '4px 0 10px' })}>{V(t)}</div>
+    return <div {...atr(parte, t, cor, { background: cor, color: '#fff', fontWeight: 700, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', padding: '6px 12px', borderRadius: 2, margin: '3px 0 7px' })}>{V(t)}</div>
   }
   if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); out.push(
     <div {...atr('diag_cab', 'Cabeçalho', cor, { background: cor, color: '#fff', padding: '12px 16px', marginBottom: 12 })}>
@@ -204,12 +204,12 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   if (c.linguaPortuguesa && !ocultasP.has('lingua')) {
     const lp = c.linguaPortuguesa
     out.push(<Sec parte="sec_lingua" t={lp.secTitulo || 'Desempenho em Língua Portuguesa'} />)
-    if (lp.secIntro) { const cor = corP('lingua_intro', '#5a5570'); out.push(<p key="lpintro" {...atr('lingua_intro', 'Introdução (Língua Portuguesa)', cor, { fontSize: base - 1, color: cor, margin: '0 0 8px', lineHeight: 1.4 })}>{V(lp.secIntro)}</p>) }
+    if (lp.secIntro) { const cor = corP('lingua_intro', '#5a5570'); out.push(<p key="lpintro" {...atr('lingua_intro', 'Introdução (Língua Portuguesa)', cor, { fontSize: base - 1, color: cor, margin: '0 0 5px', lineHeight: 1.4 })}>{V(lp.secIntro)}</p>) }
     const banda = bandaAdaptativa({ nome: lp.titulo, chave: lp.chave, tipoFonte: lp.tipoFonte, totalTxt: lp.totalTxt, bandas: lp.bandas }, vars)
     const bandas = banda ? [banda] : lp.bandas
     const cor = corP('lingua_card', corDoPilar(lp.chave, a.coresPilar ?? {}, prim))
     out.push(
-      <div key="lpcard" {...atr('lingua_card', lp.titulo, cor, { background: '#fff2cc', border: `1px solid ${cor}22`, padding: 10, marginBottom: 4 })}>
+      <div key="lpcard" {...atr('lingua_card', lp.titulo, cor, { background: '#fff2cc', border: `1px solid ${cor}22`, padding: 8, marginBottom: 4 })}>
         <div style={{ fontSize: 9, fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(lp.titulo)}</div>
         <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1.1 }}>{V(`{pct_${prefFonte(lp.tipoFonte)}${lp.chave}}`)}</div>
         <div style={{ fontSize: 9, color: '#5a5570', marginBottom: 6 }}>{V(lp.totalTxt)}</div>
@@ -232,7 +232,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
           const parte = `pilar:${i}` // ÍNDICE (único) — não a chave, que pode repetir e causar conflito entre cards
           const cor = corP(parte, prim) // destaque do card (nome + %)
           return (
-            <div key={i} {...atr(parte, pl.nome, cor, { flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${cor}22`, padding: 10 })}>
+            <div key={i} {...atr(parte, pl.nome, cor, { flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${cor}22`, padding: 8 })}>
               <div style={{ fontSize: 9, fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(pl.nome)}</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1.1 }}>{pl.chave ? V(`{pct_${prefFonte(pl.tipoFonte)}${pl.chave}}`) : 'X%'}</div>
               <div style={{ fontSize: 9, color: '#5a5570', marginBottom: 6 }}>{V(pl.totalTxt)}</div>
@@ -347,9 +347,9 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
       const BUF = 8 // folga p/ sub-pixel e diferenças de medição — evita cortar o último card da folha
       const pages: number[][] = []; let cur: number[] = []; let h = 0
       for (let i = 0; i < hs.length; i++) {
-        const bh = hs[i] + GAP
-        if (cur.length && h + bh > availH - BUF) { pages.push(cur); cur = []; h = 0 }
-        cur.push(i); h += bh
+        const bh = hs[i] + (cur.length ? GAP : 0) // GAP só ENTRE blocos — não antes do 1º da folha (recupera espaço)
+        if (cur.length && h + bh > availH - BUF) { pages.push(cur); cur = [i]; h = hs[i] }
+        else { cur.push(i); h += bh }
       }
       if (cur.length) pages.push(cur)
       setPaginas(pages.length ? pages : [[]])
