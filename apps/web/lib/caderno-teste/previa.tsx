@@ -200,7 +200,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
       <div {...atr('diag_nota_faixa', 'Faixa da nota', corFx, { background: corFx, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: 12, fontWeight: 600 })}>{V(c.notaTexto)}</div>
     </div>,
   ) }
-  c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); out.push(<p key={`intro${i}`} {...atr(`intro:${i}`, `Parágrafo de abertura ${i + 1}`, cor, { fontSize: base, lineHeight: 1.5, textAlign: 'justify', margin: '0 0 8px', color: cor })}>{V(p)}</p>) })
+  c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); out.push(<p key={`intro${i}`} {...atr(`intro:${i}`, `Parágrafo de abertura ${i + 1}`, cor, { fontSize: base, lineHeight: 1.4, textAlign: 'justify', margin: '0 0 3px', color: cor })}>{V(p)}</p>) })
   if (c.linguaPortuguesa && !ocultasP.has('lingua')) {
     const lp = c.linguaPortuguesa
     out.push(<Sec parte="sec_lingua" t={lp.secTitulo || 'Desempenho em Língua Portuguesa'} />)
@@ -324,7 +324,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
   const a = item.ajustes
   const qs = questoes.length ? questoes : QUESTOES_EXEMPLO
   const pad = a.compacto ? 40 : 56
-  const GAP = a.compacto ? 8 : 14 // espaço entre blocos (contado na paginação)
+  const GAP = a.compacto ? 5 : 8 // espaço entre blocos (contado na paginação — menor p/ caber mais na folha)
   const Ht = a.cabecalhoUrl ? 84 : pad
   const Hf = a.rodapeUrl ? 84 : 34
   const contentW = A4_W - 2 * pad
