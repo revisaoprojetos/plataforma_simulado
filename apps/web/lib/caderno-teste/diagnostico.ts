@@ -37,6 +37,10 @@ export type DiagConteudo = {
   /** Overrides por disciplina do BANCO (chave → nome editado) e disciplinas ocultadas (chaves). */
   discNomes?: Record<string, string>
   discOcultas?: string[]
+  /** Cor do TEXTO (nome) por card de disciplina (chave → hex). */
+  discCorTexto?: Record<string, string>
+  /** Fonte dos dados por card (chave do card → chave da disciplina cujos assuntos/estatísticas exibir). */
+  discFonte?: Record<string, string>
   sugestoes: DiagSugestao[]
   gabaritoTitulo: string
   gabaritoIntro: string[]

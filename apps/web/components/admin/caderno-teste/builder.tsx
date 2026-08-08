@@ -438,6 +438,31 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                   <p className="text-[10px] leading-snug text-muted-foreground">Selecione um trecho e use <b>B</b> / <i>I</i> / <u>U</u>, ou escreva <code>**negrito**</code>, <code>*itálico*</code>, <code>&lt;u&gt;sublinhado&lt;/u&gt;</code>.</p>
                 </div>
               )}
+              {pickerCor.parte.startsWith('disc:') && (() => {
+                const chave = pickerCor.parte.slice('disc:'.length)
+                const cf = (ativo.conteudo ?? {}) as DiagConteudo
+                return (
+                  <div className="mt-4 space-y-3 border-t pt-4">
+                    <div>
+                      <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cor do texto</div>
+                      <HexColorField value={cf.discCorTexto?.[chave] || '#2d254f'} onChange={(v) => setConteudo({ ...cf, discCorTexto: { ...(cf.discCorTexto ?? {}), [chave]: v } })} />
+                    </div>
+                    {disciplinasBanco.length > 0 && (
+                      <div>
+                        <div className="mb-1 text-[11px] text-muted-foreground">Disciplina (dados/assuntos)</div>
+                        <select value={cf.discFonte?.[chave] ?? chave} onChange={(e) => {
+                          const src = e.target.value
+                          const nome = disciplinasBanco.find((x) => x.chave === src)?.nome ?? ''
+                          setConteudo({ ...cf, discFonte: { ...(cf.discFonte ?? {}), [chave]: src }, discNomes: { ...(cf.discNomes ?? {}), [chave]: nome } })
+                        }} className="w-full rounded border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary">
+                          {disciplinasBanco.map((x) => <option key={x.chave} value={x.chave}>{x.nome}</option>)}
+                        </select>
+                        <p className="mt-1 text-[10px] leading-snug text-muted-foreground">Escolhe de qual disciplina vêm os assuntos e as estatísticas deste card.</p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
               <p className="mt-4 text-[10px] leading-snug text-muted-foreground">Personaliza só este bloco. Clique em qualquer bloco da prévia para editá-lo.</p>
               {podeRemoverParte(pickerCor.parte) && (
                 <button type="button" onClick={() => { setConteudo(removerParteDiag(ativo.conteudo, pickerCor.parte)); setPickerCor(null) }} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-destructive/40 px-2 py-1.5 text-[12px] font-medium text-destructive transition-colors hover:bg-destructive/10">
