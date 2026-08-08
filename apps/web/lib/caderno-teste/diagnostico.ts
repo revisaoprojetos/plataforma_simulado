@@ -73,7 +73,8 @@ export const DIAG_PADRAO: DiagConteudo = {
 
 /** Preset pronto: Diagnóstico de Desempenho — AGU 2023 (base montada a partir do documento enviado). */
 export const DIAG_AGU_2023: DiagConteudo = {
-  subtitulo: 'CONCURSOS ANTIGOS - AGU 2023 - ADVOGADO DA UNIÃO',
+  tituloCabecalho: 'Diagnóstico de Desempenho',
+  subtitulo: 'Adicionar Subtítulo',
   notaTotal: '{total_questoes}',
   notaTexto: '{acertos} acertos de {total_questoes} questões — {percentual} de aproveitamento',
   intro: [
