@@ -325,7 +325,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
   const qs = questoes.length ? questoes : QUESTOES_EXEMPLO
   const pad = a.compacto ? 40 : 56
   const GAP = a.compacto ? 5 : 8 // espaço entre blocos (contado na paginação — menor p/ caber mais na folha)
-  const Ht = a.cabecalhoUrl ? 84 : pad
+  const Ht = a.cabecalhoUrl ? 96 : pad + 16 // um pouco mais de respiro no topo
   const Hf = a.rodapeUrl ? 84 : 34
   const contentW = A4_W - 2 * pad
   const availH = A4_H - Ht - Hf - 16
