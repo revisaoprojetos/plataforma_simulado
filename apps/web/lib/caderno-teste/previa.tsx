@@ -309,15 +309,25 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
 
   useLayoutEffect(() => {
     const cont = medRef.current; if (!cont) return
-    const hs = (Array.from(cont.children) as HTMLElement[]).map((el) => el.getBoundingClientRect().height)
-    const pages: number[][] = []; let cur: number[] = []; let h = 0
-    for (let i = 0; i < hs.length; i++) {
-      const bh = hs[i] + GAP
-      if (cur.length && h + bh > availH) { pages.push(cur); cur = []; h = 0 }
-      cur.push(i); h += bh
+    let cancel = false
+    const medir = () => {
+      if (cancel || !medRef.current) return
+      const hs = (Array.from(medRef.current.children) as HTMLElement[]).map((el) => el.getBoundingClientRect().height)
+      const BUF = 8 // folga p/ sub-pixel e diferenças de medição — evita cortar o último card da folha
+      const pages: number[][] = []; let cur: number[] = []; let h = 0
+      for (let i = 0; i < hs.length; i++) {
+        const bh = hs[i] + GAP
+        if (cur.length && h + bh > availH - BUF) { pages.push(cur); cur = []; h = 0 }
+        cur.push(i); h += bh
+      }
+      if (cur.length) pages.push(cur)
+      setPaginas(pages.length ? pages : [[]])
     }
-    if (cur.length) pages.push(cur)
-    setPaginas(pages.length ? pages : [[]])
+    medir() // 1ª medição imediata (evita flash)
+    // Remede DEPOIS que as fontes carregam — antes disso o texto mede menor e um card "cabe"
+    // na conta mas renderiza mais alto e é cortado no fim da folha.
+    ;(async () => { try { await (document as any).fonts?.ready } catch { /* noop */ } medir() })()
+    return () => { cancel = true }
   }, [chave, availH]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const pages = paginas ?? [blocos.map((_, i) => i)]
