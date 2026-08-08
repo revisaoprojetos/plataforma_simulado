@@ -2,10 +2,17 @@
 // importação (Word/HTML). Um item de diagnóstico guarda este objeto em `item.conteudo`.
 
 export type DiagBanda = { faixa: string; texto: string }
-/** `chave` = slug do pilar (lei_seca/jurisprudencia/doutrina/lingua_portuguesa) → casa com {pct_pilar_<chave>} etc. */
-export type DiagPilar = { nome: string; chave?: string; totalTxt: string; bandas: DiagBanda[] }
+/** Fonte dos dados de um card: pilar canônico (`{pct_pilar_<chave>}`) ou disciplina (`{pct_<chave>}`). */
+export type TipoFonte = 'pilar' | 'disciplina'
+/** `chave` = slug do pilar/disciplina. `tipoFonte` decide o prefixo da variável (pilar_ ou nada). */
+export type DiagPilar = { nome: string; chave?: string; tipoFonte?: TipoFonte; totalTxt: string; bandas: DiagBanda[] }
 /** `chave` = slug da disciplina → casa com {pct_<chave>}/{acerto_<chave>}/{total_<chave>}/{assuntos_<chave>}. */
 export type DiagDisciplina = { nome: string; chave?: string; total: string; categoria: string }
+
+/** Prefixo da variável conforme a fonte: pilar canônico usa `pilar_`; disciplina, sem prefixo. */
+export function prefFonte(tipo?: TipoFonte): string { return tipo === 'disciplina' ? '' : 'pilar_' }
+/** Legenda "x de N questões" com as variáveis certas para a chave/fonte. */
+export function totalTxtDe(chave: string, tipo?: TipoFonte): string { const p = prefFonte(tipo); return `{acerto_${p}${chave}} de {total_${p}${chave}} questões` }
 
 /** Slug igual ao de merge.ts (para as variáveis casarem com os dados do banco/aluno). */
 export function slugDiag(s: string): string {
@@ -45,8 +52,9 @@ export type DiagConteudo = {
   tituloDisciplinas?: string
   tituloSugestoes?: string
   pilares: DiagPilar[]
-  /** Seção SEPARADA de Língua Portuguesa (ex.: PGE/RS) — pilar próprio, fora dos 3 jurídicos. */
-  linguaPortuguesa?: { titulo: string; totalTxt: string; secTitulo: string; secIntro: string; bandas: DiagBanda[] }
+  /** Seção SEPARADA (ex.: Língua Portuguesa na PGE/RS) — card de pilar/disciplina próprio, fora dos jurídicos.
+   * `chave`/`tipoFonte` tornam adaptável a qualquer matéria (ex.: história) conforme os dados do simulado. */
+  linguaPortuguesa?: { titulo: string; chave: string; tipoFonte?: TipoFonte; totalTxt: string; secTitulo: string; secIntro: string; bandas: DiagBanda[] }
   disciplinasIntro: string
   disciplinas: DiagDisciplina[]
   /** Overrides por disciplina do BANCO (chave → nome editado) e disciplinas ocultadas (chaves). */
@@ -202,6 +210,7 @@ export const DIAG_PGE_RS: DiagConteudo = {
     'Guarde este diagnóstico. Ele é o ponto de partida e o comparativo que você vai usar para medir sua evolução até o próximo simulado.',
   ],
   linguaPortuguesa: {
+    chave: 'lingua_portuguesa', tipoFonte: 'pilar',
     secTitulo: 'Desempenho em Língua Portuguesa',
     secIntro: 'Este simulado inclui 20 questões de língua portuguesa, no mesmo padrão da prova real da FUNDATEC. É uma seção separada porque português tem lógica própria: não se estuda pela mesma lente de "lei seca x jurisprudência x doutrina" usada nas matérias jurídicas, mas por frentes de gramática, sintaxe e interpretação.',
     titulo: 'LÍNGUA PORTUGUESA',

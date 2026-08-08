@@ -11,11 +11,11 @@ import { Previa } from '@/lib/caderno-teste/previa'
 import { PreviaBlocos, capaPadraoDoPreset, docDoPreset } from '@/lib/caderno-teste/previa-blocos'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
-import { metaDaModalidade, itemAtivo, novoItem, presetDoItem, CAPA_PADRAO, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
+import { metaDaModalidade, itemAtivo, novoItem, presetDoItem, CAPA_PADRAO, CORES_PILAR_PADRAO, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { camposDoBloco, aplicarCampoBloco, podeRemoverParte, removerParteDiag, type CampoTexto } from '@/lib/caderno-teste/edicao'
 import { acharBloco, atualizarBlocoAttrs, removerBloco, camposDoBlocoDoc, NOME_BLOCO, type CampoBlocoDoc } from '@/lib/caderno-teste/edicao-doc'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
-import type { DiagConteudo } from '@/lib/caderno-teste/diagnostico'
+import { totalTxtDe, type DiagConteudo } from '@/lib/caderno-teste/diagnostico'
 import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
 import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
 import { FONTES_CADERNO } from '@/lib/caderno-designer/theme'
@@ -175,6 +175,15 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   }
   const alunoAtual = registros[Math.min(alunoIdx, Math.max(0, registros.length - 1))] ?? null
   const varsPrevia = alunoAtual?.vars ?? SEM_VARS
+  // Fontes de dados disponíveis do simulado: pilares canônicos + pilares presentes nos dados + disciplinas do banco.
+  const fontesDisponiveis = (() => {
+    const map = new Map<string, { chave: string; nome: string; tipo: 'pilar' | 'disciplina' }>()
+    const human = (s: string) => s.replace(/_/g, ' ').replace(/(^|\s)\S/g, (m) => m.toUpperCase())
+    for (const k of Object.keys(CORES_PILAR_PADRAO)) map.set('p:' + k, { chave: k, nome: human(k), tipo: 'pilar' })
+    for (const k of Object.keys(varsPrevia)) { const m = k.match(/^pct_pilar_(.+)$/); if (m) map.set('p:' + m[1], { chave: m[1], nome: human(m[1]), tipo: 'pilar' }) }
+    for (const d of disciplinasBanco) map.set('d:' + d.chave, { chave: d.chave, nome: d.nome, tipo: 'disciplina' })
+    return [...map.values()]
+  })()
   const exportUrl = (fmt: 'word' | 'html') => `/api/admin/caderno-teste/exportar?caderno=${cadernoId}&grupo=${ativo.id}&formato=${fmt}${alunoAtual ? `&aluno=${alunoAtual.id}` : ''}`
   function salvar() {
     start(async () => {
@@ -466,6 +475,41 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                   )}
                 </>
               )}
+              {(pickerCor.parte.startsWith('pilar:') || pickerCor.parte === 'lingua_card') && (() => {
+                const cf = (ativo.conteudo ?? {}) as DiagConteudo
+                const isLP = pickerCor.parte === 'lingua_card'
+                const suffix = pickerCor.parte.slice(pickerCor.parte.indexOf(':') + 1)
+                const alvo = isLP ? cf.linguaPortuguesa : (cf.pilares ?? []).find((pl, i) => (pl.chave || String(i)) === suffix)
+                const chave = alvo?.chave ?? '', tipo = (alvo?.tipoFonte ?? 'pilar') as 'pilar' | 'disciplina'
+                const val = (tipo === 'disciplina' ? 'd' : 'p') + ':' + chave
+                const sel = (nc: string, nt: 'pilar' | 'disciplina') => {
+                  if (isLP) { if (cf.linguaPortuguesa) setConteudo({ ...cf, linguaPortuguesa: { ...cf.linguaPortuguesa, chave: nc, tipoFonte: nt, totalTxt: totalTxtDe(nc, nt) } }) }
+                  else setConteudo({ ...cf, pilares: (cf.pilares ?? []).map((pl, i) => (pl.chave || String(i)) === suffix ? { ...pl, chave: nc, tipoFonte: nt, totalTxt: totalTxtDe(nc, nt) } : pl) })
+                }
+                const existe = fontesDisponiveis.some((f) => (f.tipo === 'disciplina' ? 'd' : 'p') + ':' + f.chave === val)
+                return (
+                  <div className="mt-3">
+                    <div className="mb-1 text-[11px] text-muted-foreground">Fonte dos dados (pilar/disciplina do simulado)</div>
+                    <select value={val} onChange={(e) => { const v = e.target.value; const t = v.slice(0, 1); sel(v.slice(2), t === 'd' ? 'disciplina' : 'pilar') }} className="w-full rounded border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary">
+                      {!existe && <option value={val}>{chave || '(escolher)'}</option>}
+                      <optgroup label="Pilares">{fontesDisponiveis.filter((f) => f.tipo === 'pilar').map((f) => <option key={'p:' + f.chave} value={'p:' + f.chave}>{f.nome}</option>)}</optgroup>
+                      <optgroup label="Disciplinas">{fontesDisponiveis.filter((f) => f.tipo === 'disciplina').map((f) => <option key={'d:' + f.chave} value={'d:' + f.chave}>{f.nome}</option>)}</optgroup>
+                    </select>
+                    <p className="mt-1 text-[10px] leading-snug text-muted-foreground">De qual pilar/disciplina do simulado vêm o % e a contagem deste card.</p>
+                  </div>
+                )
+              })()}
+              {pickerCor.parte === 'sec_pilares' && (() => {
+                const cf = (ativo.conteudo ?? {}) as DiagConteudo
+                return (
+                  <div className="mt-3">
+                    <button type="button" onClick={() => setConteudo({ ...cf, pilares: [...(cf.pilares ?? []), { nome: 'Novo pilar', chave: '', tipoFonte: 'pilar', totalTxt: '', bandas: [{ faixa: '0-49', texto: '' }, { faixa: '50-80', texto: '' }, { faixa: '81-100', texto: '' }] }] })} className="flex w-full items-center justify-center gap-1.5 rounded-md border border-primary/40 px-2 py-1.5 text-[12px] font-medium text-primary hover:bg-primary/10">
+                      <Plus className="h-3.5 w-3.5" /> Adicionar pilar
+                    </button>
+                    <p className="mt-1 text-[10px] leading-snug text-muted-foreground">Depois clique no card do novo pilar para escolher a fonte e o texto.</p>
+                  </div>
+                )
+              })()}
               <div className="mt-3">
                 <div className="mb-1 text-[11px] text-muted-foreground">Alinhamento</div>
                 <div className="flex overflow-hidden rounded-md border">

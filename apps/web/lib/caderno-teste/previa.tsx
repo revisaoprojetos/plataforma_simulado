@@ -6,7 +6,7 @@
 
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ItemCaderno, PreviewQuestao } from './tipos'
-import { DIAG_PADRAO, slugDiag, topicosParaTexto, type DiagPilar } from './diagnostico'
+import { DIAG_PADRAO, slugDiag, topicosParaTexto, prefFonte, type DiagPilar } from './diagnostico'
 import { CORES_PILAR_PADRAO } from './tipos'
 import { formatarInline, formatarMarcadores } from './formato'
 import { cssDaFonte } from '@/lib/caderno-designer/theme'
@@ -42,7 +42,7 @@ function preencher(t: string, vars: Record<string, string>): string {
 }
 /** Banda de texto que casa com o % do pilar (0-49/50-80/81-100). null quando não há dado (mostra todas). */
 function bandaAdaptativa(pilar: DiagPilar, vars: Record<string, string>): { faixa: string; texto: string } | null {
-  const raw = pilar.chave ? vars[`pct_pilar_${pilar.chave}`] : undefined
+  const raw = pilar.chave ? vars[`pct_${prefFonte(pilar.tipoFonte)}${pilar.chave}`] : undefined
   if (raw == null) return null
   const n = parseFloat(String(raw).replace('%', '').replace(',', '.'))
   if (isNaN(n)) return null
@@ -205,13 +205,13 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     const lp = c.linguaPortuguesa
     out.push(<Sec parte="sec_lingua" t={lp.secTitulo || 'Desempenho em Língua Portuguesa'} />)
     if (lp.secIntro) { const cor = corP('lingua_intro', '#5a5570'); out.push(<p key="lpintro" {...atr('lingua_intro', 'Introdução (Língua Portuguesa)', cor, { fontSize: base - 1, color: cor, margin: '0 0 8px', lineHeight: 1.4 })}>{V(lp.secIntro)}</p>) }
-    const banda = bandaAdaptativa({ nome: lp.titulo, chave: 'lingua_portuguesa', totalTxt: lp.totalTxt, bandas: lp.bandas }, vars)
+    const banda = bandaAdaptativa({ nome: lp.titulo, chave: lp.chave, tipoFonte: lp.tipoFonte, totalTxt: lp.totalTxt, bandas: lp.bandas }, vars)
     const bandas = banda ? [banda] : lp.bandas
-    const cor = corP('lingua_card', corDoPilar('lingua_portuguesa', a.coresPilar ?? {}, prim))
+    const cor = corP('lingua_card', corDoPilar(lp.chave, a.coresPilar ?? {}, prim))
     out.push(
       <div key="lpcard" {...atr('lingua_card', lp.titulo, cor, { background: '#fff2cc', border: `1px solid ${cor}22`, padding: 10, marginBottom: 4 })}>
         <div style={{ fontSize: 9, fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(lp.titulo)}</div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1.1 }}>{V('{pct_pilar_lingua_portuguesa}')}</div>
+        <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1.1 }}>{V(`{pct_${prefFonte(lp.tipoFonte)}${lp.chave}}`)}</div>
         <div style={{ fontSize: 9, color: '#5a5570', marginBottom: 6 }}>{V(lp.totalTxt)}</div>
         {bandas.map((b, j) => (
           <div key={j} style={{ marginBottom: 6 }}>
@@ -234,7 +234,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
           return (
             <div key={i} {...atr(parte, pl.nome, cor, { flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${cor}22`, padding: 10 })}>
               <div style={{ fontSize: 9, fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(pl.nome)}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1.1 }}>{pl.chave ? V(`{pct_pilar_${pl.chave}}`) : 'X%'}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1.1 }}>{pl.chave ? V(`{pct_${prefFonte(pl.tipoFonte)}${pl.chave}}`) : 'X%'}</div>
               <div style={{ fontSize: 9, color: '#5a5570', marginBottom: 6 }}>{V(pl.totalTxt)}</div>
               {bandas.map((b, j) => (
                 <div key={j} style={{ marginBottom: 6 }}>

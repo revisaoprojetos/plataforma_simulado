@@ -1,5 +1,5 @@
 import 'server-only'
-import { DIAG_PADRAO, slugDiag, topicosParaTexto, type DiagPilar } from './diagnostico'
+import { DIAG_PADRAO, slugDiag, topicosParaTexto, prefFonte, type DiagPilar } from './diagnostico'
 import { CORES_PILAR_PADRAO, type ItemCaderno, type PreviewQuestao } from './tipos'
 import { formatarInline, formatarMarcadores } from './formato'
 import { cssDaFonte } from '@/lib/caderno-designer/theme'
@@ -32,7 +32,7 @@ function preencher(t: string, vars: Record<string, string>): string {
   })
 }
 function bandaAdaptativa(pilar: DiagPilar, vars: Record<string, string>): { faixa: string; texto: string } | null {
-  const raw = pilar.chave ? vars[`pct_pilar_${pilar.chave}`] : undefined
+  const raw = pilar.chave ? vars[`pct_${prefFonte(pilar.tipoFonte)}${pilar.chave}`] : undefined
   if (raw == null) return null
   const n = parseFloat(String(raw).replace('%', '').replace(',', '.'))
   if (isNaN(n)) return null
@@ -61,10 +61,10 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
     const lp = c.linguaPortuguesa
     h += sec(lp.secTitulo || 'Desempenho em Língua Portuguesa')
     if (lp.secIntro) h += `<p style="font-size:11px;color:${corP('lingua_intro', '#5a5570')};margin:0 0 8px;line-height:1.4;${fonteCss('lingua_intro')}">${V(lp.secIntro)}</p>`
-    const banda = bandaAdaptativa({ nome: lp.titulo, chave: 'lingua_portuguesa', totalTxt: lp.totalTxt, bandas: lp.bandas }, vars)
+    const banda = bandaAdaptativa({ nome: lp.titulo, chave: lp.chave, tipoFonte: lp.tipoFonte, totalTxt: lp.totalTxt, bandas: lp.bandas }, vars)
     const bandas = banda ? [banda] : lp.bandas
-    const cor = corP('lingua_card', corDoPilar('lingua_portuguesa', a.coresPilar ?? {}, prim))
-    let card = `<div style="font-size:10px;font-weight:700;color:${cor};letter-spacing:.5px">${esc(lp.titulo)}</div><div style="font-size:24px;font-weight:800;color:${cor}">${V('{pct_pilar_lingua_portuguesa}')}</div><div style="font-size:10px;color:#5a5570;margin-bottom:6px">${V(lp.totalTxt)}</div>`
+    const cor = corP('lingua_card', corDoPilar(lp.chave, a.coresPilar ?? {}, prim))
+    let card = `<div style="font-size:10px;font-weight:700;color:${cor};letter-spacing:.5px">${esc(lp.titulo)}</div><div style="font-size:24px;font-weight:800;color:${cor}">${V(`{pct_${prefFonte(lp.tipoFonte)}${lp.chave}}`)}</div><div style="font-size:10px;color:#5a5570;margin-bottom:6px">${V(lp.totalTxt)}</div>`
     for (const b of bandas) card += `${!banda ? `<div style="font-size:10px;font-weight:700;color:${cor}">${esc(b.faixa)}</div>` : ''}${b.texto ? `<div style="font-size:10px;color:#243b53;line-height:1.4;text-align:${alignP('lingua_card', 'justify')};margin-bottom:6px">${V(b.texto)}</div>` : ''}`
     h += `<div style="background:#fff2cc;border:1px solid ${cor}22;padding:10px;margin-bottom:10px">${card}</div>`
   }
@@ -75,7 +75,7 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
       const banda = bandaAdaptativa(pl, vars)
       const bandas = banda ? [banda] : pl.bandas
       const cor = corP(`pilar:${pl.chave || i}`, prim)
-      let card = `<div style="font-size:10px;font-weight:700;color:${cor};letter-spacing:.5px">${esc(pl.nome)}</div><div style="font-size:24px;font-weight:800;color:${cor}">${pl.chave ? V(`{pct_pilar_${pl.chave}}`) : 'X%'}</div><div style="font-size:10px;color:#5a5570;margin-bottom:6px">${V(pl.totalTxt)}</div>`
+      let card = `<div style="font-size:10px;font-weight:700;color:${cor};letter-spacing:.5px">${esc(pl.nome)}</div><div style="font-size:24px;font-weight:800;color:${cor}">${pl.chave ? V(`{pct_${prefFonte(pl.tipoFonte)}${pl.chave}}`) : 'X%'}</div><div style="font-size:10px;color:#5a5570;margin-bottom:6px">${V(pl.totalTxt)}</div>`
       for (const b of bandas) card += `${!banda ? `<div style="font-size:10px;font-weight:700;color:${cor}">${esc(b.faixa)}</div>` : ''}${b.texto ? `<div style="font-size:10px;color:#243b53;line-height:1.4;text-align:${alignP(`pilar:${pl.chave || i}`, 'justify')};margin-bottom:6px">${V(b.texto)}</div>` : ''}`
       h += `<td style="width:33%;background:#fff2cc;border:1px solid ${cor}22;padding:10px">${card}</td>`
     })
