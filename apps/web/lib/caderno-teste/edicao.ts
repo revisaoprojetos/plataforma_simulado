@@ -53,6 +53,10 @@ export function camposDoBloco(item: ItemCaderno, parte: string): CampoTexto[] {
     const i = idxDisc(c, parte.slice('disc:'.length)); if (i < 0) return []
     return [{ id: 'nome', label: 'Nome da disciplina', valor: c.disciplinas[i].nome }]
   }
+  if (parte === 'sec_pilares') return [{ id: 'tituloPilares', label: 'Título da seção', valor: c.tituloPilares ?? 'Desempenho por pilar' }]
+  if (parte === 'sec_disciplinas') return [{ id: 'tituloDisciplinas', label: 'Título da seção', valor: c.tituloDisciplinas ?? 'Desempenho por disciplina' }]
+  if (parte === 'sec_sugestoes') return [{ id: 'tituloSugestoes', label: 'Título da seção', valor: c.tituloSugestoes ?? 'Sugestões de estudo' }]
+  if (parte === 'sec_gabarito') return [{ id: 'gabaritoTitulo', label: 'Título da seção', valor: c.gabaritoTitulo }]
   if (parte === 'diag_gab_obs') return [
     { id: 'titulo', label: 'Título da seção', valor: c.gabaritoTitulo },
     ...c.gabaritoIntro.map((t, k) => ({ id: `intro:${k}`, label: `Parágrafo ${k + 1}`, valor: t, multiline: true })),
@@ -102,7 +106,11 @@ export function aplicarCampoBloco(conteudo: DiagConteudo | undefined, parte: str
     }
   } else if (parte.startsWith('disc:')) {
     const i = idxDisc(c, parte.slice('disc:'.length)); if (i >= 0 && campoId === 'nome') c.disciplinas[i].nome = valor
-  } else if (parte === 'diag_gab_obs') {
+  } else if (parte === 'sec_pilares') { c.tituloPilares = valor }
+  else if (parte === 'sec_disciplinas') { c.tituloDisciplinas = valor }
+  else if (parte === 'sec_sugestoes') { c.tituloSugestoes = valor }
+  else if (parte === 'sec_gabarito') { c.gabaritoTitulo = valor }
+  else if (parte === 'diag_gab_obs') {
     if (campoId === 'titulo') c.gabaritoTitulo = valor
     else if (campoId.startsWith('intro:')) { const k = Number(campoId.slice('intro:'.length)); if (c.gabaritoIntro[k] != null) c.gabaritoIntro[k] = valor }
     else if (campoId.startsWith('obs:')) { const k = Number(campoId.slice('obs:'.length)); if (c.gabaritoObs[k] != null) c.gabaritoObs[k] = valor }

@@ -27,6 +27,10 @@ export type DiagConteudo = {
   notaTotal: string
   notaTexto: string
   intro: string[]
+  /** Títulos das seções (editáveis). Opcionais — usam o texto padrão quando ausentes. */
+  tituloPilares?: string
+  tituloDisciplinas?: string
+  tituloSugestoes?: string
   pilares: DiagPilar[]
   disciplinasIntro: string
   disciplinas: DiagDisciplina[]

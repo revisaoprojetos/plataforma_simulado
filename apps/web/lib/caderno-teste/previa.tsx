@@ -162,9 +162,10 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   const c = item.conteudo ?? DIAG_PADRAO
   const prim = a.corPrimaria, amar = a.corSecundaria
   // Cada faixa de seção é uma parte própria (sec:<t>) — dá para colorir cada uma individualmente.
-  const Sec = ({ t }: { t: string }) => {
-    const cor = corP(`sec:${t}`, prim)
-    return <div {...atr(`sec:${t}`, t, cor, { background: cor, color: '#fff', fontWeight: 700, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', padding: '6px 12px', borderRadius: 2, margin: '4px 0 10px' })}>{t}</div>
+  // `parte` estável (sec_pilares/sec_disciplinas/…) → cor e TEXTO editáveis (o texto muda sem perder a seleção/cor).
+  const Sec = ({ parte, t }: { parte: string; t: string }) => {
+    const cor = corP(parte, prim)
+    return <div {...atr(parte, t, cor, { background: cor, color: '#fff', fontWeight: 700, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', padding: '6px 12px', borderRadius: 2, margin: '4px 0 10px' })}>{V(t)}</div>
   }
   if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); out.push(
     <div {...atr('diag_cab', 'Cabeçalho', cor, { background: cor, color: '#fff', padding: '12px 16px', marginBottom: 12 })}>
@@ -186,7 +187,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   ) }
   c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); out.push(<p key={`intro${i}`} {...atr(`intro:${i}`, `Parágrafo de abertura ${i + 1}`, cor, { fontSize: base, lineHeight: 1.5, textAlign: 'justify', margin: '0 0 8px', color: cor })}>{V(p)}</p>) })
   if (c.pilares.length) {
-    out.push(<Sec t="Desempenho por pilar" />)
+    out.push(<Sec parte="sec_pilares" t={c.tituloPilares ?? 'Desempenho por pilar'} />)
     out.push(
       <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', marginBottom: 4 }}>
         {c.pilares.map((pl, i) => {
@@ -214,7 +215,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   // Disciplinas: do BANCO quando houver (nome+chave reais); senão as do modelo. Assuntos/nº/pct vêm das variáveis.
   const discs: DiscBanco[] = discBanco.length ? discBanco : c.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave || slugDiag(d.nome) }))
   if (discs.length) {
-    out.push(<Sec t="Desempenho por disciplina" />)
+    out.push(<Sec parte="sec_disciplinas" t={c.tituloDisciplinas ?? 'Desempenho por disciplina'} />)
     if (c.disciplinasIntro) { const cor = corP('disc_intro', '#5a5570'); out.push(<p {...atr('disc_intro', 'Introdução das disciplinas', cor, { fontSize: base - 1, color: cor, margin: '0 0 8px', lineHeight: 1.4 })}>{V(c.disciplinasIntro)}</p>) }
     for (const d of discs) {
       const assuntos = (vars[`assuntos_${d.chave}`] ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
@@ -234,7 +235,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     }
   }
   if (c.sugestoes.length) {
-    out.push(<Sec t="Sugestões de estudo" />)
+    out.push(<Sec parte="sec_sugestoes" t={c.tituloSugestoes ?? 'Sugestões de estudo'} />)
     c.sugestoes.forEach((s, si) => { const cor = corP(`sug:${si}`, '#fdf3d0'); out.push(
       <div key={`sug${si}`} style={{ marginBottom: 10 }}>
         <div {...atr(`sug:${si}`, `Sugestão · ${s.titulo}`, cor, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: cor, padding: '5px 12px' })}>
@@ -253,7 +254,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     ) })
   }
   if (c.gabaritoObs.length || c.gabaritoIntro.length) {
-    out.push(<Sec t={c.gabaritoTitulo || 'Gabarito oficial desatualizado'} />)
+    out.push(<Sec parte="sec_gabarito" t={c.gabaritoTitulo || 'Gabarito oficial desatualizado'} />)
     c.gabaritoIntro.forEach((p, i) => { const cor = corP('diag_gab_obs', '#243b53'); out.push(<p key={`gabi${i}`} {...atr('diag_gab_obs', 'Observações do gabarito', cor, { fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify', color: cor })}>{V(p)}</p>) })
     if (c.gabaritoObs.length) { const cor = corP('diag_gab_obs', '#a32d2d'); out.push(<div {...atr('diag_gab_obs', 'Observação do gabarito', cor, { background: '#f5f3ff', borderTop: `2px solid ${cor}`, padding: '8px 12px' })}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: 9, color: '#5a5570' }}>{V(o)}</div>)}</div>) }
   }
