@@ -209,30 +209,6 @@ export function itemAtivo(builder: BuilderV3): ItemCaderno {
   return builder.itens.find((i) => i.id === builder.ativo) ?? builder.itens[0]
 }
 
-/** Padrão de ESTILO reutilizável (aplicado a novos itens de diagnóstico — criados ou importados). */
-export type PadraoDiag = { ajustes: Partial<BuilderAjustes>; conteudo: Partial<DiagConteudo> }
-
-// Estilo (não conteúdo): cores/fontes/alinhamento/toggles + textos de PADRÃO (títulos/rótulos/marcadores).
-const CHAVES_ESTILO_AJUSTES: (keyof BuilderAjustes)[] = ['corPrimaria', 'corSecundaria', 'mostrarCabecalho', 'mostrarDadosAluno', 'mostrarComentarios', 'mostrarGabarito', 'numAlternativas', 'colunas', 'compacto', 'coresPilar', 'coresDisc', 'coresParte', 'alinhamentoParte', 'coresTextoParte', 'estiloParte', 'fonteParte']
-const CHAVES_ESTILO_CONTEUDO: (keyof DiagConteudo)[] = ['corMarcador', 'corMarcadorForte', 'tituloCabecalho', 'subtitulo', 'rotuloNome', 'tituloPilares', 'tituloDisciplinas', 'tituloSugestoes', 'gabaritoTitulo', 'discCorTexto']
-
-/** Captura só o ESTILO de um item (para virar padrão). Ignora conteúdo (textos/listas) e imagens. */
-export function extrairPadraoDiag(item: ItemCaderno): PadraoDiag {
-  const a = item.ajustes as any; const aj: any = {}
-  for (const k of CHAVES_ESTILO_AJUSTES) if (a[k] !== undefined) aj[k] = a[k]
-  const c = (item.conteudo ?? {}) as any; const co: any = {}
-  for (const k of CHAVES_ESTILO_CONTEUDO) if (c[k] !== undefined) co[k] = c[k]
-  return { ajustes: aj, conteudo: co }
-}
-
-/** Aplica o padrão de estilo a um item (mantém o conteúdo/textos do item). */
-export function aplicarPadraoDiag(item: ItemCaderno, padrao?: PadraoDiag | null): ItemCaderno {
-  if (!padrao) return item
-  const out: ItemCaderno = { ...item, ajustes: { ...item.ajustes, ...padrao.ajustes } }
-  if (item.modalidade === 'diagnostico') out.conteudo = { ...(item.conteudo ?? DIAG_PADRAO), ...padrao.conteudo }
-  return out
-}
-
 function normalizarItem(raw: any): ItemCaderno {
   const modalidade: Modalidade = ['folha_respostas', 'caderno_questoes', 'diagnostico'].includes(raw?.modalidade) ? raw.modalidade : 'caderno_questoes'
   const meta = metaDaModalidade(modalidade)
