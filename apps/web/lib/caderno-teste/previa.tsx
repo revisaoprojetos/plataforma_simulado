@@ -312,7 +312,6 @@ function Folha({ item, num, total, pad, Ht, Hf, capa, children }: { item: ItemCa
           <div style={{ flex: 1, minHeight: 0, padding: `8px ${pad}px`, overflow: 'hidden' }}>{children}</div>
           <div style={{ height: Hf, flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
             {a.rodapeUrl && <img src={a.rodapeUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-            <span style={{ position: 'absolute', right: pad, bottom: 8, fontSize: 9, color: a.rodapeUrl ? '#fff' : '#94a3b8' }}>pág. {num}/{total}</span>
           </div>
         </div>
       )}
