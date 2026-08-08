@@ -67,18 +67,28 @@ export function camposDoBloco(item: ItemCaderno, parte: string, nomeFallback?: s
   return []
 }
 
-/** Partes do diagnóstico que podem ser REMOVIDAS (itens de lista). */
+/** Blocos ESTRUTURAIS ocultáveis: parte clicada → chave canônica do bloco (nota/nome/seção). */
+const OCULTAVEIS: Record<string, string> = {
+  diag_nota_num: 'nota', diag_nota_faixa: 'nota',
+  diag_nome_rot: 'nome', diag_nome_val: 'nome',
+  sec_pilares: 'pilares', sec_disciplinas: 'disciplinas', sec_sugestoes: 'sugestoes',
+  sec_gabarito: 'gabarito', diag_gab_obs: 'gabarito',
+}
+export function chaveOcultavel(parte: string): string | null { return OCULTAVEIS[parte] ?? null }
+
+/** Partes do diagnóstico que podem ser REMOVIDAS: itens de lista OU blocos estruturais (ocultar). */
 export function podeRemoverParte(parte: string): boolean {
-  return parte.startsWith('intro:') || parte.startsWith('pilar:') || parte.startsWith('sug:') || parte.startsWith('disc:')
+  return parte.startsWith('intro:') || parte.startsWith('pilar:') || parte.startsWith('sug:') || parte.startsWith('disc:') || chaveOcultavel(parte) !== null
 }
 
-/** Remove (retorna novo conteúdo) a parte de lista indicada. */
+/** Remove (retorna novo conteúdo): itens de lista somem; blocos estruturais entram em partesOcultas. */
 export function removerParteDiag(conteudo: DiagConteudo | undefined, parte: string): DiagConteudo {
   const c = clonar(conteudo ?? DIAG_PADRAO)
   if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] != null) c.intro.splice(i, 1) }
   else if (parte.startsWith('pilar:')) { const i = idxPilar(c, parte.slice('pilar:'.length)); if (i >= 0) c.pilares.splice(i, 1) }
   else if (parte.startsWith('sug:')) { const i = Number(parte.slice('sug:'.length)); if (c.sugestoes[i]) c.sugestoes.splice(i, 1) }
   else if (parte.startsWith('disc:')) { const chave = parte.slice('disc:'.length); const i = idxDisc(c, chave); if (i >= 0) c.disciplinas.splice(i, 1); else c.discOcultas = [...(c.discOcultas ?? []), chave] }
+  else { const oc = chaveOcultavel(parte); if (oc) c.partesOcultas = [...new Set([...(c.partesOcultas ?? []), oc])] }
   return c
 }
 

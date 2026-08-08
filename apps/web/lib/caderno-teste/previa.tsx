@@ -160,6 +160,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
 
   // Diagnóstico
   const c = item.conteudo ?? DIAG_PADRAO
+  const ocultasP = new Set(c.partesOcultas ?? []) // blocos estruturais ocultados (nota/nome/seções)
   const prim = a.corPrimaria, amar = a.corSecundaria
   // Cada faixa de seção é uma parte própria (sec:<t>) — dá para colorir cada uma individualmente.
   // `parte` estável (sec_pilares/sec_disciplinas/…) → cor e TEXTO editáveis (o texto muda sem perder a seleção/cor).
@@ -173,20 +174,20 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
       {c.subtitulo && <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{V(c.subtitulo)}</div>}
     </div>,
   ) }
-  if (a.mostrarDadosAluno) { const corN = corP('diag_nome_rot', prim), corV = corP('diag_nome_val', amar); out.push(
+  if (a.mostrarDadosAluno && !ocultasP.has('nome')) { const corN = corP('diag_nome_rot', prim), corV = corP('diag_nome_val', amar); out.push(
     <div style={{ display: 'flex', border: `1px solid ${corN}`, overflow: 'hidden', marginBottom: 12 }}>
       <div {...atr('diag_nome_rot', 'Rótulo NOME', corN, { background: corN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '8px 14px' })}>NOME:</div>
       <div {...atr('diag_nome_val', 'Faixa do nome', corV, { background: corV, color: '#3b2f00', flex: 1, padding: '8px 14px', fontSize: 12, fontWeight: 600 })}>{V('{nome}')}</div>
     </div>,
   ) }
-  { const corNum = corP('diag_nota_num', '#9b6800'), corFx = corP('diag_nota_faixa', amar); out.push(
+  if (!ocultasP.has('nota')) { const corNum = corP('diag_nota_num', '#9b6800'), corFx = corP('diag_nota_faixa', amar); out.push(
     <div style={{ display: 'flex', border: `1px solid ${prim}33`, overflow: 'hidden', marginBottom: 12 }}>
       <div {...atr('diag_nota_num', 'Bloco da nota', corNum, { background: corNum, color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'baseline' })}><span style={{ fontSize: 32, fontWeight: 800 }}>{V('{acertos}')}</span><span style={{ fontSize: 16, fontWeight: 700 }}>/{V(c.notaTotal)}</span></div>
       <div {...atr('diag_nota_faixa', 'Faixa da nota', corFx, { background: corFx, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: 12, fontWeight: 600 })}>{V(c.notaTexto)}</div>
     </div>,
   ) }
   c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); out.push(<p key={`intro${i}`} {...atr(`intro:${i}`, `Parágrafo de abertura ${i + 1}`, cor, { fontSize: base, lineHeight: 1.5, textAlign: 'justify', margin: '0 0 8px', color: cor })}>{V(p)}</p>) })
-  if (c.pilares.length) {
+  if (c.pilares.length && !ocultasP.has('pilares')) {
     out.push(<Sec parte="sec_pilares" t={c.tituloPilares ?? 'Desempenho por pilar'} />)
     out.push(
       <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', marginBottom: 4 }}>
@@ -215,7 +216,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   // Disciplinas: do BANCO quando houver (nome+chave reais); senão as do modelo. Assuntos/nº/pct vêm das variáveis.
   const ocultas = new Set(c.discOcultas ?? [])
   const discs: DiscBanco[] = (discBanco.length ? discBanco : c.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave || slugDiag(d.nome) }))).filter((d) => !ocultas.has(d.chave))
-  if (discs.length) {
+  if (discs.length && !ocultasP.has('disciplinas')) {
     out.push(<Sec parte="sec_disciplinas" t={c.tituloDisciplinas ?? 'Desempenho por disciplina'} />)
     if (c.disciplinasIntro) { const cor = corP('disc_intro', '#5a5570'); out.push(<p {...atr('disc_intro', 'Introdução das disciplinas', cor, { fontSize: base - 1, color: cor, margin: '0 0 8px', lineHeight: 1.4 })}>{V(c.disciplinasIntro)}</p>) }
     for (const d of discs) {
@@ -237,7 +238,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
       )
     }
   }
-  if (c.sugestoes.length) {
+  if (c.sugestoes.length && !ocultasP.has('sugestoes')) {
     out.push(<Sec parte="sec_sugestoes" t={c.tituloSugestoes ?? 'Sugestões de estudo'} />)
     c.sugestoes.forEach((s, si) => { const cor = corP(`sug:${si}`, '#fdf3d0'); out.push(
       <div key={`sug${si}`} style={{ marginBottom: 10 }}>
@@ -256,7 +257,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
       </div>,
     ) })
   }
-  if (c.gabaritoObs.length || c.gabaritoIntro.length) {
+  if ((c.gabaritoObs.length || c.gabaritoIntro.length) && !ocultasP.has('gabarito')) {
     out.push(<Sec parte="sec_gabarito" t={c.gabaritoTitulo || 'Gabarito oficial desatualizado'} />)
     c.gabaritoIntro.forEach((p, i) => { const cor = corP('diag_gab_obs', '#243b53'); out.push(<p key={`gabi${i}`} {...atr('diag_gab_obs', 'Observações do gabarito', cor, { fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify', color: cor })}>{V(p)}</p>) })
     if (c.gabaritoObs.length) { const cor = corP('diag_gab_obs', '#a32d2d'); out.push(<div {...atr('diag_gab_obs', 'Observação do gabarito', cor, { background: '#f5f3ff', borderTop: `2px solid ${cor}`, padding: '8px 12px' })}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: 9, color: '#5a5570' }}>{V(o)}</div>)}</div>) }
