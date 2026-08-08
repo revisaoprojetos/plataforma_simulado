@@ -248,11 +248,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
         </div>
         <div style={{ background: '#f0eeff', padding: '8px 12px' }}>
           {s.intro && <p style={{ fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify' }}>{V(s.intro)}</p>}
-          {s.itens.map((it, j) => (
-            <div key={j} style={{ fontSize: base - 1, lineHeight: 1.4, marginBottom: 2, display: 'flex', gap: 5 }}>
-              <span style={{ fontWeight: 700, color: it.forte ? '#e8850c' : '#3b5bdb' }}>{it.forte ? '>>' : '>'}</span><span>{V(it.texto)}</span>
-            </div>
-          ))}
+          {s.itens.length > 0 && <div style={{ fontSize: base - 1, lineHeight: 1.5, textAlign: 'justify' }}>{V(s.itens.map((it) => it.texto).join('\n'))}</div>}
         </div>
       </div>,
     ) })

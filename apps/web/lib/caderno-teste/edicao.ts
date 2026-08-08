@@ -46,7 +46,7 @@ export function camposDoBloco(item: ItemCaderno, parte: string, nomeFallback?: s
       { id: 'titulo', label: 'Título', valor: s.titulo },
       { id: 'prioridade', label: 'Prioridade', valor: s.prioridade },
       { id: 'intro', label: 'Introdução', valor: s.intro, multiline: true },
-      ...s.itens.map((it, j) => ({ id: `item:${j}`, label: `Tópico ${j + 1}`, valor: it.texto, multiline: true })),
+      { id: 'itens', label: 'Tópicos', valor: s.itens.map((it) => it.texto).join('\n'), multiline: true },
     ]
   }
   if (parte.startsWith('disc:')) {
@@ -114,7 +114,7 @@ export function aplicarCampoBloco(conteudo: DiagConteudo | undefined, parte: str
       if (campoId === 'titulo') s.titulo = valor
       else if (campoId === 'prioridade') s.prioridade = valor
       else if (campoId === 'intro') s.intro = valor
-      else if (campoId.startsWith('item:')) { const j = Number(campoId.slice('item:'.length)); if (s.itens[j]) s.itens[j].texto = valor }
+      else if (campoId === 'itens') s.itens = valor ? [{ forte: false, texto: valor }] : []
     }
   } else if (parte.startsWith('disc:')) {
     const chave = parte.slice('disc:'.length); const i = idxDisc(c, chave)

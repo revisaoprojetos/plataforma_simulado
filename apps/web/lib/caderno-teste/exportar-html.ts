@@ -81,8 +81,8 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
   if (c.sugestoes.length) {
     h += sec('Sugestões de estudo')
     c.sugestoes.forEach((s, si) => {
-      let it = ''
-      for (const i of s.itens) it += `<div style="font-size:11px;line-height:1.4;margin-bottom:2px"><b style="color:${i.forte ? '#e8850c' : '#3b5bdb'}">${i.forte ? '&gt;&gt;' : '&gt;'}</b> ${V(i.texto)}</div>`
+      // Todos os tópicos num só bloco (introdução permanece separada).
+      const it = s.itens.length ? `<div style="font-size:11px;line-height:1.5;text-align:justify">${V(s.itens.map((i) => i.texto).join('\n'))}</div>` : ''
       const cor = corP(`sug:${si}`, '#fdf3d0')
       h += `<div style="margin-bottom:10px"><table style="width:100%;border-collapse:collapse;background:${cor}"><tr><td style="padding:5px 12px;font-weight:800;font-size:11px;color:#9a6e00">${V(s.titulo)}</td><td style="padding:5px 12px;text-align:right;font-weight:700;font-size:10px;color:#9a6e00">${s.prioridade ? '[!] ' + V(s.prioridade) : ''}</td></tr></table><div style="background:#f0eeff;padding:8px 12px">${s.intro ? `<p style="font-size:11px;margin:0 0 6px;line-height:1.4;text-align:justify">${V(s.intro)}</p>` : ''}${it}</div></div>`
     })
