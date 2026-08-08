@@ -229,7 +229,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
         {c.pilares.map((pl, i) => {
           const banda = bandaAdaptativa(pl, vars)
           const bandas = banda ? [banda] : pl.bandas // com dado do aluno mostra só a faixa; sem dado, todas (modelo)
-          const parte = `pilar:${pl.chave || i}`
+          const parte = `pilar:${i}` // ÍNDICE (único) — não a chave, que pode repetir e causar conflito entre cards
           const cor = corP(parte, prim) // destaque do card (nome + %)
           return (
             <div key={i} {...atr(parte, pl.nome, cor, { flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${cor}22`, padding: 10 })}>

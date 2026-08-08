@@ -7,10 +7,6 @@ import { DIAG_PADRAO, slugDiag, topicosParaTexto, type DiagConteudo } from './di
 /** alvo 'titulo' edita ajustes.titulo; os demais editam item.conteudo. */
 export type CampoTexto = { id: string; label: string; valor: string; multiline?: boolean; alvo?: 'conteudo' | 'titulo' }
 
-/** Índice do pilar cuja chave/posição casa com `pilar:<x>`. */
-function idxPilar(c: DiagConteudo, x: string): number {
-  return c.pilares.findIndex((pl, i) => (pl.chave || String(i)) === x)
-}
 /** Índice da disciplina (por slug) em conteudo. */
 function idxDisc(c: DiagConteudo, chave: string): number {
   return c.disciplinas.findIndex((d) => (d.chave || slugDiag(d.nome)) === chave)
@@ -33,8 +29,7 @@ export function camposDoBloco(item: ItemCaderno, parte: string, nomeFallback?: s
   if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] == null) return []; return [{ id: 'intro', label: 'Parágrafo', valor: c.intro[i], multiline: true }] }
   if (parte === 'disc_intro') return [{ id: 'disciplinasIntro', label: 'Introdução das disciplinas', valor: c.disciplinasIntro, multiline: true }]
   if (parte.startsWith('pilar:')) {
-    const i = idxPilar(c, parte.slice('pilar:'.length)); if (i < 0) return []
-    const pl = c.pilares[i]
+    const i = Number(parte.slice('pilar:'.length)); const pl = c.pilares[i]; if (!pl) return []
     return [
       { id: 'nome', label: 'Nome do pilar', valor: pl.nome },
       { id: 'totalTxt', label: 'Legenda (x de N questões)', valor: pl.totalTxt, multiline: true },
@@ -97,7 +92,7 @@ export function podeRemoverParte(parte: string): boolean {
 export function removerParteDiag(conteudo: DiagConteudo | undefined, parte: string): DiagConteudo {
   const c = clonar(conteudo ?? DIAG_PADRAO)
   if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] != null) c.intro.splice(i, 1) }
-  else if (parte.startsWith('pilar:')) { const i = idxPilar(c, parte.slice('pilar:'.length)); if (i >= 0) c.pilares.splice(i, 1) }
+  else if (parte.startsWith('pilar:')) { const i = Number(parte.slice('pilar:'.length)); if (c.pilares[i]) c.pilares.splice(i, 1) }
   else if (parte.startsWith('sug:')) { const i = Number(parte.slice('sug:'.length)); if (c.sugestoes[i]) c.sugestoes.splice(i, 1) }
   else if (parte.startsWith('disc:')) { const chave = parte.slice('disc:'.length); const i = idxDisc(c, chave); if (i >= 0) c.disciplinas.splice(i, 1); else c.discOcultas = [...(c.discOcultas ?? []), chave] }
   else { const oc = chaveOcultavel(parte); if (oc) c.partesOcultas = [...new Set([...(c.partesOcultas ?? []), oc])] }
@@ -116,7 +111,7 @@ export function aplicarCampoBloco(conteudo: DiagConteudo | undefined, parte: str
   else if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] != null) c.intro[i] = valor }
   else if (parte === 'disc_intro') { c.disciplinasIntro = valor }
   else if (parte.startsWith('pilar:')) {
-    const i = idxPilar(c, parte.slice('pilar:'.length)); if (i >= 0) {
+    const i = Number(parte.slice('pilar:'.length)); if (c.pilares[i]) {
       const pl = c.pilares[i]
       if (campoId === 'nome') pl.nome = valor
       else if (campoId === 'totalTxt') pl.totalTxt = valor

@@ -478,13 +478,13 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
               {(pickerCor.parte.startsWith('pilar:') || pickerCor.parte === 'lingua_card') && (() => {
                 const cf = (ativo.conteudo ?? {}) as DiagConteudo
                 const isLP = pickerCor.parte === 'lingua_card'
-                const suffix = pickerCor.parte.slice(pickerCor.parte.indexOf(':') + 1)
-                const alvo = isLP ? cf.linguaPortuguesa : (cf.pilares ?? []).find((pl, i) => (pl.chave || String(i)) === suffix)
+                const idx = Number(pickerCor.parte.slice(pickerCor.parte.indexOf(':') + 1))
+                const alvo = isLP ? cf.linguaPortuguesa : (cf.pilares ?? [])[idx]
                 const chave = alvo?.chave ?? '', tipo = (alvo?.tipoFonte ?? 'pilar') as 'pilar' | 'disciplina'
                 const val = (tipo === 'disciplina' ? 'd' : 'p') + ':' + chave
                 const sel = (nc: string, nt: 'pilar' | 'disciplina') => {
                   if (isLP) { if (cf.linguaPortuguesa) setConteudo({ ...cf, linguaPortuguesa: { ...cf.linguaPortuguesa, chave: nc, tipoFonte: nt, totalTxt: totalTxtDe(nc, nt) } }) }
-                  else setConteudo({ ...cf, pilares: (cf.pilares ?? []).map((pl, i) => (pl.chave || String(i)) === suffix ? { ...pl, chave: nc, tipoFonte: nt, totalTxt: totalTxtDe(nc, nt) } : pl) })
+                  else setConteudo({ ...cf, pilares: (cf.pilares ?? []).map((pl, i) => i === idx ? { ...pl, chave: nc, tipoFonte: nt, totalTxt: totalTxtDe(nc, nt) } : pl) })
                 }
                 const existe = fontesDisponiveis.some((f) => (f.tipo === 'disciplina' ? 'd' : 'p') + ':' + f.chave === val)
                 return (
