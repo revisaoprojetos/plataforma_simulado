@@ -292,6 +292,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
   const a = item.ajustes
   const qs = questoes.length ? questoes : QUESTOES_EXEMPLO
   const pad = a.compacto ? 40 : 56
+  const GAP = a.compacto ? 8 : 14 // espaço entre blocos (contado na paginação)
   const Ht = a.cabecalhoUrl ? 84 : pad
   const Hf = a.rodapeUrl ? 84 : 34
   const contentW = A4_W - 2 * pad
@@ -310,7 +311,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
     const hs = (Array.from(cont.children) as HTMLElement[]).map((el) => el.getBoundingClientRect().height)
     const pages: number[][] = []; let cur: number[] = []; let h = 0
     for (let i = 0; i < hs.length; i++) {
-      const bh = hs[i]
+      const bh = hs[i] + GAP
       if (cur.length && h + bh > availH) { pages.push(cur); cur = []; h = 0 }
       cur.push(i); h += bh
     }
@@ -331,7 +332,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
       {temCapa && <Folha item={item} num={1} total={total} pad={pad} Ht={Ht} Hf={Hf} capa />}
       {pages.map((idxs, pi) => (
         <Folha key={pi} item={item} num={(temCapa ? 1 : 0) + pi + 1} total={total} pad={pad} Ht={Ht} Hf={Hf}>
-          {idxs.map((i) => <div key={i}>{blocos[i]}</div>)}
+          {idxs.map((i) => <div key={i} style={{ marginBottom: GAP }}>{blocos[i]}</div>)}
         </Folha>
       ))}
     </div>
