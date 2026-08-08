@@ -598,9 +598,8 @@ function CampoBlocoEditor({ campo, onChange }: { campo: CampoBlocoDoc; onChange:
       <input type="checkbox" checked={!!campo.valor} onChange={(e) => onChange(e.target.checked)} />
     </label>
   )
-  return (
-    <div><div className="mb-1 text-[11px] text-muted-foreground">{campo.label}</div><textarea value={campo.valor || ''} onChange={(e) => onChange(e.target.value)} rows={campo.id === 'texto' ? 3 : 2} className="w-full resize-y rounded border bg-background px-2 py-1 text-xs leading-snug outline-none focus:border-primary" /></div>
-  )
+  // Texto: usa o campo com barra B/I/U (mesma sintaxe do diagnóstico) — renderiza no preview.
+  return <CampoFormatavel campo={{ id: campo.id, label: campo.label, valor: String(campo.valor ?? ''), multiline: true }} onChange={onChange} />
 }
 
 /** Campo de texto com barra de formatação (negrito/itálico/sublinhado) que envolve a seleção. */

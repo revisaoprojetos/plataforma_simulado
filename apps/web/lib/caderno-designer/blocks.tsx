@@ -216,8 +216,20 @@ export function applyVars(texto: string, vars: Record<string, string>): string {
  * importação do Word. Constrói spans React (nunca HTML cru → sem XSS). Só é usada quando o bloco
  * tem `rich: true`; blocos sem esse flag renderizam o texto puro, idêntico ao comportamento antigo.
  */
+// Converte markdown leve (negrito com dois asteriscos, italico com um asterisco ou underscore) em
+// tags b/i (idêntico ao formatarInline do v2). Sublinhado usa a tag <u> direto. Conservador: o
+// italico exige par de marcadores colado ao texto (não pega asterisco solto de lista/multiplicação).
+function mdParaTags(t: string): string {
+  return t
+    .replace(/\*\*([^*]+?)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<i>$2</i>')
+    .replace(/(^|[^\w_])_([^_\n]+?)_(?![\w_])/g, '$1<i>$2</i>')
+}
+
 export function renderInline(texto: string): ReactNode {
-  if (!texto || !/<\/?(?:b|strong|i|em|u|s)>/i.test(texto)) return texto
+  if (!texto) return texto
+  const src = mdParaTags(texto)
+  if (!/<\/?(?:b|strong|i|em|u|s)>/i.test(src)) return texto
   const re = /<\/?(?:b|strong|i|em|u|s)>/gi
   const nodes: ReactNode[] = []
   const stack = { b: 0, i: 0, u: 0, s: 0 }
@@ -229,15 +241,15 @@ export function renderInline(texto: string): ReactNode {
     nodes.push(<span key={key++} style={{ fontWeight: stack.b ? 700 : undefined, fontStyle: stack.i ? 'italic' : undefined, textDecoration: deco || undefined }}>{t}</span>)
   }
   let m: RegExpExecArray | null
-  while ((m = re.exec(texto))) {
-    push(texto.slice(last, m.index))
+  while ((m = re.exec(src))) {
+    push(src.slice(last, m.index))
     const raw = m[0].toLowerCase()
     const name = raw.replace(/[<>/]/g, '')
     const k = (name === 'strong' ? 'b' : name === 'em' ? 'i' : name) as 'b' | 'i' | 'u' | 's'
     stack[k] = raw[1] === '/' ? Math.max(0, stack[k] - 1) : stack[k] + 1
     last = re.lastIndex
   }
-  push(texto.slice(last))
+  push(src.slice(last))
   return nodes
 }
 
@@ -289,7 +301,7 @@ function BlockRenderBody({ block, theme, data, full, editor, selectable, selecte
         <div style={{ minHeight: a.alturaMin || undefined, display: a.alturaMin ? 'flex' : undefined, flexDirection: 'column', justifyContent: a.valignV === 'center' ? 'center' : a.valignV === 'bottom' ? 'flex-end' : 'flex-start' }}>
           <div style={{ textAlign: ALIN[a.align as keyof typeof ALIN] ?? 'left', ...(temFundo ? { background: a.corFundo, padding: `${a.fundoPad ?? 10}px ${(a.fundoPad ?? 10) + 4}px`, borderRadius: a.fundoRaio ?? 6 } : {}) }}>
             <span style={{ fontSize: sizes[a.nivel] ?? 22, fontWeight: 700, color: corTexto, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia, fontStyle: a.italico ? 'italic' : 'normal', textDecoration: a.sublinhado ? 'underline' : 'none', letterSpacing: a.espacamento ? `${a.espacamento}px` : undefined }}>
-              {a.rich ? renderInline(applyVars(a.texto ?? '', data.vars)) : applyVars(a.texto ?? '', data.vars)}
+              {renderInline(applyVars(a.texto ?? '', data.vars))}
             </span>
             {a.subtitulo && <div style={{ fontSize: 11, fontWeight: 600, color: corTexto, opacity: temFundo ? 0.85 : 0.7, marginTop: 2 }}>{applyVars(a.subtitulo, data.vars)}</div>}
             {!temFundo && a.mostrarLinha && <div style={{ height: 2, background: a.cor || c.acento, marginTop: 4, borderRadius: 2 }} />}

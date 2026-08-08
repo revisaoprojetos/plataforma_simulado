@@ -197,7 +197,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
           const cor = corP(parte, prim) // destaque do card (nome + %)
           return (
             <div key={i} {...atr(parte, pl.nome, cor, { flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${cor}22`, padding: 10 })}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{pl.nome}</div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(pl.nome)}</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1.1 }}>{pl.chave ? V(`{pct_pilar_${pl.chave}}`) : 'X%'}</div>
               <div style={{ fontSize: 9, color: '#5a5570', marginBottom: 6 }}>{V(pl.totalTxt)}</div>
               {bandas.map((b, j) => (
@@ -224,9 +224,9 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
       out.push(
         <div {...atr(`disc:${d.chave}`, d.nome, corDisc, { background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5 })}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: prim }}>{d.nome}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: prim }}>{V(d.nome)}</div>
             {assuntos.length
-              ? assuntos.map((as, k) => <div key={k} style={{ fontSize: 9, color: '#5a5570', fontStyle: 'italic' }}>- {as}</div>)
+              ? assuntos.map((as, k) => <div key={k} style={{ fontSize: 9, color: '#5a5570', fontStyle: 'italic' }}>- {V(as)}</div>)
               : <div style={{ fontSize: 9, color: '#5a5570', fontStyle: 'italic' }}>- Assuntos das questões erradas</div>}
           </div>
           <div style={{ fontSize: 11, whiteSpace: 'nowrap' }}><span style={{ color: '#9590b0' }}>{V(`{acerto_${d.chave}}`)}/{V(`{total_${d.chave}}`)}</span> <span style={{ fontWeight: 800, color: '#9a6e00' }}>{V(`{pct_${d.chave}}`)}</span></div>
