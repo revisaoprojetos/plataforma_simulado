@@ -57,6 +57,17 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
   { const cNum = corP('diag_nota_num', '#9b6800'), cFx = corP('diag_nota_faixa', amar); h += `<table style="width:100%;border-collapse:collapse;margin-bottom:14px;border:1px solid ${prim}33"><tr><td style="background:${cNum};color:${corTextoP('diag_nota_num', '#fff')};padding:12px 22px;font-weight:800;width:120px;font-size:26px;${fonteCss('diag_nota_num')}">${V('{acertos}')}<span style="font-size:16px">/${V(c.notaTotal)}</span></td><td style="background:${cFx};color:${corTextoP('diag_nota_faixa', '#3b2f00')};padding:12px 18px;font-size:13px;font-weight:600;${fonteCss('diag_nota_faixa')}">${V(c.notaTexto)}</td></tr></table>` }
   c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); h += `<p style="font-size:12px;line-height:1.5;text-align:${alignP(`intro:${i}`, 'justify')};margin:0 0 8px;color:${cor}">${V(p)}</p>` })
 
+  if (c.linguaPortuguesa) {
+    const lp = c.linguaPortuguesa
+    h += sec(lp.secTitulo || 'Desempenho em Língua Portuguesa')
+    if (lp.secIntro) h += `<p style="font-size:11px;color:${corP('lingua_intro', '#5a5570')};margin:0 0 8px;line-height:1.4;${fonteCss('lingua_intro')}">${V(lp.secIntro)}</p>`
+    const banda = bandaAdaptativa({ nome: lp.titulo, chave: 'lingua_portuguesa', totalTxt: lp.totalTxt, bandas: lp.bandas }, vars)
+    const bandas = banda ? [banda] : lp.bandas
+    const cor = corP('lingua_card', corDoPilar('lingua_portuguesa', a.coresPilar ?? {}, prim))
+    let card = `<div style="font-size:10px;font-weight:700;color:${cor};letter-spacing:.5px">${esc(lp.titulo)}</div><div style="font-size:24px;font-weight:800;color:${cor}">${V('{pct_pilar_lingua_portuguesa}')}</div><div style="font-size:10px;color:#5a5570;margin-bottom:6px">${V(lp.totalTxt)}</div>`
+    for (const b of bandas) card += `${!banda ? `<div style="font-size:10px;font-weight:700;color:${cor}">${esc(b.faixa)}</div>` : ''}${b.texto ? `<div style="font-size:10px;color:#243b53;line-height:1.4;text-align:${alignP('lingua_card', 'justify')};margin-bottom:6px">${V(b.texto)}</div>` : ''}`
+    h += `<div style="background:#fff2cc;border:1px solid ${cor}22;padding:10px;margin-bottom:10px">${card}</div>`
+  }
   if (c.pilares.length) {
     h += sec('Desempenho por pilar')
     h += '<table style="width:100%;border-collapse:separate;border-spacing:10px 0"><tr style="vertical-align:top">'

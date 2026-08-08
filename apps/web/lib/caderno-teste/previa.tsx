@@ -201,6 +201,27 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     </div>,
   ) }
   c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); out.push(<p key={`intro${i}`} {...atr(`intro:${i}`, `Parágrafo de abertura ${i + 1}`, cor, { fontSize: base, lineHeight: 1.5, textAlign: 'justify', margin: '0 0 8px', color: cor })}>{V(p)}</p>) })
+  if (c.linguaPortuguesa && !ocultasP.has('lingua')) {
+    const lp = c.linguaPortuguesa
+    out.push(<Sec parte="sec_lingua" t={lp.secTitulo || 'Desempenho em Língua Portuguesa'} />)
+    if (lp.secIntro) { const cor = corP('lingua_intro', '#5a5570'); out.push(<p key="lpintro" {...atr('lingua_intro', 'Introdução (Língua Portuguesa)', cor, { fontSize: base - 1, color: cor, margin: '0 0 8px', lineHeight: 1.4 })}>{V(lp.secIntro)}</p>) }
+    const banda = bandaAdaptativa({ nome: lp.titulo, chave: 'lingua_portuguesa', totalTxt: lp.totalTxt, bandas: lp.bandas }, vars)
+    const bandas = banda ? [banda] : lp.bandas
+    const cor = corP('lingua_card', corDoPilar('lingua_portuguesa', a.coresPilar ?? {}, prim))
+    out.push(
+      <div key="lpcard" {...atr('lingua_card', lp.titulo, cor, { background: '#fff2cc', border: `1px solid ${cor}22`, padding: 10, marginBottom: 4 })}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(lp.titulo)}</div>
+        <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1.1 }}>{V('{pct_pilar_lingua_portuguesa}')}</div>
+        <div style={{ fontSize: 9, color: '#5a5570', marginBottom: 6 }}>{V(lp.totalTxt)}</div>
+        {bandas.map((b, j) => (
+          <div key={j} style={{ marginBottom: 6 }}>
+            {!banda && <div style={{ fontSize: 9, fontWeight: 700, color: cor }}>{b.faixa}</div>}
+            {b.texto && <div style={{ fontSize: 8.5, color: '#243b53', lineHeight: 1.4, textAlign: alignP('lingua_card', 'justify') }}>{V(b.texto)}</div>}
+          </div>
+        ))}
+      </div>,
+    )
+  }
   if (c.pilares.length && !ocultasP.has('pilares')) {
     out.push(<Sec parte="sec_pilares" t={c.tituloPilares ?? 'Desempenho por pilar'} />)
     out.push(

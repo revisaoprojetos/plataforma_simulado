@@ -60,6 +60,16 @@ export function camposDoBloco(item: ItemCaderno, parte: string, nomeFallback?: s
   if (parte === 'sec_disciplinas') return [{ id: 'tituloDisciplinas', label: 'Título da seção', valor: c.tituloDisciplinas ?? 'Desempenho por disciplina' }]
   if (parte === 'sec_sugestoes') return [{ id: 'tituloSugestoes', label: 'Título da seção', valor: c.tituloSugestoes ?? 'Sugestões de estudo' }]
   if (parte === 'sec_gabarito') return [{ id: 'gabaritoTitulo', label: 'Título da seção', valor: c.gabaritoTitulo }]
+  if (parte === 'sec_lingua') return [{ id: 'lpSecTitulo', label: 'Título da seção', valor: c.linguaPortuguesa?.secTitulo ?? 'Desempenho em Língua Portuguesa' }]
+  if (parte === 'lingua_intro') return [{ id: 'lpSecIntro', label: 'Introdução', valor: c.linguaPortuguesa?.secIntro ?? '', multiline: true }]
+  if (parte === 'lingua_card') {
+    const lp = c.linguaPortuguesa; if (!lp) return []
+    return [
+      { id: 'lpTitulo', label: 'Nome', valor: lp.titulo },
+      { id: 'lpTotal', label: 'Legenda (x de N questões)', valor: lp.totalTxt, multiline: true },
+      ...lp.bandas.map((b, j) => ({ id: `lpBanda:${j}`, label: `Texto ${b.faixa}`, valor: b.texto, multiline: true })),
+    ]
+  }
   if (parte === 'diag_gab_obs') return [
     { id: 'titulo', label: 'Título da seção', valor: c.gabaritoTitulo },
     ...c.gabaritoIntro.map((t, k) => ({ id: `intro:${k}`, label: `Parágrafo ${k + 1}`, valor: t, multiline: true })),
@@ -74,6 +84,7 @@ const OCULTAVEIS: Record<string, string> = {
   diag_nome_rot: 'nome', diag_nome_val: 'nome',
   sec_pilares: 'pilares', sec_disciplinas: 'disciplinas', sec_sugestoes: 'sugestoes',
   sec_gabarito: 'gabarito', diag_gab_obs: 'gabarito',
+  sec_lingua: 'lingua', lingua_intro: 'lingua', lingua_card: 'lingua',
 }
 export function chaveOcultavel(parte: string): string | null { return OCULTAVEIS[parte] ?? null }
 
@@ -125,6 +136,16 @@ export function aplicarCampoBloco(conteudo: DiagConteudo | undefined, parte: str
   else if (parte === 'sec_disciplinas') { c.tituloDisciplinas = valor }
   else if (parte === 'sec_sugestoes') { c.tituloSugestoes = valor }
   else if (parte === 'sec_gabarito') { c.gabaritoTitulo = valor }
+  else if (parte === 'sec_lingua') { if (c.linguaPortuguesa) c.linguaPortuguesa.secTitulo = valor }
+  else if (parte === 'lingua_intro') { if (c.linguaPortuguesa) c.linguaPortuguesa.secIntro = valor }
+  else if (parte === 'lingua_card') {
+    const lp = c.linguaPortuguesa
+    if (lp) {
+      if (campoId === 'lpTitulo') lp.titulo = valor
+      else if (campoId === 'lpTotal') lp.totalTxt = valor
+      else if (campoId.startsWith('lpBanda:')) { const j = Number(campoId.slice('lpBanda:'.length)); if (lp.bandas[j]) lp.bandas[j].texto = valor }
+    }
+  }
   else if (parte === 'diag_gab_obs') {
     if (campoId === 'titulo') c.gabaritoTitulo = valor
     else if (campoId.startsWith('intro:')) { const k = Number(campoId.slice('intro:'.length)); if (c.gabaritoIntro[k] != null) c.gabaritoIntro[k] = valor }
