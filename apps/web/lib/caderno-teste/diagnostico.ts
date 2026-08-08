@@ -34,6 +34,8 @@ export function topicosParaTexto(itens: DiagItemSugestao[]): string {
 export type DiagConteudo = {
   /** Título do cabeçalho do diagnóstico (independente do título do grupo). */
   tituloCabecalho?: string
+  /** Rótulo do campo do nome (ex.: "NOME:"). */
+  rotuloNome?: string
   subtitulo: string
   notaTotal: string
   notaTexto: string

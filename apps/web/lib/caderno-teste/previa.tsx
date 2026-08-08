@@ -187,7 +187,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   ) }
   if (a.mostrarDadosAluno && !ocultasP.has('nome')) { const corN = corP('diag_nome_rot', prim), corV = corP('diag_nome_val', amar); out.push(
     <div style={{ display: 'flex', overflow: 'hidden', marginBottom: 12 }}>
-      <div {...atr('diag_nome_rot', 'Rótulo NOME', corN, { background: corN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '8px 14px' })}>NOME:</div>
+      <div {...atr('diag_nome_rot', 'Rótulo NOME', corN, { background: corN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '8px 14px', whiteSpace: 'nowrap' })}>{V(c.rotuloNome ?? 'NOME:')}</div>
       <div {...atr('diag_nome_val', 'Faixa do nome', corV, { background: corV, color: '#3b2f00', flex: 1, padding: '8px 14px', fontSize: 12, fontWeight: 600 })}>{V('{nome}')}</div>
     </div>,
   ) }

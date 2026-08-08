@@ -27,6 +27,7 @@ export function camposDoBloco(item: ItemCaderno, parte: string, nomeFallback?: s
     { id: 'tituloCab', label: 'Título', valor: c.tituloCabecalho ?? 'Diagnóstico de Desempenho' },
     { id: 'subtitulo', label: 'Subtítulo', valor: c.subtitulo, multiline: true },
   ]
+  if (parte === 'diag_nome_rot') return [{ id: 'rotuloNome', label: 'Texto', valor: c.rotuloNome ?? 'NOME:' }]
   if (parte === 'diag_nota_num') return [{ id: 'notaTotal', label: 'Total (denominador)', valor: c.notaTotal }]
   if (parte === 'diag_nota_faixa') return [{ id: 'notaTexto', label: 'Texto da nota', valor: c.notaTexto, multiline: true }]
   if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] == null) return []; return [{ id: 'intro', label: 'Parágrafo', valor: c.intro[i], multiline: true }] }
@@ -98,6 +99,7 @@ function clonar(c: DiagConteudo): DiagConteudo { try { return structuredClone(c)
 export function aplicarCampoBloco(conteudo: DiagConteudo | undefined, parte: string, campoId: string, valor: string): DiagConteudo {
   const c = clonar(conteudo ?? DIAG_PADRAO)
   if (parte === 'diag_cab') { if (campoId === 'subtitulo') c.subtitulo = valor; else if (campoId === 'tituloCab') c.tituloCabecalho = valor }
+  else if (parte === 'diag_nome_rot') { if (campoId === 'rotuloNome') c.rotuloNome = valor }
   else if (parte === 'diag_nota_num') { if (campoId === 'notaTotal') c.notaTotal = valor }
   else if (parte === 'diag_nota_faixa') { if (campoId === 'notaTexto') c.notaTexto = valor }
   else if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] != null) c.intro[i] = valor }
