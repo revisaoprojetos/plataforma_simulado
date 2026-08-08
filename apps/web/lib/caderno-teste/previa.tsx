@@ -336,7 +336,10 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
   const blocos = useMemo(() => blocosDoItem(item, qs, vars, discBanco, { selParte, onPick: (p, n, cor, an) => onPickRef.current?.(p, n, cor, an) }), [item, qs, varsKey, discKey, selParte]) // eslint-disable-line react-hooks/exhaustive-deps
   const medRef = useRef<HTMLDivElement>(null)
   const [paginas, setPaginas] = useState<number[][] | null>(null)
-  const chave = useMemo(() => JSON.stringify({ n: blocos.length, a }), [blocos, a])
+  // A chave deve mudar sempre que a ALTURA renderizada muda: qtd de blocos, ajustes (fontes/compacto),
+  // conteúdo dos textos, variáveis (nome/estatísticas) e disciplinas do banco. Sem isso, editar um texto
+  // maior não re-pagina e o último bloco vaza atrás do rodapé.
+  const chave = useMemo(() => JSON.stringify({ n: blocos.length, a, c: item.conteudo, v: varsKey, d: discKey }), [blocos.length, a, item.conteudo, varsKey, discKey])
 
   useLayoutEffect(() => {
     const cont = medRef.current; if (!cont) return
@@ -350,7 +353,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
       // idêntico à renderização. Assim nada é empurrado com espaço sobrando nem cortado.
       const tops = kids.map((el) => el.getBoundingClientRect().top)
       const hs = kids.map((el, i) => (i < kids.length - 1 ? tops[i + 1] : el.getBoundingClientRect().bottom) - tops[i])
-      const BUF = 2 // folga mínima p/ sub-pixel (a medição já é fiel)
+      const BUF = 10 // folga p/ sub-pixel/diferenças de render — melhor sobrar espaço do que vazar no rodapé
       const pages: number[][] = []; let cur: number[] = []; let h = 0
       for (let i = 0; i < hs.length; i++) {
         if (cur.length && h + hs[i] > availH - BUF) { pages.push(cur); cur = [i]; h = hs[i] }
