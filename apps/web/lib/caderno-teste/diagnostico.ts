@@ -23,6 +23,8 @@ export type DiagItemSugestao = { forte: boolean; texto: string }
 export type DiagSugestao = { titulo: string; prioridade: string; intro: string; itens: DiagItemSugestao[] }
 
 export type DiagConteudo = {
+  /** Título do cabeçalho do diagnóstico (independente do título do grupo). */
+  tituloCabecalho?: string
   subtitulo: string
   notaTotal: string
   notaTexto: string
@@ -51,7 +53,8 @@ export type DiagConteudo = {
 
 /** Diagnóstico genérico (default quando um item de diagnóstico não tem conteúdo salvo). */
 export const DIAG_PADRAO: DiagConteudo = {
-  subtitulo: 'Nome do simulado / recorte',
+  tituloCabecalho: 'Diagnóstico de Desempenho',
+  subtitulo: 'Adicionar Subtítulo',
   notaTotal: '{total_questoes}',
   notaTexto: '{acertos} acertos de {total_questoes} questões — {percentual} de aproveitamento',
   intro: ['Texto de abertura do diagnóstico. Explique o objetivo do relatório e como o aluno deve lê-lo.'],

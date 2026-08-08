@@ -170,7 +170,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   }
   if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); out.push(
     <div {...atr('diag_cab', 'Cabeçalho', cor, { background: cor, color: '#fff', padding: '12px 16px', marginBottom: 12 })}>
-      <div style={{ fontSize: 20, fontWeight: 800 }}>{V(a.titulo || 'Diagnóstico de Desempenho')}</div>
+      <div style={{ fontSize: 20, fontWeight: 800 }}>{V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>
       {c.subtitulo && <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{V(c.subtitulo)}</div>}
     </div>,
   ) }
