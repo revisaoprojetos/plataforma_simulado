@@ -429,6 +429,25 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
               {a.coresParte?.[pickerCor.parte] && (
                 <button onClick={() => { const cp = { ...(a.coresParte ?? {}) }; delete cp[pickerCor.parte]; setAjuste({ coresParte: cp }) }} className="mt-2 text-[11px] text-muted-foreground hover:underline">Restaurar cor padrão</button>
               )}
+              {/* Sugestão: demais cores agrupadas no topo (título + marcadores) */}
+              {pickerCor.parte.startsWith('sug:') && (() => {
+                const i = Number(pickerCor.parte.slice('sug:'.length))
+                const cf = (ativo.conteudo ?? {}) as DiagConteudo
+                const s = cf.sugestoes?.[i]
+                return (
+                  <div className="mt-3 space-y-2.5">
+                    <div>
+                      <div className="mb-1 text-[11px] text-muted-foreground">Cor do título</div>
+                      <HexColorField value={s?.corTitulo || '#9a6e00'} onChange={(v) => setConteudo({ ...cf, sugestoes: (cf.sugestoes ?? []).map((x, j) => j === i ? { ...x, corTitulo: v } : x) })} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><div className="mb-1 text-[11px] text-muted-foreground">Cor de <b>&gt;</b></div><HexColorField value={cf.corMarcador || '#3b5bdb'} onChange={(v) => setConteudo({ ...cf, corMarcador: v })} /></div>
+                      <div><div className="mb-1 text-[11px] text-muted-foreground">Cor de <b>&gt;&gt;</b></div><HexColorField value={cf.corMarcadorForte || '#e8850c'} onChange={(v) => setConteudo({ ...cf, corMarcadorForte: v })} /></div>
+                    </div>
+                    <p className="text-[10px] leading-snug text-muted-foreground">No campo Tópicos, comece a linha com <code>&gt;</code> ou <code>&gt;&gt;</code> para o marcador pegar a cor.</p>
+                  </div>
+                )
+              })()}
               {campos.length > 0 && (
                 <div className="mt-4 space-y-2.5 border-t pt-4">
                   <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Texto</div>
@@ -460,22 +479,6 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                         <p className="mt-1 text-[10px] leading-snug text-muted-foreground">Escolhe de qual disciplina vêm os assuntos e as estatísticas deste card.</p>
                       </div>
                     )}
-                  </div>
-                )
-              })()}
-              {pickerCor.parte.startsWith('sug:') && (() => {
-                const cf = (ativo.conteudo ?? {}) as DiagConteudo
-                return (
-                  <div className="mt-4 grid grid-cols-2 gap-2 border-t pt-4">
-                    <div>
-                      <div className="mb-1 text-[11px] text-muted-foreground">Cor de <b>&gt;</b></div>
-                      <HexColorField value={cf.corMarcador || '#3b5bdb'} onChange={(v) => setConteudo({ ...cf, corMarcador: v })} />
-                    </div>
-                    <div>
-                      <div className="mb-1 text-[11px] text-muted-foreground">Cor de <b>&gt;&gt;</b></div>
-                      <HexColorField value={cf.corMarcadorForte || '#e8850c'} onChange={(v) => setConteudo({ ...cf, corMarcadorForte: v })} />
-                    </div>
-                    <p className="col-span-2 text-[10px] leading-snug text-muted-foreground">No campo Tópicos, comece a linha com <code>&gt;</code> ou <code>&gt;&gt;</code> para o marcador pegar essa cor.</p>
                   </div>
                 )
               })()}

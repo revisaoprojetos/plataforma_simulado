@@ -20,7 +20,7 @@ export const VARS_DIAGNOSTICO = {
   porDisciplina: ['{pct_<slug>}', '{acerto_<slug>}', '{total_<slug>}', '{assuntos_<slug>}'],
 }
 export type DiagItemSugestao = { forte: boolean; texto: string }
-export type DiagSugestao = { titulo: string; prioridade: string; intro: string; itens: DiagItemSugestao[] }
+export type DiagSugestao = { titulo: string; prioridade: string; intro: string; itens: DiagItemSugestao[]; corTitulo?: string }
 
 /** Junta os itens da sugestão num texto único (um por linha), preservando o marcador `>`/`>>`
  * (dos itens antigos com `forte`) quando o texto ainda não começa com marcador. */

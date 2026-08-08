@@ -246,7 +246,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     c.sugestoes.forEach((s, si) => { const cor = corP(`sug:${si}`, '#fdf3d0'); out.push(
       <div key={`sug${si}`} style={{ marginBottom: 10 }}>
         <div {...atr(`sug:${si}`, `Sugestão · ${s.titulo}`, cor, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: cor, padding: '5px 12px' })}>
-          <span style={{ fontWeight: 800, fontSize: 11, color: '#9a6e00' }}>{V(s.titulo)}</span>
+          <span style={{ fontWeight: 800, fontSize: 11, color: s.corTitulo || '#9a6e00' }}>{V(s.titulo)}</span>
           {s.prioridade && <span style={{ fontWeight: 700, fontSize: 9, color: '#9a6e00' }}>[!] {V(s.prioridade)}</span>}
         </div>
         <div style={{ background: '#f0eeff', padding: '8px 12px' }}>
