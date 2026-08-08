@@ -225,7 +225,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   if (c.pilares.length && !ocultasP.has('pilares')) {
     out.push(<Sec parte="sec_pilares" t={c.tituloPilares ?? 'Desempenho por pilar'} />)
     out.push(
-      <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', marginBottom: 4 }}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'stretch', marginBottom: 4 }}>
         {c.pilares.map((pl, i) => {
           const banda = bandaAdaptativa(pl, vars)
           const bandas = banda ? [banda] : pl.bandas // com dado do aluno mostra só a faixa; sem dado, todas (modelo)
@@ -324,7 +324,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
   const a = item.ajustes
   const qs = questoes.length ? questoes : QUESTOES_EXEMPLO
   const pad = a.compacto ? 40 : 56
-  const GAP = a.compacto ? 5 : 8 // espaço entre blocos (contado na paginação — menor p/ caber mais na folha)
+  const GAP = a.compacto ? 8 : 12 // espaço entre blocos (contado na paginação, fielmente)
   const Ht = a.cabecalhoUrl ? 96 : pad + 16 // um pouco mais de respiro no topo
   const Hf = a.rodapeUrl ? 84 : 34
   const contentW = A4_W - 2 * pad
