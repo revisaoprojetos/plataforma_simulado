@@ -186,3 +186,71 @@ export const DIAG_AGU_2023: DiagConteudo = {
     'Questão 63 - mudança da jurisprudência sobre estabilização da tutela antecipada (permanece relevante)',
   ],
 }
+
+/** Preset pronto: Diagnóstico de Desempenho — PGE/RS (estrutura base; textos específicos a preencher/importar). */
+export const DIAG_PGE_RS: DiagConteudo = {
+  tituloCabecalho: 'Diagnóstico de Desempenho',
+  subtitulo: 'PGE/RS - PROCURADOR DO ESTADO',
+  notaTotal: '{total_questoes}',
+  notaTexto: '{acertos} acertos de {total_questoes} questões — {percentual} de aproveitamento',
+  intro: [
+    'Este é o seu simulado com base na prova para Procurador do Estado da PGE/RS. Ele não foi pensado para medir se você "está pronto(a)", mas para colocar você diante da forma como a banca cobra e mostrar, com precisão, onde direcionar as próximas semanas de estudo.',
+    'O número de acertos é a parte menos importante deste relatório. O que importa está no que vem a seguir: o desempenho por pilar (lei seca, jurisprudência e doutrina) e por disciplina, que revela exatamente que tipo de erro você está cometendo. Errar por não ter visto o assunto é diferente de errar por não dominar o texto de lei, que é diferente de errar por não acompanhar jurisprudência. Cada lacuna se resolve de um jeito.',
+    'Ao final da leitura, você vai saber qual pilar merece reforço imediato, quais disciplinas concentram os pontos perdidos e quais assuntos precisa revisar. Guarde este diagnóstico: ele é o ponto de partida e o comparativo da sua evolução até o próximo simulado.',
+  ],
+  pilares: [
+    { nome: 'LEGISLAÇÃO', chave: 'lei_seca', totalTxt: '{acerto_pilar_lei_seca} de {total_pilar_lei_seca} questões', bandas: [
+      { faixa: '0-49', texto: 'O seu desempenho em lei seca ficou abaixo de 50% — um resultado que pede atenção imediata. A prova cobra o texto literal da lei em muitas questões, um dos principais fatores de reprovação. O estudo precisa ir além do contato superficial e chegar ao nível de detalhe que a banca exige.' },
+      { faixa: '50-80', texto: 'O seu desempenho em lei seca foi intermediário: você tem base, mas ainda deixa pontos na mesa. A banca cobra o dispositivo exato e questões que parecem simples viram armadilhas sem o domínio preciso do texto. Foque nos diplomas de maior incidência, com atenção aos detalhes que diferenciam as alternativas.' },
+      { faixa: '81-100', texto: 'O seu desempenho em lei seca foi excelente — esse costuma ser o diferencial da aprovação. Mantenha o resultado com revisões periódicas e atenção às leis específicas da PGE/RS e do Estado.' },
+    ] },
+    { nome: 'JURISPRUDÊNCIA', chave: 'jurisprudencia', totalTxt: '{acerto_pilar_jurisprudencia} de {total_pilar_jurisprudencia} questões', bandas: [
+      { faixa: '0-49', texto: 'O seu desempenho em jurisprudência ficou abaixo de 50%. Concursos de procuradoria cobram entendimentos consolidados dos tribunais. Reforce com urgência o estudo de jurisprudência (informativos do STF e STJ, teses de repercussão geral e recursos repetitivos).' },
+      { faixa: '50-80', texto: 'O seu desempenho em jurisprudência foi médio — há espaço relevante para crescer. Questões de jurisprudência diferenciam os primeiros colocados. Vale reforçar com informativos e as principais teses dos tribunais superiores.' },
+      { faixa: '81-100', texto: 'O seu desempenho em jurisprudência foi ótimo! Você acompanha os informativos e aplica os entendimentos com segurança. Mantenha o hábito, com atenção especial à jurisprudência mais recente.' },
+    ] },
+    { nome: 'DOUTRINA', chave: 'doutrina', totalTxt: '{acerto_pilar_doutrina} de {total_pilar_doutrina} questões', bandas: [
+      { faixa: '0-49', texto: 'O desempenho em doutrina ficou abaixo de 50%. A doutrina é a base que sustenta o raciocínio jurídico: quem não domina classificações, distinções conceituais e princípios tende a errar também em questões de lei e jurisprudência. O investimento aqui tem retorno duplo.' },
+      { faixa: '50-80', texto: 'O desempenho em doutrina foi intermediário. Você acerta nas questões diretas, mas perde nas distinções mais finas. Dominar doutrina ajuda a ganhar pontos também em questões de lei e jurisprudência com fundo conceitual.' },
+      { faixa: '81-100', texto: 'O desempenho em doutrina foi excelente. Você domina classificações, distinções conceituais e fundamentos teóricos — o que se reflete também em questões de lei e jurisprudência. Mantenha a solidez.' },
+    ] },
+  ],
+  disciplinasIntro: 'A análise a seguir tem foco nos seus pontos de erros. Para cada disciplina, você encontra o desempenho por categoria (lei seca, jurisprudência e doutrina) e uma leitura personalizada do que os erros revelam sobre as lacunas a priorizar.',
+  disciplinas: [
+    { nome: 'D. Administrativo', total: 'x/N', categoria: 'Assunto' },
+    { nome: 'D. Constitucional', total: 'x/N', categoria: 'Assunto' },
+    { nome: 'D. Tributário', total: 'x/N', categoria: 'Assunto' },
+    { nome: 'D. Financeiro e Econômico', total: 'x/N', categoria: 'Assunto' },
+    { nome: 'D. Civil', total: 'x/N', categoria: 'Assunto' },
+    { nome: 'D. Processual Civil', total: 'x/N', categoria: 'Assunto' },
+    { nome: 'D. Ambiental', total: 'x/N', categoria: 'Assunto' },
+    { nome: 'D. Empresarial', total: 'x/N', categoria: 'Assunto' },
+    { nome: 'D. do Trabalho/Proc. Trab.', total: 'x/N', categoria: 'Assunto' },
+    { nome: 'D. Penal/Proc. Penal', total: 'x/N', categoria: 'Assunto' },
+  ],
+  sugestoes: [
+    { titulo: 'LEI SECA', prioridade: 'Prioridade Alta', intro: 'Priorize a legislação de maior incidência na prova. Os dispositivos a reforçar, por disciplina, são:', itens: [
+      { forte: true, texto: 'CF/1988 e Constituição do Estado do RS (transversal): organização do Estado, competências, controle de constitucionalidade e ordem econômica.' },
+      { forte: true, texto: 'Lei nº 14.133/2021 — Nova Lei de Licitações e Contratos (Administrativo).' },
+      { forte: false, texto: 'Código Tributário Nacional e legislação tributária estadual do RS (Tributário).' },
+      { forte: false, texto: 'LC nº 101/2000 (LRF) e Lei nº 4.320/1964 (Financeiro).' },
+      { forte: false, texto: 'Código Civil e Código de Processo Civil (Civil / Processual Civil).' },
+    ] },
+    { titulo: 'JURISPRUDÊNCIA', prioridade: 'Prioridade Alta', intro: 'Reforce os entendimentos consolidados dos tribunais superiores nos temas de maior recorrência:', itens: [
+      { forte: true, texto: 'Fazenda Pública em juízo, execução contra a Fazenda e precatórios (Processual Civil — STF/STJ).' },
+      { forte: false, texto: 'Repartição de receitas e administração tributária (Tributário — STF).' },
+      { forte: false, texto: 'Responsabilidade civil do Estado e improbidade administrativa (Administrativo — STF/STJ).' },
+    ] },
+    { titulo: 'DOUTRINA', prioridade: 'Prioridade Alta', intro: 'Consolide os fundamentos teóricos mais cobrados:', itens: [
+      { forte: true, texto: 'Teoria Geral do Direito Constitucional e controle de constitucionalidade.' },
+      { forte: false, texto: 'Teoria geral do processo e Fazenda Pública em juízo (Processual Civil).' },
+      { forte: false, texto: 'Limitações ao poder de tributar e competência tributária (Tributário).' },
+    ] },
+  ],
+  gabaritoTitulo: 'GABARITO OFICIAL DESATUALIZADO',
+  gabaritoIntro: [
+    'Importante: caso este simulado reproduza uma prova aplicada, algumas questões — especialmente as de legislação e jurisprudência — podem estar desatualizadas por alterações legislativas e evolução do entendimento dos tribunais.',
+    'Abaixo, as questões que sofreram atualização (edite conforme o recorte da PGE/RS):',
+  ],
+  gabaritoObs: [],
+}
