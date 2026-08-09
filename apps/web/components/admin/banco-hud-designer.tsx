@@ -73,11 +73,12 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
 
   /** Foca (rola + destaca) o campo de cor correspondente a um elemento clicado na prévia. */
   function focarCampo(k: string) {
-    const grupo = GRUPOS.find((g) => g.campos.some((cc) => cc.k === k))
-    if (!grupo) return
+    const candidatos = GRUPOS.filter((g) => g.campos.some((cc) => cc.k === k))
+    if (!candidatos.length) return
+    const visivelNaAba = (g: (typeof GRUPOS)[number]) => aba === 'base' || g.pages === 'all' || g.pages.includes(aba as ScreenKey)
+    const grupo = candidatos.find(visivelNaAba) ?? candidatos[0]
     setBusca('')
-    const visivel = aba === 'base' || grupo.pages === 'all' || grupo.pages.includes(aba as ScreenKey)
-    if (!visivel) setAba('base')
+    if (!visivelNaAba(grupo)) setAba('base')
     setColapsados((p) => ({ ...p, [grupo.titulo]: false }))
     setDestaque(k)
     setTimeout(() => { document.getElementById(`campo-${k}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }) }, 80)

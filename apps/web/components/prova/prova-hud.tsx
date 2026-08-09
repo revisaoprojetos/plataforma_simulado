@@ -98,10 +98,10 @@ export function ProvaHud(p: ProvaHudProps) {
             ) : (
               <BookOpen className="h-5 w-5 shrink-0 opacity-70" />
             )}
-            <span className="truncate text-sm font-semibold">{p.titulo}</span>
+            <span data-campo="topbarTexto" className="truncate text-sm font-semibold">{p.titulo}</span>
           </div>
 
-          <div className="flex-1 text-center text-sm font-medium" style={{ color: TOPTX }}>Questão {p.questaoIndex + 1} de {p.totalQuestoes}</div>
+          <div data-campo="topbarTexto" className="flex-1 text-center text-sm font-medium" style={{ color: TOPTX }}>Questão {p.questaoIndex + 1} de {p.totalQuestoes}</div>
 
           <div className="flex flex-1 items-center justify-end gap-2">
             {p.salvando && <span className="hidden text-xs opacity-70 sm:inline" style={{ color: TOPTX }}><Loader2 className="mr-1 inline h-3 w-3 animate-spin" />Salvando...</span>}
@@ -123,23 +123,24 @@ export function ProvaHud(p: ProvaHudProps) {
             <Button data-campo="finalizar" size="sm" onClick={p.onRevisar} disabled={p.isFinalizando} style={{ background: FINALIZAR, color: '#fff' }}><Send className="mr-1.5 h-3.5 w-3.5" />Finalizar</Button>
           </div>
         </div>
-        <Progress value={p.progresso} className="h-1 rounded-none" />
+        <div data-campo="primaria"><Progress value={p.progresso} className="h-1 rounded-none" /></div>
       </header>
 
       {/* Conteúdo */}
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+      <main data-campo="fundo" className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
         <div className="grid gap-4 lg:grid-cols-[1fr_14rem] lg:gap-10">
           {/* Coluna da questão */}
           <div className="flex flex-col gap-6">
-            <Card className="relative overflow-hidden">
+            <Card data-campo="card" className="relative overflow-hidden">
               {/* fita "encaixa" após o número: número no canto + fita seguindo até o fim */}
               {/* fita: barra de largura total no topo (atrás do número e da tag) */}
               <div data-campo="fita1" className="absolute inset-x-0 top-0 z-0 h-1.5" style={{ background: FITA_GRADIENT }} />
               {/* número no canto + tag da disciplina logo abaixo da fita */}
               <div className="absolute inset-x-0 top-0 z-10 flex items-start">
-                <span className="rounded-br-lg border-b border-r bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">{p.questaoIndex + 1} / {p.totalQuestoes}</span>
+                <span data-campo="texto" className="rounded-br-lg border-b border-r bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">{p.questaoIndex + 1} / {p.totalQuestoes}</span>
                 {q.disciplina && (
                   <span
+                    data-campo="primaria"
                     title={q.disciplina}
                     className="ml-2 mt-2.5 inline-flex max-w-[45%] items-center truncate rounded-full border px-3 py-0.5 text-xs font-medium"
                     style={{ background: 'color-mix(in srgb, var(--primary) 12%, var(--card))', color: 'var(--primary)', borderColor: 'color-mix(in srgb, var(--primary) 30%, var(--border))' }}
@@ -149,7 +150,7 @@ export function ProvaHud(p: ProvaHudProps) {
                 )}
               </div>
               <CardContent className="pt-10">
-                <MarkdownContent className="leading-relaxed">{q.enunciado}</MarkdownContent>
+                <div data-campo="texto"><MarkdownContent className="leading-relaxed">{q.enunciado}</MarkdownContent></div>
                 {q.imagem_url && (
                   <div className="mt-4 overflow-hidden rounded-lg border bg-muted/30 p-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -167,7 +168,7 @@ export function ProvaHud(p: ProvaHudProps) {
                 return (
                   <div key={alt.id} className="flex items-center gap-2">
                     {podeCortar && (
-                      <button type="button" onClick={() => p.onToggleEliminar?.(alt.id)}
+                      <button type="button" data-campo="selecionada" onClick={() => p.onToggleEliminar?.(alt.id)}
                         title={eliminada ? 'Reativar alternativa' : 'Eliminar alternativa'}
                         className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors',
                           !eliminada && 'border-border text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground')}
@@ -195,14 +196,14 @@ export function ProvaHud(p: ProvaHudProps) {
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={p.onPrev} disabled={p.questaoIndex === 0} style={{ background: CARD }}><ChevronLeft className="mr-1 h-4 w-4" />Voltar</Button>
+              <Button data-campo="card" variant="outline" onClick={p.onPrev} disabled={p.questaoIndex === 0} style={{ background: CARD }}><ChevronLeft className="mr-1 h-4 w-4" />Voltar</Button>
               {podeMarcar && (
                 <Button data-campo="revisar" variant={p.marcadaAtual ? 'default' : 'outline'} onClick={p.onToggleMarcar}
                   style={p.marcadaAtual ? { background: REVISAR, color: '#fff', borderColor: REVISAR } : { background: CARD, color: REVISAR, borderColor: REVISAR }}>
                   <Flag className="mr-1 h-4 w-4" />Revisar
                 </Button>
               )}
-              <Button variant={isLast ? 'default' : 'outline'} onClick={() => (isLast ? p.onRevisar() : p.onNext())}
+              <Button data-campo={isLast ? 'finalizar' : 'card'} variant={isLast ? 'default' : 'outline'} onClick={() => (isLast ? p.onRevisar() : p.onNext())}
                 style={isLast ? { background: FINALIZAR, color: '#fff' } : { background: CARD }}>
                 {isLast ? <><Send className="mr-1 h-4 w-4" />Finalizar</> : <>Próxima<ChevronRight className="ml-1 h-4 w-4" /></>}
               </Button>
@@ -211,13 +212,13 @@ export function ProvaHud(p: ProvaHudProps) {
 
           {/* Navegador de questões — card lateral direito */}
           <aside>
-            <Card className="relative overflow-hidden pb-2 pt-3 lg:sticky lg:top-20">
+            <Card data-campo="card" className="relative overflow-hidden pb-2 pt-3 lg:sticky lg:top-20">
               <FitaTopo />
               <CardContent className="px-4 pb-0 pt-0">
                 <p className="text-center text-sm font-semibold">Navegador de questões</p>
                 <div className="mt-2 mb-3 border-t" />
                 {/* Rolável: com muitas questões (ex.: 100) o navegador não estica a página. */}
-                <div className="grid max-h-[46vh] grid-cols-5 gap-1.5 overflow-y-auto px-1.5 py-1 [scrollbar-width:thin]">
+                <div data-campo="primaria" className="grid max-h-[46vh] grid-cols-5 gap-1.5 overflow-y-auto px-1.5 py-1 [scrollbar-width:thin]">
                   {p.respondidas.map((respondida, i) => {
                     const atual = i === p.questaoIndex
                     const marcada = !!p.marcadas?.[i]
@@ -228,20 +229,20 @@ export function ProvaHud(p: ProvaHudProps) {
                     // atual = preenchimento sólido + halo com a cor do texto (destaca dos respondidos)
                     if (atual) { cls = 'bg-primary text-primary-foreground'; st = { boxShadow: '0 0 0 2px var(--background), 0 0 0 4px var(--foreground)' } }
                     return (
-                      <button key={i} onClick={() => p.onGoto(i)} title={`Questão ${i + 1}${marcada ? ' • marcada p/ revisar' : ''}`}
+                      <button key={i} data-campo={atual ? 'primaria' : respondida ? 'respondida' : undefined} onClick={() => p.onGoto(i)} title={`Questão ${i + 1}${marcada ? ' • marcada p/ revisar' : ''}`}
                         className={cn('relative flex aspect-square items-center justify-center rounded-md text-xs font-bold transition-colors', cls)}
                         style={st}>
                         {i + 1}
-                        {marcada && <Flag className="absolute -right-1 -top-1 h-3 w-3 rounded-full p-0.5 text-white" style={{ background: REVISAR }} />}
+                        {marcada && <Flag data-campo="revisar" className="absolute -right-1 -top-1 h-3 w-3 rounded-full p-0.5 text-white" style={{ background: REVISAR }} />}
                       </button>
                     )
                   })}
                 </div>
                 <div className="mt-4 space-y-1.5 border-t pt-3 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: PRIM, boxShadow: '0 0 0 1.5px var(--foreground)' }} /> Questão atual</div>
-                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: MARCADA }} /> Marcadas ({p.totalRespondidas})</div>
-                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Em branco ({branco})</div>
-                  {podeMarcar && <div className="flex items-center gap-2"><Flag className="h-3 w-3" style={{ color: REVISAR }} /> Para revisar ({p.numMarcadas ?? 0})</div>}
+                  <div data-campo="primaria" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: PRIM, boxShadow: '0 0 0 1.5px var(--foreground)' }} /> Questão atual</div>
+                  <div data-campo="respondida" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: MARCADA }} /> Marcadas ({p.totalRespondidas})</div>
+                  <div data-campo="texto" className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Em branco ({branco})</div>
+                  {podeMarcar && <div data-campo="revisar" className="flex items-center gap-2"><Flag className="h-3 w-3" style={{ color: REVISAR }} /> Para revisar ({p.numMarcadas ?? 0})</div>}
                 </div>
               </CardContent>
             </Card>
