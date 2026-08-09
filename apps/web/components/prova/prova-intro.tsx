@@ -37,6 +37,11 @@ function frameLogo(estilo?: string): string {
   if (estilo === 'borda') return 'rounded-lg border'
   return 'rounded-lg'
 }
+function filtroLogo(f?: string): string | undefined {
+  if (f === 'branco') return 'brightness(0) invert(1)'
+  if (f === 'preto') return 'brightness(0)'
+  return undefined
+}
 
 /** Estilos de carregamento (espelham os da Imersão em Configurações). */
 export type EstiloProvaLoading = 'circulo' | 'circulo_cheio' | 'spinner' | 'barra' | 'pulsar' | 'pontos' | 'porcentagem'
@@ -51,8 +56,8 @@ export const ESTILOS_PROVA_LOADING: { id: EstiloProvaLoading; nome: string }[] =
 ]
 
 /** Animação de carregamento (enquanto a sessão/prova é preparada). */
-export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact, logoUrl, logoBg, logoEstilo, tipo = 'circulo', loop, onCompleto }: {
-  mensagem?: string; compact?: boolean; logoUrl?: string | null; logoBg?: string; logoEstilo?: string; tipo?: EstiloProvaLoading; loop?: boolean; onCompleto?: () => void
+export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact, logoUrl, logoBg, logoEstilo, logoFiltro, tipo = 'circulo', loop, onCompleto }: {
+  mensagem?: string; compact?: boolean; logoUrl?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; tipo?: EstiloProvaLoading; loop?: boolean; onCompleto?: () => void
 }) {
   const cor = 'var(--prova-loading, var(--primary))'
   const wrap = cn('relative isolate flex flex-col items-center justify-center gap-5 bg-background text-foreground', compact ? 'h-full' : 'min-h-screen')
@@ -67,7 +72,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
           {logoUrl ? (
             <span className={cn('flex h-14 w-14 items-center justify-center overflow-hidden', frameLogo(logoEstilo))} style={{ background: logoBg ?? '#ffffff' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logoUrl} alt="" className="h-full w-full object-contain" />
+              <img src={logoUrl} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogo(logoFiltro) }} />
             </span>
           ) : (
             <span className="h-3 w-3 rounded-full" style={{ background: cor }} />
@@ -88,7 +93,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
           {logoUrl ? (
             <span className="absolute inset-1.5 overflow-hidden rounded-full" style={{ background: logoBg ?? '#ffffff' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logoUrl} alt="" className="h-full w-full object-cover" />
+              <img src={logoUrl} alt="" className="h-full w-full object-cover" style={{ filter: filtroLogo(logoFiltro) }} />
             </span>
           ) : (
             <span className="h-3 w-3 rounded-full" style={{ background: cor }} />
@@ -109,7 +114,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
           {logoUrl ? (
             <span className={cn('flex h-16 w-16 items-center justify-center overflow-hidden', frameLogo(logoEstilo))} style={{ background: logoBg ?? '#ffffff' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logoUrl} alt="" className="h-full w-full object-contain" />
+              <img src={logoUrl} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogo(logoFiltro) }} />
             </span>
           ) : (
             <span className="flex h-16 w-16 items-center justify-center rounded-lg text-primary-foreground" style={{ background: cor }}>
@@ -130,7 +135,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
         {logoUrl ? (
           <span className={cn('flex h-16 w-16 items-center justify-center overflow-hidden', frameLogo(logoEstilo))} style={{ background: logoBg ?? '#ffffff' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoUrl} alt="" className="h-full w-full object-contain" />
+            <img src={logoUrl} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogo(logoFiltro) }} />
           </span>
         ) : (
           <span className="flex h-16 w-16 items-center justify-center rounded-lg text-primary-foreground" style={{ background: cor }}>

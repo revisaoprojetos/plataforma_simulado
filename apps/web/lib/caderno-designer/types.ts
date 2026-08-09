@@ -159,6 +159,9 @@ export type HudCores = {
   loadingCor: string   // cor do círculo de carregamento
   loadingTipo: string  // estilo da animação de carregamento (circulo/spinner/barra/pulsar/pontos)
   loadingLogoUrl: string // imagem/logo exibida na tela de carregamento (opcional)
+  loadingLogoBg: string  // fundo atrás da imagem de carregamento (cor ou 'transparent')
+  loadingLogoEstilo: string // moldura da imagem: arredondado | quadrado | borda
+  loadingLogoFiltro: string // filtro de cor da imagem: none | branco | preto
   loadingTexto: string // cor do texto "Carregando..." da tela de carregamento
   loadingPct: string // cor do número da porcentagem (estilo "Logo + Porcentagem")
   // Imagem de fundo da tela (por página) — opcional, com opacidade/desfoque/ajuste
@@ -204,7 +207,7 @@ export const HUD_CORES_PADRAO: HudCores = {
   alerta: '#dc2626', aviso: '#f59e0b', borda: '#e5e7eb', anulada: '#6b7280', altTrocada: '#0891b2',
   altFundo: '#ffffff', altHover: '#f4f4f5',
   acerto: '#16a34a', erro: '#dc2626', branco: '#6b7280', media: '#6d28d9',
-  loadingCor: '#6d28d9', loadingTipo: 'circulo', loadingLogoUrl: '', loadingTexto: '#6b7280', loadingPct: '#6d28d9', bgImagemUrl: '', bgOpacidade: '100', bgDesfoque: '0', bgAjuste: 'cover', bgPosicao: 'center', loginInputBg: '#ffffff', tituloTexto: '#6d28d9', loginDestaque: '#6d28d9',
+  loadingCor: '#6d28d9', loadingTipo: 'circulo', loadingLogoUrl: '', loadingLogoBg: '#ffffff', loadingLogoEstilo: 'arredondado', loadingLogoFiltro: 'none', loadingTexto: '#6b7280', loadingPct: '#6d28d9', bgImagemUrl: '', bgOpacidade: '100', bgDesfoque: '0', bgAjuste: 'cover', bgPosicao: 'center', loginInputBg: '#ffffff', tituloTexto: '#6d28d9', loginDestaque: '#6d28d9',
   loginBotao: '#6d28d9', entradaBotao: '#6d28d9', entradaTempo: '#6d28d9',
   sitNaoIniciado: '#2563eb', sitAndamento: '#e6b83c', sitEncerrado: '#dc2626', sitDisponivel: '#6d28d9',
   cadernoBtn: '#6d28d9', cadernoBtnFundo: '#ffffff', voltarBtn: '#ffffff', voltarBtnFundo: '#6d28d9',

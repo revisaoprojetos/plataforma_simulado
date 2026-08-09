@@ -371,8 +371,9 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
           mensagem={mensagem}
           tipo={cores.loadingTipo as EstiloProvaLoading}
           logoUrl={cores.loadingLogoUrl || brand?.logoUrl || null}
-          logoBg={brand?.logoBg}
-          logoEstilo={brand?.logoEstilo}
+          logoBg={cores.loadingLogoUrl ? cores.loadingLogoBg : brand?.logoBg}
+          logoEstilo={cores.loadingLogoUrl ? cores.loadingLogoEstilo : brand?.logoEstilo}
+          logoFiltro={cores.loadingLogoUrl ? cores.loadingLogoFiltro : undefined}
         />
       </div>
     )

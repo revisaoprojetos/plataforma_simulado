@@ -217,7 +217,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
               )}
             </div>
             <div onClick={onPreviewClick} title="Clique num elemento para destacar a cor dele à direita" className="min-h-0 flex-1 cursor-pointer overflow-auto rounded-xl border shadow-sm [&_button]:cursor-pointer" style={hudCssVars(c) as React.CSSProperties}>
-              {aba === 'loading' && <ProvaLoading compact loop mensagem="Carregando simulado..." tipo={c.loadingTipo as EstiloProvaLoading} logoUrl={c.loadingLogoUrl || undefined} />}
+              {aba === 'loading' && <ProvaLoading compact loop mensagem="Carregando simulado..." tipo={c.loadingTipo as EstiloProvaLoading} logoUrl={c.loadingLogoUrl || undefined} logoBg={c.loadingLogoBg} logoEstilo={c.loadingLogoEstilo} logoFiltro={c.loadingLogoFiltro} />}
               {aba === 'login' && (
                 <div className="relative h-full">
                   <ProvaLoginPreview compact branding={null} titulo={titulo} status={STATUS_POR_TAB[verLoginTab]} />
@@ -302,6 +302,32 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
                 </button>
               )}
               <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">Aparece no centro da animação de carregamento. Sem imagem, usa o logo do sistema.</p>
+
+              {/* Ajustes da imagem: fundo (com transparente), moldura e cor (filtro) */}
+              {valorDe('loadingLogoUrl') && (
+                <>
+                  <label className="mt-3 block text-[11px] font-medium text-muted-foreground">Fundo da imagem</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <HexColorField value={valorDe('loadingLogoBg') === 'transparent' ? '#ffffff' : valorDe('loadingLogoBg')} onChange={(v) => set('loadingLogoBg', v)} />
+                    <button onClick={() => set('loadingLogoBg', valorDe('loadingLogoBg') === 'transparent' ? '#ffffff' : 'transparent')}
+                      className={cn('rounded-md border px-2 py-1 text-[11px] font-medium transition-colors', valorDe('loadingLogoBg') === 'transparent' ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50')}>
+                      Transparente
+                    </button>
+                  </div>
+                  <label className="mt-2 block text-[11px] font-medium text-muted-foreground">Moldura</label>
+                  <select value={valorDe('loadingLogoEstilo')} onChange={(e) => set('loadingLogoEstilo', e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary">
+                    <option value="arredondado">Pontas redondas</option>
+                    <option value="quadrado">Quadrada</option>
+                    <option value="borda">Redonda com borda</option>
+                  </select>
+                  <label className="mt-2 block text-[11px] font-medium text-muted-foreground">Cor da imagem (filtro)</label>
+                  <select value={valorDe('loadingLogoFiltro')} onChange={(e) => set('loadingLogoFiltro', e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary">
+                    <option value="none">Original</option>
+                    <option value="branco">Branco</option>
+                    <option value="preto">Preto</option>
+                  </select>
+                </>
+              )}
 
               {/* Estilo + cor da animação (junto da imagem) */}
               <label className="mt-3 block text-[11px] font-medium text-muted-foreground">Estilo da animação</label>

@@ -63,7 +63,7 @@ export function BancoHudPreview({ bancoId, titulo, base, porPagina, questoesInic
   )
 
   const conteudo = (tela: ScreenKey, c: HudCores) => {
-    if (tela === 'loading') return <ProvaLoading compact loop mensagem="Carregando simulado..." tipo={c.loadingTipo as EstiloProvaLoading} logoUrl={c.loadingLogoUrl || undefined} />
+    if (tela === 'loading') return <ProvaLoading compact loop mensagem="Carregando simulado..." tipo={c.loadingTipo as EstiloProvaLoading} logoUrl={c.loadingLogoUrl || undefined} logoBg={c.loadingLogoBg} logoEstilo={c.loadingLogoEstilo} logoFiltro={c.loadingLogoFiltro} />
     if (tela === 'login') return (
       <div className="relative h-full"><ProvaLoginPreview compact branding={null} titulo={titulo} status={STATUS_POR_TAB['form']} /></div>
     )

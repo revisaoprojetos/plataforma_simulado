@@ -180,8 +180,9 @@ export function RevisaoFinal({
           mensagem="Carregando resultado do simulado..."
           tipo={cores.loadingTipo as EstiloProvaLoading}
           logoUrl={cores.loadingLogoUrl || branding?.logoUrl || null}
-          logoBg={branding?.logoBg}
-          logoEstilo={branding?.logoEstilo}
+          logoBg={cores.loadingLogoUrl ? cores.loadingLogoBg : branding?.logoBg}
+          logoEstilo={cores.loadingLogoUrl ? cores.loadingLogoEstilo : branding?.logoEstilo}
+          logoFiltro={cores.loadingLogoUrl ? cores.loadingLogoFiltro : undefined}
         />
       </div>
     )
