@@ -574,15 +574,25 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                   {FONTES_CADERNO.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
                 </select>
               </div>
-              <div className="mt-3">
-                <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground"><span>Tamanho do texto</span><span className="font-semibold text-foreground">{Math.round((a.tamanhoParte?.[pickerCor.parte] ?? 1) * 100)}%</span></div>
-                <div className="flex items-center gap-1.5">
-                  {([['A−', -0.1], ['A+', 0.1]] as const).map(([lbl, d]) => (
-                    <button key={lbl} type="button" onClick={() => { const cur = a.tamanhoParte?.[pickerCor.parte] ?? 1; const v = Math.min(2.5, Math.max(0.6, Math.round((cur + d) * 10) / 10)); setAjuste({ tamanhoParte: { ...(a.tamanhoParte ?? {}), [pickerCor.parte]: v } }) }} className="flex-1 rounded-md border py-1 text-xs font-semibold hover:bg-muted">{lbl}</button>
-                  ))}
-                  <button type="button" onClick={() => { const t = { ...(a.tamanhoParte ?? {}) }; delete t[pickerCor.parte]; setAjuste({ tamanhoParte: t }) }} className="flex-1 rounded-md border py-1 text-[11px] hover:bg-muted">Padrão</button>
-                </div>
-              </div>
+              {(() => {
+                const base = a.compacto ? 9 : 10 // corpo padrão (casa com previa.tsx)
+                const px = Math.round((a.tamanhoParte?.[pickerCor.parte] ?? 1) * base)
+                const setPx = (v: number) => { const nv = Math.min(48, Math.max(6, Math.round(v))); const t = { ...(a.tamanhoParte ?? {}) }; if (nv === base) delete t[pickerCor.parte]; else t[pickerCor.parte] = Math.round((nv / base) * 100) / 100; setAjuste({ tamanhoParte: t }) }
+                const TAMS = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36]
+                return (
+                  <div className="mt-3">
+                    <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground"><span>Tamanho do texto</span>{px !== base && <button type="button" onClick={() => setPx(base)} className="text-[11px] hover:underline">Padrão</button>}</div>
+                    <div className="flex items-center gap-1.5">
+                      <button type="button" onClick={() => setPx(px - 1)} title="Diminuir" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-base font-semibold hover:bg-muted">−</button>
+                      <select value={px} onChange={(e) => setPx(Number(e.target.value))} className="h-8 flex-1 rounded-md border bg-background px-2 text-center text-sm outline-none focus:border-primary">
+                        {!TAMS.includes(px) && <option value={px}>{px}</option>}
+                        {TAMS.map((n) => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                      <button type="button" onClick={() => setPx(px + 1)} title="Aumentar" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-base font-semibold hover:bg-muted">+</button>
+                    </div>
+                  </div>
+                )
+              })()}
               {campos.length > 0 && (
                 <div className="mt-4 space-y-2.5 border-t pt-4">
                   <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Texto</div>
