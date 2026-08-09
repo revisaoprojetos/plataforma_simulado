@@ -27,6 +27,7 @@ export function camposDoBloco(item: ItemCaderno, parte: string, nomeFallback?: s
   if (parte === 'diag_nota_num') return [{ id: 'notaTotal', label: 'Total (denominador)', valor: c.notaTotal }]
   if (parte === 'diag_nota_faixa') return [{ id: 'notaTexto', label: 'Texto da nota', valor: c.notaTexto, multiline: true }]
   if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] == null) return []; return [{ id: 'intro', label: 'Parágrafo', valor: c.intro[i], multiline: true }] }
+  if (parte.startsWith('fechamento:')) { const i = Number(parte.slice('fechamento:'.length)); if (c.fechamento?.[i] == null) return []; return [{ id: 'fechamento', label: 'Parágrafo', valor: c.fechamento[i], multiline: true }] }
   if (parte === 'disc_intro') return [{ id: 'disciplinasIntro', label: 'Introdução das disciplinas', valor: c.disciplinasIntro, multiline: true }]
   if (parte.startsWith('pilar:')) {
     const i = Number(parte.slice('pilar:'.length)); const pl = c.pilares[i]; if (!pl) return []
@@ -85,13 +86,14 @@ export function chaveOcultavel(parte: string): string | null { return OCULTAVEIS
 
 /** Partes do diagnóstico que podem ser REMOVIDAS: itens de lista OU blocos estruturais (ocultar). */
 export function podeRemoverParte(parte: string): boolean {
-  return parte.startsWith('intro:') || parte.startsWith('pilar:') || parte.startsWith('sug:') || parte.startsWith('disc:') || chaveOcultavel(parte) !== null
+  return parte.startsWith('intro:') || parte.startsWith('fechamento:') || parte.startsWith('pilar:') || parte.startsWith('sug:') || parte.startsWith('disc:') || chaveOcultavel(parte) !== null
 }
 
 /** Remove (retorna novo conteúdo): itens de lista somem; blocos estruturais entram em partesOcultas. */
 export function removerParteDiag(conteudo: DiagConteudo | undefined, parte: string): DiagConteudo {
   const c = clonar(conteudo ?? DIAG_PADRAO)
   if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] != null) c.intro.splice(i, 1) }
+  else if (parte.startsWith('fechamento:')) { const i = Number(parte.slice('fechamento:'.length)); if (c.fechamento?.[i] != null) c.fechamento.splice(i, 1) }
   else if (parte.startsWith('pilar:')) { const i = Number(parte.slice('pilar:'.length)); if (c.pilares[i]) c.pilares.splice(i, 1) }
   else if (parte.startsWith('sug:')) { const i = Number(parte.slice('sug:'.length)); if (c.sugestoes[i]) c.sugestoes.splice(i, 1) }
   else if (parte.startsWith('disc:')) { const chave = parte.slice('disc:'.length); const i = idxDisc(c, chave); if (i >= 0) c.disciplinas.splice(i, 1); else c.discOcultas = [...(c.discOcultas ?? []), chave] }
@@ -109,6 +111,7 @@ export function aplicarCampoBloco(conteudo: DiagConteudo | undefined, parte: str
   else if (parte === 'diag_nota_num') { if (campoId === 'notaTotal') c.notaTotal = valor }
   else if (parte === 'diag_nota_faixa') { if (campoId === 'notaTexto') c.notaTexto = valor }
   else if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] != null) c.intro[i] = valor }
+  else if (parte.startsWith('fechamento:')) { const i = Number(parte.slice('fechamento:'.length)); if (c.fechamento?.[i] != null) c.fechamento[i] = valor }
   else if (parte === 'disc_intro') { c.disciplinasIntro = valor }
   else if (parte.startsWith('pilar:')) {
     const i = Number(parte.slice('pilar:'.length)); if (c.pilares[i]) {

@@ -103,6 +103,9 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
       h += `<div style="margin-bottom:10px"><table style="width:100%;border-collapse:collapse;background:${cor}"><tr><td style="padding:5px 12px;font-weight:800;font-size:11px;color:${s.corTitulo || '#9a6e00'}">${V(s.titulo)}</td><td style="padding:5px 12px;text-align:right;font-weight:700;font-size:10px;color:#9a6e00">${s.prioridade ? '[!] ' + V(s.prioridade) : ''}</td></tr></table><div style="background:#f0eeff;padding:8px 12px">${s.intro ? `<p style="font-size:11px;margin:0 0 6px;line-height:1.4;text-align:${alignP(`sug:${si}`, 'justify')}">${V(s.intro)}</p>` : ''}${it}</div></div>`
     })
   }
+  if ((c.fechamento?.length ?? 0) > 0) {
+    (c.fechamento ?? []).forEach((p, i) => { const cor = corP(`fechamento:${i}`, '#1a202c'); h += `<p style="font-size:12px;line-height:1.5;text-align:${alignP(`fechamento:${i}`, 'justify')};margin:0 0 8px;color:${cor}">${V(p)}</p>` })
+  }
   if (c.gabaritoObs.length || c.gabaritoIntro.length) {
     h += sec(c.gabaritoTitulo || 'Gabarito oficial desatualizado')
     for (const p of c.gabaritoIntro) h += `<p style="font-size:11px;margin:0 0 6px;line-height:1.4;text-align:${alignP('diag_gab_obs', 'justify')}">${V(p)}</p>`

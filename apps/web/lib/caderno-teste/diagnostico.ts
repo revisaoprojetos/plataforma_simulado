@@ -70,6 +70,8 @@ export type DiagConteudo = {
   /** Fonte dos dados por card (chave do card → chave da disciplina cujos assuntos/estatísticas exibir). */
   discFonte?: Record<string, string>
   sugestoes: DiagSugestao[]
+  /** Parágrafos de fechamento (após as sugestões) — encerramento motivacional do diagnóstico. */
+  fechamento?: string[]
   gabaritoTitulo: string
   gabaritoIntro: string[]
   gabaritoObs: string[]
@@ -270,6 +272,11 @@ export const DIAG_PGE_RS: DiagConteudo = {
       { forte: false, texto: 'Limitações ao poder de tributar e competência tributária (Tributário).' },
     ] },
   ],
+  fechamento: [
+    'Você já tem em mãos um mapa claro do que priorizar até o próximo simulado. Comece pelos pilares que mais precisam de atenção, focando primeiro nas disciplinas com maior peso na prova e nos assuntos destacados neste diagnóstico.',
+    'Esse é o verdadeiro valor desta análise: mais do que mostrar uma nota, ela indica onde vale a pena investir seu tempo de estudo para obter o maior retorno até a próxima etapa do nosso Pré-Edital.',
+    'Este é apenas o seu ponto de partida. No próximo simulado, você poderá comparar este diagnóstico com o novo resultado e enxergar sua evolução de forma concreta. Afinal, o que realmente importa não é apenas a nota de um único simulado, mas o progresso consistente que você constrói ao longo da preparação.',
+  ],
   gabaritoTitulo: 'GABARITO OFICIAL DESATUALIZADO',
   gabaritoIntro: [
     'Importante: caso este simulado reproduza uma prova aplicada, algumas questões — especialmente as de legislação e jurisprudência — podem estar desatualizadas por alterações legislativas e evolução do entendimento dos tribunais.',
@@ -337,6 +344,11 @@ export const DIAG_BASE_4: DiagConteudo = {
     { titulo: 'DOUTRINA', prioridade: 'Prioridade Alta', intro: 'Consolide os fundamentos teóricos mais cobrados:', itens: [
       { forte: true, texto: 'Adicione aqui os temas doutrinários de maior recorrência.' },
     ] },
+  ],
+  fechamento: [
+    'Você já tem em mãos um mapa claro do que priorizar até o próximo simulado. Comece pelos pilares que mais precisam de atenção, focando primeiro nas disciplinas com maior peso na prova e nos assuntos destacados neste diagnóstico.',
+    'Esse é o verdadeiro valor desta análise: mais do que mostrar uma nota, ela indica onde vale a pena investir seu tempo de estudo para obter o maior retorno até a próxima etapa.',
+    'Este é apenas o seu ponto de partida. No próximo simulado, você poderá comparar este diagnóstico com o novo resultado e enxergar sua evolução de forma concreta. Afinal, o que realmente importa não é apenas a nota de um único simulado, mas o progresso consistente que você constrói ao longo da preparação.',
   ],
   gabaritoTitulo: 'GABARITO OFICIAL DESATUALIZADO',
   gabaritoIntro: [
