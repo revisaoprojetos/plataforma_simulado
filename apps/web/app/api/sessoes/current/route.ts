@@ -41,8 +41,12 @@ export async function GET(request: NextRequest) {
     // Tolerante a null: exclui só as explicitamente anuladas (dados migrados vêm com anulada=null).
     .not('anulada', 'is', true)
     .order('ordem')
-  let sqr = await selQ('id, tipo, enunciado, imagem_url, alternativas:simulado_alternativas(id, texto, ordem)')
+  let sqr = await selQ('id, tipo, enunciado, imagem_url, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem)')
   if (sqr.error && /imagem_url|column/i.test(sqr.error.message)) {
+    sqr = await selQ('id, tipo, enunciado, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem)')
+  }
+  if (sqr.error) {
+    // fallback total: esquemas antigos sem disciplina/imagem
     sqr = await selQ('id, tipo, enunciado, alternativas:simulado_alternativas(id, texto, ordem)')
   }
   const sq = sqr.data
@@ -51,6 +55,7 @@ export async function GET(request: NextRequest) {
     id: row.questoes?.id,
     tipo: row.questoes?.tipo ?? 'objetiva',
     enunciado: row.questoes?.enunciado ?? '',
+    disciplina: row.questoes?.disciplinas?.nome ?? null,
     imagem_url: row.questoes?.imagem_url ?? null,
     alternativas: (row.questoes?.alternativas ?? [])
       .slice()

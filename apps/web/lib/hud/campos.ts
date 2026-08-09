@@ -112,7 +112,7 @@ export const STATUS_POR_TAB: Record<'form' | LoginResultadoTipo, string> = {
 
 /** Questão de exemplo p/ a prévia. */
 export const DEMO_Q = {
-  id: 'demo', enunciado: 'Qual é a capital da França?',
+  id: 'demo', enunciado: 'Qual é a capital da França?', disciplina: 'Direito Constitucional',
   alternativas: [{ id: 'a', texto: 'Londres' }, { id: 'b', texto: 'Paris' }, { id: 'c', texto: 'Roma' }],
 }
 export const DEMO_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="480" height="220"><rect width="480" height="220" fill="#e2e8f0"/><text x="240" y="32" font-family="sans-serif" font-size="15" fill="#334155" text-anchor="middle">Imagem de exemplo da questão</text><rect x="60" y="140" width="52" height="55" fill="#94a3b8"/><rect x="140" y="110" width="52" height="85" fill="#64748b"/><rect x="220" y="78" width="52" height="117" fill="#475569"/><rect x="300" y="118" width="52" height="77" fill="#64748b"/><rect x="380" y="95" width="52" height="100" fill="#94a3b8"/></svg>')

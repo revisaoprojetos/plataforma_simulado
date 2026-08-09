@@ -1,9 +1,10 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { HexColorField } from '@/components/admin/hex-color-field'
-import { Search, RotateCcw, ChevronDown, Copy, ClipboardPaste, Loader2, Save, Sparkles, Palette, Layers } from 'lucide-react'
+import { Search, RotateCcw, ChevronDown, Copy, ClipboardPaste, Loader2, Save, Sparkles, Palette, Layers, ArrowLeft } from 'lucide-react'
 import { type HudCores, type HudPorPagina, HUD_CORES_PADRAO, efetivarHud } from '@/lib/caderno-designer/types'
 import { hudCssVars } from '@/lib/caderno-designer/hud'
 import { ProvaHud } from '@/components/prova/prova-hud'
@@ -18,8 +19,8 @@ import { cn } from '@/lib/utils'
 type Aba = 'base' | ScreenKey
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
-export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicial, cor = '#6d28d9' }: {
-  bancoId: string; titulo: string; baseInicial: Partial<HudCores>; porPaginaInicial: HudPorPagina; cor?: string
+export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicial, cor = '#6d28d9', voltarHref }: {
+  bancoId: string; titulo: string; baseInicial: Partial<HudCores>; porPaginaInicial: HudPorPagina; cor?: string; voltarHref?: string
 }) {
   const [base, setBase] = useState<Partial<HudCores>>(baseInicial ?? {})
   const [porPagina, setPorPagina] = useState<HudPorPagina>(porPaginaInicial ?? {})
@@ -77,6 +78,11 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
       {/* Cabeçalho + salvar */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent 55%)` }}>
         <div className="flex items-center gap-3">
+          {voltarHref && (
+            <Link href={voltarHref} className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-2.5 py-2 text-sm font-medium text-muted-foreground shadow-sm transition-colors hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" /> Voltar
+            </Link>
+          )}
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}><Palette className="h-5 w-5" /></span>
           <div>
             <h3 className="text-sm font-semibold leading-tight">HUD do simulado</h3>
@@ -88,7 +94,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
         </button>
       </div>
 
-      <div className="grid min-h-[560px] grid-cols-[168px_minmax(0,1fr)_290px]">
+      <div className="grid h-[calc(100vh-11rem)] min-h-[560px] grid-cols-[168px_minmax(0,1fr)_290px]">
         {/* PÁGINAS */}
         <div className="space-y-1 overflow-auto border-r p-2">
           <p className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Páginas</p>

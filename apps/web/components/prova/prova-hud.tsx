@@ -30,7 +30,7 @@ function frameLogo(estilo?: string): string {
 }
 
 export type ProvaHudAlternativa = { id: string; texto: string }
-export type ProvaHudQuestao = { id: string; tipo?: string; enunciado: string; imagem_url?: string | null; alternativas: ProvaHudAlternativa[] }
+export type ProvaHudQuestao = { id: string; tipo?: string; enunciado: string; disciplina?: string | null; imagem_url?: string | null; alternativas: ProvaHudAlternativa[] }
 
 export interface ProvaHudProps {
   titulo: string
@@ -136,6 +136,15 @@ export function ProvaHud(p: ProvaHudProps) {
                 <span className="rounded-br-lg border-b border-r bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">{p.questaoIndex + 1} / {p.totalQuestoes}</span>
                 <div className="h-1.5 flex-1" style={{ background: FITA_GRADIENT }} />
               </div>
+              {q.disciplina && (
+                <span
+                  title={q.disciplina}
+                  className="absolute right-3 top-2.5 z-20 inline-flex max-w-[45%] items-center truncate rounded-full border px-3 py-0.5 text-xs font-medium"
+                  style={{ background: 'color-mix(in srgb, var(--primary) 12%, var(--card))', color: 'var(--primary)', borderColor: 'color-mix(in srgb, var(--primary) 30%, var(--border))' }}
+                >
+                  {q.disciplina}
+                </span>
+              )}
               <CardContent className="pt-10">
                 <MarkdownContent className="leading-relaxed">{q.enunciado}</MarkdownContent>
                 {q.imagem_url && (
