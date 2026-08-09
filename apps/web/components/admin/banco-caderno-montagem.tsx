@@ -69,7 +69,8 @@ function SlotCard({ slot, cor, bancoId, grupos, pdfs, valor, onGrupo, onPdf }: {
     upd(); const ro = new ResizeObserver(upd); ro.observe(el); return () => ro.disconnect()
   }, [])
   const escala = w / BASE_W
-  const boxH = Math.round(w * (BASE_H / BASE_W))
+  const [contentH, setContentH] = useState(BASE_H)
+  const ALTURA_SLOT = 380 // altura fixa da prévia; o resto rola
 
   const onSelect = (v: string) => {
     if (v === '') return onGrupo(null)
@@ -118,12 +119,18 @@ function SlotCard({ slot, cor, bancoId, grupos, pdfs, valor, onGrupo, onPdf }: {
         </select>
 
         {/* Prévia da seleção */}
-        <div ref={boxRef} className="relative w-full overflow-hidden rounded-lg border bg-neutral-100 dark:bg-neutral-900" style={{ height: valor?.itemId ? boxH : 300 }}>
+        <div ref={boxRef} className="relative w-full overflow-hidden rounded-lg border bg-neutral-100 dark:bg-neutral-900" style={{ height: ALTURA_SLOT }}>
           {valor?.itemId ? (
             <>
-              <iframe title={slot.titulo} src={`/imprimir/caderno-teste/${valor.cadernoId}?grupo=${valor.itemId}&embed=1`}
-                className="bg-white" scrolling="no"
-                style={{ border: 0, width: BASE_W, height: BASE_H, transform: `scale(${escala})`, transformOrigin: 'top left' }} />
+              {/* rola verticalmente por todas as folhas; conteúdo escalado p/ caber na largura */}
+              <div className="absolute inset-0 overflow-y-auto overflow-x-hidden">
+                <div style={{ width: w, height: Math.round(contentH * escala) }}>
+                  <iframe title={slot.titulo} src={`/imprimir/caderno-teste/${valor.cadernoId}?grupo=${valor.itemId}&embed=1`}
+                    className="bg-white" scrolling="no"
+                    onLoad={(e) => { try { const h = (e.currentTarget as HTMLIFrameElement).contentDocument?.body?.scrollHeight; if (h && h > 100) setContentH(h) } catch { /* cross-origin */ } }}
+                    style={{ border: 0, width: BASE_W, height: contentH, transform: `scale(${escala})`, transformOrigin: 'top left' }} />
+                </div>
+              </div>
               <a href={`/imprimir/caderno-teste/${valor.cadernoId}?grupo=${valor.itemId}&embed=1`} target="_blank" rel="noreferrer" title="Abrir em tela cheia" className="absolute right-2 top-2 rounded-md bg-background/90 p-1 shadow ring-1 ring-border hover:bg-background"><ExternalLink className="h-3.5 w-3.5" /></a>
             </>
           ) : ehPdf && valor?.pdfUrl ? (
