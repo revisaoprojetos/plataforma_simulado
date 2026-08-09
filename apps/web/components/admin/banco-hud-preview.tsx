@@ -10,15 +10,21 @@ import { ProvaLoginPreview, ProvaEncerradaPreview } from '@/components/prova/pro
 import { SCREENS, STATUS_POR_TAB, DEMO_Q, type ScreenKey } from '@/lib/hud/campos'
 
 /** Aba "HUD do simulado": mostra a prévia de TODAS as telas (uma ao lado da outra) + botão que abre o editor. */
-export function BancoHudPreview({ bancoId, titulo, base, porPagina }: {
+export function BancoHudPreview({ bancoId, titulo, base, porPagina, questaoInicial }: {
   bancoId: string; titulo: string; base: Partial<HudCores>; porPagina: HudPorPagina
+  questaoInicial?: { id: string; enunciado: string; disciplina: string | null; alternativas: { id: string; texto: string }[] } | null
 }) {
   const noop = () => {}
 
+  // Prévia da prova usa a 1ª questão real do banco quando existir; senão, uma questão demo.
+  const q = questaoInicial && questaoInicial.alternativas.length ? questaoInicial : DEMO_Q
+  const respostaId = q.alternativas[1]?.id
+  const eliminadas = q.alternativas[2] ? [q.alternativas[2].id] : []
+
   const demoHud = (
     <ProvaHud compact titulo={titulo} tempoLabel="45:00" timerWarning={false} salvando={false}
-      questaoIndex={1} totalQuestoes={5} totalRespondidas={1} progresso={20}
-      questaoAtual={DEMO_Q} respostaId="b" eliminadas={['c']}
+      questaoIndex={0} totalQuestoes={5} totalRespondidas={1} progresso={20}
+      questaoAtual={q} respostaId={respostaId} eliminadas={eliminadas}
       respondidas={[true, false, false, false, false]} marcadas={[false, true, true, false, false]} marcadaAtual numMarcadas={2}
       mostrarTempo onResponder={noop} onPrev={noop} onNext={noop} onRevisar={noop} onGoto={noop} />
   )
