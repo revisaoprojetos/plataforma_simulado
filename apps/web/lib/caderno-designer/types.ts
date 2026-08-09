@@ -157,6 +157,11 @@ export type HudCores = {
   loadingCor: string   // cor do círculo de carregamento
   loadingTipo: string  // estilo da animação de carregamento (circulo/spinner/barra/pulsar/pontos)
   loadingLogoUrl: string // imagem/logo exibida na tela de carregamento (opcional)
+  // Imagem de fundo da tela (por página) — opcional, com opacidade/desfoque/ajuste
+  bgImagemUrl: string  // URL da imagem de fundo (vazio = sem fundo)
+  bgOpacidade: string  // 0–100 (opacidade da imagem)
+  bgDesfoque: string   // px de desfoque (blur)
+  bgAjuste: string     // cover | contain | repeat (como a imagem preenche)
   loginInputBg: string // fundo das caixas de texto do login
   tituloTexto: string  // cor do texto do título do simulado (login/entrada)
   loginDestaque: string // cor do destaque "plataforma do {tenant}" no login
@@ -193,7 +198,7 @@ export const HUD_CORES_PADRAO: HudCores = {
   alerta: '#dc2626', aviso: '#f59e0b', borda: '#e5e7eb', anulada: '#6b7280', altTrocada: '#0891b2',
   altFundo: '#ffffff', altHover: '#f4f4f5',
   acerto: '#16a34a', erro: '#dc2626', branco: '#6b7280', media: '#6d28d9',
-  loadingCor: '#6d28d9', loadingTipo: 'circulo', loadingLogoUrl: '', loginInputBg: '#ffffff', tituloTexto: '#6d28d9', loginDestaque: '#6d28d9',
+  loadingCor: '#6d28d9', loadingTipo: 'circulo', loadingLogoUrl: '', bgImagemUrl: '', bgOpacidade: '100', bgDesfoque: '0', bgAjuste: 'cover', loginInputBg: '#ffffff', tituloTexto: '#6d28d9', loginDestaque: '#6d28d9',
   loginBotao: '#6d28d9', entradaBotao: '#6d28d9', entradaTempo: '#6d28d9',
   sitNaoIniciado: '#2563eb', sitAndamento: '#e6b83c', sitEncerrado: '#dc2626', sitDisponivel: '#6d28d9',
   cadernoBtn: '#6d28d9', cadernoBtnFundo: '#ffffff', voltarBtn: '#ffffff', voltarBtnFundo: '#6d28d9',

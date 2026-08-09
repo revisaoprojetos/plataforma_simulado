@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
 import { FitaTopo, FITA_GRADIENT } from '@/components/prova/fita-topo'
 import { ThemeToggle } from '@/components/prova/theme-toggle'
+import { TelaFundo } from '@/components/prova/hud-fundo'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E']
 
@@ -84,7 +85,7 @@ export function ProvaHud(p: ProvaHudProps) {
   const branco = p.totalQuestoes - p.totalRespondidas
 
   return (
-    <div className={cn('flex flex-col bg-background text-foreground', compact ? 'h-full' : 'min-h-screen')}>
+    <TelaFundo className={cn('flex flex-col bg-background text-foreground', compact ? 'h-full' : 'min-h-screen')}>
       {/* Header — barra superior com cor própria (distinta do fundo) */}
       <header className={cn('z-50 border-b backdrop-blur', !compact && 'sticky top-0')} style={{ background: 'var(--prova-topbar, var(--background))' }}>
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
@@ -247,6 +248,6 @@ export function ProvaHud(p: ProvaHudProps) {
           </aside>
         </div>
       </main>
-    </div>
+    </TelaFundo>
   )
 }

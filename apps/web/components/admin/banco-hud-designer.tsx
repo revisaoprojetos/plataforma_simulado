@@ -57,15 +57,17 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
   }
   const toggleGrupo = (t: string) => setColapsados((p) => ({ ...p, [t]: !p[t] }))
 
-  async function enviarImagemLoading(file: File | null) {
+  const [alvoImg, setAlvoImg] = useState<'loadingLogoUrl' | 'bgImagemUrl'>('loadingLogoUrl')
+  function abrirUpload(campo: 'loadingLogoUrl' | 'bgImagemUrl') { setAlvoImg(campo); imgRef.current?.click() }
+  async function enviarImagem(file: File | null) {
     if (!file) return
     if (!file.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
     setEnviandoImg(true)
     try {
-      const dataUri = await redimensionarImagem(file)
+      const dataUri = await redimensionarImagem(file, alvoImg === 'bgImagemUrl' ? 1600 : 900)
       const r = await hospedarImagemQuestaoAction(dataUri)
       if (!r.ok || !r.url) { toast.error(r.error ?? 'Falha ao enviar a imagem.'); return }
-      set('loadingLogoUrl', r.url)
+      set(alvoImg, r.url)
     } catch {
       toast.error('Falha ao processar a imagem.')
     } finally {
@@ -117,15 +119,31 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
 
       <div className="grid h-[calc(100vh-11rem)] min-h-[560px] grid-cols-[168px_minmax(0,1fr)_290px]">
         {/* PÁGINAS */}
-        <div className="space-y-1 overflow-auto border-r p-2">
+        <div className="flex flex-col overflow-auto border-r p-2">
           <p className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Páginas</p>
-          {ABAS.map((s) => (
-            <button key={s.key} onClick={() => setAba(s.key)}
-              className={cn('flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors', aba === s.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground')}>
-              <s.icon className="h-4 w-4 shrink-0" /><span className="truncate">{s.label}</span>
-            </button>
-          ))}
+          <div className="space-y-1">
+            {ABAS.map((s) => (
+              <button key={s.key} onClick={() => setAba(s.key)}
+                className={cn('flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors', aba === s.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground')}>
+                <s.icon className="h-4 w-4 shrink-0" /><span className="truncate">{s.label}</span>
+              </button>
+            ))}
+          </div>
           <p className="px-2 pt-2 text-[10px] leading-snug text-muted-foreground">“Base” vale p/ todas as páginas. As outras sobrescrevem só a sua.</p>
+
+          {/* Temas prontos (abaixo das páginas) */}
+          <div className="mt-4 border-t pt-3">
+            <p className="mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Temas prontos</p>
+            <div className="flex flex-col gap-1.5">
+              {PRESETS_HUD.map((p) => (
+                <button key={p.nome} onClick={() => setBase({ ...p.cores })} title={`Aplicar tema ${p.nome}`}
+                  className="inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs hover:border-primary/50 hover:bg-muted/50">
+                  <span className="flex shrink-0"><span className="h-3.5 w-3.5 rounded-l-full" style={{ background: p.prim }} /><span className="h-3.5 w-3.5 rounded-r-full" style={{ background: p.sec }} /></span>
+                  <span className="truncate">{p.nome}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* PRÉVIA */}
@@ -184,18 +202,6 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
           {/* Ferramentas de tema */}
           <div className="space-y-2 border-b p-3">
             <div>
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Temas prontos</p>
-              <div className="flex flex-wrap gap-1.5">
-                {PRESETS_HUD.map((p) => (
-                  <button key={p.nome} onClick={() => setBase({ ...p.cores })} title={`Aplicar tema ${p.nome}`}
-                    className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] hover:border-primary/50 hover:bg-muted/50">
-                    <span className="flex"><span className="h-3 w-3 rounded-l-full" style={{ background: p.prim }} /><span className="h-3 w-3 rounded-r-full" style={{ background: p.sec }} /></span>
-                    {p.nome}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Gerar paleta da marca</p>
               <div className="grid grid-cols-2 gap-2">
                 <HexColorField value={prim} onChange={setPrim} />
@@ -223,11 +229,13 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
             )}
           </div>
 
-          {/* Imagem da tela de carregamento (só aparece ao editar Base ou Carregamento) */}
-          {(aba === 'base' || aba === 'loading') && !busca && (
+          {/* input de arquivo compartilhado (carregamento + fundo) */}
+          <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={(e) => enviarImagem(e.target.files?.[0] ?? null)} />
+
+          {/* Imagem da tela de carregamento (só na página Carregamento) */}
+          {aba === 'loading' && !busca && (
             <div className="border-b p-3">
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Imagem do carregamento</p>
-              <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={(e) => enviarImagemLoading(e.target.files?.[0] ?? null)} />
               {valorDe('loadingLogoUrl') ? (
                 <div className="flex items-center gap-2">
                   <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/40">
@@ -235,7 +243,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
                     <img src={valorDe('loadingLogoUrl')} alt="" className="h-full w-full object-contain" />
                   </span>
                   <div className="flex flex-1 flex-col gap-1.5">
-                    <button onClick={() => imgRef.current?.click()} disabled={enviandoImg} className="inline-flex items-center justify-center gap-1.5 rounded-md border bg-background px-2 py-1.5 text-xs font-medium hover:bg-muted/50 disabled:opacity-60">
+                    <button onClick={() => abrirUpload('loadingLogoUrl')} disabled={enviandoImg} className="inline-flex items-center justify-center gap-1.5 rounded-md border bg-background px-2 py-1.5 text-xs font-medium hover:bg-muted/50 disabled:opacity-60">
                       {enviandoImg ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />} Trocar
                     </button>
                     <button onClick={() => set('loadingLogoUrl', '')} className="inline-flex items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10">
@@ -244,13 +252,58 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
                   </div>
                 </div>
               ) : (
-                <button onClick={() => imgRef.current?.click()} disabled={enviandoImg}
+                <button onClick={() => abrirUpload('loadingLogoUrl')} disabled={enviandoImg}
                   className="flex w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed py-4 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:opacity-60">
                   {enviandoImg ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
                   <span className="text-xs font-medium">{enviandoImg ? 'Enviando…' : 'Importar imagem'}</span>
                 </button>
               )}
               <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">Aparece no centro da animação de carregamento. Sem imagem, usa o logo do sistema.</p>
+            </div>
+          )}
+
+          {/* Imagem de fundo da tela (todas as páginas) */}
+          {!busca && (
+            <div className="border-b p-3">
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Imagem de fundo{aba !== 'base' && <span className="ml-1 font-normal normal-case text-muted-foreground/70">· só nesta tela</span>}</p>
+              {valorDe('bgImagemUrl') ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="h-14 w-20 shrink-0 overflow-hidden rounded-lg border bg-muted/40">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={valorDe('bgImagemUrl')} alt="" className="h-full w-full object-cover" />
+                    </span>
+                    <div className="flex flex-1 flex-col gap-1.5">
+                      <button onClick={() => abrirUpload('bgImagemUrl')} disabled={enviandoImg} className="inline-flex items-center justify-center gap-1.5 rounded-md border bg-background px-2 py-1.5 text-xs font-medium hover:bg-muted/50 disabled:opacity-60">
+                        {enviandoImg ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />} Trocar
+                      </button>
+                      <button onClick={() => set('bgImagemUrl', '')} className="inline-flex items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10">
+                        <Trash2 className="h-3.5 w-3.5" /> Remover
+                      </button>
+                    </div>
+                  </div>
+                  {/* Opacidade */}
+                  <label className="mt-3 block text-[11px] font-medium text-muted-foreground">Opacidade <span className="font-mono text-foreground">{valorDe('bgOpacidade') || '100'}%</span></label>
+                  <input type="range" min={0} max={100} step={5} value={Number(valorDe('bgOpacidade') || '100')} onChange={(e) => set('bgOpacidade', e.target.value)} className="mt-1 w-full accent-primary" />
+                  {/* Desfoque */}
+                  <label className="mt-2 block text-[11px] font-medium text-muted-foreground">Desfoque <span className="font-mono text-foreground">{valorDe('bgDesfoque') || '0'}px</span></label>
+                  <input type="range" min={0} max={20} step={1} value={Number(valorDe('bgDesfoque') || '0')} onChange={(e) => set('bgDesfoque', e.target.value)} className="mt-1 w-full accent-primary" />
+                  {/* Ajuste */}
+                  <label className="mt-2 block text-[11px] font-medium text-muted-foreground">Preenchimento</label>
+                  <select value={valorDe('bgAjuste') || 'cover'} onChange={(e) => set('bgAjuste', e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary">
+                    <option value="cover">Cobrir (preenche a tela)</option>
+                    <option value="contain">Conter (mostra inteira)</option>
+                    <option value="repeat">Repetir (padrão)</option>
+                  </select>
+                </>
+              ) : (
+                <button onClick={() => abrirUpload('bgImagemUrl')} disabled={enviandoImg}
+                  className="flex w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed py-4 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:opacity-60">
+                  {enviandoImg ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+                  <span className="text-xs font-medium">{enviandoImg ? 'Enviando…' : 'Importar imagem de fundo'}</span>
+                </button>
+              )}
+              <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">{aba === 'base' ? 'Fundo padrão de todas as telas.' : 'Sobrescreve o fundo só nesta tela.'} Ajuste opacidade/desfoque acima.</p>
             </div>
           )}
 

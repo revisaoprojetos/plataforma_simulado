@@ -4,6 +4,7 @@ import { BookOpen, CheckCircle2, XCircle, Circle, Home, Clock, FileText, FileSta
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
 import { FitaTopo } from '@/components/prova/fita-topo'
+import { HudFundo } from '@/components/prova/hud-fundo'
 
 function frameLogo(estilo?: string): string {
   if (estilo === 'quadrado') return 'rounded-none'
@@ -56,7 +57,7 @@ export function ProvaLoginPreview({ branding, titulo = 'Simulado', metodo = 'ema
     </div>
   )
   return (
-    <div className={cn('flex items-start justify-center bg-background p-4 text-foreground', compact ? 'h-full overflow-auto' : 'min-h-screen py-10')}>
+    <div className={cn('relative isolate flex items-start justify-center bg-background p-4 text-foreground', compact ? 'h-full overflow-auto' : 'min-h-screen py-10')}><HudFundo />
       <div className="w-full max-w-2xl space-y-6 py-2">
         {/* Cabeçalho: status + título + logo + tema */}
         <div className="flex items-start justify-between gap-4">
@@ -184,7 +185,7 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
     { disciplina: 'Raciocínio Lógico', acertos: 3, total: 10, percentual: 30 },
   ]
   return (
-    <div className={cn('bg-background text-foreground', compact ? 'h-full overflow-auto' : 'min-h-screen')}>
+    <div className={cn('relative isolate bg-background text-foreground', compact ? 'h-full overflow-auto' : 'min-h-screen')}><HudFundo />
       {/* Top bar — igual ao simulado real (cor própria via HUD) */}
       <header className="sticky top-0 z-40 border-b backdrop-blur" style={{ background: 'var(--prova-topbar, var(--background))', color: 'var(--prova-topbar-texto, var(--foreground))' }}>
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">

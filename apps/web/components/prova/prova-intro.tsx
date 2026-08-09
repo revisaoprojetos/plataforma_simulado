@@ -5,6 +5,7 @@ import { Loader2, Clock, ListChecks, Info, PlayCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { FitaTopo } from '@/components/prova/fita-topo'
+import { HudFundo } from '@/components/prova/hud-fundo'
 
 /** Barra com contagem de porcentagem 0→100 (relativa ao tempo da tela). */
 function BarraPorcentagem({ cor, duracaoMs = 4000, loop, onCompleto }: { cor: string; duracaoMs?: number; loop?: boolean; onCompleto?: () => void }) {
@@ -54,12 +55,12 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
   mensagem?: string; compact?: boolean; logoUrl?: string | null; logoBg?: string; logoEstilo?: string; tipo?: EstiloProvaLoading; loop?: boolean; onCompleto?: () => void
 }) {
   const cor = 'var(--prova-loading, var(--primary))'
-  const wrap = cn('flex flex-col items-center justify-center gap-5 bg-background text-foreground', compact ? 'h-full' : 'min-h-screen')
+  const wrap = cn('relative isolate flex flex-col items-center justify-center gap-5 bg-background text-foreground', compact ? 'h-full' : 'min-h-screen')
 
   // Círculo: logo no centro do anel girando (padrão).
   if (tipo === 'circulo') {
     return (
-      <div className={wrap}>
+      <div className={wrap}><HudFundo />
         <span className="relative flex h-24 w-24 items-center justify-center">
           <span className="absolute inset-0 animate-ping rounded-full opacity-20" style={{ background: cor }} />
           <span className="absolute inset-0 animate-spin rounded-full border-4 border-muted" style={{ borderTopColor: cor }} />
@@ -80,7 +81,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
   // Círculo preenchido: a imagem ocupa toda a área interna do anel girando.
   if (tipo === 'circulo_cheio') {
     return (
-      <div className={wrap}>
+      <div className={wrap}><HudFundo />
         <span className="relative flex h-24 w-24 items-center justify-center">
           <span className="absolute inset-0 animate-ping rounded-full opacity-20" style={{ background: cor }} />
           <span className="absolute inset-0 animate-spin rounded-full border-4 border-muted" style={{ borderTopColor: cor }} />
@@ -101,7 +102,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
   // Porcentagem: logo com ondas pulsando + barra com a % na lateral (sem o texto "Carregando").
   if (tipo === 'porcentagem') {
     return (
-      <div className={wrap}>
+      <div className={wrap}><HudFundo />
         <span className="relative flex h-20 w-20 items-center justify-center">
           <span className="absolute inset-0 animate-ping rounded-full opacity-20" style={{ background: cor }} />
           <span className="absolute -inset-3 animate-ping rounded-full opacity-10" style={{ background: cor, animationDelay: '0.4s' }} />
