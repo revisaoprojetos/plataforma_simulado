@@ -186,8 +186,8 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
         </div>
 
         {/* PRÉVIA */}
-        <div className="min-w-0 overflow-auto bg-muted/30 p-4">
-          <div className="mx-auto max-w-3xl">
+        <div className="flex min-w-0 flex-col overflow-hidden bg-muted/30 p-4">
+          <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col">
             <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
               {(telaPreview === 'prova' || telaPreview === 'entrada') && (
                 <div className="inline-flex overflow-hidden rounded-md border text-xs">
@@ -215,7 +215,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
                 </div>
               )}
             </div>
-            <div onClick={onPreviewClick} title="Clique num elemento para destacar a cor dele à direita" className="h-[560px] cursor-pointer overflow-auto rounded-xl border shadow-sm [&_button]:cursor-pointer" style={hudCssVars(c) as React.CSSProperties}>
+            <div onClick={onPreviewClick} title="Clique num elemento para destacar a cor dele à direita" className="min-h-0 flex-1 cursor-pointer overflow-auto rounded-xl border shadow-sm [&_button]:cursor-pointer" style={hudCssVars(c) as React.CSSProperties}>
               {aba === 'loading' && <ProvaLoading compact loop mensagem="Carregando simulado..." tipo={c.loadingTipo as EstiloProvaLoading} logoUrl={c.loadingLogoUrl || undefined} />}
               {aba === 'login' && (
                 <div className="relative h-full">
