@@ -37,6 +37,8 @@ export type BuilderAjustes = {
   estiloParte: Record<string, { b?: boolean; i?: boolean; u?: boolean }>
   /** Fonte por PARTE (parte → id de FONTES_CADERNO). Herdada pelos textos do bloco. */
   fonteParte: Record<string, string>
+  /** Tamanho do texto por PARTE (parte → multiplicador, ex.: 1.15). Aplica ao bloco inteiro (texto e filhos). */
+  tamanhoParte: Record<string, number>
 }
 
 /** Cores padrão por pilar (adaptável: pilares novos herdam a cor secundária até serem configurados). */
@@ -118,6 +120,7 @@ export const AJUSTES_BASE: BuilderAjustes = {
   coresTextoParte: {},
   estiloParte: {},
   fonteParte: {},
+  tamanhoParte: {},
 }
 
 export type Modelo = {

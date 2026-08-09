@@ -564,6 +564,15 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                   {FONTES_CADERNO.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
                 </select>
               </div>
+              <div className="mt-3">
+                <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground"><span>Tamanho do texto</span><span className="font-semibold text-foreground">{Math.round((a.tamanhoParte?.[pickerCor.parte] ?? 1) * 100)}%</span></div>
+                <div className="flex items-center gap-1.5">
+                  {([['A−', -0.1], ['A+', 0.1]] as const).map(([lbl, d]) => (
+                    <button key={lbl} type="button" onClick={() => { const cur = a.tamanhoParte?.[pickerCor.parte] ?? 1; const v = Math.min(2.5, Math.max(0.6, Math.round((cur + d) * 10) / 10)); setAjuste({ tamanhoParte: { ...(a.tamanhoParte ?? {}), [pickerCor.parte]: v } }) }} className="flex-1 rounded-md border py-1 text-xs font-semibold hover:bg-muted">{lbl}</button>
+                  ))}
+                  <button type="button" onClick={() => { const t = { ...(a.tamanhoParte ?? {}) }; delete t[pickerCor.parte]; setAjuste({ tamanhoParte: t }) }} className="flex-1 rounded-md border py-1 text-[11px] hover:bg-muted">Padrão</button>
+                </div>
+              </div>
               {campos.length > 0 && (
                 <div className="mt-4 space-y-2.5 border-t pt-4">
                   <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Texto</div>

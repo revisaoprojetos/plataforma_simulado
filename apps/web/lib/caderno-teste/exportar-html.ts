@@ -50,22 +50,24 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
   const corTextoP = (parte: string, def: string) => (a.coresTextoParte ?? {})[parte] || def // cor do texto por bloco
   const estCss = (parte: string) => { const e = (a.estiloParte ?? {})[parte]; return `${e?.b ? 'font-weight:700;' : ''}${e?.i ? 'font-style:italic;' : ''}${e?.u ? 'text-decoration:underline;' : ''}` } // negrito/itálico/sublinhado por bloco
   const fonteCss = (parte: string) => { const f = cssDaFonte((a.fonteParte ?? {})[parte]); return f ? `font-family:${f};` : '' } // fonte por bloco
+  const escl = (parte: string) => (a.tamanhoParte ?? {})[parte] ?? 1 // multiplicador de tamanho por bloco
+  const fsz = (parte: string, px: number) => `${Math.round(px * escl(parte) * 10) / 10}px` // font-size escalado por bloco
   const sec = (t: string) => { const cor = corP(`sec:${t}`, prim); return `<div style="background:${cor};color:#fff;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:7px 12px;margin:18px 0 10px">${esc(t)}</div>` }
   let h = ''
-  if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); h += `<div style="background:${cor};color:${corTextoP('diag_cab', '#fff')};padding:14px 18px;margin-bottom:12px;${fonteCss('diag_cab')}"><div style="font-size:22px;font-weight:800">${V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>${c.subtitulo ? `<div style="font-size:12px;opacity:.85;margin-top:2px">${V(c.subtitulo)}</div>` : ''}</div>` }
-  if (a.mostrarDadosAluno) { const cN = corP('diag_nome_rot', prim), cV = corP('diag_nome_val', amar); h += `<table style="width:100%;border-collapse:collapse;margin-bottom:12px"><tr><td style="background:${cN};color:${corTextoP('diag_nome_rot', '#fff')};font-weight:800;font-size:15px;padding:8px 14px;width:90px;${estCss('diag_nome_rot')}${fonteCss('diag_nome_rot')}">${V(c.rotuloNome ?? 'NOME:')}</td><td style="background:${cV};color:${corTextoP('diag_nome_val', '#3b2f00')};padding:8px 14px;font-size:13px;font-weight:600;${estCss('diag_nome_val')}${fonteCss('diag_nome_val')}">${V('{nome}')}</td></tr></table>` }
-  { const cNum = corP('diag_nota_num', '#9b6800'), cFx = corP('diag_nota_faixa', amar); h += `<table style="width:100%;border-collapse:collapse;margin-bottom:14px;border:1px solid ${prim}33"><tr><td style="background:${cNum};color:${corTextoP('diag_nota_num', '#fff')};padding:12px 22px;font-weight:800;width:120px;font-size:26px;${fonteCss('diag_nota_num')}">${V('{acertos}')}<span style="font-size:16px">/${V(c.notaTotal)}</span></td><td style="background:${cFx};color:${corTextoP('diag_nota_faixa', '#3b2f00')};padding:12px 18px;font-size:13px;font-weight:600;${fonteCss('diag_nota_faixa')}">${V(c.notaTexto)}</td></tr></table>` }
-  c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); h += `<p style="font-size:12px;line-height:1.5;text-align:${alignP(`intro:${i}`, 'justify')};margin:0 0 8px;color:${cor}">${V(p)}</p>` })
+  if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); h += `<div style="background:${cor};color:${corTextoP('diag_cab', '#fff')};padding:14px 18px;margin-bottom:12px;${fonteCss('diag_cab')}"><div style="font-size:${fsz('diag_cab', 22)};font-weight:800">${V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>${c.subtitulo ? `<div style="font-size:${fsz('diag_cab', 12)};opacity:.85;margin-top:2px">${V(c.subtitulo)}</div>` : ''}</div>` }
+  if (a.mostrarDadosAluno) { const cN = corP('diag_nome_rot', prim), cV = corP('diag_nome_val', amar); h += `<table style="width:100%;border-collapse:collapse;margin-bottom:12px"><tr><td style="background:${cN};color:${corTextoP('diag_nome_rot', '#fff')};font-weight:800;font-size:${fsz('diag_nome_rot', 15)};padding:8px 14px;width:90px;${estCss('diag_nome_rot')}${fonteCss('diag_nome_rot')}">${V(c.rotuloNome ?? 'NOME:')}</td><td style="background:${cV};color:${corTextoP('diag_nome_val', '#3b2f00')};padding:8px 14px;font-size:${fsz('diag_nome_val', 13)};font-weight:600;${estCss('diag_nome_val')}${fonteCss('diag_nome_val')}">${V('{nome}')}</td></tr></table>` }
+  { const cNum = corP('diag_nota_num', '#9b6800'), cFx = corP('diag_nota_faixa', amar); h += `<table style="width:100%;border-collapse:collapse;margin-bottom:14px;border:1px solid ${prim}33"><tr><td style="background:${cNum};color:${corTextoP('diag_nota_num', '#fff')};padding:12px 22px;font-weight:800;width:120px;font-size:${fsz('diag_nota_num', 26)};${fonteCss('diag_nota_num')}">${V('{acertos}')}<span style="font-size:${fsz('diag_nota_num', 16)}">/${V(c.notaTotal)}</span></td><td style="background:${cFx};color:${corTextoP('diag_nota_faixa', '#3b2f00')};padding:12px 18px;font-size:${fsz('diag_nota_faixa', 13)};font-weight:600;${fonteCss('diag_nota_faixa')}">${V(c.notaTexto)}</td></tr></table>` }
+  c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); h += `<p style="font-size:${fsz(`intro:${i}`, 12)};line-height:1.5;text-align:${alignP(`intro:${i}`, 'justify')};margin:0 0 8px;color:${cor}">${V(p)}</p>` })
 
   if (c.linguaPortuguesa) {
     const lp = c.linguaPortuguesa
     h += sec(lp.secTitulo || 'Desempenho em Língua Portuguesa')
-    if (lp.secIntro) h += `<p style="font-size:11px;color:${corP('lingua_intro', '#5a5570')};margin:0 0 8px;line-height:1.4;${fonteCss('lingua_intro')}">${V(lp.secIntro)}</p>`
+    if (lp.secIntro) h += `<p style="font-size:${fsz('lingua_intro', 11)};color:${corP('lingua_intro', '#5a5570')};margin:0 0 8px;line-height:1.4;${fonteCss('lingua_intro')}">${V(lp.secIntro)}</p>`
     const banda = bandaAdaptativa({ nome: lp.titulo, chave: lp.chave, tipoFonte: lp.tipoFonte, totalTxt: lp.totalTxt, bandas: lp.bandas }, vars)
     const bandas = banda ? [banda] : lp.bandas
     const cor = corP('lingua_card', corDoPilar(lp.chave, a.coresPilar ?? {}, prim))
-    let card = `<div style="font-size:10px;font-weight:700;color:${cor};letter-spacing:.5px">${esc(lp.titulo)}</div><div style="font-size:24px;font-weight:800;color:${cor}">${V(`{pct_${prefFonte(lp.tipoFonte)}${lp.chave}}`)}</div><div style="font-size:10px;color:#5a5570;margin-bottom:6px">${V(lp.totalTxt)}</div>`
-    for (const b of bandas) card += `${!banda ? `<div style="font-size:10px;font-weight:700;color:${cor}">${esc(b.faixa)}</div>` : ''}${b.texto ? `<div style="font-size:10px;color:#243b53;line-height:1.4;text-align:${alignP('lingua_card', 'justify')};margin-bottom:6px">${V(b.texto)}</div>` : ''}`
+    let card = `<div style="font-size:${fsz('lingua_card', 10)};font-weight:700;color:${cor};letter-spacing:.5px">${esc(lp.titulo)}</div><div style="font-size:${fsz('lingua_card', 24)};font-weight:800;color:${cor}">${V(`{pct_${prefFonte(lp.tipoFonte)}${lp.chave}}`)}</div><div style="font-size:${fsz('lingua_card', 10)};color:#5a5570;margin-bottom:6px">${V(lp.totalTxt)}</div>`
+    for (const b of bandas) card += `${!banda ? `<div style="font-size:${fsz('lingua_card', 10)};font-weight:700;color:${cor}">${esc(b.faixa)}</div>` : ''}${b.texto ? `<div style="font-size:${fsz('lingua_card', 10)};color:#243b53;line-height:1.4;text-align:${alignP('lingua_card', 'justify')};margin-bottom:6px">${V(b.texto)}</div>` : ''}`
     h += `<div style="background:#fff2cc;border:1px solid ${cor}22;padding:10px;margin-bottom:10px">${card}</div>`
   }
   if (c.pilares.length) {
@@ -74,9 +76,10 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
     c.pilares.forEach((pl, i) => {
       const banda = bandaAdaptativa(pl, vars)
       const bandas = banda ? [banda] : pl.bandas
-      const cor = corP(`pilar:${pl.chave || i}`, prim)
-      let card = `<div style="font-size:10px;font-weight:700;color:${cor};letter-spacing:.5px">${esc(pl.nome)}</div><div style="font-size:24px;font-weight:800;color:${cor}">${pl.chave ? V(`{pct_${prefFonte(pl.tipoFonte)}${pl.chave}}`) : 'X%'}</div><div style="font-size:10px;color:#5a5570;margin-bottom:6px">${V(pl.totalTxt)}</div>`
-      for (const b of bandas) card += `${!banda ? `<div style="font-size:10px;font-weight:700;color:${cor}">${esc(b.faixa)}</div>` : ''}${b.texto ? `<div style="font-size:10px;color:#243b53;line-height:1.4;text-align:${alignP(`pilar:${pl.chave || i}`, 'justify')};margin-bottom:6px">${V(b.texto)}</div>` : ''}`
+      const pk = `pilar:${i}`
+      const cor = corP(pk, prim)
+      let card = `<div style="font-size:${fsz(pk, 10)};font-weight:700;color:${cor};letter-spacing:.5px">${esc(pl.nome)}</div><div style="font-size:${fsz(pk, 24)};font-weight:800;color:${cor}">${pl.chave ? V(`{pct_${prefFonte(pl.tipoFonte)}${pl.chave}}`) : 'X%'}</div><div style="font-size:${fsz(pk, 10)};color:#5a5570;margin-bottom:6px">${V(pl.totalTxt)}</div>`
+      for (const b of bandas) card += `${!banda ? `<div style="font-size:${fsz(pk, 10)};font-weight:700;color:${cor}">${esc(b.faixa)}</div>` : ''}${b.texto ? `<div style="font-size:${fsz(pk, 10)};color:#243b53;line-height:1.4;text-align:${alignP(pk, 'justify')};margin-bottom:6px">${V(b.texto)}</div>` : ''}`
       h += `<td style="width:33%;background:#fff2cc;border:1px solid ${cor}22;padding:10px">${card}</td>`
     })
     h += '</tr></table>'
@@ -88,9 +91,9 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
     if (c.disciplinasIntro) h += `<p style="font-size:11px;color:${corP('disc_intro', '#5a5570')};margin:0 0 8px;line-height:1.4">${V(c.disciplinasIntro)}</p>`
     for (const d of discs) {
       const assuntos = (vars[`assuntos_${d.chave}`] ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
-      const asHtml = assuntos.length ? assuntos.map((x) => `<div style="font-size:10px;color:#5a5570;font-style:italic">- ${esc(x)}</div>`).join('') : '<div style="font-size:10px;color:#5a5570;font-style:italic">- Assuntos das questões erradas</div>'
+      const asHtml = assuntos.length ? assuntos.map((x) => `<div style="font-size:${fsz(`disc:${d.chave}`, 10)};color:#5a5570;font-style:italic">- ${esc(x)}</div>`).join('') : `<div style="font-size:${fsz(`disc:${d.chave}`, 10)};color:#5a5570;font-style:italic">- Assuntos das questões erradas</div>`
       const corDisc = corP(`disc:${d.chave}`, (a.coresDisc ?? {})[d.chave] || corDoPilar(d.pilar, a.coresPilar ?? {}, amar))
-      h += `<table style="width:100%;border-collapse:collapse;margin-bottom:5px;border-top:3px solid ${corDisc};background:#f5f3ff;break-inside:avoid;page-break-inside:avoid"><tr><td style="padding:6px 10px"><div style="font-size:11px;font-weight:700;color:${prim}">${esc(d.nome)}</div>${asHtml}</td><td style="padding:6px 10px;text-align:right;white-space:nowrap;font-size:11px"><span style="color:#9590b0">${V(`{acerto_${d.chave}}`)}/${V(`{total_${d.chave}}`)}</span> <span style="font-weight:800;color:#9a6e00">${V(`{pct_${d.chave}}`)}</span></td></tr></table>`
+      h += `<table style="width:100%;border-collapse:collapse;margin-bottom:5px;border-top:3px solid ${corDisc};background:#f5f3ff;break-inside:avoid;page-break-inside:avoid"><tr><td style="padding:6px 10px"><div style="font-size:${fsz(`disc:${d.chave}`, 11)};font-weight:700;color:${prim}">${esc(d.nome)}</div>${asHtml}</td><td style="padding:6px 10px;text-align:right;white-space:nowrap;font-size:${fsz(`disc:${d.chave}`, 11)}"><span style="color:#9590b0">${V(`{acerto_${d.chave}}`)}/${V(`{total_${d.chave}}`)}</span> <span style="font-weight:800;color:#9a6e00">${V(`{pct_${d.chave}}`)}</span></td></tr></table>`
     }
   }
 
@@ -98,18 +101,18 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
     h += sec('Sugestões de estudo')
     c.sugestoes.forEach((s, si) => {
       // Todos os tópicos num só bloco (introdução separada); marcadores `>`/`>>` coloridos.
-      const it = s.itens.length ? `<div style="font-size:11px;line-height:1.5;text-align:${alignP(`sug:${si}`, 'justify')}">${formatarMarcadores(preencher(topicosParaTexto(s.itens), vars), c.corMarcador, c.corMarcadorForte)}</div>` : ''
+      const it = s.itens.length ? `<div style="font-size:${fsz(`sug:${si}`, 11)};line-height:1.5;text-align:${alignP(`sug:${si}`, 'justify')}">${formatarMarcadores(preencher(topicosParaTexto(s.itens), vars), c.corMarcador, c.corMarcadorForte)}</div>` : ''
       const cor = corP(`sug:${si}`, '#fdf3d0')
-      h += `<div style="margin-bottom:10px"><table style="width:100%;border-collapse:collapse;background:${cor}"><tr><td style="padding:5px 12px;font-weight:800;font-size:11px;color:${s.corTitulo || '#9a6e00'}">${V(s.titulo)}</td><td style="padding:5px 12px;text-align:right;font-weight:700;font-size:10px;color:#9a6e00">${s.prioridade ? '[!] ' + V(s.prioridade) : ''}</td></tr></table><div style="background:#f0eeff;padding:8px 12px">${s.intro ? `<p style="font-size:11px;margin:0 0 6px;line-height:1.4;text-align:${alignP(`sug:${si}`, 'justify')}">${V(s.intro)}</p>` : ''}${it}</div></div>`
+      h += `<div style="margin-bottom:10px"><table style="width:100%;border-collapse:collapse;background:${cor}"><tr><td style="padding:5px 12px;font-weight:800;font-size:${fsz(`sug:${si}`, 11)};color:${s.corTitulo || '#9a6e00'}">${V(s.titulo)}</td><td style="padding:5px 12px;text-align:right;font-weight:700;font-size:${fsz(`sug:${si}`, 10)};color:#9a6e00">${s.prioridade ? '[!] ' + V(s.prioridade) : ''}</td></tr></table><div style="background:#f0eeff;padding:8px 12px">${s.intro ? `<p style="font-size:${fsz(`sug:${si}`, 11)};margin:0 0 6px;line-height:1.4;text-align:${alignP(`sug:${si}`, 'justify')}">${V(s.intro)}</p>` : ''}${it}</div></div>`
     })
   }
   if ((c.fechamento?.length ?? 0) > 0) {
-    (c.fechamento ?? []).forEach((p, i) => { const cor = corP(`fechamento:${i}`, '#1a202c'); h += `<p style="font-size:12px;line-height:1.5;text-align:${alignP(`fechamento:${i}`, 'justify')};margin:0 0 8px;color:${cor}">${V(p)}</p>` })
+    (c.fechamento ?? []).forEach((p, i) => { const cor = corP(`fechamento:${i}`, '#1a202c'); h += `<p style="font-size:${fsz(`fechamento:${i}`, 12)};line-height:1.5;text-align:${alignP(`fechamento:${i}`, 'justify')};margin:0 0 8px;color:${cor}">${V(p)}</p>` })
   }
   if (c.gabaritoObs.length || c.gabaritoIntro.length) {
     h += sec(c.gabaritoTitulo || 'Gabarito oficial desatualizado')
-    c.gabaritoIntro.forEach((p, i) => { const cor = corP(`gabIntro:${i}`, '#243b53'); h += `<p style="font-size:11px;margin:0 0 6px;line-height:1.4;text-align:${alignP(`gabIntro:${i}`, 'justify')};color:${cor}">${V(p)}</p>` })
-    if (c.gabaritoObs.length) { const cor = corP('gab_obs', '#a32d2d'); h += `<div style="background:#f5f3ff;border-top:2px solid ${cor};padding:8px 12px">${c.gabaritoObs.map((o) => `<div style="font-size:10px;color:#5a5570">${V(o)}</div>`).join('')}</div>` }
+    c.gabaritoIntro.forEach((p, i) => { const cor = corP(`gabIntro:${i}`, '#243b53'); h += `<p style="font-size:${fsz(`gabIntro:${i}`, 11)};margin:0 0 6px;line-height:1.4;text-align:${alignP(`gabIntro:${i}`, 'justify')};color:${cor}">${V(p)}</p>` })
+    if (c.gabaritoObs.length) { const cor = corP('gab_obs', '#a32d2d'); h += `<div style="background:#f5f3ff;border-top:3px solid ${cor};padding:6px 10px">${c.gabaritoObs.map((o) => `<div style="font-size:${fsz('gab_obs', 10)};color:#5a5570">${V(o)}</div>`).join('')}</div>` }
   }
   return h
 }

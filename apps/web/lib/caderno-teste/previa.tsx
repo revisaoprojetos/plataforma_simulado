@@ -91,13 +91,18 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   const alignP = (parte: string, def: any) => ((a.alinhamentoParte ?? {})[parte] as any) || def
   // Cor do TEXTO por PARTE (cascata para os filhos que não têm cor própria — ex.: "0/100").
   const corTextoP = (parte: string, def: any) => (a.coresTextoParte ?? {})[parte] || def
+  // Multiplicador de TAMANHO do texto por PARTE (1 = padrão). Usado no atr e nos textos internos dos cards.
+  const escP = (parte: string) => (a.tamanhoParte ?? {})[parte] ?? 1
+  const fs = (parte: string, px: number) => Math.round(px * escP(parte) * 10) / 10
   // Props (style + clique) para tornar qualquer bloco selecionável na prévia e destacá-lo quando ativo.
   // Aplica também o alinhamento por parte (herdado pelos textos filhos).
   const atr = (parte: string, label: string, cor: string, baseStyle: any): { style: any; onClick?: (e: any) => void; title?: string } => {
     const est = (a.estiloParte ?? {})[parte] ?? {}
     const fonte = cssDaFonte((a.fonteParte ?? {})[parte])
+    const esc = escP(parte); const fsBase = (baseStyle as any)?.fontSize
     const style = { ...baseStyle, textAlign: alignP(parte, baseStyle?.textAlign), color: corTextoP(parte, baseStyle?.color),
       ...(fonte ? { fontFamily: fonte } : {}),
+      ...(typeof fsBase === 'number' && esc !== 1 ? { fontSize: Math.round(fsBase * esc * 10) / 10 } : {}),
       ...(est.b ? { fontWeight: 700 } : {}), ...(est.i ? { fontStyle: 'italic' } : {}), ...(est.u ? { textDecoration: 'underline' } : {}) }
     if (!inter?.onPick) return { style }
     return {
@@ -192,8 +197,8 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   const add = (key: string, node: ReactNode, label: string, tipo: TipoBloco, parte: string, removivel = true, apagar = parte) => entradas.push({ key, node, label, tipo, parte, removivel, apagar })
   if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); add('diag_cab', (
     <div {...atr('diag_cab', 'Cabeçalho', cor, { background: cor, color: '#fff', padding: '12px 16px' })}>
-      <div style={{ fontSize: 20, fontWeight: 800 }}>{V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>
-      {c.subtitulo && <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{V(c.subtitulo)}</div>}
+      <div style={{ fontSize: fs('diag_cab', 20), fontWeight: 800 }}>{V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>
+      {c.subtitulo && <div style={{ fontSize: fs('diag_cab', 11), opacity: 0.85, marginTop: 2 }}>{V(c.subtitulo)}</div>}
     </div>
   ), 'Cabeçalho', 'cabecalho', 'diag_cab', true) }
   if (a.mostrarDadosAluno && !ocultasP.has('nome')) { const corN = corP('diag_nome_rot', prim), corV = corP('diag_nome_val', amar); add('diag_nome', (
@@ -204,7 +209,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   ), 'Dados do aluno', 'nome', 'diag_nome_rot', true) }
   if (!ocultasP.has('nota')) { const corNum = corP('diag_nota_num', '#9b6800'), corFx = corP('diag_nota_faixa', amar); add('diag_nota', (
     <div style={{ display: 'flex', border: `1px solid ${prim}33`, overflow: 'hidden' }}>
-      <div {...atr('diag_nota_num', 'Bloco da nota', corNum, { background: corNum, color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'baseline' })}><span style={{ fontSize: 32, fontWeight: 800 }}>{V('{acertos}')}</span><span style={{ fontSize: 16, fontWeight: 700 }}>/{V(c.notaTotal)}</span></div>
+      <div {...atr('diag_nota_num', 'Bloco da nota', corNum, { background: corNum, color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'baseline' })}><span style={{ fontSize: fs('diag_nota_num', 32), fontWeight: 800 }}>{V('{acertos}')}</span><span style={{ fontSize: fs('diag_nota_num', 16), fontWeight: 700 }}>/{V(c.notaTotal)}</span></div>
       <div {...atr('diag_nota_faixa', 'Faixa da nota', corFx, { background: corFx, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: 12, fontWeight: 600 })}>{V(c.notaTexto)}</div>
     </div>
   ), 'Nota', 'nota', 'diag_nota_num', true) }
@@ -218,13 +223,13 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     const cor = corP('lingua_card', corDoPilar(lp.chave, a.coresPilar ?? {}, prim))
     add('lingua_card', (
       <div key="lpcard" {...atr('lingua_card', lp.titulo, cor, { background: '#fff2cc', border: `1px solid ${cor}22`, padding: 8, marginBottom: 4 })}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(lp.titulo)}</div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1.1 }}>{V(`{pct_${prefFonte(lp.tipoFonte)}${lp.chave}}`)}</div>
-        <div style={{ fontSize: 9, color: '#5a5570', marginBottom: 6 }}>{V(lp.totalTxt)}</div>
+        <div style={{ fontSize: fs('lingua_card', 9), fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(lp.titulo)}</div>
+        <div style={{ fontSize: fs('lingua_card', 22), fontWeight: 800, color: cor, lineHeight: 1.1 }}>{V(`{pct_${prefFonte(lp.tipoFonte)}${lp.chave}}`)}</div>
+        <div style={{ fontSize: fs('lingua_card', 9), color: '#5a5570', marginBottom: 6 }}>{V(lp.totalTxt)}</div>
         {bandas.map((b, j) => (
           <div key={j} style={{ marginBottom: 6 }}>
-            {!banda && <div style={{ fontSize: 9, fontWeight: 700, color: cor }}>{b.faixa}</div>}
-            {b.texto && <div style={{ fontSize: 8.5, color: '#243b53', lineHeight: 1.4, textAlign: alignP('lingua_card', 'justify') }}>{V(b.texto)}</div>}
+            {!banda && <div style={{ fontSize: fs('lingua_card', 9), fontWeight: 700, color: cor }}>{b.faixa}</div>}
+            {b.texto && <div style={{ fontSize: fs('lingua_card', 8.5), color: '#243b53', lineHeight: 1.4, textAlign: alignP('lingua_card', 'justify') }}>{V(b.texto)}</div>}
           </div>
         ))}
       </div>
@@ -241,13 +246,13 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
           const cor = corP(parte, prim) // destaque do card (nome + %)
           return (
             <div key={i} {...atr(parte, pl.nome, cor, { flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${cor}22`, padding: 8 })}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(pl.nome)}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1.1 }}>{pl.chave ? V(`{pct_${prefFonte(pl.tipoFonte)}${pl.chave}}`) : 'X%'}</div>
-              <div style={{ fontSize: 9, color: '#5a5570', marginBottom: 6 }}>{V(pl.totalTxt)}</div>
+              <div style={{ fontSize: fs(parte, 9), fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(pl.nome)}</div>
+              <div style={{ fontSize: fs(parte, 22), fontWeight: 800, color: cor, lineHeight: 1.1 }}>{pl.chave ? V(`{pct_${prefFonte(pl.tipoFonte)}${pl.chave}}`) : 'X%'}</div>
+              <div style={{ fontSize: fs(parte, 9), color: '#5a5570', marginBottom: 6 }}>{V(pl.totalTxt)}</div>
               {bandas.map((b, j) => (
                 <div key={j} style={{ marginBottom: 6 }}>
-                  {!banda && <div style={{ fontSize: 9, fontWeight: 700, color: cor }}>{b.faixa}</div>}
-                  {b.texto && <div style={{ fontSize: 8.5, color: '#243b53', lineHeight: 1.4, textAlign: alignP(parte, 'justify') }}>{V(b.texto)}</div>}
+                  {!banda && <div style={{ fontSize: fs(parte, 9), fontWeight: 700, color: cor }}>{b.faixa}</div>}
+                  {b.texto && <div style={{ fontSize: fs(parte, 8.5), color: '#243b53', lineHeight: 1.4, textAlign: alignP(parte, 'justify') }}>{V(b.texto)}</div>}
                 </div>
               ))}
             </div>
@@ -271,12 +276,12 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
       add(`disc:${d.chave}`, (
         <div {...atr(`disc:${d.chave}`, d.nome, corDisc, { background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5 })}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: corTxt }}>{V(c.discNomes?.[d.chave] ?? d.nome)}</div>
+            <div style={{ fontSize: fs(`disc:${d.chave}`, 11), fontWeight: 700, color: corTxt }}>{V(c.discNomes?.[d.chave] ?? d.nome)}</div>
             {assuntos.length
-              ? assuntos.map((as, k) => <div key={k} style={{ fontSize: 9, color: '#5a5570', fontStyle: 'italic' }}>- {V(as)}</div>)
-              : <div style={{ fontSize: 9, color: '#5a5570', fontStyle: 'italic' }}>- Assuntos das questões erradas</div>}
+              ? assuntos.map((as, k) => <div key={k} style={{ fontSize: fs(`disc:${d.chave}`, 9), color: '#5a5570', fontStyle: 'italic' }}>- {V(as)}</div>)
+              : <div style={{ fontSize: fs(`disc:${d.chave}`, 9), color: '#5a5570', fontStyle: 'italic' }}>- Assuntos das questões erradas</div>}
           </div>
-          <div style={{ fontSize: 11, whiteSpace: 'nowrap' }}><span style={{ color: '#9590b0' }}>{V(`{acerto_${fonte}}`)}/{V(`{total_${fonte}}`)}</span> <span style={{ fontWeight: 800, color: corDisc }}>{V(`{pct_${fonte}}`)}</span></div>
+          <div style={{ fontSize: fs(`disc:${d.chave}`, 11), whiteSpace: 'nowrap' }}><span style={{ color: '#9590b0' }}>{V(`{acerto_${fonte}}`)}/{V(`{total_${fonte}}`)}</span> <span style={{ fontWeight: 800, color: corDisc }}>{V(`{pct_${fonte}}`)}</span></div>
         </div>
       ), c.discNomes?.[d.chave] ?? d.nome, 'card', `disc:${d.chave}`, true)
     }
@@ -286,12 +291,12 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     c.sugestoes.forEach((s, si) => { const cor = corP(`sug:${si}`, '#fdf3d0'); add(`sug:${si}`, (
       <div key={`sug${si}`} {...atr(`sug:${si}`, `Sugestão · ${s.titulo}`, cor, { marginBottom: 10 })}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: cor, padding: '5px 12px' }}>
-          <span style={{ fontWeight: 800, fontSize: 11, color: s.corTitulo || '#9a6e00' }}>{V(s.titulo)}</span>
-          {s.prioridade && <span style={{ fontWeight: 700, fontSize: 9, color: '#9a6e00' }}>[!] {V(s.prioridade)}</span>}
+          <span style={{ fontWeight: 800, fontSize: fs(`sug:${si}`, 11), color: s.corTitulo || '#9a6e00' }}>{V(s.titulo)}</span>
+          {s.prioridade && <span style={{ fontWeight: 700, fontSize: fs(`sug:${si}`, 9), color: '#9a6e00' }}>[!] {V(s.prioridade)}</span>}
         </div>
         <div style={{ background: '#f0eeff', padding: '8px 12px' }}>
-          {s.intro && <p style={{ fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: alignP(`sug:${si}`, 'justify') }}>{V(s.intro)}</p>}
-          {s.itens.length > 0 && <div style={{ fontSize: base - 1, lineHeight: 1.5, textAlign: alignP(`sug:${si}`, 'justify') }}>{Vm(topicosParaTexto(s.itens))}</div>}
+          {s.intro && <p style={{ fontSize: fs(`sug:${si}`, base - 1), margin: '0 0 6px', lineHeight: 1.4, textAlign: alignP(`sug:${si}`, 'justify') }}>{V(s.intro)}</p>}
+          {s.itens.length > 0 && <div style={{ fontSize: fs(`sug:${si}`, base - 1), lineHeight: 1.5, textAlign: alignP(`sug:${si}`, 'justify') }}>{Vm(topicosParaTexto(s.itens))}</div>}
         </div>
       </div>
     ), `Sugestão · ${s.titulo}`, 'card', `sug:${si}`, true) })
@@ -302,7 +307,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   if ((c.gabaritoObs.length || c.gabaritoIntro.length) && !ocultasP.has('gabarito')) {
     add('sec_gabarito', <Sec parte="sec_gabarito" t={c.gabaritoTitulo || 'Gabarito oficial desatualizado'} />, `Seção: ${c.gabaritoTitulo || 'Gabarito'}`, 'secao', 'sec_gabarito', true)
     c.gabaritoIntro.forEach((p, i) => { const cor = corP(`gabIntro:${i}`, '#243b53'); add(`gab:${i}`, <p key={`gabi${i}`} {...atr(`gabIntro:${i}`, `Gabarito — parágrafo ${i + 1}`, cor, { fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify', color: cor })}>{V(p)}</p>, `Gabarito — parágrafo ${i + 1}`, 'texto', `gabIntro:${i}`, true, `gabIntro:${i}`) })
-    if (c.gabaritoObs.length) { const cor = corP('gab_obs', '#a32d2d'); add('gab_obs', <div {...atr('gab_obs', 'Gabarito — observações', cor, { background: '#f5f3ff', borderTop: `2px solid ${cor}`, padding: '8px 12px' })}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: 9, color: '#5a5570' }}>{V(o)}</div>)}</div>, 'Gabarito — observações', 'card', 'gab_obs', true, 'gab_obs') }
+    if (c.gabaritoObs.length) { const cor = corP('gab_obs', '#a32d2d'); add('gab_obs', <div {...atr('gab_obs', 'Gabarito — observações', cor, { background: '#f5f3ff', borderTop: `3px solid ${cor}`, padding: '6px 10px' })}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: fs('gab_obs', 9), color: '#5a5570' }}>{V(o)}</div>)}</div>, 'Gabarito — observações', 'card', 'gab_obs', true, 'gab_obs') }
   }
   // Aplica a ordem salva (c.ordem): chaves listadas primeiro (na ordem), o resto mantém a ordem natural.
   const ordemSalva = c.ordem ?? []
