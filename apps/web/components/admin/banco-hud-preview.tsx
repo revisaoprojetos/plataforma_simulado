@@ -61,15 +61,15 @@ export function BancoHudPreview({ bancoId, titulo, base, porPagina }: {
             return (
               <div key={s.key} className="shrink-0">
                 <p className="mb-2 flex items-center justify-center gap-1.5 text-center text-xs font-medium text-muted-foreground"><s.icon className="h-3.5 w-3.5" />{s.label}</p>
-                <div className="w-[520px] overflow-hidden rounded-xl border bg-card shadow-sm">
+                <div className="w-[650px] overflow-hidden rounded-xl border bg-card shadow-sm">
                   {/* barra de janela (formato de tela) */}
                   <div className="flex items-center gap-1.5 border-b bg-muted/50 px-3 py-2">
                     <span className="h-2.5 w-2.5 rounded-full bg-rose-400/70" />
                     <span className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
                   </div>
-                  <div className="h-[325px] w-full overflow-hidden">
-                    <div className="h-[812px] w-[1300px] origin-top-left scale-[0.4] overflow-hidden" style={hudCssVars(c) as React.CSSProperties}>
+                  <div className="h-[406px] w-full overflow-hidden">
+                    <div className="h-[812px] w-[1300px] origin-top-left scale-[0.5] overflow-hidden" style={hudCssVars(c) as React.CSSProperties}>
                       {conteudo(s.key, c)}
                     </div>
                   </div>
