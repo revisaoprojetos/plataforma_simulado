@@ -88,7 +88,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
         </button>
       </div>
 
-      <div className="grid min-h-[560px] grid-cols-[180px_1fr_300px]">
+      <div className="grid min-h-[560px] grid-cols-[168px_minmax(0,1fr)_290px]">
         {/* PÁGINAS */}
         <div className="space-y-1 overflow-auto border-r p-2">
           <p className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Páginas</p>
@@ -153,7 +153,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
         </div>
 
         {/* CONTROLES */}
-        <div className="flex flex-col overflow-hidden border-l">
+        <div className="flex min-w-0 flex-col overflow-hidden border-l">
           {/* Ferramentas de tema */}
           <div className="space-y-2 border-b p-3">
             <div>
@@ -170,14 +170,14 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
             </div>
             <div>
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Gerar paleta da marca</p>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1"><HexColorField value={prim} onChange={setPrim} /></div>
-                <div className="flex items-center gap-1"><HexColorField value={sec} onChange={setSec} /></div>
-                <button onClick={() => setBase(derivarHud(prim, sec))} title="Recolorir tudo a partir destas cores"
-                  className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
-                  <Sparkles className="h-3.5 w-3.5" /> Gerar
-                </button>
+              <div className="grid grid-cols-2 gap-2">
+                <HexColorField value={prim} onChange={setPrim} />
+                <HexColorField value={sec} onChange={setSec} />
               </div>
+              <button onClick={() => setBase(derivarHud(prim, sec))} title="Recolorir tudo a partir destas cores"
+                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+                <Sparkles className="h-3.5 w-3.5" /> Gerar paleta
+              </button>
               <p className="mt-1 text-[10px] leading-snug text-muted-foreground">Cor primária + secundária → recolore a Base inteira automaticamente.</p>
             </div>
           </div>
