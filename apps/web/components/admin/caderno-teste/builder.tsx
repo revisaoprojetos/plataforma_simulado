@@ -435,7 +435,8 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                   docOverride={ativo.docEdit} onPickBloco={(id) => { setPickerBloco(id); setPickerCapa(false) }} selBlocoId={pickerBloco} />
               ) : (
                 <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} selParte={pickerCor?.parte}
-                  onPick={(parte, label, cor) => setPickerCor({ parte, label, cor })} />
+                  onPick={(parte, label, cor) => setPickerCor({ parte, label, cor })}
+                  onPickCapa={() => { setPickerCapa(true); setPickerCor(null); setPickerBloco(null) }} selCapa={pickerCapa} />
               )}
             </div>
           ) : (
@@ -662,7 +663,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       })()}
 
       {/* Barra lateral direita — editar o TÍTULO DA CAPA (modelos prontos) */}
-      {pickerCapa && presetAtivo && a.capaUrl && (
+      {pickerCapa && a.capaUrl && (
         <>
           <div className="pointer-events-none fixed inset-0 z-40 bg-black/5" />
           <aside className="fixed inset-y-0 right-0 z-50 flex w-80 max-w-[85vw] flex-col border-l bg-background shadow-2xl duration-200 animate-in slide-in-from-right">

@@ -5,9 +5,9 @@
 // páginas separadas por espaço, cada uma com imagem de folha (fundo), cabeçalho e rodapé.
 
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { ItemCaderno, PreviewQuestao } from './tipos'
+import type { ItemCaderno, PreviewQuestao, CapaConfig } from './tipos'
 import { DIAG_PADRAO, slugDiag, topicosParaTexto, prefFonte, type DiagPilar } from './diagnostico'
-import { CORES_PILAR_PADRAO } from './tipos'
+import { CORES_PILAR_PADRAO, CAPA_PADRAO } from './tipos'
 import { formatarInline, formatarMarcadores } from './formato'
 import { cssDaFonte } from '@/lib/caderno-designer/theme'
 
@@ -330,13 +330,34 @@ export function outlineDoItem(item: ItemCaderno, questoes: PreviewQuestao[], var
 }
 
 /** Uma folha A4 (fundo + cabeçalho + conteúdo + rodapé) ou a capa (página inteira). */
-function Folha({ item, num, total, pad, Ht, Hf, capa, children }: { item: ItemCaderno; num: number; total: number; pad: number; Ht: number; Hf: number; capa?: boolean; children?: ReactNode }) {
+function Folha({ item, num, total, pad, Ht, Hf, ehCapa, capaCfg, onPickCapa, selCapa, children }: { item: ItemCaderno; num: number; total: number; pad: number; Ht: number; Hf: number; ehCapa?: boolean; capaCfg?: CapaConfig; onPickCapa?: () => void; selCapa?: boolean; children?: ReactNode }) {
   const a = item.ajustes
+  const cfg = capaCfg ?? CAPA_PADRAO
   return (
     <div style={{ width: A4_W, height: A4_H, position: 'relative', overflow: 'hidden', background: '#fff', color: '#1a202c', boxShadow: '0 2px 20px rgba(0,0,0,.16)', fontFamily: 'Inter, system-ui, sans-serif' }}>
       {a.folhaUrl && <img src={a.folhaUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
-      {capa ? (
-        a.capaUrl && <img src={a.capaUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 1 }} />
+      {ehCapa ? (
+        a.capaUrl && (
+          <>
+            <img src={a.capaUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 1 }} />
+            {/* Título automático sobre a capa (editável): mesma lógica dos modelos doc-backed. */}
+            <div
+              onClick={onPickCapa ? (e) => { e.stopPropagation(); onPickCapa() } : undefined}
+              title={onPickCapa ? 'Clique para editar o título da capa' : undefined}
+              style={{
+                position: 'absolute', left: `${cfg.posH}%`, top: `${cfg.posV}%`, transform: 'translate(-50%, -50%)',
+                width: 'max-content', maxWidth: '84%', zIndex: 2,
+                cursor: onPickCapa ? 'pointer' : 'default', color: cfg.cor, fontSize: cfg.tamanho,
+                fontFamily: cssDaFonte(cfg.fonte) || 'Inter, system-ui, sans-serif',
+                fontWeight: cfg.negrito ? 800 : 400, fontStyle: cfg.italico ? 'italic' : 'normal',
+                textDecoration: cfg.sublinhado ? 'underline' : 'none', textAlign: cfg.alinhamento,
+                lineHeight: 1.1, whiteSpace: 'pre-wrap', padding: '6px 10px',
+                ...(selCapa ? { outline: `2px solid ${cfg.cor}`, outlineOffset: 4 } : {}),
+              }}
+              dangerouslySetInnerHTML={{ __html: formatarInline(cfg.titulo) }}
+            />
+          </>
+        )
       ) : (
         <div style={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div style={{ height: Ht, flexShrink: 0, overflow: 'hidden' }}>
@@ -352,7 +373,7 @@ function Folha({ item, num, total, pad, Ht, Hf, capa, children }: { item: ItemCa
   )
 }
 
-export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selParte }: { item: ItemCaderno; questoes: PreviewQuestao[]; vars?: Record<string, string>; discBanco?: DiscBanco[]; onPick?: (parte: string, label: string, cor: string, anchor: DOMRect) => void; selParte?: string }) {
+export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selParte, onPickCapa, selCapa }: { item: ItemCaderno; questoes: PreviewQuestao[]; vars?: Record<string, string>; discBanco?: DiscBanco[]; onPick?: (parte: string, label: string, cor: string, anchor: DOMRect) => void; selParte?: string; onPickCapa?: () => void; selCapa?: boolean }) {
   const a = item.ajustes
   const qs = questoes.length ? questoes : QUESTOES_EXEMPLO
   const pad = a.compacto ? 40 : 56
@@ -411,7 +432,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
       <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: contentW }}>
         {blocos.map((b, i) => <div key={i} style={{ marginBottom: GAP }}>{b}</div>)}
       </div>
-      {temCapa && <Folha item={item} num={1} total={total} pad={pad} Ht={Ht} Hf={Hf} capa />}
+      {temCapa && <Folha item={item} num={1} total={total} pad={pad} Ht={Ht} Hf={Hf} ehCapa capaCfg={item.capa ?? CAPA_PADRAO} onPickCapa={onPickCapa} selCapa={selCapa} />}
       {pages.map((idxs, pi) => (
         <Folha key={pi} item={item} num={(temCapa ? 1 : 0) + pi + 1} total={total} pad={pad} Ht={Ht} Hf={Hf}>
           {idxs.map((i) => <div key={i} style={{ marginBottom: GAP }}>{blocos[i]}</div>)}
