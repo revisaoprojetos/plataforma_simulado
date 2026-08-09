@@ -291,7 +291,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                 <div className="absolute right-0 top-full z-50 mt-1 w-60 overflow-hidden rounded-lg border bg-background shadow-lg">
                   <a href={pdfUrl} target="_blank" rel="noreferrer" onClick={() => setBaixarAberto(false)} className="block px-3 py-2 text-sm hover:bg-muted">PDF (imprimir) — <span className="text-muted-foreground">fiel à prévia</span></a>
                   <a href={exportUrl('html')} download onClick={() => setBaixarAberto(false)} className="block border-t px-3 py-2 text-sm hover:bg-muted">HTML (.html)</a>
-                  <a href={exportUrl('word')} download onClick={() => setBaixarAberto(false)} className="block border-t px-3 py-2 text-sm hover:bg-muted">Word (.doc) — <span className="text-muted-foreground">simplificado</span></a>
+                  <a href={exportUrl('word')} download onClick={() => setBaixarAberto(false)} className="block border-t px-3 py-2 text-sm hover:bg-muted">Word (.doc)</a>
                 </div>
               </>
             )}
