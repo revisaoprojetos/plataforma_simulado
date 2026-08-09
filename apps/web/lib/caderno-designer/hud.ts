@@ -67,6 +67,7 @@ export function hudCssVars(c: HudCores, dark = false): Record<string, string> {
     '--prova-bg-blur': `${Math.max(0, Number(c.bgDesfoque ?? '0') || 0)}px`,
     '--prova-bg-size': c.bgAjuste === 'repeat' ? 'auto' : (c.bgAjuste || 'cover'),
     '--prova-bg-repeat': c.bgAjuste === 'repeat' ? 'repeat' : 'no-repeat',
+    '--prova-bg-position': c.bgPosicao || 'center',
   }
 
   // No escuro, aplica superfícies escuras INLINE (autossuficiente, sem depender de .dark no SSR).

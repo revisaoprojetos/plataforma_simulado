@@ -14,7 +14,7 @@ export function HudFundo() {
         style={{
           backgroundImage: 'var(--prova-bg-image, none)',
           backgroundSize: 'var(--prova-bg-size, cover)',
-          backgroundPosition: 'center',
+          backgroundPosition: 'var(--prova-bg-position, center)',
           backgroundRepeat: 'var(--prova-bg-repeat, no-repeat)',
           opacity: 'var(--prova-bg-opacity, 1)' as unknown as number,
           filter: 'blur(var(--prova-bg-blur, 0px))',

@@ -97,7 +97,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
   const ABAS: { key: Aba; label: string; icon: typeof Layers }[] = [{ key: 'base', label: 'Base (todas)', icon: Layers }, ...SCREENS.map((s) => ({ key: s.key as Aba, label: s.label, icon: s.icon }))]
 
   return (
-    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+    <div className="flex h-full flex-col overflow-hidden bg-card">
       {/* Cabeçalho + salvar */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent 55%)` }}>
         <div className="flex items-center gap-3">
@@ -117,7 +117,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
         </button>
       </div>
 
-      <div className="grid h-[calc(100vh-11rem)] min-h-[560px] grid-cols-[168px_minmax(0,1fr)_290px]">
+      <div className="grid min-h-0 flex-1 grid-cols-[168px_minmax(0,1fr)_290px]">
         {/* PÁGINAS */}
         <div className="flex flex-col overflow-auto border-r p-2">
           <p className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Páginas</p>
@@ -232,6 +232,9 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
           {/* input de arquivo compartilhado (carregamento + fundo) */}
           <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={(e) => enviarImagem(e.target.files?.[0] ?? null)} />
 
+          {/* Área rolável: edições de imagem + grupos de cores */}
+          <div className="flex-1 overflow-auto">
+
           {/* Imagem da tela de carregamento (só na página Carregamento) */}
           {aba === 'loading' && !busca && (
             <div className="border-b p-3">
@@ -295,6 +298,16 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
                     <option value="contain">Conter (mostra inteira)</option>
                     <option value="repeat">Repetir (padrão)</option>
                   </select>
+                  {/* Posição */}
+                  <label className="mt-2 block text-[11px] font-medium text-muted-foreground">Posição</label>
+                  <div className="mt-1 grid grid-cols-3 gap-1">
+                    {([['left top', '↖'], ['center top', '↑'], ['right top', '↗'], ['left center', '←'], ['center', '•'], ['right center', '→'], ['left bottom', '↙'], ['center bottom', '↓'], ['right bottom', '↘']] as const).map(([v, ic]) => (
+                      <button key={v} onClick={() => set('bgPosicao', v)} title={v}
+                        className={cn('flex h-7 items-center justify-center rounded-md border text-sm transition-colors', (valorDe('bgPosicao') || 'center') === v ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50')}>
+                        {ic}
+                      </button>
+                    ))}
+                  </div>
                 </>
               ) : (
                 <button onClick={() => abrirUpload('bgImagemUrl')} disabled={enviandoImg}
@@ -308,7 +321,6 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
           )}
 
           {/* Grupos de campos */}
-          <div className="flex-1 overflow-auto">
             {gruposVisiveis.map((g) => {
               const aberto = !colapsados[g.titulo]
               return (
