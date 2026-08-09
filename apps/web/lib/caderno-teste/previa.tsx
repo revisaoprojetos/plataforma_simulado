@@ -108,7 +108,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     if (!inter?.onPick) return { style }
     return {
       style: { ...style, cursor: 'pointer', ...(inter.selParte === parte ? { outline: `2px solid ${cor}`, outlineOffset: -1 } : {}) },
-      onClick: (e) => inter!.onPick!(parte, label, cor, (e.currentTarget as HTMLElement).getBoundingClientRect()),
+      onClick: (e) => { e.stopPropagation(); inter!.onPick!(parte, label, cor, (e.currentTarget as HTMLElement).getBoundingClientRect()) },
       title: 'Clique para mudar a cor deste bloco',
     }
   }
@@ -197,9 +197,9 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   const entradas: DiagEntrada[] = []
   const add = (key: string, node: ReactNode, label: string, tipo: TipoBloco, parte: string, removivel = true, apagar = parte) => entradas.push({ key, node, label, tipo, parte, removivel, apagar })
   if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); add('diag_cab', (
-    <div {...atr('diag_cab', 'Cabeçalho', cor, { background: cor, color: '#fff', padding: '12px 16px' })}>
-      <div style={{ fontSize: fs('diag_cab', 20), fontWeight: 800 }}>{V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>
-      {c.subtitulo && <div style={{ fontSize: fs('diag_cab', 11), opacity: 0.85, marginTop: 2 }}>{V(c.subtitulo)}</div>}
+    <div {...atr('diag_cab', 'Cabeçalho (fundo)', cor, { background: cor, color: '#fff', padding: '12px 16px' })}>
+      <div {...atr('diag_cab_titulo', 'Título do cabeçalho', cor, { fontSize: fs('diag_cab_titulo', 20), fontWeight: 800 })}>{V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>
+      {c.subtitulo && <div {...atr('diag_cab_sub', 'Subtítulo do cabeçalho', cor, { fontSize: fs('diag_cab_sub', 11), opacity: 0.85, marginTop: 2 })}>{V(c.subtitulo)}</div>}
     </div>
   ), 'Cabeçalho', 'cabecalho', 'diag_cab', true) }
   if (a.mostrarDadosAluno && !ocultasP.has('nome')) { const corN = corP('diag_nome_rot', prim), corV = corP('diag_nome_val', amar); add('diag_nome', (

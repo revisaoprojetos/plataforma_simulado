@@ -456,7 +456,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       {pickerCor && (() => {
         const campos = camposDoBloco(ativo, pickerCor.parte, pickerCor.label)
         const onCampo = (campo: (typeof campos)[number], v: string) => campo.alvo === 'titulo' ? setAjuste({ titulo: v }) : setConteudo(aplicarCampoBloco(ativo.conteudo, pickerCor.parte, campo.id, v))
-        const temCorTexto = ['diag_nota_num', 'diag_nota_faixa', 'diag_cab', 'diag_nome_rot', 'diag_nome_val'].includes(pickerCor.parte) || pickerCor.parte.startsWith('sec_')
+        const temCorTexto = ['diag_nota_num', 'diag_nota_faixa', 'diag_cab', 'diag_cab_titulo', 'diag_cab_sub', 'diag_nome_rot', 'diag_nome_val'].includes(pickerCor.parte) || pickerCor.parte.startsWith('sec_')
         return (
         <>
           <div className="pointer-events-none fixed inset-0 z-40 bg-black/5" />
