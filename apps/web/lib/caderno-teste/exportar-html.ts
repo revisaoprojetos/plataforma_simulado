@@ -109,7 +109,7 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
   if (c.gabaritoObs.length || c.gabaritoIntro.length) {
     h += sec(c.gabaritoTitulo || 'Gabarito oficial desatualizado')
     c.gabaritoIntro.forEach((p, i) => { const cor = corP(`gabIntro:${i}`, '#243b53'); h += `<p style="font-size:11px;margin:0 0 6px;line-height:1.4;text-align:${alignP(`gabIntro:${i}`, 'justify')};color:${cor}">${V(p)}</p>` })
-    c.gabaritoObs.forEach((o, i) => { const cor = corP(`gabObs:${i}`, '#a32d2d'); h += `<div style="background:#f5f3ff;border-top:2px solid ${cor};padding:8px 12px;margin-bottom:5px"><div style="font-size:10px;color:#5a5570">${V(o)}</div></div>` })
+    if (c.gabaritoObs.length) { const cor = corP('gab_obs', '#a32d2d'); h += `<div style="background:#f5f3ff;border-top:2px solid ${cor};padding:8px 12px">${c.gabaritoObs.map((o) => `<div style="font-size:10px;color:#5a5570">${V(o)}</div>`).join('')}</div>` }
   }
   return h
 }

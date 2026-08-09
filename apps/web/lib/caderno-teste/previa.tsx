@@ -302,7 +302,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   if ((c.gabaritoObs.length || c.gabaritoIntro.length) && !ocultasP.has('gabarito')) {
     add('sec_gabarito', <Sec parte="sec_gabarito" t={c.gabaritoTitulo || 'Gabarito oficial desatualizado'} />, `Seção: ${c.gabaritoTitulo || 'Gabarito'}`, 'secao', 'sec_gabarito', true)
     c.gabaritoIntro.forEach((p, i) => { const cor = corP(`gabIntro:${i}`, '#243b53'); add(`gab:${i}`, <p key={`gabi${i}`} {...atr(`gabIntro:${i}`, `Gabarito — parágrafo ${i + 1}`, cor, { fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify', color: cor })}>{V(p)}</p>, `Gabarito — parágrafo ${i + 1}`, 'texto', `gabIntro:${i}`, true, `gabIntro:${i}`) })
-    c.gabaritoObs.forEach((o, i) => { const cor = corP(`gabObs:${i}`, '#a32d2d'); add(`gabObs:${i}`, <div key={`gabo${i}`} {...atr(`gabObs:${i}`, `Observação ${i + 1}`, cor, { background: '#f5f3ff', borderTop: `2px solid ${cor}`, padding: '8px 12px', marginBottom: 5 })}><div style={{ fontSize: 9, color: '#5a5570' }}>{V(o)}</div></div>, `Observação ${i + 1}`, 'card', `gabObs:${i}`, true, `gabObs:${i}`) })
+    if (c.gabaritoObs.length) { const cor = corP('gab_obs', '#a32d2d'); add('gab_obs', <div {...atr('gab_obs', 'Gabarito — observações', cor, { background: '#f5f3ff', borderTop: `2px solid ${cor}`, padding: '8px 12px' })}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: 9, color: '#5a5570' }}>{V(o)}</div>)}</div>, 'Gabarito — observações', 'card', 'gab_obs', true, 'gab_obs') }
   }
   // Aplica a ordem salva (c.ordem): chaves listadas primeiro (na ordem), o resto mantém a ordem natural.
   const ordemSalva = c.ordem ?? []
