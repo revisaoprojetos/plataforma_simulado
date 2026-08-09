@@ -393,8 +393,6 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           </label>
           <div className="col-span-1 rounded-md border bg-background px-2 py-1.5"><div className="mb-1 text-[11px] text-muted-foreground">Cor primária</div><HexColorField value={a.corPrimaria} onChange={(v) => setAjuste({ corPrimaria: v })} /></div>
           <div className="col-span-1 rounded-md border bg-background px-2 py-1.5"><div className="mb-1 text-[11px] text-muted-foreground">Cor secundária</div><HexColorField value={a.corSecundaria} onChange={(v) => setAjuste({ corSecundaria: v })} /></div>
-          <div className="col-span-1"><Tog campo="mostrarCabecalho" label="Cabeçalho" /></div>
-          <div className="col-span-1"><Tog campo="mostrarDadosAluno" label="Dados aluno" /></div>
           {ativo.modalidade === 'caderno_questoes' && <>
             <div className="col-span-1"><Tog campo="mostrarGabarito" label="Gabarito" /></div>
             <div className="col-span-1"><Tog campo="mostrarComentarios" label="Comentários" /></div>
@@ -405,11 +403,12 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           {ativo.modalidade === 'folha_respostas' && (
             <div className="col-span-1"><Segment label="Colunas" valor={a.colunas} opcoes={[2, 3, 4, 5]} onChange={(n) => setAjuste({ colunas: n })} /></div>
           )}
-          <div className="col-span-1"><Tog campo="compacto" label="Compacto" /></div>
-          <div className="col-span-2"><CampoImagem label="Capa (página inteira)" valor={a.capaUrl} onChange={(url) => setAjuste({ capaUrl: url })} /></div>
-          <div className="col-span-2"><CampoImagem label="Folha (fundo de cada página)" valor={a.folhaUrl} onChange={(url) => setAjuste({ folhaUrl: url })} /></div>
-          <div className="col-span-2"><CampoImagem label="Cabeçalho (faixa no topo)" valor={a.cabecalhoUrl} onChange={(url) => setAjuste({ cabecalhoUrl: url })} /></div>
-          <div className="col-span-2"><CampoImagem label="Rodapé (faixa na base)" valor={a.rodapeUrl} onChange={(url) => setAjuste({ rodapeUrl: url })} /></div>
+          {/* Imagens do caderno (opcionais) — agrupadas 2×2 */}
+          <div className="col-span-2 mt-1"><p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><FileUp className="h-3.5 w-3.5" /> Imagens (opcionais)</p></div>
+          <div className="col-span-1"><CampoImagem label="Capa (página inteira)" valor={a.capaUrl} onChange={(url) => setAjuste({ capaUrl: url })} /></div>
+          <div className="col-span-1"><CampoImagem label="Folha (fundo da página)" valor={a.folhaUrl} onChange={(url) => setAjuste({ folhaUrl: url })} /></div>
+          <div className="col-span-1"><CampoImagem label="Cabeçalho (faixa no topo)" valor={a.cabecalhoUrl} onChange={(url) => setAjuste({ cabecalhoUrl: url })} /></div>
+          <div className="col-span-1"><CampoImagem label="Rodapé (faixa na base)" valor={a.rodapeUrl} onChange={(url) => setAjuste({ rodapeUrl: url })} /></div>
           {ativo.modalidade === 'diagnostico' && (
             <div className="col-span-2 rounded-md border border-dashed px-2.5 py-2 text-[11px] leading-snug text-muted-foreground">
               💡 Cor das disciplinas por pilar: <strong>clique no card de uma disciplina na prévia</strong> (à direita) e escolha a cor ao lado.
@@ -917,17 +916,15 @@ function CampoImagem({ label, valor, onChange }: { label: string; valor: string;
     } catch { toast.error('Erro ao ler a imagem.') } finally { setEnviando(false) }
   }
   return (
-    <div className="rounded-md border bg-background px-2 py-1.5">
-      <div className="mb-1 text-[11px] text-muted-foreground">{label}</div>
+    <div className="rounded-md border bg-background p-1.5">
+      <div className="mb-1 truncate text-[11px] text-muted-foreground" title={label}>{label}</div>
       <input ref={ref} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) enviar(f); e.target.value = '' }} />
-      <div className="flex items-center gap-2">
-        <div className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded border bg-muted/40 text-muted-foreground">
-          {valor ? <img src={valor} alt="" className="h-full w-full object-cover" /> : <FileText className="h-4 w-4" />}
-        </div>
-        <div className="flex flex-1 gap-1.5">
-          <Button variant="outline" size="sm" className="h-7 flex-1 text-xs" onClick={() => ref.current?.click()} disabled={enviando}>{enviando ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <FileUp className="mr-1 h-3.5 w-3.5" />}{valor ? 'Trocar' : 'Enviar'}</Button>
-          {valor && <Button variant="outline" size="sm" className="h-7 text-xs text-destructive" onClick={() => onChange('')} disabled={enviando}><X className="h-3.5 w-3.5" /></Button>}
-        </div>
+      <button type="button" onClick={() => ref.current?.click()} disabled={enviando} title={valor ? 'Trocar imagem' : 'Enviar imagem'} className="flex h-16 w-full items-center justify-center overflow-hidden rounded border bg-muted/40 text-muted-foreground transition-colors hover:border-primary/50">
+        {valor ? <img src={valor} alt="" className="h-full w-full object-cover" /> : (enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />)}
+      </button>
+      <div className="mt-1 flex gap-1">
+        <Button variant="outline" size="sm" className="h-6 flex-1 px-1 text-[11px]" onClick={() => ref.current?.click()} disabled={enviando}>{enviando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (valor ? 'Trocar' : 'Enviar')}</Button>
+        {valor && <Button variant="outline" size="sm" className="h-6 px-1.5 text-[11px] text-destructive" onClick={() => onChange('')} disabled={enviando}><X className="h-3.5 w-3.5" /></Button>}
       </div>
     </div>
   )
