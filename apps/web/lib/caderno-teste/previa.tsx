@@ -358,7 +358,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
   const pad = a.compacto ? 40 : 56
   const GAP = a.compacto ? 8 : 12 // espaço entre blocos (contado na paginação, fielmente)
   const Ht = a.cabecalhoUrl ? 96 : pad + 16 // um pouco mais de respiro no topo
-  const Hf = a.rodapeUrl ? 84 : 34
+  const Hf = a.rodapeUrl ? 84 : 16 // sem imagem de rodapé, margem inferior enxuta (não sobra faixa branca)
   const contentW = A4_W - 2 * pad
   const availH = A4_H - Ht - Hf - 16
 
