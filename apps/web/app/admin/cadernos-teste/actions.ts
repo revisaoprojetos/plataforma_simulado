@@ -11,6 +11,23 @@ import type { BuilderV3, PreviewQuestao } from '@/lib/caderno-teste/tipos'
 
 export type RegistroTeste = { id: string; nome: string; vars: Record<string, string> }
 export type DiscBancoTeste = { nome: string; chave: string; pilar?: string }
+export type QuestaoMeta = { numero: number; disciplinaChave: string; disciplinaNome: string; assunto: string }
+
+/** Metadados leves (sem alternativas) de todas as questões do banco, na ordem do caderno: número +
+ * disciplina + assunto. Usado no editor do card de disciplina p/ listar as questões daquela disciplina. */
+export async function questoesMetaBanco(bancoId: string): Promise<{ ok: boolean; questoes: QuestaoMeta[] }> {
+  const access = await getCurrentAccess()
+  if (!access.tenantId || !bancoId) return { ok: true, questoes: [] }
+  const svc = createAdminClient()
+  const vinc = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', access.tenantId!).order('questao_id', { ascending: true }))
+  const ids = vinc.map((v) => v.questao_id)
+  if (!ids.length) return { ok: true, questoes: [] }
+  const qs = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_questoes').select('id, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)').in('id', chunk).eq('tenant_id', access.tenantId!))
+  const meta = new Map<string, { nome: string; assunto: string }>()
+  for (const q of qs) meta.set((q as any).id, { nome: (((q as any).disciplinas?.nome ?? '') as string).trim(), assunto: (((q as any).assuntos?.nome ?? '') as string).trim() })
+  const questoes: QuestaoMeta[] = ids.map((id, i) => { const m = meta.get(id); const nome = m?.nome ?? ''; return { numero: i + 1, disciplinaChave: nome ? slugDiag(nome) : '', disciplinaNome: nome, assunto: m?.assunto ?? '' } })
+  return { ok: true, questoes }
+}
 
 /** Pilar canônico (slug) a partir da categoria/pilares da questão + nome da disciplina (igual merge.ts). */
 function pilarSlugDe(cats: unknown[], disc: string): string {

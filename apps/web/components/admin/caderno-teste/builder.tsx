@@ -16,7 +16,7 @@ import { camposDoBloco, aplicarCampoBloco, podeRemoverParte, removerParteDiag, t
 import { acharBloco, atualizarBlocoAttrs, removerBloco, camposDoBlocoDoc, NOME_BLOCO, type CampoBlocoDoc } from '@/lib/caderno-teste/edicao-doc'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
 import { totalTxtDe, DIAG_PADRAO, type DiagConteudo } from '@/lib/caderno-teste/diagnostico'
-import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
+import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, questoesMetaBanco, type RegistroTeste, type DiscBancoTeste, type QuestaoMeta } from '@/app/admin/cadernos-teste/actions'
 import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
 import { FONTES_CADERNO } from '@/lib/caderno-designer/theme'
 import { Users, ChevronRight, Download } from 'lucide-react'
@@ -73,6 +73,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const [questoes, setQuestoes] = useState<PreviewQuestao[]>(questoesIniciais)
   const [registros, setRegistros] = useState<RegistroTeste[]>(registrosIniciais)
   const [disciplinasBanco, setDisciplinasBanco] = useState<DiscBancoTeste[]>(disciplinasIniciais)
+  const [questoesMeta, setQuestoesMeta] = useState<QuestaoMeta[]>([])
   const [alunoIdx, setAlunoIdx] = useState(0)
   const [carregandoQ, setCarregandoQ] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(abrirPickerInicial)
@@ -103,6 +104,15 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }) // sem deps: undo/redo leem refs atuais
+
+  // Metadados (número/disciplina/assunto) das questões do banco — p/ listar no editor do card de disciplina.
+  useEffect(() => {
+    let vivo = true
+    const id = builder.bancoId
+    if (!id) { setQuestoesMeta([]); return }
+    questoesMetaBanco(id).then((r) => { if (vivo && r.ok) setQuestoesMeta(r.questoes) }).catch(() => {})
+    return () => { vivo = false }
+  }, [builder.bancoId])
 
   const ativo = itemAtivo(builder)
   const presetAtivo = presetDoItem(ativo) // modelo pronto (render por blocos do v1)
@@ -604,6 +614,26 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                         <p className="mt-1 text-[10px] leading-snug text-muted-foreground">Escolhe de qual disciplina vêm os assuntos e as estatísticas deste card.</p>
                       </div>
                     )}
+                    {(() => {
+                      const src = cf.discFonte?.[chave] ?? chave
+                      const qs = questoesMeta.filter((q) => q.disciplinaChave === src)
+                      return (
+                        <div>
+                          <div className="mb-1 text-[11px] text-muted-foreground">Questões desta disciplina (na ordem do caderno)</div>
+                          {qs.length ? (
+                            <div className="scroll-claro max-h-60 space-y-0.5 overflow-y-auto rounded-md border bg-muted/20 p-1.5">
+                              {qs.map((q) => (
+                                <div key={q.numero} className="flex items-start gap-1.5 text-[11px] leading-snug">
+                                  <span className="mt-px shrink-0 rounded bg-primary/10 px-1 font-semibold text-primary">{q.numero}</span>
+                                  <span className="min-w-0 flex-1 text-muted-foreground">{q.assunto || <span className="italic opacity-70">sem assunto</span>}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : <p className="rounded-md border border-dashed px-2 py-2 text-[11px] text-muted-foreground">Nenhuma questão desta disciplina no banco (ou os metadados ainda estão carregando).</p>}
+                          <p className="mt-1 text-[10px] leading-snug text-muted-foreground">Só para referência — mostra o número da questão e o assunto de cada uma desta disciplina.</p>
+                        </div>
+                      )
+                    })()}
                   </div>
                 )
               })()}
