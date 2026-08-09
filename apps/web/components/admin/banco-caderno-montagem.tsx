@@ -37,7 +37,7 @@ export function BancoCadernoMontagem({ bancoId, cor, entregaInicial, grupos }: {
       <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
         {SLOTS.map((s) => (
           <SlotCard key={s.chave} slot={s} cor={cor} bancoId={bancoId}
-            grupos={grupos.filter((g) => g.modalidade === s.modalidade)}
+            grupos={grupos}
             valor={entrega[s.chave] ?? null}
             onGrupo={(g) => setSlot(s.chave, g ? { cadernoId: g.cadernoId, itemId: g.itemId } : null)}
             onPdf={(pdf) => setSlot(s.chave, pdf)} />
