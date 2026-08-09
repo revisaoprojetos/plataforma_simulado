@@ -431,11 +431,11 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             <div className="mx-auto" style={{ zoom } as any}>
               {presetAtivo ? (
                 <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} folhaUrl={a.folhaUrl}
-                  capa={ativo.capa} onPickCapa={() => { setPickerCapa(true); setPickerBloco(null) }} selCapa={pickerCapa}
-                  docOverride={ativo.docEdit} onPickBloco={(id) => { setPickerBloco(id); setPickerCapa(false) }} selBlocoId={pickerBloco} />
+                  capa={ativo.capa} onPickCapa={() => { setPickerCapa(true); setPickerCor(null); setPickerBloco(null) }} selCapa={pickerCapa}
+                  docOverride={ativo.docEdit} onPickBloco={(id) => { setPickerBloco(id); setPickerCapa(false); setPickerCor(null) }} selBlocoId={pickerBloco} />
               ) : (
                 <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} selParte={pickerCor?.parte}
-                  onPick={(parte, label, cor) => setPickerCor({ parte, label, cor })}
+                  onPick={(parte, label, cor) => { setPickerCapa(false); setPickerBloco(null); setPickerCor({ parte, label, cor }) }}
                   onPickCapa={() => { setPickerCapa(true); setPickerCor(null); setPickerBloco(null) }} selCapa={pickerCapa} />
               )}
             </div>
