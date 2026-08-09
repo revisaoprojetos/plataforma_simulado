@@ -132,19 +132,19 @@ export function ProvaHud(p: ProvaHudProps) {
           <div className="flex flex-col gap-6">
             <Card className="relative overflow-hidden">
               {/* fita "encaixa" após o número: número no canto + fita seguindo até o fim */}
-              <div className="absolute inset-x-0 top-0 z-10 flex items-start">
-                <span className="rounded-br-lg border-b border-r bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">{p.questaoIndex + 1} / {p.totalQuestoes}</span>
-                <div className="h-1.5 flex-1" style={{ background: FITA_GRADIENT }} />
+              <div className="absolute inset-x-0 top-0 z-10 flex items-center">
+                <span className="self-start rounded-br-lg border-b border-r bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">{p.questaoIndex + 1} / {p.totalQuestoes}</span>
+                {q.disciplina && (
+                  <span
+                    title={q.disciplina}
+                    className="ml-2 inline-flex max-w-[45%] items-center truncate rounded-full border px-3 py-0.5 text-xs font-medium"
+                    style={{ background: 'color-mix(in srgb, var(--primary) 12%, var(--card))', color: 'var(--primary)', borderColor: 'color-mix(in srgb, var(--primary) 30%, var(--border))' }}
+                  >
+                    {q.disciplina}
+                  </span>
+                )}
+                <div className="ml-2 h-1.5 flex-1 self-start" style={{ background: FITA_GRADIENT }} />
               </div>
-              {q.disciplina && (
-                <span
-                  title={q.disciplina}
-                  className="absolute right-3 top-2.5 z-20 inline-flex max-w-[45%] items-center truncate rounded-full border px-3 py-0.5 text-xs font-medium"
-                  style={{ background: 'color-mix(in srgb, var(--primary) 12%, var(--card))', color: 'var(--primary)', borderColor: 'color-mix(in srgb, var(--primary) 30%, var(--border))' }}
-                >
-                  {q.disciplina}
-                </span>
-              )}
               <CardContent className="pt-10">
                 <MarkdownContent className="leading-relaxed">{q.enunciado}</MarkdownContent>
                 {q.imagem_url && (
