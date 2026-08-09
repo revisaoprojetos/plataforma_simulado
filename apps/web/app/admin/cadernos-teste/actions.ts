@@ -200,13 +200,17 @@ export type MontagemGrupo = { cadernoId: string; cadernoNome: string; itemId: st
 export type EntregaRef = { cadernoId?: string; itemId?: string; pdfUrl?: string; pdfNome?: string } | null
 export type EntregaSlots = { diagnostico?: EntregaRef; folha?: EntregaRef; enunciado?: EntregaRef; gabarito?: EntregaRef }
 
-/** Carrega a montagem salva do banco + todos os grupos disponíveis (de todos os cadernos-teste do banco). */
-export async function carregarMontagem(bancoId: string): Promise<{ entrega: EntregaSlots; grupos: MontagemGrupo[] }> {
+export type MontagemPdf = { url: string; nome: string; origem: string }
+
+/** Carrega a montagem salva do banco + grupos + PDFs já enviados nos cadernos do banco. */
+export async function carregarMontagem(bancoId: string): Promise<{ entrega: EntregaSlots; grupos: MontagemGrupo[]; pdfs: MontagemPdf[] }> {
   const access = await getCurrentAccess()
-  if (!access.tenantId || !bancoId) return { entrega: {}, grupos: [] }
+  if (!access.tenantId || !bancoId) return { entrega: {}, grupos: [], pdfs: [] }
   const svc = createAdminClient()
   const r = await svc.from(TABELA).select('id, nome, config').eq('tenant_id', access.tenantId).eq('deletado', false)
   const grupos: MontagemGrupo[] = []
+  const pdfs: MontagemPdf[] = []
+  const vistoUrl = new Set<string>()
   for (const c of ((r.data ?? []) as any[])) {
     const cfg = (c.config ?? {}) as any
     if ((cfg?.builderV3?.bancoId ?? cfg?.bancoId ?? null) !== bancoId) continue
@@ -216,13 +220,16 @@ export async function carregarMontagem(bancoId: string): Promise<{ entrega: Entr
       if (!it?.id) continue
       grupos.push({ cadernoId: c.id, cadernoNome: c.nome ?? 'Caderno', itemId: String(it.id), modalidade: String(it.modalidade ?? ''), modelo: String(it.modelo ?? ''), label: `${meta.nome}${modeloNome ? ` · ${modeloNome}` : ''}` })
     }
+    // PDFs já enviados neste caderno (Gabarito e Enunciado)
+    const mg = materialDoConfig(cfg); if (mg.pdfUrl && !vistoUrl.has(mg.pdfUrl)) { vistoUrl.add(mg.pdfUrl); pdfs.push({ url: mg.pdfUrl, nome: mg.pdfNome || 'Gabarito', origem: `${c.nome ?? 'Caderno'} · Gabarito` }) }
+    const me = materialEnunciadoDoConfig(cfg); if (me.pdfUrl && !vistoUrl.has(me.pdfUrl)) { vistoUrl.add(me.pdfUrl); pdfs.push({ url: me.pdfUrl, nome: me.pdfNome || 'Enunciado', origem: `${c.nome ?? 'Caderno'} · Enunciado` }) }
   }
   let entrega: EntregaSlots = {}
   try {
     const p = await svc.from('simulado_pastas').select('caderno_entrega').eq('id', bancoId).eq('tenant_id', access.tenantId).maybeSingle()
     entrega = ((p.data as any)?.caderno_entrega ?? {}) as EntregaSlots
   } catch { /* coluna pode não existir ainda */ }
-  return { entrega: entrega ?? {}, grupos }
+  return { entrega: entrega ?? {}, grupos, pdfs }
 }
 
 /** Salva a montagem (slots) do banco em simulado_pastas.caderno_entrega. */

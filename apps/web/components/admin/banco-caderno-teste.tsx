@@ -25,7 +25,7 @@ export async function BancoCadernoTeste({ bancoId, cor = '#6d28d9' }: { bancoId:
               Nenhuma peça criada ainda. Crie um caderno no construtor abaixo para poder selecionar aqui.
             </div>
           ) : (
-            <BancoCadernoMontagem bancoId={bancoId} cor={cor} entregaInicial={montagem.entrega} grupos={montagem.grupos} />
+            <BancoCadernoMontagem bancoId={bancoId} cor={cor} entregaInicial={montagem.entrega} grupos={montagem.grupos} pdfs={montagem.pdfs} />
           )}
         </div>
       </div>

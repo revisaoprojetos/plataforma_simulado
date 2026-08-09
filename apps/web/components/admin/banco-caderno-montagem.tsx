@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { BarChart3, ClipboardList, FileText, BookOpenCheck, ExternalLink, Loader2, ImageUp, Trash2 } from 'lucide-react'
 import { PdfPreview } from '@/components/admin/pdf-preview'
-import { salvarMontagem, type EntregaSlots, type EntregaRef, type MontagemGrupo } from '@/app/admin/cadernos-teste/actions'
+import { salvarMontagem, type EntregaSlots, type EntregaRef, type MontagemGrupo, type MontagemPdf } from '@/app/admin/cadernos-teste/actions'
 
 type SlotKey = 'diagnostico' | 'folha' | 'enunciado' | 'gabarito'
 const SLOTS: { chave: SlotKey; titulo: string; icon: typeof FileText; modalidade: string; pdf: boolean }[] = [
@@ -14,8 +14,8 @@ const SLOTS: { chave: SlotKey; titulo: string; icon: typeof FileText; modalidade
   { chave: 'gabarito', titulo: 'Gabarito Comentado', icon: BookOpenCheck, modalidade: 'caderno_questoes', pdf: true },
 ]
 
-export function BancoCadernoMontagem({ bancoId, cor, entregaInicial, grupos }: {
-  bancoId: string; cor: string; entregaInicial: EntregaSlots; grupos: MontagemGrupo[]
+export function BancoCadernoMontagem({ bancoId, cor, entregaInicial, grupos, pdfs = [] }: {
+  bancoId: string; cor: string; entregaInicial: EntregaSlots; grupos: MontagemGrupo[]; pdfs?: MontagemPdf[]
 }) {
   const [entrega, setEntrega] = useState<EntregaSlots>(entregaInicial ?? {})
   const [salvando, setSalvando] = useState(false)
@@ -37,7 +37,7 @@ export function BancoCadernoMontagem({ bancoId, cor, entregaInicial, grupos }: {
       <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
         {SLOTS.map((s) => (
           <SlotCard key={s.chave} slot={s} cor={cor} bancoId={bancoId}
-            grupos={grupos}
+            grupos={grupos} pdfs={pdfs}
             valor={entrega[s.chave] ?? null}
             onGrupo={(g) => setSlot(s.chave, g ? { cadernoId: g.cadernoId, itemId: g.itemId } : null)}
             onPdf={(pdf) => setSlot(s.chave, pdf)} />
@@ -47,14 +47,16 @@ export function BancoCadernoMontagem({ bancoId, cor, entregaInicial, grupos }: {
   )
 }
 
-function SlotCard({ slot, cor, bancoId, grupos, valor, onGrupo, onPdf }: {
+function SlotCard({ slot, cor, bancoId, grupos, pdfs, valor, onGrupo, onPdf }: {
   slot: { chave: SlotKey; titulo: string; icon: typeof FileText; modalidade: string; pdf: boolean }
-  cor: string; bancoId: string; grupos: MontagemGrupo[]; valor: EntregaRef
+  cor: string; bancoId: string; grupos: MontagemGrupo[]; pdfs: MontagemPdf[]; valor: EntregaRef
   onGrupo: (g: MontagemGrupo | null) => void; onPdf: (pdf: EntregaRef) => void
 }) {
   const Icon = slot.icon
   const ehPdf = !!valor?.pdfUrl
-  const sel = valor?.itemId ? `${valor.cadernoId}::${valor.itemId}` : ehPdf ? 'pdf' : ''
+  // PDF atual é um dos já enviados (aparece na lista) ou um upload avulso deste slot?
+  const pdfNaLista = ehPdf && pdfs.some((p) => p.url === valor?.pdfUrl)
+  const sel = valor?.itemId ? `${valor.cadernoId}::${valor.itemId}` : pdfNaLista ? `pdfurl::${valor?.pdfUrl}` : ehPdf ? 'pdf' : ''
   const fileRef = useRef<HTMLInputElement>(null)
   const [enviando, setEnviando] = useState(false)
   // Escala da prévia: mostra a página A4 inteira ajustada à largura do slot (zoom out).
@@ -71,7 +73,8 @@ function SlotCard({ slot, cor, bancoId, grupos, valor, onGrupo, onPdf }: {
 
   const onSelect = (v: string) => {
     if (v === '') return onGrupo(null)
-    if (v === 'pdf') return onPdf({ pdfUrl: valor?.pdfUrl ?? '', pdfNome: valor?.pdfNome ?? '' })
+    if (v === 'pdf') return onPdf({ pdfUrl: pdfNaLista ? '' : (valor?.pdfUrl ?? ''), pdfNome: pdfNaLista ? '' : (valor?.pdfNome ?? '') })
+    if (v.startsWith('pdfurl::')) { const url = v.slice('pdfurl::'.length); const p = pdfs.find((x) => x.url === url); return onPdf({ pdfUrl: url, pdfNome: p?.nome ?? '' }) }
     const [cadernoId, itemId] = v.split('::')
     const g = grupos.find((x) => x.cadernoId === cadernoId && x.itemId === itemId) ?? null
     onGrupo(g)
@@ -103,8 +106,15 @@ function SlotCard({ slot, cor, bancoId, grupos, valor, onGrupo, onPdf }: {
       <div className="space-y-2 p-2.5">
         <select value={sel} onChange={(e) => onSelect(e.target.value)} className="w-full rounded-lg border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary">
           <option value="">— Nenhum —</option>
-          {grupos.map((g) => <option key={`${g.cadernoId}::${g.itemId}`} value={`${g.cadernoId}::${g.itemId}`}>{g.cadernoNome} · {g.label}</option>)}
-          {slot.pdf && <option value="pdf">PDF enviado</option>}
+          <optgroup label="Cadernos do construtor">
+            {grupos.map((g) => <option key={`${g.cadernoId}::${g.itemId}`} value={`${g.cadernoId}::${g.itemId}`}>{g.cadernoNome} · {g.label}</option>)}
+          </optgroup>
+          {slot.pdf && (
+            <optgroup label="PDFs">
+              {pdfs.map((p) => <option key={p.url} value={`pdfurl::${p.url}`}>{p.origem}</option>)}
+              <option value="pdf">Enviar novo PDF…</option>
+            </optgroup>
+          )}
         </select>
 
         {/* Prévia da seleção */}
