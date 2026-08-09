@@ -27,7 +27,7 @@ function BarraPorcentagem({ cor, duracaoMs = 4000, loop, onCompleto }: { cor: st
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
         <div className="h-full rounded-full transition-[width] duration-100 ease-linear" style={{ width: `${pct}%`, background: cor }} />
       </div>
-      <span className="w-10 shrink-0 text-right text-sm font-semibold tabular-nums" style={{ color: cor }}>{pct}%</span>
+      <span data-campo="loadingPct" className="w-10 shrink-0 text-right text-sm font-semibold tabular-nums" style={{ color: 'var(--prova-loading-pct, var(--prova-loading))' }}>{pct}%</span>
     </div>
   )
 }

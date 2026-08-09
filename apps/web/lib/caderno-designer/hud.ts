@@ -38,6 +38,7 @@ export function hudCssVars(c: HudCores, dark = false): Record<string, string> {
     '--prova-media': c.media,
     '--prova-loading': c.loadingCor,
     '--prova-loading-texto': c.loadingTexto || mutedFg,
+    '--prova-loading-pct': c.loadingPct || c.loadingCor,
     '--prova-titulo': c.tituloTexto,
     '--prova-login-destaque': c.loginDestaque,
     '--prova-login-botao': c.loginBotao,

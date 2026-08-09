@@ -30,6 +30,7 @@ export const GRUPOS: HudGrupo[] = [
     { k: 'loadingTipo', label: 'Estilo da animação', desc: 'Formato do indicador de carregamento', select: ESTILOS_PROVA_LOADING.map((e) => ({ v: e.id, label: e.nome })) },
     { k: 'loadingCor', label: 'Cor do carregamento', desc: 'Barra/indicador de loading' },
     { k: 'loadingTexto', label: 'Cor do texto', desc: 'Texto "Carregando…"' },
+    { k: 'loadingPct', label: 'Cor da porcentagem', desc: 'Número "%" (estilo Logo + Porcentagem)' },
   ] },
   { titulo: 'Página de login', pages: ['login'], campos: [
     { k: 'card', label: 'Fundo dos cards', desc: 'Cards de informações e identificação' },
