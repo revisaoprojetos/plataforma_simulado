@@ -28,11 +28,15 @@ export async function POST(req: NextRequest) {
 
   let html = ''
   let ehPdf = false
+  const avisosFonte: string[] = []
   try {
     if (nome.endsWith('.docx') || (buf[0] === 0x50 && buf[1] === 0x4b && !nome.endsWith('.pdf'))) {
       const mammoth = (await import('mammoth')).default ?? (await import('mammoth'))
-      const res = await (mammoth as any).convertToHtml({ buffer: buf }, { styleMap: ['u => u', 'strike => s'] })
+      // styleMap preserva sublinhado/tachado; negrito/itálico/headings já são convertidos por padrão.
+      const res = await (mammoth as any).convertToHtml({ buffer: buf }, { styleMap: ['u => u', 'strike => s', "p[style-name='Heading 1'] => h1", "p[style-name='Heading 2'] => h2", "p[style-name='Heading 3'] => h3", "p[style-name='Título 1'] => h1", "p[style-name='Título 2'] => h2"] })
       html = res.value
+      const erros = ((res.messages ?? []) as any[]).filter((m) => m?.type === 'error').map((m) => String(m.message))
+      if (erros.length) avisosFonte.push(`Word: ${erros.slice(0, 3).join('; ')}`)
     } else if (nome.endsWith('.pdf') || buf.subarray(0, 4).toString('latin1') === '%PDF') {
       ehPdf = true
       html = await pdfParaHtml(buf)
@@ -46,6 +50,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { conteudo, avisos } = htmlParaDiagnostico(html)
+  avisos.unshift(...avisosFonte)
   if (ehPdf) avisos.unshift('Importado de PDF (aproximado) — os pilares em colunas podem embaralhar. Para fidelidade, use Word/HTML.')
   return NextResponse.json({ ok: true, modalidade: 'diagnostico', conteudo, avisos })
 }
