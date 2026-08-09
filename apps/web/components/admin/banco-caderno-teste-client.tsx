@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { BarChart3, Pencil, Clock, Layers, ExternalLink, Loader2, FileText, ClipboardList } from 'lucide-react'
+import { BarChart3, Pencil, Clock, Layers, ExternalLink, Loader2, FileText, ClipboardList, Trash2 } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { MaterialPdfCard } from '@/components/admin/banco-caderno-client'
 import { removerMaterialPdf } from '@/app/admin/banco-questoes/estudantes-actions'
-import type { CadernoTesteResumo, CadernoTesteGrupo } from '@/app/admin/cadernos-teste/actions'
+import { apagarCadernoTeste, type CadernoTesteResumo, type CadernoTesteGrupo } from '@/app/admin/cadernos-teste/actions'
 
 /** Lista os cadernos de teste do banco; cada um com a prévia dos grupos + "Abrir editor" + os 2 PDFs. */
 export function BancoCadernoTesteClient({ bancoId, cor, cadernos }: { bancoId: string; cor: string; cadernos: CadernoTesteResumo[] }) {
@@ -30,6 +30,19 @@ function CadernoTesteItem({ bancoId, cor, caderno }: { bancoId: string; cor: str
   const [enBusy, setEnBusy] = useState(false)
   const fileMat = useRef<HTMLInputElement>(null)
   const fileEn = useRef<HTMLInputElement>(null)
+  const [apagando, setApagando] = useState(false)
+
+  async function apagar() {
+    const ok = await confirmar({ titulo: 'Apagar caderno de teste', mensagem: `Isto remove "${caderno.nome}" definitivamente. Esta ação não pode ser desfeita.`, confirmar: 'Apagar', destrutivo: true })
+    if (!ok) return
+    setApagando(true)
+    try {
+      const r = await apagarCadernoTeste(caderno.id, bancoId)
+      if (!r.ok) { toast.error(r.error ?? 'Falha ao apagar.'); return }
+      toast.success('Caderno de teste apagado')
+      router.refresh()
+    } finally { setApagando(false) }
+  }
 
   async function enviar(file: File, slot: 'material' | 'enunciado') {
     if (slot === 'enunciado' ? enBusy : matBusy) return
@@ -80,6 +93,10 @@ function CadernoTesteItem({ bancoId, cor, caderno }: { bancoId: string; cor: str
         <Link href={`/admin/cadernos-teste/${caderno.id}`} className="inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:border-primary/50 hover:bg-primary/5">
           <Pencil className="h-3.5 w-3.5" /> Abrir editor
         </Link>
+        <button onClick={apagar} disabled={apagando} title="Apagar caderno de teste"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium text-destructive transition-colors hover:border-destructive/50 hover:bg-destructive/10 disabled:opacity-60">
+          {apagando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Apagar
+        </button>
       </div>
 
       <input ref={fileMat} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) enviar(f, 'material'); e.currentTarget.value = '' }} />

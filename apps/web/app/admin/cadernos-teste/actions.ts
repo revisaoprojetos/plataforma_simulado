@@ -167,6 +167,19 @@ export async function listarCadernosTesteDoBanco(bancoId: string): Promise<Cader
 }
 
 /** Cria um caderno de TESTE já vinculado ao banco e retorna o id (para abrir o editor). */
+export async function apagarCadernoTeste(id: string, bancoId?: string): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('questoes:update')) && !(await checkPermission('questoes:delete'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId || !id) return { ok: false, error: 'Tenant/caderno não resolvido.' }
+  const svc = createAdminClient()
+  const { data: antes } = await svc.from(TABELA).select('nome, config').eq('id', id).eq('tenant_id', access.tenantId).maybeSingle()
+  const del = await svc.from(TABELA).delete().eq('id', id).eq('tenant_id', access.tenantId)
+  if (del.error) return { ok: false, error: del.error.message }
+  await registrarAudit({ operacao: 'DELETE', entidade: TABELA, entidadeId: id, antes: (antes as any) ?? undefined })
+  if (bancoId) revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  return { ok: true }
+}
+
 export async function criarCadernoTesteNoBanco(bancoId: string, nome?: string): Promise<{ ok: boolean; id?: string; error?: string }> {
   if (!(await checkPermission('questoes:create')) && !(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
   const access = await getCurrentAccess()
