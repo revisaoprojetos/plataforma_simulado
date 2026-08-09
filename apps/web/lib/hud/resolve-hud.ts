@@ -29,9 +29,21 @@ export async function resolverHudConfig(simuladoId: string, tenantId?: string | 
   try {
     const svc = createAdminClient()
 
-    // 1) Vínculo explícito do simulado.
     const { data: sim } = await svc.from('simulado_simulados').select('regras').eq('id', simuladoId).maybeSingle()
-    const explicitId = (sim?.regras as { caderno_id?: string } | null)?.caderno_id
+    const regras = (sim?.regras ?? null) as { caderno_id?: string; banco_base_id?: string } | null
+
+    // 0) HUD do BANCO (novo): simulado.regras.banco_base_id → simulado_pastas.hud. Tem prioridade.
+    const bancoId = regras?.banco_base_id
+    if (bancoId) {
+      try {
+        const { data: pasta } = await svc.from('simulado_pastas').select('hud').eq('id', bancoId).maybeSingle()
+        const hud = (pasta as { hud?: { hudCores?: unknown } } | null)?.hud
+        if (hud?.hudCores) return montar(hud, null)
+      } catch { /* coluna hud pode não existir ainda */ }
+    }
+
+    // 1) Vínculo explícito do simulado (caderno).
+    const explicitId = regras?.caderno_id
     if (explicitId) {
       const { data: cad } = await svc.from('simulado_cadernos_designer').select('id, config').eq('id', explicitId).maybeSingle()
       if ((cad?.config as { hudCores?: unknown } | null)?.hudCores) return montar(cad!.config, cad!.id as string)

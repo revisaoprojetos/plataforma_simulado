@@ -9,6 +9,7 @@ import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { softDelete } from '@/lib/soft-delete'
 import { tipoEhCertoErrado, alternativasSaoCertoErrado } from '@/lib/simulado/formato'
 import type { AnaliseImport, QuestaoImport, AltImport, ResultadoImport } from './import-types'
+import type { HudCores, HudPorPagina } from '@/lib/caderno-designer/types'
 
 async function guard() {
   if (!(await checkPermission('questoes:view'))) {
@@ -751,6 +752,36 @@ export async function salvarGruposBanco(bancoId: string, grupos: GrupoBanco[]): 
   const svc = createAdminClient()
   const { error } = await svc.from('simulado_pastas').update({ grupos }).eq('id', bancoId).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
+  revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  return { ok: true }
+}
+
+// ── HUD do simulado por BANCO (simulado_pastas.hud jsonb) ──────────────────────────────────────
+/** Lê o HUD (tema da prova) salvo no banco. Tolerante à coluna `hud` ausente (cai no vazio → padrão). */
+export async function carregarHudBanco(bancoId: string): Promise<{ ok: boolean; base: Partial<HudCores>; porPagina: HudPorPagina }> {
+  const vazio = { ok: true, base: {} as Partial<HudCores>, porPagina: {} as HudPorPagina }
+  const g = await guard()
+  if (!g.ok || !bancoId) return vazio
+  const svc = createAdminClient()
+  try {
+    const { data, error } = await svc.from('simulado_pastas').select('hud').eq('id', bancoId).eq('tenant_id', g.tenantId).maybeSingle()
+    if (error) return vazio // coluna pode não existir ainda
+    const hud = (data as any)?.hud
+    if (!hud || typeof hud !== 'object') return vazio
+    return { ok: true, base: (hud.hudCores ?? {}) as Partial<HudCores>, porPagina: (hud.hudPorPagina ?? {}) as HudPorPagina }
+  } catch { return vazio }
+}
+
+/** Salva o HUD (base + por página) no banco. Aplica a todos os simulados com regras.banco_base_id = este banco. */
+export async function salvarHudBanco(bancoId: string, dados: { hudCores: Partial<HudCores>; hudPorPagina: HudPorPagina }): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId || !bancoId) return { ok: false, error: 'Banco não resolvido.' }
+  const svc = createAdminClient()
+  const hud = { hudCores: dados.hudCores ?? {}, hudPorPagina: dados.hudPorPagina ?? {} }
+  const { error } = await svc.from('simulado_pastas').update({ hud }).eq('id', bancoId).eq('tenant_id', access.tenantId)
+  if (error) return { ok: false, error: /column .*hud|hud.*column|schema cache/i.test(error.message) ? 'Coluna ausente — rode: alter table simulado_pastas add column if not exists hud jsonb;' : error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: bancoId, depois: { hud: 'atualizado' } })
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return { ok: true }
 }
