@@ -7,6 +7,7 @@ import { registrarAudit } from '@/lib/audit'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { carregarRegistros } from '@/lib/caderno-designer/merge'
 import { slugDiag } from '@/lib/caderno-teste/diagnostico'
+import { materialDoConfig, materialEnunciadoDoConfig, type MaterialCaderno } from '@/lib/caderno-designer/material'
 import type { BuilderV3, PreviewQuestao } from '@/lib/caderno-teste/tipos'
 
 export type RegistroTeste = { id: string; nome: string; vars: Record<string, string> }
@@ -140,9 +141,9 @@ export async function dadosBancoTeste(bancoId: string): Promise<{ ok: boolean; r
   return { ok: true, registros, disciplinas }
 }
 
-export type CadernoTesteResumo = { id: string; nome: string; atualizadoEm: string | null; grupos: number }
+export type CadernoTesteResumo = { id: string; nome: string; atualizadoEm: string | null; grupos: number; material: MaterialCaderno; materialEnunciado: MaterialCaderno }
 
-/** Lista os cadernos de TESTE vinculados a um banco (config.builderV3.bancoId === bancoId). */
+/** Lista os cadernos de TESTE vinculados a um banco (config.builderV3.bancoId === bancoId), com o material PDF. */
 export async function listarCadernosTesteDoBanco(bancoId: string): Promise<CadernoTesteResumo[]> {
   const access = await getCurrentAccess()
   if (!access.tenantId || !bancoId) return []
@@ -151,7 +152,11 @@ export async function listarCadernosTesteDoBanco(bancoId: string): Promise<Cader
   const rows = (r.data ?? []) as any[]
   return rows
     .filter((c) => { const cfg = (c.config ?? {}) as any; return (cfg?.builderV3?.bancoId ?? cfg?.bancoId ?? null) === bancoId })
-    .map((c) => { const cfg = (c.config ?? {}) as any; const itens = cfg?.builderV3?.itens; return { id: c.id, nome: c.nome ?? 'Caderno de teste', atualizadoEm: c.atualizado_em ?? null, grupos: Array.isArray(itens) ? itens.length : 0 } })
+    .map((c) => {
+      const cfg = (c.config ?? {}) as any
+      const itens = cfg?.builderV3?.itens
+      return { id: c.id, nome: c.nome ?? 'Caderno de teste', atualizadoEm: c.atualizado_em ?? null, grupos: Array.isArray(itens) ? itens.length : 0, material: materialDoConfig(cfg), materialEnunciado: materialEnunciadoDoConfig(cfg) }
+    })
 }
 
 /** Cria um caderno de TESTE já vinculado ao banco e retorna o id (para abrir o editor). */

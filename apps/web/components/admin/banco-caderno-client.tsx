@@ -286,7 +286,7 @@ export function BancoCadernoClient({
 }
 
 /** Card de um PDF importado do aluno (Gabarito Comentado / Enunciado de Questões): preview + upload/remoção. */
-function MaterialPdfCard({ cor, titulo, hint, pdfUrl, pdfNome, busy, onUpload, onRemover }: {
+export function MaterialPdfCard({ cor, titulo, hint, pdfUrl, pdfNome, busy, onUpload, onRemover }: {
   cor: string
   titulo: string
   hint?: string
