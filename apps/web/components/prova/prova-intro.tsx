@@ -125,7 +125,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
 
   // Demais estilos: logo em cima + indicador (igual à Imersão).
   return (
-    <div className={wrap}>
+    <div data-campo="fundo" className={wrap}><HudFundo />
       <div className={cn('animate-page', tipo === 'pulsar' && 'animate-pulse')}>
         {logoUrl ? (
           <span className={cn('flex h-16 w-16 items-center justify-center overflow-hidden', frameLogo(logoEstilo))} style={{ background: logoBg ?? '#ffffff' }}>
