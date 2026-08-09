@@ -16,6 +16,10 @@ const A4_H = 1123
 const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
 
 export type DiscBanco = { nome: string; chave: string; pilar?: string }
+/** Tipo de bloco (p/ ícone no painel de estrutura). */
+export type TipoBloco = 'cabecalho' | 'nome' | 'nota' | 'texto' | 'secao' | 'card' | 'desempenho'
+/** Uma entrada da estrutura (outline) do diagnóstico: nó renderizado + metadados p/ o painel. */
+export type DiagEntrada = { key: string; node: ReactNode; label: string; tipo: TipoBloco; parte: string; removivel: boolean }
 /** Cor de um pilar: config do grupo → padrão → cor secundária. */
 function corDoPilar(slug: string | undefined, coresPilar: Record<string, string>, fallback: string): string {
   if (!slug) return fallback
@@ -70,7 +74,7 @@ const QUESTOES_EXEMPLO: PreviewQuestao[] = [
 type Interativo = { selParte?: string; onPick?: (parte: string, label: string, cor: string, anchor: DOMRect) => void }
 
 /** Monta os blocos (nós) do conteúdo do grupo, em ordem — a paginação distribui isso em folhas. */
-function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<string, string>, discBanco: DiscBanco[], inter?: Interativo): ReactNode[] {
+function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<string, string>, discBanco: DiscBanco[], inter?: Interativo, sink?: { entradas?: DiagEntrada[] }): ReactNode[] {
   const a = item.ajustes
   const base = a.compacto ? 10 : 12
   // Texto com formatação inline (**negrito**, *itálico*, <u>sublinhado</u>) já com variáveis aplicadas.
@@ -182,33 +186,36 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     const cor = corP(parte, prim)
     return <div {...atr(parte, t, cor, { background: cor, color: '#fff', fontWeight: 700, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', padding: '6px 12px', borderRadius: 2, margin: '3px 0 7px' })}>{V(t)}</div>
   }
-  if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); out.push(
+  // Coleta as entradas (blocos) com CHAVE — depois aplica a ordem salva (c.ordem) e alimenta o outline.
+  const entradas: DiagEntrada[] = []
+  const add = (key: string, node: ReactNode, label: string, tipo: TipoBloco, parte: string, removivel: boolean) => entradas.push({ key, node, label, tipo, parte, removivel })
+  if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); add('diag_cab', (
     <div {...atr('diag_cab', 'Cabeçalho', cor, { background: cor, color: '#fff', padding: '12px 16px' })}>
       <div style={{ fontSize: 20, fontWeight: 800 }}>{V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>
       {c.subtitulo && <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{V(c.subtitulo)}</div>}
-    </div>,
-  ) }
-  if (a.mostrarDadosAluno && !ocultasP.has('nome')) { const corN = corP('diag_nome_rot', prim), corV = corP('diag_nome_val', amar); out.push(
+    </div>
+  ), 'Cabeçalho', 'cabecalho', 'diag_cab', true) }
+  if (a.mostrarDadosAluno && !ocultasP.has('nome')) { const corN = corP('diag_nome_rot', prim), corV = corP('diag_nome_val', amar); add('diag_nome', (
     <div style={{ display: 'flex', overflow: 'hidden' }}>
       <div {...atr('diag_nome_rot', 'Rótulo NOME', corN, { background: corN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '8px 14px', whiteSpace: 'nowrap' })}>{V(c.rotuloNome ?? 'NOME:')}</div>
       <div {...atr('diag_nome_val', 'Faixa do nome', corV, { background: corV, color: '#3b2f00', flex: 1, padding: '8px 14px', fontSize: 12, fontWeight: 600 })}>{V('{nome}')}</div>
-    </div>,
-  ) }
-  if (!ocultasP.has('nota')) { const corNum = corP('diag_nota_num', '#9b6800'), corFx = corP('diag_nota_faixa', amar); out.push(
+    </div>
+  ), 'Dados do aluno', 'nome', 'diag_nome_rot', true) }
+  if (!ocultasP.has('nota')) { const corNum = corP('diag_nota_num', '#9b6800'), corFx = corP('diag_nota_faixa', amar); add('diag_nota', (
     <div style={{ display: 'flex', border: `1px solid ${prim}33`, overflow: 'hidden' }}>
       <div {...atr('diag_nota_num', 'Bloco da nota', corNum, { background: corNum, color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'baseline' })}><span style={{ fontSize: 32, fontWeight: 800 }}>{V('{acertos}')}</span><span style={{ fontSize: 16, fontWeight: 700 }}>/{V(c.notaTotal)}</span></div>
       <div {...atr('diag_nota_faixa', 'Faixa da nota', corFx, { background: corFx, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: 12, fontWeight: 600 })}>{V(c.notaTexto)}</div>
-    </div>,
-  ) }
-  c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); out.push(<p key={`intro${i}`} {...atr(`intro:${i}`, `Parágrafo de abertura ${i + 1}`, cor, { fontSize: base, lineHeight: 1.4, textAlign: 'justify', margin: '0 0 3px', color: cor })}>{V(p)}</p>) })
+    </div>
+  ), 'Nota', 'nota', 'diag_nota_num', true) }
+  c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); add(`intro:${i}`, <p key={`intro${i}`} {...atr(`intro:${i}`, `Parágrafo de abertura ${i + 1}`, cor, { fontSize: base, lineHeight: 1.4, textAlign: 'justify', margin: '0 0 3px', color: cor })}>{V(p)}</p>, `Introdução ${i + 1}`, 'texto', `intro:${i}`, true) })
   if (c.linguaPortuguesa && !ocultasP.has('lingua')) {
     const lp = c.linguaPortuguesa
-    out.push(<Sec parte="sec_lingua" t={lp.secTitulo || 'Desempenho em Língua Portuguesa'} />)
-    if (lp.secIntro) { const cor = corP('lingua_intro', '#5a5570'); out.push(<p key="lpintro" {...atr('lingua_intro', 'Introdução (Língua Portuguesa)', cor, { fontSize: base - 1, color: cor, margin: '0 0 5px', lineHeight: 1.4 })}>{V(lp.secIntro)}</p>) }
+    add('sec_lingua', <Sec parte="sec_lingua" t={lp.secTitulo || 'Desempenho em Língua Portuguesa'} />, `Seção: ${lp.secTitulo || 'Língua Portuguesa'}`, 'secao', 'sec_lingua', true)
+    if (lp.secIntro) { const cor = corP('lingua_intro', '#5a5570'); add('lingua_intro', <p key="lpintro" {...atr('lingua_intro', 'Introdução (Língua Portuguesa)', cor, { fontSize: base - 1, color: cor, margin: '0 0 5px', lineHeight: 1.4 })}>{V(lp.secIntro)}</p>, 'Introdução (Língua Portuguesa)', 'texto', 'lingua_intro', true) }
     const banda = bandaAdaptativa({ nome: lp.titulo, chave: lp.chave, tipoFonte: lp.tipoFonte, totalTxt: lp.totalTxt, bandas: lp.bandas }, vars)
     const bandas = banda ? [banda] : lp.bandas
     const cor = corP('lingua_card', corDoPilar(lp.chave, a.coresPilar ?? {}, prim))
-    out.push(
+    add('lingua_card', (
       <div key="lpcard" {...atr('lingua_card', lp.titulo, cor, { background: '#fff2cc', border: `1px solid ${cor}22`, padding: 8, marginBottom: 4 })}>
         <div style={{ fontSize: 9, fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(lp.titulo)}</div>
         <div style={{ fontSize: 22, fontWeight: 800, color: cor, lineHeight: 1.1 }}>{V(`{pct_${prefFonte(lp.tipoFonte)}${lp.chave}}`)}</div>
@@ -219,12 +226,12 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
             {b.texto && <div style={{ fontSize: 8.5, color: '#243b53', lineHeight: 1.4, textAlign: alignP('lingua_card', 'justify') }}>{V(b.texto)}</div>}
           </div>
         ))}
-      </div>,
-    )
+      </div>
+    ), `Card: ${lp.titulo}`, 'card', 'lingua_card', true)
   }
   if (c.pilares.length && !ocultasP.has('pilares')) {
-    out.push(<Sec parte="sec_pilares" t={c.tituloPilares ?? 'Desempenho por pilar'} />)
-    out.push(
+    add('sec_pilares', <Sec parte="sec_pilares" t={c.tituloPilares ?? 'Desempenho por pilar'} />, `Seção: ${c.tituloPilares ?? 'Desempenho por pilar'}`, 'secao', 'sec_pilares', true)
+    add('pilares', (
       <div style={{ display: 'flex', gap: 14, alignItems: 'stretch', marginBottom: 4 }}>
         {c.pilares.map((pl, i) => {
           const banda = bandaAdaptativa(pl, vars)
@@ -245,22 +252,22 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
             </div>
           )
         })}
-      </div>,
-    )
+      </div>
+    ), 'Cards de pilar', 'desempenho', '', false)
   }
   // Disciplinas: do BANCO quando houver (nome+chave reais); senão as do modelo. Assuntos/nº/pct vêm das variáveis.
   const ocultas = new Set(c.discOcultas ?? [])
   const discs: DiscBanco[] = (discBanco.length ? discBanco : c.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave || slugDiag(d.nome) }))).filter((d) => !ocultas.has(d.chave))
   if (discs.length && !ocultasP.has('disciplinas')) {
-    out.push(<Sec parte="sec_disciplinas" t={c.tituloDisciplinas ?? 'Desempenho por disciplina'} />)
-    if (c.disciplinasIntro) { const cor = corP('disc_intro', '#5a5570'); out.push(<p {...atr('disc_intro', 'Introdução das disciplinas', cor, { fontSize: base - 1, color: cor, margin: '0 0 8px', lineHeight: 1.4 })}>{V(c.disciplinasIntro)}</p>) }
+    add('sec_disciplinas', <Sec parte="sec_disciplinas" t={c.tituloDisciplinas ?? 'Desempenho por disciplina'} />, `Seção: ${c.tituloDisciplinas ?? 'Desempenho por disciplina'}`, 'secao', 'sec_disciplinas', true)
+    if (c.disciplinasIntro) { const cor = corP('disc_intro', '#5a5570'); add('disc_intro', <p {...atr('disc_intro', 'Introdução das disciplinas', cor, { fontSize: base - 1, color: cor, margin: '0 0 8px', lineHeight: 1.4 })}>{V(c.disciplinasIntro)}</p>, 'Introdução (disciplinas)', 'texto', 'disc_intro', false) }
     for (const d of discs) {
       const fonte = c.discFonte?.[d.chave] ?? d.chave // disciplina cujos assuntos/estatísticas o card exibe
       const assuntos = (vars[`assuntos_${fonte}`] ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
       // cor da disciplina: parte (coresParte) → individual legado (coresDisc) → cor do pilar → secundária.
       const corDisc = corP(`disc:${d.chave}`, (a.coresDisc ?? {})[d.chave] || corDoPilar(d.pilar, a.coresPilar ?? {}, amar))
       const corTxt = c.discCorTexto?.[d.chave] ?? prim
-      out.push(
+      add(`disc:${d.chave}`, (
         <div {...atr(`disc:${d.chave}`, d.nome, corDisc, { background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5 })}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: corTxt }}>{V(c.discNomes?.[d.chave] ?? d.nome)}</div>
@@ -269,13 +276,13 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
               : <div style={{ fontSize: 9, color: '#5a5570', fontStyle: 'italic' }}>- Assuntos das questões erradas</div>}
           </div>
           <div style={{ fontSize: 11, whiteSpace: 'nowrap' }}><span style={{ color: '#9590b0' }}>{V(`{acerto_${fonte}}`)}/{V(`{total_${fonte}}`)}</span> <span style={{ fontWeight: 800, color: corDisc }}>{V(`{pct_${fonte}}`)}</span></div>
-        </div>,
-      )
+        </div>
+      ), c.discNomes?.[d.chave] ?? d.nome, 'card', `disc:${d.chave}`, true)
     }
   }
   if (c.sugestoes.length && !ocultasP.has('sugestoes')) {
-    out.push(<Sec parte="sec_sugestoes" t={c.tituloSugestoes ?? 'Sugestões de estudo'} />)
-    c.sugestoes.forEach((s, si) => { const cor = corP(`sug:${si}`, '#fdf3d0'); out.push(
+    add('sec_sugestoes', <Sec parte="sec_sugestoes" t={c.tituloSugestoes ?? 'Sugestões de estudo'} />, `Seção: ${c.tituloSugestoes ?? 'Sugestões de estudo'}`, 'secao', 'sec_sugestoes', true)
+    c.sugestoes.forEach((s, si) => { const cor = corP(`sug:${si}`, '#fdf3d0'); add(`sug:${si}`, (
       <div key={`sug${si}`} {...atr(`sug:${si}`, `Sugestão · ${s.titulo}`, cor, { marginBottom: 10 })}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: cor, padding: '5px 12px' }}>
           <span style={{ fontWeight: 800, fontSize: 11, color: s.corTitulo || '#9a6e00' }}>{V(s.titulo)}</span>
@@ -285,18 +292,34 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
           {s.intro && <p style={{ fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: alignP(`sug:${si}`, 'justify') }}>{V(s.intro)}</p>}
           {s.itens.length > 0 && <div style={{ fontSize: base - 1, lineHeight: 1.5, textAlign: alignP(`sug:${si}`, 'justify') }}>{Vm(topicosParaTexto(s.itens))}</div>}
         </div>
-      </div>,
-    ) })
+      </div>
+    ), `Sugestão · ${s.titulo}`, 'card', `sug:${si}`, true) })
   }
   if ((c.fechamento?.length ?? 0) > 0 && !ocultasP.has('fechamento')) {
-    (c.fechamento ?? []).forEach((p, i) => { const cor = corP(`fechamento:${i}`, '#1a202c'); out.push(<p key={`fech${i}`} {...atr(`fechamento:${i}`, `Parágrafo de fechamento ${i + 1}`, cor, { fontSize: base, lineHeight: 1.4, textAlign: 'justify', margin: '0 0 3px', color: cor })}>{V(p)}</p>) })
+    (c.fechamento ?? []).forEach((p, i) => { const cor = corP(`fechamento:${i}`, '#1a202c'); add(`fechamento:${i}`, <p key={`fech${i}`} {...atr(`fechamento:${i}`, `Parágrafo de fechamento ${i + 1}`, cor, { fontSize: base, lineHeight: 1.4, textAlign: 'justify', margin: '0 0 3px', color: cor })}>{V(p)}</p>, `Fechamento ${i + 1}`, 'texto', `fechamento:${i}`, true) })
   }
   if ((c.gabaritoObs.length || c.gabaritoIntro.length) && !ocultasP.has('gabarito')) {
-    out.push(<Sec parte="sec_gabarito" t={c.gabaritoTitulo || 'Gabarito oficial desatualizado'} />)
-    c.gabaritoIntro.forEach((p, i) => { const cor = corP('diag_gab_obs', '#243b53'); out.push(<p key={`gabi${i}`} {...atr('diag_gab_obs', 'Observações do gabarito', cor, { fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify', color: cor })}>{V(p)}</p>) })
-    if (c.gabaritoObs.length) { const cor = corP('diag_gab_obs', '#a32d2d'); out.push(<div {...atr('diag_gab_obs', 'Observação do gabarito', cor, { background: '#f5f3ff', borderTop: `2px solid ${cor}`, padding: '8px 12px' })}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: 9, color: '#5a5570' }}>{V(o)}</div>)}</div>) }
+    add('sec_gabarito', <Sec parte="sec_gabarito" t={c.gabaritoTitulo || 'Gabarito oficial desatualizado'} />, `Seção: ${c.gabaritoTitulo || 'Gabarito'}`, 'secao', 'sec_gabarito', true)
+    c.gabaritoIntro.forEach((p, i) => { const cor = corP('diag_gab_obs', '#243b53'); add(`gab:${i}`, <p key={`gabi${i}`} {...atr('diag_gab_obs', 'Observações do gabarito', cor, { fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify', color: cor })}>{V(p)}</p>, `Gabarito — parágrafo ${i + 1}`, 'texto', 'diag_gab_obs', false) })
+    if (c.gabaritoObs.length) { const cor = corP('diag_gab_obs', '#a32d2d'); add('gab_obs', <div {...atr('diag_gab_obs', 'Observação do gabarito', cor, { background: '#f5f3ff', borderTop: `2px solid ${cor}`, padding: '8px 12px' })}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: 9, color: '#5a5570' }}>{V(o)}</div>)}</div>, 'Gabarito — observações', 'texto', 'diag_gab_obs', false) }
   }
-  return out
+  // Aplica a ordem salva (c.ordem): chaves listadas primeiro (na ordem), o resto mantém a ordem natural.
+  const ordemSalva = c.ordem ?? []
+  const mapaE = new Map(entradas.map((e) => [e.key, e]))
+  const vistos = new Set<string>()
+  const ordenadas: DiagEntrada[] = []
+  for (const k of ordemSalva) { const e = mapaE.get(k); if (e && !vistos.has(k)) { ordenadas.push(e); vistos.add(k) } }
+  for (const e of entradas) if (!vistos.has(e.key)) ordenadas.push(e)
+  if (sink) sink.entradas = ordenadas
+  return ordenadas.map((e) => e.node)
+}
+
+/** Estrutura (outline) do diagnóstico na ordem atual — usado pelo painel de estrutura do builder. */
+export function outlineDoItem(item: ItemCaderno, questoes: PreviewQuestao[], vars: Record<string, string>, discBanco: DiscBanco[]): DiagEntrada[] {
+  if (item.modalidade !== 'diagnostico') return []
+  const sink: { entradas?: DiagEntrada[] } = {}
+  blocosDoItem(item, questoes.length ? questoes : QUESTOES_EXEMPLO, vars, discBanco, undefined, sink)
+  return sink.entradas ?? []
 }
 
 /** Uma folha A4 (fundo + cabeçalho + conteúdo + rodapé) ou a capa (página inteira). */

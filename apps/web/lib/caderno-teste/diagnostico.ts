@@ -62,6 +62,8 @@ export type DiagConteudo = {
   discOcultas?: string[]
   /** Blocos estruturais ocultados (nota/nome/pilares/disciplinas/sugestoes/gabarito). */
   partesOcultas?: string[]
+  /** Ordem dos blocos na prévia (chaves das entradas). Ausentes ficam na ordem natural, ao final. */
+  ordem?: string[]
   /** Cor dos marcadores no início da linha: `>` (normal) e `>>` (forte). */
   corMarcador?: string
   corMarcadorForte?: string
