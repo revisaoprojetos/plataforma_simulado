@@ -246,7 +246,11 @@ export function htmlParaDiagnostico(html: string): { conteudo: DiagConteudo; avi
   } else avisos.push('Seção “desempenho por pilar” não encontrada.')
 
   if (iDisc >= 0) {
-    const d = parseDisciplinas(linhas.slice(iDisc + 1, iSug >= 0 ? iSug : (iGab >= 0 ? iGab : undefined)))
+    const regDisc = linhas.slice(iDisc + 1, iSug >= 0 ? iSug : (iGab >= 0 ? iGab : undefined))
+    // 1º parágrafo longo (não é nome de disciplina) = introdução das disciplinas (senão viraria disciplina falsa).
+    let ini = 0
+    if (regDisc[0] && regDisc[0].p.length > 60 && !ehNomePilar(regDisc[0].p, regDisc[0].h)) { conteudo.disciplinasIntro = regDisc[0].f; ini = 1 }
+    const d = parseDisciplinas(regDisc.slice(ini))
     if (d.length) conteudo.disciplinas = d; else avisos.push('Não reconheci as disciplinas.')
   } else avisos.push('Seção “desempenho por disciplina” não encontrada.')
 

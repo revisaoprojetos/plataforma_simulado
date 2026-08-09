@@ -119,6 +119,71 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
   return h
 }
 
+/**
+ * Word SEMÂNTICO do diagnóstico — feito para EDITAR no Word e REIMPORTAR (round-trip com importar.ts):
+ * títulos de seção como headings, nomes de pilar/disciplina/sugestão como headings, faixas em negrito,
+ * tópicos com `>`/`>>`, e os TOKENS ({acertos}, {pct_...}) PRESERVADOS (sem preencher com dados do aluno),
+ * para o motor adaptativo regenerar perfeitamente na importação. Sem tabelas/flex (o Word renderiza limpo).
+ */
+export function gerarWordDiagnostico(item: ItemCaderno, disc: DiscBanco[] = []): string {
+  const c = item.conteudo ?? DIAG_PADRAO
+  const W = (t: unknown) => formatarInline(String(t ?? '')) // markdown -> <b>/<i>/<u>; tokens {..} preservados
+  let h = ''
+  const titulo = c.tituloCabecalho || 'Diagnóstico de Desempenho'
+  h += `<h1>${W(titulo)}</h1>`
+  if (c.subtitulo) h += `<p>${W(c.subtitulo)}</p>`
+  if (c.notaTexto) h += `<p>${W(c.notaTexto)}</p>`
+  for (const p of c.intro) h += `<p>${W(p)}</p>`
+
+  if (c.linguaPortuguesa) {
+    const lp = c.linguaPortuguesa
+    h += `<h2>${W(lp.secTitulo || 'Desempenho em Língua Portuguesa')}</h2>`
+    if (lp.secIntro) h += `<p>${W(lp.secIntro)}</p>`
+    h += `<h3>${W(lp.titulo)}</h3>`
+    if (lp.totalTxt) h += `<p>${W(lp.totalTxt)}</p>`
+    for (const b of lp.bandas) { h += `<p><b>${esc(b.faixa)}</b></p>`; if (b.texto) h += `<p>${W(b.texto)}</p>` }
+  }
+
+  if (c.pilares.length) {
+    h += `<h2>Desempenho por Pilar</h2>`
+    for (const pl of c.pilares) {
+      h += `<h3>${W(pl.nome)}</h3>`
+      if (pl.totalTxt) h += `<p>${W(pl.totalTxt)}</p>`
+      for (const b of pl.bandas) { h += `<p><b>${esc(b.faixa)}</b></p>`; if (b.texto) h += `<p>${W(b.texto)}</p>` }
+    }
+  }
+
+  const discs = disc.length ? disc : c.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave || slugDiag(d.nome) }))
+  if (discs.length) {
+    h += `<h2>Desempenho por Disciplina</h2>`
+    if (c.disciplinasIntro) h += `<p>${W(c.disciplinasIntro)}</p>`
+    for (const d of discs) h += `<h3>${W(c.discNomes?.[d.chave] ?? d.nome)}</h3>`
+  }
+
+  if (c.sugestoes.length) {
+    h += `<h2>Sugestões de Estudo</h2>`
+    for (const s of c.sugestoes) {
+      h += `<h3>${W(s.titulo)}</h3>`
+      if (s.prioridade) h += `<p>[!] ${W(s.prioridade)}</p>`
+      if (s.intro) h += `<p>${W(s.intro)}</p>`
+      for (const it of s.itens) h += `<p>${it.forte ? '&gt;&gt;' : '&gt;'} ${W(it.texto)}</p>`
+    }
+  }
+
+  for (const p of (c.fechamento ?? [])) h += `<p>${W(p)}</p>`
+
+  if (c.gabaritoObs.length || c.gabaritoIntro.length) {
+    h += `<h2>${W(c.gabaritoTitulo || 'Gabarito Oficial Desatualizado')}</h2>`
+    for (const p of c.gabaritoIntro) h += `<p>${W(p)}</p>`
+    for (const o of c.gabaritoObs) h += `<p>${W(o)}</p>`
+  }
+
+  return `<!doctype html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${esc(titulo)}</title>`
+    + `<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->`
+    + `<style>@page{size:A4;margin:2cm}body{font-family:Arial,Helvetica,sans-serif;font-size:11pt;color:#111;line-height:1.4}h1{font-size:18pt;margin:0 0 6pt}h2{font-size:13pt;margin:14pt 0 4pt}h3{font-size:11pt;margin:8pt 0 2pt}p{margin:0 0 6pt}</style></head>`
+    + `<body>${h}</body></html>`
+}
+
 function htmlCaderno(item: ItemCaderno, qs: PreviewQuestao[]): string {
   const a = item.ajustes
   const corP = (parte: string, def: string) => (a.coresParte ?? {})[parte] || def

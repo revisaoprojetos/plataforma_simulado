@@ -4,7 +4,7 @@ import { getCurrentAccess } from '@/lib/auth/permissions'
 import { carregarRegistros } from '@/lib/caderno-designer/merge'
 import { normalizarBuilder, novoItem, type Modalidade } from '@/lib/caderno-teste/tipos'
 import { slugDiag } from '@/lib/caderno-teste/diagnostico'
-import { gerarHtmlItem, type DiscBanco } from '@/lib/caderno-teste/exportar-html'
+import { gerarHtmlItem, gerarWordDiagnostico, type DiscBanco } from '@/lib/caderno-teste/exportar-html'
 import { previewQuestoesBanco } from '@/app/admin/cadernos-teste/actions'
 
 const MODS: Modalidade[] = ['folha_respostas', 'caderno_questoes', 'diagnostico']
@@ -70,6 +70,10 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const html = gerarHtmlItem(item, { vars, questoes, disciplinas })
+  // Word do diagnóstico = documento SEMÂNTICO (editar + reimportar, tokens preservados). Demais
+  // formatos/modalidades usam o HTML visual.
+  const html = (formato === 'word' && item.modalidade === 'diagnostico')
+    ? gerarWordDiagnostico(item, disciplinas)
+    : gerarHtmlItem(item, { vars, questoes, disciplinas })
   return baixar(html, item.ajustes.titulo || (cad as any).nome || 'caderno', formato)
 }

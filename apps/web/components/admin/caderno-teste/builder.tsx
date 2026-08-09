@@ -290,8 +290,8 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                 <div className="fixed inset-0 z-40" onClick={() => setBaixarAberto(false)} />
                 <div className="absolute right-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-lg border bg-background shadow-lg">
                   <a href={pdfUrl} target="_blank" rel="noreferrer" onClick={() => setBaixarAberto(false)} className="block px-3 py-2 text-sm hover:bg-muted">PDF (imprimir) — <span className="text-muted-foreground">fiel à prévia</span></a>
-                  <a href={exportUrl('html')} download onClick={() => setBaixarAberto(false)} className="block border-t px-3 py-2 text-sm hover:bg-muted">HTML (.html) — <span className="text-muted-foreground">edita no navegador</span></a>
-                  <p className="border-t px-3 py-2 text-[11px] leading-snug text-muted-foreground">Word não é oferecido: o motor do Word não renderiza este layout fielmente (troca cores/espaços). Para arquivo idêntico à prévia, use o <strong>PDF (imprimir)</strong>.</p>
+                  <a href={exportUrl('word')} download onClick={() => setBaixarAberto(false)} className="block border-t px-3 py-2 text-sm hover:bg-muted">Word (.doc) — <span className="text-muted-foreground">editar e reimportar</span></a>
+                  <a href={exportUrl('html')} download onClick={() => setBaixarAberto(false)} className="block border-t px-3 py-2 text-sm hover:bg-muted">HTML (.html)</a>
                 </div>
               </>
             )}
