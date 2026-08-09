@@ -14,7 +14,7 @@ export default async function BancoHudEditorPage({ params }: { params: Promise<{
   const { data } = await svc.from('simulado_pastas').select('nome').eq('id', id).eq('tenant_id', tid ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
   const titulo = ((data as { nome?: string } | null)?.nome ?? 'Simulado') as string
   return (
-    <div className="h-[calc(100vh-3rem)]">
+    <div className="-m-6 h-screen">
       <BancoHudDesigner bancoId={id} titulo={titulo} baseInicial={base} porPaginaInicial={porPagina} voltarHref={`/admin/banco-questoes/${id}?tab=hud`} />
     </div>
   )
