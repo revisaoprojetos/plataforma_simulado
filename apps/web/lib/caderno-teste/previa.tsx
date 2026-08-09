@@ -18,8 +18,9 @@ const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
 export type DiscBanco = { nome: string; chave: string; pilar?: string }
 /** Tipo de bloco (p/ ícone no painel de estrutura). */
 export type TipoBloco = 'cabecalho' | 'nome' | 'nota' | 'texto' | 'secao' | 'card' | 'desempenho'
-/** Uma entrada da estrutura (outline) do diagnóstico: nó renderizado + metadados p/ o painel. */
-export type DiagEntrada = { key: string; node: ReactNode; label: string; tipo: TipoBloco; parte: string; removivel: boolean }
+/** Uma entrada da estrutura (outline) do diagnóstico: nó renderizado + metadados p/ o painel.
+ * `parte` = alvo da edição; `apagar` = alvo da remoção (às vezes diferente, ex.: parágrafos do gabarito). */
+export type DiagEntrada = { key: string; node: ReactNode; label: string; tipo: TipoBloco; parte: string; removivel: boolean; apagar: string }
 /** Cor de um pilar: config do grupo → padrão → cor secundária. */
 function corDoPilar(slug: string | undefined, coresPilar: Record<string, string>, fallback: string): string {
   if (!slug) return fallback
@@ -188,7 +189,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   }
   // Coleta as entradas (blocos) com CHAVE — depois aplica a ordem salva (c.ordem) e alimenta o outline.
   const entradas: DiagEntrada[] = []
-  const add = (key: string, node: ReactNode, label: string, tipo: TipoBloco, parte: string, removivel: boolean) => entradas.push({ key, node, label, tipo, parte, removivel })
+  const add = (key: string, node: ReactNode, label: string, tipo: TipoBloco, parte: string, removivel = true, apagar = parte) => entradas.push({ key, node, label, tipo, parte, removivel, apagar })
   if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); add('diag_cab', (
     <div {...atr('diag_cab', 'Cabeçalho', cor, { background: cor, color: '#fff', padding: '12px 16px' })}>
       <div style={{ fontSize: 20, fontWeight: 800 }}>{V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>
@@ -253,14 +254,14 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
           )
         })}
       </div>
-    ), 'Cards de pilar', 'desempenho', '', false)
+    ), 'Cards de pilar', 'desempenho', '', true, 'sec_pilares')
   }
   // Disciplinas: do BANCO quando houver (nome+chave reais); senão as do modelo. Assuntos/nº/pct vêm das variáveis.
   const ocultas = new Set(c.discOcultas ?? [])
   const discs: DiscBanco[] = (discBanco.length ? discBanco : c.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave || slugDiag(d.nome) }))).filter((d) => !ocultas.has(d.chave))
   if (discs.length && !ocultasP.has('disciplinas')) {
     add('sec_disciplinas', <Sec parte="sec_disciplinas" t={c.tituloDisciplinas ?? 'Desempenho por disciplina'} />, `Seção: ${c.tituloDisciplinas ?? 'Desempenho por disciplina'}`, 'secao', 'sec_disciplinas', true)
-    if (c.disciplinasIntro) { const cor = corP('disc_intro', '#5a5570'); add('disc_intro', <p {...atr('disc_intro', 'Introdução das disciplinas', cor, { fontSize: base - 1, color: cor, margin: '0 0 8px', lineHeight: 1.4 })}>{V(c.disciplinasIntro)}</p>, 'Introdução (disciplinas)', 'texto', 'disc_intro', false) }
+    if (c.disciplinasIntro) { const cor = corP('disc_intro', '#5a5570'); add('disc_intro', <p {...atr('disc_intro', 'Introdução das disciplinas', cor, { fontSize: base - 1, color: cor, margin: '0 0 8px', lineHeight: 1.4 })}>{V(c.disciplinasIntro)}</p>, 'Introdução (disciplinas)', 'texto', 'disc_intro') }
     for (const d of discs) {
       const fonte = c.discFonte?.[d.chave] ?? d.chave // disciplina cujos assuntos/estatísticas o card exibe
       const assuntos = (vars[`assuntos_${fonte}`] ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
@@ -300,8 +301,8 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   }
   if ((c.gabaritoObs.length || c.gabaritoIntro.length) && !ocultasP.has('gabarito')) {
     add('sec_gabarito', <Sec parte="sec_gabarito" t={c.gabaritoTitulo || 'Gabarito oficial desatualizado'} />, `Seção: ${c.gabaritoTitulo || 'Gabarito'}`, 'secao', 'sec_gabarito', true)
-    c.gabaritoIntro.forEach((p, i) => { const cor = corP('diag_gab_obs', '#243b53'); add(`gab:${i}`, <p key={`gabi${i}`} {...atr('diag_gab_obs', 'Observações do gabarito', cor, { fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify', color: cor })}>{V(p)}</p>, `Gabarito — parágrafo ${i + 1}`, 'texto', 'diag_gab_obs', false) })
-    if (c.gabaritoObs.length) { const cor = corP('diag_gab_obs', '#a32d2d'); add('gab_obs', <div {...atr('diag_gab_obs', 'Observação do gabarito', cor, { background: '#f5f3ff', borderTop: `2px solid ${cor}`, padding: '8px 12px' })}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: 9, color: '#5a5570' }}>{V(o)}</div>)}</div>, 'Gabarito — observações', 'texto', 'diag_gab_obs', false) }
+    c.gabaritoIntro.forEach((p, i) => { const cor = corP('diag_gab_obs', '#243b53'); add(`gab:${i}`, <p key={`gabi${i}`} {...atr('diag_gab_obs', 'Observações do gabarito', cor, { fontSize: base - 1, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify', color: cor })}>{V(p)}</p>, `Gabarito — parágrafo ${i + 1}`, 'texto', 'diag_gab_obs', true, `gabIntro:${i}`) })
+    if (c.gabaritoObs.length) { const cor = corP('diag_gab_obs', '#a32d2d'); add('gab_obs', <div {...atr('diag_gab_obs', 'Observação do gabarito', cor, { background: '#f5f3ff', borderTop: `2px solid ${cor}`, padding: '8px 12px' })}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: 9, color: '#5a5570' }}>{V(o)}</div>)}</div>, 'Gabarito — observações', 'texto', 'diag_gab_obs', true, 'gabObs') }
   }
   // Aplica a ordem salva (c.ordem): chaves listadas primeiro (na ordem), o resto mantém a ordem natural.
   const ordemSalva = c.ordem ?? []

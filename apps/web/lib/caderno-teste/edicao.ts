@@ -97,6 +97,10 @@ export function removerParteDiag(conteudo: DiagConteudo | undefined, parte: stri
   else if (parte.startsWith('pilar:')) { const i = Number(parte.slice('pilar:'.length)); if (c.pilares[i]) c.pilares.splice(i, 1) }
   else if (parte.startsWith('sug:')) { const i = Number(parte.slice('sug:'.length)); if (c.sugestoes[i]) c.sugestoes.splice(i, 1) }
   else if (parte.startsWith('disc:')) { const chave = parte.slice('disc:'.length); const i = idxDisc(c, chave); if (i >= 0) c.disciplinas.splice(i, 1); else c.discOcultas = [...(c.discOcultas ?? []), chave] }
+  else if (parte === 'disc_intro') { c.disciplinasIntro = '' }
+  else if (parte === 'lingua_intro') { if (c.linguaPortuguesa) c.linguaPortuguesa.secIntro = '' }
+  else if (parte.startsWith('gabIntro:')) { const i = Number(parte.slice('gabIntro:'.length)); if (c.gabaritoIntro[i] != null) c.gabaritoIntro.splice(i, 1) }
+  else if (parte === 'gabObs') { c.gabaritoObs = [] }
   else { const oc = chaveOcultavel(parte); if (oc) c.partesOcultas = [...new Set([...(c.partesOcultas ?? []), oc])] }
   return c
 }

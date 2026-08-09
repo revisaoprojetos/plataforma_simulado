@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { Fragment, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown, Check, Undo2, Redo2, Trash2, Menu, ArrowUp, ArrowDown, GripVertical, Type, Heading, LayoutGrid } from 'lucide-react'
@@ -193,8 +193,12 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const reordenar = (keys: string[]) => setConteudo({ ...conteudoBase(), ordem: keys })
   function moverEntrada(idx: number, dir: -1 | 1) { const keys = outline.map((e) => e.key); const j = idx + dir; if (j < 0 || j >= keys.length) return; [keys[idx], keys[j]] = [keys[j], keys[idx]]; reordenar(keys) }
   function soltarEntrada(from: number, to: number) { if (from === to) return; const keys = outline.map((e) => e.key); const [k] = keys.splice(from, 1); keys.splice(to, 0, k); reordenar(keys) }
-  function apagarEntrada(e: DiagEntrada) { if (e.parte === 'diag_cab') setAjuste({ mostrarCabecalho: false }); else setConteudo(removerParteDiag(ativo.conteudo, e.parte)) }
-  function editarEntrada(e: DiagEntrada) { if (!e.parte) return; setOrigemEstrutura(true); setEstruturaAberta(false); setPickerBloco(null); setPickerCapa(false); setPickerCor({ parte: e.parte, label: e.label, cor: a.coresParte?.[e.parte] ?? a.corPrimaria }) }
+  function apagarEntrada(e: DiagEntrada) { if (e.apagar === 'diag_cab') setAjuste({ mostrarCabecalho: false }); else setConteudo(removerParteDiag(ativo.conteudo, e.apagar)) }
+  function editarEntrada(e: DiagEntrada) { if (!e.parte) return; abrirEdicaoDeParte(e.parte, e.label) }
+  function abrirEdicaoDeParte(parte: string, label: string) { setOrigemEstrutura(true); setEstruturaAberta(false); setPickerBloco(null); setPickerCapa(false); setPickerCor({ parte, label, cor: a.coresParte?.[parte] ?? a.corPrimaria }) }
+  // Pilares: cada card é listado individualmente no painel (editar/apagar/reordenar dentro do array).
+  function moverPilar(i: number, dir: -1 | 1) { const pilares = [...conteudoBase().pilares]; const j = i + dir; if (j < 0 || j >= pilares.length) return; [pilares[i], pilares[j]] = [pilares[j], pilares[i]]; setConteudo({ ...conteudoBase(), pilares }) }
+  function apagarPilar(i: number) { setConteudo({ ...conteudoBase(), pilares: conteudoBase().pilares.filter((_, j) => j !== i) }) }
   const fecharPickerCor = () => { setPickerCor(null); setOrigemEstrutura(false) }
   const ICONE_TIPO: Record<TipoBloco, any> = { cabecalho: LayoutTemplate, nome: FileText, nota: BarChart3, texto: Type, secao: Heading, card: LayoutGrid, desempenho: BarChart3 }
   const exportUrl = (fmt: 'word' | 'html') => `/api/admin/caderno-teste/exportar?caderno=${cadernoId}&grupo=${ativo.id}&formato=${fmt}${alunoAtual ? `&aluno=${alunoAtual.id}` : ''}`
@@ -445,7 +449,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
         const temCorTexto = ['diag_nota_num', 'diag_nota_faixa', 'diag_cab', 'diag_nome_rot', 'diag_nome_val'].includes(pickerCor.parte) || pickerCor.parte.startsWith('sec_')
         return (
         <>
-          <div className="fixed inset-0 z-40 bg-black/10" onClick={fecharPickerCor} />
+          <div className="pointer-events-none fixed inset-0 z-40 bg-black/5" />
           <aside className="fixed inset-y-0 right-0 z-50 flex w-80 max-w-[85vw] flex-col border-l bg-background shadow-2xl duration-200 animate-in slide-in-from-right">
             <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
               <div className="flex min-w-0 items-center gap-2">
@@ -609,7 +613,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       {/* Barra lateral direita — editar o TÍTULO DA CAPA (modelos prontos) */}
       {pickerCapa && presetAtivo && a.capaUrl && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/10" onClick={() => setPickerCapa(false)} />
+          <div className="pointer-events-none fixed inset-0 z-40 bg-black/5" />
           <aside className="fixed inset-y-0 right-0 z-50 flex w-80 max-w-[85vw] flex-col border-l bg-background shadow-2xl duration-200 animate-in slide-in-from-right">
             <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
               <div className="min-w-0">
@@ -683,7 +687,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       {/* Barra lateral direita — editar um BLOCO do modelo pronto (cor/fonte/texto individual) */}
       {pickerBloco && blocoSel && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/10" onClick={() => setPickerBloco(null)} />
+          <div className="pointer-events-none fixed inset-0 z-40 bg-black/5" />
           <aside className="fixed inset-y-0 right-0 z-50 flex w-80 max-w-[85vw] flex-col border-l bg-background shadow-2xl duration-200 animate-in slide-in-from-right">
             <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
               <div className="min-w-0">
@@ -731,7 +735,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       {/* Painel de ESTRUTURA (outline) — lista/ordena/edita/remove os blocos do diagnóstico */}
       {estruturaAberta && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/10" onClick={() => setEstruturaAberta(false)} />
+          <div className="pointer-events-none fixed inset-0 z-40 bg-black/5" />
           <aside className="fixed inset-y-0 right-0 z-50 flex w-96 max-w-[90vw] flex-col border-l bg-background shadow-2xl duration-200 animate-in slide-in-from-right">
             <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
               <div className="min-w-0">
@@ -745,20 +749,35 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
               <div className="space-y-1">
                 {outline.map((e, i) => {
                   const Icon = ICONE_TIPO[e.tipo] ?? Type
+                  const pilares = e.key === 'pilares' ? (ativo.conteudo?.pilares ?? []) : []
                   return (
-                    <div key={e.key} draggable onDragStart={() => setDragIdx(i)} onDragOver={(ev) => ev.preventDefault()}
-                      onDrop={() => { if (dragIdx != null) soltarEntrada(dragIdx, i); setDragIdx(null) }} onDragEnd={() => setDragIdx(null)}
-                      className={cn('group flex items-center gap-1.5 rounded-md border bg-background px-1.5 py-1.5', dragIdx === i && 'opacity-50')}>
-                      <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/60" />
-                      <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
-                      <span className="min-w-0 flex-1 truncate text-[12px]" title={e.label}>{e.label}</span>
-                      <div className="flex shrink-0 items-center">
-                        <button type="button" onClick={() => moverEntrada(i, -1)} disabled={i === 0} title="Subir" className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
-                        <button type="button" onClick={() => moverEntrada(i, 1)} disabled={i === outline.length - 1} title="Descer" className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
-                        {e.parte && <button type="button" onClick={() => editarEntrada(e)} title="Editar bloco" className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>}
-                        {e.removivel && <button type="button" onClick={() => apagarEntrada(e)} title="Apagar bloco" className="rounded p-1 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>}
+                    <Fragment key={e.key}>
+                      <div draggable onDragStart={() => setDragIdx(i)} onDragOver={(ev) => ev.preventDefault()}
+                        onDrop={() => { if (dragIdx != null) soltarEntrada(dragIdx, i); setDragIdx(null) }} onDragEnd={() => setDragIdx(null)}
+                        className={cn('group flex items-center gap-1.5 rounded-md border bg-background px-1.5 py-1.5', dragIdx === i && 'opacity-50')}>
+                        <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/60" />
+                        <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+                        <span className="min-w-0 flex-1 truncate text-[12px]" title={e.label}>{e.label}</span>
+                        <div className="flex shrink-0 items-center">
+                          <button type="button" onClick={() => moverEntrada(i, -1)} disabled={i === 0} title="Subir" className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
+                          <button type="button" onClick={() => moverEntrada(i, 1)} disabled={i === outline.length - 1} title="Descer" className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
+                          {e.parte && <button type="button" onClick={() => editarEntrada(e)} title="Editar bloco" className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>}
+                          {e.removivel && <button type="button" onClick={() => apagarEntrada(e)} title="Apagar bloco" className="rounded p-1 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>}
+                        </div>
                       </div>
-                    </div>
+                      {pilares.map((pl, pi) => (
+                        <div key={pi} className="ml-6 flex items-center gap-1.5 rounded-md border border-dashed bg-muted/20 px-1.5 py-1.5">
+                          <LayoutGrid className="h-3.5 w-3.5 shrink-0 text-primary/70" />
+                          <span className="min-w-0 flex-1 truncate text-[12px]" title={pl.nome}>{pl.nome || `Pilar ${pi + 1}`}</span>
+                          <div className="flex shrink-0 items-center">
+                            <button type="button" onClick={() => moverPilar(pi, -1)} disabled={pi === 0} title="Subir" className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
+                            <button type="button" onClick={() => moverPilar(pi, 1)} disabled={pi === pilares.length - 1} title="Descer" className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
+                            <button type="button" onClick={() => abrirEdicaoDeParte(`pilar:${pi}`, pl.nome || `Pilar ${pi + 1}`)} title="Editar pilar" className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                            <button type="button" onClick={() => apagarPilar(pi)} title="Apagar pilar" className="rounded p-1 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+                          </div>
+                        </div>
+                      ))}
+                    </Fragment>
                   )
                 })}
                 {outline.length === 0 && <p className="px-1 py-4 text-center text-xs text-muted-foreground">Sem blocos para exibir.</p>}
