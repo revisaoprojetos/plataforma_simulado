@@ -117,7 +117,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
         </button>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[168px_minmax(0,1fr)_290px]">
+      <div className="grid min-h-0 flex-1 grid-cols-[132px_minmax(0,1fr)_240px] lg:grid-cols-[160px_minmax(0,1fr)_280px] xl:grid-cols-[190px_minmax(0,1fr)_320px] 2xl:grid-cols-[210px_minmax(0,1fr)_360px]">
         {/* PÁGINAS */}
         <div className="flex flex-col overflow-auto border-r p-2">
           <p className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Páginas</p>
