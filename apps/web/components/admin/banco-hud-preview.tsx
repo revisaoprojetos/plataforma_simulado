@@ -5,19 +5,44 @@ import { Pencil, Palette } from 'lucide-react'
 import { type HudCores, type HudPorPagina, efetivarHud } from '@/lib/caderno-designer/types'
 import { hudCssVars } from '@/lib/caderno-designer/hud'
 import { ProvaHud } from '@/components/prova/prova-hud'
-import { DEMO_Q } from '@/lib/hud/campos'
+import { ProvaIntro, ProvaLoading, type EstiloProvaLoading } from '@/components/prova/prova-intro'
+import { ProvaLoginPreview, ProvaEncerradaPreview } from '@/components/prova/prova-previews'
+import { SCREENS, STATUS_POR_TAB, DEMO_Q, type ScreenKey } from '@/lib/hud/campos'
 
-/** Aba "HUD do simulado": mostra só a prévia do tema atual + botão que abre o editor dedicado. */
+/** Aba "HUD do simulado": mostra a prévia de TODAS as telas (uma ao lado da outra) + botão que abre o editor. */
 export function BancoHudPreview({ bancoId, titulo, base, porPagina }: {
   bancoId: string; titulo: string; base: Partial<HudCores>; porPagina: HudPorPagina
 }) {
-  const c = efetivarHud(base, porPagina, 'prova')
   const noop = () => {}
+
+  const demoHud = (
+    <ProvaHud compact titulo={titulo} tempoLabel="45:00" timerWarning={false} salvando={false}
+      questaoIndex={1} totalQuestoes={5} totalRespondidas={1} progresso={20}
+      questaoAtual={DEMO_Q} respostaId="b" eliminadas={['c']}
+      respondidas={[true, false, false, false, false]} marcadas={[false, true, true, false, false]} marcadaAtual numMarcadas={2}
+      mostrarTempo onResponder={noop} onPrev={noop} onNext={noop} onRevisar={noop} onGoto={noop} />
+  )
+
+  const conteudo = (tela: ScreenKey, c: HudCores) => {
+    if (tela === 'loading') return <ProvaLoading compact loop mensagem="Carregando simulado..." tipo={c.loadingTipo as EstiloProvaLoading} />
+    if (tela === 'login') return (
+      <div className="relative h-full"><ProvaLoginPreview compact branding={null} titulo={titulo} status={STATUS_POR_TAB['form']} /></div>
+    )
+    if (tela === 'entrada') return (
+      <div className="relative h-full overflow-hidden">
+        <div aria-hidden className="pointer-events-none absolute inset-0 select-none blur-[2px]" style={hudCssVars(efetivarHud(base, porPagina, 'prova')) as React.CSSProperties}>{demoHud}</div>
+        <ProvaIntro compact overlay titulo={titulo} inicioLabel="00:00" tempoLabel="45:00" totalQuestoes={5} onIniciar={noop} />
+      </div>
+    )
+    if (tela === 'encerrada') return <ProvaEncerradaPreview compact branding={null} titulo={titulo} liberado />
+    return demoHud
+  }
+
   return (
     <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3" style={{ background: `linear-gradient(90deg, ${c.primaria}1f, transparent 55%)` }}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3" style={{ background: `linear-gradient(90deg, ${efetivarHud(base, porPagina, 'prova').primaria}1f, transparent 55%)` }}>
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: c.primaria }}><Palette className="h-5 w-5" /></span>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: efetivarHud(base, porPagina, 'prova').primaria }}><Palette className="h-5 w-5" /></span>
           <div>
             <h3 className="text-sm font-semibold leading-tight">HUD do simulado</h3>
             <p className="text-xs text-muted-foreground">Tema de cores da prova do aluno — vale p/ os simulados deste banco</p>
@@ -28,14 +53,22 @@ export function BancoHudPreview({ bancoId, titulo, base, porPagina }: {
         </Link>
       </div>
 
-      <div className="bg-muted/30 p-4 sm:p-6">
-        <p className="mb-3 text-center text-xs text-muted-foreground">Prévia da tela de prova com o tema atual — clique em <span className="font-medium text-foreground">Editar HUD</span> para ajustar.</p>
-        <div className="mx-auto max-w-3xl overflow-hidden rounded-xl border shadow-sm" style={hudCssVars(c) as React.CSSProperties}>
-          <ProvaHud compact titulo={titulo} tempoLabel="45:00" timerWarning={false} salvando={false}
-            questaoIndex={1} totalQuestoes={5} totalRespondidas={1} progresso={20}
-            questaoAtual={DEMO_Q} respostaId="b" eliminadas={['c']}
-            respondidas={[true, false, false, false, false]} marcadas={[false, true, true, false, false]} marcadaAtual numMarcadas={2}
-            mostrarTempo onResponder={noop} onPrev={noop} onNext={noop} onRevisar={noop} onGoto={noop} />
+      <div className="bg-muted/30 p-4">
+        <p className="mb-3 text-center text-xs text-muted-foreground">Prévia de todas as telas com o tema atual — clique em <span className="font-medium text-foreground">Editar HUD</span> para ajustar.</p>
+        <div className="flex gap-4 overflow-x-auto pb-2">
+          {SCREENS.map((s) => {
+            const c = efetivarHud(base, porPagina, s.key)
+            return (
+              <div key={s.key} className="shrink-0">
+                <p className="mb-2 flex items-center justify-center gap-1.5 text-center text-xs font-medium text-muted-foreground"><s.icon className="h-3.5 w-3.5" />{s.label}</p>
+                <div className="h-[520px] w-[360px] overflow-hidden rounded-xl border bg-card shadow-sm">
+                  <div className="h-[1040px] w-[720px] origin-top-left scale-50 overflow-hidden" style={hudCssVars(c) as React.CSSProperties}>
+                    {conteudo(s.key, c)}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>
