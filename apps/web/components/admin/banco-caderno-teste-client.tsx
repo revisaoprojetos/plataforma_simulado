@@ -1,16 +1,16 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { BarChart3, Pencil, Clock, Layers } from 'lucide-react'
+import { BarChart3, Pencil, Clock, Layers, ExternalLink, Loader2, FileText, ClipboardList } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { MaterialPdfCard } from '@/components/admin/banco-caderno-client'
 import { removerMaterialPdf } from '@/app/admin/banco-questoes/estudantes-actions'
-import type { CadernoTesteResumo } from '@/app/admin/cadernos-teste/actions'
+import type { CadernoTesteResumo, CadernoTesteGrupo } from '@/app/admin/cadernos-teste/actions'
 
-/** Lista os cadernos de teste do banco; cada um com "Abrir editor" + os 2 PDFs (Gabarito/Enunciado). */
+/** Lista os cadernos de teste do banco; cada um com a prévia dos grupos + "Abrir editor" + os 2 PDFs. */
 export function BancoCadernoTesteClient({ bancoId, cor, cadernos }: { bancoId: string; cor: string; cadernos: CadernoTesteResumo[] }) {
   return (
     <div className="space-y-4">
@@ -73,7 +73,7 @@ function CadernoTesteItem({ bancoId, cor, caderno }: { bancoId: string; cor: str
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold leading-tight" title={caderno.nome}>{caderno.nome}</p>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1"><Layers className="h-3 w-3" /> {caderno.grupos} grupo(s)</span>
+            <span className="inline-flex items-center gap-1"><Layers className="h-3 w-3" /> {caderno.itens.length} grupo(s)</span>
             {caderno.atualizadoEm && <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {fmt(caderno.atualizadoEm)}</span>}
           </div>
         </div>
@@ -84,11 +84,49 @@ function CadernoTesteItem({ bancoId, cor, caderno }: { bancoId: string; cor: str
 
       <input ref={fileMat} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) enviar(f, 'material'); e.currentTarget.value = '' }} />
       <input ref={fileEn} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) enviar(f, 'enunciado'); e.currentTarget.value = '' }} />
-      <div className="grid gap-3 sm:grid-cols-2">
+
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Material do aluno</p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {caderno.itens.map((g) => <PreviaGrupoCard key={g.id} cadernoId={caderno.id} grupo={g} cor={cor} />)}
         <MaterialPdfCard cor={cor} titulo="Gabarito Comentado" hint="Ex.: caderno pronto da EBT · máx. ~8 MB"
           pdfUrl={matUrl} pdfNome={matNome} busy={matBusy} onUpload={() => fileMat.current?.click()} onRemover={() => remover('material')} />
         <MaterialPdfCard cor={cor} titulo="Enunciado de Questões" hint="Só as questões (sem gabarito) — o aluno baixa antes de iniciar · máx. ~8 MB"
           pdfUrl={enUrl} pdfNome={enNome} busy={enBusy} onUpload={() => fileEn.current?.click()} onRemover={() => remover('enunciado')} />
+      </div>
+    </div>
+  )
+}
+
+/** Preview (iframe) de um grupo do caderno de teste — renderizado pela rota /imprimir/caderno-teste. */
+function PreviaGrupoCard({ cadernoId, grupo, cor }: { cadernoId: string; grupo: CadernoTesteGrupo; cor: string }) {
+  const BASE_W = 820, BASE_H = 1123
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [w, setW] = useState(320)
+  const [carregado, setCarregado] = useState(false)
+  useEffect(() => {
+    const el = boxRef.current; if (!el) return
+    const upd = () => setW(el.clientWidth || 320)
+    upd(); const ro = new ResizeObserver(upd); ro.observe(el); return () => ro.disconnect()
+  }, [])
+  const s = w / BASE_W
+  const boxH = Math.round(w * (BASE_H / BASE_W))
+  const Icon = grupo.modalidade === 'diagnostico' ? BarChart3 : grupo.modalidade === 'folha_respostas' ? ClipboardList : FileText
+  const src = `/imprimir/caderno-teste/${cadernoId}?grupo=${grupo.id}&embed=1`
+  return (
+    <div className="flex min-w-0 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
+      <div className="flex items-center gap-2 border-b px-2.5 py-2" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent)` }}>
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white shadow-sm" style={{ background: cor }}><Icon className="h-3.5 w-3.5" /></span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold" title={grupo.label}>{grupo.label}</span>
+        <a href={src} target="_blank" rel="noreferrer" title="Abrir em tela cheia" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ExternalLink className="h-4 w-4" /></a>
+      </div>
+      <div ref={boxRef} className="relative w-full overflow-hidden bg-neutral-200 dark:bg-neutral-800" style={{ height: boxH }}>
+        {!carregado && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-neutral-100 text-muted-foreground dark:bg-neutral-900">
+            <Loader2 className="h-6 w-6 animate-spin" /><span className="text-xs">Carregando prévia…</span>
+          </div>
+        )}
+        <iframe src={src} title={grupo.label} loading="lazy" onLoad={() => setCarregado(true)}
+          style={{ width: BASE_W, height: BASE_H, transform: `scale(${s})`, transformOrigin: 'top left', border: 0, background: '#fff' }} />
       </div>
     </div>
   )

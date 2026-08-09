@@ -8,6 +8,7 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { carregarRegistros } from '@/lib/caderno-designer/merge'
 import { slugDiag } from '@/lib/caderno-teste/diagnostico'
 import { materialDoConfig, materialEnunciadoDoConfig, type MaterialCaderno } from '@/lib/caderno-designer/material'
+import { metaDaModalidade } from '@/lib/caderno-teste/tipos'
 import type { BuilderV3, PreviewQuestao } from '@/lib/caderno-teste/tipos'
 
 export type RegistroTeste = { id: string; nome: string; vars: Record<string, string> }
@@ -141,7 +142,8 @@ export async function dadosBancoTeste(bancoId: string): Promise<{ ok: boolean; r
   return { ok: true, registros, disciplinas }
 }
 
-export type CadernoTesteResumo = { id: string; nome: string; atualizadoEm: string | null; grupos: number; material: MaterialCaderno; materialEnunciado: MaterialCaderno }
+export type CadernoTesteGrupo = { id: string; modalidade: string; label: string }
+export type CadernoTesteResumo = { id: string; nome: string; atualizadoEm: string | null; itens: CadernoTesteGrupo[]; material: MaterialCaderno; materialEnunciado: MaterialCaderno }
 
 /** Lista os cadernos de TESTE vinculados a um banco (config.builderV3.bancoId === bancoId), com o material PDF. */
 export async function listarCadernosTesteDoBanco(bancoId: string): Promise<CadernoTesteResumo[]> {
@@ -154,8 +156,13 @@ export async function listarCadernosTesteDoBanco(bancoId: string): Promise<Cader
     .filter((c) => { const cfg = (c.config ?? {}) as any; return (cfg?.builderV3?.bancoId ?? cfg?.bancoId ?? null) === bancoId })
     .map((c) => {
       const cfg = (c.config ?? {}) as any
-      const itens = cfg?.builderV3?.itens
-      return { id: c.id, nome: c.nome ?? 'Caderno de teste', atualizadoEm: c.atualizado_em ?? null, grupos: Array.isArray(itens) ? itens.length : 0, material: materialDoConfig(cfg), materialEnunciado: materialEnunciadoDoConfig(cfg) }
+      const raw = Array.isArray(cfg?.builderV3?.itens) ? cfg.builderV3.itens : []
+      const itens: CadernoTesteGrupo[] = raw.map((it: any) => {
+        const meta = metaDaModalidade(it?.modalidade)
+        const modeloNome = meta.modelos.find((m) => m.id === it?.modelo)?.nome
+        return { id: String(it?.id ?? ''), modalidade: String(it?.modalidade ?? ''), label: it?.ajustes?.titulo || `${meta.nome}${modeloNome ? ` · ${modeloNome}` : ''}` }
+      }).filter((g: CadernoTesteGrupo) => g.id)
+      return { id: c.id, nome: c.nome ?? 'Caderno de teste', atualizadoEm: c.atualizado_em ?? null, itens, material: materialDoConfig(cfg), materialEnunciado: materialEnunciadoDoConfig(cfg) }
     })
 }
 
