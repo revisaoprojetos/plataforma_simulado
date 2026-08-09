@@ -60,4 +60,13 @@ export const PRESETS_HUD: { nome: string; prim: string; sec: string; cores: Part
   { nome: 'Azul', prim: '#2563eb', sec: '#f59e0b', cores: derivarHud('#2563eb', '#f59e0b') },
   { nome: 'Vinho', prim: '#9f1239', sec: '#e0a83c', cores: derivarHud('#9f1239', '#e0a83c') },
   { nome: 'Grafite', prim: '#334155', sec: '#f59e0b', cores: derivarHud('#334155', '#f59e0b') },
+  { nome: 'Petróleo', prim: '#0f766e', sec: '#f59e0b', cores: derivarHud('#0f766e', '#f59e0b') },
+  { nome: 'Índigo', prim: '#4338ca', sec: '#22d3ee', cores: derivarHud('#4338ca', '#22d3ee') },
+  { nome: 'Laranja', prim: '#ea580c', sec: '#0ea5e9', cores: derivarHud('#ea580c', '#0ea5e9') },
+  { nome: 'Rosa', prim: '#db2777', sec: '#8b5cf6', cores: derivarHud('#db2777', '#8b5cf6') },
+  { nome: 'Ciano', prim: '#0891b2', sec: '#f59e0b', cores: derivarHud('#0891b2', '#f59e0b') },
+  { nome: 'Marinho', prim: '#1e3a8a', sec: '#fbbf24', cores: derivarHud('#1e3a8a', '#fbbf24') },
+  { nome: 'Esmeralda', prim: '#10b981', sec: '#6366f1', cores: derivarHud('#10b981', '#6366f1') },
+  { nome: 'Bordô + Dourado', prim: '#7f1d1d', sec: '#d4af37', cores: derivarHud('#7f1d1d', '#d4af37') },
+  { nome: 'Ardósia', prim: '#475569', sec: '#38bdf8', cores: derivarHud('#475569', '#38bdf8') },
 ]

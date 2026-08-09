@@ -44,10 +44,12 @@ function filtroLogo(f?: string): string | undefined {
 }
 
 /** Estilos de carregamento (espelham os da Imersão em Configurações). */
-export type EstiloProvaLoading = 'circulo' | 'circulo_cheio' | 'spinner' | 'barra' | 'pontos' | 'porcentagem'
+export type EstiloProvaLoading = 'circulo' | 'circulo_cheio' | 'anel_duplo' | 'ondas' | 'spinner' | 'barra' | 'pontos' | 'porcentagem'
 export const ESTILOS_PROVA_LOADING: { id: EstiloProvaLoading; nome: string }[] = [
   { id: 'circulo', nome: 'Círculo + Logo' },
   { id: 'circulo_cheio', nome: 'Círculo + Logo (preenchido)' },
+  { id: 'anel_duplo', nome: 'Anel duplo + Logo' },
+  { id: 'ondas', nome: 'Logo + Ondas' },
   { id: 'spinner', nome: 'Logo + Spinner' },
   { id: 'barra', nome: 'Logo + Barra' },
   { id: 'porcentagem', nome: 'Logo + Porcentagem' },
@@ -127,6 +129,48 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
     )
   }
 
+  // Anel duplo: dois anéis girando em sentidos opostos ao redor da logo.
+  if (tipo === 'anel_duplo') {
+    return (
+      <div data-campo="fundo" className={wrap}><HudFundo />
+        <span className="relative flex h-24 w-24 items-center justify-center">
+          <span data-campo="loadingCor" className="absolute inset-0 animate-spin rounded-full border-4 border-transparent" style={{ borderTopColor: cor, borderRightColor: cor }} />
+          <span data-campo="loadingCor" className="absolute inset-2 animate-spin rounded-full border-4 border-transparent" style={{ borderBottomColor: cor, borderLeftColor: cor, animationDirection: 'reverse', animationDuration: '1.4s' }} />
+          {logoUrl ? (
+            <span className={cn('flex h-12 w-12 items-center justify-center overflow-hidden', frameLogo(logoEstilo))} style={{ background: logoBg ?? '#ffffff' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logoUrl} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogo(logoFiltro) }} />
+            </span>
+          ) : (
+            <span className="h-3 w-3 rounded-full" style={{ background: cor }} />
+          )}
+        </span>
+        <p data-campo="loadingTexto" className="animate-pulse text-sm font-medium" style={{ color: 'var(--prova-loading-texto, var(--muted-foreground))' }}>{mensagem}</p>
+      </div>
+    )
+  }
+
+  // Ondas: ondas expandindo por trás da logo.
+  if (tipo === 'ondas') {
+    return (
+      <div data-campo="fundo" className={wrap}><HudFundo />
+        <span className="relative flex h-20 w-20 items-center justify-center">
+          <span data-campo="loadingCor" className="absolute inset-0 animate-ping rounded-full opacity-30" style={{ background: cor }} />
+          <span data-campo="loadingCor" className="absolute -inset-3 animate-ping rounded-full opacity-10" style={{ background: cor, animationDelay: '0.5s' }} />
+          {logoUrl ? (
+            <span className={cn('relative flex h-14 w-14 items-center justify-center overflow-hidden', frameLogo(logoEstilo))} style={{ background: logoBg ?? '#ffffff' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logoUrl} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogo(logoFiltro) }} />
+            </span>
+          ) : (
+            <span className="relative flex h-14 w-14 items-center justify-center rounded-lg text-primary-foreground" style={{ background: cor }}><ListChecks className="h-7 w-7" /></span>
+          )}
+        </span>
+        <p data-campo="loadingTexto" className="text-sm font-medium" style={{ color: 'var(--prova-loading-texto, var(--muted-foreground))' }}>{mensagem}</p>
+      </div>
+    )
+  }
+
   // Demais estilos: logo em cima + indicador (igual à Imersão).
   return (
     <div data-campo="fundo" className={wrap}><HudFundo />
@@ -142,7 +186,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
           </span>
         )}
       </div>
-      <p className="text-sm font-medium text-muted-foreground">{mensagem}</p>
+      <p data-campo="loadingTexto" className="text-sm font-medium" style={{ color: 'var(--prova-loading-texto, var(--muted-foreground))' }}>{mensagem}</p>
       {tipo === 'spinner' && <Loader2 className="h-7 w-7 animate-spin" style={{ color: cor }} />}
       {tipo === 'pontos' && (
         <div className="flex gap-2">
@@ -154,7 +198,6 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
           <div className="loading-bar-fill h-full rounded-full" style={{ background: cor }} />
         </div>
       )}
-      {/* pulsar: o próprio logo já pulsa */}
     </div>
   )
 }
