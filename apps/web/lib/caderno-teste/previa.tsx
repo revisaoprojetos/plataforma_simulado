@@ -378,8 +378,10 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
   const qs = questoes.length ? questoes : QUESTOES_EXEMPLO
   const pad = a.compacto ? 40 : 56
   const GAP = a.compacto ? 8 : 12 // espaço entre blocos (contado na paginação, fielmente)
-  const Ht = a.cabecalhoUrl ? 96 : pad + 16 // um pouco mais de respiro no topo
-  const Hf = a.rodapeUrl ? 84 : 16 // sem imagem de rodapé, margem inferior enxuta (não sobra faixa branca)
+  // Quando há imagem de FUNDO da página (folhaUrl), ela costuma trazer faixas de cabeçalho/rodapé
+  // embutidas — reserva margem p/ o conteúdo não ficar por cima delas.
+  const Ht = a.cabecalhoUrl ? 96 : a.folhaUrl ? 72 : pad + 16
+  const Hf = a.rodapeUrl ? 84 : a.folhaUrl ? 72 : 16
   const contentW = A4_W - 2 * pad
   const availH = A4_H - Ht - Hf - 16
 
