@@ -350,10 +350,8 @@ export const DIAG_BASE_4: DiagConteudo = {
     'Esse é o verdadeiro valor desta análise: mais do que mostrar uma nota, ela indica onde vale a pena investir seu tempo de estudo para obter o maior retorno até a próxima etapa.',
     'Este é apenas o seu ponto de partida. No próximo simulado, você poderá comparar este diagnóstico com o novo resultado e enxergar sua evolução de forma concreta. Afinal, o que realmente importa não é apenas a nota de um único simulado, mas o progresso consistente que você constrói ao longo da preparação.',
   ],
+  // Base limpa: sem card de gabarito desatualizado por padrão (título fica pronto p/ quem quiser adicionar).
   gabaritoTitulo: 'GABARITO OFICIAL DESATUALIZADO',
-  gabaritoIntro: [
-    'Caso este simulado reproduza uma prova aplicada, algumas questões — especialmente as de legislação e jurisprudência — podem estar desatualizadas por alterações legislativas e evolução do entendimento dos tribunais.',
-    'Abaixo, as questões que sofreram atualização (edite conforme o recorte do seu simulado):',
-  ],
+  gabaritoIntro: [],
   gabaritoObs: [],
 }
