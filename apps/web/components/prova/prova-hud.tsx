@@ -197,7 +197,7 @@ export function ProvaHud(p: ProvaHudProps) {
               <Button variant="outline" onClick={p.onPrev} disabled={p.questaoIndex === 0} style={{ background: CARD }}><ChevronLeft className="mr-1 h-4 w-4" />Voltar</Button>
               {podeMarcar && (
                 <Button variant={p.marcadaAtual ? 'default' : 'outline'} onClick={p.onToggleMarcar}
-                  style={p.marcadaAtual ? { background: REVISAR, color: '#fff' } : { background: CARD }}>
+                  style={p.marcadaAtual ? { background: REVISAR, color: '#fff', borderColor: REVISAR } : { background: CARD, color: REVISAR, borderColor: REVISAR }}>
                   <Flag className="mr-1 h-4 w-4" />Revisar
                 </Button>
               )}
