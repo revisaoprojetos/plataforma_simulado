@@ -252,7 +252,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   )
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden bg-background">
+    <div className="-m-6 flex h-screen flex-col overflow-hidden bg-background">
       <div className="flex items-center justify-between gap-3 border-b bg-card/60 px-4 py-2.5">
         <div className="flex items-center gap-3">
           <Link href="/admin/cadernos-teste" className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
