@@ -57,6 +57,17 @@ function SlotCard({ slot, cor, bancoId, grupos, valor, onGrupo, onPdf }: {
   const sel = valor?.itemId ? `${valor.cadernoId}::${valor.itemId}` : ehPdf ? 'pdf' : ''
   const fileRef = useRef<HTMLInputElement>(null)
   const [enviando, setEnviando] = useState(false)
+  // Escala da prévia: mostra a página A4 inteira ajustada à largura do slot (zoom out).
+  const BASE_W = 794, BASE_H = 1123
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [w, setW] = useState(300)
+  useEffect(() => {
+    const el = boxRef.current; if (!el) return
+    const upd = () => setW(el.clientWidth || 300)
+    upd(); const ro = new ResizeObserver(upd); ro.observe(el); return () => ro.disconnect()
+  }, [])
+  const escala = w / BASE_W
+  const boxH = Math.round(w * (BASE_H / BASE_W))
 
   const onSelect = (v: string) => {
     if (v === '') return onGrupo(null)
@@ -97,11 +108,13 @@ function SlotCard({ slot, cor, bancoId, grupos, valor, onGrupo, onPdf }: {
         </select>
 
         {/* Prévia da seleção */}
-        <div className="relative h-[300px] w-full overflow-hidden rounded-lg border bg-neutral-100 dark:bg-neutral-900">
+        <div ref={boxRef} className="relative w-full overflow-hidden rounded-lg border bg-neutral-100 dark:bg-neutral-900" style={{ height: valor?.itemId ? boxH : 300 }}>
           {valor?.itemId ? (
             <>
-              <iframe title={slot.titulo} src={`/imprimir/caderno-teste/${valor.cadernoId}?grupo=${valor.itemId}&embed=1`} className="h-full w-full bg-white" style={{ border: 0 }} />
-              <a href={`/imprimir/caderno-teste/${valor.cadernoId}?grupo=${valor.itemId}&embed=1`} target="_blank" rel="noreferrer" title="Abrir" className="absolute right-2 top-2 rounded-md bg-background/90 p-1 shadow ring-1 ring-border hover:bg-background"><ExternalLink className="h-3.5 w-3.5" /></a>
+              <iframe title={slot.titulo} src={`/imprimir/caderno-teste/${valor.cadernoId}?grupo=${valor.itemId}&embed=1`}
+                className="bg-white" scrolling="no"
+                style={{ border: 0, width: BASE_W, height: BASE_H, transform: `scale(${escala})`, transformOrigin: 'top left' }} />
+              <a href={`/imprimir/caderno-teste/${valor.cadernoId}?grupo=${valor.itemId}&embed=1`} target="_blank" rel="noreferrer" title="Abrir em tela cheia" className="absolute right-2 top-2 rounded-md bg-background/90 p-1 shadow ring-1 ring-border hover:bg-background"><ExternalLink className="h-3.5 w-3.5" /></a>
             </>
           ) : ehPdf && valor?.pdfUrl ? (
             <>
