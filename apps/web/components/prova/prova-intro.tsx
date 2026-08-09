@@ -44,14 +44,13 @@ function filtroLogo(f?: string): string | undefined {
 }
 
 /** Estilos de carregamento (espelham os da Imersão em Configurações). */
-export type EstiloProvaLoading = 'circulo' | 'circulo_cheio' | 'spinner' | 'barra' | 'pulsar' | 'pontos' | 'porcentagem'
+export type EstiloProvaLoading = 'circulo' | 'circulo_cheio' | 'spinner' | 'barra' | 'pontos' | 'porcentagem'
 export const ESTILOS_PROVA_LOADING: { id: EstiloProvaLoading; nome: string }[] = [
   { id: 'circulo', nome: 'Círculo + Logo' },
   { id: 'circulo_cheio', nome: 'Círculo + Logo (preenchido)' },
   { id: 'spinner', nome: 'Logo + Spinner' },
   { id: 'barra', nome: 'Logo + Barra' },
   { id: 'porcentagem', nome: 'Logo + Porcentagem' },
-  { id: 'pulsar', nome: 'Logo pulsante' },
   { id: 'pontos', nome: 'Logo + Pontos' },
 ]
 
@@ -131,7 +130,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
   // Demais estilos: logo em cima + indicador (igual à Imersão).
   return (
     <div data-campo="fundo" className={wrap}><HudFundo />
-      <div className={cn('animate-page', tipo === 'pulsar' && 'animate-pulse')}>
+      <div className="animate-page">
         {logoUrl ? (
           <span className={cn('flex h-16 w-16 items-center justify-center overflow-hidden', frameLogo(logoEstilo))} style={{ background: logoBg ?? '#ffffff' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
