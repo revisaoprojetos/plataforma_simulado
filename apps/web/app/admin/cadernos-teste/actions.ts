@@ -22,7 +22,10 @@ export async function questoesMetaBanco(bancoId: string): Promise<{ ok: boolean;
   if (!access.tenantId || !bancoId) return { ok: true, questoes: [] }
   const svc = createAdminClient()
   const vinc = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', access.tenantId!).order('questao_id', { ascending: true }))
-  const ids = vinc.map((v) => v.questao_id)
+  let ordemBanco: string[] = []
+  try { const { data: pasta } = await svc.from('simulado_pastas').select('ordem_questoes').eq('id', bancoId).eq('tenant_id', access.tenantId!).maybeSingle(); if (Array.isArray((pasta as any)?.ordem_questoes)) ordemBanco = (pasta as any).ordem_questoes } catch { /* coluna pode não existir */ }
+  const posBanco = new Map(ordemBanco.map((id, i) => [id, i]))
+  const ids = vinc.map((v) => v.questao_id).sort((a, b) => (posBanco.get(a) ?? 1e9) - (posBanco.get(b) ?? 1e9))
   if (!ids.length) return { ok: true, questoes: [] }
   const qs = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_questoes').select('id, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)').in('id', chunk).eq('tenant_id', access.tenantId!))
   const meta = new Map<string, { nome: string; assunto: string }>()
@@ -72,7 +75,13 @@ export async function previewQuestoesBanco(bancoId: string): Promise<{ ok: boole
   if (!bancoId) return { ok: true, questoes: [] }
   const svc = createAdminClient()
   const vinc = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', access.tenantId!).order('questao_id', { ascending: true }))
-  const ids = vinc.map((v) => v.questao_id).slice(0, 80) // teto para a prévia (não é a geração final)
+  // Ordem DESIGNADA no banco (simulado_pastas.ordem_questoes); fallback: ordem estável por id.
+  let ordemBanco: string[] = []
+  try { const { data: pasta } = await svc.from('simulado_pastas').select('ordem_questoes').eq('id', bancoId).eq('tenant_id', access.tenantId!).maybeSingle(); if (Array.isArray((pasta as any)?.ordem_questoes)) ordemBanco = (pasta as any).ordem_questoes } catch { /* coluna pode não existir */ }
+  const posBanco = new Map(ordemBanco.map((id, i) => [id, i]))
+  const ids = vinc.map((v) => v.questao_id)
+    .sort((a, b) => (posBanco.get(a) ?? 1e9) - (posBanco.get(b) ?? 1e9))
+    .slice(0, 80) // teto para a prévia (não é a geração final)
   if (!ids.length) return { ok: true, questoes: [] }
   const { data: qs } = await svc.from('simulado_questoes').select('id, enunciado, tipo').in('id', ids).eq('tenant_id', access.tenantId)
   const { data: alts } = await svc.from('simulado_alternativas').select('questao_id, texto, ordem, correta, comentario').in('questao_id', ids).eq('tenant_id', access.tenantId)
