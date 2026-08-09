@@ -61,6 +61,16 @@ export default async function RootLayout({
             __html: `try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.cookie='theme='+t+';path=/;max-age=31536000;samesite=lax'}catch(e){}`,
           }}
         />
+        {/* Splash do /admin: se ainda não visto nesta sessão, pausa a animação de entrada
+            (classe splash-ativo) ANTES do 1º paint — evita a animação rodar escondida atrás do
+            splash. Fica no <head> (server, estável) e não no admin layout, pois um <script> dentro
+            de um client component faz o React 19 avisar. Rede de segurança de 2s; o SplashSistema
+            tira a classe no fade. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(location.pathname.indexOf('/admin')===0&&!sessionStorage.getItem('splash_sistema_visto')){document.documentElement.classList.add('splash-ativo');setTimeout(function(){document.documentElement.classList.remove('splash-ativo')},2000)}}catch(e){}`,
+          }}
+        />
         {/* Dynamic white-label theme — overrides shadcn CSS variable defaults */}
         <style dangerouslySetInnerHTML={{ __html: themeCSS }} />
         {/* Fontes do Google usadas nos cadernos de prova (editor + impressão/PDF) */}
