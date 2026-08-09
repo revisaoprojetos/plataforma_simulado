@@ -97,7 +97,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
   const ABAS: { key: Aba; label: string; icon: typeof Layers }[] = [{ key: 'base', label: 'Base (todas)', icon: Layers }, ...SCREENS.map((s) => ({ key: s.key as Aba, label: s.label, icon: s.icon }))]
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-card">
+    <div className="overflow-hidden bg-card">
       {/* Cabeçalho + salvar */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent 55%)` }}>
         <div className="flex items-center gap-3">
@@ -117,7 +117,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
         </button>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[168px_minmax(0,1fr)_290px]">
+      <div className="grid h-[calc(100vh-3.5rem)] min-h-[520px] grid-cols-[168px_minmax(0,1fr)_290px]">
         {/* PÁGINAS */}
         <div className="flex flex-col overflow-auto border-r p-2">
           <p className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Páginas</p>
