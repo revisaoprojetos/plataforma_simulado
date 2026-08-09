@@ -34,7 +34,11 @@ export async function POST(req: NextRequest) {
   const configKey = slot === 'enunciado' ? 'material_enunciado' : 'material'
   // Tabela alvo: designer (real) ou a isolada de teste. Whitelist — nunca aceita nome arbitrário.
   const tabela = String(form.get('tabela') ?? '') === 'simulado_cadernos_teste' ? 'simulado_cadernos_teste' : 'simulado_cadernos_designer'
-  if (!(file instanceof File) || !cadernoId) return NextResponse.json({ ok: false, error: 'Dados incompletos.' }, { status: 400 })
+  // alvo=entrega → PDF do slot da MONTAGEM do banco (simulado_pastas.caderno_entrega), não de um caderno.
+  const alvo = String(form.get('alvo') ?? '')
+  if (!(file instanceof File)) return NextResponse.json({ ok: false, error: 'Dados incompletos.' }, { status: 400 })
+  if (alvo !== 'entrega' && !cadernoId) return NextResponse.json({ ok: false, error: 'Dados incompletos.' }, { status: 400 })
+  if (alvo === 'entrega' && !bancoId) return NextResponse.json({ ok: false, error: 'Banco ausente.' }, { status: 400 })
   if (file.size > 8 * 1024 * 1024) return NextResponse.json({ ok: false, error: 'PDF muito grande (máx. ~8 MB).' }, { status: 400 })
 
   const buf = Buffer.from(await file.arrayBuffer())
@@ -43,6 +47,28 @@ export async function POST(req: NextRequest) {
   if (buf.subarray(0, 4).toString('latin1') !== '%PDF') return NextResponse.json({ ok: false, error: 'O arquivo não é um PDF válido.' }, { status: 400 })
 
   const svc = createAdminClient()
+
+  // ----- Montagem do banco (slot enunciado/gabarito como PDF) -----
+  if (alvo === 'entrega') {
+    const chave = slot === 'enunciado' ? 'enunciado' : 'gabarito'
+    const hash = createHash('sha1').update(buf).digest('hex').slice(0, 10)
+    const path = `materiais/${access.tenantId}/entrega-${bancoId}-${chave}-${hash}.pdf`
+    try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
+    let up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true })
+    if (up.error && /bucket.*not.*found/i.test(up.error.message)) { await svc.storage.createBucket('pdfs', { public: true }).catch(() => {}); up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true }) }
+    if (up.error) return NextResponse.json({ ok: false, error: up.error.message }, { status: 500 })
+    const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
+    const nome = ((file.name || 'PDF').replace(/\.pdf$/i, '').trim()) || 'PDF'
+    const p = await svc.from('simulado_pastas').select('caderno_entrega').eq('id', bancoId).eq('tenant_id', access.tenantId).maybeSingle()
+    const ent = (((p.data as any)?.caderno_entrega) ?? {}) as Record<string, unknown>
+    ent[chave] = { pdfUrl: url, pdfNome: nome }
+    const { error } = await svc.from('simulado_pastas').update({ caderno_entrega: ent }).eq('id', bancoId).eq('tenant_id', access.tenantId)
+    if (error) { try { await svc.storage.from('pdfs').remove([path]) } catch { /* ignora */ }; return NextResponse.json({ ok: false, error: /caderno_entrega/i.test(error.message) ? 'Rode o SQL scripts/sql/banco-caderno-entrega.sql.' : error.message }, { status: 500 }) }
+    await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: bancoId, depois: { [`entrega_${chave}_pdf`]: nome } })
+    revalidatePath(`/admin/banco-questoes/${bancoId}`)
+    return NextResponse.json({ ok: true, url, nome })
+  }
+
   const { data: cad } = await svc.from(tabela).select('config').eq('id', cadernoId).eq('tenant_id', access.tenantId).maybeSingle()
   if (!cad) return NextResponse.json({ ok: false, error: 'Caderno não encontrado.' }, { status: 404 })
 

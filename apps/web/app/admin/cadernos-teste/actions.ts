@@ -194,3 +194,46 @@ export async function criarCadernoTesteNoBanco(bancoId: string, nome?: string): 
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return { ok: true, id: (ins.data as any).id }
 }
+
+// ===== Montagem / entrega do Caderno (teste) por banco (slots) =====
+export type MontagemGrupo = { cadernoId: string; cadernoNome: string; itemId: string; modalidade: string; modelo: string; label: string }
+export type EntregaRef = { cadernoId?: string; itemId?: string; pdfUrl?: string; pdfNome?: string } | null
+export type EntregaSlots = { diagnostico?: EntregaRef; folha?: EntregaRef; enunciado?: EntregaRef; gabarito?: EntregaRef }
+
+/** Carrega a montagem salva do banco + todos os grupos disponíveis (de todos os cadernos-teste do banco). */
+export async function carregarMontagem(bancoId: string): Promise<{ entrega: EntregaSlots; grupos: MontagemGrupo[] }> {
+  const access = await getCurrentAccess()
+  if (!access.tenantId || !bancoId) return { entrega: {}, grupos: [] }
+  const svc = createAdminClient()
+  const r = await svc.from(TABELA).select('id, nome, config').eq('tenant_id', access.tenantId).eq('deletado', false)
+  const grupos: MontagemGrupo[] = []
+  for (const c of ((r.data ?? []) as any[])) {
+    const cfg = (c.config ?? {}) as any
+    if ((cfg?.builderV3?.bancoId ?? cfg?.bancoId ?? null) !== bancoId) continue
+    for (const it of (Array.isArray(cfg?.builderV3?.itens) ? cfg.builderV3.itens : [])) {
+      const meta = metaDaModalidade(it?.modalidade)
+      const modeloNome = meta.modelos.find((m) => m.id === it?.modelo)?.nome
+      if (!it?.id) continue
+      grupos.push({ cadernoId: c.id, cadernoNome: c.nome ?? 'Caderno', itemId: String(it.id), modalidade: String(it.modalidade ?? ''), modelo: String(it.modelo ?? ''), label: `${meta.nome}${modeloNome ? ` · ${modeloNome}` : ''}` })
+    }
+  }
+  let entrega: EntregaSlots = {}
+  try {
+    const p = await svc.from('simulado_pastas').select('caderno_entrega').eq('id', bancoId).eq('tenant_id', access.tenantId).maybeSingle()
+    entrega = ((p.data as any)?.caderno_entrega ?? {}) as EntregaSlots
+  } catch { /* coluna pode não existir ainda */ }
+  return { entrega: entrega ?? {}, grupos }
+}
+
+/** Salva a montagem (slots) do banco em simulado_pastas.caderno_entrega. */
+export async function salvarMontagem(bancoId: string, entrega: EntregaSlots): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId || !bancoId) return { ok: false, error: 'Tenant/banco não resolvido.' }
+  const svc = createAdminClient()
+  const up = await svc.from('simulado_pastas').update({ caderno_entrega: entrega }).eq('id', bancoId).eq('tenant_id', access.tenantId)
+  if (up.error) return { ok: false, error: /column .*caderno_entrega/i.test(up.error.message) ? 'Rode o SQL scripts/sql/banco-caderno-entrega.sql (coluna caderno_entrega ausente).' : up.error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: bancoId, depois: { caderno_entrega: entrega } })
+  revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  return { ok: true }
+}
