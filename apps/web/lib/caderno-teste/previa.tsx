@@ -385,7 +385,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
       // idêntico à renderização. Assim nada é empurrado com espaço sobrando nem cortado.
       const tops = kids.map((el) => el.getBoundingClientRect().top)
       const hs = kids.map((el, i) => (i < kids.length - 1 ? tops[i + 1] : el.getBoundingClientRect().bottom) - tops[i])
-      const BUF = 10 // folga p/ sub-pixel/diferenças de render — melhor sobrar espaço do que vazar no rodapé
+      const BUF = 18 // folga p/ sub-pixel/diferenças de render — evita card cortado/sliver colorido no fim da folha
       const pages: number[][] = []; let cur: number[] = []; let h = 0
       for (let i = 0; i < hs.length; i++) {
         if (cur.length && h + hs[i] > availH - BUF) { pages.push(cur); cur = [i]; h = hs[i] }
