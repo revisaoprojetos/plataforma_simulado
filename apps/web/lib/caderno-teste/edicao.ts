@@ -29,7 +29,7 @@ export function camposDoBloco(item: ItemCaderno, parte: string, nomeFallback?: s
   if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] == null) return []; return [{ id: 'intro', label: 'Parágrafo', valor: c.intro[i], multiline: true }] }
   if (parte.startsWith('fechamento:')) { const i = Number(parte.slice('fechamento:'.length)); if (c.fechamento?.[i] == null) return []; return [{ id: 'fechamento', label: 'Parágrafo', valor: c.fechamento[i], multiline: true }] }
   if (parte.startsWith('gabIntro:')) { const i = Number(parte.slice('gabIntro:'.length)); if (c.gabaritoIntro[i] == null) return []; return [{ id: 'texto', label: 'Parágrafo', valor: c.gabaritoIntro[i], multiline: true }] }
-  if (parte === 'gab_obs') return c.gabaritoObs.map((o, i) => ({ id: `obs:${i}`, label: `Observação ${i + 1}`, valor: o, multiline: true }))
+  if (parte === 'gab_obs') return [{ id: 'obs', label: 'Observações (uma por linha)', valor: c.gabaritoObs.join('\n'), multiline: true }]
   if (parte === 'disc_intro') return [{ id: 'disciplinasIntro', label: 'Introdução das disciplinas', valor: c.disciplinasIntro, multiline: true }]
   if (parte.startsWith('pilar:')) {
     const i = Number(parte.slice('pilar:'.length)); const pl = c.pilares[i]; if (!pl) return []
@@ -119,7 +119,7 @@ export function aplicarCampoBloco(conteudo: DiagConteudo | undefined, parte: str
   else if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] != null) c.intro[i] = valor }
   else if (parte.startsWith('fechamento:')) { const i = Number(parte.slice('fechamento:'.length)); if (c.fechamento?.[i] != null) c.fechamento[i] = valor }
   else if (parte.startsWith('gabIntro:')) { const i = Number(parte.slice('gabIntro:'.length)); if (c.gabaritoIntro[i] != null) c.gabaritoIntro[i] = valor }
-  else if (parte === 'gab_obs') { if (campoId.startsWith('obs:')) { const i = Number(campoId.slice('obs:'.length)); if (c.gabaritoObs[i] != null) c.gabaritoObs[i] = valor } }
+  else if (parte === 'gab_obs') { if (campoId === 'obs') c.gabaritoObs = valor.split('\n').filter((l) => l.trim().length > 0) }
   else if (parte === 'disc_intro') { c.disciplinasIntro = valor }
   else if (parte.startsWith('pilar:')) {
     const i = Number(parte.slice('pilar:'.length)); if (c.pilares[i]) {
