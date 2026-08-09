@@ -160,7 +160,8 @@ export async function listarCadernosTesteDoBanco(bancoId: string): Promise<Cader
       const itens: CadernoTesteGrupo[] = raw.map((it: any) => {
         const meta = metaDaModalidade(it?.modalidade)
         const modeloNome = meta.modelos.find((m) => m.id === it?.modelo)?.nome
-        return { id: String(it?.id ?? ''), modalidade: String(it?.modalidade ?? ''), label: it?.ajustes?.titulo || `${meta.nome}${modeloNome ? ` · ${modeloNome}` : ''}` }
+        // Rótulo do grupo = MODALIDADE (+ modelo) — identifica cada tipo. O nome do caderno fica no cabeçalho.
+        return { id: String(it?.id ?? ''), modalidade: String(it?.modalidade ?? ''), label: `${meta.nome}${modeloNome ? ` · ${modeloNome}` : ''}` }
       }).filter((g: CadernoTesteGrupo) => g.id)
       return { id: c.id, nome: c.nome ?? 'Caderno de teste', atualizadoEm: c.atualizado_em ?? null, itens, material: materialDoConfig(cfg), materialEnunciado: materialEnunciadoDoConfig(cfg) }
     })
