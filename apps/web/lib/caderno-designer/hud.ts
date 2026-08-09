@@ -16,8 +16,8 @@ function contraste(hex: string): string {
  * fita, situações, acerto/erro, etc.) são aplicados.
  */
 export function hudCssVars(c: HudCores, dark = false): Record<string, string> {
-  const muted = `color-mix(in oklab, ${c.texto} 10%, ${c.fundo})`
-  const mutedFg = `color-mix(in oklab, ${c.texto} 55%, ${c.fundo})`
+  const muted = c.superficie || `color-mix(in oklab, ${c.texto} 10%, ${c.fundo})`
+  const mutedFg = c.textoSecundario || `color-mix(in oklab, ${c.texto} 55%, ${c.fundo})`
 
   // Acentos do caderno — aplicados em claro E escuro.
   const acentos: Record<string, string> = {

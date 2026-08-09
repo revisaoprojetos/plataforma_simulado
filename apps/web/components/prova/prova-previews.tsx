@@ -388,12 +388,12 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
                     <>
                       <div data-campo="acerto" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ACERTO }} /> Acertou (1)</div>
                       <div data-campo="erro" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ERRO }} /> Errou (1)</div>
-                      <div data-campo="texto" className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Sem resposta (1)</div>
+                      <div data-campo="superficie" className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Sem resposta (1)</div>
                     </>
                   ) : (
                     <>
                       <div data-campo="respondida" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_MARCADA }} /> Respondidas (4)</div>
-                      <div data-campo="texto" className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Em branco (1)</div>
+                      <div data-campo="superficie" className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Em branco (1)</div>
                     </>
                   )}
                   <div data-campo="anulada" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ANUL }} /> Anuladas (1)</div>

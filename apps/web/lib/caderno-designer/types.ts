@@ -143,6 +143,8 @@ export type HudCores = {
   revisar: string      // marcar p/ revisar (botão Revisar + flag no navegador)
   card: string         // fundo do card da questão / alternativas
   texto: string        // cor do texto
+  textoSecundario: string // rótulos e textos auxiliares (muted-foreground)
+  superficie: string   // fundos suaves (caixas/chips cinza) (muted)
   alerta: string       // timer acabando / erro (destructive)
   aviso: string        // atenção (âmbar): pop-up "não liberado", faixa de gabarito
   borda: string        // bordas
@@ -196,6 +198,7 @@ export const HUD_CORES_PADRAO: HudCores = {
   fundo: '#ffffff', topbar: '#f6f6f9', topbarTexto: '#1a1d24', timer: '#1a1d24', primaria: '#6d28d9',
   timerFundo: '#eef1f5', selecionada: '#6d28d9', finalizar: '#6d28d9',
   respondida: '#6d28d9', revisar: '#f59e0b', card: '#ffffff', texto: '#1a1d24',
+  textoSecundario: '#71767f', superficie: '#eceef2',
   alerta: '#dc2626', aviso: '#f59e0b', borda: '#e5e7eb', anulada: '#6b7280', altTrocada: '#0891b2',
   altFundo: '#ffffff', altHover: '#f4f4f5',
   acerto: '#16a34a', erro: '#dc2626', branco: '#6b7280', media: '#6d28d9',

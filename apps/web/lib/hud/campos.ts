@@ -22,6 +22,8 @@ export const GRUPOS: HudGrupo[] = [
   { titulo: 'Base da tela', pages: 'all', campos: [
     { k: 'fundo', label: 'Fundo da tela', desc: 'Cor de fundo geral' },
     { k: 'texto', label: 'Texto', desc: 'Cor do texto geral' },
+    { k: 'textoSecundario', label: 'Texto secundário', desc: 'Rótulos e textos auxiliares (cinza)' },
+    { k: 'superficie', label: 'Superfície suave', desc: 'Fundos cinza (caixas, chips, campos)' },
     { k: 'borda', label: 'Bordas', desc: 'Contornos e divisórias' },
   ] },
   { titulo: 'Carregamento', pages: ['loading'], campos: [

@@ -137,7 +137,7 @@ export function ProvaHud(p: ProvaHudProps) {
               <div data-campo="fita1" className="absolute inset-x-0 top-0 z-0 h-1.5" style={{ background: FITA_GRADIENT }} />
               {/* número no canto + tag da disciplina logo abaixo da fita */}
               <div className="absolute inset-x-0 top-0 z-10 flex items-start">
-                <span data-campo="texto" className="rounded-br-lg border-b border-r bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">{p.questaoIndex + 1} / {p.totalQuestoes}</span>
+                <span data-campo="superficie" className="rounded-br-lg border-b border-r bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">{p.questaoIndex + 1} / {p.totalQuestoes}</span>
                 {q.disciplina && (
                   <span
                     data-campo="primaria"
@@ -241,7 +241,7 @@ export function ProvaHud(p: ProvaHudProps) {
                 <div className="mt-4 space-y-1.5 border-t pt-3 text-xs text-muted-foreground">
                   <div data-campo="primaria" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: PRIM, boxShadow: '0 0 0 1.5px var(--foreground)' }} /> Questão atual</div>
                   <div data-campo="respondida" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: MARCADA }} /> Marcadas ({p.totalRespondidas})</div>
-                  <div data-campo="texto" className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Em branco ({branco})</div>
+                  <div data-campo="superficie" className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Em branco ({branco})</div>
                   {podeMarcar && <div data-campo="revisar" className="flex items-center gap-2"><Flag className="h-3 w-3" style={{ color: REVISAR }} /> Para revisar ({p.numMarcadas ?? 0})</div>}
                 </div>
               </CardContent>

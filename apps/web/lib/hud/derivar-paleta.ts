@@ -29,7 +29,7 @@ export function derivarHud(prim: string, sec?: string): Partial<HudCores> {
   const s = sec || '#f59e0b'
   return {
     // base
-    fundo: '#ffffff', card: '#ffffff', texto: '#1a1d24', borda: '#e5e7eb',
+    fundo: '#ffffff', card: '#ffffff', texto: '#1a1d24', borda: '#e5e7eb', textoSecundario: '#71767f', superficie: '#eceef2',
     // marca
     primaria: prim, selecionada: prim, finalizar: prim, respondida: prim, media: prim, loadingCor: prim, loadingTipo: 'circulo',
     // barra da prova
