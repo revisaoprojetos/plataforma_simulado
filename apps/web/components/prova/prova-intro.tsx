@@ -60,10 +60,10 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
   // Círculo: logo no centro do anel girando (padrão).
   if (tipo === 'circulo') {
     return (
-      <div className={wrap}><HudFundo />
+      <div data-campo="fundo" className={wrap}><HudFundo />
         <span className="relative flex h-24 w-24 items-center justify-center">
           <span className="absolute inset-0 animate-ping rounded-full opacity-20" style={{ background: cor }} />
-          <span className="absolute inset-0 animate-spin rounded-full border-4 border-muted" style={{ borderTopColor: cor }} />
+          <span data-campo="loadingCor" className="absolute inset-0 animate-spin rounded-full border-4 border-muted" style={{ borderTopColor: cor }} />
           {logoUrl ? (
             <span className={cn('flex h-14 w-14 items-center justify-center overflow-hidden', frameLogo(logoEstilo))} style={{ background: logoBg ?? '#ffffff' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -73,7 +73,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
             <span className="h-3 w-3 rounded-full" style={{ background: cor }} />
           )}
         </span>
-        <p className="animate-pulse text-sm font-medium text-muted-foreground">{mensagem}</p>
+        <p data-campo="texto" className="animate-pulse text-sm font-medium text-muted-foreground">{mensagem}</p>
       </div>
     )
   }
@@ -81,10 +81,10 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
   // Círculo preenchido: a imagem ocupa toda a área interna do anel girando.
   if (tipo === 'circulo_cheio') {
     return (
-      <div className={wrap}><HudFundo />
+      <div data-campo="fundo" className={wrap}><HudFundo />
         <span className="relative flex h-24 w-24 items-center justify-center">
           <span className="absolute inset-0 animate-ping rounded-full opacity-20" style={{ background: cor }} />
-          <span className="absolute inset-0 animate-spin rounded-full border-4 border-muted" style={{ borderTopColor: cor }} />
+          <span data-campo="loadingCor" className="absolute inset-0 animate-spin rounded-full border-4 border-muted" style={{ borderTopColor: cor }} />
           {logoUrl ? (
             <span className="absolute inset-1.5 overflow-hidden rounded-full" style={{ background: logoBg ?? '#ffffff' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -94,7 +94,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
             <span className="h-3 w-3 rounded-full" style={{ background: cor }} />
           )}
         </span>
-        <p className="animate-pulse text-sm font-medium text-muted-foreground">{mensagem}</p>
+        <p data-campo="texto" className="animate-pulse text-sm font-medium text-muted-foreground">{mensagem}</p>
       </div>
     )
   }
@@ -102,7 +102,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
   // Porcentagem: logo com ondas pulsando + barra com a % na lateral (sem o texto "Carregando").
   if (tipo === 'porcentagem') {
     return (
-      <div className={wrap}><HudFundo />
+      <div data-campo="fundo" className={wrap}><HudFundo />
         <span className="relative flex h-20 w-20 items-center justify-center">
           <span className="absolute inset-0 animate-ping rounded-full opacity-20" style={{ background: cor }} />
           <span className="absolute -inset-3 animate-ping rounded-full opacity-10" style={{ background: cor, animationDelay: '0.4s' }} />
@@ -117,7 +117,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
             </span>
           )}
         </span>
-        <p className="text-sm font-medium text-muted-foreground">{mensagem}</p>
+        <p data-campo="texto" className="text-sm font-medium text-muted-foreground">{mensagem}</p>
         <BarraPorcentagem cor={cor} loop={loop} onCompleto={onCompleto} />
       </div>
     )
@@ -186,9 +186,9 @@ export function ProvaIntro(p: ProvaIntroProps) {
   if (p.atraso) {
     return (
       <div className={cn('flex items-center justify-center p-4 text-foreground', p.overlay ? cn('z-50 animate-in fade-in bg-black/50 backdrop-blur-sm duration-200', p.compact ? 'absolute inset-0' : 'fixed inset-0') : cn('bg-background', p.compact ? 'h-full' : 'min-h-screen'))}>
-        <div className="relative w-full max-w-md animate-in fade-in zoom-in-95 overflow-hidden rounded-2xl border bg-card p-8 shadow-xl duration-500">
+        <div data-campo="card" className="relative w-full max-w-md animate-in fade-in zoom-in-95 overflow-hidden rounded-2xl border bg-card p-8 shadow-xl duration-500">
           <FitaTopo />
-          <h2 className="mb-5 flex items-center gap-2 text-xl font-bold leading-tight" style={{ color: 'var(--prova-titulo, var(--primary))' }}>
+          <h2 data-campo="tituloTexto" className="mb-5 flex items-center gap-2 text-xl font-bold leading-tight" style={{ color: 'var(--prova-titulo, var(--primary))' }}>
             <Clock className="h-6 w-6 shrink-0" /> Você está entrando com atraso
           </h2>
 
@@ -200,7 +200,7 @@ export function ProvaIntro(p: ProvaIntroProps) {
             </div>
             <div className="rounded-xl border bg-muted/40 p-4 text-center">
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tempo restante</p>
-              <p className="font-mono text-2xl font-bold tabular-nums" style={{ color: 'var(--prova-entrada-tempo, var(--primary))' }}>{p.tempoLabel ?? 'Sem limite'}</p>
+              <p data-campo="entradaTempo" className="font-mono text-2xl font-bold tabular-nums" style={{ color: 'var(--prova-entrada-tempo, var(--primary))' }}>{p.tempoLabel ?? 'Sem limite'}</p>
               <p className="mt-0.5 text-[11px] text-muted-foreground">min disponíveis</p>
             </div>
           </div>
@@ -213,7 +213,7 @@ export function ProvaIntro(p: ProvaIntroProps) {
             Seu tempo será contado a partir de agora. O encerramento ocorre no horário previsto — aproveite bem o tempo restante.
           </p>
 
-          <Button className="w-full" size="lg" onClick={p.onIniciar} disabled={p.iniciando} style={{ background: 'var(--prova-entrada-botao, var(--primary))' }}>
+          <Button data-campo="entradaBotao" className="w-full" size="lg" onClick={p.onIniciar} disabled={p.iniciando} style={{ background: 'var(--prova-entrada-botao, var(--primary))' }}>
             {p.iniciando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Entrando...</> : 'Entendi, vou começar'}
           </Button>
         </div>
@@ -223,10 +223,10 @@ export function ProvaIntro(p: ProvaIntroProps) {
 
   return (
     <div className={cn('flex items-center justify-center p-4 text-foreground', p.overlay ? cn('z-50 animate-in fade-in bg-black/50 backdrop-blur-sm duration-200', p.compact ? 'absolute inset-0' : 'fixed inset-0') : cn('bg-background', p.compact ? 'h-full' : 'min-h-screen'))}>
-      <div className="relative w-full max-w-md animate-in fade-in zoom-in-95 overflow-hidden rounded-2xl border bg-card p-8 shadow-xl duration-500">
+      <div data-campo="card" className="relative w-full max-w-md animate-in fade-in zoom-in-95 overflow-hidden rounded-2xl border bg-card p-8 shadow-xl duration-500">
         <FitaTopo />
         {/* Ícone de "começando" + aviso de que o simulado iniciou */}
-        <div className="mb-5 flex items-center gap-3">
+        <div data-campo="tituloTexto" className="mb-5 flex items-center gap-3">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full" style={{ background: 'color-mix(in oklab, var(--prova-titulo, var(--primary)) 15%, var(--card))' }}>
             <PlayCircle className="h-7 w-7" style={{ color: 'var(--prova-titulo, var(--primary))' }} />
           </span>
@@ -237,7 +237,7 @@ export function ProvaIntro(p: ProvaIntroProps) {
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl border bg-muted/40 p-4 text-center">
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tempo restante</p>
-            <p className="font-mono text-2xl font-bold tabular-nums" style={{ color: 'var(--prova-entrada-tempo, var(--primary))' }}>{p.tempoLabel ?? 'Sem limite'}</p>
+            <p data-campo="entradaTempo" className="font-mono text-2xl font-bold tabular-nums" style={{ color: 'var(--prova-entrada-tempo, var(--primary))' }}>{p.tempoLabel ?? 'Sem limite'}</p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">{p.tempoLabel ? 'min disponíveis' : 'sem limite de tempo'}</p>
           </div>
           <div className="rounded-xl border bg-muted/40 p-4 text-center">
@@ -253,7 +253,7 @@ export function ProvaIntro(p: ProvaIntroProps) {
           <span>{desc}</span>
         </p>
 
-        <Button className="w-full" size="lg" onClick={p.onIniciar} disabled={p.iniciando}>
+        <Button data-campo="entradaBotao" className="w-full" size="lg" onClick={p.onIniciar} disabled={p.iniciando} style={{ background: 'var(--prova-entrada-botao, var(--primary))' }}>
           {p.iniciando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Entrando...</> : 'Iniciar simulado'}
         </Button>
       </div>

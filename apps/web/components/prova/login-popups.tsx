@@ -131,7 +131,7 @@ export function LoginResultado({ tipo, nome, mensagem, quando, onVoltar, compact
         ? cn('z-50 animate-in fade-in bg-black/50 backdrop-blur-sm duration-200', compact ? 'absolute inset-0' : 'fixed inset-0')
         : cn('bg-background', compact ? 'h-full' : 'min-h-screen'),
     )}>
-      <div className="relative w-full max-w-md animate-in fade-in zoom-in-95 overflow-hidden rounded-2xl border bg-card text-center shadow-xl duration-500">
+      <div data-campo={tipo === 'nao_iniciado' ? 'aviso' : tipo === 'sucesso' ? 'sitAndamento' : 'alerta'} className="relative w-full max-w-md animate-in fade-in zoom-in-95 overflow-hidden rounded-2xl border bg-card text-center shadow-xl duration-500">
         <FitaTopo />
         {/* Cabeçalho — tom da situação */}
         <div className="px-8 pb-6 pt-8" style={{ background: `color-mix(in oklab, ${cfg.cor} 12%, var(--card))` }}>

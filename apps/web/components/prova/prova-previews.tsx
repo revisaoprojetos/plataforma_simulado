@@ -47,7 +47,7 @@ export function ProvaLoginPreview({ branding, titulo = 'Simulado', metodo = 'ema
   const Campo = ({ label, ph }: { label: string; ph: string }) => (
     <div className="space-y-1.5">
       <span className="block text-sm font-medium">{label}</span>
-      <div className="flex h-9 items-center rounded-md border px-3 text-sm text-muted-foreground" style={{ background: 'var(--prova-login-input, var(--background))' }}>{ph}</div>
+      <div data-campo="loginInputBg" className="flex h-9 items-center rounded-md border px-3 text-sm text-muted-foreground" style={{ background: 'var(--prova-login-input, var(--background))' }}>{ph}</div>
     </div>
   )
   const InfoBoxDT = ({ label, valor }: { label: string; valor: string }) => (
@@ -57,7 +57,7 @@ export function ProvaLoginPreview({ branding, titulo = 'Simulado', metodo = 'ema
     </div>
   )
   return (
-    <div className={cn('relative isolate flex items-start justify-center bg-background p-4 text-foreground', compact ? 'h-full overflow-auto' : 'min-h-screen py-10')}><HudFundo />
+    <div data-campo="fundo" className={cn('relative isolate flex items-start justify-center bg-background p-4 text-foreground', compact ? 'h-full overflow-auto' : 'min-h-screen py-10')}><HudFundo />
       <div className="w-full max-w-2xl space-y-6 py-2">
         {/* Cabeçalho: status + título + logo + tema */}
         <div className="flex items-start justify-between gap-4">
@@ -69,17 +69,17 @@ export function ProvaLoginPreview({ branding, titulo = 'Simulado', metodo = 'ema
               </div>
             )}
             <div>
-              <span className="inline-block rounded-full px-3 py-1 text-xs font-semibold" style={statusStyle(status)}>{status}</span>
-              <h1 className="mt-2 text-3xl font-extrabold uppercase leading-none tracking-tight" style={{ color: 'var(--prova-titulo, var(--primary))' }}>{titulo}</h1>
+              <span data-campo={/n[ãa]o/i.test(status) ? 'sitNaoIniciado' : /encerr/i.test(status) ? 'sitEncerrado' : /dispon/i.test(status) ? 'sitDisponivel' : 'sitAndamento'} className="inline-block rounded-full px-3 py-1 text-xs font-semibold" style={statusStyle(status)}>{status}</span>
+              <h1 data-campo="tituloTexto" className="mt-2 text-3xl font-extrabold uppercase leading-none tracking-tight" style={{ color: 'var(--prova-titulo, var(--primary))' }}>{titulo}</h1>
             </div>
           </div>
           <Moon className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
         </div>
 
         {/* Card: Informações da prova */}
-        <div className="relative overflow-hidden rounded-2xl border bg-card p-6 shadow-sm">
+        <div data-campo="card" className="relative overflow-hidden rounded-2xl border bg-card p-6 shadow-sm">
           <FitaTopo />
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><BookOpen className="h-5 w-5" style={{ color: 'var(--primary)' }} /> Informações do simulado</h2>
+          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><BookOpen data-campo="primaria" className="h-5 w-5" style={{ color: 'var(--primary)' }} /> Informações do simulado</h2>
           <div className="flex items-center gap-2 rounded-xl bg-muted/50 px-4 py-3 text-sm"><Clock className="h-4 w-4 text-muted-foreground" /> Duração: <strong className="font-semibold">42h</strong></div>
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <InfoBoxDT label="Início" valor="01/07/2026 00:00" />
@@ -88,17 +88,17 @@ export function ProvaLoginPreview({ branding, titulo = 'Simulado', metodo = 'ema
         </div>
 
         {/* Card: Identificação */}
-        <div className="relative overflow-hidden rounded-2xl border bg-card p-6 shadow-sm">
+        <div data-campo="card" className="relative overflow-hidden rounded-2xl border bg-card p-6 shadow-sm">
           <FitaTopo />
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><BookOpen className="h-5 w-5" style={{ color: 'var(--primary)' }} /> Identifique-se para iniciar</h2>
+          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><BookOpen data-campo="primaria" className="h-5 w-5" style={{ color: 'var(--primary)' }} /> Identifique-se para iniciar</h2>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <span className="block text-sm font-medium">E-mail cadastrado na <strong className="font-semibold" style={{ color: 'var(--prova-login-destaque, var(--primary))' }}>plataforma do {plataforma}</strong> *</span>
-              <div className="flex h-9 items-center rounded-md border px-3 text-sm text-muted-foreground" style={{ background: 'var(--prova-login-input, var(--background))' }}>seu@email.com</div>
+              <span className="block text-sm font-medium">E-mail cadastrado na <strong data-campo="loginDestaque" className="font-semibold" style={{ color: 'var(--prova-login-destaque, var(--primary))' }}>plataforma do {plataforma}</strong> *</span>
+              <div data-campo="loginInputBg" className="flex h-9 items-center rounded-md border px-3 text-sm text-muted-foreground" style={{ background: 'var(--prova-login-input, var(--background))' }}>seu@email.com</div>
             </div>
             {metodo === 'email_cpf' && <Campo label="CPF" ph="000.000.000-00" />}
             {metodo === 'email_telefone' && <Campo label="Telefone" ph="(00) 00000-0000" />}
-            <div className="flex h-10 w-full items-center justify-center rounded-md text-sm font-medium text-primary-foreground" style={{ background: 'var(--prova-login-botao, var(--primary))' }}>Iniciar simulado</div>
+            <div data-campo="loginBotao" className="flex h-10 w-full items-center justify-center rounded-md text-sm font-medium text-primary-foreground" style={{ background: 'var(--prova-login-botao, var(--primary))' }}>Iniciar simulado</div>
           </div>
         </div>
       </div>
@@ -185,24 +185,24 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
     { disciplina: 'Raciocínio Lógico', acertos: 3, total: 10, percentual: 30 },
   ]
   return (
-    <div className={cn('relative isolate bg-background text-foreground', compact ? 'h-full overflow-auto' : 'min-h-screen')}><HudFundo />
+    <div data-campo="fundo" className={cn('relative isolate bg-background text-foreground', compact ? 'h-full overflow-auto' : 'min-h-screen')}><HudFundo />
       {/* Top bar — igual ao simulado real (cor própria via HUD) */}
-      <header className="sticky top-0 z-40 border-b backdrop-blur" style={{ background: 'var(--prova-topbar, var(--background))', color: 'var(--prova-topbar-texto, var(--foreground))' }}>
+      <header data-campo="topbar" className="sticky top-0 z-40 border-b backdrop-blur" style={{ background: 'var(--prova-topbar, var(--background))', color: 'var(--prova-topbar-texto, var(--foreground))' }}>
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
+          <div data-campo="topbarTexto" className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-green-600" />
             <span className="text-sm font-semibold">Simulado finalizado</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="hud-btn inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium" style={STYLE_INICIO}><ArrowLeft className="h-3.5 w-3.5" /> Voltar ao início</span>
-            <span className="hud-btn inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium" style={STYLE_VOLTAR}><Home className="h-3.5 w-3.5" /> Meus simulados</span>
+            <span data-campo="inicioBtn" className="hud-btn inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium" style={STYLE_INICIO}><ArrowLeft className="h-3.5 w-3.5" /> Voltar ao início</span>
+            <span data-campo="voltarBtn" className="hud-btn inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium" style={STYLE_VOLTAR}><Home className="h-3.5 w-3.5" /> Meus simulados</span>
           </div>
         </div>
       </header>
 
       <div className="mx-auto w-full max-w-5xl space-y-5 p-4 py-6">
         {/* Resumo */}
-        <div className="relative overflow-hidden rounded-2xl border bg-card p-6 shadow-sm sm:p-8">
+        <div data-campo="card" className="relative overflow-hidden rounded-2xl border bg-card p-6 shadow-sm sm:p-8">
           <FitaTopo />
           <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <Trophy className="h-4 w-4" /> Simulado finalizado
@@ -219,22 +219,22 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
 
           {liberado ? (
             <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="rounded-xl border p-3 text-center" style={cardStat(COR_ACERTO)}>
+              <div data-campo="acerto" className="rounded-xl border p-3 text-center" style={cardStat(COR_ACERTO)}>
                 <CheckCircle2 className="mx-auto mb-1 h-4 w-4" style={{ color: COR_ACERTO }} />
                 <p className="text-xl font-bold tabular-nums" style={{ color: COR_ACERTO }}>3</p>
                 <p className="text-[11px] text-muted-foreground">Acertadas</p>
               </div>
-              <div className="rounded-xl border p-3 text-center" style={cardStat(COR_ERRO)}>
+              <div data-campo="erro" className="rounded-xl border p-3 text-center" style={cardStat(COR_ERRO)}>
                 <XCircle className="mx-auto mb-1 h-4 w-4" style={{ color: COR_ERRO }} />
                 <p className="text-xl font-bold tabular-nums" style={{ color: COR_ERRO }}>1</p>
                 <p className="text-[11px] text-muted-foreground">Erradas</p>
               </div>
-              <div className="rounded-xl border p-3 text-center" style={cardStat(COR_BRANCO)}>
+              <div data-campo="branco" className="rounded-xl border p-3 text-center" style={cardStat(COR_BRANCO)}>
                 <FileText className="mx-auto mb-1 h-4 w-4" style={{ color: COR_BRANCO }} />
                 <p className="text-xl font-bold tabular-nums" style={{ color: COR_BRANCO }}>1</p>
                 <p className="text-[11px] text-muted-foreground">Em branco</p>
               </div>
-              <div className="rounded-xl border p-3 text-center" style={cardStat(COR_MEDIA)}>
+              <div data-campo="media" className="rounded-xl border p-3 text-center" style={cardStat(COR_MEDIA)}>
                 <Trophy className="mx-auto mb-1 h-4 w-4" style={{ color: COR_MEDIA }} />
                 <p className="text-xl font-bold tabular-nums" style={{ color: COR_MEDIA }}>60%</p>
                 <p className="text-[11px] text-muted-foreground">Média</p>
@@ -248,22 +248,22 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
           )}
 
           <div className="mt-5 grid grid-cols-2 gap-2">
-            <div className={BTN_CADERNO} style={STYLE_CADERNO}><FileText className="mr-1.5 h-4 w-4" /> Folha de Respostas PDF</div>
-            <div className={BTN_CADERNO} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Gabarito Comentado (PDF)</div>
+            <div data-campo="cadernoBtn" className={BTN_CADERNO} style={STYLE_CADERNO}><FileText className="mr-1.5 h-4 w-4" /> Folha de Respostas PDF</div>
+            <div data-campo="cadernoBtn" className={BTN_CADERNO} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Gabarito Comentado (PDF)</div>
           </div>
 
           {/* Voltar ao menu — logo abaixo dos downloads */}
           {/* Cadernos "como você fez" (sem gabarito), um por modalidade — a navegação fica na barra superior. */}
           <div className="mt-2 grid gap-2 sm:grid-cols-3">
-            <div className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Folha de Respostas</div>
-            <div className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Caderno de questões</div>
-            <div className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Diagnóstico</div>
+            <div data-campo="cadernoBtn" className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Folha de Respostas</div>
+            <div data-campo="cadernoBtn" className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Caderno de questões</div>
+            <div data-campo="cadernoBtn" className={cn(BTN_CADERNO, 'h-11 w-full')} style={STYLE_CADERNO}><FileStack className="mr-1.5 h-4 w-4" /> Diagnóstico</div>
           </div>
         </div>
 
         {/* Desempenho por matéria — só quando o gabarito está liberado */}
         {liberado && (
-          <div className="relative overflow-hidden rounded-2xl border bg-card p-5 pt-6 shadow-sm">
+          <div data-campo="card" className="relative overflow-hidden rounded-2xl border bg-card p-5 pt-6 shadow-sm">
             <FitaTopo />
             <h2 className="mb-3 text-sm font-semibold">Desempenho por matéria</h2>
             <div className="space-y-3">
@@ -286,17 +286,17 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
         <div className="grid gap-4 lg:grid-cols-[1fr_14rem] lg:gap-10">
           {/* Coluna: revisão — apenas a primeira questão (demo: gabarito alterado) */}
           <div className="space-y-3">
-            <div className="relative overflow-hidden rounded-xl border bg-card">
+            <div data-campo="card" className="relative overflow-hidden rounded-xl border bg-card">
               <FitaTopo />
               <div className="space-y-3 p-4 pt-5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex h-7 min-w-7 items-center justify-center rounded-md bg-muted px-2 text-sm font-semibold">1</span>
                   {liberado ? (
-                    <span className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ background: `color-mix(in oklab, ${COR_ERRO} 15%, var(--card))`, color: COR_ERRO }}>
+                    <span data-campo="erro" className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ background: `color-mix(in oklab, ${COR_ERRO} 15%, var(--card))`, color: COR_ERRO }}>
                       <XCircle className="h-3.5 w-3.5" /> Errou
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                    <span data-campo="respondida" className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                       <Circle className="h-3.5 w-3.5" /> Respondida
                     </span>
                   )}
@@ -305,7 +305,7 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
 
                 {/* Gabarito alterado após a resposta (só com gabarito liberado) */}
                 {liberado && (
-                  <div className="rounded-md border p-3 text-xs" style={{ borderColor: COR_ALT, background: `color-mix(in oklab, ${COR_ALT} 10%, var(--card))` }}>
+                  <div data-campo="altTrocada" className="rounded-md border p-3 text-xs" style={{ borderColor: COR_ALT, background: `color-mix(in oklab, ${COR_ALT} 10%, var(--card))` }}>
                     <p className="mb-1 flex items-center gap-1.5 font-semibold" style={{ color: COR_ALT }}>
                       <RefreshCw className="h-3.5 w-3.5" /> Esta questão teve a alternativa correta alterada
                     </p>
@@ -329,7 +329,7 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
                       : antesCorreta ? { borderColor: COR_ALT, color: COR_ALT }
                       : undefined
                     return (
-                      <div key={alt.l} className={cn(
+                      <div key={alt.l} data-campo={correta ? 'acerto' : erradaMarcada ? 'erro' : antesCorreta ? 'altTrocada' : 'selecionada'} className={cn(
                         'flex items-start gap-3 rounded-lg border p-3 text-sm',
                         !correta && !erradaMarcada && !antesCorreta && alt.marcada && 'border-primary bg-primary/5',
                       )}
@@ -353,7 +353,7 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
 
                 {/* Justificativa — cor segue acerto/erro (aqui: errou) */}
                 {liberado && (
-                  <div className="rounded-md border p-3 text-sm" style={{ borderColor: COR_ERRO, background: `color-mix(in oklab, ${COR_ERRO} 10%, var(--card))` }}>
+                  <div data-campo="erro" className="rounded-md border p-3 text-sm" style={{ borderColor: COR_ERRO, background: `color-mix(in oklab, ${COR_ERRO} 10%, var(--card))` }}>
                     <p className="mb-1 text-xs font-semibold" style={{ color: COR_ERRO }}>Justificativa</p>
                     <p className="leading-relaxed">Explicação da questão exibida quando o gabarito é liberado — a moldura segue a cor de acerto (verde) ou erro (vermelho) do aluno.</p>
                   </div>
@@ -364,7 +364,7 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
 
           {/* Navegador de questões — card lateral direito (mesmo modo da prova) */}
           <aside>
-            <div className="relative overflow-hidden rounded-xl border bg-card pb-2 pt-3 lg:sticky lg:top-4">
+            <div data-campo="card" className="relative overflow-hidden rounded-xl border bg-card pb-2 pt-3 lg:sticky lg:top-4">
               <FitaTopo />
               <div className="px-4">
                 <p className="text-center text-sm font-semibold">Navegador de questões</p>
@@ -379,25 +379,25 @@ export function ProvaEncerradaPreview({ branding, titulo = 'Simulado', compact, 
                     else if (liberado && q.tipo === 'errou') { cls = 'text-white'; st = { background: COR_ERRO } }
                     else if (q.respondida) { cls = 'text-white'; st = { background: COR_MARCADA } }
                     return (
-                      <span key={q.n} className={cn('flex aspect-square items-center justify-center rounded-md text-xs font-bold', cls)} style={st}>{q.n}</span>
+                      <span key={q.n} data-campo={q.tipo === 'anulada' ? 'anulada' : q.tipo === 'alt' ? 'altTrocada' : liberado && q.tipo === 'acertou' ? 'acerto' : liberado && q.tipo === 'errou' ? 'erro' : q.respondida ? 'respondida' : undefined} className={cn('flex aspect-square items-center justify-center rounded-md text-xs font-bold', cls)} style={st}>{q.n}</span>
                     )
                   })}
                 </div>
                 <div className="mt-4 space-y-1.5 border-t pt-3 text-xs text-muted-foreground">
                   {liberado ? (
                     <>
-                      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ACERTO }} /> Acertou (1)</div>
-                      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ERRO }} /> Errou (1)</div>
-                      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Sem resposta (1)</div>
+                      <div data-campo="acerto" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ACERTO }} /> Acertou (1)</div>
+                      <div data-campo="erro" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ERRO }} /> Errou (1)</div>
+                      <div data-campo="texto" className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Sem resposta (1)</div>
                     </>
                   ) : (
                     <>
-                      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_MARCADA }} /> Respondidas (4)</div>
-                      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Em branco (1)</div>
+                      <div data-campo="respondida" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_MARCADA }} /> Respondidas (4)</div>
+                      <div data-campo="texto" className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Em branco (1)</div>
                     </>
                   )}
-                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ANUL }} /> Anuladas (1)</div>
-                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ALT }} /> Alternativa trocada (1)</div>
+                  <div data-campo="anulada" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ANUL }} /> Anuladas (1)</div>
+                  <div data-campo="altTrocada" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: COR_ALT }} /> Alternativa trocada (1)</div>
                 </div>
               </div>
             </div>
