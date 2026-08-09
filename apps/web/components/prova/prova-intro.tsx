@@ -38,9 +38,10 @@ function frameLogo(estilo?: string): string {
 }
 
 /** Estilos de carregamento (espelham os da Imersão em Configurações). */
-export type EstiloProvaLoading = 'circulo' | 'spinner' | 'barra' | 'pulsar' | 'pontos' | 'porcentagem'
+export type EstiloProvaLoading = 'circulo' | 'circulo_cheio' | 'spinner' | 'barra' | 'pulsar' | 'pontos' | 'porcentagem'
 export const ESTILOS_PROVA_LOADING: { id: EstiloProvaLoading; nome: string }[] = [
   { id: 'circulo', nome: 'Círculo + Logo' },
+  { id: 'circulo_cheio', nome: 'Círculo + Logo (preenchido)' },
   { id: 'spinner', nome: 'Logo + Spinner' },
   { id: 'barra', nome: 'Logo + Barra' },
   { id: 'porcentagem', nome: 'Logo + Porcentagem' },
@@ -66,6 +67,27 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
             <span className={cn('flex h-14 w-14 items-center justify-center overflow-hidden', frameLogo(logoEstilo))} style={{ background: logoBg ?? '#ffffff' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={logoUrl} alt="" className="h-full w-full object-contain" />
+            </span>
+          ) : (
+            <span className="h-3 w-3 rounded-full" style={{ background: cor }} />
+          )}
+        </span>
+        <p className="animate-pulse text-sm font-medium text-muted-foreground">{mensagem}</p>
+      </div>
+    )
+  }
+
+  // Círculo preenchido: a imagem ocupa toda a área interna do anel girando.
+  if (tipo === 'circulo_cheio') {
+    return (
+      <div className={wrap}>
+        <span className="relative flex h-24 w-24 items-center justify-center">
+          <span className="absolute inset-0 animate-ping rounded-full opacity-20" style={{ background: cor }} />
+          <span className="absolute inset-0 animate-spin rounded-full border-4 border-muted" style={{ borderTopColor: cor }} />
+          {logoUrl ? (
+            <span className="absolute inset-1.5 overflow-hidden rounded-full" style={{ background: logoBg ?? '#ffffff' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logoUrl} alt="" className="h-full w-full object-cover" />
             </span>
           ) : (
             <span className="h-3 w-3 rounded-full" style={{ background: cor }} />
