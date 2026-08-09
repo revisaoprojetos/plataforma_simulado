@@ -230,7 +230,11 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       if (!resp.ok || !r.ok || !r.conteudo) { toast.error(r.error ?? 'Falha ao importar.'); return }
       const it = novoItem('diagnostico', 'padrao')
       it.conteudo = r.conteudo
-      it.ajustes = { ...it.ajustes, corPrimaria: '#2d254f', corSecundaria: '#f6b420', titulo: 'Diagnóstico de Desempenho' }
+      // Se o .docx trouxe a config embutida (ajustes/capa), restaura o estilo/modelo exato; senão, padrão.
+      it.ajustes = r.ajustes && typeof r.ajustes === 'object'
+        ? { ...it.ajustes, ...r.ajustes }
+        : { ...it.ajustes, corPrimaria: '#2d254f', corSecundaria: '#f6b420', titulo: 'Diagnóstico de Desempenho' }
+      if (r.capa && typeof r.capa === 'object') it.capa = r.capa
       setBuilder((b) => ({ ...b, itens: [...b.itens, it], ativo: it.id }))
       if (Array.isArray(r.avisos) && r.avisos.length) toast.warning(`Importado com ${r.avisos.length} aviso(s) — revise a prévia.`)
       toast.success('Caderno importado como novo grupo de Diagnóstico. Revise e salve.')
@@ -290,7 +294,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                 <div className="fixed inset-0 z-40" onClick={() => setBaixarAberto(false)} />
                 <div className="absolute right-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-lg border bg-background shadow-lg">
                   <a href={pdfUrl} target="_blank" rel="noreferrer" onClick={() => setBaixarAberto(false)} className="block px-3 py-2 text-sm hover:bg-muted">PDF (imprimir) — <span className="text-muted-foreground">fiel à prévia</span></a>
-                  <a href={exportUrl('word')} download onClick={() => setBaixarAberto(false)} className="block border-t px-3 py-2 text-sm hover:bg-muted">Word (.doc) — <span className="text-muted-foreground">editar e reimportar</span></a>
+                  <a href={exportUrl('word')} download onClick={() => setBaixarAberto(false)} className="block border-t px-3 py-2 text-sm hover:bg-muted">Word (.docx) — <span className="text-muted-foreground">fiel + editar/reimportar</span></a>
                   <a href={exportUrl('html')} download onClick={() => setBaixarAberto(false)} className="block border-t px-3 py-2 text-sm hover:bg-muted">HTML (.html)</a>
                 </div>
               </>

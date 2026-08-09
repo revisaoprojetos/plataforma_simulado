@@ -49,8 +49,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message || 'Falha ao ler o arquivo.' }, { status: 500 })
   }
 
+  // Config embutida (CTV3:base64) do .docx gerado por nós → restaura modelo/estilo exatos na reimportação.
+  // O TEXTO visível (editado no Word) vira o conteúdo; os ajustes/capa vêm da config embutida.
+  let embutido: any = null
+  const mCfg = html.match(/CTV3:([A-Za-z0-9+/=]{16,})/)
+  if (mCfg) { try { embutido = JSON.parse(Buffer.from(mCfg[1], 'base64').toString('utf8')) } catch { /* ignora */ } html = html.replace(mCfg[0], '') }
+
   const { conteudo, avisos } = htmlParaDiagnostico(html)
   avisos.unshift(...avisosFonte)
   if (ehPdf) avisos.unshift('Importado de PDF (aproximado) — os pilares em colunas podem embaralhar. Para fidelidade, use Word/HTML.')
-  return NextResponse.json({ ok: true, modalidade: 'diagnostico', conteudo, avisos })
+  const resp: Record<string, unknown> = { ok: true, modalidade: 'diagnostico', conteudo, avisos }
+  if (embutido && typeof embutido === 'object') {
+    if (embutido.ajustes && typeof embutido.ajustes === 'object') resp.ajustes = embutido.ajustes
+    if (embutido.capa && typeof embutido.capa === 'object') resp.capa = embutido.capa
+    // Tokens/chaves de fonte e cores por bloco só existem na config embutida — mescla no conteúdo parseado.
+    if (embutido.conteudo && typeof embutido.conteudo === 'object') {
+      const ec = embutido.conteudo as any
+      for (const k of ['discFonte', 'discNomes', 'discCorTexto', 'corMarcador', 'corMarcadorForte', 'ordem', 'partesOcultas'] as const) {
+        if (ec[k] != null) (conteudo as any)[k] = ec[k]
+      }
+    }
+  }
+  return NextResponse.json(resp)
 }

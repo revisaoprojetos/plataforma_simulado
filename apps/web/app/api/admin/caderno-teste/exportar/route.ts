@@ -4,7 +4,8 @@ import { getCurrentAccess } from '@/lib/auth/permissions'
 import { carregarRegistros } from '@/lib/caderno-designer/merge'
 import { normalizarBuilder, novoItem, type Modalidade } from '@/lib/caderno-teste/tipos'
 import { slugDiag } from '@/lib/caderno-teste/diagnostico'
-import { gerarHtmlItem, gerarWordDiagnostico, type DiscBanco } from '@/lib/caderno-teste/exportar-html'
+import { gerarHtmlItem, type DiscBanco } from '@/lib/caderno-teste/exportar-html'
+import { gerarDocxDiagnostico } from '@/lib/caderno-teste/exportar-docx'
 import { previewQuestoesBanco } from '@/app/admin/cadernos-teste/actions'
 
 const MODS: Modalidade[] = ['folha_respostas', 'caderno_questoes', 'diagnostico']
@@ -70,10 +71,13 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Word do diagnóstico = documento SEMÂNTICO (editar + reimportar, tokens preservados). Demais
-  // formatos/modalidades usam o HTML visual.
-  const html = (formato === 'word' && item.modalidade === 'diagnostico')
-    ? gerarWordDiagnostico(item, disciplinas)
-    : gerarHtmlItem(item, { vars, questoes, disciplinas })
+  // Word do diagnóstico = .docx NATIVO (fiel + editável + reimportável com a config embutida).
+  if (formato === 'word' && item.modalidade === 'diagnostico') {
+    const buf = await gerarDocxDiagnostico(item, disciplinas, vars)
+    const nome = item.ajustes.titulo || (cad as any).nome || 'caderno'
+    const arq = nome.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'caderno'
+    return new NextResponse(new Uint8Array(buf), { status: 200, headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Content-Disposition': `attachment; filename="${arq}.docx"` } })
+  }
+  const html = gerarHtmlItem(item, { vars, questoes, disciplinas })
   return baixar(html, item.ajustes.titulo || (cad as any).nome || 'caderno', formato)
 }
