@@ -186,10 +186,11 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
     const BUF = 4
     const grupos: number[][] = []; let atual: number[] = []; let h = 0
     for (let i = 0; i < alturas.length; i++) {
-      if (itens[i].quebra) { if (atual.length) { grupos.push(atual); atual = []; h = 0 } continue }
-      const alt = alturas[i]; const gap = atual.length ? (itens[i].gapTop || 0) : 0
+      const it = itens[i]; if (!it) continue
+      if (it.quebra) { if (atual.length) { grupos.push(atual); atual = []; h = 0 } continue }
+      const alt = alturas[i]; const gap = atual.length ? (it.gapTop || 0) : 0
       if (atual.length && h + gap + alt > availH - BUF) { grupos.push(atual); atual = []; h = 0 }
-      const gap2 = atual.length ? (itens[i].gapTop || 0) : 0
+      const gap2 = atual.length ? (it.gapTop || 0) : 0
       atual.push(i); h += gap2 + alt
     }
     if (atual.length) grupos.push(atual)
@@ -202,7 +203,9 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
   if (!doc) return null
   const capaEfetiva: CapaConfig = { ...capaPadraoDoPreset(presetId), ...(capa ?? {}) }
   const capaPage = capaUrl ? doc.pages.find((p) => p.kind === 'capa') : null
-  const pages = paginas ?? [itens.map((_, i) => i)]
+  // Descarta uma paginação obsoleta (índices além dos itens atuais) — evita crash ao trocar de doc/caderno.
+  const paginasOk = paginas && paginas.every((g) => g.every((i) => itens[i])) ? paginas : null
+  const pages = paginasOk ?? [itens.map((_, i) => i)]
 
   // Delegação: clique em qualquer bloco (data-block-id) abre o editor daquele bloco.
   const onClick = selectable ? (e: ReactMouseEvent) => {
@@ -222,7 +225,7 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
       {capaPage && <FolhaCapa key="capa" capaUrl={capaUrl!} capa={capaEfetiva} theme={theme} onPick={onPickCapa} sel={selCapa} />}
       {pages.map((idxs, pi) => (
         <FolhaConteudo key={pi} theme={theme} folhaUrl={folhaUrl} cabH={cabH} rodH={rodH}>
-          {idxs.map((i, gi) => <div key={itens[i].key} style={{ marginTop: gi === 0 ? 0 : (itens[i].gapTop || 0) }}>{itens[i].node}</div>)}
+          {idxs.map((i, gi) => itens[i] && <div key={itens[i].key} style={{ marginTop: gi === 0 ? 0 : (itens[i].gapTop || 0) }}>{itens[i].node}</div>)}
         </FolhaConteudo>
       ))}
     </div>
