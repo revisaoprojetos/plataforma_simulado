@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
-import { carregarRegistros } from '@/lib/caderno-designer/merge'
 import { normalizarBuilder } from '@/lib/caderno-teste/tipos'
-import { slugDiag } from '@/lib/caderno-teste/diagnostico'
 import { gerarHtmlItem, type DiscBanco } from '@/lib/caderno-teste/exportar-html'
-import { previewQuestoesBanco } from '@/app/admin/cadernos-teste/actions'
+import { previewQuestoesBanco, dadosBancoTeste } from '@/app/admin/cadernos-teste/actions'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -38,17 +36,15 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   let disciplinas: DiscBanco[] = []
   let questoes: any[] = []
   if (bancoId) {
-    const { data: pasta } = await svc.from('simulado_pastas').select('nome, grupos').eq('id', bancoId).eq('tenant_id', access.tenantId).maybeSingle()
-    const bancoNome = ((pasta as any)?.nome ?? 'Simulado') as string
     if (item.modalidade === 'diagnostico') {
-      if (alunoId) { try { const regs = await carregarRegistros(svc, access.tenantId, bancoId, bancoNome, undefined, alunoId, 1); if (regs[0]) vars = regs[0].vars } catch { /* sem dados */ } }
-      const nomes = new Set<string>()
-      for (const g of (Array.isArray((pasta as any)?.grupos) ? (pasta as any).grupos : [])) for (const d of (g?.disciplinas ?? [])) if (typeof d === 'string' && d.trim()) nomes.add(d.trim())
-      disciplinas = [...nomes].map((nome) => ({ nome, chave: slugDiag(nome) }))
-      if (!disciplinas.length) {
-        const human = (s: string) => s.replace(/_/g, ' ').replace(/^./, (ch) => ch.toUpperCase())
-        disciplinas = Object.keys(vars).filter((k) => k.startsWith('total_') && !k.startsWith('total_pilar_') && k !== 'total_questoes').map((k) => { const c = k.slice(6); return { nome: human(c), chave: c } })
-      }
+      // MESMA fonte do editor: disciplinas reais (das questões do banco) + dados do aluno (1º por padrão),
+      // para os cards de disciplina e os textos aparecerem populados na prévia.
+      try {
+        const rd = await dadosBancoTeste(bancoId)
+        disciplinas = rd.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave, pilar: d.pilar }))
+        const reg = alunoId ? rd.registros.find((r) => r.id === alunoId) : rd.registros[0]
+        if (reg) vars = reg.vars
+      } catch { /* segue com o conteúdo do modelo */ }
     } else {
       try { const r = await previewQuestoesBanco(bancoId); questoes = r.questoes ?? [] } catch { /* sem questões */ }
     }
