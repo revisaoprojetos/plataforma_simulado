@@ -30,6 +30,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
   const [busca, setBusca] = useState('')
   const [colapsados, setColapsados] = useState<Record<string, boolean>>({})
   const [copiada, setCopiada] = useState<string | null>(null)
+  const [destaque, setDestaque] = useState<string | null>(null)
   const [prim, setPrim] = useState(cor || '#6d28d9')
   const [sec, setSec] = useState('#f59e0b')
   const [salvando, iniciar] = useTransition()
@@ -56,6 +57,25 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
     else setPorPagina((p) => ({ ...p, [aba]: {} }))
   }
   const toggleGrupo = (t: string) => setColapsados((p) => ({ ...p, [t]: !p[t] }))
+
+  /** Foca (rola + destaca) o campo de cor correspondente a um elemento clicado na prévia. */
+  function focarCampo(k: string) {
+    const grupo = GRUPOS.find((g) => g.campos.some((cc) => cc.k === k))
+    if (!grupo) return
+    setBusca('')
+    const visivel = aba === 'base' || grupo.pages === 'all' || grupo.pages.includes(aba as ScreenKey)
+    if (!visivel) setAba('base')
+    setColapsados((p) => ({ ...p, [grupo.titulo]: false }))
+    setDestaque(k)
+    setTimeout(() => { document.getElementById(`campo-${k}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }) }, 80)
+    setTimeout(() => setDestaque((d) => (d === k ? null : d)), 2200)
+  }
+  /** Delegação: clique em elemento com [data-campo] na prévia → foca o campo. */
+  const onPreviewClick = (e: React.MouseEvent) => {
+    const alvo = (e.target as HTMLElement).closest('[data-campo]')
+    const k = alvo?.getAttribute('data-campo')
+    if (k) focarCampo(k)
+  }
 
   const [alvoImg, setAlvoImg] = useState<'loadingLogoUrl' | 'bgImagemUrl'>('loadingLogoUrl')
   function abrirUpload(campo: 'loadingLogoUrl' | 'bgImagemUrl') { setAlvoImg(campo); imgRef.current?.click() }
@@ -176,7 +196,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
                 </div>
               )}
             </div>
-            <div className="h-[560px] overflow-auto rounded-xl border shadow-sm" style={hudCssVars(c) as React.CSSProperties}>
+            <div onClick={onPreviewClick} title="Clique num elemento para destacar a cor dele à direita" className="h-[560px] cursor-pointer overflow-auto rounded-xl border shadow-sm [&_button]:cursor-pointer" style={hudCssVars(c) as React.CSSProperties}>
               {aba === 'loading' && <ProvaLoading compact loop mensagem="Carregando simulado..." tipo={c.loadingTipo as EstiloProvaLoading} logoUrl={c.loadingLogoUrl || undefined} />}
               {aba === 'login' && (
                 <div className="relative h-full">
@@ -335,7 +355,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
                     <div className="px-2 pb-2">
                       {g.desc && <p className="px-2 pb-1.5 pt-0.5 text-[10px] leading-tight text-muted-foreground">{g.desc}</p>}
                       {g.campos.map((f) => (
-                        <div key={f.k} className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50">
+                        <div key={f.k} id={`campo-${f.k}`} className={cn('flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50', destaque === f.k && 'ring-2 ring-primary ring-offset-1 ring-offset-background bg-primary/10')}>
                           {f.select ? (
                             <>
                               <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{f.label}</span><span className="block truncate text-[10px] leading-tight text-muted-foreground">{f.desc}</span></span>

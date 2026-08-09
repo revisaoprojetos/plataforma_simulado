@@ -87,7 +87,7 @@ export function ProvaHud(p: ProvaHudProps) {
   return (
     <TelaFundo className={cn('flex flex-col bg-background text-foreground', compact ? 'h-full' : 'min-h-screen')}>
       {/* Header — barra superior com cor própria (distinta do fundo) */}
-      <header className={cn('z-50 border-b backdrop-blur', !compact && 'sticky top-0')} style={{ background: 'var(--prova-topbar, var(--background))' }}>
+      <header data-campo="topbar" className={cn('z-50 border-b backdrop-blur', !compact && 'sticky top-0')} style={{ background: 'var(--prova-topbar, var(--background))' }}>
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
           <div className="flex flex-1 items-center gap-2" style={{ color: TOPTX }}>
             {p.logoUrl ? (
@@ -106,7 +106,7 @@ export function ProvaHud(p: ProvaHudProps) {
           <div className="flex flex-1 items-center justify-end gap-2">
             {p.salvando && <span className="hidden text-xs opacity-70 sm:inline" style={{ color: TOPTX }}><Loader2 className="mr-1 inline h-3 w-3 animate-spin" />Salvando...</span>}
             {p.tempoLabel !== null && (
-              <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 font-mono text-sm font-medium"
+              <div data-campo="timer" className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 font-mono text-sm font-medium"
                 style={p.timerWarning && mostrarTempo
                   ? { background: `color-mix(in oklab, ${TIMER_FIM} 15%, var(--background))`, color: TIMER_FIM }
                   : { background: TIMER_BG, color: TIMER }}>
@@ -120,7 +120,7 @@ export function ProvaHud(p: ProvaHudProps) {
               </div>
             )}
             {p.onToggleDark && <ThemeToggle dark={!!p.dark} onToggle={p.onToggleDark} />}
-            <Button size="sm" onClick={p.onRevisar} disabled={p.isFinalizando} style={{ background: FINALIZAR, color: '#fff' }}><Send className="mr-1.5 h-3.5 w-3.5" />Finalizar</Button>
+            <Button data-campo="finalizar" size="sm" onClick={p.onRevisar} disabled={p.isFinalizando} style={{ background: FINALIZAR, color: '#fff' }}><Send className="mr-1.5 h-3.5 w-3.5" />Finalizar</Button>
           </div>
         </div>
         <Progress value={p.progresso} className="h-1 rounded-none" />
@@ -134,7 +134,7 @@ export function ProvaHud(p: ProvaHudProps) {
             <Card className="relative overflow-hidden">
               {/* fita "encaixa" após o número: número no canto + fita seguindo até o fim */}
               {/* fita: barra de largura total no topo (atrás do número e da tag) */}
-              <div className="absolute inset-x-0 top-0 z-0 h-1.5" style={{ background: FITA_GRADIENT }} />
+              <div data-campo="fita1" className="absolute inset-x-0 top-0 z-0 h-1.5" style={{ background: FITA_GRADIENT }} />
               {/* número no canto + tag da disciplina logo abaixo da fita */}
               <div className="absolute inset-x-0 top-0 z-10 flex items-start">
                 <span className="rounded-br-lg border-b border-r bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">{p.questaoIndex + 1} / {p.totalQuestoes}</span>
@@ -175,7 +175,7 @@ export function ProvaHud(p: ProvaHudProps) {
                         <Scissors className="h-4 w-4" />
                       </button>
                     )}
-                    <button type="button" onClick={() => (eliminada ? p.onToggleEliminar?.(alt.id) : p.onResponder(alt.id))}
+                    <button type="button" data-campo={isSelected ? 'selecionada' : 'altFundo'} onClick={() => (eliminada ? p.onToggleEliminar?.(alt.id) : p.onResponder(alt.id))}
                       className={cn('flex-1 rounded-lg border p-4 text-left transition-all',
                         eliminada ? 'border-border bg-[var(--prova-alt-fundo,var(--card))] opacity-50'
                           : isSelected ? ''
@@ -197,7 +197,7 @@ export function ProvaHud(p: ProvaHudProps) {
             <div className="flex items-center justify-end gap-2 pt-2">
               <Button variant="outline" onClick={p.onPrev} disabled={p.questaoIndex === 0} style={{ background: CARD }}><ChevronLeft className="mr-1 h-4 w-4" />Voltar</Button>
               {podeMarcar && (
-                <Button variant={p.marcadaAtual ? 'default' : 'outline'} onClick={p.onToggleMarcar}
+                <Button data-campo="revisar" variant={p.marcadaAtual ? 'default' : 'outline'} onClick={p.onToggleMarcar}
                   style={p.marcadaAtual ? { background: REVISAR, color: '#fff', borderColor: REVISAR } : { background: CARD, color: REVISAR, borderColor: REVISAR }}>
                   <Flag className="mr-1 h-4 w-4" />Revisar
                 </Button>
