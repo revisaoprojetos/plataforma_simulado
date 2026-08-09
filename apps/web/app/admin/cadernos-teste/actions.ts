@@ -139,3 +139,32 @@ export async function dadosBancoTeste(bancoId: string): Promise<{ ok: boolean; r
   }
   return { ok: true, registros, disciplinas }
 }
+
+export type CadernoTesteResumo = { id: string; nome: string; atualizadoEm: string | null; grupos: number }
+
+/** Lista os cadernos de TESTE vinculados a um banco (config.builderV3.bancoId === bancoId). */
+export async function listarCadernosTesteDoBanco(bancoId: string): Promise<CadernoTesteResumo[]> {
+  const access = await getCurrentAccess()
+  if (!access.tenantId || !bancoId) return []
+  const svc = createAdminClient()
+  const r = await svc.from(TABELA).select('id, nome, config, atualizado_em').eq('tenant_id', access.tenantId).eq('deletado', false).order('atualizado_em', { ascending: false })
+  const rows = (r.data ?? []) as any[]
+  return rows
+    .filter((c) => { const cfg = (c.config ?? {}) as any; return (cfg?.builderV3?.bancoId ?? cfg?.bancoId ?? null) === bancoId })
+    .map((c) => { const cfg = (c.config ?? {}) as any; const itens = cfg?.builderV3?.itens; return { id: c.id, nome: c.nome ?? 'Caderno de teste', atualizadoEm: c.atualizado_em ?? null, grupos: Array.isArray(itens) ? itens.length : 0 } })
+}
+
+/** Cria um caderno de TESTE já vinculado ao banco e retorna o id (para abrir o editor). */
+export async function criarCadernoTesteNoBanco(bancoId: string, nome?: string): Promise<{ ok: boolean; id?: string; error?: string }> {
+  if (!(await checkPermission('questoes:create')) && !(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId || !bancoId) return { ok: false, error: 'Tenant/banco não resolvido.' }
+  const svc = createAdminClient()
+  const { data: pasta } = await svc.from('simulado_pastas').select('nome').eq('id', bancoId).eq('tenant_id', access.tenantId).maybeSingle()
+  const titulo = (nome && nome.trim()) || `Caderno de teste — ${(pasta as any)?.nome ?? 'Simulado'}`
+  const ins = await svc.from(TABELA).insert({ tenant_id: access.tenantId, nome: titulo, config: { bancoId } }).select('id').single()
+  if (ins.error || !ins.data) return { ok: false, error: ins.error?.message ?? 'Erro ao criar' }
+  await registrarAudit({ operacao: 'INSERT', entidade: TABELA, entidadeId: (ins.data as any).id, depois: { nome: titulo, bancoId } })
+  revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  return { ok: true, id: (ins.data as any).id }
+}
