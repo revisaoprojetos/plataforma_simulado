@@ -99,7 +99,7 @@ function CadernoTesteItem({ bancoId, cor, caderno }: { bancoId: string; cor: str
 
 /** Preview (iframe) de um grupo do caderno de teste — renderizado pela rota /imprimir/caderno-teste. */
 function PreviaGrupoCard({ cadernoId, grupo, cor }: { cadernoId: string; grupo: CadernoTesteGrupo; cor: string }) {
-  const BASE_W = 820, BASE_H = 1123
+  const BASE_W = 794, BASE_H = 1123 // uma folha A4 (a prévia é paginada; o card mostra a 1ª folha)
   const boxRef = useRef<HTMLDivElement>(null)
   const [w, setW] = useState(320)
   const [carregado, setCarregado] = useState(false)

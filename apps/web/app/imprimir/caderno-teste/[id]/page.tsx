@@ -1,44 +1,42 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { normalizarBuilder } from '@/lib/caderno-teste/tipos'
-import { gerarHtmlItem, type DiscBanco } from '@/lib/caderno-teste/exportar-html'
+import type { DiscBanco } from '@/lib/caderno-teste/previa'
+import type { PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { previewQuestoesBanco, dadosBancoTeste } from '@/app/admin/cadernos-teste/actions'
+import { PreviewCadernoTeste } from './preview-caderno-teste'
 
 export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 
 /**
- * Renderiza INLINE (text/html) um grupo do caderno de teste — para preview em iframe na aba do banco.
- * Reusa o mesmo gerador (gerarHtmlItem) do download, então a prévia bate com a edição.
- * GET /imprimir/caderno-teste/[id]?grupo=<itemId>&aluno=<id>&embed=1
+ * Prévia (paginada em A4) de um grupo do caderno de teste — usada no iframe da aba do banco.
+ * Renderiza os MESMOS componentes do editor (Previa/PreviaBlocos), então a prévia bate 1:1.
  */
-export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export default async function ImprimirCadernoTestePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ grupo?: string; aluno?: string }> }) {
+  const { id: cadernoId } = await params
+  const sp = await searchParams
+  const grupoId = sp.grupo ?? ''
+  const alunoId = sp.aluno
+
   const access = await getCurrentAccess()
   if (!access.tenantId || !(access.isAdmin || access.permissions.includes('questoes:view'))) {
-    return new NextResponse('Sem permissão.', { status: 403 })
+    return <div className="p-6 text-sm text-muted-foreground">Sem permissão.</div>
   }
-  const { id: cadernoId } = await ctx.params
-  const url = new URL(req.url)
-  const grupoId = url.searchParams.get('grupo') ?? ''
-  const alunoId = url.searchParams.get('aluno') || undefined
 
   const svc = createAdminClient()
   const { data: cad } = await svc.from('simulado_cadernos_teste').select('nome, config').eq('id', cadernoId).eq('tenant_id', access.tenantId).maybeSingle()
-  if (!cad) return new NextResponse('Caderno não encontrado.', { status: 404 })
+  if (!cad) return <div className="p-6 text-sm text-muted-foreground">Caderno não encontrado.</div>
 
   const builder = normalizarBuilder((cad as any).config, (cad as any).nome)
   const item = builder.itens.find((i) => i.id === grupoId) ?? builder.itens.find((i) => i.id === builder.ativo) ?? builder.itens[0]
-  if (!item) return new NextResponse('Grupo não encontrado.', { status: 404 })
+  if (!item) return <div className="p-6 text-sm text-muted-foreground">Grupo não encontrado.</div>
 
   const bancoId = builder.bancoId
   let vars: Record<string, string> = {}
   let disciplinas: DiscBanco[] = []
-  let questoes: any[] = []
+  let questoes: PreviewQuestao[] = []
   if (bancoId) {
     if (item.modalidade === 'diagnostico') {
-      // MESMA fonte do editor: disciplinas reais (das questões do banco) + dados do aluno (1º por padrão),
-      // para os cards de disciplina e os textos aparecerem populados na prévia.
       try {
         const rd = await dadosBancoTeste(bancoId)
         disciplinas = rd.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave, pilar: d.pilar }))
@@ -50,6 +48,5 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     }
   }
 
-  const html = gerarHtmlItem(item, { vars, questoes, disciplinas })
-  return new NextResponse(html, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } })
+  return <PreviewCadernoTeste item={item} questoes={questoes} vars={vars} discBanco={disciplinas} />
 }
