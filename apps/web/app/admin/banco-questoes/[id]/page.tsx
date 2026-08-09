@@ -12,6 +12,7 @@ import { BancoEstudantes } from '@/components/admin/banco-estudantes'
 import { BancoTabsShell } from '@/components/admin/banco-tabs-shell'
 import { BancoCaderno } from '@/components/admin/banco-caderno'
 import { BancoCadernoTeste } from '@/components/admin/banco-caderno-teste'
+import { BancoHud } from '@/components/admin/banco-hud'
 import { BancoRelatorio } from '@/components/admin/banco-relatorio'
 import { AdicionarQuestoesDialog } from '@/components/admin/adicionar-questoes-dialog'
 
@@ -160,6 +161,7 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
           <TabsTrigger value="estudantes">Estudantes</TabsTrigger>
           <TabsTrigger value="caderno">Caderno</TabsTrigger>
           <TabsTrigger value="caderno-teste">Caderno teste</TabsTrigger>
+          <TabsTrigger value="hud">HUD do simulado</TabsTrigger>
           <TabsTrigger value="relatorio">Relatório</TabsTrigger>
           <TabsTrigger value="personalizar">Personalizar</TabsTrigger>
         </TabsList>
@@ -289,6 +291,14 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
           {abaInicial === 'caderno-teste' ? (
             <Suspense fallback={<AbaCarregando />}>
               <BancoCadernoTeste bancoId={id} cor={corBanco} />
+            </Suspense>
+          ) : <AbaCarregando />}
+        </TabsContent>
+
+        <TabsContent value="hud">
+          {abaInicial === 'hud' ? (
+            <Suspense fallback={<AbaCarregando />}>
+              <BancoHud bancoId={id} cor={corBanco} />
             </Suspense>
           ) : <AbaCarregando />}
         </TabsContent>
