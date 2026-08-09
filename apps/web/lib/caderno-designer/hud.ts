@@ -37,6 +37,7 @@ export function hudCssVars(c: HudCores, dark = false): Record<string, string> {
     '--prova-branco': c.branco,
     '--prova-media': c.media,
     '--prova-loading': c.loadingCor,
+    '--prova-loading-texto': c.loadingTexto || mutedFg,
     '--prova-titulo': c.tituloTexto,
     '--prova-login-destaque': c.loginDestaque,
     '--prova-login-botao': c.loginBotao,

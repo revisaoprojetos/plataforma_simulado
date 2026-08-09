@@ -111,7 +111,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
   }
 
   // Na página Carregamento, estilo/cor da animação são editados no bloco da imagem (evita duplicar).
-  const ocultarNoGrupo = aba === 'loading' ? new Set(['loadingTipo', 'loadingCor']) : new Set<string>()
+  const ocultarNoGrupo = aba === 'loading' ? new Set(['loadingTipo', 'loadingCor', 'loadingTexto']) : new Set<string>()
   const gruposVisiveis = (aba === 'base' ? GRUPOS : GRUPOS.filter((g) => g.pages === 'all' || g.pages.includes(aba)))
     .map((g) => ({ ...g, campos: (busca ? g.campos.filter((f) => norm(f.label + ' ' + f.desc).includes(norm(busca))) : g.campos).filter((f) => !ocultarNoGrupo.has(f.k)) }))
     .filter((g) => g.campos.length)
@@ -311,7 +311,12 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
               <label className="mt-2 block text-[11px] font-medium text-muted-foreground">Cor do carregamento</label>
               <div className="mt-1 flex items-center gap-2">
                 <HexColorField value={valorDe('loadingCor')} onChange={(v) => set('loadingCor', v)} />
-                <span className="text-[10px] leading-tight text-muted-foreground">Indicador de carregamento (anel/spinner/barra).</span>
+                <span className="text-[10px] leading-tight text-muted-foreground">Barra/indicador (anel/spinner/barra).</span>
+              </div>
+              <label className="mt-2 block text-[11px] font-medium text-muted-foreground">Cor do texto</label>
+              <div className="mt-1 flex items-center gap-2">
+                <HexColorField value={valorDe('loadingTexto')} onChange={(v) => set('loadingTexto', v)} />
+                <span className="text-[10px] leading-tight text-muted-foreground">Texto “Carregando…”.</span>
               </div>
             </div>
           )}

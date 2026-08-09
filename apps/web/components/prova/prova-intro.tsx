@@ -73,7 +73,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
             <span className="h-3 w-3 rounded-full" style={{ background: cor }} />
           )}
         </span>
-        <p data-campo="texto" className="animate-pulse text-sm font-medium text-muted-foreground">{mensagem}</p>
+        <p data-campo="loadingTexto" className="animate-pulse text-sm font-medium" style={{ color: 'var(--prova-loading-texto, var(--muted-foreground))' }}>{mensagem}</p>
       </div>
     )
   }
@@ -94,7 +94,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
             <span className="h-3 w-3 rounded-full" style={{ background: cor }} />
           )}
         </span>
-        <p data-campo="texto" className="animate-pulse text-sm font-medium text-muted-foreground">{mensagem}</p>
+        <p data-campo="loadingTexto" className="animate-pulse text-sm font-medium" style={{ color: 'var(--prova-loading-texto, var(--muted-foreground))' }}>{mensagem}</p>
       </div>
     )
   }
@@ -117,7 +117,7 @@ export function ProvaLoading({ mensagem = 'Preparando seu simulado...', compact,
             </span>
           )}
         </span>
-        <p data-campo="texto" className="text-sm font-medium text-muted-foreground">{mensagem}</p>
+        <p data-campo="loadingTexto" className="text-sm font-medium" style={{ color: 'var(--prova-loading-texto, var(--muted-foreground))' }}>{mensagem}</p>
         <BarraPorcentagem cor={cor} loop={loop} onCompleto={onCompleto} />
       </div>
     )
