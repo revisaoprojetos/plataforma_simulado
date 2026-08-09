@@ -132,6 +132,9 @@ export function ProvaHud(p: ProvaHudProps) {
           <div className="flex flex-col gap-6">
             <Card className="relative overflow-hidden">
               {/* fita "encaixa" após o número: número no canto + fita seguindo até o fim */}
+              {/* fita: barra de largura total no topo (atrás do número e da tag) */}
+              <div className="absolute inset-x-0 top-0 z-0 h-1.5" style={{ background: FITA_GRADIENT }} />
+              {/* número no canto + tag da disciplina logo abaixo da fita */}
               <div className="absolute inset-x-0 top-0 z-10 flex items-start">
                 <span className="rounded-br-lg border-b border-r bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">{p.questaoIndex + 1} / {p.totalQuestoes}</span>
                 {q.disciplina && (
@@ -143,7 +146,6 @@ export function ProvaHud(p: ProvaHudProps) {
                     {q.disciplina}
                   </span>
                 )}
-                <div className="ml-2 mt-0 h-1.5 flex-1" style={{ background: FITA_GRADIENT }} />
               </div>
               <CardContent className="pt-10">
                 <MarkdownContent className="leading-relaxed">{q.enunciado}</MarkdownContent>
