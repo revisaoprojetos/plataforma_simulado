@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown, Check, Undo2, Redo2, Trash2 } from 'lucide-react'
+import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown, Check, Undo2, Redo2, Trash2, Menu, ArrowUp, ArrowDown, GripVertical, Type, Heading, LayoutGrid } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { HexColorField } from '@/components/admin/hex-color-field'
-import { Previa } from '@/lib/caderno-teste/previa'
+import { Previa, outlineDoItem, type DiagEntrada, type TipoBloco } from '@/lib/caderno-teste/previa'
 import { PreviaBlocos, capaPadraoDoPreset, docDoPreset } from '@/lib/caderno-teste/previa-blocos'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
@@ -15,7 +15,7 @@ import { metaDaModalidade, itemAtivo, novoItem, presetDoItem, CAPA_PADRAO, CORES
 import { camposDoBloco, aplicarCampoBloco, podeRemoverParte, removerParteDiag, type CampoTexto } from '@/lib/caderno-teste/edicao'
 import { acharBloco, atualizarBlocoAttrs, removerBloco, camposDoBlocoDoc, NOME_BLOCO, type CampoBlocoDoc } from '@/lib/caderno-teste/edicao-doc'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
-import { totalTxtDe, type DiagConteudo } from '@/lib/caderno-teste/diagnostico'
+import { totalTxtDe, DIAG_PADRAO, type DiagConteudo } from '@/lib/caderno-teste/diagnostico'
 import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, type RegistroTeste, type DiscBancoTeste } from '@/app/admin/cadernos-teste/actions'
 import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
 import { FONTES_CADERNO } from '@/lib/caderno-designer/theme'
@@ -85,6 +85,9 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const [pickerCor, setPickerCor] = useState<{ parte: string; label: string; cor: string } | null>(null)
   const [pickerCapa, setPickerCapa] = useState(false)
   const [pickerBloco, setPickerBloco] = useState<string | null>(null)
+  const [estruturaAberta, setEstruturaAberta] = useState(false) // painel de estrutura (outline) do diagnóstico
+  const [origemEstrutura, setOrigemEstrutura] = useState(false) // edição aberta a partir do painel (mostra "voltar")
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
   const importRef = useRef<HTMLInputElement>(null)
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
@@ -184,6 +187,16 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
     for (const d of disciplinasBanco) map.set('d:' + d.chave, { chave: d.chave, nome: d.nome, tipo: 'disciplina' })
     return [...map.values()]
   })()
+  // Painel de estrutura (outline) do diagnóstico: lista → ordena (setas/arrastar) → edita/remove cada bloco.
+  const outline = ativo.modalidade === 'diagnostico' && builder.bancoId ? outlineDoItem(ativo, questoes, varsPrevia, disciplinasBanco) : []
+  const conteudoBase = () => ativo.conteudo ?? DIAG_PADRAO
+  const reordenar = (keys: string[]) => setConteudo({ ...conteudoBase(), ordem: keys })
+  function moverEntrada(idx: number, dir: -1 | 1) { const keys = outline.map((e) => e.key); const j = idx + dir; if (j < 0 || j >= keys.length) return; [keys[idx], keys[j]] = [keys[j], keys[idx]]; reordenar(keys) }
+  function soltarEntrada(from: number, to: number) { if (from === to) return; const keys = outline.map((e) => e.key); const [k] = keys.splice(from, 1); keys.splice(to, 0, k); reordenar(keys) }
+  function apagarEntrada(e: DiagEntrada) { if (e.parte === 'diag_cab') setAjuste({ mostrarCabecalho: false }); else setConteudo(removerParteDiag(ativo.conteudo, e.parte)) }
+  function editarEntrada(e: DiagEntrada) { if (!e.parte) return; setOrigemEstrutura(true); setEstruturaAberta(false); setPickerBloco(null); setPickerCapa(false); setPickerCor({ parte: e.parte, label: e.label, cor: a.coresParte?.[e.parte] ?? a.corPrimaria }) }
+  const fecharPickerCor = () => { setPickerCor(null); setOrigemEstrutura(false) }
+  const ICONE_TIPO: Record<TipoBloco, any> = { cabecalho: LayoutTemplate, nome: FileText, nota: BarChart3, texto: Type, secao: Heading, card: LayoutGrid, desempenho: BarChart3 }
   const exportUrl = (fmt: 'word' | 'html') => `/api/admin/caderno-teste/exportar?caderno=${cadernoId}&grupo=${ativo.id}&formato=${fmt}${alunoAtual ? `&aluno=${alunoAtual.id}` : ''}`
   function salvar() {
     start(async () => {
@@ -392,7 +405,15 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
         </div>
 
         {/* Direita: prévia A4 do grupo ativo (padding lateral menor) */}
-        <div ref={ref} className="scroll-claro min-h-0 overflow-auto bg-[radial-gradient(circle,theme(colors.slate.300)_1px,transparent_1px)] [background-size:18px_18px] px-3 py-5 dark:bg-[radial-gradient(circle,theme(colors.slate.700)_1px,transparent_1px)]">
+        <div ref={ref} className="scroll-claro relative min-h-0 overflow-auto bg-[radial-gradient(circle,theme(colors.slate.300)_1px,transparent_1px)] [background-size:18px_18px] px-3 py-5 dark:bg-[radial-gradient(circle,theme(colors.slate.700)_1px,transparent_1px)]">
+          {ativo.modalidade === 'diagnostico' && builder.bancoId && (
+            <div className="pointer-events-none sticky top-0 z-20 -mt-2 mb-1 flex justify-end pr-1">
+              <button type="button" onClick={() => setEstruturaAberta(true)} title="Estrutura do diagnóstico (ordenar/editar/adicionar blocos)"
+                className="pointer-events-auto flex items-center gap-1.5 rounded-lg border bg-background/95 px-2.5 py-1.5 text-xs font-medium shadow-sm backdrop-blur transition-colors hover:border-primary/50">
+                <Menu className="h-4 w-4" /> Estrutura
+              </button>
+            </div>
+          )}
           {builder.bancoId ? (
             <div className="mx-auto" style={{ zoom } as any}>
               {presetAtivo ? (
@@ -424,14 +445,17 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
         const temCorTexto = ['diag_nota_num', 'diag_nota_faixa', 'diag_cab', 'diag_nome_rot', 'diag_nome_val'].includes(pickerCor.parte) || pickerCor.parte.startsWith('sec_')
         return (
         <>
-          <div className="fixed inset-0 z-40 bg-black/10" onClick={() => setPickerCor(null)} />
+          <div className="fixed inset-0 z-40 bg-black/10" onClick={fecharPickerCor} />
           <aside className="fixed inset-y-0 right-0 z-50 flex w-80 max-w-[85vw] flex-col border-l bg-background shadow-2xl duration-200 animate-in slide-in-from-right">
             <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
-              <div className="min-w-0">
-                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Editar bloco</div>
-                <div className="truncate text-sm font-semibold" title={pickerCor.label}>{pickerCor.label}</div>
+              <div className="flex min-w-0 items-center gap-2">
+                {origemEstrutura && <button onClick={() => { setPickerCor(null); setOrigemEstrutura(false); setEstruturaAberta(true) }} title="Voltar para a estrutura" className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-4 w-4" /></button>}
+                <div className="min-w-0">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Editar bloco</div>
+                  <div className="truncate text-sm font-semibold" title={pickerCor.label}>{pickerCor.label}</div>
+                </div>
               </div>
-              <button onClick={() => setPickerCor(null)} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+              <button onClick={fecharPickerCor} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
             <div className="scroll-claro min-h-0 flex-1 overflow-y-auto px-4 py-4">
               {pickerCor.parte.startsWith('sug:') ? (() => {
@@ -699,6 +723,49 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
               <button type="button" onClick={() => removerBlocoDoc(pickerBloco!)} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-destructive/40 px-2 py-1.5 text-[12px] font-medium text-destructive transition-colors hover:bg-destructive/10">
                 <Trash2 className="h-3.5 w-3.5" /> Apagar este bloco
               </button>
+            </div>
+          </aside>
+        </>
+      )}
+
+      {/* Painel de ESTRUTURA (outline) — lista/ordena/edita/remove os blocos do diagnóstico */}
+      {estruturaAberta && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/10" onClick={() => setEstruturaAberta(false)} />
+          <aside className="fixed inset-y-0 right-0 z-50 flex w-96 max-w-[90vw] flex-col border-l bg-background shadow-2xl duration-200 animate-in slide-in-from-right">
+            <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+              <div className="min-w-0">
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Estrutura</div>
+                <div className="truncate text-sm font-semibold">Blocos do diagnóstico</div>
+              </div>
+              <button onClick={() => setEstruturaAberta(false)} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="scroll-claro min-h-0 flex-1 overflow-y-auto px-3 py-3">
+              <p className="mb-2 px-1 text-[11px] leading-snug text-muted-foreground">Arraste pelo <GripVertical className="inline h-3 w-3" /> ou use as setas para reordenar. Clique no lápis para editar o bloco.</p>
+              <div className="space-y-1">
+                {outline.map((e, i) => {
+                  const Icon = ICONE_TIPO[e.tipo] ?? Type
+                  return (
+                    <div key={e.key} draggable onDragStart={() => setDragIdx(i)} onDragOver={(ev) => ev.preventDefault()}
+                      onDrop={() => { if (dragIdx != null) soltarEntrada(dragIdx, i); setDragIdx(null) }} onDragEnd={() => setDragIdx(null)}
+                      className={cn('group flex items-center gap-1.5 rounded-md border bg-background px-1.5 py-1.5', dragIdx === i && 'opacity-50')}>
+                      <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/60" />
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span className="min-w-0 flex-1 truncate text-[12px]" title={e.label}>{e.label}</span>
+                      <div className="flex shrink-0 items-center">
+                        <button type="button" onClick={() => moverEntrada(i, -1)} disabled={i === 0} title="Subir" className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => moverEntrada(i, 1)} disabled={i === outline.length - 1} title="Descer" className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
+                        {e.parte && <button type="button" onClick={() => editarEntrada(e)} title="Editar bloco" className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>}
+                        {e.removivel && <button type="button" onClick={() => apagarEntrada(e)} title="Apagar bloco" className="rounded p-1 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>}
+                      </div>
+                    </div>
+                  )
+                })}
+                {outline.length === 0 && <p className="px-1 py-4 text-center text-xs text-muted-foreground">Sem blocos para exibir.</p>}
+              </div>
+              <div className="mt-3 rounded-md border border-dashed px-2.5 py-2 text-[11px] leading-snug text-muted-foreground">
+                <Plus className="mr-1 inline h-3.5 w-3.5" /> Adicionar novos blocos (texto, card, desempenho) — em breve.
+              </div>
             </div>
           </aside>
         </>
