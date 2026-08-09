@@ -22,8 +22,9 @@ import { cn } from '@/lib/utils'
 type Aba = 'base' | ScreenKey
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
-export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicial, cor = '#6d28d9', voltarHref }: {
+export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicial, cor = '#6d28d9', voltarHref, sistemaLogo }: {
   bancoId: string; titulo: string; baseInicial: Partial<HudCores>; porPaginaInicial: HudPorPagina; cor?: string; voltarHref?: string
+  sistemaLogo?: { url?: string | null; bg?: string; estilo?: string; filtro?: string }
 }) {
   const [base, setBase] = useState<Partial<HudCores>>(baseInicial ?? {})
   const [porPagina, setPorPagina] = useState<HudPorPagina>(porPaginaInicial ?? {})
@@ -299,6 +300,12 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
                   className="flex w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed py-4 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:opacity-60">
                   {enviandoImg ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
                   <span className="text-xs font-medium">{enviandoImg ? 'Enviando…' : 'Importar imagem'}</span>
+                </button>
+              )}
+              {sistemaLogo?.url && (
+                <button onClick={() => { set('loadingLogoUrl', sistemaLogo.url ?? ''); set('loadingLogoBg', sistemaLogo.bg ?? '#ffffff'); set('loadingLogoEstilo', sistemaLogo.estilo ?? 'arredondado'); set('loadingLogoFiltro', sistemaLogo.filtro ?? 'none') }}
+                  className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium hover:bg-muted/50">
+                  <ImagePlus className="h-3.5 w-3.5" /> Usar a logo do sistema
                 </button>
               )}
               <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">Aparece no centro da animação de carregamento. Sem imagem, usa o logo do sistema.</p>
