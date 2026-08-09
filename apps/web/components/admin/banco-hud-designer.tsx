@@ -7,6 +7,7 @@ import { HexColorField } from '@/components/admin/hex-color-field'
 import { Search, RotateCcw, ChevronDown, Copy, ClipboardPaste, Loader2, Save, Sparkles, Palette, Layers, ArrowLeft, ImagePlus, Trash2 } from 'lucide-react'
 import { redimensionarImagem } from '@/lib/imagem'
 import { hospedarImagemQuestaoAction } from '@/app/admin/questoes/actions'
+import { ESTILOS_PROVA_LOADING } from '@/components/prova/prova-intro'
 import { type HudCores, type HudPorPagina, HUD_CORES_PADRAO, efetivarHud } from '@/lib/caderno-designer/types'
 import { hudCssVars } from '@/lib/caderno-designer/hud'
 import { ProvaHud } from '@/components/prova/prova-hud'
@@ -108,8 +109,10 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
     }
   }
 
+  // Na página Carregamento, estilo/cor da animação são editados no bloco da imagem (evita duplicar).
+  const ocultarNoGrupo = aba === 'loading' ? new Set(['loadingTipo', 'loadingCor']) : new Set<string>()
   const gruposVisiveis = (aba === 'base' ? GRUPOS : GRUPOS.filter((g) => g.pages === 'all' || g.pages.includes(aba)))
-    .map((g) => ({ ...g, campos: busca ? g.campos.filter((f) => norm(f.label + ' ' + f.desc).includes(norm(busca))) : g.campos }))
+    .map((g) => ({ ...g, campos: (busca ? g.campos.filter((f) => norm(f.label + ' ' + f.desc).includes(norm(busca))) : g.campos).filter((f) => !ocultarNoGrupo.has(f.k)) }))
     .filter((g) => g.campos.length)
 
   const salvar = () => iniciar(async () => {
@@ -294,6 +297,17 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
                 </button>
               )}
               <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">Aparece no centro da animação de carregamento. Sem imagem, usa o logo do sistema.</p>
+
+              {/* Estilo + cor da animação (junto da imagem) */}
+              <label className="mt-3 block text-[11px] font-medium text-muted-foreground">Estilo da animação</label>
+              <select value={valorDe('loadingTipo')} onChange={(e) => set('loadingTipo', e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary">
+                {ESTILOS_PROVA_LOADING.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
+              </select>
+              <label className="mt-2 block text-[11px] font-medium text-muted-foreground">Cor do carregamento</label>
+              <div className="mt-1 flex items-center gap-2">
+                <HexColorField value={valorDe('loadingCor')} onChange={(v) => set('loadingCor', v)} />
+                <span className="text-[10px] leading-tight text-muted-foreground">Indicador de carregamento (anel/spinner/barra).</span>
+              </div>
             </div>
           )}
 
