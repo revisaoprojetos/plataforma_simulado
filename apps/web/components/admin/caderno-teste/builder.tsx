@@ -212,6 +212,8 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const fecharPickerCor = () => { setPickerCor(null); setOrigemEstrutura(false) }
   const ICONE_TIPO: Record<TipoBloco, any> = { cabecalho: LayoutTemplate, nome: FileText, nota: BarChart3, texto: Type, secao: Heading, card: LayoutGrid, desempenho: BarChart3 }
   const exportUrl = (fmt: 'word' | 'html') => `/api/admin/caderno-teste/exportar?caderno=${cadernoId}&grupo=${ativo.id}&formato=${fmt}${alunoAtual ? `&aluno=${alunoAtual.id}` : ''}`
+  // Saída FIEL: abre a prévia A4 (mesma render) p/ imprimir / salvar como PDF pelo navegador.
+  const pdfUrl = `/imprimir/caderno-teste/${cadernoId}?grupo=${ativo.id}${alunoAtual ? `&aluno=${alunoAtual.id}` : ''}`
   function salvar() {
     start(async () => {
       const r = await salvarBuilderTeste(cadernoId, builder)
@@ -286,9 +288,10 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             {baixarAberto && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setBaixarAberto(false)} />
-                <div className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-lg border bg-background shadow-lg">
-                  <a href={exportUrl('word')} onClick={() => setBaixarAberto(false)} className="block px-3 py-2 text-sm hover:bg-muted">Word (.doc)</a>
-                  <a href={exportUrl('html')} onClick={() => setBaixarAberto(false)} className="block border-t px-3 py-2 text-sm hover:bg-muted">HTML (.html)</a>
+                <div className="absolute right-0 top-full z-50 mt-1 w-60 overflow-hidden rounded-lg border bg-background shadow-lg">
+                  <a href={pdfUrl} target="_blank" rel="noreferrer" onClick={() => setBaixarAberto(false)} className="block px-3 py-2 text-sm hover:bg-muted">PDF (imprimir) — <span className="text-muted-foreground">fiel à prévia</span></a>
+                  <a href={exportUrl('html')} download onClick={() => setBaixarAberto(false)} className="block border-t px-3 py-2 text-sm hover:bg-muted">HTML (.html)</a>
+                  <a href={exportUrl('word')} download onClick={() => setBaixarAberto(false)} className="block border-t px-3 py-2 text-sm hover:bg-muted">Word (.doc) — <span className="text-muted-foreground">simplificado</span></a>
                 </div>
               </>
             )}
