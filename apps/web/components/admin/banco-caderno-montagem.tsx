@@ -71,6 +71,8 @@ function SlotCard({ slot, cor, bancoId, grupos, pdfs, valor, onGrupo, onPdf }: {
   const escala = w / BASE_W
   const [contentH, setContentH] = useState(BASE_H)
   const ALTURA_SLOT = 380 // altura fixa da prévia; o resto rola
+  // Ao trocar a seleção, zera a altura medida (remede no load do novo conteúdo).
+  useEffect(() => { setContentH(BASE_H) }, [valor?.cadernoId, valor?.itemId])
 
   const onSelect = (v: string) => {
     if (v === '') return onGrupo(null)
@@ -127,7 +129,11 @@ function SlotCard({ slot, cor, bancoId, grupos, pdfs, valor, onGrupo, onPdf }: {
                 <div style={{ width: w, height: Math.round(contentH * escala) }}>
                   <iframe title={slot.titulo} src={`/imprimir/caderno-teste/${valor.cadernoId}?grupo=${valor.itemId}&embed=1`}
                     className="bg-white" scrolling="no"
-                    onLoad={(e) => { try { const h = (e.currentTarget as HTMLIFrameElement).contentDocument?.body?.scrollHeight; if (h && h > 100) setContentH(h) } catch { /* cross-origin */ } }}
+                    onLoad={(e) => {
+                      const ifr = e.currentTarget as HTMLIFrameElement
+                      const ler = () => { try { const d = ifr.contentDocument; const h = Math.max(d?.body?.scrollHeight || 0, d?.documentElement?.scrollHeight || 0); if (h > 100) setContentH((p) => Math.max(p, h)) } catch { /* cross-origin */ } }
+                      ler();[300, 700, 1200, 2000, 3000].forEach((ms) => setTimeout(ler, ms))
+                    }}
                     style={{ border: 0, width: BASE_W, height: contentH, transform: `scale(${escala})`, transformOrigin: 'top left' }} />
                 </div>
               </div>
