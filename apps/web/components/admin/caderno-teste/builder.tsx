@@ -557,15 +557,37 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                   ))}
                 </div>
               </div>
-              <div className="mt-3">
-                <div className="mb-1 text-[11px] text-muted-foreground">Estilo</div>
-                <div className="flex gap-1.5">
-                  {([['b', <b key="b">B</b>], ['i', <i key="i">I</i>], ['u', <u key="u">U</u>]] as const).map(([k, ic]) => {
-                    const cur = a.estiloParte?.[pickerCor.parte] ?? {}
-                    return <button key={k} type="button" onClick={() => setAjuste({ estiloParte: { ...(a.estiloParte ?? {}), [pickerCor.parte]: { ...cur, [k]: !(cur as any)[k] } } })}
-                      className={cn('flex h-7 w-8 items-center justify-center rounded border text-[13px]', (cur as any)[k] ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted')}>{ic}</button>
-                  })}
+              <div className="mt-3 flex items-start gap-2">
+                <div className="shrink-0">
+                  <div className="mb-1 text-[11px] text-muted-foreground">Estilo</div>
+                  <div className="flex gap-1.5">
+                    {([['b', <b key="b">B</b>], ['i', <i key="i">I</i>], ['u', <u key="u">U</u>]] as const).map(([k, ic]) => {
+                      const cur = a.estiloParte?.[pickerCor.parte] ?? {}
+                      return <button key={k} type="button" onClick={() => setAjuste({ estiloParte: { ...(a.estiloParte ?? {}), [pickerCor.parte]: { ...cur, [k]: !(cur as any)[k] } } })}
+                        className={cn('flex h-8 w-8 items-center justify-center rounded border text-[13px]', (cur as any)[k] ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted')}>{ic}</button>
+                    })}
+                  </div>
                 </div>
+                <div className="mt-5 w-px self-stretch bg-border/70" />
+                {(() => {
+                  const base = a.compacto ? 9 : 10 // corpo padrão (casa com previa.tsx)
+                  const px = Math.round((a.tamanhoParte?.[pickerCor.parte] ?? 1) * base)
+                  const setPx = (v: number) => { const nv = Math.min(48, Math.max(6, Math.round(v))); const t = { ...(a.tamanhoParte ?? {}) }; if (nv === base) delete t[pickerCor.parte]; else t[pickerCor.parte] = Math.round((nv / base) * 100) / 100; setAjuste({ tamanhoParte: t }) }
+                  const TAMS = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36]
+                  return (
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground"><span>Tamanho</span>{px !== base && <button type="button" onClick={() => setPx(base)} className="text-[11px] hover:underline">Padrão</button>}</div>
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => setPx(px - 1)} title="Diminuir" className="flex h-8 w-7 shrink-0 items-center justify-center rounded-md border text-base font-semibold hover:bg-muted">−</button>
+                        <select value={px} onChange={(e) => setPx(Number(e.target.value))} className="h-8 min-w-0 flex-1 rounded-md border bg-background px-1 text-center text-sm outline-none focus:border-primary">
+                          {!TAMS.includes(px) && <option value={px}>{px}</option>}
+                          {TAMS.map((n) => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                        <button type="button" onClick={() => setPx(px + 1)} title="Aumentar" className="flex h-8 w-7 shrink-0 items-center justify-center rounded-md border text-base font-semibold hover:bg-muted">+</button>
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
               <div className="mt-3">
                 <div className="mb-1 text-[11px] text-muted-foreground">Fonte</div>
@@ -574,25 +596,6 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                   {FONTES_CADERNO.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
                 </select>
               </div>
-              {(() => {
-                const base = a.compacto ? 9 : 10 // corpo padrão (casa com previa.tsx)
-                const px = Math.round((a.tamanhoParte?.[pickerCor.parte] ?? 1) * base)
-                const setPx = (v: number) => { const nv = Math.min(48, Math.max(6, Math.round(v))); const t = { ...(a.tamanhoParte ?? {}) }; if (nv === base) delete t[pickerCor.parte]; else t[pickerCor.parte] = Math.round((nv / base) * 100) / 100; setAjuste({ tamanhoParte: t }) }
-                const TAMS = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36]
-                return (
-                  <div className="mt-3">
-                    <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground"><span>Tamanho do texto</span>{px !== base && <button type="button" onClick={() => setPx(base)} className="text-[11px] hover:underline">Padrão</button>}</div>
-                    <div className="flex items-center gap-1.5">
-                      <button type="button" onClick={() => setPx(px - 1)} title="Diminuir" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-base font-semibold hover:bg-muted">−</button>
-                      <select value={px} onChange={(e) => setPx(Number(e.target.value))} className="h-8 flex-1 rounded-md border bg-background px-2 text-center text-sm outline-none focus:border-primary">
-                        {!TAMS.includes(px) && <option value={px}>{px}</option>}
-                        {TAMS.map((n) => <option key={n} value={n}>{n}</option>)}
-                      </select>
-                      <button type="button" onClick={() => setPx(px + 1)} title="Aumentar" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-base font-semibold hover:bg-muted">+</button>
-                    </div>
-                  </div>
-                )
-              })()}
               {campos.length > 0 && (
                 <div className="mt-4 space-y-2.5 border-t pt-4">
                   <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Texto</div>
