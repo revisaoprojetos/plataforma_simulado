@@ -58,6 +58,18 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
   }
   const toggleGrupo = (t: string) => setColapsados((p) => ({ ...p, [t]: !p[t] }))
 
+  /** Lê a posição do fundo como [x%, y%] (aceita palavras-chave e porcentagens). */
+  const lerPos = (): [number, number] => {
+    const kw: Record<string, number> = { left: 0, top: 0, center: 50, right: 100, bottom: 100 }
+    const parts = (valorDe('bgPosicao') || 'center').trim().split(/\s+/)
+    const n = (s: string) => (s in kw ? kw[s] : (parseInt(s, 10) || 50))
+    return [n(parts[0] ?? 'center'), n(parts[1] ?? parts[0] ?? 'center')]
+  }
+  const setPosEixo = (eixo: 'x' | 'y', val: string) => {
+    const [x, y] = lerPos()
+    set('bgPosicao', eixo === 'x' ? `${val}% ${y}%` : `${x}% ${val}%`)
+  }
+
   /** Foca (rola + destaca) o campo de cor correspondente a um elemento clicado na prévia. */
   function focarCampo(k: string) {
     const grupo = GRUPOS.find((g) => g.campos.some((cc) => cc.k === k))
@@ -318,16 +330,11 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
                     <option value="contain">Conter (mostra inteira)</option>
                     <option value="repeat">Repetir (padrão)</option>
                   </select>
-                  {/* Posição */}
-                  <label className="mt-2 block text-[11px] font-medium text-muted-foreground">Posição</label>
-                  <div className="mt-1 grid grid-cols-3 gap-1">
-                    {([['left top', '↖'], ['center top', '↑'], ['right top', '↗'], ['left center', '←'], ['center', '•'], ['right center', '→'], ['left bottom', '↙'], ['center bottom', '↓'], ['right bottom', '↘']] as const).map(([v, ic]) => (
-                      <button key={v} onClick={() => set('bgPosicao', v)} title={v}
-                        className={cn('flex h-7 items-center justify-center rounded-md border text-sm transition-colors', (valorDe('bgPosicao') || 'center') === v ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50')}>
-                        {ic}
-                      </button>
-                    ))}
-                  </div>
+                  {/* Posição — sliders X/Y (arrastar na horizontal e vertical) */}
+                  <label className="mt-2 block text-[11px] font-medium text-muted-foreground">Posição horizontal <span className="font-mono text-foreground">{lerPos()[0]}%</span></label>
+                  <input type="range" min={0} max={100} step={1} value={lerPos()[0]} onChange={(e) => setPosEixo('x', e.target.value)} className="mt-1 w-full accent-primary" />
+                  <label className="mt-2 block text-[11px] font-medium text-muted-foreground">Posição vertical <span className="font-mono text-foreground">{lerPos()[1]}%</span></label>
+                  <input type="range" min={0} max={100} step={1} value={lerPos()[1]} onChange={(e) => setPosEixo('y', e.target.value)} className="mt-1 w-full accent-primary" />
                 </>
               ) : (
                 <button onClick={() => abrirUpload('bgImagemUrl')} disabled={enviandoImg}
