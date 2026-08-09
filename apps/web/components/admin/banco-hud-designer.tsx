@@ -1,10 +1,12 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { HexColorField } from '@/components/admin/hex-color-field'
-import { Search, RotateCcw, ChevronDown, Copy, ClipboardPaste, Loader2, Save, Sparkles, Palette, Layers, ArrowLeft } from 'lucide-react'
+import { Search, RotateCcw, ChevronDown, Copy, ClipboardPaste, Loader2, Save, Sparkles, Palette, Layers, ArrowLeft, ImagePlus, Trash2 } from 'lucide-react'
+import { redimensionarImagem } from '@/lib/imagem'
+import { hospedarImagemQuestaoAction } from '@/app/admin/questoes/actions'
 import { type HudCores, type HudPorPagina, HUD_CORES_PADRAO, efetivarHud } from '@/lib/caderno-designer/types'
 import { hudCssVars } from '@/lib/caderno-designer/hud'
 import { ProvaHud } from '@/components/prova/prova-hud'
@@ -31,6 +33,8 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
   const [prim, setPrim] = useState(cor || '#6d28d9')
   const [sec, setSec] = useState('#f59e0b')
   const [salvando, iniciar] = useTransition()
+  const [enviandoImg, setEnviandoImg] = useState(false)
+  const imgRef = useRef<HTMLInputElement>(null)
   // Prévia interativa
   const [verAcabando, setVerAcabando] = useState(false)
   const [verLoginTab, setVerLoginTab] = useState<'form' | LoginResultadoTipo>('form')
@@ -52,6 +56,23 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
     else setPorPagina((p) => ({ ...p, [aba]: {} }))
   }
   const toggleGrupo = (t: string) => setColapsados((p) => ({ ...p, [t]: !p[t] }))
+
+  async function enviarImagemLoading(file: File | null) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
+    setEnviandoImg(true)
+    try {
+      const dataUri = await redimensionarImagem(file)
+      const r = await hospedarImagemQuestaoAction(dataUri)
+      if (!r.ok || !r.url) { toast.error(r.error ?? 'Falha ao enviar a imagem.'); return }
+      set('loadingLogoUrl', r.url)
+    } catch {
+      toast.error('Falha ao processar a imagem.')
+    } finally {
+      setEnviandoImg(false)
+      if (imgRef.current) imgRef.current.value = ''
+    }
+  }
 
   const gruposVisiveis = (aba === 'base' ? GRUPOS : GRUPOS.filter((g) => g.pages === 'all' || g.pages.includes(aba)))
     .map((g) => ({ ...g, campos: busca ? g.campos.filter((f) => norm(f.label + ' ' + f.desc).includes(norm(busca))) : g.campos }))
@@ -138,7 +159,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
               )}
             </div>
             <div className="h-[560px] overflow-auto rounded-xl border shadow-sm" style={hudCssVars(c) as React.CSSProperties}>
-              {aba === 'loading' && <ProvaLoading compact loop mensagem="Carregando simulado..." tipo={c.loadingTipo as EstiloProvaLoading} />}
+              {aba === 'loading' && <ProvaLoading compact loop mensagem="Carregando simulado..." tipo={c.loadingTipo as EstiloProvaLoading} logoUrl={c.loadingLogoUrl || undefined} />}
               {aba === 'login' && (
                 <div className="relative h-full">
                   <ProvaLoginPreview compact branding={null} titulo={titulo} status={STATUS_POR_TAB[verLoginTab]} />
@@ -201,6 +222,37 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
               </div>
             )}
           </div>
+
+          {/* Imagem da tela de carregamento (só aparece ao editar Base ou Carregamento) */}
+          {(aba === 'base' || aba === 'loading') && !busca && (
+            <div className="border-b p-3">
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Imagem do carregamento</p>
+              <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={(e) => enviarImagemLoading(e.target.files?.[0] ?? null)} />
+              {valorDe('loadingLogoUrl') ? (
+                <div className="flex items-center gap-2">
+                  <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/40">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={valorDe('loadingLogoUrl')} alt="" className="h-full w-full object-contain" />
+                  </span>
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    <button onClick={() => imgRef.current?.click()} disabled={enviandoImg} className="inline-flex items-center justify-center gap-1.5 rounded-md border bg-background px-2 py-1.5 text-xs font-medium hover:bg-muted/50 disabled:opacity-60">
+                      {enviandoImg ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />} Trocar
+                    </button>
+                    <button onClick={() => set('loadingLogoUrl', '')} className="inline-flex items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10">
+                      <Trash2 className="h-3.5 w-3.5" /> Remover
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => imgRef.current?.click()} disabled={enviandoImg}
+                  className="flex w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed py-4 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:opacity-60">
+                  {enviandoImg ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+                  <span className="text-xs font-medium">{enviandoImg ? 'Enviando…' : 'Importar imagem'}</span>
+                </button>
+              )}
+              <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">Aparece no centro da animação de carregamento. Sem imagem, usa o logo do sistema.</p>
+            </div>
+          )}
 
           {/* Grupos de campos */}
           <div className="flex-1 overflow-auto">

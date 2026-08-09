@@ -370,7 +370,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
         <ProvaLoading
           mensagem={mensagem}
           tipo={cores.loadingTipo as EstiloProvaLoading}
-          logoUrl={brand?.logoUrl ?? null}
+          logoUrl={cores.loadingLogoUrl || brand?.logoUrl || null}
           logoBg={brand?.logoBg}
           logoEstilo={brand?.logoEstilo}
         />

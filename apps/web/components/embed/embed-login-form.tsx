@@ -218,7 +218,7 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
         <ProvaLoading
           mensagem="Preparando seu simulado..."
           tipo={cores.loadingTipo as EstiloProvaLoading}
-          logoUrl={branding?.logoUrl ?? null}
+          logoUrl={cores.loadingLogoUrl || branding?.logoUrl || null}
           logoBg={branding?.logoBg}
           logoEstilo={branding?.logoEstilo}
         />

@@ -179,7 +179,7 @@ export function RevisaoFinal({
         <ProvaLoading
           mensagem="Carregando resultado do simulado..."
           tipo={cores.loadingTipo as EstiloProvaLoading}
-          logoUrl={branding?.logoUrl ?? null}
+          logoUrl={cores.loadingLogoUrl || branding?.logoUrl || null}
           logoBg={branding?.logoBg}
           logoEstilo={branding?.logoEstilo}
         />
