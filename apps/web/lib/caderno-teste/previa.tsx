@@ -161,8 +161,31 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   }
 
   if (item.modalidade === 'folha_respostas') {
-    if (a.mostrarCabecalho) out.push(<Cabecalho />)
-    if (a.mostrarDadosAluno) out.push(<Dados />)
+    const cor = a.corPrimaria, corSec = a.corSecundaria
+    // Card de título/subtítulo (formato AGU) — barra colorida com o nome do simulado.
+    const corHead = corP('folha_head', cor)
+    out.push(
+      <div {...atr('folha_head', 'Cabeçalho (título/subtítulo)', corHead, { background: corHead, color: '#fff', padding: a.compacto ? '10px 16px' : '14px 18px', borderRadius: 6, marginBottom: 12 })}>
+        <div style={{ fontSize: fs('folha_head', a.compacto ? 18 : 22), fontWeight: 800, letterSpacing: 0.3 }}>{a.titulo || 'Folha de Respostas'}</div>
+        <div style={{ fontSize: 11, opacity: 0.9, marginTop: 2 }}>{V('{simulado}')}</div>
+      </div>,
+    )
+    // Card "Dados do estudante" — faixa + tabela com as variáveis do aluno.
+    const corDados = corP('folha_dados', cor)
+    out.push(
+      <div {...atr('folha_dados', 'Dados do estudante', corDados, { border: `1px solid ${corDados}44`, borderRadius: 6, overflow: 'hidden', marginBottom: 12 })}>
+        <div style={{ background: corDados, color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '5px 12px' }}>Dados do estudante</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.6fr 1fr 1fr' }}>
+          {[['Nome', V('{nome}') || 'Nome do aluno'], ['E-mail', V('{email}') || 'email@exemplo.com'], ['CPF', V('{cpf}') || '000.000.000-00'], ['Data', '__/__/____']].map(([r, v], i) => (
+            <div key={r as string} style={{ padding: '7px 12px', borderLeft: i ? `1px solid ${corDados}22` : 'none' }}>
+              <div style={{ fontSize: 8.5, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94a3b8' }}>{r}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>,
+    )
+
     const total = qs.length || 20
     const cols = Math.max(1, Math.min(6, a.colunas))
     const linhas = Math.ceil(total / cols)
@@ -171,9 +194,16 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     const bolha = (l: string, correta: boolean) => (
       <span key={l} style={{
         width: 18, height: 18, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700,
-        border: `1.5px solid ${correta ? a.corPrimaria : a.corPrimaria + '88'}`,
-        background: correta ? a.corPrimaria : 'transparent', color: correta ? '#fff' : `${a.corPrimaria}cc`,
+        border: `1.5px solid ${correta ? cor : cor + '88'}`,
+        background: correta ? cor : 'transparent', color: correta ? '#fff' : `${cor}cc`,
       }}>{l}</span>
+    )
+    // Faixa de seção (Gabarito oficial × grade em branco).
+    const corSecao = corP('folha_secao', comGab ? cor : corSec)
+    out.push(
+      <div {...atr('folha_secao', 'Faixa da seção', corSecao, { background: corSecao, color: '#fff', textAlign: 'center', fontSize: 10.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '5px', borderRadius: 4, marginBottom: 10 })}>
+        {comGab ? 'Gabarito oficial' : 'Gabarito de alternativas'}
+      </div>,
     )
     for (let r = 0; r < linhas; r++) {
       out.push(
