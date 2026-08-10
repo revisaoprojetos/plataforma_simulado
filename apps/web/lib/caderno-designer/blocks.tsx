@@ -391,30 +391,34 @@ function BlockRenderBody({ block, theme, data, full, editor, selectable, selecte
         const orientacao = a.orientacao === 'horizontal' ? 'horizontal' : 'vertical'
 
         if (orientacao === 'horizontal') {
-          // Questões em COLUNAS: cada faixa tem linhas Nº / Alternativa marcada / Gabarito.
-          const porFaixa = Math.max(5, Math.min(20, a.porLinha ?? 10))
-          const faixas: number[][] = []
-          for (let i = 0; i < nums.length; i += porFaixa) faixas.push(nums.slice(i, i + porFaixa))
-          const rot = { ...cellBase, textAlign: 'left' as const, width: 130, minWidth: 130, fontSize: 9, fontWeight: 800 as const, background: corHeader, color: corHeaderTexto }
+          // Estilo "badges": Nº + alternativa marcada + gabarito, vários por linha, com legenda.
+          const porLinhaC = Math.max(3, Math.min(8, a.porLinha ?? 5))
+          const linhasC: number[][] = []
+          for (let i = 0; i < nums.length; i += porLinhaC) linhasC.push(nums.slice(i, i + porLinhaC))
+          const badge = (bg: string, txt: string) => (
+            <span style={{ background: bg, color: '#fff', fontWeight: 800, fontSize: 10.5, width: 20, minWidth: 20, textAlign: 'center', padding: '3px 0', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{txt}</span>
+          )
           return (
-            <div style={{ fontFamily: fontFamily2, display: 'flex', flexDirection: 'column', gap: 10, breakInside: 'avoid' }}>
-              {faixas.map((faixa, fi) => (
-                <table key={fi} style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', border: `1px solid ${borda}` }}>
-                  <tbody>
-                    <tr style={{ background: corHeader, color: corHeaderTexto }}>
-                      <td style={rot}>Nº</td>
-                      {faixa.map((n) => <td key={n} style={{ ...cellBase, fontWeight: 800, fontSize: 10 }}>{n}</td>)}
-                    </tr>
-                    <tr style={{ borderTop: `1px solid ${borda}` }}>
-                      <td style={rot}>Alternativa marcada</td>
-                      {faixa.map((n) => { const mk = marcadaDe(n); return <td key={n} style={{ ...cellBase, fontWeight: 800, color: corMkDe(mk, oficialDe(n)) }}>{mk}</td> })}
-                    </tr>
-                    <tr style={{ borderTop: `1px solid ${borda}` }}>
-                      <td style={rot}>Gabarito</td>
-                      {faixa.map((n) => <td key={n} style={{ ...cellBase, fontWeight: 800, color: corHeader }}>{oficialDe(n)}</td>)}
-                    </tr>
-                  </tbody>
-                </table>
+            <div style={{ fontFamily: fontFamily2, breakInside: 'avoid' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, justifyContent: 'center', padding: '2px 0 8px', fontSize: 9, color: c.texto }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{badge(VERDE, '')}Marcada correta</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{badge(VERMELHO, '')}Marcada errada</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{badge(corHeader, '')}Gabarito</span>
+              </div>
+              {linhasC.map((linha, ri) => (
+                <div key={ri} style={{ display: 'flex', borderTop: `1px solid ${borda}` }}>
+                  {linha.map((n, idx) => {
+                    const mk = marcadaDe(n), of = oficialDe(n)
+                    return (
+                      <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, padding: '4px 6px', borderLeft: idx ? `1px solid ${borda}` : 'none' }}>
+                        <span style={{ fontWeight: 700, fontSize: 10, color: c.texto, width: 20, minWidth: 20, textAlign: 'right' }}>{String(n).padStart(2, '0')}</span>
+                        {badge(corMkDe(mk, of), mk)}
+                        {badge(corHeader, of)}
+                      </div>
+                    )
+                  })}
+                  {linha.length < porLinhaC && Array.from({ length: porLinhaC - linha.length }).map((_, k) => <div key={`e${k}`} style={{ flex: 1, borderLeft: `1px solid ${borda}` }} />)}
+                </div>
               ))}
             </div>
           )
