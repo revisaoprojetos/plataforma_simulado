@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown, Check, Undo2, Redo2, Trash2, Menu, ArrowUp, ArrowDown, GripVertical, Type, Heading, LayoutGrid } from 'lucide-react'
+import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, BookOpenCheck, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown, Check, Undo2, Redo2, Trash2, Menu, ArrowUp, ArrowDown, GripVertical, Type, Heading, LayoutGrid } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { HexColorField } from '@/components/admin/hex-color-field'
@@ -21,7 +21,7 @@ import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
 import { FONTES_CADERNO } from '@/lib/caderno-designer/theme'
 import { Users, ChevronRight, Download } from 'lucide-react'
 
-const ICONE_MOD: Record<Modalidade, any> = { caderno_questoes: FileText, folha_respostas: ClipboardList, diagnostico: BarChart3 }
+const ICONE_MOD: Record<Modalidade, any> = { caderno_questoes: FileText, caderno_completo: BookOpenCheck, folha_respostas: ClipboardList, diagnostico: BarChart3 }
 const SEM_VARS: Record<string, string> = {} // referência estável (evita re-render em loop no PreviaBlocos)
 
 /** Zoom da prévia para caber na largura do painel direito. */
@@ -134,7 +134,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             <div className="max-w-xs px-6 text-center">
               <LayoutTemplate className="mx-auto mb-3 h-9 w-9 text-muted-foreground/40" />
               <p className="text-sm font-medium text-muted-foreground">Prévia em branco</p>
-              <p className="mt-1 text-xs text-muted-foreground">Clique em <strong>Escolher modelo</strong> para montar o caderno (Caderno de Questões, Folha de Respostas ou Diagnóstico).</p>
+              <p className="mt-1 text-xs text-muted-foreground">Clique em <strong>Escolher modelo</strong> para montar o caderno (Folha de Respostas, Caderno de Enunciado, Caderno completo ou Diagnóstico).</p>
               <button onClick={abrirPicker} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/5"><LayoutTemplate className="h-3.5 w-3.5" /> Escolher modelo</button>
             </div>
           </div>
@@ -430,11 +430,11 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
           </label>
           <div className="col-span-1 rounded-md border bg-background px-2 py-1.5"><div className="mb-1 text-[11px] text-muted-foreground">Cor primária</div><HexColorField value={a.corPrimaria} onChange={(v) => setAjuste({ corPrimaria: v })} /></div>
           <div className="col-span-1 rounded-md border bg-background px-2 py-1.5"><div className="mb-1 text-[11px] text-muted-foreground">Cor secundária</div><HexColorField value={a.corSecundaria} onChange={(v) => setAjuste({ corSecundaria: v })} /></div>
-          {ativo.modalidade === 'caderno_questoes' && <>
+          {(ativo.modalidade === 'caderno_questoes' || ativo.modalidade === 'caderno_completo') && <>
             <div className="col-span-1"><Tog campo="mostrarGabarito" label="Gabarito" /></div>
             <div className="col-span-1"><Tog campo="mostrarComentarios" label="Comentários" /></div>
           </>}
-          {(ativo.modalidade === 'caderno_questoes' || ativo.modalidade === 'folha_respostas') && (
+          {(ativo.modalidade === 'caderno_questoes' || ativo.modalidade === 'caderno_completo' || ativo.modalidade === 'folha_respostas') && (
             <div className="col-span-1"><Segment label="Nº alternativas" valor={a.numAlternativas} opcoes={[4, 5]} onChange={(n) => setAjuste({ numAlternativas: n })} /></div>
           )}
           {ativo.modalidade === 'folha_respostas' && (

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { SemPermissao } from '@/components/ui/alert-box'
-import { FlaskConical, FileText, ClipboardList, BarChart3 } from 'lucide-react'
+import { FlaskConical, FileText, ClipboardList, BookOpenCheck, BarChart3 } from 'lucide-react'
 import { metaDaModalidade, type Modalidade } from '@/lib/caderno-teste/tipos'
 import { CriarCadernoTesteBtn } from './criar-btn'
 
@@ -10,7 +10,7 @@ import { CriarCadernoTesteBtn } from './criar-btn'
 // Começa do zero (não lista os cadernos reais). "Criar caderno" cria um vazio e abre o construtor.
 export const dynamic = 'force-dynamic'
 
-const ICONE: Record<Modalidade, any> = { caderno_questoes: FileText, folha_respostas: ClipboardList, diagnostico: BarChart3 }
+const ICONE: Record<Modalidade, any> = { caderno_questoes: FileText, caderno_completo: BookOpenCheck, folha_respostas: ClipboardList, diagnostico: BarChart3 }
 
 export default async function CadernosTestePage() {
   const access = await getCurrentAccess()

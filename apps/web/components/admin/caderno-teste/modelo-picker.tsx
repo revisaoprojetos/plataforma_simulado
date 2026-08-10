@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, FileText, ClipboardList, BarChart3, Check, Download } from 'lucide-react'
+import { X, FileText, ClipboardList, BookOpenCheck, BarChart3, Check, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Previa } from '@/lib/caderno-teste/previa'
 import { PreviaBlocos } from '@/lib/caderno-teste/previa-blocos'
 import { MODALIDADES, metaDaModalidade, novoItem, presetDoModelo, type Modalidade } from '@/lib/caderno-teste/tipos'
 
-const ICONE: Record<Modalidade, any> = { caderno_questoes: FileText, folha_respostas: ClipboardList, diagnostico: BarChart3 }
+const ICONE: Record<Modalidade, any> = { caderno_questoes: FileText, caderno_completo: BookOpenCheck, folha_respostas: ClipboardList, diagnostico: BarChart3 }
 const SEM_QUESTOES: never[] = [] // referência estável (evita re-render em loop no PreviaBlocos)
 
 /** Miniatura "montada" do modelo — uma prévia A4 real, escalada e não-interativa. */

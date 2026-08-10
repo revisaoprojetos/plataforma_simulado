@@ -136,7 +136,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     )
   }
 
-  if (item.modalidade === 'caderno_questoes') {
+  if (item.modalidade === 'caderno_questoes' || item.modalidade === 'caderno_completo') {
     if (a.mostrarCabecalho) out.push(<Cabecalho />)
     if (a.mostrarDadosAluno) out.push(<Dados />)
     for (const q of qs) {

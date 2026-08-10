@@ -6,7 +6,7 @@
 import { DIAG_PADRAO, DIAG_AGU_2023, DIAG_PGE_RS, DIAG_BASE_4, type DiagConteudo } from './diagnostico'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
 
-export type Modalidade = 'folha_respostas' | 'caderno_questoes' | 'diagnostico'
+export type Modalidade = 'folha_respostas' | 'caderno_questoes' | 'caderno_completo' | 'diagnostico'
 
 export type BuilderAjustes = {
   titulo: string
@@ -133,22 +133,27 @@ export type ModalidadeMeta = { id: Modalidade; nome: string; descricao: string; 
 
 export const MODALIDADES: ModalidadeMeta[] = [
   {
-    id: 'caderno_questoes', nome: 'Caderno de Questões', descricao: 'Enunciados e alternativas para o aluno resolver.',
-    modelos: [
-      { id: 'classico', nome: 'Clássico', descricao: 'Questões com alternativas, espaçado.', ajustes: { mostrarGabarito: false, mostrarComentarios: false, compacto: false } },
-      { id: 'com_gabarito', nome: 'Com gabarito', descricao: 'Destaca a correta e mostra o comentário.', ajustes: { mostrarGabarito: true, mostrarComentarios: true, compacto: false } },
-      { id: 'compacto', nome: 'Compacto', descricao: 'Fonte e espaços menores (mais por página).', ajustes: { mostrarGabarito: false, mostrarComentarios: false, compacto: true } },
-      { id: 'agu_perguntas', nome: 'AGU · Caderno de questões', descricao: 'Modelo pronto (idêntico ao v1): capa + dados do estudante + enunciados e alternativas. Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-perguntas' },
-      { id: 'agu_completo', nome: 'AGU · Caderno completo', descricao: 'Modelo pronto (v1): + resposta marcada, correção (marcada × correta) e comentário.', ajustes: {}, docPreset: 'caderno-completo' },
-      { id: 'agu_discursivo', nome: 'AGU · Caderno discursivo', descricao: 'Modelo pronto (v1): caderno de questões discursivas.', ajustes: {}, docPreset: 'caderno-discursivo' },
-    ],
-  },
-  {
     id: 'folha_respostas', nome: 'Folha de Respostas', descricao: 'Grade de bolhas A–E para marcação.',
     modelos: [
       { id: 'classico', nome: 'Clássico', descricao: '2 colunas de questões.', ajustes: { colunas: 2, compacto: false } },
       { id: 'compacto', nome: 'Compacto', descricao: '4 colunas (mais questões por página).', ajustes: { colunas: 4, compacto: true } },
       { id: 'agu_folha', nome: 'AGU · Folha de respostas', descricao: 'Modelo pronto (idêntico ao v1): capa + dados do estudante + grade azul/dourada (marcado + oficial). Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-objetivo' },
+    ],
+  },
+  {
+    id: 'caderno_questoes', nome: 'Caderno de Enunciado', descricao: 'Só os enunciados e alternativas para o aluno resolver (sem gabarito).',
+    modelos: [
+      { id: 'classico', nome: 'Clássico', descricao: 'Questões com alternativas, espaçado.', ajustes: { mostrarGabarito: false, mostrarComentarios: false, compacto: false } },
+      { id: 'compacto', nome: 'Compacto', descricao: 'Fonte e espaços menores (mais por página).', ajustes: { mostrarGabarito: false, mostrarComentarios: false, compacto: true } },
+      { id: 'agu_perguntas', nome: 'AGU · Caderno de enunciado', descricao: 'Modelo pronto (idêntico ao v1): capa + dados do estudante + enunciados e alternativas. Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-perguntas' },
+      { id: 'agu_discursivo', nome: 'AGU · Caderno discursivo', descricao: 'Modelo pronto (v1): caderno de questões discursivas.', ajustes: {}, docPreset: 'caderno-discursivo' },
+    ],
+  },
+  {
+    id: 'caderno_completo', nome: 'Caderno completo', descricao: 'Enunciados + gabarito e comentário (questões e respostas comentadas).',
+    modelos: [
+      { id: 'com_gabarito', nome: 'Clássico (com gabarito)', descricao: 'Destaca a correta e mostra o comentário.', ajustes: { mostrarGabarito: true, mostrarComentarios: true, compacto: false } },
+      { id: 'agu_completo', nome: 'AGU · Caderno completo', descricao: 'Modelo pronto (v1): + resposta marcada, correção (marcada × correta) e comentário.', ajustes: {}, docPreset: 'caderno-completo' },
     ],
   },
   {
@@ -217,7 +222,7 @@ export function itemAtivo(builder: BuilderV3): ItemCaderno {
 }
 
 function normalizarItem(raw: any): ItemCaderno {
-  const modalidade: Modalidade = ['folha_respostas', 'caderno_questoes', 'diagnostico'].includes(raw?.modalidade) ? raw.modalidade : 'caderno_questoes'
+  const modalidade: Modalidade = ['folha_respostas', 'caderno_questoes', 'caderno_completo', 'diagnostico'].includes(raw?.modalidade) ? raw.modalidade : 'caderno_questoes'
   const meta = metaDaModalidade(modalidade)
   const modelo = meta.modelos.some((m) => m.id === raw?.modelo) ? raw.modelo : meta.modelos[0].id
   const item: ItemCaderno = { id: typeof raw?.id === 'string' ? raw.id : novoId(), modalidade, modelo, ajustes: { ...AJUSTES_BASE, ...(raw?.ajustes ?? {}) } }
