@@ -135,9 +135,12 @@ export const MODALIDADES: ModalidadeMeta[] = [
   {
     id: 'folha_respostas', nome: 'Folha de Respostas', descricao: 'Grade de bolhas A–E para marcação.',
     modelos: [
-      { id: 'classico', nome: 'Clássico', descricao: '2 colunas de questões.', ajustes: { colunas: 2, compacto: false } },
-      { id: 'compacto', nome: 'Compacto', descricao: '4 colunas (mais questões por página).', ajustes: { colunas: 4, compacto: true } },
-      { id: 'agu_folha', nome: 'AGU · Folha de respostas', descricao: 'Modelo pronto (idêntico ao v1): capa + dados do estudante + grade azul/dourada (marcado + oficial). Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-objetivo' },
+      { id: 'classico', nome: 'Clássico (2 colunas)', descricao: 'Bolhas em branco para o aluno marcar — 2 colunas.', ajustes: { colunas: 2, compacto: false, mostrarGabarito: false } },
+      { id: 'compacto', nome: 'Compacto (4 colunas)', descricao: 'Bolhas em branco, fonte/espaços menores — 4 colunas (mais por página).', ajustes: { colunas: 4, compacto: true, mostrarGabarito: false } },
+      { id: 'coluna_unica', nome: 'Coluna única', descricao: 'Uma questão por linha, bolhas maiores — mais legível.', ajustes: { colunas: 1, compacto: false, mostrarGabarito: false } },
+      { id: 'gabarito', nome: 'Gabarito oficial (2 colunas)', descricao: 'Destaca a alternativa CORRETA (bolha preenchida) — folha de gabarito.', ajustes: { colunas: 2, compacto: false, mostrarGabarito: true } },
+      { id: 'gabarito_compacto', nome: 'Gabarito oficial (4 colunas)', descricao: 'Gabarito com a correta preenchida — 4 colunas.', ajustes: { colunas: 4, compacto: true, mostrarGabarito: true } },
+      { id: 'agu_folha', nome: 'AGU · Folha de respostas (marcada × oficial)', descricao: 'Modelo pronto (idêntico ao v1): capa + dados + grade azul/dourada com o marcado do aluno ao lado do gabarito oficial. Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-objetivo' },
     ],
   },
   {

@@ -166,15 +166,22 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     const total = qs.length || 20
     const cols = Math.max(1, Math.min(6, a.colunas))
     const linhas = Math.ceil(total / cols)
+    const comGab = a.mostrarGabarito // preenche a bolha da alternativa OFICIAL (gabarito)
+    const letraCorretaDe = (n: number): string | undefined => qs[n - 1]?.alternativas.find((x) => x.correta)?.letra
+    const bolha = (l: string, correta: boolean) => (
+      <span key={l} style={{
+        width: 18, height: 18, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700,
+        border: `1.5px solid ${correta ? a.corPrimaria : a.corPrimaria + '88'}`,
+        background: correta ? a.corPrimaria : 'transparent', color: correta ? '#fff' : `${a.corPrimaria}cc`,
+      }}>{l}</span>
+    )
     for (let r = 0; r < linhas; r++) {
       out.push(
         <div style={{ display: 'flex', gap: 18, marginBottom: a.compacto ? 4 : 7 }}>
-          {Array.from({ length: cols }, (_, c) => { const n = r * cols + c + 1; return (
+          {Array.from({ length: cols }, (_, c) => { const n = r * cols + c + 1; const corr = comGab ? letraCorretaDe(n) : undefined; return (
             <div key={c} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, visibility: n <= total ? 'visible' : 'hidden' }}>
               <span style={{ width: 22, fontSize: base - 1, fontWeight: 700, color: '#64748b', textAlign: 'right' }}>{String(n).padStart(2, '0')}</span>
-              {LETRAS.slice(0, a.numAlternativas).map((l) => (
-                <span key={l} style={{ width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${a.corPrimaria}88`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: `${a.corPrimaria}cc`, fontWeight: 600 }}>{l}</span>
-              ))}
+              {LETRAS.slice(0, a.numAlternativas).map((l) => bolha(l, l === corr))}
             </div>
           ) })}
         </div>,
