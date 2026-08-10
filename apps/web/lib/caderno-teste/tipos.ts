@@ -47,12 +47,15 @@ function folhaCombinada(orientacao: 'vertical' | 'horizontal' = 'vertical'): Cad
   return doc as CadernoDoc
 }
 
-/** Variante do doc do caderno de ENUNCIADO (perguntas) sem o bloco DADOS DO ESTUDANTE
- *  — prova em branco só precisa do título + questões (desempenho é de resultado). */
-function enunciadoSemDados(): CadernoDoc {
+/** Variante do doc do caderno de ENUNCIADO (perguntas): mantém DADOS DO ESTUDANTE
+ *  (nome/e-mail/data/tempo), mas SEM o desempenho (acertos/erros/média) — prova em
+ *  branco não mostra nota; o tempo vem "-" antes de fazer e o valor real depois. */
+function enunciadoSemDesempenho(): CadernoDoc {
   const doc: any = (() => { try { return structuredClone(CADERNO_PERGUNTAS_DOC) } catch { return JSON.parse(JSON.stringify(CADERNO_PERGUNTAS_DOC)) } })()
   const cont = (doc.pages ?? []).find((p: any) => p.kind === 'conteudo')
-  if (cont) cont.blocks = (cont.blocks ?? []).filter((b: any) => b.type !== 'identificacao')
+  if (cont) for (const b of (cont.blocks ?? [])) {
+    if (b.type === 'identificacao') { b.attributes = { ...b.attributes, mostrarDesempenho: false, desempenho: [] } }
+  }
   return doc as CadernoDoc
 }
 
@@ -199,7 +202,7 @@ export const MODALIDADES: ModalidadeMeta[] = [
     modelos: [
       { id: 'classico', nome: 'Clássico', descricao: 'Questões com alternativas, espaçado.', ajustes: { mostrarGabarito: false, mostrarComentarios: false, compacto: false } },
       { id: 'compacto', nome: 'Compacto', descricao: 'Fonte e espaços menores (mais por página).', ajustes: { mostrarGabarito: false, mostrarComentarios: false, compacto: true } },
-      { id: 'agu_perguntas', nome: 'AGU · Caderno de enunciado', descricao: 'Modelo pronto (idêntico ao v1): capa + título + enunciados e alternativas (sem o bloco DADOS DO ESTUDANTE). Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-perguntas', doc: enunciadoSemDados() },
+      { id: 'agu_perguntas', nome: 'AGU · Caderno de enunciado', descricao: 'Modelo pronto (idêntico ao v1): capa + DADOS DO ESTUDANTE (nome/e-mail/data/tempo) + enunciados e alternativas. Sem desempenho (nota) — prova em branco. Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-perguntas', doc: enunciadoSemDesempenho() },
       { id: 'agu_discursivo', nome: 'AGU · Caderno discursivo', descricao: 'Modelo pronto (v1): caderno de questões discursivas.', ajustes: {}, docPreset: 'caderno-discursivo' },
     ],
   },
