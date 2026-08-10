@@ -26,6 +26,25 @@ function folhaVariante(origem: 'marcado' | 'oficial'): CadernoDoc {
   return doc as CadernoDoc
 }
 
+/** Variante do doc da folha AGU com UMA tabela só: marcada + oficial lado a lado (origem 'ambos'). */
+function folhaCombinada(): CadernoDoc {
+  const doc: any = (() => { try { return structuredClone(FOLHA_RESPOSTAS_DOC) } catch { return JSON.parse(JSON.stringify(FOLHA_RESPOSTAS_DOC)) } })()
+  const cont = (doc.pages ?? []).find((p: any) => p.kind === 'conteudo')
+  if (cont) {
+    const novo: any[] = []; let inseriu = false
+    for (const b of (cont.blocks ?? [])) {
+      if (b.type === 'gabarito-grid') {
+        if (!inseriu) { novo.push({ ...b, attributes: { ...b.attributes, origem: 'ambos', porLinha: 5, titulo: '' } }); inseriu = true }
+        else if (novo.length && novo[novo.length - 1]?.type === 'espacador' && novo[novo.length - 1]?.attributes?.altura === 40) novo.pop()
+        continue
+      }
+      novo.push(b)
+    }
+    cont.blocks = novo
+  }
+  return doc as CadernoDoc
+}
+
 export type Modalidade = 'folha_respostas' | 'caderno_questoes' | 'caderno_completo' | 'diagnostico'
 
 export type BuilderAjustes = {
@@ -160,6 +179,7 @@ export const MODALIDADES: ModalidadeMeta[] = [
       { id: 'agu_folha', nome: 'AGU · Completa (marcada × oficial)', descricao: 'Modelo AGU (idêntico ao v1): capa + dados + gabarito das alternativas MARCADAS e gabarito OFICIAL. Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-objetivo' },
       { id: 'agu_marcada', nome: 'AGU · Gabarito das alternativas (marcada)', descricao: 'Mesmo layout AGU, mostrando só a grade das alternativas marcadas pelo aluno.', ajustes: {}, docPreset: 'caderno-objetivo', doc: folhaVariante('marcado') },
       { id: 'agu_oficial', nome: 'AGU · Gabarito oficial', descricao: 'Mesmo layout AGU, mostrando só o gabarito oficial.', ajustes: {}, docPreset: 'caderno-objetivo', doc: folhaVariante('oficial') },
+      { id: 'agu_combinado', nome: 'AGU · Gabarito único (marcada + oficial)', descricao: 'Uma tabela só: a alternativa MARCADA e o GABARITO lado a lado, com acerto (verde) / erro (vermelho) destacado.', ajustes: {}, docPreset: 'caderno-objetivo', doc: folhaCombinada() },
     ],
   },
   {

@@ -355,9 +355,9 @@ function BlockRenderBody({ block, theme, data, full, editor, selectable, selecte
     case 'gabarito-grid': {
       const nAlt = a.numAlternativas ?? data.numAlternativas ?? 5
       const letras = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, nAlt)
-      const origem = a.origem ?? 'marcado' // 'marcado' = respostas do aluno | 'oficial' = gabarito correto
-      // Gabarito OFICIAL revela as respostas → só na versão com o gabarito liberado (no editor sempre mostra).
-      if (origem === 'oficial' && !data.gabaritoLiberado && !editor) return null
+      const origem = a.origem ?? 'marcado' // 'marcado' = respostas do aluno | 'oficial' = gabarito correto | 'ambos' = os dois lado a lado
+      // Gabarito OFICIAL (ou combinado) revela as respostas → só na versão com o gabarito liberado (no editor sempre mostra).
+      if ((origem === 'oficial' || origem === 'ambos') && !data.gabaritoLiberado && !editor) return null
       const usarDados = data.questoes.length > 0
       const total = a.numQuestoes ?? (usarDados ? data.questoes.length : (data.numQuestoes ?? 100))
       const porLinha = Math.max(4, Math.min(20, a.porLinha ?? 10))
@@ -375,12 +375,52 @@ function BlockRenderBody({ block, theme, data, full, editor, selectable, selecte
         return letras[(n - 1) % letras.length] // amostra p/ preview no editor
       }
       const nums = Array.from({ length: total }, (_, i) => i + 1)
-      const linhas: number[][] = []
-      for (let i = 0; i < nums.length; i += porLinha) linhas.push(nums.slice(i, i + porLinha))
       const borda = `${c.secundaria}2b`
-      const titulo = a.titulo || (origem === 'oficial' ? 'Gabarito Oficial' : 'Gabarito de Alternativas')
+      const titulo = a.titulo || (origem === 'ambos' ? 'Gabarito (marcada × oficial)' : origem === 'oficial' ? 'Gabarito Oficial' : 'Gabarito de Alternativas')
       const corHeader = a.corHeader || c.primaria
       const corHeaderTexto = a.corHeaderTexto || '#ffffff'
+
+      // ---- Modo COMBINADO: marcada + oficial numa tabela só, com acerto/erro destacado ----
+      if (origem === 'ambos') {
+        const VERDE = '#16a34a', VERMELHO = '#dc2626'
+        const oficialDe = (n: number): string => { const q = qDe(n); const of = q?.alternativas.find((al) => al.correta)?.letra; return of || (q ? '—' : letras[(n - 1) % letras.length]) }
+        const marcadaDe = (n: number): string => { const q = qDe(n); if (temResp) return (q && data.respostas?.[q.id]) || '—'; return letras[(n - 1) % letras.length] }
+        const porLinhaC = Math.max(3, Math.min(8, a.porLinha ?? 5))
+        const linhasC: number[][] = []
+        for (let i = 0; i < nums.length; i += porLinhaC) linhasC.push(nums.slice(i, i + porLinhaC))
+        const fontFamily2 = cssDaFonte(a.fonte) || theme.tipografia.familia
+        const raio2 = a.bordaRaio ?? 8
+        const cel = (bg: string, txt: string) => ({ background: bg, color: '#fff', fontWeight: 800, fontSize: 10.5, width: 20, minWidth: 20, textAlign: 'center' as const, padding: '3px 0', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' })
+        return (
+          <div style={{ fontFamily: fontFamily2, border: `1px solid ${borda}`, borderRadius: raio2, overflow: 'hidden', breakInside: 'avoid' }}>
+            <div style={{ background: corHeader, color: corHeaderTexto, fontWeight: 800, textAlign: 'center', padding: '7px 10px', fontSize: 12.5, letterSpacing: 1, textTransform: 'uppercase' }}>{titulo}</div>
+            <div style={{ display: 'flex', gap: 14, justifyContent: 'center', padding: '4px 8px', fontSize: 9, color: c.texto, borderTop: `1px solid ${borda}` }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: VERDE }} /> Marcada correta</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: VERMELHO }} /> Marcada errada</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: corHeader }} /> Gabarito</span>
+            </div>
+            {linhasC.map((linha, ri) => (
+              <div key={ri} style={{ display: 'flex', borderTop: `1px solid ${borda}` }}>
+                {linha.map((n, idx) => {
+                  const mk = marcadaDe(n), of = oficialDe(n)
+                  const corMk = mk === '—' ? '#9aa5b1' : (mk === of ? VERDE : VERMELHO)
+                  return (
+                    <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, padding: '4px 6px', borderLeft: idx ? `1px solid ${borda}` : 'none' }}>
+                      <span style={{ fontWeight: 700, fontSize: 10, color: c.texto, width: 20, minWidth: 20, textAlign: 'right' }}>{String(n).padStart(2, '0')}</span>
+                      <span style={cel(corMk, mk)}>{mk}</span>
+                      <span style={cel(corHeader, of)}>{of}</span>
+                    </div>
+                  )
+                })}
+                {linha.length < porLinhaC && Array.from({ length: porLinhaC - linha.length }).map((_, k) => <div key={`e${k}`} style={{ flex: 1, borderLeft: `1px solid ${borda}` }} />)}
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      const linhas: number[][] = []
+      for (let i = 0; i < nums.length; i += porLinha) linhas.push(nums.slice(i, i + porLinha))
       const corMarcadas = a.corMarcadas || a.corLetra || c.primaria // cor da letra respondida
       // Linhas alternadas (fundo + cor do número): ímpar = 1ª, 3ª… (ri par) | par = 2ª, 4ª… (ri ímpar)
       const fundoImpar = a.fundoImpar || a.corLinhaImpar || `${c.acento}26`
