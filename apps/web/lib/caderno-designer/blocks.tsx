@@ -380,40 +380,75 @@ function BlockRenderBody({ block, theme, data, full, editor, selectable, selecte
       const corHeader = a.corHeader || c.primaria
       const corHeaderTexto = a.corHeaderTexto || '#ffffff'
 
-      // ---- Modo COMBINADO: marcada + oficial numa tabela só, com acerto/erro destacado ----
+      // ---- Modo COMBINADO: Nº · Alternativa marcada · Gabarito (vertical ou horizontal) ----
       if (origem === 'ambos') {
         const VERDE = '#16a34a', VERMELHO = '#dc2626'
         const oficialDe = (n: number): string => { const q = qDe(n); const of = q?.alternativas.find((al) => al.correta)?.letra; return of || (q ? '—' : letras[(n - 1) % letras.length]) }
         const marcadaDe = (n: number): string => { const q = qDe(n); if (temResp) return (q && data.respostas?.[q.id]) || '—'; return letras[(n - 1) % letras.length] }
-        const porLinhaC = Math.max(3, Math.min(8, a.porLinha ?? 5))
-        const linhasC: number[][] = []
-        for (let i = 0; i < nums.length; i += porLinhaC) linhasC.push(nums.slice(i, i + porLinhaC))
         const fontFamily2 = cssDaFonte(a.fonte) || theme.tipografia.familia
-        const raio2 = a.bordaRaio ?? 8
-        const cel = (bg: string, txt: string) => ({ background: bg, color: '#fff', fontWeight: 800, fontSize: 10.5, width: 20, minWidth: 20, textAlign: 'center' as const, padding: '3px 0', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' })
-        return (
-          <div style={{ fontFamily: fontFamily2, border: `1px solid ${borda}`, borderRadius: raio2, overflow: 'hidden', breakInside: 'avoid' }}>
-            <div style={{ background: corHeader, color: corHeaderTexto, fontWeight: 800, textAlign: 'center', padding: '7px 10px', fontSize: 12.5, letterSpacing: 1, textTransform: 'uppercase' }}>{titulo}</div>
-            <div style={{ display: 'flex', gap: 14, justifyContent: 'center', padding: '4px 8px', fontSize: 9, color: c.texto, borderTop: `1px solid ${borda}` }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: VERDE }} /> Marcada correta</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: VERMELHO }} /> Marcada errada</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: corHeader }} /> Gabarito</span>
+        const corMkDe = (mk: string, of: string) => mk === '—' ? '#9aa5b1' : (mk === of ? VERDE : VERMELHO)
+        const cellBase = { fontSize: 10.5, padding: '3px 4px', textAlign: 'center' as const, borderRight: `1px solid ${borda}` }
+        const orientacao = a.orientacao === 'horizontal' ? 'horizontal' : 'vertical'
+
+        if (orientacao === 'horizontal') {
+          // Questões em COLUNAS: cada faixa tem linhas Nº / Alternativa marcada / Gabarito.
+          const porFaixa = Math.max(5, Math.min(20, a.porLinha ?? 10))
+          const faixas: number[][] = []
+          for (let i = 0; i < nums.length; i += porFaixa) faixas.push(nums.slice(i, i + porFaixa))
+          const rot = { ...cellBase, textAlign: 'left' as const, width: 130, minWidth: 130, fontSize: 9, fontWeight: 800 as const, background: corHeader, color: corHeaderTexto }
+          return (
+            <div style={{ fontFamily: fontFamily2, display: 'flex', flexDirection: 'column', gap: 10, breakInside: 'avoid' }}>
+              {faixas.map((faixa, fi) => (
+                <table key={fi} style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', border: `1px solid ${borda}` }}>
+                  <tbody>
+                    <tr style={{ background: corHeader, color: corHeaderTexto }}>
+                      <td style={rot}>Nº</td>
+                      {faixa.map((n) => <td key={n} style={{ ...cellBase, fontWeight: 800, fontSize: 10 }}>{n}</td>)}
+                    </tr>
+                    <tr style={{ borderTop: `1px solid ${borda}` }}>
+                      <td style={rot}>Alternativa marcada</td>
+                      {faixa.map((n) => { const mk = marcadaDe(n); return <td key={n} style={{ ...cellBase, fontWeight: 800, color: corMkDe(mk, oficialDe(n)) }}>{mk}</td> })}
+                    </tr>
+                    <tr style={{ borderTop: `1px solid ${borda}` }}>
+                      <td style={rot}>Gabarito</td>
+                      {faixa.map((n) => <td key={n} style={{ ...cellBase, fontWeight: 800, color: corHeader }}>{oficialDe(n)}</td>)}
+                    </tr>
+                  </tbody>
+                </table>
+              ))}
             </div>
-            {linhasC.map((linha, ri) => (
-              <div key={ri} style={{ display: 'flex', borderTop: `1px solid ${borda}` }}>
-                {linha.map((n, idx) => {
-                  const mk = marcadaDe(n), of = oficialDe(n)
-                  const corMk = mk === '—' ? '#9aa5b1' : (mk === of ? VERDE : VERMELHO)
-                  return (
-                    <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, padding: '4px 6px', borderLeft: idx ? `1px solid ${borda}` : 'none' }}>
-                      <span style={{ fontWeight: 700, fontSize: 10, color: c.texto, width: 20, minWidth: 20, textAlign: 'right' }}>{String(n).padStart(2, '0')}</span>
-                      <span style={cel(corMk, mk)}>{mk}</span>
-                      <span style={cel(corHeader, of)}>{of}</span>
-                    </div>
-                  )
-                })}
-                {linha.length < porLinhaC && Array.from({ length: porLinhaC - linha.length }).map((_, k) => <div key={`e${k}`} style={{ flex: 1, borderLeft: `1px solid ${borda}` }} />)}
-              </div>
+          )
+        }
+
+        // VERTICAL: várias tabelas lado a lado, 1 questão por linha.
+        const nBlocos = Math.max(1, Math.min(5, Math.ceil(total / 25)))
+        const porColuna = Math.ceil(total / nBlocos)
+        const blocos: number[][] = []
+        for (let i = 0; i < nums.length; i += porColuna) blocos.push(nums.slice(i, i + porColuna))
+        return (
+          <div style={{ fontFamily: fontFamily2, display: 'flex', gap: 10, breakInside: 'avoid' }}>
+            {blocos.map((bloco, bi) => (
+              <table key={bi} style={{ flex: 1, borderCollapse: 'collapse', tableLayout: 'fixed', border: `1px solid ${borda}` }}>
+                <thead>
+                  <tr style={{ background: corHeader, color: corHeaderTexto }}>
+                    <th style={{ ...cellBase, width: '22%', fontSize: 9, fontWeight: 800, padding: '4px 2px' }}>Nº</th>
+                    <th style={{ ...cellBase, fontSize: 8.5, fontWeight: 800, lineHeight: 1.15, padding: '4px 2px' }}>Alternativa marcada</th>
+                    <th style={{ ...cellBase, borderRight: 'none', fontSize: 8.5, fontWeight: 800, lineHeight: 1.15, padding: '4px 2px' }}>Gabarito</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bloco.map((n) => {
+                    const mk = marcadaDe(n), of = oficialDe(n)
+                    return (
+                      <tr key={n} style={{ borderTop: `1px solid ${borda}` }}>
+                        <td style={{ ...cellBase, fontWeight: 700, color: c.texto }}>{n}</td>
+                        <td style={{ ...cellBase, fontWeight: 800, color: corMkDe(mk, of) }}>{mk}</td>
+                        <td style={{ ...cellBase, borderRight: 'none', fontWeight: 800, color: corHeader }}>{of}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             ))}
           </div>
         )
