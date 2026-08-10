@@ -5,7 +5,7 @@
 
 import { DIAG_PADRAO, DIAG_AGU_2023, DIAG_PGE_RS, DIAG_BASE_4, type DiagConteudo } from './diagnostico'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
-import { FOLHA_RESPOSTAS_DOC } from '@/lib/caderno-designer/preset-cadernos-doc'
+import { FOLHA_RESPOSTAS_DOC, CADERNO_PERGUNTAS_DOC } from '@/lib/caderno-designer/preset-cadernos-doc'
 
 /** Variante do doc da folha AGU mostrando SÓ um dos gabaritos (marcado ou oficial). */
 function folhaVariante(origem: 'marcado' | 'oficial'): CadernoDoc {
@@ -44,6 +44,15 @@ function folhaCombinada(orientacao: 'vertical' | 'horizontal' = 'vertical'): Cad
     }
     cont.blocks = novo
   }
+  return doc as CadernoDoc
+}
+
+/** Variante do doc do caderno de ENUNCIADO (perguntas) sem o bloco DADOS DO ESTUDANTE
+ *  — prova em branco só precisa do título + questões (desempenho é de resultado). */
+function enunciadoSemDados(): CadernoDoc {
+  const doc: any = (() => { try { return structuredClone(CADERNO_PERGUNTAS_DOC) } catch { return JSON.parse(JSON.stringify(CADERNO_PERGUNTAS_DOC)) } })()
+  const cont = (doc.pages ?? []).find((p: any) => p.kind === 'conteudo')
+  if (cont) cont.blocks = (cont.blocks ?? []).filter((b: any) => b.type !== 'identificacao')
   return doc as CadernoDoc
 }
 
@@ -190,7 +199,7 @@ export const MODALIDADES: ModalidadeMeta[] = [
     modelos: [
       { id: 'classico', nome: 'Clássico', descricao: 'Questões com alternativas, espaçado.', ajustes: { mostrarGabarito: false, mostrarComentarios: false, compacto: false } },
       { id: 'compacto', nome: 'Compacto', descricao: 'Fonte e espaços menores (mais por página).', ajustes: { mostrarGabarito: false, mostrarComentarios: false, compacto: true } },
-      { id: 'agu_perguntas', nome: 'AGU · Caderno de enunciado', descricao: 'Modelo pronto (idêntico ao v1): capa + dados do estudante + enunciados e alternativas. Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-perguntas' },
+      { id: 'agu_perguntas', nome: 'AGU · Caderno de enunciado', descricao: 'Modelo pronto (idêntico ao v1): capa + título + enunciados e alternativas (sem o bloco DADOS DO ESTUDANTE). Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-perguntas', doc: enunciadoSemDados() },
       { id: 'agu_discursivo', nome: 'AGU · Caderno discursivo', descricao: 'Modelo pronto (v1): caderno de questões discursivas.', ajustes: {}, docPreset: 'caderno-discursivo' },
     ],
   },
