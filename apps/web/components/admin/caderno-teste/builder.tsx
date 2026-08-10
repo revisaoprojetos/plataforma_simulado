@@ -114,6 +114,36 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
     return () => { vivo = false }
   }, [builder.bancoId])
 
+  // Caderno vazio (recém-criado): abre o editor com prévia EM BRANCO e o picker FECHADO.
+  if (builder.itens.length === 0) {
+    const abrirPicker = () => { setPickerMode('add'); setPickerOpen(true) }
+    return (
+      <div className="-m-6 flex h-screen flex-col overflow-hidden bg-background">
+        <div className="relative z-30 flex items-center justify-between gap-3 border-b bg-card/60 px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            <Link href="/admin/cadernos-teste" className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
+            <div>
+              <h1 className="text-lg font-bold leading-tight">Construtor de caderno (teste)</h1>
+              <p className="text-xs text-muted-foreground">Escolha um modelo para começar.</p>
+            </div>
+          </div>
+          <button onClick={abrirPicker} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"><LayoutTemplate className="h-4 w-4" /> Escolher modelo</button>
+        </div>
+        <div className="flex flex-1 items-center justify-center overflow-auto bg-muted/30 p-6">
+          <div className="flex items-center justify-center rounded-sm border bg-white shadow-md" style={{ width: 480, height: Math.round((480 * 1123) / 794) }}>
+            <div className="max-w-xs px-6 text-center">
+              <LayoutTemplate className="mx-auto mb-3 h-9 w-9 text-muted-foreground/40" />
+              <p className="text-sm font-medium text-muted-foreground">Prévia em branco</p>
+              <p className="mt-1 text-xs text-muted-foreground">Clique em <strong>Escolher modelo</strong> para montar o caderno (Caderno de Questões, Folha de Respostas ou Diagnóstico).</p>
+              <button onClick={abrirPicker} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/5"><LayoutTemplate className="h-3.5 w-3.5" /> Escolher modelo</button>
+            </div>
+          </div>
+        </div>
+        <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: 'caderno_questoes', modelo: 'classico' }} onSelecionar={onPicker} />
+      </div>
+    )
+  }
+
   const ativo = itemAtivo(builder)
   const presetAtivo = presetDoItem(ativo) // modelo pronto (render por blocos do v1)
   const meta = metaDaModalidade(ativo.modalidade)
@@ -164,10 +194,10 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   }
   function onPicker(m: Modalidade, modeloId: string) {
     setBuilder((b) => {
-      if (pickerMode === 'add') {
-        const src = itemAtivo(b).ajustes
+      if (pickerMode === 'add' || b.itens.length === 0) {
+        const src = itemAtivo(b)?.ajustes // pode ser undefined quando o caderno está vazio
         const it = novoItem(m, modeloId)
-        it.ajustes = { ...it.ajustes, titulo: src.titulo, corPrimaria: src.corPrimaria, corSecundaria: src.corSecundaria }
+        if (src) it.ajustes = { ...it.ajustes, titulo: src.titulo, corPrimaria: src.corPrimaria, corSecundaria: src.corSecundaria }
         return { ...b, itens: [...b.itens, it], ativo: it.id }
       }
       return { ...b, itens: b.itens.map((it) => {
