@@ -26,6 +26,8 @@ export default async function CadernoTesteEditorPage({ params }: { params: Promi
   if (!caderno) notFound()
 
   const builder = normalizarBuilder((caderno as any).config, (caderno as any).nome)
+  // Caderno recém-criado (sem builderV3 salvo) → abre o seletor de modelo em vez de vir com o padrão pronto.
+  const ehNovo = !(((caderno as any).config?.builderV3?.itens?.length) > 0)
   let questoes: PreviewQuestao[] = []
   let registros: any[] = []
   let disciplinas: any[] = []
@@ -36,6 +38,6 @@ export default async function CadernoTesteEditorPage({ params }: { params: Promi
   }
 
   return (
-    <CadernoTesteBuilder cadernoId={caderno.id} builderInicial={builder} bancos={(bancos ?? []) as { id: string; nome: string }[]} questoesIniciais={questoes} registrosIniciais={registros} disciplinasIniciais={disciplinas} />
+    <CadernoTesteBuilder cadernoId={caderno.id} builderInicial={builder} bancos={(bancos ?? []) as { id: string; nome: string }[]} questoesIniciais={questoes} registrosIniciais={registros} disciplinasIniciais={disciplinas} abrirPickerInicial={ehNovo} />
   )
 }
