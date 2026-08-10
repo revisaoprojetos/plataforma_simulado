@@ -15,12 +15,13 @@ function MiniPrevia({ modalidade, modeloId }: { modalidade: Modalidade; modeloId
   const LARG = 240
   const zoom = LARG / 794
   const preset = presetDoModelo(modalidade, modeloId) // modelo pronto → render por blocos (v1)
+  const it = novoItem(modalidade, modeloId) // p/ variantes doc-backed (docEdit) e diagnóstico
   return (
     <div style={{ width: LARG, height: 316, overflow: 'hidden', background: '#fff', borderRadius: 6 }} className="pointer-events-none border">
       <div style={{ width: 794, transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
         {preset
-          ? <PreviaBlocos presetId={preset} questoes={SEM_QUESTOES} titulo={metaDaModalidade(modalidade).nome} />
-          : <Previa item={novoItem(modalidade, modeloId)} questoes={SEM_QUESTOES} />}
+          ? <PreviaBlocos presetId={preset} questoes={SEM_QUESTOES} titulo={metaDaModalidade(modalidade).nome} docOverride={it.docEdit} />
+          : <Previa item={it} questoes={SEM_QUESTOES} />}
       </div>
     </div>
   )

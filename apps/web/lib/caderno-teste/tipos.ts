@@ -5,6 +5,26 @@
 
 import { DIAG_PADRAO, DIAG_AGU_2023, DIAG_PGE_RS, DIAG_BASE_4, type DiagConteudo } from './diagnostico'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
+import { FOLHA_RESPOSTAS_DOC } from '@/lib/caderno-designer/preset-cadernos-doc'
+
+/** Variante do doc da folha AGU mostrando SÓ um dos gabaritos (marcado ou oficial). */
+function folhaVariante(origem: 'marcado' | 'oficial'): CadernoDoc {
+  const doc: any = (() => { try { return structuredClone(FOLHA_RESPOSTAS_DOC) } catch { return JSON.parse(JSON.stringify(FOLHA_RESPOSTAS_DOC)) } })()
+  const cont = (doc.pages ?? []).find((p: any) => p.kind === 'conteudo')
+  if (cont) {
+    const novo: any[] = []
+    for (const b of (cont.blocks ?? [])) {
+      if (b.type === 'gabarito-grid' && b.attributes?.origem !== origem) {
+        // remove o grid do outro gabarito + o espaçador de 40 imediatamente anterior
+        if (novo.length && novo[novo.length - 1]?.type === 'espacador' && novo[novo.length - 1]?.attributes?.altura === 40) novo.pop()
+        continue
+      }
+      novo.push(b)
+    }
+    cont.blocks = novo
+  }
+  return doc as CadernoDoc
+}
 
 export type Modalidade = 'folha_respostas' | 'caderno_questoes' | 'caderno_completo' | 'diagnostico'
 
@@ -128,19 +148,18 @@ export type Modelo = {
   /** Modelo PRONTO renderizado pelo motor de blocos do v1 (id do preset em caderno-designer/presets.ts).
    * Quando presente, a prévia usa PreviaBlocos (idêntico ao v1) em vez do render simples. */
   docPreset?: string
+  /** Doc pronto (variante) aplicado ao criar o item — sobrescreve o preset (ex.: folha AGU só com um gabarito). */
+  doc?: CadernoDoc
 }
 export type ModalidadeMeta = { id: Modalidade; nome: string; descricao: string; modelos: Modelo[] }
 
 export const MODALIDADES: ModalidadeMeta[] = [
   {
-    id: 'folha_respostas', nome: 'Folha de Respostas', descricao: 'Grade de bolhas A–E para marcação.',
+    id: 'folha_respostas', nome: 'Folha de Respostas', descricao: 'Layout AGU: capa + dados do estudante + gabaritos.',
     modelos: [
-      { id: 'classico', nome: 'Clássico (2 colunas)', descricao: 'Bolhas em branco para o aluno marcar — 2 colunas.', ajustes: { colunas: 2, compacto: false, mostrarGabarito: false } },
-      { id: 'compacto', nome: 'Compacto (4 colunas)', descricao: 'Bolhas em branco, fonte/espaços menores — 4 colunas (mais por página).', ajustes: { colunas: 4, compacto: true, mostrarGabarito: false } },
-      { id: 'coluna_unica', nome: 'Coluna única', descricao: 'Uma questão por linha, bolhas maiores — mais legível.', ajustes: { colunas: 1, compacto: false, mostrarGabarito: false } },
-      { id: 'gabarito', nome: 'Gabarito oficial (2 colunas)', descricao: 'Destaca a alternativa CORRETA (bolha preenchida) — folha de gabarito.', ajustes: { colunas: 2, compacto: false, mostrarGabarito: true } },
-      { id: 'gabarito_compacto', nome: 'Gabarito oficial (4 colunas)', descricao: 'Gabarito com a correta preenchida — 4 colunas.', ajustes: { colunas: 4, compacto: true, mostrarGabarito: true } },
-      { id: 'agu_folha', nome: 'AGU · Folha de respostas (marcada × oficial)', descricao: 'Modelo pronto (idêntico ao v1): capa + dados + grade azul/dourada com o marcado do aluno ao lado do gabarito oficial. Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-objetivo' },
+      { id: 'agu_folha', nome: 'AGU · Completa (marcada × oficial)', descricao: 'Modelo AGU (idêntico ao v1): capa + dados + gabarito das alternativas MARCADAS e gabarito OFICIAL. Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-objetivo' },
+      { id: 'agu_marcada', nome: 'AGU · Gabarito das alternativas (marcada)', descricao: 'Mesmo layout AGU, mostrando só a grade das alternativas marcadas pelo aluno.', ajustes: {}, docPreset: 'caderno-objetivo', doc: folhaVariante('marcado') },
+      { id: 'agu_oficial', nome: 'AGU · Gabarito oficial', descricao: 'Mesmo layout AGU, mostrando só o gabarito oficial.', ajustes: {}, docPreset: 'caderno-objetivo', doc: folhaVariante('oficial') },
     ],
   },
   {
@@ -210,6 +229,7 @@ export function novoItem(modalidade: Modalidade, modeloId: string): ItemCaderno 
   const modelo = meta.modelos.find((m) => m.id === modeloId) ?? meta.modelos[0]
   const item: ItemCaderno = { id: novoId(), modalidade, modelo: modelo.id, ajustes: ajustesDeModelo(modalidade, modelo.id) }
   if (modalidade === 'diagnostico') item.conteudo = clonar(modelo.conteudo ?? DIAG_PADRAO)
+  if (modelo.doc) item.docEdit = clonar(modelo.doc) // variante pronta (ex.: folha AGU só com um gabarito)
   return item
 }
 
