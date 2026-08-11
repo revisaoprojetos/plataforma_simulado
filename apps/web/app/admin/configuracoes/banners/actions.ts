@@ -21,26 +21,40 @@ export interface BannerInput {
   destaqueTexto?: string | null
   fadeAtivo?: boolean
   fadeNivel?: number
+  // Estilo do pop-up (guardado no mesmo mapa tema.banner_destaques[id]).
+  popupEstilo?: 'classico' | 'sobre' | 'compacto'
+  popupPontas?: 'arredondado' | 'quadrado'
 }
 
-type DestaqueEntry = { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number }
+type DestaqueEntry = { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: string; popupPontas?: string }
 
-/** Salva a config por-banner (rótulo "Em destaque" + degradê) em tema.banner_destaques[bannerId]. */
+/** Salva a config por-banner (rótulo "Em destaque" + degradê + estilo do pop-up) em
+ *  tema.banner_destaques[bannerId], mesclando com o que já existir. */
 async function salvarDestaque(
   svc: ReturnType<typeof createAdminClient>,
   tenantId: string,
   bannerId: string,
-  data: Pick<BannerInput, 'destaqueAtivo' | 'destaqueTexto' | 'fadeAtivo' | 'fadeNivel'>,
+  data: Pick<BannerInput, 'destaqueAtivo' | 'destaqueTexto' | 'fadeAtivo' | 'fadeNivel' | 'popupEstilo' | 'popupPontas'>,
 ) {
-  if (data.destaqueAtivo === undefined && data.destaqueTexto === undefined && data.fadeAtivo === undefined && data.fadeNivel === undefined) return
+  const nada = data.destaqueAtivo === undefined && data.destaqueTexto === undefined && data.fadeAtivo === undefined
+    && data.fadeNivel === undefined && data.popupEstilo === undefined && data.popupPontas === undefined
+  if (nada) return
   const { data: t } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
   const tema = { ...(((t?.tema as Record<string, unknown>) ?? {})) }
   const mapa = { ...(((tema.banner_destaques as Record<string, unknown>) ?? {})) } as Record<string, DestaqueEntry>
+  const atual = mapa[bannerId] ?? {}
   mapa[bannerId] = {
-    ativo: data.destaqueAtivo !== false,
-    texto: (data.destaqueTexto?.trim() || undefined),
-    fadeAtivo: data.fadeAtivo !== false,
-    fadeNivel: typeof data.fadeNivel === 'number' ? Math.max(0, Math.min(150, Math.round(data.fadeNivel))) : undefined,
+    ...atual,
+    ...(data.destaqueAtivo !== undefined || data.destaqueTexto !== undefined || data.fadeAtivo !== undefined || data.fadeNivel !== undefined
+      ? {
+          ativo: data.destaqueAtivo !== false,
+          texto: (data.destaqueTexto?.trim() || undefined),
+          fadeAtivo: data.fadeAtivo !== false,
+          fadeNivel: typeof data.fadeNivel === 'number' ? Math.max(0, Math.min(150, Math.round(data.fadeNivel))) : undefined,
+        }
+      : {}),
+    ...(data.popupEstilo !== undefined ? { popupEstilo: data.popupEstilo } : {}),
+    ...(data.popupPontas !== undefined ? { popupPontas: data.popupPontas } : {}),
   }
   tema.banner_destaques = mapa
   await svc.from('simulado_tenants').update({ tema }).eq('id', tenantId)

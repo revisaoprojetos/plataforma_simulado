@@ -13,9 +13,13 @@ function Alvo({ href, className, style, children, onClick, 'aria-label': ariaLab
   return <Link href={href} onClick={onClick} aria-label={ariaLabel} className={className} style={style}>{children}</Link>
 }
 
+export type PopupEstilo = 'classico' | 'sobre' | 'compacto'
+export type PopupPontas = 'arredondado' | 'quadrado'
+
 export type BannerPortal = {
   id: string; tipo: 'banner' | 'popup' | 'hero'; titulo: string | null; mensagem: string | null
   imagem_url: string | null; link: string | null; cor: string | null; ordem?: number
+  estilo?: PopupEstilo | null; pontas?: PopupPontas | null // só p/ pop-up
 }
 
 /** Chip informativo do banner de simulado (ex.: disponibilidade, nº de questões, tipo, contagem). */
@@ -254,29 +258,100 @@ export function textoContraste(hex: string): string {
   return lum > 0.62 ? '#1b1036' : '#ffffff'
 }
 
-export type PopupDados = { titulo: string | null; mensagem: string | null; imagem_url: string | null; cor: string | null; link: string | null }
+export type PopupDados = { titulo: string | null; mensagem: string | null; imagem_url: string | null; cor: string | null; link: string | null; estilo?: PopupEstilo | null; pontas?: PopupPontas | null }
+
+export const POPUP_ESTILOS: { v: PopupEstilo; label: string }[] = [
+  { v: 'classico', label: 'Clássico' },
+  { v: 'sobre', label: 'Sobre a imagem' },
+  { v: 'compacto', label: 'Compacto' },
+]
 
 /** Card do pop-up (visual reutilizado no portal do aluno e na prévia do admin).
+ *  Estilos: 'classico' (imagem no topo + texto), 'sobre' (texto sobre a imagem),
+ *  'compacto' (ícone + texto, sem imagem grande). Pontas arredondadas ou quadradas.
  *  `preview` = estático (CTA não navega, fechar é opcional). */
 export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; onFechar?: () => void; preview?: boolean }) {
   const cor = banner.cor || '#6366f1'
   const txt = textoContraste(cor)
+  const estilo: PopupEstilo = banner.estilo ?? 'classico'
+  const quad = banner.pontas === 'quadrado'
+  const rCard = quad ? 'rounded-none' : 'rounded-3xl'
+  const rBtn = quad ? 'rounded-none' : 'rounded-xl'
+  const rChip = quad ? 'rounded-none' : 'rounded-full'
+  const anim = 'animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-300'
+  const stop = (e: React.MouseEvent) => e.stopPropagation()
   const mostrarCTA = !!banner.link || preview
-  const ctaCls = 'inline-flex items-center justify-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-md transition hover:opacity-95'
   const ctaStyle: React.CSSProperties = { background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 78%, #000))`, color: txt }
+  const ctaCls = cn('inline-flex items-center justify-center gap-1.5 px-5 py-2.5 text-sm font-semibold shadow-md transition hover:opacity-95', rBtn)
+
+  const CTA = mostrarCTA ? (
+    preview || !banner.link
+      ? <span className={ctaCls} style={ctaStyle}>Ver mais <ArrowRight className="h-4 w-4" /></span>
+      : <Alvo href={banner.link} onClick={onFechar} className={ctaCls} style={ctaStyle}>Ver mais <ArrowRight className="h-4 w-4" /></Alvo>
+  ) : null
+  const Fechar = (dark?: boolean) => (
+    <button type="button" onClick={onFechar}
+      className={cn('px-4 py-2.5 text-sm font-medium transition-colors', rBtn, dark ? 'text-white/85 hover:bg-white/10' : 'border text-muted-foreground hover:bg-muted')}>Fechar</button>
+  )
+  const CloseX = (sobre?: boolean) => (
+    <button type="button" onClick={onFechar} aria-label="Fechar"
+      className={cn('absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center transition', quad ? 'rounded-none' : 'rounded-full',
+        sobre ? 'bg-black/40 text-white ring-1 ring-white/25 backdrop-blur hover:bg-black/60' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>
+      <X className="h-4 w-4" />
+    </button>
+  )
+  const Eyebrow = (dark?: boolean) => (
+    <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide', rChip)}
+      style={dark ? { background: 'rgba(255,255,255,.16)', color: '#fff' } : { background: `color-mix(in oklab, ${cor} 16%, var(--card))`, color: cor }}>
+      <Megaphone className="h-3.5 w-3.5" /> Aviso
+    </span>
+  )
+
+  // ---- SOBRE A IMAGEM: texto e ações por cima da imagem, com degradê escuro ----
+  if (estilo === 'sobre') {
+    return (
+      <div onClick={stop} className={cn('relative flex min-h-[22rem] w-full max-w-md flex-col justify-end overflow-hidden border text-white shadow-2xl', rCard, anim)}>
+        {banner.imagem_url
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={banner.imagem_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${cor}, #14101f)` }} />}
+        <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(8,6,16,.92) 8%, rgba(8,6,16,.55) 42%, rgba(8,6,16,.06) 80%)' }} />
+        {CloseX(true)}
+        <div className="relative space-y-2 p-6">
+          {Eyebrow(true)}
+          {banner.titulo && <h3 className="text-2xl font-bold leading-tight tracking-tight drop-shadow">{banner.titulo}</h3>}
+          {banner.mensagem && <p className="whitespace-pre-wrap text-sm leading-relaxed text-white/85">{banner.mensagem}</p>}
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">{Fechar(true)}{CTA}</div>
+        </div>
+      </div>
+    )
+  }
+
+  // ---- COMPACTO: barra de cor + ícone + texto (sem imagem grande) ----
+  if (estilo === 'compacto') {
+    return (
+      <div onClick={stop} className={cn('relative w-full max-w-md overflow-hidden border bg-card text-foreground shadow-2xl', rCard, anim)}>
+        <div className="absolute inset-y-0 left-0 w-1.5" style={{ background: cor }} />
+        {CloseX(false)}
+        <div className="flex items-start gap-4 p-5 pl-6">
+          <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center', quad ? 'rounded-none' : 'rounded-2xl')} style={{ background: `color-mix(in oklab, ${cor} 18%, var(--card))`, color: cor }}>
+            <Megaphone className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            {banner.titulo && <h3 className="pr-6 text-lg font-bold leading-snug tracking-tight">{banner.titulo}</h3>}
+            {banner.mensagem && <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{banner.mensagem}</p>}
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">{Fechar(false)}{CTA}</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ---- CLÁSSICO (padrão): faixa de cor + imagem no topo + conteúdo ----
   return (
-    <div onClick={(e) => e.stopPropagation()}
-      className="relative w-full max-w-md animate-in fade-in zoom-in-95 slide-in-from-bottom-2 overflow-hidden rounded-3xl border bg-card text-foreground shadow-2xl duration-300">
-      {/* Faixa de cor no topo (cor de destaque do aviso) */}
-      <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${cor}, color-mix(in oklab, ${cor} 45%, #ffffff))` }} />
-
-      {/* Fechar — flutuante (sobre a imagem quando houver) */}
-      <button type="button" onClick={onFechar} aria-label="Fechar"
-        className={cn('absolute right-3 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full transition',
-          banner.imagem_url ? 'bg-black/40 text-white ring-1 ring-white/25 backdrop-blur hover:bg-black/60' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>
-        <X className="h-4 w-4" />
-      </button>
-
+    <div onClick={stop} className={cn('relative w-full max-w-md overflow-hidden border bg-card text-foreground shadow-2xl', rCard, anim)}>
+      <div className={cn('h-1.5 w-full')} style={{ background: `linear-gradient(90deg, ${cor}, color-mix(in oklab, ${cor} 45%, #ffffff))` }} />
+      {CloseX(!!banner.imagem_url)}
       {banner.imagem_url && (
         <div className="relative">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -284,23 +359,11 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-card to-transparent" />
         </div>
       )}
-
       <div className={cn('px-6 pb-6', banner.imagem_url ? 'pt-4' : 'pt-6')}>
-        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
-          style={{ background: `color-mix(in oklab, ${cor} 16%, var(--card))`, color: cor }}>
-          <Megaphone className="h-3.5 w-3.5" /> Aviso
-        </span>
+        {Eyebrow(false)}
         {banner.titulo && <h3 className="mt-3 text-xl font-bold leading-snug tracking-tight">{banner.titulo}</h3>}
         {banner.mensagem && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{banner.mensagem}</p>}
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button type="button" onClick={onFechar}
-            className="rounded-xl border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">Fechar</button>
-          {mostrarCTA && (
-            preview || !banner.link
-              ? <span className={ctaCls} style={ctaStyle}>Ver mais <ArrowRight className="h-4 w-4" /></span>
-              : <Alvo href={banner.link} onClick={onFechar} className={ctaCls} style={ctaStyle}>Ver mais <ArrowRight className="h-4 w-4" /></Alvo>
-          )}
-        </div>
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">{Fechar(false)}{CTA}</div>
       </div>
     </div>
   )

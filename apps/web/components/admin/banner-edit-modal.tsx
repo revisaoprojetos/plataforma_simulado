@@ -12,7 +12,7 @@ import { redimensionarImagem } from '@/lib/imagem'
 import { BannerCropper } from '@/components/admin/banner-cropper'
 import { atualizarBannerAction } from '@/app/admin/configuracoes/banners/actions'
 import { ehBannerSimulado, type Banner, type DestinoBanner } from '@/components/admin/banners-manager'
-import { SimSlide, PopupCard, type HeroSimSlide } from '@/components/aluno/banners-portal'
+import { SimSlide, PopupCard, POPUP_ESTILOS, type HeroSimSlide, type PopupEstilo, type PopupPontas } from '@/components/aluno/banners-portal'
 
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f) })
@@ -20,7 +20,7 @@ function fileToDataUrl(f: File): Promise<string> {
 
 /** Pop-up de configuração TOTAL de um banner já criado (tipo, título, mensagem, imagem+recorte,
  *  link/destino, cor, ativo). Salva via atualizarBannerAction. */
-export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; onClose: () => void }) {
+export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; onClose: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   // Modo da UI: "simulado" é um destaque (hero) que aponta p/ um simulado/pasta. Detecta pelo banner.
@@ -39,6 +39,8 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
   const [destaqueTexto, setDestaqueTexto] = useState(destaqueTextoInicial)
   const [fadeAtivo, setFadeAtivo] = useState(fadeAtivoInicial)
   const [fadeNivel, setFadeNivel] = useState(fadeNivelInicial)
+  const [estilo, setEstilo] = useState<PopupEstilo>(popupEstiloInicial)
+  const [pontas, setPontas] = useState<PopupPontas>(popupPontasInicial)
   const [enviando, setEnviando] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropOpen, setCropOpen] = useState(false)
@@ -60,7 +62,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
 
   function salvar() {
     start(async () => {
-      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel }, tenantId)
+      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel, ...(uiTipo === 'popup' ? { popupEstilo: estilo, popupPontas: pontas } : {}) }, tenantId)
       if (r.ok) { toast.success('Banner atualizado.'); router.refresh(); onClose() }
       else toast.error(r.error ?? 'Falha ao salvar.')
     })
@@ -132,7 +134,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
               // Prévia EXATA do pop-up (mesmo card do aluno), estática, sobre um fundo dim.
               <div className="flex justify-center rounded-lg border bg-neutral-200/60 p-4 dark:bg-neutral-900/50 sm:p-6">
                 <div className="w-full max-w-sm">
-                  <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null }} preview />
+                  <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null, estilo, pontas }} preview />
                 </div>
               </div>
             ) : (
@@ -239,6 +241,24 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                     </div>
                   )}
                 </>
+              ) : uiTipo === 'popup' ? (
+                <div className="space-y-1.5 rounded-lg border bg-background px-3 py-2.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Estilo do pop-up</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {POPUP_ESTILOS.map(({ v, label }) => (
+                      <button key={v} type="button" onClick={() => setEstilo(v)}
+                        className={cn('rounded-md border px-1.5 py-1.5 text-[11px] font-medium transition', estilo === v ? 'border-primary bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-muted')}>{label}</button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1.5 pt-0.5">
+                    <span className="mr-1 text-[11px] text-muted-foreground">Pontas</span>
+                    {([['arredondado', 'Arredondadas'], ['quadrado', 'Quadradas']] as const).map(([v, label]) => (
+                      <button key={v} type="button" onClick={() => setPontas(v)}
+                        className={cn('rounded-md border px-2 py-1 text-[11px] font-medium transition', pontas === v ? 'border-primary bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-muted')}>{label}</button>
+                    ))}
+                  </div>
+                  <p className="pt-0.5 text-[11px] text-muted-foreground">“Sobre a imagem” coloca o texto por cima; “Compacto” é sem imagem grande.</p>
+                </div>
               ) : (
                 <p className="rounded-lg border border-dashed px-3 py-2.5 text-[11px] text-muted-foreground">As opções de rótulo, degradê e desempenho valem só para banners do tipo <strong>Simulado</strong>.</p>
               )}
