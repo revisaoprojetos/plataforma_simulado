@@ -497,8 +497,9 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
-      {/* passe de medição (escondido) — mesmos gaps (marginTop) da renderização real */}
-      <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: contentW }}>
+      {/* passe de medição (escondido) — MESMO contexto tipográfico da folha (fonte/cor), senão o
+          texto quebra diferente e as alturas não batem (bloco "cabe" na conta mas é cortado). */}
+      <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: contentW, fontFamily: 'Inter, system-ui, sans-serif', color: '#1a202c' }}>
         {blocos.map((b, i) => <div key={i} style={{ marginTop: i === 0 ? 0 : (b.juntar ? 0 : GAP) }}>{b.node}</div>)}
       </div>
       {temCapa && <Folha item={item} num={1} total={total} pad={pad} Ht={Ht} Hf={Hf} ehCapa capaCfg={item.capa ?? CAPA_PADRAO} onPickCapa={onPickCapa} selCapa={selCapa} />}
