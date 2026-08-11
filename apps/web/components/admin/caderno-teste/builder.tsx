@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { HexColorField } from '@/components/admin/hex-color-field'
 import { Previa, outlineDoItem, type DiagEntrada, type TipoBloco } from '@/lib/caderno-teste/previa'
-import { PreviaBlocos, capaPadraoDoPreset, docDoPreset } from '@/lib/caderno-teste/previa-blocos'
+import { PreviaBlocos, capaPadraoDoPreset, docDoPreset, idsDeterministicos } from '@/lib/caderno-teste/previa-blocos'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
 import { metaDaModalidade, itemAtivo, novoItem, presetDoItem, CAPA_PADRAO, CORES_PILAR_PADRAO, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
@@ -162,22 +162,23 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
     return { ...it, capa: { ...base, ...patch } }
   }) }))
   // Edição por bloco (modelos prontos): doc efetivo = docEdit do item OU o preset original.
-  const docEfetivo: CadernoDoc | null = presetAtivo ? (ativo.docEdit ?? docDoPreset(presetAtivo)) : null
+  // Normaliza ids (posição) para casar com os ids que a prévia renderiza (idsDeterministicos).
+  const docEfetivo: CadernoDoc | null = presetAtivo ? idsDeterministicos(ativo.docEdit ?? docDoPreset(presetAtivo)!) : null
   const blocoSel = pickerBloco && docEfetivo ? acharBloco(docEfetivo, pickerBloco) : null
   const setBlocoAttr = (id: string, patch: Record<string, unknown>) => setBuilder((b) => ({ ...b, itens: b.itens.map((it) => {
     if (it.id !== b.ativo) return it
     const preset = presetDoItem(it)
-    const base = it.docEdit ?? (preset ? docDoPreset(preset) : null)
-    if (!base) return it
-    return { ...it, docEdit: atualizarBlocoAttrs(base, id, patch) }
+    const raw = it.docEdit ?? (preset ? docDoPreset(preset) : null)
+    if (!raw) return it
+    return { ...it, docEdit: atualizarBlocoAttrs(idsDeterministicos(raw), id, patch) }
   }) }))
   const removerBlocoDoc = (id: string) => {
     setBuilder((b) => ({ ...b, itens: b.itens.map((it) => {
       if (it.id !== b.ativo) return it
       const preset = presetDoItem(it)
-      const base = it.docEdit ?? (preset ? docDoPreset(preset) : null)
-      if (!base) return it
-      return { ...it, docEdit: removerBloco(base, id) }
+      const raw = it.docEdit ?? (preset ? docDoPreset(preset) : null)
+      if (!raw) return it
+      return { ...it, docEdit: removerBloco(idsDeterministicos(raw), id) }
     }) }))
     setPickerBloco(null)
   }

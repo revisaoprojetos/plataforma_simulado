@@ -21,7 +21,7 @@ type Item = { key: string; gapTop: number; quebra?: boolean; node: ReactNode }
 /** Reatribui ids determinísticos (por posição) a páginas/blocos — o preset gera ids aleatórios a cada
  * build(), o que faria o id clicado na prévia não bater com a busca no builder. Ids estáveis permitem
  * casar seleção↔edição entre instâncias e persistir o docEdit de forma consistente. */
-function idsDeterministicos(doc: CadernoDoc): CadernoDoc {
+export function idsDeterministicos(doc: CadernoDoc): CadernoDoc {
   const walk = (bs: any[] | undefined, prefix: string): any[] => (bs ?? []).map((b, i) => ({
     ...b, id: `${prefix}b${i}`, innerBlocks: b.innerBlocks ? walk(b.innerBlocks, `${prefix}b${i}-`) : b.innerBlocks,
   }))
@@ -157,7 +157,9 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
   /** Bloco selecionado (destaque). */
   selBlocoId?: string | null
 }) {
-  const doc = useMemo(() => docOverride ?? docDoPreset(presetId), [docOverride, presetId])
+  // docOverride (docEdit/variantes) pode vir SEM ids → keys `undefined-undefined` e nós
+  // duplicados/embaralhados no BlockRender. Normaliza os ids (posição) sempre.
+  const doc = useMemo(() => docOverride ? idsDeterministicos(docOverride) : docDoPreset(presetId), [docOverride, presetId])
   const theme = useMemo(() => resolveTheme(cores), [cores])
   const data = useMemo(() => montarCadernoData(questoes, vars, titulo), [questoes, vars, titulo])
   const selectable = !!onPickBloco
