@@ -20,7 +20,7 @@ export type DiscBanco = { nome: string; chave: string; pilar?: string }
 export type TipoBloco = 'cabecalho' | 'nome' | 'nota' | 'texto' | 'secao' | 'card' | 'desempenho'
 /** Uma entrada da estrutura (outline) do diagnóstico: nó renderizado + metadados p/ o painel.
  * `parte` = alvo da edição; `apagar` = alvo da remoção (às vezes diferente, ex.: parágrafos do gabarito). */
-export type DiagEntrada = { key: string; node: ReactNode; label: string; tipo: TipoBloco; parte: string; removivel: boolean; apagar: string }
+export type DiagEntrada = { key: string; node: ReactNode; label: string; tipo: TipoBloco; parte: string; removivel: boolean; apagar: string; juntar?: boolean; outlineOculto?: boolean }
 /** Cor de um pilar: config do grupo → padrão → cor secundária. */
 function corDoPilar(slug: string | undefined, coresPilar: Record<string, string>, fallback: string): string {
   if (!slug) return fallback
@@ -233,6 +233,9 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   // Coleta as entradas (blocos) com CHAVE — depois aplica a ordem salva (c.ordem) e alimenta o outline.
   const entradas: DiagEntrada[] = []
   const add = (key: string, node: ReactNode, label: string, tipo: TipoBloco, parte: string, removivel = true, apagar = parte) => entradas.push({ key, node, label, tipo, parte, removivel, apagar })
+  // Sub-bloco "colado" (continuação de um card): sem gap acima e oculto no outline. Permite que
+  // cards grandes (muitos assuntos/itens) QUEBREM entre páginas em vez de vazarem atrás do rodapé.
+  const addCont = (key: string, node: ReactNode, parte: string) => entradas.push({ key, node, label: '', tipo: 'card', parte, removivel: false, apagar: parte, juntar: true, outlineOculto: true })
   if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); add('diag_cab', (
     <div {...atr('diag_cab', 'Cabeçalho (fundo)', cor, { background: cor, color: '#fff', padding: '12px 16px' })}>
       <div {...atr('diag_cab_titulo', 'Título do cabeçalho', cor, { fontSize: fs('diag_cab_titulo', 20), fontWeight: 800 })}>{V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>
@@ -311,33 +314,47 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
       // cor da disciplina: parte (coresParte) → individual legado (coresDisc) → cor do pilar → secundária.
       const corDisc = corP(`disc:${d.chave}`, (a.coresDisc ?? {})[d.chave] || corDoPilar(d.pilar, a.coresPilar ?? {}, amar))
       const corTxt = c.discCorTexto?.[d.chave] ?? prim
-      add(`disc:${d.chave}`, (
-        <div {...atr(`disc:${d.chave}`, d.nome, corDisc, { background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 5 })}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: fs(`disc:${d.chave}`, 11), fontWeight: 700, color: corTxt }}>{V(c.discNomes?.[d.chave] ?? d.nome)}</div>
-            {assuntos.length
-              ? assuntos.map((as, k) => <div key={k} style={{ fontSize: fs(`disc:${d.chave}`, corpo), color: '#5a5570', fontStyle: 'italic' }}>- {V(as)}</div>)
-              : <div style={{ fontSize: fs(`disc:${d.chave}`, corpo), color: '#5a5570', fontStyle: 'italic' }}>- Assuntos das questões erradas</div>}
-          </div>
-          <div style={{ fontSize: fs(`disc:${d.chave}`, 11), whiteSpace: 'nowrap' }}><span style={{ color: '#9590b0' }}>{V(`{acerto_${fonte}}`)}/{V(`{total_${fonte}}`)}</span> <span style={{ fontWeight: 800, color: corDisc }}>{V(`{pct_${fonte}}`)}</span></div>
+      const dk = `disc:${d.chave}`
+      const lista = assuntos.length ? assuntos : ['Assuntos das questões erradas']
+      // Cabeçalho do card (nome + estatística) — bloco selecionável.
+      add(dk, (
+        <div {...atr(dk, d.nome, corDisc, { background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: '6px 10px 2px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 })}>
+          <div style={{ fontSize: fs(dk, 11), fontWeight: 700, color: corTxt }}>{V(c.discNomes?.[d.chave] ?? d.nome)}</div>
+          <div style={{ fontSize: fs(dk, 11), whiteSpace: 'nowrap' }}><span style={{ color: '#9590b0' }}>{V(`{acerto_${fonte}}`)}/{V(`{total_${fonte}}`)}</span> <span style={{ fontWeight: 800, color: corDisc }}>{V(`{pct_${fonte}}`)}</span></div>
         </div>
-      ), c.discNomes?.[d.chave] ?? d.nome, 'card', `disc:${d.chave}`, true)
+      ), c.discNomes?.[d.chave] ?? d.nome, 'card', dk, true)
+      // Cada assunto = sub-bloco colado (mesma cor de fundo) → o card pode quebrar entre páginas.
+      lista.forEach((as, k) => addCont(`${dk}:a${k}`, (
+        <div {...atr(dk, d.nome, corDisc, { background: '#f5f3ff', padding: `0 10px ${k === lista.length - 1 ? 6 : 1}px`, marginBottom: k === lista.length - 1 ? 5 : 0 })}>
+          <div style={{ fontSize: fs(dk, corpo), color: '#5a5570', fontStyle: 'italic' }}>- {V(as)}</div>
+        </div>
+      ), dk))
     }
   }
   if (c.sugestoes.length && !ocultasP.has('sugestoes')) {
     add('sec_sugestoes', <Sec parte="sec_sugestoes" t={c.tituloSugestoes ?? 'Sugestões de estudo'} />, `Seção: ${c.tituloSugestoes ?? 'Sugestões de estudo'}`, 'secao', 'sec_sugestoes', true)
-    c.sugestoes.forEach((s, si) => { const cor = corP(`sug:${si}`, '#fdf3d0'); add(`sug:${si}`, (
-      <div key={`sug${si}`} {...atr(`sug:${si}`, `Sugestão · ${s.titulo}`, cor, { marginBottom: 10 })}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: cor, padding: '5px 12px' }}>
-          <span style={{ fontWeight: 800, fontSize: fs(`sug:${si}`, 11), color: s.corTitulo || '#9a6e00' }}>{V(s.titulo)}</span>
-          {s.prioridade && <span style={{ fontWeight: 700, fontSize: fs(`sug:${si}`, 9), color: '#9a6e00' }}>[!] {V(s.prioridade)}</span>}
+    c.sugestoes.forEach((s, si) => {
+      const cor = corP(`sug:${si}`, '#fdf3d0'); const sk = `sug:${si}`
+      // Cabeçalho (título + prioridade) — bloco selecionável.
+      add(sk, (
+        <div {...atr(sk, `Sugestão · ${s.titulo}`, cor, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: cor, padding: '5px 12px' })}>
+          <span style={{ fontWeight: 800, fontSize: fs(sk, 11), color: s.corTitulo || '#9a6e00' }}>{V(s.titulo)}</span>
+          {s.prioridade && <span style={{ fontWeight: 700, fontSize: fs(sk, 9), color: '#9a6e00' }}>[!] {V(s.prioridade)}</span>}
         </div>
-        <div style={{ background: '#f0eeff', padding: '8px 12px' }}>
-          {s.intro && <p style={{ fontSize: fs(`sug:${si}`, corpo), margin: '0 0 6px', lineHeight: 1.4, textAlign: alignP(`sug:${si}`, 'justify') }}>{V(s.intro)}</p>}
-          {s.itens.length > 0 && <div style={{ fontSize: fs(`sug:${si}`, corpo), lineHeight: 1.5, textAlign: alignP(`sug:${si}`, 'justify') }}>{Vm(topicosParaTexto(s.itens))}</div>}
+      ), `Sugestão · ${s.titulo}`, 'card', sk, true)
+      const nItens = s.itens.length
+      // Intro (colado) + cada item (colado): #f0eeff contínuo → o bloco pode quebrar entre páginas.
+      if (s.intro) addCont(`${sk}:intro`, (
+        <div {...atr(sk, `Sugestão · ${s.titulo}`, cor, { background: '#f0eeff', padding: `8px 12px ${nItens ? 4 : 8}px` })}>
+          <p style={{ fontSize: fs(sk, corpo), margin: 0, lineHeight: 1.4, textAlign: alignP(sk, 'justify') }}>{V(s.intro)}</p>
         </div>
-      </div>
-    ), `Sugestão · ${s.titulo}`, 'card', `sug:${si}`, true) })
+      ), sk)
+      s.itens.forEach((it, ii) => addCont(`${sk}:i${ii}`, (
+        <div {...atr(sk, `Sugestão · ${s.titulo}`, cor, { background: '#f0eeff', padding: `${!s.intro && ii === 0 ? 8 : 0}px 12px ${ii === nItens - 1 ? 8 : 2}px` })}>
+          <div style={{ fontSize: fs(sk, corpo), lineHeight: 1.5, textAlign: alignP(sk, 'justify') }}>{Vm(topicosParaTexto([it]))}</div>
+        </div>
+      ), sk))
+    })
   }
   if ((c.fechamento?.length ?? 0) > 0 && !ocultasP.has('fechamento')) {
     (c.fechamento ?? []).forEach((p, i) => { const cor = corP(`fechamento:${i}`, '#1a202c'); add(`fechamento:${i}`, <p key={`fech${i}`} {...atr(`fechamento:${i}`, `Parágrafo de fechamento ${i + 1}`, cor, { fontSize: corpo, lineHeight: 1.4, textAlign: 'justify', margin: '0 0 3px', color: cor })}>{V(p)}</p>, `Fechamento ${i + 1}`, 'texto', `fechamento:${i}`, true) })
@@ -348,12 +365,20 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     if (c.gabaritoObs.length) { const cor = corP('gab_obs', '#a32d2d'); add('gab_obs', <div {...atr('gab_obs', 'Gabarito — observações', cor, { background: '#f5f3ff', borderTop: `3px solid ${cor}`, padding: '6px 10px' })}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: fs('gab_obs', corpo), color: '#5a5570' }}>{V(o)}</div>)}</div>, 'Gabarito — observações', 'card', 'gab_obs', true, 'gab_obs') }
   }
   // Aplica a ordem salva (c.ordem): chaves listadas primeiro (na ordem), o resto mantém a ordem natural.
+  // Agrupa cada bloco ÂNCORA (juntar=false) com suas CONTINUAÇÕES (juntar=true) seguintes, para que a
+  // ordem salva (c.ordem, que só lista âncoras) nunca separe um card dos seus sub-blocos.
+  const grupos: { ancora: DiagEntrada; conts: DiagEntrada[] }[] = []
+  for (const e of entradas) {
+    if (e.juntar && grupos.length) grupos[grupos.length - 1].conts.push(e)
+    else grupos.push({ ancora: e, conts: [] })
+  }
   const ordemSalva = c.ordem ?? []
-  const mapaE = new Map(entradas.map((e) => [e.key, e]))
+  const mapaG = new Map(grupos.map((g) => [g.ancora.key, g]))
   const vistos = new Set<string>()
   const ordenadas: DiagEntrada[] = []
-  for (const k of ordemSalva) { const e = mapaE.get(k); if (e && !vistos.has(k)) { ordenadas.push(e); vistos.add(k) } }
-  for (const e of entradas) if (!vistos.has(e.key)) ordenadas.push(e)
+  const pushG = (g: { ancora: DiagEntrada; conts: DiagEntrada[] }) => { ordenadas.push(g.ancora, ...g.conts); vistos.add(g.ancora.key) }
+  for (const k of ordemSalva) { const g = mapaG.get(k); if (g && !vistos.has(k)) pushG(g) }
+  for (const g of grupos) if (!vistos.has(g.ancora.key)) pushG(g)
   if (sink) sink.entradas = ordenadas
   return ordenadas.map((e) => e.node)
 }
@@ -363,7 +388,7 @@ export function outlineDoItem(item: ItemCaderno, questoes: PreviewQuestao[], var
   if (item.modalidade !== 'diagnostico') return []
   const sink: { entradas?: DiagEntrada[] } = {}
   blocosDoItem(item, questoes.length ? questoes : QUESTOES_EXEMPLO, vars, discBanco, undefined, sink)
-  return sink.entradas ?? []
+  return (sink.entradas ?? []).filter((e) => !e.outlineOculto)
 }
 
 /** Uma folha A4 (fundo + cabeçalho + conteúdo + rodapé) ou a capa (página inteira). */
@@ -425,7 +450,12 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
   const onPickRef = useRef(onPick); onPickRef.current = onPick
   const varsKey = useMemo(() => JSON.stringify(vars), [vars])
   const discKey = useMemo(() => JSON.stringify(discBanco), [discBanco])
-  const blocos = useMemo(() => blocosDoItem(item, qs, vars, discBanco, { selParte, onPick: (p, n, cor, an) => onPickRef.current?.(p, n, cor, an) }), [item, qs, varsKey, discKey, selParte]) // eslint-disable-line react-hooks/exhaustive-deps
+  const blocos = useMemo(() => {
+    const sink: { entradas?: DiagEntrada[] } = {}
+    const nodes = blocosDoItem(item, qs, vars, discBanco, { selParte, onPick: (p, n, cor, an) => onPickRef.current?.(p, n, cor, an) }, sink)
+    // `juntar` = sub-bloco colado (sem gap acima) → cards grandes quebram entre páginas.
+    return sink.entradas ? sink.entradas.map((e) => ({ node: e.node, juntar: !!e.juntar })) : nodes.map((n) => ({ node: n, juntar: false }))
+  }, [item, qs, varsKey, discKey, selParte]) // eslint-disable-line react-hooks/exhaustive-deps
   const medRef = useRef<HTMLDivElement>(null)
   const [paginas, setPaginas] = useState<number[][] | null>(null)
   // A chave deve mudar sempre que a ALTURA renderizada muda: qtd de blocos, ajustes (fontes/compacto),
@@ -467,14 +497,14 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
-      {/* passe de medição (escondido) */}
+      {/* passe de medição (escondido) — mesmos gaps (marginTop) da renderização real */}
       <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: contentW }}>
-        {blocos.map((b, i) => <div key={i} style={{ marginBottom: GAP }}>{b}</div>)}
+        {blocos.map((b, i) => <div key={i} style={{ marginTop: i === 0 ? 0 : (b.juntar ? 0 : GAP) }}>{b.node}</div>)}
       </div>
       {temCapa && <Folha item={item} num={1} total={total} pad={pad} Ht={Ht} Hf={Hf} ehCapa capaCfg={item.capa ?? CAPA_PADRAO} onPickCapa={onPickCapa} selCapa={selCapa} />}
       {pages.map((idxs, pi) => (
         <Folha key={pi} item={item} num={(temCapa ? 1 : 0) + pi + 1} total={total} pad={pad} Ht={Ht} Hf={Hf}>
-          {idxs.map((i) => <div key={i} style={{ marginBottom: GAP }}>{blocos[i]}</div>)}
+          {idxs.map((i, gi) => <div key={i} style={{ marginTop: gi === 0 ? 0 : (blocos[i].juntar ? 0 : GAP) }}>{blocos[i].node}</div>)}
         </Folha>
       ))}
     </div>
