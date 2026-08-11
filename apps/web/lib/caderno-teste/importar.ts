@@ -160,7 +160,7 @@ function parsePilares(reg: Linha[]): DiagPilar[] {
         let txt = ''
         for (let n = k + 1; n < jan.length; n++) {
           const l = jan[n]
-          if (detectarFaixa(l.p) || faixaNaAbertura(l.p) || /texto modulado/i.test(norm(l.p)) || /de\s+\d+\s+quest/i.test(l.p) || ehNomePilar(l.p, l.h)) break
+          if (detectarFaixa(l.p) || /texto modulado/i.test(norm(l.p)) || /de\s+\d+\s+quest/i.test(l.p) || ehNomePilar(l.p, l.h)) break
           txt += (txt ? ' ' : '') + l.f
         }
         if (txt.trim()) { bandas.push({ faixa, texto: txt }); vistas.add(faixa) }
@@ -250,13 +250,20 @@ export function htmlParaDiagnostico(html: string, caixas: string[] = []): { cont
   const conteudo: DiagConteudo = structuredClone(DIAG_PADRAO)
   const nP = linhas.map((l) => norm(l.p))
   const acha = (re: RegExp, from = 0) => { for (let i = from; i < nP.length; i++) if (re.test(nP[i])) return i; return -1 }
+  // Cabeçalho de seção é uma linha CURTA (ou título/negrito). Evita casar a FRASE da introdução
+  // (ex.: "…o desempenho por pilar… e por disciplina…"), que senão zeraria a fatia dos pilares.
+  const achaSec = (re: RegExp) => {
+    let alt = -1
+    for (let i = 0; i < nP.length; i++) if (re.test(nP[i])) { if (linhas[i].p.length <= 48 || linhas[i].h) return i; if (alt < 0) alt = i }
+    return alt
+  }
 
   // Detecção de seções por sinônimos (acento/maiúsculas indiferentes).
-  const iLP = acha(/desempenho em lingua|lingua portuguesa/)
-  let iPilar = acha(/por pilar/); if (iPilar < 0) iPilar = acha(/desempenho.*pilar|pilar.*desempenho/)
-  const iDisc = acha(/por disciplina|por materia|por assunto|desempenho por disciplina/)
-  const iSug = acha(/sugest|recomenda|plano de estudo|como estudar|o que estudar|proximos passos|o que priorizar/)
-  const iGab = acha(/gabarito|quest(o|ao)es?\s+(anulad|desatualiz|atualiz)/)
+  const iLP = achaSec(/desempenho em lingua|lingua portuguesa/)
+  let iPilar = achaSec(/por pilar/); if (iPilar < 0) iPilar = achaSec(/desempenho.*pilar|pilar.*desempenho/)
+  const iDisc = achaSec(/por disciplina|por materia|por assunto|desempenho por disciplina/)
+  const iSug = achaSec(/sugest|recomenda|plano de estudo|como estudar|o que estudar|proximos passos|o que priorizar/)
+  const iGab = achaSec(/gabarito|quest(o|ao)es?\s+(anulad|desatualiz|atualiz)/)
 
   // Início das seções (p/ delimitar intro).
   const secs = [iLP, iPilar, iDisc, iSug, iGab].filter((x) => x >= 0)
