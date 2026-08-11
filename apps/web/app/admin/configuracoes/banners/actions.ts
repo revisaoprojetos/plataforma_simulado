@@ -22,7 +22,7 @@ export interface BannerInput {
   fadeAtivo?: boolean
   fadeNivel?: number
   // Estilo do pop-up (guardado no mesmo mapa tema.banner_destaques[id]).
-  popupEstilo?: 'classico' | 'sobre' | 'compacto' | 'cartaz' | 'lado'
+  popupEstilo?: 'classico' | 'sobre' | 'compacto' | 'cartaz' | 'lado' | 'faixa'
   popupPontas?: 'arredondado' | 'quadrado'
   // Texto sobre o banner (banner/destaque): posição + cor + tamanho.
   bannerTextoPos?: string

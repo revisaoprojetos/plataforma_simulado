@@ -13,7 +13,7 @@ function Alvo({ href, className, style, children, onClick, 'aria-label': ariaLab
   return <Link href={href} onClick={onClick} aria-label={ariaLabel} className={className} style={style}>{children}</Link>
 }
 
-export type PopupEstilo = 'classico' | 'sobre' | 'compacto' | 'cartaz' | 'lado'
+export type PopupEstilo = 'classico' | 'sobre' | 'compacto' | 'cartaz' | 'lado' | 'faixa'
 export type PopupPontas = 'arredondado' | 'quadrado'
 export type BannerTextoPos =
   | 'top-left' | 'top-center' | 'top-right'
@@ -335,6 +335,7 @@ export const POPUP_ESTILOS: { v: PopupEstilo; label: string }[] = [
   { v: 'compacto', label: 'Compacto' },
   { v: 'cartaz', label: 'Cartaz (grande)' },
   { v: 'lado', label: 'Lado a lado' },
+  { v: 'faixa', label: 'Faixa larga' },
 ]
 
 /** Card do pop-up (visual reutilizado no portal do aluno e na prévia do admin).
@@ -461,6 +462,28 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
           {banner.titulo && <h3 className="mt-3 whitespace-pre-wrap text-xl font-bold leading-snug tracking-tight sm:text-2xl">{banner.titulo}</h3>}
           {banner.mensagem && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{banner.mensagem}</p>}
           <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center">{Fechar(false)}{botaoCTA()}</div>
+        </div>
+      </div>
+    )
+  }
+
+  // ---- FAIXA LARGA: banner largo (imagem de fundo) com texto + CTA sobrepostos à esquerda ----
+  if (estilo === 'faixa') {
+    return (
+      <div onClick={stop} className={cn('relative w-full max-w-5xl overflow-hidden border text-white shadow-2xl', rCard, anim)}>
+        <div className="relative aspect-[1920/560] w-full sm:aspect-[1920/460]">
+          {banner.imagem_url
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={banner.imagem_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor}, #14101f)` }} />}
+          <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(8,6,16,.9) 2%, rgba(8,6,16,.55) 42%, rgba(8,6,16,.05) 78%)' }} />
+          {CloseX(true)}
+          <div className="absolute inset-0 flex max-w-2xl flex-col justify-center gap-2 p-6 sm:p-10">
+            {Eyebrow(true)}
+            {banner.titulo && <h3 className="whitespace-pre-wrap text-xl font-extrabold leading-tight tracking-tight drop-shadow sm:text-3xl">{banner.titulo}</h3>}
+            {banner.mensagem && <p className="line-clamp-2 whitespace-pre-wrap text-sm text-white/85 drop-shadow sm:text-base">{banner.mensagem}</p>}
+            {mostrarCTA && <div className="mt-2">{botaoCTA()}</div>}
+          </div>
         </div>
       </div>
     )
