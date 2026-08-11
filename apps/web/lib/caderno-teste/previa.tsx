@@ -396,7 +396,7 @@ function Folha({ item, num, total, pad, Ht, Hf, ehCapa, capaCfg, onPickCapa, sel
   const a = item.ajustes
   const cfg = capaCfg ?? CAPA_PADRAO
   return (
-    <div style={{ width: A4_W, height: A4_H, position: 'relative', overflow: 'hidden', background: '#fff', color: '#1a202c', boxShadow: '0 2px 20px rgba(0,0,0,.16)', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ width: A4_W, minHeight: A4_H, position: 'relative', overflow: 'visible', background: '#fff', color: '#1a202c', boxShadow: '0 2px 20px rgba(0,0,0,.16)', fontFamily: 'Inter, system-ui, sans-serif' }}>
       {a.folhaUrl && <img src={a.folhaUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
       {ehCapa ? (
         a.capaUrl && (
@@ -421,11 +421,13 @@ function Folha({ item, num, total, pad, Ht, Hf, ehCapa, capaCfg, onPickCapa, sel
           </>
         )
       ) : (
-        <div style={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'relative', zIndex: 1, minHeight: A4_H, display: 'flex', flexDirection: 'column' }}>
           <div style={{ height: Ht, flexShrink: 0, overflow: 'hidden' }}>
             {a.cabecalhoUrl && <img src={a.cabecalhoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
           </div>
-          <div style={{ flex: 1, minHeight: 0, padding: `8px ${pad}px`, overflow: 'hidden' }}>{children}</div>
+          {/* flex "1 0 auto" = preenche a folha (páginas curtas) mas NÃO encolhe (páginas cheias):
+              se um bloco passar do limite, a folha CRESCE em vez de cortar/esconder — nada some. */}
+          <div style={{ flex: '1 0 auto', padding: `8px ${pad}px`, overflow: 'visible' }}>{children}</div>
           <div style={{ height: Hf, flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
             {a.rodapeUrl && <img src={a.rodapeUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
           </div>
