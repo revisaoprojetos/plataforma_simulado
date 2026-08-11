@@ -390,7 +390,7 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
   // ---- SOBRE A IMAGEM: texto e ações por cima da imagem, com degradê escuro ----
   if (estilo === 'sobre') {
     return (
-      <div onClick={stop} className={cn('relative flex min-h-[22rem] w-full max-w-md flex-col justify-end overflow-hidden border text-white shadow-2xl', rCard, anim)}>
+      <div onClick={stop} className={cn('relative flex min-h-[22rem] w-full max-w-md flex-col justify-end overflow-hidden text-white shadow-2xl', rCard, anim)}>
         {banner.imagem_url
           // eslint-disable-next-line @next/next/no-img-element
           ? <img src={banner.imagem_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -410,7 +410,7 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
   // ---- COMPACTO: barra de cor + ícone + texto (sem imagem grande) ----
   if (estilo === 'compacto') {
     return (
-      <div onClick={stop} className={cn('relative w-full max-w-md overflow-hidden border bg-card text-foreground shadow-2xl', rCard, anim)}>
+      <div onClick={stop} className={cn('relative w-full max-w-md overflow-hidden bg-card text-foreground shadow-2xl', rCard, anim)}>
         <div className="absolute inset-y-0 left-0 w-1.5" style={{ background: cor }} />
         {CloseX(false)}
         <div className="flex items-start gap-4 p-5 pl-6">
@@ -430,7 +430,7 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
   // ---- CARTAZ: versão GRANDE (imagem alta no topo, texto centralizado, CTA em destaque) ----
   if (estilo === 'cartaz') {
     return (
-      <div onClick={stop} className={cn('relative w-full max-w-lg overflow-hidden border bg-card text-foreground shadow-2xl', rCard, anim)}>
+      <div onClick={stop} className={cn('relative w-full max-w-lg overflow-hidden bg-card text-foreground shadow-2xl', rCard, anim)}>
         <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${cor}, color-mix(in oklab, ${cor} 45%, #ffffff))` }} />
         {CloseX(!!banner.imagem_url)}
         {banner.imagem_url && (
@@ -456,7 +456,7 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
   // ---- LADO A LADO: imagem numa metade, texto + CTA na outra (mais largo) ----
   if (estilo === 'lado') {
     return (
-      <div onClick={stop} className={cn('relative flex w-full max-w-2xl flex-col overflow-hidden border bg-card text-foreground shadow-2xl sm:flex-row', rCard, anim)}>
+      <div onClick={stop} className={cn('relative flex w-full max-w-2xl flex-col overflow-hidden bg-card text-foreground shadow-2xl sm:flex-row', rCard, anim)}>
         {CloseX(true)}
         <div className="relative shrink-0 sm:w-1/2">
           {banner.imagem_url
@@ -477,7 +477,7 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
   // ---- FAIXA LARGA: banner largo (imagem de fundo) com texto + CTA sobrepostos à esquerda ----
   if (estilo === 'faixa') {
     return (
-      <div onClick={stop} className={cn('relative w-full max-w-5xl overflow-hidden border text-white shadow-2xl', rCard, anim)}>
+      <div onClick={stop} className={cn('relative w-full max-w-5xl overflow-hidden text-white shadow-2xl', rCard, anim)}>
         <div className="relative aspect-[1920/560] w-full sm:aspect-[1920/460]">
           {banner.imagem_url
             // eslint-disable-next-line @next/next/no-img-element
@@ -498,7 +498,7 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
 
   // ---- CLÁSSICO (padrão): faixa de cor + imagem no topo + conteúdo ----
   return (
-    <div onClick={stop} className={cn('relative w-full max-w-md overflow-hidden border bg-card text-foreground shadow-2xl', rCard, anim)}>
+    <div onClick={stop} className={cn('relative w-full max-w-md overflow-hidden bg-card text-foreground shadow-2xl', rCard, anim)}>
       <div className={cn('h-1.5 w-full')} style={{ background: `linear-gradient(90deg, ${cor}, color-mix(in oklab, ${cor} 45%, #ffffff))` }} />
       {CloseX(!!banner.imagem_url)}
       {banner.imagem_url && (
