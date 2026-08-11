@@ -59,6 +59,28 @@ function enunciadoSemDesempenho(): CadernoDoc {
   return doc as CadernoDoc
 }
 
+/** Doc explícito e limpo do caderno DISCURSIVO: capa + 1 header "CADERNO DE QUESTÕES
+ *  DISCURSIVA" + DADOS DO ESTUDANTE (sem desempenho), SEM as questões objetivas.
+ *  Determinístico (não depende da resolução do preset) — evita render mesclado. */
+function discursivoLimpo(): CadernoDoc {
+  const doc: any = (() => { try { return structuredClone(CADERNO_PERGUNTAS_DOC) } catch { return JSON.parse(JSON.stringify(CADERNO_PERGUNTAS_DOC)) } })()
+  const capa = (doc.pages ?? []).find((p: any) => p.kind === 'capa')
+  if (capa) { const t = (capa.blocks ?? []).find((b: any) => b.type === 'texto-livre'); if (t) t.attributes = { ...t.attributes, texto: 'CADERNO DE \nQUESTÕES DISCURSIVA' } }
+  const cont = (doc.pages ?? []).find((p: any) => p.kind === 'conteudo')
+  if (cont) {
+    cont.blocks = (cont.blocks ?? []).filter((b: any) => b.type !== 'repeticao') // sem questões objetivas
+    for (const b of cont.blocks) {
+      if (b.type === 'card') {
+        const tx = (b.innerBlocks ?? []).filter((x: any) => x.type === 'texto-livre')
+        if (tx[0]) tx[0].attributes = { ...tx[0].attributes, texto: 'CADERNO DE QUESTÕES DISCURSIVA\n' }
+        if (tx[1]) tx[1].attributes = { ...tx[1].attributes, texto: 'Concurso Simulado AGU\n' }
+      }
+      if (b.type === 'identificacao') b.attributes = { ...b.attributes, mostrarDesempenho: false, desempenho: [] }
+    }
+  }
+  return doc as CadernoDoc
+}
+
 export type Modalidade = 'folha_respostas' | 'caderno_questoes' | 'caderno_completo' | 'diagnostico'
 
 export type BuilderAjustes = {
@@ -203,7 +225,7 @@ export const MODALIDADES: ModalidadeMeta[] = [
       { id: 'classico', nome: 'Clássico', descricao: 'Questões com alternativas, espaçado.', ajustes: { mostrarGabarito: false, mostrarComentarios: false, compacto: false } },
       { id: 'compacto', nome: 'Compacto', descricao: 'Fonte e espaços menores (mais por página).', ajustes: { mostrarGabarito: false, mostrarComentarios: false, compacto: true } },
       { id: 'agu_perguntas', nome: 'AGU · Caderno de enunciado', descricao: 'Modelo pronto (idêntico ao v1): capa + DADOS DO ESTUDANTE (nome/e-mail/data/tempo) + enunciados e alternativas. Sem desempenho (nota) — prova em branco. Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-perguntas', doc: enunciadoSemDesempenho() },
-      { id: 'agu_discursivo', nome: 'AGU · Caderno discursivo', descricao: 'Modelo pronto (v1): caderno de questões discursivas.', ajustes: {}, docPreset: 'caderno-discursivo' },
+      { id: 'agu_discursivo', nome: 'AGU · Caderno discursivo', descricao: 'Modelo pronto (v1): capa + DADOS DO ESTUDANTE (sem desempenho) para caderno de questões discursivas. Reenvie a capa/fundo.', ajustes: {}, docPreset: 'caderno-discursivo', doc: discursivoLimpo() },
     ],
   },
   {
