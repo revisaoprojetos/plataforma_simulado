@@ -268,6 +268,11 @@
   0% { opacity: 0; transform: scale(0.94); }
   100% { opacity: 1; transform: scale(1); }
 }
+@keyframes popup-in {
+  0% { opacity: 0; transform: translateY(28px) scale(0.9); }
+  55% { opacity: 1; transform: translateY(-6px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
 @keyframes shimmer {
   100% { transform: translateX(100%); }
 }
@@ -282,6 +287,7 @@
 .animate-page { animation: page-enter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .animate-rise { animation: riseIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .animate-pop { animation: pop-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.popup-in { animation: popup-in 0.45s cubic-bezier(0.22, 0.9, 0.28, 1.12) both; }
 
 /* Gráficos: barra horizontal cresce da esquerda; coluna cresce de baixo; preenchimento por largura. */
 .grow-w { transform-origin: left center; animation: growW 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
@@ -340,7 +346,7 @@ html.splash-ativo .animate-pop { animation-play-state: paused !important; }
 
 /* Respeita quem pediu menos movimento. */
 @media (prefers-reduced-motion: reduce) {
-  .animate-page, .animate-rise, .animate-pop, .grow-w, .grow-h, .bar-fill,
+  .animate-page, .animate-rise, .animate-pop, .popup-in, .grow-w, .grow-h, .bar-fill,
   .stagger > *, [data-cascata] { animation: none !important; }
 }
 

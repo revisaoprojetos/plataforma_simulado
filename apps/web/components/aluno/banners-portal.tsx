@@ -13,7 +13,7 @@ function Alvo({ href, className, style, children, onClick, 'aria-label': ariaLab
   return <Link href={href} onClick={onClick} aria-label={ariaLabel} className={className} style={style}>{children}</Link>
 }
 
-export type PopupEstilo = 'classico' | 'sobre' | 'compacto'
+export type PopupEstilo = 'classico' | 'sobre' | 'compacto' | 'cartaz' | 'lado'
 export type PopupPontas = 'arredondado' | 'quadrado'
 export type BannerTextoPos =
   | 'top-left' | 'top-center' | 'top-right'
@@ -318,6 +318,8 @@ export const POPUP_ESTILOS: { v: PopupEstilo; label: string }[] = [
   { v: 'classico', label: 'Clássico' },
   { v: 'sobre', label: 'Sobre a imagem' },
   { v: 'compacto', label: 'Compacto' },
+  { v: 'cartaz', label: 'Cartaz (grande)' },
+  { v: 'lado', label: 'Lado a lado' },
 ]
 
 /** Card do pop-up (visual reutilizado no portal do aluno e na prévia do admin).
@@ -332,17 +334,18 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
   const rCard = quad ? 'rounded-none' : 'rounded-3xl'
   const rBtn = quad ? 'rounded-none' : 'rounded-xl'
   const rChip = quad ? 'rounded-none' : 'rounded-full'
-  const anim = 'animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-300'
+  const anim = 'popup-in'
   const stop = (e: React.MouseEvent) => e.stopPropagation()
   const mostrarCTA = !!banner.link || preview
   const ctaStyle: React.CSSProperties = { background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 78%, #000))`, color: txt }
-  const ctaCls = cn('inline-flex items-center justify-center gap-1.5 px-5 py-2.5 text-sm font-semibold shadow-md transition hover:opacity-95', rBtn)
-
-  const CTA = mostrarCTA ? (
-    preview || !banner.link
-      ? <span className={ctaCls} style={ctaStyle}>Ver mais <ArrowRight className="h-4 w-4" /></span>
-      : <Alvo href={banner.link} onClick={onFechar} className={ctaCls} style={ctaStyle}>Ver mais <ArrowRight className="h-4 w-4" /></Alvo>
-  ) : null
+  const botaoCTA = (full?: boolean) => {
+    if (!mostrarCTA) return null
+    const cls = cn('inline-flex items-center justify-center gap-1.5 text-sm font-semibold shadow-md transition hover:opacity-95', rBtn, full ? 'w-full px-5 py-3' : 'px-5 py-2.5')
+    return preview || !banner.link
+      ? <span className={cls} style={ctaStyle}>Ver mais <ArrowRight className="h-4 w-4" /></span>
+      : <Alvo href={banner.link} onClick={onFechar} className={cls} style={ctaStyle}>Ver mais <ArrowRight className="h-4 w-4" /></Alvo>
+  }
+  const CTA = botaoCTA()
   const Fechar = (dark?: boolean) => (
     <button type="button" onClick={onFechar}
       className={cn('px-4 py-2.5 text-sm font-medium transition-colors', rBtn, dark ? 'text-white/85 hover:bg-white/10' : 'border text-muted-foreground hover:bg-muted')}>Fechar</button>
@@ -396,6 +399,53 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
             {banner.mensagem && <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{banner.mensagem}</p>}
             <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">{Fechar(false)}{CTA}</div>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ---- CARTAZ: versão GRANDE (imagem alta no topo, texto centralizado, CTA em destaque) ----
+  if (estilo === 'cartaz') {
+    return (
+      <div onClick={stop} className={cn('relative w-full max-w-lg overflow-hidden border bg-card text-foreground shadow-2xl', rCard, anim)}>
+        <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${cor}, color-mix(in oklab, ${cor} 45%, #ffffff))` }} />
+        {CloseX(!!banner.imagem_url)}
+        {banner.imagem_url && (
+          <div className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={banner.imagem_url} alt="" className="max-h-80 w-full object-cover" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-card to-transparent" />
+          </div>
+        )}
+        <div className={cn('px-7 pb-7 text-center', banner.imagem_url ? 'pt-4' : 'pt-7')}>
+          <div className="flex justify-center">{Eyebrow(false)}</div>
+          {banner.titulo && <h3 className="mt-3 whitespace-pre-wrap text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl">{banner.titulo}</h3>}
+          {banner.mensagem && <p className="mx-auto mt-2 max-w-md whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground sm:text-base">{banner.mensagem}</p>}
+          <div className="mt-6 flex flex-col gap-2">
+            {botaoCTA(true)}
+            <button type="button" onClick={onFechar} className={cn('px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground', rBtn)}>Agora não</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ---- LADO A LADO: imagem numa metade, texto + CTA na outra (mais largo) ----
+  if (estilo === 'lado') {
+    return (
+      <div onClick={stop} className={cn('relative flex w-full max-w-2xl flex-col overflow-hidden border bg-card text-foreground shadow-2xl sm:flex-row', rCard, anim)}>
+        {CloseX(true)}
+        <div className="relative shrink-0 sm:w-1/2">
+          {banner.imagem_url
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={banner.imagem_url} alt="" className="h-44 w-full object-cover sm:h-full" />
+            : <div className="h-44 w-full sm:h-full" style={{ background: `linear-gradient(135deg, ${cor}, #14101f)` }} />}
+        </div>
+        <div className="flex flex-1 flex-col justify-center p-6">
+          {Eyebrow(false)}
+          {banner.titulo && <h3 className="mt-3 whitespace-pre-wrap text-xl font-bold leading-snug tracking-tight sm:text-2xl">{banner.titulo}</h3>}
+          {banner.mensagem && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{banner.mensagem}</p>}
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center">{Fechar(false)}{botaoCTA()}</div>
         </div>
       </div>
     )

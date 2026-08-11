@@ -303,8 +303,8 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
           <div className={cn('scroll-claro overflow-y-auto bg-muted/30 p-5', uiTipo === 'popup' ? 'min-h-0 border-t md:border-l md:border-t-0' : 'order-1 shrink-0 border-b')}>
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prévia</p>
             {uiTipo === 'popup' ? (
-              <div className="flex justify-center rounded-lg border bg-neutral-200/60 p-4 dark:bg-neutral-900/50">
-                <div className="w-full max-w-sm">
+              <div className="flex justify-center overflow-x-auto rounded-lg border bg-neutral-200/60 p-4 dark:bg-neutral-900/50">
+                <div className="w-full">
                   <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null, estilo, pontas }} preview />
                 </div>
               </div>
