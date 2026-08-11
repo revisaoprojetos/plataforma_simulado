@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { X, Upload, Crop, Loader2, Check } from 'lucide-react'
+import { X, Upload, Crop, Loader2, Check, Eye, EyeOff } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
@@ -20,7 +20,7 @@ function fileToDataUrl(f: File): Promise<string> {
 
 /** Pop-up de configuração TOTAL de um banner já criado (tipo, título, mensagem, imagem+recorte,
  *  link/destino, cor, ativo). Salva via atualizarBannerAction. */
-export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', bannerTextoPosInicial = 'center', bannerTextoCorInicial = 'claro', bannerTextoTamInicial = 'medio', onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; bannerTextoPosInicial?: BannerTextoPos; bannerTextoCorInicial?: BannerTextoCor; bannerTextoTamInicial?: BannerTextoTam; onClose: () => void }) {
+export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', bannerTextoPosInicial = 'center', bannerTextoCorInicial = 'claro', bannerTextoTamInicial = 'medio', bannerOcultarTituloInicial = false, bannerOcultarMensagemInicial = false, onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; bannerTextoPosInicial?: BannerTextoPos; bannerTextoCorInicial?: BannerTextoCor; bannerTextoTamInicial?: BannerTextoTam; bannerOcultarTituloInicial?: boolean; bannerOcultarMensagemInicial?: boolean; onClose: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   // Modo da UI: "simulado" é um destaque (hero) que aponta p/ um simulado/pasta. Detecta pelo banner.
@@ -44,6 +44,9 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
   const [bannerPos, setBannerPos] = useState<BannerTextoPos>(bannerTextoPosInicial)
   const [bannerCor, setBannerCor] = useState<BannerTextoCor>(bannerTextoCorInicial)
   const [bannerTam, setBannerTam] = useState<BannerTextoTam>(bannerTextoTamInicial)
+  const [ocultarTitulo, setOcultarTitulo] = useState(bannerOcultarTituloInicial)
+  const [ocultarMensagem, setOcultarMensagem] = useState(bannerOcultarMensagemInicial)
+  const ehBanner = uiTipo === 'banner' || uiTipo === 'hero'
   const [enviando, setEnviando] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropOpen, setCropOpen] = useState(false)
@@ -65,7 +68,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
 
   function salvar() {
     start(async () => {
-      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel, ...(uiTipo === 'popup' ? { popupEstilo: estilo, popupPontas: pontas } : {}), ...(uiTipo === 'banner' || uiTipo === 'hero' ? { bannerTextoPos: bannerPos, bannerTextoCor: bannerCor, bannerTextoTam: bannerTam } : {}) }, tenantId)
+      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel, ...(uiTipo === 'popup' ? { popupEstilo: estilo, popupPontas: pontas } : {}), ...(ehBanner ? { bannerTextoPos: bannerPos, bannerTextoCor: bannerCor, bannerTextoTam: bannerTam, bannerOcultarTitulo: ocultarTitulo, bannerOcultarMensagem: ocultarMensagem } : {}) }, tenantId)
       if (r.ok) { toast.success('Banner atualizado.'); router.refresh(); onClose() }
       else toast.error(r.error ?? 'Falha ao salvar.')
     })
@@ -135,9 +138,19 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
             )}
 
             {/* Conteúdo */}
-            <div className="space-y-1"><label className="text-xs text-muted-foreground">Título</label><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Novo simulado disponível!" /></div>
-            <div className="space-y-1"><label className="text-xs text-muted-foreground">Mensagem</label>
-              <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={3} placeholder="Texto do aviso…" className="w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-muted-foreground">Título</label>
+                {ehBanner && titulo && <OcultarBtn oculto={ocultarTitulo} onClick={() => setOcultarTitulo((v) => !v)} />}
+              </div>
+              <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Novo simulado disponível!" className={cn(ehBanner && ocultarTitulo && 'opacity-50')} />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-muted-foreground">Mensagem</label>
+                {ehBanner && mensagem && <OcultarBtn oculto={ocultarMensagem} onClick={() => setOcultarMensagem((v) => !v)} />}
+              </div>
+              <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={3} placeholder="Texto do aviso…" className={cn('w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring', ehBanner && ocultarMensagem && 'opacity-50')} />
             </div>
 
             {/* Imagem */}
@@ -299,7 +312,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                 {uiTipo === 'simulado'
                   ? <div className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${previewScale})` }}><SimSlide s={previewSlide} stats={previewSlide.stats} /></div>
                   : imagem
-                    ? <ImgSlide b={{ id: banner.id, tipo: 'banner', titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, link: null, cor, textoPos: bannerPos, textoCor: bannerCor, textoTam: bannerTam }} preview />
+                    ? <ImgSlide b={{ id: banner.id, tipo: 'banner', titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, link: null, cor, textoPos: bannerPos, textoCor: bannerCor, textoTam: bannerTam, ocultarTitulo, ocultarMensagem }} preview />
                     : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
               </div>
             )}
@@ -316,5 +329,15 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
       </div>
     </div>,
     document.body,
+  )
+}
+
+/** Botão "olho" ao lado do campo: oculta/mostra aquele texto no banner (mantém o valor). */
+function OcultarBtn({ oculto, onClick }: { oculto: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} title={oculto ? 'Mostrar no banner' : 'Ocultar no banner'}
+      className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium transition', oculto ? 'text-muted-foreground hover:text-foreground' : 'text-primary hover:bg-primary/10')}>
+      {oculto ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />} {oculto ? 'Oculto' : 'Visível'}
+    </button>
   )
 }

@@ -41,6 +41,7 @@ export type BannerPortal = {
   imagem_url: string | null; link: string | null; cor: string | null; ordem?: number
   estilo?: PopupEstilo | null; pontas?: PopupPontas | null // só p/ pop-up
   textoPos?: BannerTextoPos | null; textoCor?: BannerTextoCor | null; textoTam?: BannerTextoTam | null // texto sobre o banner (banner/destaque)
+  ocultarTitulo?: boolean | null; ocultarMensagem?: boolean | null // esconder título/mensagem no banner (mantém o valor)
 }
 
 /** Classes/estilo de alinhamento do texto sobre o banner, pela âncora escolhida. */
@@ -188,7 +189,9 @@ function Carrossel({ slides, stats }: { slides: Slide[]; stats?: BannerStats | n
  *  Com imagem + título/mensagem, sobrepõe o texto na posição escolhida (`textoPos`). */
 export function ImgSlide({ b, preview }: { b: BannerPortal; preview?: boolean }) {
   const cor = b.cor ?? '#6366f1'
-  const temTexto = !!(b.titulo || b.mensagem)
+  const mostraTitulo = !!b.titulo && !b.ocultarTitulo
+  const mostraMsg = !!b.mensagem && !b.ocultarMensagem
+  const temTexto = mostraTitulo || mostraMsg
   const claro = (b.textoCor ?? 'claro') === 'claro'
   const al = alinhamentoBanner(b.textoPos ?? 'center')
   const tam = BANNER_TAM[b.textoTam ?? 'medio']
@@ -200,8 +203,8 @@ export function ImgSlide({ b, preview }: { b: BannerPortal; preview?: boolean })
         <div className={cn('absolute inset-0 flex p-6 sm:p-10', al.items, al.justify)}>
           {claro && <div className="pointer-events-none absolute inset-0" style={{ background: al.scrim }} />}
           <div className={cn('relative max-w-2xl', al.text)}>
-            {b.titulo && <p className={cn(tam.t, 'font-extrabold leading-tight tracking-tight', claro ? 'text-white [text-shadow:0_2px_12px_rgba(0,0,0,.75)]' : 'text-slate-900')}>{b.titulo}</p>}
-            {b.mensagem && <p className={cn('mt-1.5 whitespace-pre-wrap', tam.m, claro ? 'text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,.7)]' : 'text-slate-800')}>{b.mensagem}</p>}
+            {mostraTitulo && <p className={cn(tam.t, 'font-extrabold leading-tight tracking-tight', claro ? 'text-white [text-shadow:0_2px_12px_rgba(0,0,0,.75)]' : 'text-slate-900')}>{b.titulo}</p>}
+            {mostraMsg && <p className={cn('mt-1.5 whitespace-pre-wrap', tam.m, claro ? 'text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,.7)]' : 'text-slate-800')}>{b.mensagem}</p>}
           </div>
         </div>
       )}
@@ -210,8 +213,8 @@ export function ImgSlide({ b, preview }: { b: BannerPortal; preview?: boolean })
     <div className="absolute inset-0 flex items-center gap-3 p-4" style={{ background: cor + '14' }}>
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: cor + '22', color: cor }}><Megaphone className="h-5 w-5" /></span>
       <div className="min-w-0 flex-1">
-        {b.titulo && <p className="text-sm font-semibold">{b.titulo}</p>}
-        {b.mensagem && <p className="text-xs text-muted-foreground">{b.mensagem}</p>}
+        {mostraTitulo && <p className="text-sm font-semibold">{b.titulo}</p>}
+        {mostraMsg && <p className="text-xs text-muted-foreground">{b.mensagem}</p>}
       </div>
     </div>
   )

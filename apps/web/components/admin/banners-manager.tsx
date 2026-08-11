@@ -39,7 +39,7 @@ export const ehBannerSimulado = (b: { tipo: string; link: string | null }) => b.
 
 export type DestinoBanner = { label: string; href: string; grupo?: string }
 
-export type DestaqueMap = Record<string, { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: PopupEstilo; popupPontas?: PopupPontas; bannerTextoPos?: BannerTextoPos; bannerTextoCor?: BannerTextoCor; bannerTextoTam?: BannerTextoTam }>
+export type DestaqueMap = Record<string, { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: PopupEstilo; popupPontas?: PopupPontas; bannerTextoPos?: BannerTextoPos; bannerTextoCor?: BannerTextoCor; bannerTextoTam?: BannerTextoTam; bannerOcultarTitulo?: boolean; bannerOcultarMensagem?: boolean }>
 
 export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = false, destaques = {} }: { banners: Banner[]; tenantId?: string; destinos?: DestinoBanner[]; desempenhoAtivo?: boolean; destaques?: DestaqueMap }) {
   const router = useRouter()
@@ -386,7 +386,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
         })}
       </div>
 
-      {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} destaqueAtivoInicial={destaques[editando.id]?.ativo !== false} destaqueTextoInicial={destaques[editando.id]?.texto ?? ''} fadeAtivoInicial={destaques[editando.id]?.fadeAtivo !== false} fadeNivelInicial={destaques[editando.id]?.fadeNivel ?? 100} popupEstiloInicial={destaques[editando.id]?.popupEstilo ?? 'classico'} popupPontasInicial={destaques[editando.id]?.popupPontas ?? 'arredondado'} bannerTextoPosInicial={destaques[editando.id]?.bannerTextoPos ?? 'center'} bannerTextoCorInicial={destaques[editando.id]?.bannerTextoCor ?? 'claro'} bannerTextoTamInicial={destaques[editando.id]?.bannerTextoTam ?? 'medio'} onClose={() => setEditando(null)} />}
+      {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} destaqueAtivoInicial={destaques[editando.id]?.ativo !== false} destaqueTextoInicial={destaques[editando.id]?.texto ?? ''} fadeAtivoInicial={destaques[editando.id]?.fadeAtivo !== false} fadeNivelInicial={destaques[editando.id]?.fadeNivel ?? 100} popupEstiloInicial={destaques[editando.id]?.popupEstilo ?? 'classico'} popupPontasInicial={destaques[editando.id]?.popupPontas ?? 'arredondado'} bannerTextoPosInicial={destaques[editando.id]?.bannerTextoPos ?? 'center'} bannerTextoCorInicial={destaques[editando.id]?.bannerTextoCor ?? 'claro'} bannerTextoTamInicial={destaques[editando.id]?.bannerTextoTam ?? 'medio'} bannerOcultarTituloInicial={(destaques[editando.id] as any)?.bannerOcultarTitulo ?? false} bannerOcultarMensagemInicial={(destaques[editando.id] as any)?.bannerOcultarMensagem ?? false} onClose={() => setEditando(null)} />}
     </div>
   )
 }

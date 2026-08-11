@@ -28,9 +28,11 @@ export interface BannerInput {
   bannerTextoPos?: string
   bannerTextoCor?: 'claro' | 'escuro'
   bannerTextoTam?: 'pequeno' | 'medio' | 'grande'
+  bannerOcultarTitulo?: boolean
+  bannerOcultarMensagem?: boolean
 }
 
-type DestaqueEntry = { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: string; popupPontas?: string; bannerTextoPos?: string; bannerTextoCor?: string; bannerTextoTam?: string }
+type DestaqueEntry = { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: string; popupPontas?: string; bannerTextoPos?: string; bannerTextoCor?: string; bannerTextoTam?: string; bannerOcultarTitulo?: boolean; bannerOcultarMensagem?: boolean }
 
 /** Salva a config por-banner (rótulo "Em destaque" + degradê + estilo do pop-up) em
  *  tema.banner_destaques[bannerId], mesclando com o que já existir. */
@@ -38,11 +40,12 @@ async function salvarDestaque(
   svc: ReturnType<typeof createAdminClient>,
   tenantId: string,
   bannerId: string,
-  data: Pick<BannerInput, 'destaqueAtivo' | 'destaqueTexto' | 'fadeAtivo' | 'fadeNivel' | 'popupEstilo' | 'popupPontas' | 'bannerTextoPos' | 'bannerTextoCor' | 'bannerTextoTam'>,
+  data: Pick<BannerInput, 'destaqueAtivo' | 'destaqueTexto' | 'fadeAtivo' | 'fadeNivel' | 'popupEstilo' | 'popupPontas' | 'bannerTextoPos' | 'bannerTextoCor' | 'bannerTextoTam' | 'bannerOcultarTitulo' | 'bannerOcultarMensagem'>,
 ) {
   const nada = data.destaqueAtivo === undefined && data.destaqueTexto === undefined && data.fadeAtivo === undefined
     && data.fadeNivel === undefined && data.popupEstilo === undefined && data.popupPontas === undefined
     && data.bannerTextoPos === undefined && data.bannerTextoCor === undefined && data.bannerTextoTam === undefined
+    && data.bannerOcultarTitulo === undefined && data.bannerOcultarMensagem === undefined
   if (nada) return
   const { data: t } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
   const tema = { ...(((t?.tema as Record<string, unknown>) ?? {})) }
@@ -63,6 +66,8 @@ async function salvarDestaque(
     ...(data.bannerTextoPos !== undefined ? { bannerTextoPos: data.bannerTextoPos } : {}),
     ...(data.bannerTextoCor !== undefined ? { bannerTextoCor: data.bannerTextoCor } : {}),
     ...(data.bannerTextoTam !== undefined ? { bannerTextoTam: data.bannerTextoTam } : {}),
+    ...(data.bannerOcultarTitulo !== undefined ? { bannerOcultarTitulo: data.bannerOcultarTitulo } : {}),
+    ...(data.bannerOcultarMensagem !== undefined ? { bannerOcultarMensagem: data.bannerOcultarMensagem } : {}),
   }
   tema.banner_destaques = mapa
   await svc.from('simulado_tenants').update({ tema }).eq('id', tenantId)
