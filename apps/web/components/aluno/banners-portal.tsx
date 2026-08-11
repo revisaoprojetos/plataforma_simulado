@@ -64,6 +64,14 @@ export function BannersPortal({ banners, simulados = [], stats }: { banners: Ban
     setPopup(null)
   }
 
+  // Fecha no Esc enquanto o pop-up estiver aberto.
+  useEffect(() => {
+    if (!popup) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') fecharPopup() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [popup])
+
   // Um carrossel só: banners de imagem (banner/destaque) + simulados em destaque,
   // ORDENADOS pela ordem global do console (campo `ordem`), não agrupados por tipo.
   const slides: Slide[] = [
@@ -81,22 +89,44 @@ export function BannersPortal({ banners, simulados = [], stats }: { banners: Ban
       )}
 
       {popup && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={fecharPopup}>
-          <div className="w-full max-w-md overflow-hidden rounded-2xl border bg-card shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div role="dialog" aria-modal="true" aria-label={popup.titulo ?? 'Aviso'}
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={fecharPopup}>
+          <div onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-md animate-in fade-in zoom-in-95 slide-in-from-bottom-2 overflow-hidden rounded-3xl border bg-card text-foreground shadow-2xl duration-300">
+            {/* Faixa de cor no topo (cor de destaque do aviso) */}
+            <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${popup.cor ?? '#6366f1'}, color-mix(in oklab, ${popup.cor ?? '#6366f1'} 45%, #ffffff))` }} />
+
+            {/* Fechar — flutuante (sobre a imagem quando houver) */}
+            <button type="button" onClick={fecharPopup} aria-label="Fechar"
+              className={cn('absolute right-3 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full transition',
+                popup.imagem_url ? 'bg-black/40 text-white ring-1 ring-white/25 backdrop-blur hover:bg-black/60' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>
+              <X className="h-4 w-4" />
+            </button>
+
             {popup.imagem_url && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={popup.imagem_url} alt="" className="max-h-56 w-full object-cover" />
-            )}
-            <div className="space-y-3 p-5">
-              <div className="flex items-start gap-2">
-                <span className="h-1 w-10 rounded-full" style={{ background: popup.cor ?? '#6366f1' }} />
-                <button type="button" onClick={fecharPopup} className="ml-auto rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+              <div className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={popup.imagem_url} alt="" className="max-h-64 w-full object-cover" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-card to-transparent" />
               </div>
-              {popup.titulo && <h3 className="text-lg font-bold tracking-tight">{popup.titulo}</h3>}
-              {popup.mensagem && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{popup.mensagem}</p>}
-              <div className="flex justify-end gap-2 pt-1">
-                {popup.link && <Alvo href={popup.link} onClick={fecharPopup} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90">Ver mais</Alvo>}
-                <button type="button" onClick={fecharPopup} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Fechar</button>
+            )}
+
+            <div className={cn('px-6 pb-6', popup.imagem_url ? 'pt-4' : 'pt-6')}>
+              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                style={{ background: `color-mix(in oklab, ${popup.cor ?? '#6366f1'} 16%, var(--card))`, color: popup.cor ?? '#6366f1' }}>
+                <Megaphone className="h-3.5 w-3.5" /> Aviso
+              </span>
+              {popup.titulo && <h3 className="mt-3 text-xl font-bold leading-snug tracking-tight">{popup.titulo}</h3>}
+              {popup.mensagem && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{popup.mensagem}</p>}
+              <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button type="button" onClick={fecharPopup}
+                  className="rounded-xl border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">Fechar</button>
+                {popup.link && (
+                  <Alvo href={popup.link} onClick={fecharPopup}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-md transition hover:opacity-95">
+                    Ver mais <ArrowRight className="h-4 w-4" />
+                  </Alvo>
+                )}
               </div>
             </div>
           </div>
