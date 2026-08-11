@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Radio, Play, RotateCcw, Clock, CalendarClock, Hourglass, CircleCheck, Infinity as InfinityIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { iconeBanco } from '@/lib/banco-visual'
+import { CapaCard } from '@/components/aluno/capa-card'
 import { EnunciadoDownloadBotao } from '@/components/aluno/enunciado-download-menu'
 import type { ItemSimulado } from '@/lib/aluno/simulado-item'
 
@@ -27,14 +27,10 @@ function FitaNovo() {
 export function CardSimulado({ s, dica = false }: { s: ItemSimulado; dica?: boolean }) {
   const StatusIcon = ICON[s.tom] ?? Radio
   const cor = s.vis?.cor ?? '#6d28d9'
-  const BancoIcon = iconeBanco(s.vis?.icone)
   const capa = s.vis?.capa
   return (
     <div className={cn('group relative aspect-[4/5] transform-gpu overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition duration-300', s.podeFazer && 'hover:-translate-y-1 hover:shadow-xl hover:ring-white/25')}>
-      {capa
-        ? <img src={capa} alt="" className="absolute inset-0 h-full w-full transform-gpu object-cover transition-transform duration-500 group-hover:scale-105" />
-        : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
-      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
+      <CapaCard capa={capa} cor={cor} icone={s.vis?.icone} />
       {/* glow da cor da marca no rodapé — dá profundidade e identidade */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
       {/* escurecimento p/ legibilidade do texto */}
