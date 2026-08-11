@@ -7,7 +7,7 @@ import { Plus, Loader2, Trash2, Eye, EyeOff, Megaphone, MessageSquareWarning, Im
 import { redimensionarImagem } from '@/lib/imagem'
 import { BannerCropper } from '@/components/admin/banner-cropper'
 import { BannerEditModal } from '@/components/admin/banner-edit-modal'
-import { PopupCard, POPUP_ESTILOS, type PopupEstilo, type PopupPontas } from '@/components/aluno/banners-portal'
+import { PopupCard, type PopupEstilo, type PopupPontas } from '@/components/aluno/banners-portal'
 
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f) })
@@ -64,8 +64,6 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
   const [cor, setCor] = useState('#6366f1')
   const [destaqueAtivoN, setDestaqueAtivoN] = useState(true)
   const [destaqueTextoN, setDestaqueTextoN] = useState('')
-  const [estiloN, setEstiloN] = useState<PopupEstilo>('classico')
-  const [pontasN, setPontasN] = useState<PopupPontas>('arredondado')
   const [fadeAtivoN, setFadeAtivoN] = useState(true)
   const [fadeNivelN, setFadeNivelN] = useState(100)
   const [enviando, setEnviando] = useState(false)
@@ -138,7 +136,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
     if (uiTipo !== 'simulado' && !titulo.trim() && !mensagem.trim() && !imagem.trim()) { toast.error('Preencha ao menos um título, mensagem ou imagem.'); return }
     setAlvo('novo')
     start(async () => {
-      const r = await criarBannerAction({ tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo: true, destaqueAtivo: destaqueAtivoN, destaqueTexto: destaqueTextoN, fadeAtivo: fadeAtivoN, fadeNivel: fadeNivelN, ...(uiTipo === 'popup' ? { popupEstilo: estiloN, popupPontas: pontasN } : {}) }, tenantId)
+      const r = await criarBannerAction({ tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo: true, destaqueAtivo: destaqueAtivoN, destaqueTexto: destaqueTextoN, fadeAtivo: fadeAtivoN, fadeNivel: fadeNivelN }, tenantId)
       setAlvo(null)
       if (!r.ok) { toast.error(r.error ?? 'Falha ao criar.'); return }
       toast.success('Criado!'); setTitulo(''); setMensagem(''); setImagem(''); setLink(''); setDestaqueTextoN(''); setDestaqueAtivoN(true); setFadeAtivoN(true); setFadeNivelN(100)
@@ -250,27 +248,10 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
           </div>
         )}
         {uiTipo === 'popup' && (
-          <div className="space-y-2.5">
-            <div className="space-y-1.5 rounded-lg border bg-background px-3 py-2.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Estilo do pop-up</p>
-              <div className="grid grid-cols-3 gap-1.5">
-                {POPUP_ESTILOS.map(({ v, label }) => (
-                  <button key={v} type="button" onClick={() => setEstiloN(v)}
-                    className={cn('rounded-md border px-1.5 py-1.5 text-[11px] font-medium transition', estiloN === v ? 'border-primary bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-muted')}>{label}</button>
-                ))}
-              </div>
-              <div className="flex items-center gap-1.5 pt-0.5">
-                <span className="mr-1 text-[11px] text-muted-foreground">Pontas</span>
-                {([['arredondado', 'Arredondadas'], ['quadrado', 'Quadradas']] as const).map(([v, label]) => (
-                  <button key={v} type="button" onClick={() => setPontasN(v)}
-                    className={cn('rounded-md border px-2 py-1 text-[11px] font-medium transition', pontasN === v ? 'border-primary bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-muted')}>{label}</button>
-                ))}
-              </div>
-            </div>
-            <div className="rounded-xl border bg-neutral-200/60 p-3 dark:bg-neutral-900/50">
-              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Prévia ao vivo</p>
-              <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null, estilo: estiloN, pontas: pontasN }} preview />
-            </div>
+          <div className="rounded-xl border bg-neutral-200/60 p-3 dark:bg-neutral-900/50">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Prévia ao vivo</p>
+            <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null }} preview />
+            <p className="mt-2 text-[11px] text-muted-foreground">Os <strong>estilos</strong> (sobre a imagem, compacto, pontas…) você ajusta depois em <strong>Configurar</strong> ⚙️.</p>
           </div>
         )}
         <div className="space-y-1"><label className="text-xs text-muted-foreground">Título</label><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Novo simulado disponível!" /></div>
