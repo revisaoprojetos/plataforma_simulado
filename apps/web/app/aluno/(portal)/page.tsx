@@ -46,7 +46,17 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     notaMedia: notasAluno.length ? notasAluno.reduce((a, b) => a + b, 0) / notasAluno.length : null,
     melhorNota: notasAluno.length ? Math.max(...notasAluno) : null,
   }
-  const todosBanners = (banRows ?? []) as any[]
+  // Agendamento por-aviso (início/fim em tema.banner_destaques[id]): oculta fora da janela.
+  const agora = Date.now()
+  const dentroJanela = (id: string) => {
+    const d = destaquesBanner[id] as any
+    const ini = d?.agendaInicio ? Date.parse(d.agendaInicio) : NaN
+    const fim = d?.agendaFim ? Date.parse(d.agendaFim) : NaN
+    if (!Number.isNaN(ini) && agora < ini) return false
+    if (!Number.isNaN(fim) && agora > fim) return false
+    return true
+  }
+  const todosBanners = ((banRows ?? []) as any[]).filter((b) => dentroJanela(b.id))
   // Ordem GLOBAL do carrossel = posição na lista já ordenada por (ordem, criado_em) no console.
   const ordemGlobal = new Map<string, number>(todosBanners.map((b, i) => [b.id, i]))
   // Banners de DESTAQUE (tipo 'hero'): os que apontam para um simulado (link /simulado/token)
@@ -256,7 +266,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   return (
     <div className="animate-page space-y-6">
       {/* Banners do tenant — UM carrossel só (banner + destaque + simulado) + pop-up. SÓ na Início. */}
-      <BannersPortal banners={bannersSemSim.map((b) => ({ ...b, ordem: ordemGlobal.get(b.id) ?? 0, estilo: (destaquesBanner[b.id] as any)?.popupEstilo ?? null, pontas: (destaquesBanner[b.id] as any)?.popupPontas ?? null, textoPos: (destaquesBanner[b.id] as any)?.bannerTextoPos ?? null, textoCor: (destaquesBanner[b.id] as any)?.bannerTextoCor ?? null, textoTam: (destaquesBanner[b.id] as any)?.bannerTextoTam ?? null, ocultarTitulo: (destaquesBanner[b.id] as any)?.bannerOcultarTitulo ?? false, ocultarMensagem: (destaquesBanner[b.id] as any)?.bannerOcultarMensagem ?? false }))} simulados={heroSims} stats={mostrarDesempenhoBanner ? statsAluno : null} />
+      <BannersPortal banners={bannersSemSim.map((b) => ({ ...b, ordem: ordemGlobal.get(b.id) ?? 0, estilo: (destaquesBanner[b.id] as any)?.popupEstilo ?? null, pontas: (destaquesBanner[b.id] as any)?.popupPontas ?? null, textoPos: (destaquesBanner[b.id] as any)?.bannerTextoPos ?? null, textoCor: (destaquesBanner[b.id] as any)?.bannerTextoCor ?? null, textoTam: (destaquesBanner[b.id] as any)?.bannerTextoTam ?? null, ocultarTitulo: (destaquesBanner[b.id] as any)?.bannerOcultarTitulo ?? false, ocultarMensagem: (destaquesBanner[b.id] as any)?.bannerOcultarMensagem ?? false, freq: (destaquesBanner[b.id] as any)?.freq ?? null }))} simulados={heroSims} stats={mostrarDesempenhoBanner ? statsAluno : null} />
 
       {/* Saudação solta. */}
       <div>

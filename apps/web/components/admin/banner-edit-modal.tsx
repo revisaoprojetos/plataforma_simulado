@@ -18,9 +18,17 @@ function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f) })
 }
 
+/** ISO (UTC) → valor de <input type="datetime-local"> no fuso local do admin. */
+function isoParaInput(iso?: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso); if (Number.isNaN(d.getTime())) return ''
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
+}
+
 /** Pop-up de configuração TOTAL de um banner já criado (tipo, título, mensagem, imagem+recorte,
  *  link/destino, cor, ativo). Salva via atualizarBannerAction. */
-export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', bannerTextoPosInicial = 'center', bannerTextoCorInicial = 'claro', bannerTextoTamInicial = 'medio', bannerOcultarTituloInicial = false, bannerOcultarMensagemInicial = false, onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; bannerTextoPosInicial?: BannerTextoPos; bannerTextoCorInicial?: BannerTextoCor; bannerTextoTamInicial?: BannerTextoTam; bannerOcultarTituloInicial?: boolean; bannerOcultarMensagemInicial?: boolean; onClose: () => void }) {
+export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', bannerTextoPosInicial = 'center', bannerTextoCorInicial = 'claro', bannerTextoTamInicial = 'medio', bannerOcultarTituloInicial = false, bannerOcultarMensagemInicial = false, agendaInicioInicial = '', agendaFimInicial = '', freqInicial = 'login', onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; bannerTextoPosInicial?: BannerTextoPos; bannerTextoCorInicial?: BannerTextoCor; bannerTextoTamInicial?: BannerTextoTam; bannerOcultarTituloInicial?: boolean; bannerOcultarMensagemInicial?: boolean; agendaInicioInicial?: string; agendaFimInicial?: string; freqInicial?: 'login' | 'sempre' | 'uma_vez'; onClose: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   // Modo da UI: "simulado" é um destaque (hero) que aponta p/ um simulado/pasta. Detecta pelo banner.
@@ -46,6 +54,9 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
   const [bannerTam, setBannerTam] = useState<BannerTextoTam>(bannerTextoTamInicial)
   const [ocultarTitulo, setOcultarTitulo] = useState(bannerOcultarTituloInicial)
   const [ocultarMensagem, setOcultarMensagem] = useState(bannerOcultarMensagemInicial)
+  const [agendaIni, setAgendaIni] = useState(isoParaInput(agendaInicioInicial))
+  const [agendaFim, setAgendaFim] = useState(isoParaInput(agendaFimInicial))
+  const [freq, setFreq] = useState<'login' | 'sempre' | 'uma_vez'>(freqInicial)
   const ehBanner = uiTipo === 'banner' || uiTipo === 'hero'
   const [enviando, setEnviando] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
@@ -68,7 +79,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
 
   function salvar() {
     start(async () => {
-      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel, ...(uiTipo === 'popup' ? { popupEstilo: estilo, popupPontas: pontas } : {}), ...(ehBanner ? { bannerTextoPos: bannerPos, bannerTextoCor: bannerCor, bannerTextoTam: bannerTam, bannerOcultarTitulo: ocultarTitulo, bannerOcultarMensagem: ocultarMensagem } : {}) }, tenantId)
+      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel, ...(uiTipo === 'popup' ? { popupEstilo: estilo, popupPontas: pontas } : {}), ...(ehBanner ? { bannerTextoPos: bannerPos, bannerTextoCor: bannerCor, bannerTextoTam: bannerTam, bannerOcultarTitulo: ocultarTitulo, bannerOcultarMensagem: ocultarMensagem } : {}), agendaInicio: agendaIni ? new Date(agendaIni).toISOString() : '', agendaFim: agendaFim ? new Date(agendaFim).toISOString() : '', ...(uiTipo === 'popup' ? { freq } : {}) }, tenantId)
       if (r.ok) { toast.success('Banner atualizado.'); router.refresh(); onClose() }
       else toast.error(r.error ?? 'Falha ao salvar.')
     })
@@ -194,6 +205,31 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
             <div className="flex items-center justify-between gap-4 rounded-lg border bg-background px-3 py-2.5">
               <div className="flex items-center gap-2"><label className="text-xs text-muted-foreground">Cor de destaque</label><input type="color" value={cor} onChange={(e) => setCor(e.target.value)} className="h-8 w-10 cursor-pointer rounded border bg-transparent p-0.5" /></div>
               <div className="flex items-center gap-2"><span className="text-xs text-muted-foreground">Ativo</span><Switch checked={ativo} onCheckedChange={setAtivo} /></div>
+            </div>
+
+            {/* Regras de exibição — agendamento (janela) + frequência do pop-up */}
+            <div className="space-y-2.5 rounded-lg border bg-background px-3 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Regras de exibição</p>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block space-y-1 text-[11px] text-muted-foreground">Início (opcional)
+                  <input type="datetime-local" value={agendaIni} onChange={(e) => setAgendaIni(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+                </label>
+                <label className="block space-y-1 text-[11px] text-muted-foreground">Fim (opcional)
+                  <input type="datetime-local" value={agendaFim} onChange={(e) => setAgendaFim(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+                </label>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Fora dessa janela o aviso não aparece. Em branco = sempre.</p>
+              {uiTipo === 'popup' && (
+                <div>
+                  <span className="mb-1 block text-[11px] text-muted-foreground">Frequência do pop-up</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {([['login', 'A cada login'], ['sempre', 'Sempre'], ['uma_vez', 'Uma vez']] as const).map(([v, l]) => (
+                      <button key={v} type="button" onClick={() => setFreq(v)}
+                        className={cn('rounded-md border px-1.5 py-1.5 text-[11px] font-medium transition', freq === v ? 'border-primary bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-muted')}>{l}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Opções específicas do tipo */}

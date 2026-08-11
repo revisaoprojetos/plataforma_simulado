@@ -30,9 +30,13 @@ export interface BannerInput {
   bannerTextoTam?: 'pequeno' | 'medio' | 'grande'
   bannerOcultarTitulo?: boolean
   bannerOcultarMensagem?: boolean
+  // Regras de exibição: agendamento (janela) + frequência do pop-up.
+  agendaInicio?: string | null
+  agendaFim?: string | null
+  freq?: 'login' | 'sempre' | 'uma_vez'
 }
 
-type DestaqueEntry = { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: string; popupPontas?: string; bannerTextoPos?: string; bannerTextoCor?: string; bannerTextoTam?: string; bannerOcultarTitulo?: boolean; bannerOcultarMensagem?: boolean }
+type DestaqueEntry = { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: string; popupPontas?: string; bannerTextoPos?: string; bannerTextoCor?: string; bannerTextoTam?: string; bannerOcultarTitulo?: boolean; bannerOcultarMensagem?: boolean; agendaInicio?: string; agendaFim?: string; freq?: string }
 
 /** Salva a config por-banner (rótulo "Em destaque" + degradê + estilo do pop-up) em
  *  tema.banner_destaques[bannerId], mesclando com o que já existir. */
@@ -40,12 +44,13 @@ async function salvarDestaque(
   svc: ReturnType<typeof createAdminClient>,
   tenantId: string,
   bannerId: string,
-  data: Pick<BannerInput, 'destaqueAtivo' | 'destaqueTexto' | 'fadeAtivo' | 'fadeNivel' | 'popupEstilo' | 'popupPontas' | 'bannerTextoPos' | 'bannerTextoCor' | 'bannerTextoTam' | 'bannerOcultarTitulo' | 'bannerOcultarMensagem'>,
+  data: Pick<BannerInput, 'destaqueAtivo' | 'destaqueTexto' | 'fadeAtivo' | 'fadeNivel' | 'popupEstilo' | 'popupPontas' | 'bannerTextoPos' | 'bannerTextoCor' | 'bannerTextoTam' | 'bannerOcultarTitulo' | 'bannerOcultarMensagem' | 'agendaInicio' | 'agendaFim' | 'freq'>,
 ) {
   const nada = data.destaqueAtivo === undefined && data.destaqueTexto === undefined && data.fadeAtivo === undefined
     && data.fadeNivel === undefined && data.popupEstilo === undefined && data.popupPontas === undefined
     && data.bannerTextoPos === undefined && data.bannerTextoCor === undefined && data.bannerTextoTam === undefined
     && data.bannerOcultarTitulo === undefined && data.bannerOcultarMensagem === undefined
+    && data.agendaInicio === undefined && data.agendaFim === undefined && data.freq === undefined
   if (nada) return
   const { data: t } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
   const tema = { ...(((t?.tema as Record<string, unknown>) ?? {})) }
@@ -68,6 +73,9 @@ async function salvarDestaque(
     ...(data.bannerTextoTam !== undefined ? { bannerTextoTam: data.bannerTextoTam } : {}),
     ...(data.bannerOcultarTitulo !== undefined ? { bannerOcultarTitulo: data.bannerOcultarTitulo } : {}),
     ...(data.bannerOcultarMensagem !== undefined ? { bannerOcultarMensagem: data.bannerOcultarMensagem } : {}),
+    ...(data.agendaInicio !== undefined ? { agendaInicio: data.agendaInicio || undefined } : {}),
+    ...(data.agendaFim !== undefined ? { agendaFim: data.agendaFim || undefined } : {}),
+    ...(data.freq !== undefined ? { freq: data.freq } : {}),
   }
   tema.banner_destaques = mapa
   await svc.from('simulado_tenants').update({ tema }).eq('id', tenantId)

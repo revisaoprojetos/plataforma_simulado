@@ -42,6 +42,7 @@ export type BannerPortal = {
   estilo?: PopupEstilo | null; pontas?: PopupPontas | null // só p/ pop-up
   textoPos?: BannerTextoPos | null; textoCor?: BannerTextoCor | null; textoTam?: BannerTextoTam | null // texto sobre o banner (banner/destaque)
   ocultarTitulo?: boolean | null; ocultarMensagem?: boolean | null // esconder título/mensagem no banner (mantém o valor)
+  freq?: 'login' | 'sempre' | 'uma_vez' | null // frequência do pop-up
 }
 
 /** Classes/estilo de alinhamento do texto sobre o banner, pela âncora escolhida. */
@@ -94,17 +95,31 @@ type Slide = ({ kind: 'img' } & BannerPortal) | HeroSimSlide
 export function BannersPortal({ banners, simulados = [], stats }: { banners: BannerPortal[]; simulados?: HeroSimSlide[]; stats?: BannerStats | null }) {
   const [popup, setPopup] = useState<BannerPortal | null>(null)
 
-  // Mostra o pop-up SÓ logo após o login (marcador 'popup-login' setado no formulário de login),
-  // não a cada visita à home. Consome o marcador na 1ª montagem para não repetir ao voltar ao início.
+  // Frequência do pop-up (config por-aviso):
+  //  'login'    → só logo após o login (marcador 'popup-login'), não a cada visita à home (padrão);
+  //  'sempre'   → toda vez que a home carrega;
+  //  'uma_vez'  → uma vez por navegador (localStorage).
   useEffect(() => {
-    let fresh = false
-    try { fresh = sessionStorage.getItem('popup-login') === '1'; if (fresh) sessionStorage.removeItem('popup-login') } catch { /* SSR/priv */ }
-    if (!fresh) return
     const pop = banners.find((b) => b.tipo === 'popup')
-    if (pop) setPopup(pop)
+    if (!pop) return
+    const freq = pop.freq ?? 'login'
+    try {
+      if (freq === 'uma_vez') {
+        if (localStorage.getItem('popup-visto-' + pop.id)) return
+        setPopup(pop)
+      } else if (freq === 'sempre') {
+        setPopup(pop)
+      } else {
+        const fresh = sessionStorage.getItem('popup-login') === '1'
+        if (fresh) { sessionStorage.removeItem('popup-login'); setPopup(pop) }
+      }
+    } catch { /* SSR/priv */ }
   }, [banners])
 
-  function fecharPopup() { setPopup(null) }
+  function fecharPopup() {
+    if (popup && (popup.freq ?? 'login') === 'uma_vez') { try { localStorage.setItem('popup-visto-' + popup.id, '1') } catch {} }
+    setPopup(null)
+  }
 
   // Fecha no Esc enquanto o pop-up estiver aberto.
   useEffect(() => {
