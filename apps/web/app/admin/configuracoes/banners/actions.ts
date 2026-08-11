@@ -28,6 +28,8 @@ export interface BannerInput {
   bannerTextoPos?: string
   bannerTextoCor?: 'claro' | 'escuro'
   bannerTextoTam?: 'pequeno' | 'medio' | 'grande'
+  bannerTextoX?: number
+  bannerTextoY?: number
   bannerOcultarTitulo?: boolean
   bannerOcultarMensagem?: boolean
   // Regras de exibição: agendamento (janela) + frequência do pop-up.
@@ -36,7 +38,7 @@ export interface BannerInput {
   freq?: 'login' | 'sempre' | 'uma_vez'
 }
 
-type DestaqueEntry = { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: string; popupPontas?: string; bannerTextoPos?: string; bannerTextoCor?: string; bannerTextoTam?: string; bannerOcultarTitulo?: boolean; bannerOcultarMensagem?: boolean; agendaInicio?: string; agendaFim?: string; freq?: string }
+type DestaqueEntry = { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: string; popupPontas?: string; bannerTextoPos?: string; bannerTextoCor?: string; bannerTextoTam?: string; bannerTextoX?: number; bannerTextoY?: number; bannerOcultarTitulo?: boolean; bannerOcultarMensagem?: boolean; agendaInicio?: string; agendaFim?: string; freq?: string }
 
 /** Salva a config por-banner (rótulo "Em destaque" + degradê + estilo do pop-up) em
  *  tema.banner_destaques[bannerId], mesclando com o que já existir. */
@@ -44,11 +46,12 @@ async function salvarDestaque(
   svc: ReturnType<typeof createAdminClient>,
   tenantId: string,
   bannerId: string,
-  data: Pick<BannerInput, 'destaqueAtivo' | 'destaqueTexto' | 'fadeAtivo' | 'fadeNivel' | 'popupEstilo' | 'popupPontas' | 'bannerTextoPos' | 'bannerTextoCor' | 'bannerTextoTam' | 'bannerOcultarTitulo' | 'bannerOcultarMensagem' | 'agendaInicio' | 'agendaFim' | 'freq'>,
+  data: Pick<BannerInput, 'destaqueAtivo' | 'destaqueTexto' | 'fadeAtivo' | 'fadeNivel' | 'popupEstilo' | 'popupPontas' | 'bannerTextoPos' | 'bannerTextoCor' | 'bannerTextoTam' | 'bannerTextoX' | 'bannerTextoY' | 'bannerOcultarTitulo' | 'bannerOcultarMensagem' | 'agendaInicio' | 'agendaFim' | 'freq'>,
 ) {
   const nada = data.destaqueAtivo === undefined && data.destaqueTexto === undefined && data.fadeAtivo === undefined
     && data.fadeNivel === undefined && data.popupEstilo === undefined && data.popupPontas === undefined
     && data.bannerTextoPos === undefined && data.bannerTextoCor === undefined && data.bannerTextoTam === undefined
+    && data.bannerTextoX === undefined && data.bannerTextoY === undefined
     && data.bannerOcultarTitulo === undefined && data.bannerOcultarMensagem === undefined
     && data.agendaInicio === undefined && data.agendaFim === undefined && data.freq === undefined
   if (nada) return
@@ -71,6 +74,8 @@ async function salvarDestaque(
     ...(data.bannerTextoPos !== undefined ? { bannerTextoPos: data.bannerTextoPos } : {}),
     ...(data.bannerTextoCor !== undefined ? { bannerTextoCor: data.bannerTextoCor } : {}),
     ...(data.bannerTextoTam !== undefined ? { bannerTextoTam: data.bannerTextoTam } : {}),
+    ...(data.bannerTextoX !== undefined ? { bannerTextoX: data.bannerTextoX } : {}),
+    ...(data.bannerTextoY !== undefined ? { bannerTextoY: data.bannerTextoY } : {}),
     ...(data.bannerOcultarTitulo !== undefined ? { bannerOcultarTitulo: data.bannerOcultarTitulo } : {}),
     ...(data.bannerOcultarMensagem !== undefined ? { bannerOcultarMensagem: data.bannerOcultarMensagem } : {}),
     ...(data.agendaInicio !== undefined ? { agendaInicio: data.agendaInicio || undefined } : {}),

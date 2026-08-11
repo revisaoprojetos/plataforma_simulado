@@ -41,22 +41,17 @@ export type BannerPortal = {
   imagem_url: string | null; link: string | null; cor: string | null; ordem?: number
   estilo?: PopupEstilo | null; pontas?: PopupPontas | null // só p/ pop-up
   textoPos?: BannerTextoPos | null; textoCor?: BannerTextoCor | null; textoTam?: BannerTextoTam | null // texto sobre o banner (banner/destaque)
+  textoX?: number | null; textoY?: number | null // posição livre do texto (0–100%), sobrepõe textoPos
   ocultarTitulo?: boolean | null; ocultarMensagem?: boolean | null // esconder título/mensagem no banner (mantém o valor)
   freq?: 'login' | 'sempre' | 'uma_vez' | null // frequência do pop-up
 }
 
-/** Classes/estilo de alinhamento do texto sobre o banner, pela âncora escolhida. */
-function alinhamentoBanner(pos: BannerTextoPos) {
+/** Âncora 3×3 → coordenadas X/Y (0–100%). Base para as barras de posição livre. */
+export function posParaXY(pos: BannerTextoPos): { x: number; y: number } {
   const [v, h] = pos === 'center' ? ['center', 'center'] : pos.split('-')
-  const items = v === 'top' ? 'items-start' : v === 'bottom' ? 'items-end' : 'items-center'
-  const justify = h === 'left' ? 'justify-start' : h === 'right' ? 'justify-end' : 'justify-center'
-  const text = h === 'left' ? 'text-left' : h === 'right' ? 'text-right' : 'text-center'
-  const scrim = v === 'bottom'
-    ? 'linear-gradient(to top, rgba(0,0,0,.62), transparent 55%)'
-    : v === 'top'
-      ? 'linear-gradient(to bottom, rgba(0,0,0,.62), transparent 55%)'
-      : 'radial-gradient(ellipse at center, rgba(0,0,0,.5), transparent 72%)'
-  return { items, justify, text, scrim }
+  const x = h === 'left' ? 0 : h === 'right' ? 100 : 50
+  const y = v === 'top' ? 0 : v === 'bottom' ? 100 : 50
+  return { x, y }
 }
 
 /** Chip informativo do banner de simulado (ex.: disponibilidade, nº de questões, tipo, contagem). */
@@ -208,20 +203,32 @@ export function ImgSlide({ b, preview }: { b: BannerPortal; preview?: boolean })
   const mostraMsg = !!b.mensagem && !b.ocultarMensagem
   const temTexto = mostraTitulo || mostraMsg
   const claro = (b.textoCor ?? 'claro') === 'claro'
-  const al = alinhamentoBanner(b.textoPos ?? 'center')
   const tam = BANNER_TAM[b.textoTam ?? 'medio']
+  const base = posParaXY(b.textoPos ?? 'center')
+  const x = Math.max(0, Math.min(100, b.textoX ?? base.x))
+  const y = Math.max(0, Math.min(100, b.textoY ?? base.y))
+  const talign = x < 34 ? 'text-left' : x > 66 ? 'text-right' : 'text-center'
+  const scrim = y > 66
+    ? 'linear-gradient(to top, rgba(0,0,0,.62), transparent 55%)'
+    : y < 34
+      ? 'linear-gradient(to bottom, rgba(0,0,0,.62), transparent 55%)'
+      : 'radial-gradient(ellipse at center, rgba(0,0,0,.5), transparent 72%)'
   const conteudo = b.imagem_url ? (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={b.imagem_url} alt={b.titulo ?? ''} className="absolute inset-0 h-full w-full object-cover" />
       {temTexto && (
-        <div className={cn('absolute inset-0 flex p-6 sm:p-10', al.items, al.justify)}>
-          {claro && <div className="pointer-events-none absolute inset-0" style={{ background: al.scrim }} />}
-          <div className={cn('relative max-w-2xl', al.text)}>
-            {mostraTitulo && <p className={cn(tam.t, 'whitespace-pre-wrap font-extrabold leading-tight tracking-tight', claro ? 'text-white [text-shadow:0_2px_12px_rgba(0,0,0,.75)]' : 'text-slate-900')}>{b.titulo}</p>}
-            {mostraMsg && <p className={cn('mt-1.5 whitespace-pre-wrap', tam.m, claro ? 'text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,.7)]' : 'text-slate-800')}>{b.mensagem}</p>}
+        <>
+          {claro && <div className="pointer-events-none absolute inset-0" style={{ background: scrim }} />}
+          <div className="pointer-events-none absolute inset-0 p-5 sm:p-8">
+            <div className="relative h-full w-full">
+              <div className={cn('absolute max-w-[80%]', talign)} style={{ left: `${x}%`, top: `${y}%`, transform: `translate(-${x}%, -${y}%)` }}>
+                {mostraTitulo && <p className={cn(tam.t, 'whitespace-pre-wrap font-extrabold leading-tight tracking-tight', claro ? 'text-white [text-shadow:0_2px_12px_rgba(0,0,0,.75)]' : 'text-slate-900')}>{b.titulo}</p>}
+                {mostraMsg && <p className={cn('mt-1.5 whitespace-pre-wrap', tam.m, claro ? 'text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,.7)]' : 'text-slate-800')}>{b.mensagem}</p>}
+              </div>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </>
   ) : (

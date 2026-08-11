@@ -12,7 +12,7 @@ import { redimensionarImagem } from '@/lib/imagem'
 import { BannerCropper } from '@/components/admin/banner-cropper'
 import { atualizarBannerAction } from '@/app/admin/configuracoes/banners/actions'
 import { ehBannerSimulado, type Banner, type DestinoBanner } from '@/components/admin/banners-manager'
-import { SimSlide, PopupCard, ImgSlide, POPUP_ESTILOS, BANNER_POSICOES, type HeroSimSlide, type PopupEstilo, type PopupPontas, type BannerTextoPos, type BannerTextoCor, type BannerTextoTam } from '@/components/aluno/banners-portal'
+import { SimSlide, PopupCard, ImgSlide, POPUP_ESTILOS, BANNER_POSICOES, posParaXY, type HeroSimSlide, type PopupEstilo, type PopupPontas, type BannerTextoPos, type BannerTextoCor, type BannerTextoTam } from '@/components/aluno/banners-portal'
 
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f) })
@@ -28,7 +28,7 @@ function isoParaInput(iso?: string | null): string {
 
 /** Pop-up de configuração TOTAL de um banner já criado (tipo, título, mensagem, imagem+recorte,
  *  link/destino, cor, ativo). Salva via atualizarBannerAction. */
-export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', bannerTextoPosInicial = 'center', bannerTextoCorInicial = 'claro', bannerTextoTamInicial = 'medio', bannerOcultarTituloInicial = false, bannerOcultarMensagemInicial = false, agendaInicioInicial = '', agendaFimInicial = '', freqInicial = 'login', onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; bannerTextoPosInicial?: BannerTextoPos; bannerTextoCorInicial?: BannerTextoCor; bannerTextoTamInicial?: BannerTextoTam; bannerOcultarTituloInicial?: boolean; bannerOcultarMensagemInicial?: boolean; agendaInicioInicial?: string; agendaFimInicial?: string; freqInicial?: 'login' | 'sempre' | 'uma_vez'; onClose: () => void }) {
+export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', bannerTextoPosInicial = 'center', bannerTextoCorInicial = 'claro', bannerTextoTamInicial = 'medio', bannerTextoXInicial = null, bannerTextoYInicial = null, bannerOcultarTituloInicial = false, bannerOcultarMensagemInicial = false, agendaInicioInicial = '', agendaFimInicial = '', freqInicial = 'login', onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; bannerTextoPosInicial?: BannerTextoPos; bannerTextoCorInicial?: BannerTextoCor; bannerTextoTamInicial?: BannerTextoTam; bannerTextoXInicial?: number | null; bannerTextoYInicial?: number | null; bannerOcultarTituloInicial?: boolean; bannerOcultarMensagemInicial?: boolean; agendaInicioInicial?: string; agendaFimInicial?: string; freqInicial?: 'login' | 'sempre' | 'uma_vez'; onClose: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   // Modo da UI: "simulado" é um destaque (hero) que aponta p/ um simulado/pasta. Detecta pelo banner.
@@ -52,6 +52,8 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
   const [bannerPos, setBannerPos] = useState<BannerTextoPos>(bannerTextoPosInicial)
   const [bannerCor, setBannerCor] = useState<BannerTextoCor>(bannerTextoCorInicial)
   const [bannerTam, setBannerTam] = useState<BannerTextoTam>(bannerTextoTamInicial)
+  const [bannerX, setBannerX] = useState<number>(bannerTextoXInicial ?? posParaXY(bannerTextoPosInicial).x)
+  const [bannerY, setBannerY] = useState<number>(bannerTextoYInicial ?? posParaXY(bannerTextoPosInicial).y)
   const [ocultarTitulo, setOcultarTitulo] = useState(bannerOcultarTituloInicial)
   const [ocultarMensagem, setOcultarMensagem] = useState(bannerOcultarMensagemInicial)
   const [agendaIni, setAgendaIni] = useState(isoParaInput(agendaInicioInicial))
@@ -86,7 +88,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
 
   function salvar() {
     start(async () => {
-      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel, ...(uiTipo === 'popup' ? { popupEstilo: estilo, popupPontas: pontas } : {}), ...(ehBanner ? { bannerTextoPos: bannerPos, bannerTextoCor: bannerCor, bannerTextoTam: bannerTam, bannerOcultarTitulo: ocultarTitulo, bannerOcultarMensagem: ocultarMensagem } : {}), agendaInicio: agendaIni ? new Date(agendaIni).toISOString() : '', agendaFim: agendaFim ? new Date(agendaFim).toISOString() : '', ...(uiTipo === 'popup' ? { freq } : {}) }, tenantId)
+      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel, ...(uiTipo === 'popup' ? { popupEstilo: estilo, popupPontas: pontas } : {}), ...(ehBanner ? { bannerTextoPos: bannerPos, bannerTextoCor: bannerCor, bannerTextoTam: bannerTam, bannerTextoX: Math.round(bannerX), bannerTextoY: Math.round(bannerY), bannerOcultarTitulo: ocultarTitulo, bannerOcultarMensagem: ocultarMensagem } : {}), agendaInicio: agendaIni ? new Date(agendaIni).toISOString() : '', agendaFim: agendaFim ? new Date(agendaFim).toISOString() : '', ...(uiTipo === 'popup' ? { freq } : {}) }, tenantId)
       if (r.ok) { toast.success('Banner atualizado.'); router.refresh(); onClose() }
       else toast.error(r.error ?? 'Falha ao salvar.')
     })
@@ -140,6 +142,9 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
     destaqueAtivo, destaqueTexto: destaqueTexto || null,
     fadeAtivo, fadeNivel,
   }
+
+  // Objeto do banner (imagem/destaque) p/ a prévia — mesmo componente do portal (ImgSlide).
+  const previewBannerB = { id: banner.id, tipo: 'banner' as const, titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, link: null, cor, textoPos: bannerPos, textoCor: bannerCor, textoTam: bannerTam, textoX: bannerX, textoY: bannerY, ocultarTitulo, ocultarMensagem }
 
   if (typeof document === 'undefined') return null
   return createPortal(
@@ -322,14 +327,27 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Texto sobre a imagem</p>
                   <div className="flex items-start gap-5">
                     <div>
-                      <span className="mb-1 block text-[11px] text-muted-foreground">Posição</span>
+                      <span className="mb-1 block text-[11px] text-muted-foreground">Posição (atalhos)</span>
                       <div className="grid w-fit grid-cols-3 gap-1">
-                        {BANNER_POSICOES.map((p) => (
-                          <button key={p} type="button" onClick={() => setBannerPos(p)} title={p}
-                            className={cn('flex h-6 w-6 items-center justify-center rounded border transition', bannerPos === p ? 'border-primary bg-primary/10' : 'hover:bg-muted')}>
-                            <span className={cn('h-2 w-2 rounded-full', bannerPos === p ? 'bg-primary' : 'bg-muted-foreground/40')} />
-                          </button>
-                        ))}
+                        {BANNER_POSICOES.map((p) => {
+                          const xy = posParaXY(p); const on = Math.round(bannerX) === xy.x && Math.round(bannerY) === xy.y
+                          return (
+                            <button key={p} type="button" onClick={() => { setBannerPos(p); setBannerX(xy.x); setBannerY(xy.y) }} title={p}
+                              className={cn('flex h-6 w-6 items-center justify-center rounded border transition', on ? 'border-primary bg-primary/10' : 'hover:bg-muted')}>
+                              <span className={cn('h-2 w-2 rounded-full', on ? 'bg-primary' : 'bg-muted-foreground/40')} />
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div className="mt-2 w-40 space-y-1.5">
+                        <label className="flex items-center gap-2 text-[11px] text-muted-foreground"><span className="w-9 shrink-0">Horiz.</span>
+                          <input type="range" min={0} max={100} value={Math.round(bannerX)} onChange={(e) => setBannerX(Number(e.target.value))} className="h-1.5 flex-1 cursor-pointer accent-primary" />
+                          <span className="w-8 shrink-0 text-right tabular-nums">{Math.round(bannerX)}%</span>
+                        </label>
+                        <label className="flex items-center gap-2 text-[11px] text-muted-foreground"><span className="w-9 shrink-0">Vert.</span>
+                          <input type="range" min={0} max={100} value={Math.round(bannerY)} onChange={(e) => setBannerY(Number(e.target.value))} className="h-1.5 flex-1 cursor-pointer accent-primary" />
+                          <span className="w-8 shrink-0 text-right tabular-nums">{Math.round(bannerY)}%</span>
+                        </label>
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -363,7 +381,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
           <div className={cn('scroll-claro overflow-y-auto bg-muted/30 p-5', uiTipo === 'popup' ? 'min-h-0 border-t md:border-l md:border-t-0' : 'order-1 shrink-0 border-b')}>
             <div className="mb-3 flex items-center justify-between">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prévia</p>
-              {uiTipo === 'popup' && (
+              {(uiTipo === 'popup' || ehBanner) && (
                 <button type="button" onClick={() => setExpandido(true)}
                   className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground">
                   <Maximize2 className="h-3.5 w-3.5" /> Expandir (tamanho real)
@@ -380,10 +398,12 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
               </div>
             ) : (
               <div ref={previewRef} className="relative aspect-[1920/500] w-full overflow-hidden rounded-lg border">
+                {/* Prévia proporcional: renderiza no tamanho real (STAGE 1600px) e escala — o
+                    tamanho do texto fica coerente com o banner real na home do aluno. */}
                 {uiTipo === 'simulado'
                   ? <div className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${previewScale})` }}><SimSlide s={previewSlide} stats={previewSlide.stats} /></div>
                   : imagem
-                    ? <ImgSlide b={{ id: banner.id, tipo: 'banner', titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, link: null, cor, textoPos: bannerPos, textoCor: bannerCor, textoTam: bannerTam, ocultarTitulo, ocultarMensagem }} preview />
+                    ? <div className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${previewScale})` }}><ImgSlide b={previewBannerB} preview /></div>
                     : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
               </div>
             )}
@@ -400,10 +420,19 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
       </div>
     </div>
 
-    {/* Expandir: pop-up em TAMANHO REAL, igual ao que o aluno vê (overlay do aluno). */}
+    {/* Expandir: pop-up ou banner em TAMANHO REAL, como o aluno vê. */}
     {expandido && (
-      <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setExpandido(false)}>
-        <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null, estilo, pontas }} preview onFechar={() => setExpandido(false)} />
+      <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setExpandido(false)}>
+        {uiTipo === 'popup' ? (
+          <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null, estilo, pontas }} preview onFechar={() => setExpandido(false)} />
+        ) : (
+          <div className="relative w-full max-w-6xl animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="relative aspect-[1920/500] w-full overflow-hidden rounded-2xl border shadow-2xl">
+              <ImgSlide b={previewBannerB} preview />
+            </div>
+            <button type="button" onClick={() => setExpandido(false)} aria-label="Fechar" className="absolute -right-3 -top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-white ring-2 ring-white/30 backdrop-blur transition hover:bg-black/90"><X className="h-4 w-4" /></button>
+          </div>
+        )}
       </div>
     )}
     </>,
