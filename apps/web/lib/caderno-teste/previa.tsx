@@ -475,7 +475,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
       // idêntico à renderização. Assim nada é empurrado com espaço sobrando nem cortado.
       const tops = kids.map((el) => el.getBoundingClientRect().top)
       const hs = kids.map((el, i) => (i < kids.length - 1 ? tops[i + 1] : el.getBoundingClientRect().bottom) - tops[i])
-      const BUF = 18 // folga p/ sub-pixel/diferenças de render — evita card cortado/sliver colorido no fim da folha
+      const BUF = 26 // folga p/ sub-pixel/diferenças de render — evita card cortado/sliver colorido no fim da folha
       const pages: number[][] = []; let cur: number[] = []; let h = 0
       for (let i = 0; i < hs.length; i++) {
         if (blocos[i]?.juntar) {
@@ -506,9 +506,10 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
-      {/* passe de medição (escondido) — MESMO contexto tipográfico da folha (fonte/cor), senão o
-          texto quebra diferente e as alturas não batem (bloco "cabe" na conta mas é cortado). */}
-      <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: contentW, fontFamily: 'Inter, system-ui, sans-serif', color: '#1a202c' }}>
+      {/* passe de medição (escondido) — ESPELHA a caixa de conteúdo da folha: mesma largura A4 +
+          padding + border-box + fonte/cor. Assim o texto quebra no MESMO nº de linhas e as alturas
+          batem (senão um bloco "cabe" na conta mas renderiza mais alto e é cortado). */}
+      <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: A4_W, padding: `8px ${pad}px`, boxSizing: 'border-box', fontFamily: 'Inter, system-ui, sans-serif', color: '#1a202c' }}>
         {blocos.map((b, i) => <div key={i} style={{ marginTop: i === 0 ? 0 : (b.juntar ? 0 : GAP) }}>{b.node}</div>)}
       </div>
       {temCapa && <Folha item={item} num={1} total={total} pad={pad} Ht={Ht} Hf={Hf} ehCapa capaCfg={item.capa ?? CAPA_PADRAO} onPickCapa={onPickCapa} selCapa={selCapa} />}
