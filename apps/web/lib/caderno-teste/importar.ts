@@ -1,6 +1,48 @@
 import 'server-only'
+import zlib from 'node:zlib'
 import { parse, type HTMLElement } from 'node-html-parser'
 import { DIAG_PADRAO, slugDiag, type DiagConteudo, type DiagPilar, type DiagDisciplina, type DiagSugestao } from './diagnostico'
+
+// ===== Recuperação de CAIXAS DE TEXTO do .docx (o mammoth ignora text boxes/shapes) =====
+/** Descompacta 1 entrada de um zip (.docx) sem dependência externa. */
+function unzipEntry(buf: Buffer, nome: string): string | null {
+  try {
+    let eocd = -1
+    for (let i = buf.length - 22; i >= 0 && i > buf.length - 22 - 65536; i--) { if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break } }
+    if (eocd < 0) return null
+    const count = buf.readUInt16LE(eocd + 10)
+    let p = buf.readUInt32LE(eocd + 16)
+    for (let n = 0; n < count; n++) {
+      if (buf.readUInt32LE(p) !== 0x02014b50) break
+      const method = buf.readUInt16LE(p + 10)
+      const compSize = buf.readUInt32LE(p + 20)
+      const fnLen = buf.readUInt16LE(p + 28), exLen = buf.readUInt16LE(p + 30), cmLen = buf.readUInt16LE(p + 32)
+      const lho = buf.readUInt32LE(p + 42)
+      const fname = buf.toString('utf8', p + 46, p + 46 + fnLen)
+      if (fname === nome) {
+        const lfn = buf.readUInt16LE(lho + 26), lex = buf.readUInt16LE(lho + 28)
+        const data = buf.subarray(lho + 30 + lfn + lex, lho + 30 + lfn + lex + compSize)
+        return method === 0 ? data.toString('utf8') : zlib.inflateRawSync(data).toString('utf8')
+      }
+      p += 46 + fnLen + exLen + cmLen
+    }
+  } catch { /* zip inesperado */ }
+  return null
+}
+const decodeXml = (s: string) => s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#(\d+);/g, (_, d) => String.fromCharCode(+d)).replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+
+/** Extrai os parágrafos que estão DENTRO de caixas de texto/shapes (<w:txbxContent>) do document.xml. */
+export function caixasDeTextoDocx(buf: Buffer): string[] {
+  const xml = unzipEntry(buf, 'word/document.xml'); if (!xml) return []
+  const out: string[] = []
+  for (const tb of xml.matchAll(/<w:txbxContent[\s\S]*?<\/w:txbxContent>/g)) {
+    for (const pm of tb[0].matchAll(/<w:p[\s>][\s\S]*?<\/w:p>/g)) {
+      const t = lim(decodeXml((pm[0].match(/<w:t[^>]*>[\s\S]*?<\/w:t>/g) ?? []).join('')))
+      if (t) out.push(t)
+    }
+  }
+  return out
+}
 
 /**
  * Mapeia um Diagnóstico (Word→HTML, HTML ou PDF) para a estrutura DiagConteudo. HEURÍSTICO e ADAPTATIVO:
@@ -202,7 +244,7 @@ export async function pdfParaHtml(buffer: Buffer): Promise<string> {
   return linhas.map((l) => `<p>${l.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`).join('')
 }
 
-export function htmlParaDiagnostico(html: string): { conteudo: DiagConteudo; avisos: string[] } {
+export function htmlParaDiagnostico(html: string, caixas: string[] = []): { conteudo: DiagConteudo; avisos: string[] } {
   const linhas = extrairLinhas(html)
   const avisos: string[] = []
   const conteudo: DiagConteudo = structuredClone(DIAG_PADRAO)
@@ -266,6 +308,25 @@ export function htmlParaDiagnostico(html: string): { conteudo: DiagConteudo; avi
     const p = parsePilares(linhas.slice(iPilar + 1, fim))
     if (p.length) conteudo.pilares = p; else avisos.push('Não reconheci os pilares — usando o padrão.')
   } else avisos.push('Seção “desempenho por pilar” não encontrada.')
+
+  // Bandas vazias? Recupera os textos que estavam em CAIXAS DE TEXTO do .docx (mammoth ignora),
+  // atribuindo-os por ordem (3 por pilar) + faixa detectada na abertura.
+  const semBanda = (conteudo.pilares ?? []).filter((pl) => (pl.bandas ?? []).every((b) => !b.texto?.trim()))
+  const textosCaixa = caixas.filter((t) => t.length > 40)
+  if (semBanda.length && textosCaixa.length) {
+    semBanda.forEach((pl, gi) => {
+      const grupo = textosCaixa.slice(gi * 3, gi * 3 + 3)
+      if (!grupo.length) return
+      const usados = new Set<number>()
+      pl.bandas = ['0-49', '50-80', '81-100'].map((f, k) => {
+        let idx = grupo.findIndex((t, ti) => !usados.has(ti) && faixaNaAbertura(t) === f)
+        if (idx < 0) idx = grupo.findIndex((_, ti) => !usados.has(ti)) // sobra por posição
+        if (idx >= 0) usados.add(idx)
+        return { faixa: f, texto: idx >= 0 ? grupo[idx] : '' }
+      })
+    })
+    avisos.push('Recuperei textos de bandas que estavam em caixas de texto do Word.')
+  }
 
   if (iDisc >= 0) {
     const regDisc = linhas.slice(iDisc + 1, iSug >= 0 ? iSug : (iGab >= 0 ? iGab : undefined))

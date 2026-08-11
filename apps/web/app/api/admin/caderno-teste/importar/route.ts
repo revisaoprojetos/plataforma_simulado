@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
-import { htmlParaDiagnostico, pdfParaHtml } from '@/lib/caderno-teste/importar'
+import { htmlParaDiagnostico, pdfParaHtml, caixasDeTextoDocx } from '@/lib/caderno-teste/importar'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
 
   let html = ''
   let ehPdf = false
+  let caixas: string[] = [] // textos em caixas de texto do .docx (mammoth ignora)
   const avisosFonte: string[] = []
   try {
     if (nome.endsWith('.docx') || (buf[0] === 0x50 && buf[1] === 0x4b && !nome.endsWith('.pdf'))) {
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
       // styleMap preserva sublinhado/tachado; negrito/itálico/headings já são convertidos por padrão.
       const res = await (mammoth as any).convertToHtml({ buffer: buf }, { styleMap: ['u => u', 'strike => s', "p[style-name='Heading 1'] => h1", "p[style-name='Heading 2'] => h2", "p[style-name='Heading 3'] => h3", "p[style-name='Título 1'] => h1", "p[style-name='Título 2'] => h2"] })
       html = res.value
+      try { caixas = caixasDeTextoDocx(buf) } catch { /* sem caixas */ }
       const erros = ((res.messages ?? []) as any[]).filter((m) => m?.type === 'error').map((m) => String(m.message))
       if (erros.length) avisosFonte.push(`Word: ${erros.slice(0, 3).join('; ')}`)
     } else if (nome.endsWith('.pdf') || buf.subarray(0, 4).toString('latin1') === '%PDF') {
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest) {
   const mCfg = html.match(/CTV3:([A-Za-z0-9+/=]{16,})/)
   if (mCfg) { try { embutido = JSON.parse(Buffer.from(mCfg[1], 'base64').toString('utf8')) } catch { /* ignora */ } html = html.replace(mCfg[0], '') }
 
-  const { conteudo, avisos } = htmlParaDiagnostico(html)
+  const { conteudo, avisos } = htmlParaDiagnostico(html, caixas)
   avisos.unshift(...avisosFonte)
   if (ehPdf) avisos.unshift('Importado de PDF (aproximado) — os pilares em colunas podem embaralhar. Para fidelidade, use Word/HTML.')
   const resp: Record<string, unknown> = { ok: true, modalidade: 'diagnostico', conteudo, avisos }
