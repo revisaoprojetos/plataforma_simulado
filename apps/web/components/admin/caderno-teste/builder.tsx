@@ -465,7 +465,9 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             </div>
           )}
           {builder.bancoId ? (
-            <div className="mx-auto" style={{ zoom } as any}>
+            // key por grupo+modalidade+modelo: força REMOUNT ao trocar de modelo/grupo,
+            // evitando nós velhos (header do modelo anterior) presos por ids determinísticos.
+            <div key={`${ativo.id}:${ativo.modalidade}:${ativo.modelo}`} className="mx-auto" style={{ zoom } as any}>
               {presetAtivo ? (
                 <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} folhaUrl={a.folhaUrl}
                   capa={ativo.capa} onPickCapa={() => { setPickerCapa(true); setPickerCor(null); setPickerBloco(null) }} selCapa={pickerCapa}
