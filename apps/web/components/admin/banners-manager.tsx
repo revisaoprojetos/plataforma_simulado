@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus, Loader2, Trash2, Eye, EyeOff, Megaphone, MessageSquareWarning, ImageIcon, Upload, X, Crop, Settings, Clapperboard, GripVertical } from 'lucide-react'
@@ -55,6 +56,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
     })
   }
   const [alvo, setAlvo] = useState<string | null>(null)
+  const [criando, setCriando] = useState(false)
   const [uiTipo, setUiTipo] = useState<'banner' | 'popup' | 'hero' | 'simulado'>('banner')
   const tipo: 'banner' | 'popup' | 'hero' = uiTipo === 'simulado' ? 'hero' : uiTipo
   const [titulo, setTitulo] = useState('')
@@ -72,6 +74,13 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
   const [editando, setEditando] = useState<Banner | null>(null)
   const [lista, setLista] = useState<Banner[]>(banners)
   useEffect(() => { setLista(banners) }, [banners])
+  // Fecha o modal de criação no Esc.
+  useEffect(() => {
+    if (!criando) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCriando(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [criando])
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [overIdx, setOverIdx] = useState<number | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -139,7 +148,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
       const r = await criarBannerAction({ tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo: true, destaqueAtivo: destaqueAtivoN, destaqueTexto: destaqueTextoN, fadeAtivo: fadeAtivoN, fadeNivel: fadeNivelN }, tenantId)
       setAlvo(null)
       if (!r.ok) { toast.error(r.error ?? 'Falha ao criar.'); return }
-      toast.success('Criado!'); setTitulo(''); setMensagem(''); setImagem(''); setLink(''); setDestaqueTextoN(''); setDestaqueAtivoN(true); setFadeAtivoN(true); setFadeNivelN(100)
+      toast.success('Criado!'); setTitulo(''); setMensagem(''); setImagem(''); setLink(''); setDestaqueTextoN(''); setDestaqueAtivoN(true); setFadeAtivoN(true); setFadeNivelN(100); setCriando(false)
       router.refresh()
     })
   }
@@ -178,10 +187,15 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
         ))}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,360px)_1fr]">
-      {/* Form de criação */}
-      <form onSubmit={criar} className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
-        <h2 className="flex items-center gap-2 text-sm font-semibold"><tabAtual.Icon className="h-4 w-4 text-primary" /> Novo {tabAtual.label.toLowerCase()}</h2>
+      {/* Modal de criação (abre pelo botão "Adicionar") */}
+      {criando && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setCriando(false)}>
+          <div className="flex max-h-[90vh] w-full max-w-md animate-in fade-in zoom-in-95 flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl duration-200" onClick={(e) => e.stopPropagation()}>
+            <header className="flex shrink-0 items-center justify-between border-b px-5 py-3.5">
+              <span className="flex items-center gap-2 text-sm font-semibold"><tabAtual.Icon className="h-4 w-4 text-primary" /> Novo {tabAtual.label.toLowerCase()}</span>
+              <button type="button" onClick={() => setCriando(false)} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+            </header>
+            <form onSubmit={criar} className="scroll-claro min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
         {aba === 'banner' && (
           <div className="grid grid-cols-2 gap-2">
             {([
@@ -308,13 +322,20 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
         <Button type="submit" disabled={pending && alvo === 'novo'} className="w-full">
           {pending && alvo === 'novo' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />} Adicionar
         </Button>
-      </form>
+            </form>
+          </div>
+        </div>,
+        document.body,
+      )}
 
-      {/* Lista (filtrada pela aba) */}
+      {/* Lista (filtrada pela aba) — largura total */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">{tabAtual.label} ({visiveis.length})</h2>
-          {visiveis.length > 1 && <span className="text-[11px] text-muted-foreground">Arraste pelos ⠿ para ordenar</span>}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-semibold">{tabAtual.label} ({visiveis.length})</h2>
+            {visiveis.length > 1 && <span className="text-[11px] text-muted-foreground">Arraste pelos ⠿ para ordenar</span>}
+          </div>
+          <Button size="sm" onClick={() => setCriando(true)}><Plus className="mr-1.5 h-4 w-4" /> Adicionar {tabAtual.label.toLowerCase()}</Button>
         </div>
         {visiveis.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">{tabAtual.vazio}</div>
@@ -363,7 +384,6 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
           </div>
           )
         })}
-      </div>
       </div>
 
       {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} destaqueAtivoInicial={destaques[editando.id]?.ativo !== false} destaqueTextoInicial={destaques[editando.id]?.texto ?? ''} fadeAtivoInicial={destaques[editando.id]?.fadeAtivo !== false} fadeNivelInicial={destaques[editando.id]?.fadeNivel ?? 100} popupEstiloInicial={destaques[editando.id]?.popupEstilo ?? 'classico'} popupPontasInicial={destaques[editando.id]?.popupPontas ?? 'arredondado'} onClose={() => setEditando(null)} />}
