@@ -25,6 +25,13 @@ export type Banner = {
 
 const TIPO_LABEL: Record<string, string> = { banner: 'banner', popup: 'pop-up', hero: 'destaque' }
 
+const TABS = [
+  { t: 'banner', label: 'Banner', Icon: Megaphone, vazio: 'Nenhum banner (faixa no topo) ainda.' },
+  { t: 'popup', label: 'Pop-up', Icon: MessageSquareWarning, vazio: 'Nenhum pop-up ainda.' },
+  { t: 'hero', label: 'Destaque', Icon: ImageIcon, vazio: 'Nenhum banner de destaque ainda.' },
+  { t: 'simulado', label: 'Simulado', Icon: Clapperboard, vazio: 'Nenhum banner de simulado ainda.' },
+] as const
+
 /** Um banner de destaque que aponta para um simulado (/simulado/token) OU uma pasta de simulados
  *  (…?pasta=id) usa o FUNDO do simulado/pasta e ganha CTA na home do aluno (com contagem, no caso de pasta). */
 export const ehBannerSimulado = (b: { tipo: string; link: string | null }) => b.tipo === 'hero' && !!b.link && (b.link.startsWith('/simulado/') || /[?&]pasta=/.test(b.link))
@@ -81,11 +88,14 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
   }
   function soltarEm(destino: number) {
     if (dragIdx === null || dragIdx === destino) { setDragIdx(null); setOverIdx(null); return }
-    const nova = [...lista]
-    const [it] = nova.splice(dragIdx, 1)
-    nova.splice(destino, 0, it)
+    // dragIdx/destino são índices na lista VISÍVEL (da aba). Reordena só a aba e recompõe a lista completa.
+    const novaAba = [...visiveis]
+    const [it] = novaAba.splice(dragIdx, 1)
+    novaAba.splice(destino, 0, it)
     setDragIdx(null); setOverIdx(null)
-    persistirOrdem(nova)
+    let k = 0
+    const full = lista.map((b) => (pertenceAoTab(b) ? novaAba[k++] : b))
+    persistirOrdem(full)
   }
 
   async function onArquivo(f: File | null) {
@@ -108,6 +118,13 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
   const simulados = (destinos ?? []).filter((d) => (d.grupo ?? 'Simulados') === 'Simulados')
   const pastasDest = (destinos ?? []).filter((d) => d.grupo === 'Pastas')
   const destSim = [...pastasDest, ...simulados] // opções da aba "Simulado": pasta (com contagem) ou simulado
+
+  // Cada aba = um tipo de aviso. "Destaque" = hero sem link de simulado; "Simulado" = hero com link.
+  const pertenceAoTab = (b: Banner, t: 'banner' | 'popup' | 'hero' | 'simulado' = uiTipo) =>
+    t === 'simulado' ? ehBannerSimulado(b) : t === 'hero' ? (b.tipo === 'hero' && !ehBannerSimulado(b)) : b.tipo === t
+  const contaTab = (t: 'banner' | 'popup' | 'hero' | 'simulado') => lista.filter((b) => pertenceAoTab(b, t)).length
+  const visiveis = lista.filter((b) => pertenceAoTab(b))
+  const tabAtual = TABS.find((x) => x.t === uiTipo)!
 
   function criar(e: React.FormEvent) {
     e.preventDefault()
@@ -145,23 +162,22 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,360px)_1fr]">
+    <div className="space-y-5">
+      {/* Abas por tipo de aviso */}
+      <div className="flex flex-wrap gap-1.5 rounded-2xl border bg-card p-1.5 shadow-sm">
+        {TABS.map(({ t, label, Icon }) => (
+          <button key={t} type="button" onClick={() => setUiTipo(t)}
+            className={cn('flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition', uiTipo === t ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted')}>
+            <Icon className="h-4 w-4" /> {label}
+            <span className={cn('ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums', uiTipo === t ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted-foreground/15 text-muted-foreground')}>{contaTab(t)}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,360px)_1fr]">
       {/* Form de criação */}
       <form onSubmit={criar} className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
-        <h2 className="text-sm font-semibold">Novo aviso</h2>
-        <div className="grid grid-cols-4 gap-2">
-          {([
-            { t: 'banner', label: 'Banner', Icon: Megaphone },
-            { t: 'popup', label: 'Pop-up', Icon: MessageSquareWarning },
-            { t: 'hero', label: 'Destaque', Icon: ImageIcon },
-            { t: 'simulado', label: 'Simulado', Icon: Clapperboard },
-          ] as const).map(({ t, label, Icon }) => (
-            <button key={t} type="button" onClick={() => setUiTipo(t)}
-              className={cn('flex flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-[11px] font-medium transition', uiTipo === t ? 'border-primary bg-primary/5 text-primary' : 'hover:bg-muted')}>
-              <Icon className="h-4 w-4" /> {label}
-            </button>
-          ))}
-        </div>
+        <h2 className="flex items-center gap-2 text-sm font-semibold"><tabAtual.Icon className="h-4 w-4 text-primary" /> Novo {tabAtual.label.toLowerCase()}</h2>
         {uiTipo === 'hero' && <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">Banner de <strong>destaque</strong> aparece no topo da home do aluno, em carrossel. Use uma <strong>imagem larga</strong> (ex.: 1920×600). O link é opcional. A ordem segue a criação.</p>}
         {uiTipo === 'simulado' && (
           <div className="space-y-1.5 rounded-lg bg-muted/50 px-3 py-2.5">
@@ -270,16 +286,16 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
         </Button>
       </form>
 
-      {/* Lista */}
+      {/* Lista (filtrada pela aba) */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Avisos ({lista.length})</h2>
-          {lista.length > 1 && <span className="text-[11px] text-muted-foreground">Arraste pelos ⠿ para ordenar</span>}
+          <h2 className="text-sm font-semibold">{tabAtual.label} ({visiveis.length})</h2>
+          {visiveis.length > 1 && <span className="text-[11px] text-muted-foreground">Arraste pelos ⠿ para ordenar</span>}
         </div>
-        {lista.length === 0 ? (
-          <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Nenhum banner ou pop-up ainda.</div>
-        ) : lista.map((b, idx) => {
-          const primeiro = idx === 0, ultimo = idx === lista.length - 1
+        {visiveis.length === 0 ? (
+          <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">{tabAtual.vazio}</div>
+        ) : visiveis.map((b, idx) => {
+          const primeiro = idx === 0, ultimo = idx === visiveis.length - 1
           return (
           <div key={b.id} draggable
             onDragStart={() => setDragIdx(idx)}
@@ -303,8 +319,8 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
               <p className="flex items-center gap-2 truncate text-sm font-medium">
                 {b.titulo || '(sem título)'}
                 <span className="rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">{ehBannerSimulado(b) ? 'simulado' : (TIPO_LABEL[b.tipo] ?? b.tipo)}</span>
-                {primeiro && lista.length > 1 && <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">1º · primeiro</span>}
-                {ultimo && lista.length > 1 && <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">último</span>}
+                {primeiro && visiveis.length > 1 && <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">1º · primeiro</span>}
+                {ultimo && visiveis.length > 1 && <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">último</span>}
               </p>
               <p className="truncate text-xs text-muted-foreground">{b.mensagem || b.link || '—'}</p>
             </div>
@@ -323,6 +339,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
           </div>
           )
         })}
+      </div>
       </div>
 
       {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} destaqueAtivoInicial={destaques[editando.id]?.ativo !== false} destaqueTextoInicial={destaques[editando.id]?.texto ?? ''} fadeAtivoInicial={destaques[editando.id]?.fadeAtivo !== false} fadeNivelInicial={destaques[editando.id]?.fadeNivel ?? 100} onClose={() => setEditando(null)} />}
