@@ -12,7 +12,7 @@ import { redimensionarImagem } from '@/lib/imagem'
 import { BannerCropper } from '@/components/admin/banner-cropper'
 import { atualizarBannerAction } from '@/app/admin/configuracoes/banners/actions'
 import { ehBannerSimulado, type Banner, type DestinoBanner } from '@/components/admin/banners-manager'
-import { SimSlide, PopupCard, ImgSlide, POPUP_ESTILOS, BANNER_POSICOES, type HeroSimSlide, type PopupEstilo, type PopupPontas, type BannerTextoPos, type BannerTextoCor } from '@/components/aluno/banners-portal'
+import { SimSlide, PopupCard, ImgSlide, POPUP_ESTILOS, BANNER_POSICOES, type HeroSimSlide, type PopupEstilo, type PopupPontas, type BannerTextoPos, type BannerTextoCor, type BannerTextoTam } from '@/components/aluno/banners-portal'
 
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f) })
@@ -20,7 +20,7 @@ function fileToDataUrl(f: File): Promise<string> {
 
 /** Pop-up de configuração TOTAL de um banner já criado (tipo, título, mensagem, imagem+recorte,
  *  link/destino, cor, ativo). Salva via atualizarBannerAction. */
-export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', bannerTextoPosInicial = 'center', bannerTextoCorInicial = 'claro', onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; bannerTextoPosInicial?: BannerTextoPos; bannerTextoCorInicial?: BannerTextoCor; onClose: () => void }) {
+export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', bannerTextoPosInicial = 'center', bannerTextoCorInicial = 'claro', bannerTextoTamInicial = 'medio', onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; bannerTextoPosInicial?: BannerTextoPos; bannerTextoCorInicial?: BannerTextoCor; bannerTextoTamInicial?: BannerTextoTam; onClose: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   // Modo da UI: "simulado" é um destaque (hero) que aponta p/ um simulado/pasta. Detecta pelo banner.
@@ -43,6 +43,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
   const [pontas, setPontas] = useState<PopupPontas>(popupPontasInicial)
   const [bannerPos, setBannerPos] = useState<BannerTextoPos>(bannerTextoPosInicial)
   const [bannerCor, setBannerCor] = useState<BannerTextoCor>(bannerTextoCorInicial)
+  const [bannerTam, setBannerTam] = useState<BannerTextoTam>(bannerTextoTamInicial)
   const [enviando, setEnviando] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropOpen, setCropOpen] = useState(false)
@@ -64,7 +65,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
 
   function salvar() {
     start(async () => {
-      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel, ...(uiTipo === 'popup' ? { popupEstilo: estilo, popupPontas: pontas } : {}), ...(uiTipo === 'banner' || uiTipo === 'hero' ? { bannerTextoPos: bannerPos, bannerTextoCor: bannerCor } : {}) }, tenantId)
+      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel, ...(uiTipo === 'popup' ? { popupEstilo: estilo, popupPontas: pontas } : {}), ...(uiTipo === 'banner' || uiTipo === 'hero' ? { bannerTextoPos: bannerPos, bannerTextoCor: bannerCor, bannerTextoTam: bannerTam } : {}) }, tenantId)
       if (r.ok) { toast.success('Banner atualizado.'); router.refresh(); onClose() }
       else toast.error(r.error ?? 'Falha ao salvar.')
     })
@@ -257,13 +258,24 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                         ))}
                       </div>
                     </div>
-                    <div>
-                      <span className="mb-1 block text-[11px] text-muted-foreground">Cor do texto</span>
-                      <div className="flex gap-1.5">
-                        {([['claro', 'Claro'], ['escuro', 'Escuro']] as const).map(([v, l]) => (
-                          <button key={v} type="button" onClick={() => setBannerCor(v)}
-                            className={cn('rounded-md border px-2.5 py-1 text-[11px] font-medium transition', bannerCor === v ? 'border-primary bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-muted')}>{l}</button>
-                        ))}
+                    <div className="space-y-2">
+                      <div>
+                        <span className="mb-1 block text-[11px] text-muted-foreground">Cor do texto</span>
+                        <div className="flex gap-1.5">
+                          {([['claro', 'Claro'], ['escuro', 'Escuro']] as const).map(([v, l]) => (
+                            <button key={v} type="button" onClick={() => setBannerCor(v)}
+                              className={cn('rounded-md border px-2.5 py-1 text-[11px] font-medium transition', bannerCor === v ? 'border-primary bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-muted')}>{l}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="mb-1 block text-[11px] text-muted-foreground">Tamanho</span>
+                        <div className="flex gap-1.5">
+                          {([['pequeno', 'P'], ['medio', 'M'], ['grande', 'G']] as const).map(([v, l]) => (
+                            <button key={v} type="button" onClick={() => setBannerTam(v)} title={v}
+                              className={cn('rounded-md border px-2.5 py-1 text-[11px] font-medium transition', bannerTam === v ? 'border-primary bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-muted')}>{l}</button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -287,7 +299,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                 {uiTipo === 'simulado'
                   ? <div className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${previewScale})` }}><SimSlide s={previewSlide} stats={previewSlide.stats} /></div>
                   : imagem
-                    ? <ImgSlide b={{ id: banner.id, tipo: 'banner', titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, link: null, cor, textoPos: bannerPos, textoCor: bannerCor }} preview />
+                    ? <ImgSlide b={{ id: banner.id, tipo: 'banner', titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, link: null, cor, textoPos: bannerPos, textoCor: bannerCor, textoTam: bannerTam }} preview />
                     : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
               </div>
             )}

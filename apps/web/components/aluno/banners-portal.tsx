@@ -20,6 +20,14 @@ export type BannerTextoPos =
   | 'center-left' | 'center' | 'center-right'
   | 'bottom-left' | 'bottom-center' | 'bottom-right'
 export type BannerTextoCor = 'claro' | 'escuro'
+export type BannerTextoTam = 'pequeno' | 'medio' | 'grande'
+
+/** Classes de fonte do texto do banner por tamanho (título | mensagem). */
+const BANNER_TAM: Record<BannerTextoTam, { t: string; m: string }> = {
+  pequeno: { t: 'text-lg sm:text-2xl', m: 'text-xs sm:text-sm' },
+  medio: { t: 'text-2xl sm:text-4xl', m: 'text-sm sm:text-base' },
+  grande: { t: 'text-3xl sm:text-5xl', m: 'text-base sm:text-lg' },
+}
 
 /** As 9 âncoras de posição do texto sobre o banner (grade 3×3). */
 export const BANNER_POSICOES: BannerTextoPos[] = [
@@ -32,7 +40,7 @@ export type BannerPortal = {
   id: string; tipo: 'banner' | 'popup' | 'hero'; titulo: string | null; mensagem: string | null
   imagem_url: string | null; link: string | null; cor: string | null; ordem?: number
   estilo?: PopupEstilo | null; pontas?: PopupPontas | null // só p/ pop-up
-  textoPos?: BannerTextoPos | null; textoCor?: BannerTextoCor | null // texto sobre o banner (banner/destaque)
+  textoPos?: BannerTextoPos | null; textoCor?: BannerTextoCor | null; textoTam?: BannerTextoTam | null // texto sobre o banner (banner/destaque)
 }
 
 /** Classes/estilo de alinhamento do texto sobre o banner, pela âncora escolhida. */
@@ -183,6 +191,7 @@ export function ImgSlide({ b, preview }: { b: BannerPortal; preview?: boolean })
   const temTexto = !!(b.titulo || b.mensagem)
   const claro = (b.textoCor ?? 'claro') === 'claro'
   const al = alinhamentoBanner(b.textoPos ?? 'center')
+  const tam = BANNER_TAM[b.textoTam ?? 'medio']
   const conteudo = b.imagem_url ? (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -191,8 +200,8 @@ export function ImgSlide({ b, preview }: { b: BannerPortal; preview?: boolean })
         <div className={cn('absolute inset-0 flex p-6 sm:p-10', al.items, al.justify)}>
           {claro && <div className="pointer-events-none absolute inset-0" style={{ background: al.scrim }} />}
           <div className={cn('relative max-w-2xl', al.text)}>
-            {b.titulo && <p className={cn('text-2xl font-extrabold leading-tight tracking-tight sm:text-4xl', claro ? 'text-white [text-shadow:0_2px_12px_rgba(0,0,0,.75)]' : 'text-slate-900')}>{b.titulo}</p>}
-            {b.mensagem && <p className={cn('mt-1.5 whitespace-pre-wrap text-sm sm:text-base', claro ? 'text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,.7)]' : 'text-slate-800')}>{b.mensagem}</p>}
+            {b.titulo && <p className={cn(tam.t, 'font-extrabold leading-tight tracking-tight', claro ? 'text-white [text-shadow:0_2px_12px_rgba(0,0,0,.75)]' : 'text-slate-900')}>{b.titulo}</p>}
+            {b.mensagem && <p className={cn('mt-1.5 whitespace-pre-wrap', tam.m, claro ? 'text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,.7)]' : 'text-slate-800')}>{b.mensagem}</p>}
           </div>
         </div>
       )}
