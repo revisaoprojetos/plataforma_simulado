@@ -84,6 +84,18 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [overIdx, setOverIdx] = useState<number | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  // Prévia do pop-up na criação: mede a caixa e aplica zoom (mantém proporção real).
+  const popupPrevRef = useRef<HTMLDivElement>(null)
+  const [popupPrevW, setPopupPrevW] = useState(360)
+  useEffect(() => {
+    const el = popupPrevRef.current
+    if (!el) return
+    const upd = () => setPopupPrevW(el.clientWidth)
+    upd()
+    const ro = new ResizeObserver(upd)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [uiTipo])
 
   function persistirOrdem(nova: Banner[]) {
     setLista(nova) // otimista
@@ -264,7 +276,11 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
         {uiTipo === 'popup' && (
           <div className="rounded-xl border bg-neutral-200/60 p-3 dark:bg-neutral-900/50">
             <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Prévia ao vivo</p>
-            <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null }} preview />
+            <div ref={popupPrevRef}>
+              <div className="mx-auto" style={{ width: 430, zoom: Math.min(1, popupPrevW / 430) } as React.CSSProperties}>
+                <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null }} preview />
+              </div>
+            </div>
             <p className="mt-2 text-[11px] text-muted-foreground">Os <strong>estilos</strong> (sobre a imagem, compacto, pontas…) você ajusta depois em <strong>Configurar</strong> ⚙️.</p>
           </div>
         )}

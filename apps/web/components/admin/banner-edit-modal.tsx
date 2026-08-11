@@ -102,6 +102,22 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
     return () => ro.disconnect()
   }, [])
 
+  // Prévia REAL do pop-up: renderiza o MESMO card no tamanho natural do estilo e aplica `zoom`
+  // para caber na caixa sem cortar (largura de cada estilo ≈ a largura real na tela do aluno).
+  const stagePopup = estilo === 'faixa' ? 1000 : estilo === 'lado' ? 680 : estilo === 'cartaz' ? 520 : 430
+  const popupRef = useRef<HTMLDivElement>(null)
+  const [popupW, setPopupW] = useState(400)
+  useEffect(() => {
+    const el = popupRef.current
+    if (!el) return
+    const upd = () => setPopupW(el.clientWidth)
+    upd()
+    const ro = new ResizeObserver(upd)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const zoomPopup = Math.min(1, popupW / stagePopup)
+
   // Prévia EXATA: monta um HeroSimSlide com o estado atual e renderiza o MESMO componente do portal.
   const ehPasta = /[?&]pasta=/.test(link)
   const previewSlide: HeroSimSlide = {
@@ -339,9 +355,11 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
           <div className={cn('scroll-claro overflow-y-auto bg-muted/30 p-5', uiTipo === 'popup' ? 'min-h-0 border-t md:border-l md:border-t-0' : 'order-1 shrink-0 border-b')}>
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prévia</p>
             {uiTipo === 'popup' ? (
-              <div className="flex justify-center overflow-x-auto rounded-lg border bg-neutral-200/60 p-4 dark:bg-neutral-900/50">
-                <div className="w-full">
-                  <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null, estilo, pontas }} preview />
+              <div className="rounded-lg border bg-neutral-200/60 p-4 dark:bg-neutral-900/50">
+                <div ref={popupRef}>
+                  <div className="mx-auto" style={{ width: stagePopup, zoom: zoomPopup } as React.CSSProperties}>
+                    <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null, estilo, pontas }} preview />
+                  </div>
                 </div>
               </div>
             ) : (
