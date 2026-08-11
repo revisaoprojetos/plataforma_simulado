@@ -26,10 +26,9 @@ export type Banner = {
 const TIPO_LABEL: Record<string, string> = { banner: 'banner', popup: 'pop-up', hero: 'destaque' }
 
 const TABS = [
-  { t: 'banner', label: 'Banner', Icon: Megaphone, vazio: 'Nenhum banner (faixa no topo) ainda.' },
+  { t: 'banner', label: 'Banner', Icon: Megaphone, vazio: 'Nenhum banner ainda (texto/link ou simulado).' },
   { t: 'popup', label: 'Pop-up', Icon: MessageSquareWarning, vazio: 'Nenhum pop-up ainda.' },
   { t: 'hero', label: 'Destaque', Icon: ImageIcon, vazio: 'Nenhum banner de destaque ainda.' },
-  { t: 'simulado', label: 'Simulado', Icon: Clapperboard, vazio: 'Nenhum banner de simulado ainda.' },
 ] as const
 
 /** Um banner de destaque que aponta para um simulado (/simulado/token) OU uma pasta de simulados
@@ -94,7 +93,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
     novaAba.splice(destino, 0, it)
     setDragIdx(null); setOverIdx(null)
     let k = 0
-    const full = lista.map((b) => (pertenceAoTab(b) ? novaAba[k++] : b))
+    const full = lista.map((b) => (pertenceAAba(b) ? novaAba[k++] : b))
     persistirOrdem(full)
   }
 
@@ -119,12 +118,16 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
   const pastasDest = (destinos ?? []).filter((d) => d.grupo === 'Pastas')
   const destSim = [...pastasDest, ...simulados] // opções da aba "Simulado": pasta (com contagem) ou simulado
 
-  // Cada aba = um tipo de aviso. "Destaque" = hero sem link de simulado; "Simulado" = hero com link.
-  const pertenceAoTab = (b: Banner, t: 'banner' | 'popup' | 'hero' | 'simulado' = uiTipo) =>
-    t === 'simulado' ? ehBannerSimulado(b) : t === 'hero' ? (b.tipo === 'hero' && !ehBannerSimulado(b)) : b.tipo === t
-  const contaTab = (t: 'banner' | 'popup' | 'hero' | 'simulado') => lista.filter((b) => pertenceAoTab(b, t)).length
-  const visiveis = lista.filter((b) => pertenceAoTab(b))
-  const tabAtual = TABS.find((x) => x.t === uiTipo)!
+  // Aba "Banner" agrupa banners de TEXTO/LINK e de SIMULADO (a sub-opção troca o uiTipo).
+  // "Destaque" = hero sem link de simulado.
+  const aba: 'banner' | 'popup' | 'hero' = uiTipo === 'simulado' ? 'banner' : uiTipo
+  const pertenceAAba = (b: Banner, a: 'banner' | 'popup' | 'hero' = aba) =>
+    a === 'banner' ? (b.tipo === 'banner' || ehBannerSimulado(b))
+      : a === 'hero' ? (b.tipo === 'hero' && !ehBannerSimulado(b))
+        : b.tipo === a
+  const contaTab = (a: 'banner' | 'popup' | 'hero') => lista.filter((b) => pertenceAAba(b, a)).length
+  const visiveis = lista.filter((b) => pertenceAAba(b))
+  const tabAtual = TABS.find((x) => x.t === aba)!
 
   function criar(e: React.FormEvent) {
     e.preventDefault()
@@ -166,10 +169,10 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
       {/* Abas por tipo de aviso */}
       <div className="flex flex-wrap gap-1.5 rounded-2xl border bg-card p-1.5 shadow-sm">
         {TABS.map(({ t, label, Icon }) => (
-          <button key={t} type="button" onClick={() => setUiTipo(t)}
-            className={cn('flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition', uiTipo === t ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted')}>
+          <button key={t} type="button" onClick={() => { if (t !== aba) setUiTipo(t) }}
+            className={cn('flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition', aba === t ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted')}>
             <Icon className="h-4 w-4" /> {label}
-            <span className={cn('ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums', uiTipo === t ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted-foreground/15 text-muted-foreground')}>{contaTab(t)}</span>
+            <span className={cn('ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums', aba === t ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted-foreground/15 text-muted-foreground')}>{contaTab(t)}</span>
           </button>
         ))}
       </div>
@@ -178,6 +181,19 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
       {/* Form de criação */}
       <form onSubmit={criar} className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
         <h2 className="flex items-center gap-2 text-sm font-semibold"><tabAtual.Icon className="h-4 w-4 text-primary" /> Novo {tabAtual.label.toLowerCase()}</h2>
+        {aba === 'banner' && (
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { v: 'banner', label: 'Texto / Link', Icon: Megaphone },
+              { v: 'simulado', label: 'Simulado', Icon: Clapperboard },
+            ] as const).map(({ v, label, Icon }) => (
+              <button key={v} type="button" onClick={() => setUiTipo(v)}
+                className={cn('flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition', uiTipo === v ? 'border-primary bg-primary/5 text-primary' : 'hover:bg-muted')}>
+                <Icon className="h-4 w-4" /> {label}
+              </button>
+            ))}
+          </div>
+        )}
         {uiTipo === 'hero' && <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">Banner de <strong>destaque</strong> aparece no topo da home do aluno, em carrossel. Use uma <strong>imagem larga</strong> (ex.: 1920×600). O link é opcional. A ordem segue a criação.</p>}
         {uiTipo === 'simulado' && (
           <div className="space-y-1.5 rounded-lg bg-muted/50 px-3 py-2.5">
