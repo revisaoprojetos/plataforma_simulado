@@ -7,6 +7,7 @@ import { Plus, Loader2, Trash2, Eye, EyeOff, Megaphone, MessageSquareWarning, Im
 import { redimensionarImagem } from '@/lib/imagem'
 import { BannerCropper } from '@/components/admin/banner-cropper'
 import { BannerEditModal } from '@/components/admin/banner-edit-modal'
+import { PopupCard } from '@/components/aluno/banners-portal'
 
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f) })
@@ -244,6 +245,12 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
                 <p className="text-[11px] text-muted-foreground">Painel com Simulados/Nota média/Melhor nota no canto inferior direito. Vale para <strong>todos</strong> os banners de simulado. Desativado por padrão.</p>
               </div>
             </div>
+          </div>
+        )}
+        {uiTipo === 'popup' && (
+          <div className="rounded-xl border bg-neutral-200/60 p-3 dark:bg-neutral-900/50">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Prévia ao vivo</p>
+            <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null }} preview />
           </div>
         )}
         <div className="space-y-1"><label className="text-xs text-muted-foreground">Título</label><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Novo simulado disponível!" /></div>

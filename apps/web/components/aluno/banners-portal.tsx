@@ -54,15 +54,17 @@ type Slide = ({ kind: 'img' } & BannerPortal) | HeroSimSlide
 export function BannersPortal({ banners, simulados = [], stats }: { banners: BannerPortal[]; simulados?: HeroSimSlide[]; stats?: BannerStats | null }) {
   const [popup, setPopup] = useState<BannerPortal | null>(null)
 
+  // Mostra o pop-up SÓ logo após o login (marcador 'popup-login' setado no formulário de login),
+  // não a cada visita à home. Consome o marcador na 1ª montagem para não repetir ao voltar ao início.
   useEffect(() => {
-    const pop = banners.find((b) => b.tipo === 'popup' && !localStorage.getItem('popup-visto-' + b.id))
+    let fresh = false
+    try { fresh = sessionStorage.getItem('popup-login') === '1'; if (fresh) sessionStorage.removeItem('popup-login') } catch { /* SSR/priv */ }
+    if (!fresh) return
+    const pop = banners.find((b) => b.tipo === 'popup')
     if (pop) setPopup(pop)
   }, [banners])
 
-  function fecharPopup() {
-    if (popup) localStorage.setItem('popup-visto-' + popup.id, '1')
-    setPopup(null)
-  }
+  function fecharPopup() { setPopup(null) }
 
   // Fecha no Esc enquanto o pop-up estiver aberto.
   useEffect(() => {
@@ -91,45 +93,7 @@ export function BannersPortal({ banners, simulados = [], stats }: { banners: Ban
       {popup && typeof document !== 'undefined' && createPortal(
         <div role="dialog" aria-modal="true" aria-label={popup.titulo ?? 'Aviso'}
           className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={fecharPopup}>
-          <div onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md animate-in fade-in zoom-in-95 slide-in-from-bottom-2 overflow-hidden rounded-3xl border bg-card text-foreground shadow-2xl duration-300">
-            {/* Faixa de cor no topo (cor de destaque do aviso) */}
-            <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${popup.cor ?? '#6366f1'}, color-mix(in oklab, ${popup.cor ?? '#6366f1'} 45%, #ffffff))` }} />
-
-            {/* Fechar — flutuante (sobre a imagem quando houver) */}
-            <button type="button" onClick={fecharPopup} aria-label="Fechar"
-              className={cn('absolute right-3 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full transition',
-                popup.imagem_url ? 'bg-black/40 text-white ring-1 ring-white/25 backdrop-blur hover:bg-black/60' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>
-              <X className="h-4 w-4" />
-            </button>
-
-            {popup.imagem_url && (
-              <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={popup.imagem_url} alt="" className="max-h-64 w-full object-cover" />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-card to-transparent" />
-              </div>
-            )}
-
-            <div className={cn('px-6 pb-6', popup.imagem_url ? 'pt-4' : 'pt-6')}>
-              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
-                style={{ background: `color-mix(in oklab, ${popup.cor ?? '#6366f1'} 16%, var(--card))`, color: popup.cor ?? '#6366f1' }}>
-                <Megaphone className="h-3.5 w-3.5" /> Aviso
-              </span>
-              {popup.titulo && <h3 className="mt-3 text-xl font-bold leading-snug tracking-tight">{popup.titulo}</h3>}
-              {popup.mensagem && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{popup.mensagem}</p>}
-              <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <button type="button" onClick={fecharPopup}
-                  className="rounded-xl border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">Fechar</button>
-                {popup.link && (
-                  <Alvo href={popup.link} onClick={fecharPopup}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-md transition hover:opacity-95">
-                    Ver mais <ArrowRight className="h-4 w-4" />
-                  </Alvo>
-                )}
-              </div>
-            </div>
-          </div>
+          <PopupCard banner={popup} onFechar={fecharPopup} />
         </div>,
         document.body,
       )}
@@ -277,6 +241,67 @@ function Kpi({ valor, rotulo, divisor }: { valor: string; rotulo: string; diviso
     <div className={cn('px-4 py-3 text-center', divisor && 'border-l border-white/12')}>
       <div className="text-lg font-extrabold leading-none text-white sm:text-xl">{valor}</div>
       <div className="mt-1 text-[10px] font-medium uppercase tracking-wider text-white/60">{rotulo}</div>
+    </div>
+  )
+}
+
+/** Texto legível (claro/escuro) sobre uma cor de fundo, pela luminância. */
+export function textoContraste(hex: string): string {
+  const h = (hex || '').replace('#', '')
+  if (h.length !== 6) return '#ffffff'
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
+  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+  return lum > 0.62 ? '#1b1036' : '#ffffff'
+}
+
+export type PopupDados = { titulo: string | null; mensagem: string | null; imagem_url: string | null; cor: string | null; link: string | null }
+
+/** Card do pop-up (visual reutilizado no portal do aluno e na prévia do admin).
+ *  `preview` = estático (CTA não navega, fechar é opcional). */
+export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; onFechar?: () => void; preview?: boolean }) {
+  const cor = banner.cor || '#6366f1'
+  const txt = textoContraste(cor)
+  const mostrarCTA = !!banner.link || preview
+  const ctaCls = 'inline-flex items-center justify-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-md transition hover:opacity-95'
+  const ctaStyle: React.CSSProperties = { background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 78%, #000))`, color: txt }
+  return (
+    <div onClick={(e) => e.stopPropagation()}
+      className="relative w-full max-w-md animate-in fade-in zoom-in-95 slide-in-from-bottom-2 overflow-hidden rounded-3xl border bg-card text-foreground shadow-2xl duration-300">
+      {/* Faixa de cor no topo (cor de destaque do aviso) */}
+      <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${cor}, color-mix(in oklab, ${cor} 45%, #ffffff))` }} />
+
+      {/* Fechar — flutuante (sobre a imagem quando houver) */}
+      <button type="button" onClick={onFechar} aria-label="Fechar"
+        className={cn('absolute right-3 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full transition',
+          banner.imagem_url ? 'bg-black/40 text-white ring-1 ring-white/25 backdrop-blur hover:bg-black/60' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>
+        <X className="h-4 w-4" />
+      </button>
+
+      {banner.imagem_url && (
+        <div className="relative">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={banner.imagem_url} alt="" className="max-h-64 w-full object-cover" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-card to-transparent" />
+        </div>
+      )}
+
+      <div className={cn('px-6 pb-6', banner.imagem_url ? 'pt-4' : 'pt-6')}>
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
+          style={{ background: `color-mix(in oklab, ${cor} 16%, var(--card))`, color: cor }}>
+          <Megaphone className="h-3.5 w-3.5" /> Aviso
+        </span>
+        {banner.titulo && <h3 className="mt-3 text-xl font-bold leading-snug tracking-tight">{banner.titulo}</h3>}
+        {banner.mensagem && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{banner.mensagem}</p>}
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onFechar}
+            className="rounded-xl border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">Fechar</button>
+          {mostrarCTA && (
+            preview || !banner.link
+              ? <span className={ctaCls} style={ctaStyle}>Ver mais <ArrowRight className="h-4 w-4" /></span>
+              : <Alvo href={banner.link} onClick={onFechar} className={ctaCls} style={ctaStyle}>Ver mais <ArrowRight className="h-4 w-4" /></Alvo>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

@@ -52,6 +52,8 @@ export function AlunoEntrarForm({
         else setErro(j.message ?? 'Não foi possível entrar.')
         return
       }
+      // Marca "acabou de logar" → o portal mostra o pop-up 1x (só no login, não a cada visita à home).
+      try { sessionStorage.setItem('popup-login', '1') } catch {}
       setEntrando(true); router.push('/aluno'); router.refresh()
     } catch { setErro('Erro de conexão. Tente novamente.') } finally { setCarregando(false) }
   }

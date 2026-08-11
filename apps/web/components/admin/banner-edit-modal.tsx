@@ -12,7 +12,7 @@ import { redimensionarImagem } from '@/lib/imagem'
 import { BannerCropper } from '@/components/admin/banner-cropper'
 import { atualizarBannerAction } from '@/app/admin/configuracoes/banners/actions'
 import { ehBannerSimulado, type Banner, type DestinoBanner } from '@/components/admin/banners-manager'
-import { SimSlide, type HeroSimSlide } from '@/components/aluno/banners-portal'
+import { SimSlide, PopupCard, type HeroSimSlide } from '@/components/aluno/banners-portal'
 
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f) })
@@ -128,25 +128,35 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
               renderizados por cima (WYSIWYG, atualiza ao vivo conforme você configura). */}
           <div className="space-y-1.5">
             <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : uiTipo === 'simulado' ? '(prévia — padrão: fundo do simulado)' : '(molde 1920×500 — largura total)'}</label>
-            <div ref={previewRef} className={cn('relative w-full overflow-hidden rounded-lg border', tipo === 'popup' ? 'aspect-[16/6]' : 'aspect-[1920/500]')}>
-              {uiTipo === 'simulado'
-                // Prévia EXATA: mesmo componente do aluno, renderizado no tamanho real e ESCALADO.
-                ? <div className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${previewScale})` }}><SimSlide s={previewSlide} stats={previewSlide.stats} /></div>
-                : imagem
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={imagem} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                  : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
-              {imagem && (
-                <div className="absolute right-1.5 top-1.5 flex gap-1.5">
-                  {tipo !== 'popup' && (
+            {uiTipo === 'popup' ? (
+              // Prévia EXATA do pop-up (mesmo card do aluno), estática, sobre um fundo dim.
+              <div className="flex justify-center rounded-lg border bg-neutral-200/60 p-4 dark:bg-neutral-900/50 sm:p-6">
+                <div className="w-full max-w-sm">
+                  <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null }} preview />
+                </div>
+              </div>
+            ) : (
+              <div ref={previewRef} className="relative aspect-[1920/500] w-full overflow-hidden rounded-lg border">
+                {uiTipo === 'simulado'
+                  // Prévia EXATA: mesmo componente do aluno, renderizado no tamanho real e ESCALADO.
+                  ? <div className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${previewScale})` }}><SimSlide s={previewSlide} stats={previewSlide.stats} /></div>
+                  : imagem
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={imagem} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                    : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
+                {imagem && (
+                  <div className="absolute right-1.5 top-1.5 flex gap-1.5">
                     <button type="button" onClick={() => { setCropSrc(cropSrc || imagem); setCropOpen(true) }} title="Ajustar recorte"
                       className="flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><Crop className="h-3.5 w-3.5" /></button>
-                  )}
-                  <button type="button" onClick={() => setImagem('')} title="Remover imagem"
-                    className="flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><X className="h-3.5 w-3.5" /></button>
-                </div>
-              )}
-            </div>
+                    <button type="button" onClick={() => setImagem('')} title="Remover imagem"
+                      className="flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><X className="h-3.5 w-3.5" /></button>
+                  </div>
+                )}
+              </div>
+            )}
+            {imagem && uiTipo === 'popup' && (
+              <button type="button" onClick={() => setImagem('')} className="text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">Remover imagem</button>
+            )}
             <div className="flex gap-2">
               <Input value={imagem.startsWith('data:') ? '' : imagem} onChange={(e) => setImagem(e.target.value)} placeholder="Cole uma URL ou envie um arquivo →" className="flex-1" />
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onArquivo(e.target.files?.[0] ?? null)} />
