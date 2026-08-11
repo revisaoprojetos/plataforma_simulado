@@ -86,6 +86,18 @@ function detectarFaixa(t: string): string | null {
   return null
 }
 
+/** Faixa detectada pela ABERTURA de um parágrafo longo (o próprio texto da banda), quando o
+ *  doc não traz um rótulo curto separado. Ex.: "…ficou abaixo de 50%…", "…foi intermediário",
+ *  "…foi excelente". Analisa só o começo (veredito) para não confundir com o corpo do texto. */
+function faixaNaAbertura(t: string): string | null {
+  if (t.length <= 40) return null // parágrafos curtos são rótulos (detectarFaixa), não texto de banda
+  const s = norm(t).slice(0, 100)
+  if (/(abaixo|menos|inferior|ruim|deixou a desejar|nao foi bom|ficou baixo|precisa (de )?aten)/.test(s)) return '0-49'
+  if (/(excelente|otimo|maravilhoso|excepcional|muito bom|acima de 8|parabens)/.test(s)) return '81-100'
+  if (/(intermediari|foi medi|foi medio|na media|razoavel|regular|espaco.*(cresc|melhor)|há espaco|ha espaco)/.test(s)) return '50-80'
+  return null
+}
+
 function parsePilares(reg: Linha[]): DiagPilar[] {
   const pilares: DiagPilar[] = []
   for (let i = 0; i < reg.length; i++) {
@@ -97,17 +109,27 @@ function parsePilares(reg: Linha[]): DiagPilar[] {
       ? `{acerto_pilar_${chave}} de {total_pilar_${chave}} questões`
       : (jan.find((l) => /de\s+\d+\s+quest/i.test(l.p))?.f ?? 'X de N questões')
     const bandas: { faixa: string; texto: string }[] = []
+    const vistas = new Set<string>()
     for (let k = 0; k < jan.length; k++) {
+      // (a) rótulo curto ("0-49" / "Abaixo de 50%") → texto vem nas linhas seguintes.
       const faixa = detectarFaixa(jan[k].p)
-      if (!faixa) continue
-      let txt = ''
-      for (let n = k + 1; n < jan.length; n++) {
-        const l = jan[n]
-        if (detectarFaixa(l.p) || /texto modulado/i.test(norm(l.p)) || /de\s+\d+\s+quest/i.test(l.p) || ehNomePilar(l.p, l.h)) break
-        txt += (txt ? ' ' : '') + l.f
+      if (faixa) {
+        if (vistas.has(faixa)) continue
+        let txt = ''
+        for (let n = k + 1; n < jan.length; n++) {
+          const l = jan[n]
+          if (detectarFaixa(l.p) || faixaNaAbertura(l.p) || /texto modulado/i.test(norm(l.p)) || /de\s+\d+\s+quest/i.test(l.p) || ehNomePilar(l.p, l.h)) break
+          txt += (txt ? ' ' : '') + l.f
+        }
+        if (txt.trim()) { bandas.push({ faixa, texto: txt }); vistas.add(faixa) }
+        continue
       }
-      bandas.push({ faixa, texto: txt })
+      // (b) parágrafo longo que JÁ é o texto da banda (veredito na abertura).
+      const inl = faixaNaAbertura(jan[k].p)
+      if (inl && !vistas.has(inl)) { bandas.push({ faixa: inl, texto: jan[k].f }); vistas.add(inl) }
     }
+    const ORD = ['0-49', '50-80', '81-100']
+    bandas.sort((a, b) => ORD.indexOf(a.faixa) - ORD.indexOf(b.faixa))
     if (bandas.length) pilares.push({ nome, chave, totalTxt, bandas })
   }
   return pilares
