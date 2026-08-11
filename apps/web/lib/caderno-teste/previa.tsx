@@ -478,8 +478,17 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
       const BUF = 18 // folga p/ sub-pixel/diferenças de render — evita card cortado/sliver colorido no fim da folha
       const pages: number[][] = []; let cur: number[] = []; let h = 0
       for (let i = 0; i < hs.length; i++) {
-        if (cur.length && h + hs[i] > availH - BUF) { pages.push(cur); cur = [i]; h = hs[i] }
-        else { cur.push(i); h += hs[i] }
+        if (blocos[i]?.juntar) {
+          // Continuação (sub-bloco colado): quebra normal.
+          if (cur.length && h + hs[i] > availH - BUF) { pages.push(cur); cur = [i]; h = hs[i] }
+          else { cur.push(i); h += hs[i] }
+        } else {
+          // ÂNCORA (cabeçalho do card): só fica nesta página se ELE + a 1ª continuação couberem juntos
+          // — senão desce inteiro, evitando cabeçalho órfão no rodapé com os assuntos na página seguinte.
+          const primeiroCont = (i + 1 < hs.length && blocos[i + 1]?.juntar) ? hs[i + 1] : 0
+          if (cur.length && h + hs[i] + primeiroCont > availH - BUF) { pages.push(cur); cur = []; h = 0 }
+          cur.push(i); h += hs[i]
+        }
       }
       if (cur.length) pages.push(cur)
       setPaginas(pages.length ? pages : [[]])
