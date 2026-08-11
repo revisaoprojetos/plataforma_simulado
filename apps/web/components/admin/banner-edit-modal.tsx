@@ -143,7 +143,8 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                 <label className="text-xs text-muted-foreground">Título</label>
                 {ehBanner && titulo && <OcultarBtn oculto={ocultarTitulo} onClick={() => setOcultarTitulo((v) => !v)} />}
               </div>
-              <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Novo simulado disponível!" className={cn(ehBanner && ocultarTitulo && 'opacity-50')} />
+              <textarea value={titulo} onChange={(e) => setTitulo(e.target.value)} rows={2} placeholder="Ex.: Novo simulado disponível! (Enter = nova linha)"
+                className={cn('w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring', ehBanner && ocultarTitulo && 'opacity-50')} />
             </div>
             <div className="space-y-1">
               <div className="flex items-center justify-between">

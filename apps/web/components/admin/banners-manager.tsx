@@ -268,7 +268,9 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
             <p className="mt-2 text-[11px] text-muted-foreground">Os <strong>estilos</strong> (sobre a imagem, compacto, pontas…) você ajusta depois em <strong>Configurar</strong> ⚙️.</p>
           </div>
         )}
-        <div className="space-y-1"><label className="text-xs text-muted-foreground">Título</label><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Novo simulado disponível!" /></div>
+        <div className="space-y-1"><label className="text-xs text-muted-foreground">Título</label>
+          <textarea value={titulo} onChange={(e) => setTitulo(e.target.value)} rows={2} placeholder="Ex.: Novo simulado disponível! (Enter = nova linha)" className="w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
+        </div>
         <div className="space-y-1"><label className="text-xs text-muted-foreground">Mensagem</label>
           <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={3} placeholder="Texto do aviso…" className="w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
         </div>

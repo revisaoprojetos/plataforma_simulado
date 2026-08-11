@@ -203,7 +203,7 @@ export function ImgSlide({ b, preview }: { b: BannerPortal; preview?: boolean })
         <div className={cn('absolute inset-0 flex p-6 sm:p-10', al.items, al.justify)}>
           {claro && <div className="pointer-events-none absolute inset-0" style={{ background: al.scrim }} />}
           <div className={cn('relative max-w-2xl', al.text)}>
-            {mostraTitulo && <p className={cn(tam.t, 'font-extrabold leading-tight tracking-tight', claro ? 'text-white [text-shadow:0_2px_12px_rgba(0,0,0,.75)]' : 'text-slate-900')}>{b.titulo}</p>}
+            {mostraTitulo && <p className={cn(tam.t, 'whitespace-pre-wrap font-extrabold leading-tight tracking-tight', claro ? 'text-white [text-shadow:0_2px_12px_rgba(0,0,0,.75)]' : 'text-slate-900')}>{b.titulo}</p>}
             {mostraMsg && <p className={cn('mt-1.5 whitespace-pre-wrap', tam.m, claro ? 'text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,.7)]' : 'text-slate-800')}>{b.mensagem}</p>}
           </div>
         </div>
@@ -373,7 +373,7 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
         {CloseX(true)}
         <div className="relative space-y-2 p-6">
           {Eyebrow(true)}
-          {banner.titulo && <h3 className="text-2xl font-bold leading-tight tracking-tight drop-shadow">{banner.titulo}</h3>}
+          {banner.titulo && <h3 className="whitespace-pre-wrap text-2xl font-bold leading-tight tracking-tight drop-shadow">{banner.titulo}</h3>}
           {banner.mensagem && <p className="whitespace-pre-wrap text-sm leading-relaxed text-white/85">{banner.mensagem}</p>}
           <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">{Fechar(true)}{CTA}</div>
         </div>
@@ -392,7 +392,7 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
             <Megaphone className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
-            {banner.titulo && <h3 className="pr-6 text-lg font-bold leading-snug tracking-tight">{banner.titulo}</h3>}
+            {banner.titulo && <h3 className="pr-6 text-lg font-bold whitespace-pre-wrap leading-snug tracking-tight">{banner.titulo}</h3>}
             {banner.mensagem && <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{banner.mensagem}</p>}
             <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">{Fechar(false)}{CTA}</div>
           </div>
@@ -415,7 +415,7 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
       )}
       <div className={cn('px-6 pb-6', banner.imagem_url ? 'pt-4' : 'pt-6')}>
         {Eyebrow(false)}
-        {banner.titulo && <h3 className="mt-3 text-xl font-bold leading-snug tracking-tight">{banner.titulo}</h3>}
+        {banner.titulo && <h3 className="mt-3 text-xl font-bold whitespace-pre-wrap leading-snug tracking-tight">{banner.titulo}</h3>}
         {banner.mensagem && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{banner.mensagem}</p>}
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">{Fechar(false)}{CTA}</div>
       </div>
