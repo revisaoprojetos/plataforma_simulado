@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { X, Upload, Crop, Loader2, Check, Eye, EyeOff } from 'lucide-react'
+import { X, Upload, Crop, Loader2, Check, Eye, EyeOff, Maximize2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
@@ -57,7 +57,14 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
   const [agendaIni, setAgendaIni] = useState(isoParaInput(agendaInicioInicial))
   const [agendaFim, setAgendaFim] = useState(isoParaInput(agendaFimInicial))
   const [freq, setFreq] = useState<'login' | 'sempre' | 'uma_vez'>(freqInicial)
+  const [expandido, setExpandido] = useState(false)
   const ehBanner = uiTipo === 'banner' || uiTipo === 'hero'
+  useEffect(() => {
+    if (!expandido) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpandido(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [expandido])
   const [enviando, setEnviando] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropOpen, setCropOpen] = useState(false)
@@ -136,6 +143,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
 
   if (typeof document === 'undefined') return null
   return createPortal(
+    <>
     <div className="fixed inset-0 z-[125] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <header className="flex shrink-0 items-center justify-between border-b px-5 py-3.5">
@@ -353,7 +361,15 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
 
           {/* PRÉVIA — lateral (pop-up) ou no topo (banner/destaque/simulado) */}
           <div className={cn('scroll-claro overflow-y-auto bg-muted/30 p-5', uiTipo === 'popup' ? 'min-h-0 border-t md:border-l md:border-t-0' : 'order-1 shrink-0 border-b')}>
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prévia</p>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prévia</p>
+              {uiTipo === 'popup' && (
+                <button type="button" onClick={() => setExpandido(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                  <Maximize2 className="h-3.5 w-3.5" /> Expandir (tamanho real)
+                </button>
+              )}
+            </div>
             {uiTipo === 'popup' ? (
               <div className="rounded-lg border bg-neutral-200/60 p-4 dark:bg-neutral-900/50">
                 <div ref={popupRef}>
@@ -382,7 +398,15 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
           </button>
         </footer>
       </div>
-    </div>,
+    </div>
+
+    {/* Expandir: pop-up em TAMANHO REAL, igual ao que o aluno vê (overlay do aluno). */}
+    {expandido && (
+      <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setExpandido(false)}>
+        <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null, estilo, pontas }} preview onFechar={() => setExpandido(false)} />
+      </div>
+    )}
+    </>,
     document.body,
   )
 }
