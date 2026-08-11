@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { X, Upload, Crop, Loader2, Check, Megaphone, MessageSquareWarning, ImageIcon, Clapperboard } from 'lucide-react'
+import { X, Upload, Crop, Loader2, Check } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
@@ -24,7 +24,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
   const router = useRouter()
   const [pending, start] = useTransition()
   // Modo da UI: "simulado" é um destaque (hero) que aponta p/ um simulado/pasta. Detecta pelo banner.
-  const [uiTipo, setUiTipo] = useState<'banner' | 'popup' | 'hero' | 'simulado'>(ehBannerSimulado(banner) ? 'simulado' : banner.tipo)
+  const [uiTipo] = useState<'banner' | 'popup' | 'hero' | 'simulado'>(ehBannerSimulado(banner) ? 'simulado' : banner.tipo)
   const tipo: Banner['tipo'] = uiTipo === 'simulado' ? 'hero' : uiTipo
   const simulados = (destinos ?? []).filter((d) => (d.grupo ?? 'Simulados') === 'Simulados')
   const pastasDest = (destinos ?? []).filter((d) => d.grupo === 'Pastas')
@@ -110,26 +110,11 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
           <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
         </header>
 
-        <div className="grid min-h-0 flex-1 overflow-hidden md:grid-cols-[minmax(0,1fr)_minmax(0,440px)]">
-          {/* ESQUERDA — configurações */}
-          <div className="scroll-claro min-h-0 space-y-4 overflow-y-auto p-5">
-            {/* Tipo do aviso */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tipo do aviso</label>
-              <div className="grid grid-cols-4 gap-1.5">
-                {([
-                  { t: 'banner', label: 'Banner', Icon: Megaphone },
-                  { t: 'popup', label: 'Pop-up', Icon: MessageSquareWarning },
-                  { t: 'hero', label: 'Destaque', Icon: ImageIcon },
-                  { t: 'simulado', label: 'Simulado', Icon: Clapperboard },
-                ] as const).map(({ t, label, Icon }) => (
-                  <button key={t} type="button" onClick={() => setUiTipo(t)}
-                    className={cn('flex items-center justify-center gap-1.5 rounded-md border px-1.5 py-1.5 text-[11px] font-medium transition', uiTipo === t ? 'border-primary bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-muted')}>
-                    <Icon className="h-3.5 w-3.5" /> {label}
-                  </button>
-                ))}
-              </div>
-            </div>
+        {/* Pop-up = 2 colunas (config à esquerda, prévia à direita). Banner/Destaque/Simulado =
+            prévia (larga) no TOPO e configurações embaixo. O tipo já vem separado pelas abas. */}
+        <div className={cn('min-h-0 flex-1 overflow-hidden', uiTipo === 'popup' ? 'grid md:grid-cols-[minmax(0,1fr)_minmax(0,440px)]' : 'flex flex-col')}>
+          {/* CONFIGURAÇÕES */}
+          <div className={cn('scroll-claro min-h-0 space-y-4 overflow-y-auto p-5', uiTipo !== 'popup' && 'order-2 flex-1')}>
 
             {/* Seleção do simulado/pasta (só no modo Simulado). */}
             {uiTipo === 'simulado' && (
@@ -261,8 +246,8 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
             </div>
           </div>
 
-          {/* DIREITA — prévia ao vivo */}
-          <div className="scroll-claro min-h-0 overflow-y-auto border-t bg-muted/30 p-5 md:border-l md:border-t-0">
+          {/* PRÉVIA — lateral (pop-up) ou no topo (banner/destaque/simulado) */}
+          <div className={cn('scroll-claro overflow-y-auto bg-muted/30 p-5', uiTipo === 'popup' ? 'min-h-0 border-t md:border-l md:border-t-0' : 'order-1 shrink-0 border-b')}>
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prévia</p>
             {uiTipo === 'popup' ? (
               <div className="flex justify-center rounded-lg border bg-neutral-200/60 p-4 dark:bg-neutral-900/50">
