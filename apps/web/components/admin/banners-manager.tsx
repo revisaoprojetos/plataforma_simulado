@@ -8,7 +8,7 @@ import { Plus, Loader2, Trash2, Eye, EyeOff, Megaphone, MessageSquareWarning, Im
 import { redimensionarImagem } from '@/lib/imagem'
 import { BannerCropper } from '@/components/admin/banner-cropper'
 import { BannerEditModal } from '@/components/admin/banner-edit-modal'
-import { PopupCard, type PopupEstilo, type PopupPontas } from '@/components/aluno/banners-portal'
+import { PopupCard, type PopupEstilo, type PopupPontas, type BannerTextoPos, type BannerTextoCor } from '@/components/aluno/banners-portal'
 
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f) })
@@ -39,7 +39,7 @@ export const ehBannerSimulado = (b: { tipo: string; link: string | null }) => b.
 
 export type DestinoBanner = { label: string; href: string; grupo?: string }
 
-export type DestaqueMap = Record<string, { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: PopupEstilo; popupPontas?: PopupPontas }>
+export type DestaqueMap = Record<string, { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: PopupEstilo; popupPontas?: PopupPontas; bannerTextoPos?: BannerTextoPos; bannerTextoCor?: BannerTextoCor }>
 
 export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = false, destaques = {} }: { banners: Banner[]; tenantId?: string; destinos?: DestinoBanner[]; desempenhoAtivo?: boolean; destaques?: DestaqueMap }) {
   const router = useRouter()
@@ -386,7 +386,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
         })}
       </div>
 
-      {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} destaqueAtivoInicial={destaques[editando.id]?.ativo !== false} destaqueTextoInicial={destaques[editando.id]?.texto ?? ''} fadeAtivoInicial={destaques[editando.id]?.fadeAtivo !== false} fadeNivelInicial={destaques[editando.id]?.fadeNivel ?? 100} popupEstiloInicial={destaques[editando.id]?.popupEstilo ?? 'classico'} popupPontasInicial={destaques[editando.id]?.popupPontas ?? 'arredondado'} onClose={() => setEditando(null)} />}
+      {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} destaqueAtivoInicial={destaques[editando.id]?.ativo !== false} destaqueTextoInicial={destaques[editando.id]?.texto ?? ''} fadeAtivoInicial={destaques[editando.id]?.fadeAtivo !== false} fadeNivelInicial={destaques[editando.id]?.fadeNivel ?? 100} popupEstiloInicial={destaques[editando.id]?.popupEstilo ?? 'classico'} popupPontasInicial={destaques[editando.id]?.popupPontas ?? 'arredondado'} bannerTextoPosInicial={destaques[editando.id]?.bannerTextoPos ?? 'center'} bannerTextoCorInicial={destaques[editando.id]?.bannerTextoCor ?? 'claro'} onClose={() => setEditando(null)} />}
     </div>
   )
 }

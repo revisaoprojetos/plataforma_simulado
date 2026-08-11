@@ -12,7 +12,7 @@ import { redimensionarImagem } from '@/lib/imagem'
 import { BannerCropper } from '@/components/admin/banner-cropper'
 import { atualizarBannerAction } from '@/app/admin/configuracoes/banners/actions'
 import { ehBannerSimulado, type Banner, type DestinoBanner } from '@/components/admin/banners-manager'
-import { SimSlide, PopupCard, POPUP_ESTILOS, type HeroSimSlide, type PopupEstilo, type PopupPontas } from '@/components/aluno/banners-portal'
+import { SimSlide, PopupCard, ImgSlide, POPUP_ESTILOS, BANNER_POSICOES, type HeroSimSlide, type PopupEstilo, type PopupPontas, type BannerTextoPos, type BannerTextoCor } from '@/components/aluno/banners-portal'
 
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f) })
@@ -20,7 +20,7 @@ function fileToDataUrl(f: File): Promise<string> {
 
 /** Pop-up de configuração TOTAL de um banner já criado (tipo, título, mensagem, imagem+recorte,
  *  link/destino, cor, ativo). Salva via atualizarBannerAction. */
-export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; onClose: () => void }) {
+export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', bannerTextoPosInicial = 'center', bannerTextoCorInicial = 'claro', onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; bannerTextoPosInicial?: BannerTextoPos; bannerTextoCorInicial?: BannerTextoCor; onClose: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   // Modo da UI: "simulado" é um destaque (hero) que aponta p/ um simulado/pasta. Detecta pelo banner.
@@ -41,6 +41,8 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
   const [fadeNivel, setFadeNivel] = useState(fadeNivelInicial)
   const [estilo, setEstilo] = useState<PopupEstilo>(popupEstiloInicial)
   const [pontas, setPontas] = useState<PopupPontas>(popupPontasInicial)
+  const [bannerPos, setBannerPos] = useState<BannerTextoPos>(bannerTextoPosInicial)
+  const [bannerCor, setBannerCor] = useState<BannerTextoCor>(bannerTextoCorInicial)
   const [enviando, setEnviando] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropOpen, setCropOpen] = useState(false)
@@ -62,7 +64,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
 
   function salvar() {
     start(async () => {
-      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel, ...(uiTipo === 'popup' ? { popupEstilo: estilo, popupPontas: pontas } : {}) }, tenantId)
+      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel, ...(uiTipo === 'popup' ? { popupEstilo: estilo, popupPontas: pontas } : {}), ...(uiTipo === 'banner' || uiTipo === 'hero' ? { bannerTextoPos: bannerPos, bannerTextoCor: bannerCor } : {}) }, tenantId)
       if (r.ok) { toast.success('Banner atualizado.'); router.refresh(); onClose() }
       else toast.error(r.error ?? 'Falha ao salvar.')
     })
@@ -241,7 +243,32 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                   <p className="pt-0.5 text-[11px] text-muted-foreground">“Sobre a imagem” coloca o texto por cima; “Compacto” é sem imagem grande.</p>
                 </div>
               ) : (
-                <p className="rounded-lg border border-dashed px-3 py-2.5 text-[11px] text-muted-foreground">As opções de rótulo, degradê e desempenho valem só para banners do tipo <strong>Simulado</strong>.</p>
+                <div className="space-y-2 rounded-lg border bg-background px-3 py-2.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Texto sobre a imagem</p>
+                  <div className="flex items-start gap-5">
+                    <div>
+                      <span className="mb-1 block text-[11px] text-muted-foreground">Posição</span>
+                      <div className="grid w-fit grid-cols-3 gap-1">
+                        {BANNER_POSICOES.map((p) => (
+                          <button key={p} type="button" onClick={() => setBannerPos(p)} title={p}
+                            className={cn('flex h-6 w-6 items-center justify-center rounded border transition', bannerPos === p ? 'border-primary bg-primary/10' : 'hover:bg-muted')}>
+                            <span className={cn('h-2 w-2 rounded-full', bannerPos === p ? 'bg-primary' : 'bg-muted-foreground/40')} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="mb-1 block text-[11px] text-muted-foreground">Cor do texto</span>
+                      <div className="flex gap-1.5">
+                        {([['claro', 'Claro'], ['escuro', 'Escuro']] as const).map(([v, l]) => (
+                          <button key={v} type="button" onClick={() => setBannerCor(v)}
+                            className={cn('rounded-md border px-2.5 py-1 text-[11px] font-medium transition', bannerCor === v ? 'border-primary bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-muted')}>{l}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Preencha <strong>Título</strong>/<strong>Mensagem</strong> para o texto aparecer sobre o banner.</p>
+                </div>
               )}
             </div>
           </div>
@@ -260,8 +287,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                 {uiTipo === 'simulado'
                   ? <div className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${previewScale})` }}><SimSlide s={previewSlide} stats={previewSlide.stats} /></div>
                   : imagem
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={imagem} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                    ? <ImgSlide b={{ id: banner.id, tipo: 'banner', titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, link: null, cor, textoPos: bannerPos, textoCor: bannerCor }} preview />
                     : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
               </div>
             )}

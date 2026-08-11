@@ -15,11 +15,38 @@ function Alvo({ href, className, style, children, onClick, 'aria-label': ariaLab
 
 export type PopupEstilo = 'classico' | 'sobre' | 'compacto'
 export type PopupPontas = 'arredondado' | 'quadrado'
+export type BannerTextoPos =
+  | 'top-left' | 'top-center' | 'top-right'
+  | 'center-left' | 'center' | 'center-right'
+  | 'bottom-left' | 'bottom-center' | 'bottom-right'
+export type BannerTextoCor = 'claro' | 'escuro'
+
+/** As 9 âncoras de posição do texto sobre o banner (grade 3×3). */
+export const BANNER_POSICOES: BannerTextoPos[] = [
+  'top-left', 'top-center', 'top-right',
+  'center-left', 'center', 'center-right',
+  'bottom-left', 'bottom-center', 'bottom-right',
+]
 
 export type BannerPortal = {
   id: string; tipo: 'banner' | 'popup' | 'hero'; titulo: string | null; mensagem: string | null
   imagem_url: string | null; link: string | null; cor: string | null; ordem?: number
   estilo?: PopupEstilo | null; pontas?: PopupPontas | null // só p/ pop-up
+  textoPos?: BannerTextoPos | null; textoCor?: BannerTextoCor | null // texto sobre o banner (banner/destaque)
+}
+
+/** Classes/estilo de alinhamento do texto sobre o banner, pela âncora escolhida. */
+function alinhamentoBanner(pos: BannerTextoPos) {
+  const [v, h] = pos === 'center' ? ['center', 'center'] : pos.split('-')
+  const items = v === 'top' ? 'items-start' : v === 'bottom' ? 'items-end' : 'items-center'
+  const justify = h === 'left' ? 'justify-start' : h === 'right' ? 'justify-end' : 'justify-center'
+  const text = h === 'left' ? 'text-left' : h === 'right' ? 'text-right' : 'text-center'
+  const scrim = v === 'bottom'
+    ? 'linear-gradient(to top, rgba(0,0,0,.62), transparent 55%)'
+    : v === 'top'
+      ? 'linear-gradient(to bottom, rgba(0,0,0,.62), transparent 55%)'
+      : 'radial-gradient(ellipse at center, rgba(0,0,0,.5), transparent 72%)'
+  return { items, justify, text, scrim }
 }
 
 /** Chip informativo do banner de simulado (ex.: disponibilidade, nº de questões, tipo, contagem). */
@@ -149,12 +176,27 @@ function Carrossel({ slides, stats }: { slides: Slide[]; stats?: BannerStats | n
   )
 }
 
-/** Banner de imagem (ou faixa colorida com texto quando não há imagem). */
-function ImgSlide({ b }: { b: BannerPortal }) {
+/** Banner de imagem (ou faixa colorida com texto quando não há imagem).
+ *  Com imagem + título/mensagem, sobrepõe o texto na posição escolhida (`textoPos`). */
+export function ImgSlide({ b, preview }: { b: BannerPortal; preview?: boolean }) {
   const cor = b.cor ?? '#6366f1'
+  const temTexto = !!(b.titulo || b.mensagem)
+  const claro = (b.textoCor ?? 'claro') === 'claro'
+  const al = alinhamentoBanner(b.textoPos ?? 'center')
   const conteudo = b.imagem_url ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={b.imagem_url} alt={b.titulo ?? ''} className="absolute inset-0 h-full w-full object-cover" />
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={b.imagem_url} alt={b.titulo ?? ''} className="absolute inset-0 h-full w-full object-cover" />
+      {temTexto && (
+        <div className={cn('absolute inset-0 flex p-6 sm:p-10', al.items, al.justify)}>
+          {claro && <div className="pointer-events-none absolute inset-0" style={{ background: al.scrim }} />}
+          <div className={cn('relative max-w-2xl', al.text)}>
+            {b.titulo && <p className={cn('text-2xl font-extrabold leading-tight tracking-tight sm:text-4xl', claro ? 'text-white [text-shadow:0_2px_12px_rgba(0,0,0,.75)]' : 'text-slate-900')}>{b.titulo}</p>}
+            {b.mensagem && <p className={cn('mt-1.5 whitespace-pre-wrap text-sm sm:text-base', claro ? 'text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,.7)]' : 'text-slate-800')}>{b.mensagem}</p>}
+          </div>
+        </div>
+      )}
+    </>
   ) : (
     <div className="absolute inset-0 flex items-center gap-3 p-4" style={{ background: cor + '14' }}>
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: cor + '22', color: cor }}><Megaphone className="h-5 w-5" /></span>
@@ -164,7 +206,7 @@ function ImgSlide({ b }: { b: BannerPortal }) {
       </div>
     </div>
   )
-  return b.link ? <Alvo href={b.link} aria-label={b.titulo ?? 'Abrir'} className="absolute inset-0">{conteudo}</Alvo> : <>{conteudo}</>
+  return b.link && !preview ? <Alvo href={b.link} aria-label={b.titulo ?? 'Abrir'} className="absolute inset-0">{conteudo}</Alvo> : <>{conteudo}</>
 }
 
 /** Simulado em destaque como banner: capa/cor de fundo + overlay com título, descrição, chips,
