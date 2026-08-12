@@ -2,6 +2,7 @@ import { getCurrentAccess } from '@/lib/auth/permissions'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getGamConfig } from '@/lib/gamificacao'
+import { metricasGamificacao } from '@/lib/gamificacao/metricas'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { GamificacaoTabs } from './gamificacao-tabs'
 import { Trophy } from 'lucide-react'
@@ -24,6 +25,7 @@ export default async function GamificacaoPage() {
   const svc = createAdminClient()
   const config = await getGamConfig(svc, tenantId)
   const podeGerenciar = access.isAdmin || access.permissions.includes('gamificacao:manage')
+  const metricas = config && tenantId ? await metricasGamificacao(svc, tenantId, config) : null
 
   return (
     <div className="space-y-6">
@@ -40,7 +42,7 @@ export default async function GamificacaoPage() {
         </span>
       </div>
 
-      {config && <GamificacaoTabs config={config} podeGerenciar={podeGerenciar} />}
+      {config && metricas && <GamificacaoTabs config={config} podeGerenciar={podeGerenciar} metricas={metricas} />}
     </div>
   )
 }

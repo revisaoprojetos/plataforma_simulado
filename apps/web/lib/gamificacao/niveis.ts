@@ -15,12 +15,12 @@ export function xpAcumuladoParaNivel(nivel: number, curva: NivelCurva): number {
   return total
 }
 
-/** Nível atual a partir do XP total. */
+/** Nível atual a partir do XP total (limitado pelo nível máximo da curva). */
 export function nivelParaXp(xpTotal: number, curva: NivelCurva): number {
+  const max = Math.max(1, curva.nivel_max ?? 30)
   let nivel = 1
   let acc = 0
-  // Teto de segurança para não iterar infinito com curvas degeneradas.
-  while (nivel < 999) {
+  while (nivel < max) {
     const custo = custoNivel(nivel, curva)
     if (acc + custo > xpTotal) break
     acc += custo
@@ -38,7 +38,13 @@ export interface ProgressoNivel {
 }
 
 export function progressoNivel(xpTotal: number, curva: NivelCurva): ProgressoNivel {
+  const max = Math.max(1, curva.nivel_max ?? 30)
   const nivel = nivelParaXp(xpTotal, curva)
+  // No nível máximo não há "próximo": barra cheia e nada a conquistar.
+  if (nivel >= max) {
+    const custo = custoNivel(nivel - 1, curva)
+    return { nivel, xpNoNivel: custo, xpDoNivel: custo, xpParaProximo: 0, pct: 100 }
+  }
   const base = xpAcumuladoParaNivel(nivel, curva)
   const custo = custoNivel(nivel, curva)
   const xpNoNivel = Math.max(0, xpTotal - base)

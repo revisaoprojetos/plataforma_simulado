@@ -1,15 +1,17 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Zap, Trophy, Award, Target, SlidersHorizontal } from 'lucide-react'
+import { Zap, Trophy, Award, Target, SlidersHorizontal, BarChart3 } from 'lucide-react'
 import type { GamConfig } from '@/lib/gamificacao/config'
+import type { MetricasGam } from '@/lib/gamificacao/metricas'
 import { XpNiveisForm } from './forms/xp-niveis-form'
 import { LigasForm } from './forms/ligas-form'
 import { ConquistasForm } from './forms/conquistas-form'
 import { MissoesForm } from './forms/missoes-form'
 import { RegrasGeraisForm } from './forms/regras-gerais-form'
+import { MetricasView } from './forms/metricas-view'
 
-export function GamificacaoTabs({ config, podeGerenciar }: { config: GamConfig; podeGerenciar: boolean }) {
+export function GamificacaoTabs({ config, podeGerenciar, metricas }: { config: GamConfig; podeGerenciar: boolean; metricas: MetricasGam }) {
   return (
     <Tabs defaultValue="xp">
       <TabsList className="flex-wrap">
@@ -18,6 +20,7 @@ export function GamificacaoTabs({ config, podeGerenciar }: { config: GamConfig; 
         <TabsTrigger value="conquistas"><Award /> Conquistas</TabsTrigger>
         <TabsTrigger value="missoes"><Target /> Missões</TabsTrigger>
         <TabsTrigger value="regras"><SlidersHorizontal /> Regras gerais</TabsTrigger>
+        <TabsTrigger value="metricas"><BarChart3 /> Métricas</TabsTrigger>
       </TabsList>
 
       <TabsContent value="xp" className="pt-5"><XpNiveisForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
@@ -25,6 +28,7 @@ export function GamificacaoTabs({ config, podeGerenciar }: { config: GamConfig; 
       <TabsContent value="conquistas" className="pt-5"><ConquistasForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
       <TabsContent value="missoes" className="pt-5"><MissoesForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
       <TabsContent value="regras" className="pt-5"><RegrasGeraisForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
+      <TabsContent value="metricas" className="pt-5"><MetricasView m={metricas} /></TabsContent>
     </Tabs>
   )
 }
