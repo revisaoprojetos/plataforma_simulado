@@ -71,7 +71,7 @@ interface Resultado {
   finalizado_em: string | null
   estudante_id: string | null
   caderno_id: string | null
-  modalidades?: { id: string; nome: string; semGab?: boolean; comGab?: boolean; pdfUrl?: string }[]
+  modalidades?: { id: string; nome: string; semGab?: boolean; comGab?: boolean; pdfUrl?: string; cadernoTeste?: { cadernoId: string; itemId: string } }[]
   posicao: number | null
   total_participantes: number
   stats_por_disciplina: StatDisciplina[]
@@ -276,16 +276,24 @@ export function RevisaoFinal({
     // PDF importado (material pronto da empresa): entrega direta do arquivo.
     const md = modalidades.find((m) => m.id === mod)
     if (md?.pdfUrl) { window.open(md.pdfUrl, '_blank', 'noopener,noreferrer'); return }
-    if (!data?.caderno_id) { window.open(`${urlComoFezFallback}&print=1`, '_blank', 'noopener,noreferrer'); return }
     const limpar = (s?: string) => (s ?? '').trim().replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_')
     const arquivo = [data?.aluno_nome, data?.titulo, nome].map(limpar).filter(Boolean).join('_') || 'caderno'
-    const qs = new URLSearchParams({ caderno: data.caderno_id, sessao: sessionToken, mod, nome: arquivo })
-    if (data.estudante_id) qs.set('aluno', String(data.estudante_id))
-    if (gab) qs.set('gabarito', '1')
+    // Entrega V2 (item gerado) → rota do caderno de teste; senão o fallback da folha por sessão.
+    let apiUrl: string
+    if (md?.cadernoTeste) {
+      const qs = new URLSearchParams({ caderno: md.cadernoTeste.cadernoId, grupo: md.cadernoTeste.itemId, sessao: sessionToken, nome: arquivo })
+      if (gab) qs.set('gabarito', '1')
+      apiUrl = `/api/aluno/caderno-teste-pdf?${qs.toString()}`
+    } else if (data?.caderno_id) {
+      const qs = new URLSearchParams({ caderno: data.caderno_id, sessao: sessionToken, mod, nome: arquivo })
+      if (data.estudante_id) qs.set('aluno', String(data.estudante_id))
+      if (gab) qs.set('gabarito', '1')
+      apiUrl = `/api/aluno/caderno-pdf?${qs.toString()}`
+    } else { window.open(`${urlComoFezFallback}&print=1`, '_blank', 'noopener,noreferrer'); return }
     marcarPdf(key, true)
     toast.loading('Download iniciado — gerando PDF…', { id: key })
     try {
-      const res = await fetch(`/api/aluno/caderno-pdf?${qs.toString()}`)
+      const res = await fetch(apiUrl)
       if (!res.ok) throw new Error('falha')
       const blob = await res.blob()
       const objUrl = URL.createObjectURL(blob)
@@ -298,8 +306,12 @@ export function RevisaoFinal({
       setTimeout(() => URL.revokeObjectURL(objUrl), 10_000)
       toast.success('Download concluído', { id: key, description: nome })
     } catch {
-      toast.error('Não foi possível gerar o PDF. Abrindo para salvar…', { id: key })
-      window.open(`/imprimir/caderno/${data.caderno_id}?mod=${mod}&sessao=${sessionToken}${data.estudante_id ? `&aluno=${data.estudante_id}` : ''}&${gab ? 'gabarito=1' : 'semgab=1'}&rawimg=1&print=1`, '_blank', 'noopener,noreferrer')
+      // Fallback só p/ caderno V1 (rota de impressão); no V2 o download é sempre a rota gerada.
+      if (md?.cadernoTeste) toast.error('Não foi possível gerar o PDF agora. Tente novamente em instantes.', { id: key })
+      else {
+        toast.error('Não foi possível gerar o PDF. Abrindo para salvar…', { id: key })
+        window.open(`/imprimir/caderno/${data?.caderno_id}?mod=${mod}&sessao=${sessionToken}${data?.estudante_id ? `&aluno=${data.estudante_id}` : ''}&${gab ? 'gabarito=1' : 'semgab=1'}&rawimg=1&print=1`, '_blank', 'noopener,noreferrer')
+      }
     } finally {
       marcarPdf(key, false)
     }
