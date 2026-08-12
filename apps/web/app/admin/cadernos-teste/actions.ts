@@ -11,7 +11,7 @@ import { materialDoConfig, materialEnunciadoDoConfig, type MaterialCaderno } fro
 import { metaDaModalidade } from '@/lib/caderno-teste/tipos'
 import type { BuilderV3, PreviewQuestao } from '@/lib/caderno-teste/tipos'
 
-export type RegistroTeste = { id: string; nome: string; vars: Record<string, string> }
+export type RegistroTeste = { id: string; nome: string; vars: Record<string, string>; respostas: Record<string, string> }
 export type DiscBancoTeste = { nome: string; chave: string; pilar?: string }
 export type QuestaoMeta = { numero: number; disciplinaChave: string; disciplinaNome: string; assunto: string }
 
@@ -111,7 +111,7 @@ export async function dadosBancoTeste(bancoId: string): Promise<{ ok: boolean; r
   let registros: RegistroTeste[] = []
   try {
     const regs = await carregarRegistros(svc, access.tenantId, bancoId, bancoNome, undefined, undefined, 30)
-    registros = regs.map((r) => ({ id: r.id, nome: r.nome, vars: r.vars }))
+    registros = regs.map((r) => ({ id: r.id, nome: r.nome, vars: r.vars, respostas: r.respostas }))
   } catch { /* base sem sessões/respostas — segue sem alunos */ }
 
   // Disciplinas AUTORITATIVAS: nomes reais das disciplinas das questões DO BANCO selecionado —

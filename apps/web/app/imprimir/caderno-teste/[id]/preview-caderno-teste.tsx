@@ -6,12 +6,16 @@ import { PreviaBlocos } from '@/lib/caderno-teste/previa-blocos'
 import { presetDoItem, type ItemCaderno, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
 
 /** Renderiza um grupo do caderno de teste com os MESMOS componentes de prévia do editor (paginado em A4). */
-export function PreviewCadernoTeste({ item, questoes, vars, discBanco, standalone }: {
+export function PreviewCadernoTeste({ item, questoes, vars, discBanco, standalone, respostas, gabaritoLiberado }: {
   item: ItemCaderno
   questoes: PreviewQuestao[]
   vars: Record<string, string>
   discBanco: DiscBanco[]
   standalone?: boolean
+  /** Respostas do aluno (questaoId → letra) — folha "como fez"/correção. */
+  respostas?: Record<string, string>
+  /** Revela o gabarito oficial (false = só marcações do aluno). */
+  gabaritoLiberado?: boolean
 }) {
   const preset = presetDoItem(item)
   return (
@@ -27,7 +31,7 @@ export function PreviewCadernoTeste({ item, questoes, vars, discBanco, standalon
         </div>
       )}
       {preset
-        ? <PreviaBlocos presetId={preset} questoes={questoes} vars={vars} titulo={item.ajustes.titulo} capaUrl={item.ajustes.capaUrl} folhaUrl={item.ajustes.folhaUrl} capa={item.capa} docOverride={item.docEdit} />
+        ? <PreviaBlocos presetId={preset} questoes={questoes} vars={vars} titulo={item.ajustes.titulo} capaUrl={item.ajustes.capaUrl} folhaUrl={item.ajustes.folhaUrl} capa={item.capa} docOverride={item.docEdit} respostas={respostas} gabaritoLiberado={gabaritoLiberado} />
         : <Previa item={item} questoes={questoes} vars={vars} discBanco={discBanco} />}
     </div>
   )

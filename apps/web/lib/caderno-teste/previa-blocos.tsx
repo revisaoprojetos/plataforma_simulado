@@ -52,14 +52,17 @@ export function capaPadraoDoPreset(presetId: string): CapaConfig {
   return { ...CAPA_PADRAO, titulo: doc ? tituloCapaDoDoc(doc) : CAPA_PADRAO.titulo }
 }
 
-/** Questões do banco (PreviewQuestao) + variáveis do aluno → CadernoData que os blocos consomem. */
-export function montarCadernoData(questoes: PreviewQuestao[], vars: Record<string, string>, titulo: string): CadernoData {
+/** Questões do banco (PreviewQuestao) + variáveis do aluno → CadernoData que os blocos consomem.
+ *  `opts.respostas` (questaoId → letra marcada) alimenta a folha "como fez" / correção; `opts.gabaritoLiberado`
+ *  controla a revelação do gabarito oficial (false = só as marcações do aluno). */
+export function montarCadernoData(questoes: PreviewQuestao[], vars: Record<string, string>, titulo: string, opts?: { respostas?: Record<string, string>; gabaritoLiberado?: boolean }): CadernoData {
   const qs: QuestaoData[] = questoes.map((q, i) => ({
     id: q.id, numero: q.numero || i + 1, enunciado: q.enunciado ?? '', tipo: q.tipo, comentario: '',
     alternativas: (q.alternativas ?? []).map((a) => ({ letra: a.letra, texto: a.texto, correta: a.correta, comentario: a.comentario ?? '', lei: '' })),
   }))
   const data: CadernoData = {
-    questoes: qs, numQuestoes: qs.length || 20, numAlternativas: 5, gabaritoLiberado: true,
+    questoes: qs, numQuestoes: qs.length || 20, numAlternativas: 5, gabaritoLiberado: opts?.gabaritoLiberado ?? true,
+    respostas: opts?.respostas,
     vars: { nome: '', simulado: titulo, acertos: '', erros: '', total_questoes: String(qs.length || 20), nota: '', percentual: '', ...vars },
   }
   if (qs[0]) { const base = dataComQuestao(data, qs[0]); data.vars = base.vars; data.questaoAtual = base.questaoAtual }
@@ -134,11 +137,15 @@ function FolhaCapa({ capaUrl, capa, theme, onPick, sel }: { capaUrl: string; cap
 }
 
 /** Prévia A4 de um modelo pronto (doc v1) com as questões do banco + variáveis do aluno. */
-export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl, folhaUrl, capa, onPickCapa, selCapa, docOverride, onPickBloco, selBlocoId }: {
+export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl, folhaUrl, capa, onPickCapa, selCapa, docOverride, onPickBloco, selBlocoId, respostas, gabaritoLiberado }: {
   presetId: string
   questoes: PreviewQuestao[]
   vars?: Record<string, string>
   titulo: string
+  /** Respostas do aluno (questaoId → letra marcada) — pinta a folha "como fez"/correção. */
+  respostas?: Record<string, string>
+  /** Revela o gabarito oficial (false = só marcações do aluno). Default true (prévia do modelo). */
+  gabaritoLiberado?: boolean
   cores?: Partial<CadernoTheme['cores']> | null
   /** Imagem de capa: quando vazia, a página de capa NÃO aparece; quando definida, entra como capa. */
   capaUrl?: string
@@ -161,7 +168,8 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
   // duplicados/embaralhados no BlockRender. Normaliza os ids (posição) sempre.
   const doc = useMemo(() => docOverride ? idsDeterministicos(docOverride) : docDoPreset(presetId), [docOverride, presetId])
   const theme = useMemo(() => resolveTheme(cores), [cores])
-  const data = useMemo(() => montarCadernoData(questoes, vars, titulo), [questoes, vars, titulo])
+  const respostasKey = useMemo(() => JSON.stringify(respostas ?? null), [respostas])
+  const data = useMemo(() => montarCadernoData(questoes, vars, titulo, { respostas, gabaritoLiberado }), [questoes, vars, titulo, respostasKey, gabaritoLiberado]) // eslint-disable-line react-hooks/exhaustive-deps
   const selectable = !!onPickBloco
   const running = doc?.running ?? RUNNING_PADRAO
   // Reserva de área segura (cabeçalho/rodapé) — a arte do letterhead já traz cabeçalho/rodapé.

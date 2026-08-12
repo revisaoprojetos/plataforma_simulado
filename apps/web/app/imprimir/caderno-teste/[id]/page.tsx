@@ -12,12 +12,14 @@ export const dynamic = 'force-dynamic'
  * Prévia (paginada em A4) de um grupo do caderno de teste — usada no iframe da aba do banco.
  * Renderiza os MESMOS componentes do editor (Previa/PreviaBlocos), então a prévia bate 1:1.
  */
-export default async function ImprimirCadernoTestePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ grupo?: string; aluno?: string; embed?: string }> }) {
+export default async function ImprimirCadernoTestePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ grupo?: string; aluno?: string; embed?: string; gabarito?: string; semgab?: string }> }) {
   const { id: cadernoId } = await params
   const sp = await searchParams
   const grupoId = sp.grupo ?? ''
   const alunoId = sp.aluno
   const embed = sp.embed === '1'
+  // "como fez" (semgab=1) esconde o gabarito oficial e mostra só as marcações; caso contrário revela a correção.
+  const gabaritoLiberado = sp.semgab === '1' ? false : true
 
   const access = await getCurrentAccess()
   if (!access.tenantId || !(access.isAdmin || access.permissions.includes('questoes:view'))) {
@@ -36,6 +38,7 @@ export default async function ImprimirCadernoTestePage({ params, searchParams }:
   let vars: Record<string, string> = {}
   let disciplinas: DiscBanco[] = []
   let questoes: PreviewQuestao[] = []
+  let respostas: Record<string, string> = {}
   if (bancoId) {
     if (item.modalidade === 'diagnostico') {
       try {
@@ -46,8 +49,16 @@ export default async function ImprimirCadernoTestePage({ params, searchParams }:
       } catch { /* segue com o conteúdo do modelo */ }
     } else {
       try { const r = await previewQuestoesBanco(bancoId); questoes = r.questoes ?? [] } catch { /* sem questões */ }
+      // Folha "como fez" e caderno completo precisam das MARCAÇÕES do aluno (respostas) + suas variáveis.
+      if (item.modalidade === 'folha_respostas' || item.modalidade === 'caderno_completo') {
+        try {
+          const rd = await dadosBancoTeste(bancoId)
+          const reg = alunoId ? rd.registros.find((r) => r.id === alunoId) : rd.registros[0]
+          if (reg) { vars = { ...vars, ...reg.vars }; respostas = reg.respostas }
+        } catch { /* sem sessões/respostas — folha em branco */ }
+      }
     }
   }
 
-  return <PreviewCadernoTeste item={item} questoes={questoes} vars={vars} discBanco={disciplinas} standalone={!embed} />
+  return <PreviewCadernoTeste item={item} questoes={questoes} vars={vars} discBanco={disciplinas} standalone={!embed} respostas={respostas} gabaritoLiberado={gabaritoLiberado} />
 }
