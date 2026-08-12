@@ -13,6 +13,10 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } from '@/components/aluno/simulados-catalogo-aluno'
 import { SemAcessoModal } from '@/components/aluno/sem-acesso-modal'
 import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
+import { getGamConfig } from '@/lib/gamificacao'
+import { resumoGamificacao, missoesHoje } from '@/lib/gamificacao/leitura'
+import { GamificacaoHero } from '@/components/aluno/gamificacao-hero'
+import { MissoesLista } from '@/components/aluno/missoes-lista'
 
 export default async function AlunoHome({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
   const { pasta } = await searchParams
@@ -254,6 +258,15 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     )
   }
 
+  // Gamificação (hero + missões do dia) — só quando o tenant ativou; leituras leves (cache + janela).
+  const gamConfig = await getGamConfig(svc, sessao!.tenantId)
+  const [gamResumo, gamMissoes] = gamConfig?.ativo
+    ? await Promise.all([
+        resumoGamificacao(svc, sessao!.tenantId, estId, gamConfig),
+        missoesHoje(svc, sessao!.tenantId, estId, gamConfig),
+      ])
+    : [null, []]
+
   const atalhos = [
     { href: '/aluno/simulados', icon: ClipboardList, titulo: 'Meus Simulados', desc: 'Seus simulados e resultados' },
     { href: '/aluno/recomendado', icon: Sparkles, titulo: 'Recomendado', desc: 'Questões focadas nos seus pontos fracos' },
@@ -267,6 +280,14 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     <div className="animate-page space-y-6">
       {/* Banners do tenant — UM carrossel só (banner + destaque + simulado) + pop-up. SÓ na Início. */}
       <BannersPortal banners={bannersSemSim.map((b) => ({ ...b, ordem: ordemGlobal.get(b.id) ?? 0, estilo: (destaquesBanner[b.id] as any)?.popupEstilo ?? null, pontas: (destaquesBanner[b.id] as any)?.popupPontas ?? null, textoPos: (destaquesBanner[b.id] as any)?.bannerTextoPos ?? null, textoCor: (destaquesBanner[b.id] as any)?.bannerTextoCor ?? null, textoTam: (destaquesBanner[b.id] as any)?.bannerTextoTam ?? null, textoX: (destaquesBanner[b.id] as any)?.bannerTextoX ?? null, textoY: (destaquesBanner[b.id] as any)?.bannerTextoY ?? null, ocultarTitulo: (destaquesBanner[b.id] as any)?.bannerOcultarTitulo ?? false, ocultarMensagem: (destaquesBanner[b.id] as any)?.bannerOcultarMensagem ?? false, freq: (destaquesBanner[b.id] as any)?.freq ?? null }))} simulados={heroSims} stats={mostrarDesempenhoBanner ? statsAluno : null} />
+
+      {/* Gamificação: hero (nível/liga/streak/XP) + missões do dia. Só quando o tenant ativou. */}
+      {gamResumo && (
+        <div className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+          <GamificacaoHero nome={sessao!.nome} resumo={gamResumo} />
+          {gamMissoes.length > 0 ? <MissoesLista missoes={gamMissoes} renova="meia-noite" /> : <div className="hidden lg:block" />}
+        </div>
+      )}
 
       {/* Saudação solta. */}
       <div>

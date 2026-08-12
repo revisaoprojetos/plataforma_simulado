@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { type LoginConfig } from '@/lib/login-config'
-import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, LogOut } from 'lucide-react'
+import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy } from 'lucide-react'
 import {
   Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter,
@@ -27,6 +27,7 @@ const NAV = [
   { href: '/aluno', label: 'Início', icon: Home, exact: true },
   { href: '/aluno/simulados', label: 'Meus Simulados', icon: ClipboardList },
   { href: '/aluno/recomendado', label: 'Recomendado', icon: Sparkles },
+  { href: '/aluno/ligas', label: 'Ligas', icon: Trophy },
   { href: '/aluno/questoes', label: 'Banco de Questões', icon: BookOpen },
   { href: '/aluno/favoritos', label: 'Favoritos', icon: Star },
   { href: '/aluno/cadernos', label: 'Cadernos', icon: NotebookPen },

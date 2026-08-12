@@ -5,6 +5,11 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { montarRelatorioEstudante } from '@/app/admin/relatorios/estudantes/_dados'
 import { RelatorioEstudanteView } from '@/app/admin/relatorios/estudantes/relatorio-estudante-view'
 import { Mail, Phone, IdCard, BarChart3, ArrowRight } from 'lucide-react'
+import { getGamConfig } from '@/lib/gamificacao'
+import { resumoGamificacao, conquistasDoAluno, missoesHoje } from '@/lib/gamificacao/leitura'
+import { GamificacaoHero } from '@/components/aluno/gamificacao-hero'
+import { ConquistasGrid } from '@/components/aluno/conquistas-grid'
+import { MissoesLista } from '@/components/aluno/missoes-lista'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,9 +34,13 @@ export default async function PerfilAlunoPage() {
   if (!sessao) redirect('/aluno/entrar')
 
   const svc = createAdminClient()
-  const [{ data: est }, dados] = await Promise.all([
+  const gamConfig = await getGamConfig(svc, sessao.tenantId)
+  const [{ data: est }, dados, gamResumo, gamConquistas, gamMissoes] = await Promise.all([
     svc.from('simulado_estudantes').select('nome, email, cpf, telefone').eq('id', sessao.estudanteId).maybeSingle(),
     montarRelatorioEstudante(svc, sessao.estudanteId, sessao.tenantId),
+    gamConfig?.ativo ? resumoGamificacao(svc, sessao.tenantId, sessao.estudanteId, gamConfig) : Promise.resolve(null),
+    gamConfig?.ativo ? conquistasDoAluno(svc, sessao.tenantId, sessao.estudanteId, gamConfig) : Promise.resolve([]),
+    gamConfig?.ativo ? missoesHoje(svc, sessao.tenantId, sessao.estudanteId, gamConfig) : Promise.resolve([]),
   ])
 
   const nome = est?.nome ?? sessao.nome
@@ -64,6 +73,17 @@ export default async function PerfilAlunoPage() {
           </div>
         </div>
       </div>
+
+      {/* Gamificação — nível/liga/streak + conquistas + missões do dia (quando ativo) */}
+      {gamResumo && (
+        <div className="space-y-4">
+          <GamificacaoHero nome={nome} resumo={gamResumo} />
+          <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+            <ConquistasGrid conquistas={gamConquistas} />
+            {gamMissoes.length > 0 ? <MissoesLista missoes={gamMissoes} renova="meia-noite" /> : <div className="hidden lg:block" />}
+          </div>
+        </div>
+      )}
 
       {/* Desempenho — KPIs, gráficos e histórico (mesmo motor do admin) */}
       {dados && dados.simulados > 0 ? (
