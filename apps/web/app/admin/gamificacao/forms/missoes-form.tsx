@@ -8,6 +8,7 @@ import { Plus, Trash2, Target } from 'lucide-react'
 import type { GamConfig, MissaoDef, MissaoTipo } from '@/lib/gamificacao/config'
 import { salvarMissoes } from '../actions'
 import { SaveBar, SectionCard } from './_campos'
+import { useUnsavedGuard } from '@/components/admin/use-unsaved-guard'
 
 let seq = 0
 const novoId = () => `m_${Date.now()}_${seq++}`
@@ -21,6 +22,7 @@ const selectCls = 'h-9 w-full rounded-lg border bg-background px-2 text-sm disab
 export function MissoesForm({ config, podeGerenciar }: { config: GamConfig; podeGerenciar: boolean }) {
   const [missoes, setMissoes] = useState<MissaoDef[]>(config.missoes_def)
   const [salvando, start] = useTransition()
+  const { dirty, markSaved } = useUnsavedGuard({ missoes })
 
   const set = (i: number, patch: Partial<MissaoDef>) => setMissoes((l) => l.map((x, j) => (j === i ? { ...x, ...patch } : x)))
   const add = () => setMissoes((l) => [...l, { id: novoId(), titulo: 'Nova missão', tipo: 'finalizar_simulado', meta: 1, xp: 20 }])
@@ -30,13 +32,13 @@ export function MissoesForm({ config, podeGerenciar }: { config: GamConfig; pode
     e.preventDefault()
     start(async () => {
       const r = await salvarMissoes(missoes)
-      if (r?.error) toast.error(r.error); else toast.success('Missões salvas.')
+      if (r?.error) toast.error(r.error); else { toast.success('Missões salvas.'); markSaved() }
     })
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      {podeGerenciar && <SaveBar salvando={salvando} hint="Missões diárias do aluno." />}
+      {podeGerenciar && <SaveBar salvando={salvando} dirty={dirty} hint="Missões diárias do aluno." />}
       <SectionCard titulo="Missões diárias" descricao="Renovam à meia-noite (fuso do tenant). O aluno ganha o XP ao atingir a meta do dia.">
         <div className="space-y-2">
           {missoes.map((m, i) => (

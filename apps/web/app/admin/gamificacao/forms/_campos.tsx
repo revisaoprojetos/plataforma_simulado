@@ -80,11 +80,14 @@ export function SaveButton({ salvando, disabled }: { salvando: boolean; disabled
 }
 
 /** Barra de ações fixa no topo da aba: some com a rolagem mas volta a "grudar" no topo ao subir. */
-export function SaveBar({ salvando, hint, children }: { salvando: boolean; hint?: string; children?: React.ReactNode }) {
+export function SaveBar({ salvando, hint, children, dirty }: { salvando: boolean; hint?: string; children?: React.ReactNode; dirty?: boolean }) {
   return (
-    <div className="sticky -top-6 z-20 -mx-1 flex flex-wrap items-center gap-2 border-b bg-background/85 px-1 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-      {hint && <span className="mr-auto text-xs text-muted-foreground">{hint}</span>}
-      {!hint && <span className="mr-auto" />}
+    <div className={`sticky -top-6 z-20 -mx-1 flex flex-wrap items-center gap-2 border-b px-1 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-background/70 ${dirty ? 'bg-amber-500/[0.06]' : 'bg-background/85'}`}>
+      <div className="mr-auto flex items-center gap-2 text-xs">
+        {dirty
+          ? <span className="inline-flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-400"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Alterações não salvas</span>
+          : hint && <span className="text-muted-foreground">{hint}</span>}
+      </div>
       {children}
       <SaveButton salvando={salvando} />
     </div>

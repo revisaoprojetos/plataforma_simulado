@@ -8,6 +8,7 @@ import { Plus, Trash2, RefreshCw, Shield } from 'lucide-react'
 import type { GamConfig, LigaDef } from '@/lib/gamificacao/config'
 import { salvarLigas, rebuildGamificacao } from '../actions'
 import { SaveBar, SectionCard } from './_campos'
+import { useUnsavedGuard } from '@/components/admin/use-unsaved-guard'
 
 let seq = 0
 const novoId = () => `liga_${Date.now()}_${seq++}`
@@ -16,6 +17,7 @@ export function LigasForm({ config, podeGerenciar }: { config: GamConfig; podeGe
   const [ligas, setLigas] = useState<LigaDef[]>(config.ligas)
   const [salvando, start] = useTransition()
   const [rebuild, startRebuild] = useTransition()
+  const { dirty, markSaved } = useUnsavedGuard({ ligas })
 
   const set = (i: number, patch: Partial<LigaDef>) => setLigas((l) => l.map((x, j) => (j === i ? { ...x, ...patch } : x)))
   const add = () => setLigas((l) => [...l, { id: novoId(), nome: 'Nova liga', xp_min: 0, cor: '#8b5cf6' }])
@@ -25,7 +27,7 @@ export function LigasForm({ config, podeGerenciar }: { config: GamConfig; podeGe
     e.preventDefault()
     start(async () => {
       const r = await salvarLigas(ligas)
-      if (r?.error) toast.error(r.error); else toast.success('Ligas salvas. Recalcule os tiers para aplicar os novos limites.')
+      if (r?.error) toast.error(r.error); else { toast.success('Ligas salvas. Recalcule os tiers para aplicar os novos limites.'); markSaved() }
     })
   }
   function onRebuild() {
@@ -40,7 +42,7 @@ export function LigasForm({ config, podeGerenciar }: { config: GamConfig; podeGe
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       {podeGerenciar && (
-        <SaveBar salvando={salvando} hint="Salve e recalcule os tiers após mudar os limites.">
+        <SaveBar salvando={salvando} dirty={dirty} hint="Salve e recalcule os tiers após mudar os limites.">
           <Button type="button" variant="secondary" onClick={onRebuild} disabled={rebuild}>
             <RefreshCw className={`h-4 w-4 ${rebuild ? 'animate-spin' : ''}`} /> Recalcular tiers
           </Button>

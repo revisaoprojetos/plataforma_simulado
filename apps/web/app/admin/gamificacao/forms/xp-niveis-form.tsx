@@ -9,18 +9,20 @@ import type { GamConfig, TituloNivel } from '@/lib/gamificacao/config'
 import { xpAcumuladoParaNivel, tituloParaNivel } from '@/lib/gamificacao/niveis'
 import { salvarXpNiveis } from '../actions'
 import { NumberField, SaveBar, SectionCard } from './_campos'
+import { useUnsavedGuard } from '@/components/admin/use-unsaved-guard'
 
 export function XpNiveisForm({ config, podeGerenciar }: { config: GamConfig; podeGerenciar: boolean }) {
   const [simulado, setSimulado] = useState(config.xp_regras.simulado)
   const [pratica, setPratica] = useState(config.xp_regras.pratica)
   const [curva, setCurva] = useState(config.nivel_curva)
   const [salvando, start] = useTransition()
+  const { dirty, markSaved } = useUnsavedGuard({ simulado, pratica, curva })
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     start(async () => {
       const r = await salvarXpNiveis({ simulado, pratica, nivel_curva: curva })
-      if (r?.error) toast.error(r.error); else toast.success('XP, níveis e cargos salvos.')
+      if (r?.error) toast.error(r.error); else { toast.success('XP, níveis e cargos salvos.'); markSaved() }
     })
   }
 
@@ -42,7 +44,7 @@ export function XpNiveisForm({ config, podeGerenciar }: { config: GamConfig; pod
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      {podeGerenciar && <SaveBar salvando={salvando} hint="Aplica XP, níveis e cargos." />}
+      {podeGerenciar && <SaveBar salvando={salvando} dirty={dirty} hint="Aplica XP, níveis e cargos." />}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <SectionCard titulo="XP por concluir simulado" icon={Zap} descricao="XP que o aluno ganha ao finalizar cada simulado (base + acertos + bônus por nota).">

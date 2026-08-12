@@ -8,6 +8,7 @@ import { Plus, Trash2, Rocket, Flame, Zap, Trophy, Medal, Award, type LucideIcon
 import type { GamConfig, ConquistaDef, ConquistaRegraTipo } from '@/lib/gamificacao/config'
 import { salvarConquistas } from '../actions'
 import { SaveBar, SectionCard } from './_campos'
+import { useUnsavedGuard } from '@/components/admin/use-unsaved-guard'
 
 let seq = 0
 const novoId = () => `c_${Date.now()}_${seq++}`
@@ -23,6 +24,7 @@ const selectCls = 'h-9 w-full rounded-lg border bg-background px-2 text-sm disab
 export function ConquistasForm({ config, podeGerenciar }: { config: GamConfig; podeGerenciar: boolean }) {
   const [lista, setLista] = useState<ConquistaDef[]>(config.conquistas_def)
   const [salvando, start] = useTransition()
+  const { dirty, markSaved } = useUnsavedGuard({ lista })
 
   const set = (i: number, patch: Partial<ConquistaDef>) => setLista((l) => l.map((x, j) => (j === i ? { ...x, ...patch } : x)))
   const setRegra = (i: number, patch: Partial<ConquistaDef['regra']>) => setLista((l) => l.map((x, j) => (j === i ? { ...x, regra: { ...x.regra, ...patch } } : x)))
@@ -33,13 +35,13 @@ export function ConquistasForm({ config, podeGerenciar }: { config: GamConfig; p
     e.preventDefault()
     start(async () => {
       const r = await salvarConquistas(lista)
-      if (r?.error) toast.error(r.error); else toast.success('Conquistas salvas.')
+      if (r?.error) toast.error(r.error); else { toast.success('Conquistas salvas.'); markSaved() }
     })
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      {podeGerenciar && <SaveBar salvando={salvando} hint="Conquistas do aluno." />}
+      {podeGerenciar && <SaveBar salvando={salvando} dirty={dirty} hint="Conquistas do aluno." />}
       <SectionCard titulo="Conquistas" descricao="Desbloqueadas uma única vez ao cumprir a regra. Podem conceder XP extra ao desbloquear.">
         <div className="grid gap-3 lg:grid-cols-2">
           {lista.map((c, i) => {

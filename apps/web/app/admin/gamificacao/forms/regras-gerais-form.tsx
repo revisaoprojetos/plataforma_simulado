@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import type { GamConfig } from '@/lib/gamificacao/config'
 import { salvarRegrasGerais } from '../actions'
 import { NumberField, TextField, SaveBar, SectionCard } from './_campos'
+import { useUnsavedGuard } from '@/components/admin/use-unsaved-guard'
 
 export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig; podeGerenciar: boolean }) {
   const [ativo, setAtivo] = useState(config.ativo)
@@ -14,18 +15,19 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
   const [streak, setStreak] = useState(config.xp_regras.streak)
   const [chest, setChest] = useState(config.xp_regras.chest)
   const [salvando, start] = useTransition()
+  const { dirty, markSaved } = useUnsavedGuard({ ativo, timezone, streak, chest })
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     start(async () => {
       const r = await salvarRegrasGerais({ ativo, timezone, streak, chest })
-      if (r?.error) toast.error(r.error); else toast.success('Regras gerais salvas.')
+      if (r?.error) toast.error(r.error); else { toast.success('Regras gerais salvas.'); markSaved() }
     })
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      {podeGerenciar && <SaveBar salvando={salvando} hint="Ativação, streak, baú e fuso." />}
+      {podeGerenciar && <SaveBar salvando={salvando} dirty={dirty} hint="Ativação, streak, baú e fuso." />}
       <div className={`flex items-center justify-between gap-4 rounded-2xl border p-5 shadow-sm ${ativo ? 'border-emerald-500/40 bg-emerald-500/5' : 'bg-card'}`}>
         <div>
           <Label className="text-sm font-semibold">Gamificação ativa</Label>

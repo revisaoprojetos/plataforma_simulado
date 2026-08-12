@@ -23,12 +23,12 @@ export function GamificacaoTabs({ config, podeGerenciar, metricas }: { config: G
         <TabsTrigger value="metricas"><BarChart3 /> Métricas</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="xp" className="pt-1 pb-1"><XpNiveisForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
-      <TabsContent value="ligas" className="pt-1 pb-1"><LigasForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
-      <TabsContent value="conquistas" className="pt-1 pb-1"><ConquistasForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
-      <TabsContent value="missoes" className="pt-1 pb-1"><MissoesForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
-      <TabsContent value="regras" className="pt-1 pb-1"><RegrasGeraisForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
-      <TabsContent value="metricas" className="pt-1 pb-1"><MetricasView m={metricas} /></TabsContent>
+      <TabsContent value="xp" keepMounted className="pt-1 pb-1"><XpNiveisForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
+      <TabsContent value="ligas" keepMounted className="pt-1 pb-1"><LigasForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
+      <TabsContent value="conquistas" keepMounted className="pt-1 pb-1"><ConquistasForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
+      <TabsContent value="missoes" keepMounted className="pt-1 pb-1"><MissoesForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
+      <TabsContent value="regras" keepMounted className="pt-1 pb-1"><RegrasGeraisForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
+      <TabsContent value="metricas" keepMounted className="pt-1 pb-1"><MetricasView m={metricas} /></TabsContent>
     </Tabs>
   )
 }
