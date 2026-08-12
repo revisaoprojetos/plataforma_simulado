@@ -82,7 +82,7 @@ export function SaveButton({ salvando, disabled }: { salvando: boolean; disabled
 /** Barra de ações fixa no topo da aba: some com a rolagem mas volta a "grudar" no topo ao subir. */
 export function SaveBar({ salvando, hint, children }: { salvando: boolean; hint?: string; children?: React.ReactNode }) {
   return (
-    <div className="sticky -top-6 z-20 -mx-1 mb-1 flex flex-wrap items-center gap-2 border-b bg-background/85 px-1 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+    <div className="sticky -top-6 z-20 -mx-1 flex flex-wrap items-center gap-2 border-b bg-background/85 px-1 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-background/70">
       {hint && <span className="mr-auto text-xs text-muted-foreground">{hint}</span>}
       {!hint && <span className="mr-auto" />}
       {children}
