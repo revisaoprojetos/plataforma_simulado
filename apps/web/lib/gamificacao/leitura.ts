@@ -66,7 +66,7 @@ export async function missoesHoje(svc: any, tenantId: string, estudanteId: strin
     .from('simulado_missao_progresso')
     .select('missao_id, progresso, completa')
     .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('dia', hoje)
-  const porId = new Map((data ?? []).map((r: any) => [r.missao_id, r]))
+  const porId = new Map<string, any>((data ?? []).map((r: any) => [r.missao_id, r]))
   return (config.missoes_def ?? []).map((def) => {
     const p = porId.get(def.id)
     return { def, progresso: Math.min(p?.progresso ?? 0, def.meta), completa: p?.completa ?? false }
@@ -83,7 +83,7 @@ export async function conquistasDoAluno(svc: any, tenantId: string, estudanteId:
     .from('simulado_conquista_desbloqueios')
     .select('conquista_id, desbloqueado_em')
     .eq('tenant_id', tenantId).eq('estudante_id', estudanteId)
-  const porId = new Map((data ?? []).map((r: any) => [r.conquista_id, r.desbloqueado_em]))
+  const porId = new Map<string, string>((data ?? []).map((r: any) => [r.conquista_id, r.desbloqueado_em]))
   return (config.conquistas_def ?? []).map((def) => ({
     def,
     desbloqueada: porId.has(def.id),
