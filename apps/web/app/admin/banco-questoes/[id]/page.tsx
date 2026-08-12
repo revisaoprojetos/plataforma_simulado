@@ -159,8 +159,8 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
           <TabsTrigger value="visao">Visão geral</TabsTrigger>
           <TabsTrigger value="questoes">Questões</TabsTrigger>
           <TabsTrigger value="estudantes">Estudantes</TabsTrigger>
-          <TabsTrigger value="caderno">Caderno</TabsTrigger>
-          <TabsTrigger value="caderno-teste">Caderno teste</TabsTrigger>
+          <TabsTrigger value="caderno-teste">Caderno</TabsTrigger>
+          <TabsTrigger value="caderno">Caderno (legado)</TabsTrigger>
           <TabsTrigger value="hud">HUD do simulado</TabsTrigger>
           <TabsTrigger value="relatorio">Relatório</TabsTrigger>
           <TabsTrigger value="personalizar">Personalizar</TabsTrigger>

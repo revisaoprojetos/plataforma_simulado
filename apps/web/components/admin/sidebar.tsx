@@ -113,8 +113,8 @@ const navGroups: NavGroup[] = [
       { label: 'Questões', href: '/admin/questoes', icon: BookOpen, perm: 'questoes:view' },
       { label: 'Banco de Simulado', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
       { label: 'Correção (discursivas)', href: '/admin/correcao', icon: PenLine, perm: 'questoes:view' },
-      { label: 'Cadernos de Prova', href: '/admin/cadernos', icon: FileText, perm: 'questoes:view' },
-      { label: 'Cadernos (teste)', href: '/admin/cadernos-teste', icon: FlaskConical, perm: 'questoes:view' },
+      { label: 'Cadernos', href: '/admin/cadernos-teste', icon: FileText, perm: 'questoes:view' },
+      { label: 'Cadernos de Prova (legado)', href: '/admin/cadernos', icon: FlaskConical, perm: 'questoes:view' },
     ],
   },
   {
