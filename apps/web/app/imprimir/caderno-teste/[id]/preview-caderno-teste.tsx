@@ -19,9 +19,20 @@ export function PreviewCadernoTeste({ item, questoes, vars, discBanco, standalon
 }) {
   const preset = presetDoItem(item)
   return (
-    <div className="flex min-h-screen justify-center bg-neutral-100 py-4 dark:bg-neutral-900">
-      {/* Impressão: folha A4 sem margem do navegador; esconde a barra de ação. */}
-      <style>{'@media print{@page{size:A4;margin:0}body{background:#fff!important}.no-print{display:none!important}}'}</style>
+    <div className="caderno-print-root flex min-h-screen justify-center bg-neutral-100 py-4 dark:bg-neutral-900">
+      {/* Impressão: folha A4 sem margem do navegador; esconde a barra de ação. Zera o padding/gap/sombra
+          da PRÉVIA de tela (senão a linha cinza do topo vaza e o gap de 22px entre folhas empurra o rodapé
+          para uma página extra). break-after: 1 folha por página; a última NÃO quebra (evita página vazia). */}
+      <style>{`@media print{
+        @page{size:A4;margin:0}
+        html,body{background:#fff!important}
+        .no-print{display:none!important}
+        .caderno-print-root{padding:0!important;margin:0!important;background:#fff!important;min-height:0!important}
+        .caderno-pronto{gap:0!important}
+        .caderno-pronto>[aria-hidden]{display:none!important}
+        .caderno-pronto>div{box-shadow:none!important;break-after:page;page-break-after:always}
+        .caderno-pronto>div:last-child{break-after:avoid;page-break-after:avoid}
+      }`}</style>
       {standalone && (
         <div className="no-print fixed right-4 top-4 z-50">
           <button type="button" onClick={() => window.print()}
