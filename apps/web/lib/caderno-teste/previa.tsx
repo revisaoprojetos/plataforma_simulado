@@ -315,10 +315,13 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
       const corDisc = corP(`disc:${d.chave}`, (a.coresDisc ?? {})[d.chave] || corDoPilar(d.pilar, a.coresPilar ?? {}, amar))
       const corTxt = c.discCorTexto?.[d.chave] ?? prim
       const dk = `disc:${d.chave}`
-      const lista = assuntos.length ? assuntos : ['Assuntos das questões erradas']
-      // Cabeçalho do card (nome + estatística) — bloco selecionável.
+      // Acertou tudo (sem assuntos errados) num render com dados reais do aluno → não mostra nada;
+      // sem dados (modelo/preview vazio) → mantém o rótulo placeholder p/ ilustrar o campo no editor.
+      const temDadosAluno = Object.keys(vars).length > 0
+      const lista = assuntos.length ? assuntos : (temDadosAluno ? [] : ['Assuntos das questões erradas'])
+      // Cabeçalho do card (nome + estatística) — bloco selecionável. Sem sub-linhas (gabaritou) → fecha o padding.
       add(dk, (
-        <div {...atr(dk, d.nome, corDisc, { background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: '6px 10px 2px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 })}>
+        <div {...atr(dk, d.nome, corDisc, { background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: lista.length ? '6px 10px 2px' : '6px 10px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 })}>
           <div style={{ fontSize: fs(dk, 11), fontWeight: 700, color: corTxt }}>{V(c.discNomes?.[d.chave] ?? d.nome)}</div>
           <div style={{ fontSize: fs(dk, 11), whiteSpace: 'nowrap' }}><span style={{ color: '#9590b0' }}>{V(`{acerto_${fonte}}`)}/{V(`{total_${fonte}}`)}</span> <span style={{ fontWeight: 800, color: corDisc }}>{V(`{pct_${fonte}}`)}</span></div>
         </div>
