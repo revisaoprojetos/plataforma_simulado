@@ -47,15 +47,15 @@ export function XpNiveisForm({ config, podeGerenciar }: { config: GamConfig; pod
       <div className="grid gap-4 xl:grid-cols-2">
         <SectionCard titulo="XP por concluir simulado" icon={Zap} descricao="XP que o aluno ganha ao finalizar cada simulado (base + acertos + bônus por nota).">
           <div className="grid grid-cols-3 gap-2.5">
-            <NumberField stacked label="XP base (por concluir)" value={simulado.base} onChange={(v) => setSimulado({ ...simulado, base: v })} suffix="XP" disabled={!podeGerenciar} />
-            <NumberField stacked label="XP por acerto" value={simulado.por_acerto} onChange={(v) => setSimulado({ ...simulado, por_acerto: v })} suffix="XP / acerto" disabled={!podeGerenciar} />
+            <NumberField stacked label="XP base (por concluir)" value={simulado.base} onChange={(v) => setSimulado({ ...simulado, base: v })} suffix="XP" hint="Fixo por finalizar, mesmo sem acertar." disabled={!podeGerenciar} />
+            <NumberField stacked label="XP por acerto" value={simulado.por_acerto} onChange={(v) => setSimulado({ ...simulado, por_acerto: v })} suffix="XP / acerto" hint="Multiplicado pelo nº de questões corretas." disabled={!podeGerenciar} />
             <NumberField stacked label="Bônus máximo por nota" value={simulado.bonus_nota_max} onChange={(v) => setSimulado({ ...simulado, bonus_nota_max: v })} suffix="XP na nota 100" hint="Proporcional à nota: 100 = cheio; 50 = metade." disabled={!podeGerenciar} />
           </div>
         </SectionCard>
 
         <SectionCard titulo="XP por praticar (Banco de Questões)" icon={BookOpen} descricao="XP ao acertar questões na prática avulsa do banco, com bônus em disciplinas fracas.">
           <div className="grid grid-cols-2 gap-2.5">
-            <NumberField stacked label="XP por acerto na prática" value={pratica.por_acerto} onChange={(v) => setPratica({ ...pratica, por_acerto: v })} suffix="XP" disabled={!podeGerenciar} />
+            <NumberField stacked label="XP por acerto na prática" value={pratica.por_acerto} onChange={(v) => setPratica({ ...pratica, por_acerto: v })} suffix="XP" hint="Por questão acertada no banco (repetível)." disabled={!podeGerenciar} />
             <NumberField stacked label="Bônus em disciplina fraca" value={pratica.bonus_disc_fraca} onChange={(v) => setPratica({ ...pratica, bonus_disc_fraca: v })} suffix="XP extra" hint="Quando o aproveitamento na disciplina está abaixo de 50%." disabled={!podeGerenciar} />
           </div>
         </SectionCard>
@@ -64,9 +64,9 @@ export function XpNiveisForm({ config, podeGerenciar }: { config: GamConfig; pod
       <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
         <SectionCard titulo="Curva de níveis" icon={TrendingUp} descricao="Custo do nível n→n+1 = base + (n−1) × incremento. Cresce a cada nível." className="flex flex-col lg:h-[34rem]">
           <div className="grid grid-cols-3 gap-2.5">
-            <NumberField stacked label="Custo base (1→2)" value={curva.base} onChange={(v) => setCurva({ ...curva, base: v })} suffix="XP" disabled={!podeGerenciar} />
-            <NumberField stacked label="Incremento" value={curva.incremento} onChange={(v) => setCurva({ ...curva, incremento: v })} suffix="XP" disabled={!podeGerenciar} />
-            <NumberField stacked label="Nível máximo" value={curva.nivel_max} onChange={(v) => setCurva({ ...curva, nivel_max: Math.max(2, Math.min(200, v)) })} suffix="níveis" min={2} disabled={!podeGerenciar} />
+            <NumberField stacked label="Custo base (1→2)" value={curva.base} onChange={(v) => setCurva({ ...curva, base: v })} suffix="XP" hint="XP para sair do nível 1 para o 2." disabled={!podeGerenciar} />
+            <NumberField stacked label="Incremento" value={curva.incremento} onChange={(v) => setCurva({ ...curva, incremento: v })} suffix="XP" hint="Quanto o custo sobe a cada nível." disabled={!podeGerenciar} />
+            <NumberField stacked label="Nível máximo" value={curva.nivel_max} onChange={(v) => setCurva({ ...curva, nivel_max: Math.max(2, Math.min(200, v)) })} suffix="níveis" min={2} hint="Último nível que o aluno pode alcançar." disabled={!podeGerenciar} />
           </div>
 
           <div className="mt-4 flex min-h-0 flex-1 flex-col">
