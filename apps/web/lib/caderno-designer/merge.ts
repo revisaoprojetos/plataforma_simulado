@@ -97,7 +97,7 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
   if (qids.length) {
     // Sessão exata (sessaoId) ou todas as tentativas reais dos alunos (paginado).
     const sessoes = sessaoId
-      ? await fetchAll<any>(() => svc.from('simulado_sessoes_prova').select('id, estudante_id, iniciado_em, finalizado_em, status').eq('id', sessaoId).eq('deletado', false).order('id'))
+      ? await fetchAll<any>(() => svc.from('simulado_sessoes_prova').select('id, estudante_id, iniciado_em, finalizado_em, status').eq('id', sessaoId).eq('tenant_id', tenantId).eq('deletado', false).order('id'))
       : await fetchAllByIn<any>(estIds, (chunk) => svc.from('simulado_sessoes_prova').select('id, estudante_id, iniciado_em, finalizado_em, status').in('estudante_id', chunk).eq('is_teste', false).eq('deletado', false).order('id'))
     const allSessIds = sessoes.map((s: any) => s.id)
 

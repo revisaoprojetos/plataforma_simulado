@@ -30,17 +30,21 @@ export default async function ImprimirCadernoTestePage({ params, searchParams }:
 
   // ---- Acesso: token de render (Gotenberg) | sessão do aluno | admin ----
   let tenantId: string | null = null
+  // Pode ver DADOS REAIS do aluno (PII/desempenho/respostas)? Token = render do próprio aluno; sessão = dono
+  // (forçado adiante); admin só com permissão de resultados. Conteúdo-only (só questoes:view) vê placeholders.
+  let podeDados = false
   const tok = verificarRenderToken(sp.pdftoken)
   if (tok && tok.r === 'caderno-teste' && tok.id === cadernoId) {
-    tenantId = tok.t
+    tenantId = tok.t; podeDados = true
   } else if (sp.sessao) {
     const { data: sess } = await svc.from('simulado_sessoes_prova').select('tenant_id').eq('id', sp.sessao).maybeSingle()
     if (!sess) return semPermissao('Sessão não encontrada.')
-    tenantId = (sess as any).tenant_id
+    tenantId = (sess as any).tenant_id; podeDados = true
   } else {
     const access = await getCurrentAccess()
     if (!access.tenantId || !(access.isAdmin || access.permissions.includes('questoes:view'))) return semPermissao()
     tenantId = access.tenantId
+    podeDados = access.isAdmin || access.permissions.includes('estudantes:view') || access.permissions.includes('relatorios:view')
   }
   if (!tenantId) return semPermissao()
 
@@ -74,15 +78,15 @@ export default async function ImprimirCadernoTestePage({ params, searchParams }:
   if (bancoId) {
     if (item.modalidade === 'diagnostico') {
       try {
-        const rd = await carregarDadosBancoCore(svc, tenantId, bancoId, { aluno: alunoId, sessao })
+        const rd = await carregarDadosBancoCore(svc, tenantId, bancoId, podeDados ? { aluno: alunoId, sessao } : undefined)
         disciplinas = rd.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave, pilar: d.pilar }))
-        const reg = alunoId ? rd.registros.find((r) => r.id === alunoId) : rd.registros[0]
-        if (reg) vars = reg.vars
+        // Vars reais do aluno (nota/PII) só p/ quem enxerga resultados; senão o modelo mostra placeholders.
+        if (podeDados) { const reg = alunoId ? rd.registros.find((r) => r.id === alunoId) : rd.registros[0]; if (reg) vars = reg.vars }
       } catch { /* segue com o conteúdo do modelo */ }
     } else {
       try { questoes = await carregarQuestoesBancoCore(svc, tenantId, bancoId) } catch { /* sem questões */ }
       // Folha "como fez" e caderno completo precisam das MARCAÇÕES do aluno (respostas) + suas variáveis.
-      if (item.modalidade === 'folha_respostas' || item.modalidade === 'caderno_completo') {
+      if (podeDados && (item.modalidade === 'folha_respostas' || item.modalidade === 'caderno_completo')) {
         try {
           const rd = await carregarDadosBancoCore(svc, tenantId, bancoId, { aluno: alunoId, sessao })
           const reg = alunoId ? rd.registros.find((r) => r.id === alunoId) : rd.registros[0]
