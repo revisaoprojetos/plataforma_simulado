@@ -5,6 +5,7 @@ import { contextoNota, calcularNota } from '@/lib/simulado/nota'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
 import { publicarAoVivo } from '@/lib/realtime/pubsub'
+import { onSimuladoFinalizado } from '@/lib/gamificacao'
 
 // POST /api/sessoes/finalizar — finaliza a sessão e calcula a nota.
 //
@@ -133,6 +134,10 @@ export async function POST(request: NextRequest) {
     void dispararWebhook(sessao.tenant_id, 'estudante.finalizou',
       await dadosProgressao(supabase, sessao, { nota: Math.round(nota * 100) / 100, acertos, total: totalQ }))
   }
+
+  // Gamificação (XP/streak/missões/conquistas). FORA do guard de status: idempotente pela dedupe
+  // do ledger (refId=sessao_id) — seguro mesmo se o auto-encerramento já tiver finalizado. Fire-and-forget.
+  void onSimuladoFinalizado(supabase, { tenantId: sessao.tenant_id, estudanteId: sessao.estudante_id, sessaoId: sessao_id, nota, acertos, total: totalQ })
 
   // Posição final do aluno (após o recálculo).
   const { data: ranked } = await supabase

@@ -6,6 +6,7 @@ import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
 import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
 import { publicarAoVivo } from '@/lib/realtime/pubsub'
+import { onSimuladoFinalizado } from '@/lib/gamificacao'
 
 export const dynamic = 'force-dynamic'
 
@@ -122,6 +123,8 @@ async function processar() {
     afetados.add(s.simulado_id)
     if (s.tenant_id) tenantsAfetados.add(s.tenant_id)
     eventos.push({ tenant_id: s.tenant_id, sessao_id: s.id, tipo: 'auto_finalizou' })
+    // Gamificação: XP do simulado auto-encerrado (idempotente pela dedupe do ledger; refId=sessao_id).
+    void onSimuladoFinalizado(svc, { tenantId: s.tenant_id, estudanteId: s.estudante_id ?? null, sessaoId: s.id, nota, acertos, total })
     // Notifica sistemas externos (webhooks/n8n): estudante não finalizou (auto-encerrado por tempo/janela).
     if (s.estudante_id) {
       await dispararWebhook(s.tenant_id, 'estudante.nao_finalizou',

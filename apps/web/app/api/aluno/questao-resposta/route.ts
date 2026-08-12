@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
+import { onPraticaRespondida } from '@/lib/gamificacao'
 
 // POST /api/aluno/questao-resposta — registra UMA tentativa avulsa (prática no Banco de Questões).
 // Cada tentativa vira um registro (histórico) — o aluno pode refazer quantas vezes quiser.
@@ -28,14 +29,19 @@ export async function POST(request: NextRequest) {
     const { data: q } = await svc.from('simulado_questoes').select('disciplina_id, tenant_id').eq('id', questao_id).maybeSingle()
     if (!q || q.tenant_id !== sessao.tenantId) return NextResponse.json({ message: 'Questão inválida.' }, { status: 400 })
 
-    await svc.from('simulado_respostas_avulsas').insert({
+    const { data: inserida } = await svc.from('simulado_respostas_avulsas').insert({
       tenant_id: sessao.tenantId,
       estudante_id: sessao.estudanteId,
       questao_id,
       alternativa_id,
       disciplina_id: q.disciplina_id ?? null,
       correta: !!alt.correta,
-    })
+    }).select('id').single()
+
+    // Gamificação: XP de prática + streak/missões/conquistas (idempotente por resposta). Fire-and-forget.
+    if (inserida?.id) {
+      void onPraticaRespondida(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, respostaId: inserida.id, correta: !!alt.correta, disciplinaId: q.disciplina_id ?? null })
+    }
     return NextResponse.json({ ok: true, correta: !!alt.correta })
   } catch {
     // Tabela ainda não migrada — não quebra a prática do aluno.
