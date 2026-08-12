@@ -128,6 +128,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
   // Retomar a sessão: restaura questão atual + marcações de revisar + se já entrou.
   // (As respostas vêm do servidor; o tempo continua por iniciado_em.)
   const [progHidratado, setProgHidratado] = useState(false)
+  const avisouTempoRef = useRef(false) // já avisou "tempo acabou, mas pode continuar" (regra sem punição)?
   useEffect(() => {
     if (!sessao?.id) return
     try {
@@ -242,6 +243,12 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
         const r = await fetch(`/api/sessoes/tempo?st=${sessionToken}`)
         if (r.ok) {
           const d = await r.json()
+          // Regra "continuar após o tempo, sem punição": NÃO auto-finaliza — o aluno segue respondendo
+          // e entrega manualmente quando quiser (o servidor aceita respostas normalmente).
+          if (!cancel && d?.permitir_continuar_apos_tempo === true) {
+            if (!avisouTempoRef.current) { avisouTempoRef.current = true; toast.info('O tempo acabou, mas você pode continuar e enviar quando quiser.', { duration: 8000 }) }
+            return
+          }
           const novo = d?.tempo_limite_min ?? null
           if (!cancel && novo != null && sessao?.iniciado_em) {
             const fimMs = new Date(sessao.iniciado_em).getTime() + novo * 60_000

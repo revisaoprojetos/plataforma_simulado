@@ -75,18 +75,19 @@ async function processar() {
 
   // 2) Sessão cujo tempo individual (ou o `data_fim` do simulado) estourou.
   const simIds = [...new Set(emAndamento.map((s) => s.simulado_id))]
-  const info = new Map<string, { tempo: number | null; dataFim: string | null }>()
+  const info = new Map<string, { tempo: number | null; dataFim: string | null; semPunicao: boolean }>()
   if (simIds.length) {
     const si = await fetchAllByIn<any>(simIds, (chunk) =>
-      svc.from('simulado_simulados').select('id, tempo_limite_min, data_fim').in('id', chunk).order('id'))
-    for (const x of si) info.set(x.id, { tempo: x.tempo_limite_min ?? null, dataFim: x.data_fim ?? null })
+      svc.from('simulado_simulados').select('id, tempo_limite_min, data_fim, regras').in('id', chunk).order('id'))
+    for (const x of si) info.set(x.id, { tempo: x.tempo_limite_min ?? null, dataFim: x.data_fim ?? null, semPunicao: (x.regras?.permitir_continuar_apos_tempo === true) })
   }
   const nowMs = Date.now()
   for (const s of emAndamento) {
     const meta = info.get(s.simulado_id)
     if (!meta) continue
     let expira: number | null = null
-    if (meta.tempo && s.iniciado_em) expira = new Date(s.iniciado_em).getTime() + meta.tempo * 60_000
+    // "Continuar após o tempo, sem punição": não finaliza pelo limite INDIVIDUAL; só a janela (data_fim) fecha.
+    if (!meta.semPunicao && meta.tempo && s.iniciado_em) expira = new Date(s.iniciado_em).getTime() + meta.tempo * 60_000
     if (meta.dataFim) { const df = new Date(meta.dataFim).getTime(); expira = expira === null ? df : Math.min(expira, df) }
     if (expira !== null && expira < nowMs) paraFinalizar.set(s.id, s)
   }

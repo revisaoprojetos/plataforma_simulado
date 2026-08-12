@@ -54,6 +54,7 @@ const simuladoSchema = z.object({
       caderno_publico: z.enum(['todos', 'passaporte']).optional(),
       iniciar_atrasado: z.boolean().optional(),
       entrada_antecipada: z.boolean().optional(),
+      permitir_continuar_apos_tempo: z.boolean().optional(),
       acesso_gratuito: z.boolean().optional(),
       politica_anulacao: z.enum(['pontua_todos', 'desconsidera']).optional(),
     })
@@ -322,6 +323,17 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
                         <span className="text-xs text-muted-foreground">min de atraso</span>
                       </div>
                     )}
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Switch
+                    id="permitir_continuar_apos_tempo"
+                    defaultChecked={initialData?.regras?.permitir_continuar_apos_tempo ?? false}
+                    onCheckedChange={(v) => setValue('regras.permitir_continuar_apos_tempo', v)}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <Label htmlFor="permitir_continuar_apos_tempo">Continuar após o tempo, sem punição</Label>
+                    <p className="text-xs text-muted-foreground">Mesmo esgotado o tempo limite individual, o aluno em prova continua respondendo e entrega quando quiser — sem encerramento automático nem punição. Uma janela de horário fixo (data de fim), quando houver, ainda encerra a prova no fim.</p>
                   </div>
                 </div>
               </AccordionContent>

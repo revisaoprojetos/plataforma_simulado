@@ -21,9 +21,14 @@ export async function GET(request: NextRequest) {
 
   const { data: sim } = await svc
     .from('simulado_simulados')
-    .select('tempo_limite_min')
+    .select('tempo_limite_min, regras')
     .eq('id', sess.simulado_id)
     .maybeSingle()
 
-  return NextResponse.json({ tempo_limite_min: sim?.tempo_limite_min ?? null, status: sess.status })
+  return NextResponse.json({
+    tempo_limite_min: sim?.tempo_limite_min ?? null,
+    status: sess.status,
+    // Regra "continuar após o tempo, sem punição": o runner não auto-finaliza ao zerar o cronômetro.
+    permitir_continuar_apos_tempo: (sim?.regras as any)?.permitir_continuar_apos_tempo === true,
+  })
 }

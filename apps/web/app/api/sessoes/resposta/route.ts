@@ -39,10 +39,12 @@ export async function POST(request: NextRequest) {
   // o auto-encerramento (cron) finaliza a sessão logo em seguida.
   const { data: sim } = await supabase
     .from('simulado_simulados')
-    .select('tempo_limite_min, data_fim')
+    .select('tempo_limite_min, data_fim, regras')
     .eq('id', sessao.simulado_id)
     .maybeSingle()
-  if (sessaoExpirada(sessao.iniciado_em, sim?.tempo_limite_min, sim?.data_fim)) {
+  // Regra "continuar após o tempo, sem punição": ignora o limite individual (a janela ainda vale).
+  const semPunicaoTempo = ((sim?.regras as any)?.permitir_continuar_apos_tempo === true)
+  if (sessaoExpirada(sessao.iniciado_em, sim?.tempo_limite_min, sim?.data_fim, semPunicaoTempo)) {
     return NextResponse.json({ message: 'Tempo esgotado — a prova não aceita mais respostas.', expirado: true }, { status: 409 })
   }
 
