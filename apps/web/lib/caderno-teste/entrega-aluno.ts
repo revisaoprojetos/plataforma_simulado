@@ -1,4 +1,16 @@
-import type { ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
+/** Cada caderno que o aluno pode baixar (folha, diagnóstico, caderno de questões, gabarito). */
+export interface ModalidadeAluno {
+  id: string
+  nome: string
+  /** "Como você fez" (sem gabarito) — disponível assim que o aluno finaliza. */
+  semGab: boolean
+  /** "Com correção" — disponível quando a nota/gabarito é liberado. */
+  comGab: boolean
+  /** Gabarito Comentado (PDF importado): baixa o arquivo direto. */
+  pdfUrl?: string
+  /** Item gerado da entrega V2 → download pela rota /api/aluno/caderno-teste-pdf. */
+  cadernoTeste?: { cadernoId: string; itemId: string }
+}
 
 // Entrega V2: espelha os tipos de app/admin/cadernos-teste/actions.ts (definidos aqui p/ NÃO importar de
 // um arquivo 'use server' — evita acoplar a lib ao bundle de server actions). `simulado_pastas.caderno_entrega`.

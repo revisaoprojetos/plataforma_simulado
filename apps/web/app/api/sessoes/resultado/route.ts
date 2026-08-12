@@ -5,8 +5,7 @@ import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
-import type { ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
-import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
+import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
 
 // GET /api/sessoes/resultado?st={sessao_id}

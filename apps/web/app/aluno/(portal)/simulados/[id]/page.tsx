@@ -9,8 +9,7 @@ import { montarResultadoAluno, type SessaoInput } from '@/lib/simulado/resultado
 import { montarDesempenhoAluno } from '@/lib/simulado/desempenho-aluno'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { tiposDeSimulados } from '@/lib/simulado/tipo'
-import type { ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
-import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
+import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
 import { MeuSimuladoView } from '@/components/aluno/meu-simulado-view'
 import { NpsAvaliacao } from '@/components/aluno/nps-avaliacao'
 
