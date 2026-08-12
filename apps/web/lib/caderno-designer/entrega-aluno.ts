@@ -11,6 +11,9 @@ export interface ModalidadeAluno {
   comGab: boolean
   /** Quando é o Gabarito Comentado (PDF importado): baixa o arquivo direto. */
   pdfUrl?: string
+  /** Entrega V2: quando presente, o download é GERADO pela rota do caderno de teste
+   *  (/api/aluno/caderno-teste-pdf?caderno&grupo), em vez do render v1. */
+  cadernoTeste?: { cadernoId: string; itemId: string }
 }
 
 const temConteudo = (d: any) =>
