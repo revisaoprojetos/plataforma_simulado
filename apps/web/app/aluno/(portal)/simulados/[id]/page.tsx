@@ -9,7 +9,7 @@ import { montarResultadoAluno, type SessaoInput } from '@/lib/simulado/resultado
 import { montarDesempenhoAluno } from '@/lib/simulado/desempenho-aluno'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { tiposDeSimulados } from '@/lib/simulado/tipo'
-import { modalidadesDoAluno, type ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
+import type { ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
 import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
 import { MeuSimuladoView } from '@/components/aluno/meu-simulado-view'
 import { NpsAvaliacao } from '@/components/aluno/nps-avaliacao'
@@ -66,37 +66,10 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
     montarComparativo(svc, id, { minhaNota: melhor.nota != null ? Number(melhor.nota) : null, minhaSessaoId: melhor.id }),
     montarDesempenhoAluno(svc, estId),
     (async (): Promise<{ cadernoId: string | null; modalidades: ModalidadeAluno[] }> => {
+      // Entrega V2 (fonte única): modalidades vêm do caderno_entrega do banco do simulado.
       const bancoBaseId = (sim.regras as any)?.banco_base_id as string | undefined
-      // Entrega V2 (flag por simulado): se ligada e o banco tem entrega utilizável, entrega o V2.
-      if ((sim.regras as any)?.entrega_v2 === true && bancoBaseId) {
-        const entrega = await carregarEntregaBanco(svc, null, bancoBaseId)
-        if (temEntregaV2(entrega)) return { cadernoId: null, modalidades: modalidadesDoAlunoV2(entrega) }
-      }
-      let cadernoId = ((sim.regras as any)?.caderno_id as string | undefined) ?? null
-      if (!cadernoId && bancoBaseId) {
-        const { data: banco } = await svc.from('simulado_pastas').select('caderno_id').eq('id', bancoBaseId).maybeSingle()
-        cadernoId = ((banco as any)?.caderno_id as string | undefined) ?? null
-      }
-      if (!cadernoId) {
-        const { data: pq } = await svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', id)
-        const qIds = [...new Set((pq ?? []).map((r: any) => r.questao_id).filter(Boolean))]
-        if (qIds.length) {
-          const { data: qp } = await svc.from('simulado_questao_pasta').select('questao_id, pasta_id').in('questao_id', qIds)
-          const pastaIds = [...new Set((qp ?? []).map((r: any) => r.pasta_id))]
-          const { data: pastas } = pastaIds.length ? await svc.from('simulado_pastas').select('id, caderno_id').in('id', pastaIds) : { data: [] as any[] }
-          const cadDaPasta = new Map<string, string>((pastas ?? []).filter((p: any) => p.caderno_id).map((p: any) => [p.id, p.caderno_id]))
-          const cont = new Map<string, number>()
-          for (const r of qp ?? []) if (cadDaPasta.has((r as any).pasta_id)) cont.set((r as any).pasta_id, (cont.get((r as any).pasta_id) ?? 0) + 1)
-          const escolha = [...cont.entries()].sort((a, b) => b[1] - a[1])[0]
-          if (escolha) cadernoId = cadDaPasta.get(escolha[0])!
-        }
-      }
-      let modalidades: ModalidadeAluno[] = []
-      if (cadernoId) {
-        const { data: cad } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoId).maybeSingle()
-        modalidades = modalidadesDoAluno((cad as any)?.config, tipo)
-      }
-      return { cadernoId, modalidades }
+      const entrega = bancoBaseId ? await carregarEntregaBanco(svc, null, bancoBaseId) : null
+      return { cadernoId: null, modalidades: temEntregaV2(entrega) ? modalidadesDoAlunoV2(entrega) : [] }
     })(),
   ])
   const { cadernoId, modalidades } = cadernoInfo

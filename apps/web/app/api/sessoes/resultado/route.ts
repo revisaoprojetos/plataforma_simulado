@@ -5,7 +5,7 @@ import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
-import { modalidadesDoAluno, type ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
+import type { ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
 import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
 
@@ -186,31 +186,14 @@ export async function GET(request: NextRequest) {
     }
   } catch { /* sem estudante */ }
 
-  // Caderno vinculado + suas modalidades (para o download "como você fez" por modalidade).
-  let cadernoId: string | null = null
+  // Caderno do aluno (entrega V2, fonte única): modalidades vêm do caderno_entrega do banco do simulado.
+  const cadernoId: string | null = null
   let modalidades: ModalidadeAluno[] = []
-  // Entrega V2 (flag por simulado): se ligada e o banco tem entrega, usa a entrega V2.
   const bancoBaseIdV2 = (simulado?.regras as any)?.banco_base_id as string | undefined
-  if ((simulado?.regras as any)?.entrega_v2 === true && bancoBaseIdV2) {
+  if (bancoBaseIdV2) {
     const entrega = await carregarEntregaBanco(admin, sessao.tenant_id, bancoBaseIdV2)
     if (temEntregaV2(entrega)) modalidades = modalidadesDoAlunoV2(entrega)
   }
-  if (!modalidades.length) try {
-    const qids = questoes.map((q: any) => q.id).filter(Boolean)
-    if (qids.length) {
-      const { data: qp } = await admin.from('simulado_questao_pasta').select('pasta_id').in('questao_id', qids)
-      const pastaIds = [...new Set((qp ?? []).map((r: any) => r.pasta_id))]
-      if (pastaIds.length) {
-        const { data: cads } = await admin.from('simulado_cadernos_designer').select('id, config').eq('tenant_id', sessao.tenant_id).order('atualizado_em', { ascending: false })
-        const cad = (cads ?? []).find((c: any) => c.config?.bancoId && pastaIds.includes(c.config.bancoId))
-        cadernoId = (cad?.id as string) ?? null
-        if (cad) {
-          const tipo = tipoDoSimulado(questoes.map((q: any) => q.tipo))
-          modalidades = modalidadesDoAluno(cad.config, tipo)
-        }
-      }
-    }
-  } catch { /* sem caderno */ }
 
   return NextResponse.json({
     titulo: simulado?.titulo ?? 'Simulado',

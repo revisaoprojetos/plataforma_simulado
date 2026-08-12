@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
 import { iconeBanco } from '@/lib/banco-visual'
 import { tiposDeSimulados } from '@/lib/simulado/tipo'
-import { modalidadesDoAluno, type ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
+import type { ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
 import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
 import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
 import { ArrowLeft, ShieldCheck } from 'lucide-react'
@@ -69,27 +69,8 @@ export default async function EstudanteSimuladoPage({ params }: { params: Promis
   // Melhor tentativa (nota; desempate pela mais recente) — usada no comparativo.
   const melhor = [...finalizadas].sort((a, b) => (Number(b.nota ?? -1) - Number(a.nota ?? -1)) || (new Date(b.finalizado_em ?? 0).getTime() - new Date(a.finalizado_em ?? 0).getTime()))[0]
 
-  // Caderno do designer: regras.caderno_id → banco_base_id → banco das questões (espelha o portal do aluno).
-  let cadernoId = ((sim.regras as any)?.caderno_id as string | undefined) ?? null
   const bancoBaseId = (sim.regras as any)?.banco_base_id as string | undefined
-  if (!cadernoId && bancoBaseId) {
-    const { data: banco } = await svc.from('simulado_pastas').select('caderno_id').eq('id', bancoBaseId).maybeSingle()
-    cadernoId = ((banco as any)?.caderno_id as string | undefined) ?? null
-  }
-  if (!cadernoId) {
-    const { data: pq } = await svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', simuladoId)
-    const qIds = [...new Set((pq ?? []).map((r: any) => r.questao_id).filter(Boolean))]
-    if (qIds.length) {
-      const { data: qp } = await svc.from('simulado_questao_pasta').select('questao_id, pasta_id').in('questao_id', qIds)
-      const pastaIds = [...new Set((qp ?? []).map((r: any) => r.pasta_id))]
-      const { data: pastas } = pastaIds.length ? await svc.from('simulado_pastas').select('id, caderno_id').in('id', pastaIds) : { data: [] as any[] }
-      const cadDaPasta = new Map<string, string>((pastas ?? []).filter((p: any) => p.caderno_id).map((p: any) => [p.id, p.caderno_id]))
-      const cont = new Map<string, number>()
-      for (const r of qp ?? []) if (cadDaPasta.has((r as any).pasta_id)) cont.set((r as any).pasta_id, (cont.get((r as any).pasta_id) ?? 0) + 1)
-      const escolha = [...cont.entries()].sort((a, b) => b[1] - a[1])[0]
-      if (escolha) cadernoId = cadDaPasta.get(escolha[0])!
-    }
-  }
+  const cadernoId: string | null = null
 
   const sessoesInput: SessaoInput[] = finalizadas.map((s) => ({
     id: s.id, tentativa_num: s.tentativa_num, nota: s.nota, iniciado_em: s.iniciado_em, finalizado_em: s.finalizado_em, posicao_ranking: s.posicao_ranking,
@@ -101,17 +82,11 @@ export default async function EstudanteSimuladoPage({ params }: { params: Promis
     montarComparativo(svc, simuladoId, { minhaNota: melhor.nota != null ? Number(melhor.nota) : null, minhaSessaoId: melhor.id }),
   ])
 
-  // Cadernos do aluno (fonte única): Folha de Respostas, Caderno de questões,
-  // Diagnóstico e o Enunciado (PDF importado). Aqui o admin vê tudo liberado.
+  // Cadernos do aluno (entrega V2, fonte única). Aqui o admin vê tudo liberado.
   let modalidades: ModalidadeAluno[] = []
-  // Entrega V2 (flag por simulado): se ligada e o banco tem entrega, usa a entrega V2.
-  if ((sim.regras as any)?.entrega_v2 === true && bancoBaseId) {
+  if (bancoBaseId) {
     const entrega = await carregarEntregaBanco(svc, null, bancoBaseId)
     if (temEntregaV2(entrega)) modalidades = modalidadesDoAlunoV2(entrega)
-  }
-  if (!modalidades.length && cadernoId) {
-    const { data: cad } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoId).maybeSingle()
-    modalidades = modalidadesDoAluno((cad as any)?.config, tipo)
   }
 
   return (

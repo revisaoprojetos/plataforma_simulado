@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge'
 import { RemoverQuestaoBanco } from '@/components/admin/remover-questao-banco'
 import { BancoEstudantes } from '@/components/admin/banco-estudantes'
 import { BancoTabsShell } from '@/components/admin/banco-tabs-shell'
-import { BancoCaderno } from '@/components/admin/banco-caderno'
 import { BancoCadernoTeste } from '@/components/admin/banco-caderno-teste'
 import { BancoHud } from '@/components/admin/banco-hud'
 import { BancoRelatorio } from '@/components/admin/banco-relatorio'
@@ -160,7 +159,6 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
           <TabsTrigger value="questoes">Questões</TabsTrigger>
           <TabsTrigger value="estudantes">Estudantes</TabsTrigger>
           <TabsTrigger value="caderno-teste">Caderno</TabsTrigger>
-          <TabsTrigger value="caderno">Caderno (legado)</TabsTrigger>
           <TabsTrigger value="hud">HUD do simulado</TabsTrigger>
           <TabsTrigger value="relatorio">Relatório</TabsTrigger>
           <TabsTrigger value="personalizar">Personalizar</TabsTrigger>
@@ -275,14 +273,6 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
           {abaInicial === 'estudantes' ? (
             <Suspense fallback={<AbaCarregando />}>
               <BancoEstudantes bancoId={id} cor={corBanco} />
-            </Suspense>
-          ) : <AbaCarregando />}
-        </TabsContent>
-
-        <TabsContent value="caderno">
-          {abaInicial === 'caderno' ? (
-            <Suspense fallback={<AbaCarregando />}>
-              <BancoCaderno bancoId={id} cor={corBanco} />
             </Suspense>
           ) : <AbaCarregando />}
         </TabsContent>

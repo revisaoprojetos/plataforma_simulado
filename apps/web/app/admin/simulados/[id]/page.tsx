@@ -8,7 +8,6 @@ import { SimuladoQuestoesManager } from '@/components/admin/simulado-questoes-ma
 import { SimuladoEstudantes } from '@/components/admin/simulado-estudantes'
 import { SimuladoSessoes } from '@/components/admin/simulado-sessoes'
 import { SimuladoManutencao } from '@/components/admin/simulado-manutencao'
-import { SimuladoCadernoLink } from '@/components/admin/simulado-caderno-link'
 import { SimuladoRelatorio } from '@/components/admin/simulado-relatorio'
 import { SimuladoRecorrecao } from '@/components/admin/simulado-recorrecao'
 import { SimuladoAcessos } from '@/components/admin/simulado-acessos'
@@ -106,13 +105,6 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
       .limit(50),
   ])
 
-  // Cadernos de design do tenant (para vincular o tema/HUD ao simulado).
-  const { data: cadernosRaw } = await supabase
-    .from('simulado_cadernos_designer')
-    .select('id, nome')
-    .order('atualizado_em', { ascending: false })
-  const cadernos = (cadernosRaw ?? []).map((c: any) => ({ id: c.id as string, nome: (c.nome as string) ?? 'Caderno' }))
-  const cadernoVinculado = ((simulado.regras as Record<string, unknown> | null)?.caderno_id as string | undefined) ?? null
 
   // Sessões da aba (todas, com nome do aluno) — renderizadas no servidor, sem spinner no client.
   const sessoesTab = (await listarSessoesSimulado(id)).sessoes ?? []
@@ -336,7 +328,6 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
 
         {/* Questões */}
         <TabsContent value="questoes" className="space-y-4">
-          <SimuladoCadernoLink simuladoId={id} cadernos={cadernos} atual={cadernoVinculado} />
           <Card>
             <CardHeader>
               <CardTitle>Questões do Simulado</CardTitle>

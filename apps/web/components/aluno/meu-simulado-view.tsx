@@ -119,22 +119,15 @@ export function MeuSimuladoView({
     // Enunciado/gabarito = PDF importado: entrega direta do arquivo, sem gerar no servidor.
     const md = modalidades.find((m) => m.id === mod)
     if (md?.pdfUrl) { abrir(md.pdfUrl); return }
+    if (!md?.cadernoTeste) return
     const chave = `${sessaoId}:${mod}:${gab ? 'g' : 's'}`
     if (baixando) return
     const limpar = (s?: string) => (s ?? '').trim().replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_')
     const arquivo = [simuladoTitulo, nome, `tentativa-${modalTent?.n ?? ''}`].map(limpar).filter(Boolean).join('_') || 'caderno'
-    // Entrega V2 (item gerado) → rota do caderno de teste; senão v1 (caderno designer); nenhum → página print.
-    let apiUrl: string
-    if (md?.cadernoTeste) {
-      const qs = new URLSearchParams({ caderno: md.cadernoTeste.cadernoId, grupo: md.cadernoTeste.itemId, sessao: sessaoId, nome: arquivo })
-      if (gab) qs.set('gabarito', '1')
-      apiUrl = `/api/aluno/caderno-teste-pdf?${qs.toString()}`
-    } else if (cadernoId) {
-      const qs = new URLSearchParams({ caderno: cadernoId, sessao: sessaoId, mod, nome: arquivo })
-      if (estId) qs.set('aluno', estId)
-      if (gab) qs.set('gabarito', '1')
-      apiUrl = `/api/aluno/caderno-pdf?${qs.toString()}`
-    } else { abrir(cadUrl(sessaoId, mod, gab)); return }
+    // Entrega V2: item gerado → rota do caderno de teste (folha/diagnóstico/questões).
+    const qs = new URLSearchParams({ caderno: md.cadernoTeste.cadernoId, grupo: md.cadernoTeste.itemId, sessao: sessaoId, nome: arquivo })
+    if (gab) qs.set('gabarito', '1')
+    const apiUrl = `/api/aluno/caderno-teste-pdf?${qs.toString()}`
     setBaixando(chave)
     toast.loading('Gerando PDF com o fundo e os cards…', { id: 'cadpdf' })
     try {
