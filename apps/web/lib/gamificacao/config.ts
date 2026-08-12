@@ -7,7 +7,9 @@ export interface XpRegras {
   streak: { por_dia: number; cap: number }
   chest: { cada_n_dias: number; xp: number }
 }
-export interface NivelCurva { tipo: string; base: number; incremento: number; nivel_max: number }
+/** Cargo/título exibido a partir de um nível (ex.: nível 6+ = "Júnior"). */
+export interface TituloNivel { nivel_min: number; titulo: string }
+export interface NivelCurva { tipo: string; base: number; incremento: number; nivel_max: number; titulos: TituloNivel[] }
 export interface LigaDef { id: string; nome: string; xp_min: number; cor: string }
 export type MissaoTipo = 'finalizar_simulado' | 'acertar_n' | 'praticar_n'
 export interface MissaoDef { id: string; titulo: string; tipo: MissaoTipo; meta: number; xp: number }
@@ -33,7 +35,18 @@ export const DEFAULT_XP_REGRAS: XpRegras = {
   streak: { por_dia: 10, cap: 50 },
   chest: { cada_n_dias: 7, xp: 100 },
 }
-export const DEFAULT_NIVEL_CURVA: NivelCurva = { tipo: 'formula', base: 100, incremento: 40, nivel_max: 30 }
+export const DEFAULT_TITULOS: TituloNivel[] = [
+  { nivel_min: 1, titulo: 'Aprendiz' },
+  { nivel_min: 3, titulo: 'Estagiário' },
+  { nivel_min: 6, titulo: 'Júnior' },
+  { nivel_min: 10, titulo: 'Pleno' },
+  { nivel_min: 14, titulo: 'Sênior' },
+  { nivel_min: 18, titulo: 'Procurador' },
+  { nivel_min: 22, titulo: 'Promotor' },
+  { nivel_min: 26, titulo: 'Advogado' },
+  { nivel_min: 30, titulo: 'Mestre do Direito' },
+]
+export const DEFAULT_NIVEL_CURVA: NivelCurva = { tipo: 'formula', base: 100, incremento: 40, nivel_max: 30, titulos: DEFAULT_TITULOS }
 export const DEFAULT_LIGAS: LigaDef[] = [
   { id: 'bronze', nome: 'Bronze', xp_min: 0, cor: '#a16207' },
   { id: 'prata', nome: 'Prata', xp_min: 500, cor: '#94a3b8' },

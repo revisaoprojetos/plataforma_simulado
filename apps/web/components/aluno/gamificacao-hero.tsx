@@ -30,12 +30,15 @@ export function GamificacaoHero({ nome, resumo }: { nome: string; resumo: Resumo
             </div>
           </div>
           <div className="min-w-0">
-            <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--brand-accent, var(--primary))' }}>
-              <Zap className="h-3.5 w-3.5" /> {fmt(xpTotal)} XP total
+            <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--brand-accent, var(--primary))' }}>
+              <span className="inline-flex items-center gap-1.5"><Zap className="h-3.5 w-3.5" /> {fmt(xpTotal)} XP total</span>
+              {progresso.titulo && <span className="rounded-full bg-primary/10 px-2 py-0.5 normal-case tracking-normal text-primary">{progresso.titulo}</span>}
             </div>
-            <h2 className="truncate text-lg font-bold tracking-tight">Continue firme, {nome.split(' ')[0]}!</h2>
+            <h2 className="truncate text-lg font-bold tracking-tight">Nível {progresso.nivel}{progresso.titulo ? ` · ${progresso.titulo}` : ''}</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              Faltam <span className="font-semibold text-foreground">{fmt(progresso.xpParaProximo)} XP</span> para o nível {progresso.nivel + 1}.
+              {progresso.xpParaProximo > 0
+                ? <>Faltam <span className="font-semibold text-foreground">{fmt(progresso.xpParaProximo)} XP</span> para o nível {progresso.nivel + 1}.</>
+                : <>Você atingiu o nível máximo. 🎉</>}
             </p>
             <div className="mt-2 h-2 w-48 max-w-full overflow-hidden rounded-full bg-muted">
               <div className="h-full rounded-full transition-all duration-700" style={{ width: `${progresso.pct}%`, background: 'var(--brand-primary, var(--primary))' }} />
