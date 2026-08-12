@@ -33,6 +33,19 @@ export function TextField({ label, value, onChange, placeholder, disabled }: {
   )
 }
 
+/** Seção padrão da área de gamificação: título + descrição + conteúdo, em card. */
+export function SectionCard({ titulo, descricao, children, className }: { titulo: string; descricao?: string; children: React.ReactNode; className?: string }) {
+  return (
+    <section className={`rounded-2xl border bg-card p-5 shadow-sm ${className ?? ''}`}>
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold">{titulo}</h3>
+        {descricao && <p className="mt-0.5 text-xs text-muted-foreground">{descricao}</p>}
+      </div>
+      {children}
+    </section>
+  )
+}
+
 export function SaveButton({ salvando, disabled }: { salvando: boolean; disabled?: boolean }) {
   return (
     <Button type="submit" disabled={salvando || disabled}>

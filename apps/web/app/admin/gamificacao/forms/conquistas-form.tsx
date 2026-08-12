@@ -2,13 +2,12 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Trash2, Award } from 'lucide-react'
+import { Plus, Trash2, Rocket, Flame, Zap, Trophy, Medal, Award, type LucideIcon } from 'lucide-react'
 import type { GamConfig, ConquistaDef, ConquistaRegraTipo } from '@/lib/gamificacao/config'
 import { salvarConquistas } from '../actions'
-import { SaveButton } from './_campos'
+import { SaveButton, SectionCard } from './_campos'
 
 let seq = 0
 const novoId = () => `c_${Date.now()}_${seq++}`
@@ -18,8 +17,8 @@ const REGRAS: { v: ConquistaRegraTipo; label: string }[] = [
   { v: 'streak', label: 'Dias de sequência' },
   { v: 'nota_max', label: 'Nota máxima atingida' },
 ]
-const ICONES = ['rocket', 'flame', 'zap', 'trophy', 'medal']
-const selectCls = 'h-9 rounded-md border bg-background px-2 text-sm'
+const ICONES: Record<string, LucideIcon> = { rocket: Rocket, flame: Flame, zap: Zap, trophy: Trophy, medal: Medal }
+const selectCls = 'h-9 w-full rounded-lg border bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-60'
 
 export function ConquistasForm({ config, podeGerenciar }: { config: GamConfig; podeGerenciar: boolean }) {
   const [lista, setLista] = useState<ConquistaDef[]>(config.conquistas_def)
@@ -40,55 +39,56 @@ export function ConquistasForm({ config, podeGerenciar }: { config: GamConfig; p
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <p className="text-sm text-muted-foreground">Conquistas são desbloqueadas <strong>uma vez</strong> ao cumprir a regra. Podem conceder XP extra ao desbloquear.</p>
-
-      <div className="space-y-2">
-        {lista.map((c, i) => (
-          <Card key={c.id} className="space-y-3 p-3">
-            <div className="flex flex-wrap items-end gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Award className="h-4 w-4" /></span>
-              <label className="min-w-[160px] flex-1 space-y-1">
-                <span className="text-[11px] text-muted-foreground">Título</span>
-                <Input value={c.titulo} onChange={(e) => set(i, { titulo: e.target.value })} disabled={!podeGerenciar} />
-              </label>
-              <label className="space-y-1">
-                <span className="block text-[11px] text-muted-foreground">Ícone</span>
-                <select className={selectCls} value={c.icone} onChange={(e) => set(i, { icone: e.target.value })} disabled={!podeGerenciar}>
-                  {ICONES.map((ic) => <option key={ic} value={ic}>{ic}</option>)}
-                </select>
-              </label>
-              {podeGerenciar && <Button type="button" variant="ghost" size="icon" onClick={() => rem(i)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>}
-            </div>
-            <label className="block space-y-1">
-              <span className="text-[11px] text-muted-foreground">Descrição</span>
-              <Input value={c.descricao} onChange={(e) => set(i, { descricao: e.target.value })} disabled={!podeGerenciar} />
-            </label>
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="space-y-1">
-                <span className="block text-[11px] text-muted-foreground">Regra</span>
-                <select className={selectCls} value={c.regra.tipo} onChange={(e) => setRegra(i, { tipo: e.target.value as ConquistaRegraTipo })} disabled={!podeGerenciar}>
-                  {REGRAS.map((rg) => <option key={rg.v} value={rg.v}>{rg.label}</option>)}
-                </select>
-              </label>
-              <label className="w-28 space-y-1">
-                <span className="text-[11px] text-muted-foreground">Meta (≥)</span>
-                <Input type="number" min={0} value={c.regra.meta} onChange={(e) => setRegra(i, { meta: Number(e.target.value || 0) })} disabled={!podeGerenciar} />
-              </label>
-              <label className="w-28 space-y-1">
-                <span className="text-[11px] text-muted-foreground">XP ao desbloquear</span>
-                <Input type="number" min={0} value={c.xp} onChange={(e) => set(i, { xp: Number(e.target.value || 0) })} disabled={!podeGerenciar} />
-              </label>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      {podeGerenciar && (
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" onClick={add}><Plus className="h-4 w-4" /> Adicionar conquista</Button>
-          <SaveButton salvando={salvando} />
+      <SectionCard titulo="Conquistas" descricao="Desbloqueadas uma única vez ao cumprir a regra. Podem conceder XP extra ao desbloquear.">
+        <div className="grid gap-3 lg:grid-cols-2">
+          {lista.map((c, i) => {
+            const Icon = ICONES[c.icone] ?? Award
+            return (
+              <div key={c.id} className="space-y-3 rounded-xl border bg-muted/20 p-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"><Icon className="h-5 w-5" /></span>
+                  <label className="min-w-0 flex-1 space-y-1">
+                    <span className="block text-[11px] font-medium text-muted-foreground">Título</span>
+                    <Input value={c.titulo} onChange={(e) => set(i, { titulo: e.target.value })} disabled={!podeGerenciar} />
+                  </label>
+                  {podeGerenciar && <Button type="button" variant="ghost" size="icon" onClick={() => rem(i)} aria-label={`Remover ${c.titulo}`} className="self-end text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>}
+                </div>
+                <label className="block space-y-1">
+                  <span className="text-[11px] font-medium text-muted-foreground">Descrição</span>
+                  <Input value={c.descricao} onChange={(e) => set(i, { descricao: e.target.value })} disabled={!podeGerenciar} placeholder="Ex.: Conclua seu primeiro simulado" />
+                </label>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <label className="space-y-1">
+                    <span className="block text-[11px] font-medium text-muted-foreground">Ícone</span>
+                    <select className={selectCls} value={c.icone} onChange={(e) => set(i, { icone: e.target.value })} disabled={!podeGerenciar}>
+                      {Object.keys(ICONES).map((ic) => <option key={ic} value={ic}>{ic}</option>)}
+                    </select>
+                  </label>
+                  <label className="col-span-1 space-y-1 sm:col-span-1">
+                    <span className="block text-[11px] font-medium text-muted-foreground">Regra</span>
+                    <select className={selectCls} value={c.regra.tipo} onChange={(e) => setRegra(i, { tipo: e.target.value as ConquistaRegraTipo })} disabled={!podeGerenciar}>
+                      {REGRAS.map((rg) => <option key={rg.v} value={rg.v}>{rg.label}</option>)}
+                    </select>
+                  </label>
+                  <label className="space-y-1">
+                    <span className="block text-[11px] font-medium text-muted-foreground">Meta (≥)</span>
+                    <Input type="number" min={0} value={c.regra.meta} onChange={(e) => setRegra(i, { meta: Number(e.target.value || 0) })} disabled={!podeGerenciar} />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="block text-[11px] font-medium text-muted-foreground">XP</span>
+                    <Input type="number" min={0} value={c.xp} onChange={(e) => set(i, { xp: Number(e.target.value || 0) })} disabled={!podeGerenciar} />
+                  </label>
+                </div>
+              </div>
+            )
+          })}
+          {lista.length === 0 && <p className="rounded-lg border bg-muted/30 p-4 text-center text-sm text-muted-foreground lg:col-span-2">Nenhuma conquista. Adicione a primeira.</p>}
         </div>
-      )}
+
+        {podeGerenciar && <Button type="button" variant="outline" onClick={add} className="mt-3"><Plus className="h-4 w-4" /> Adicionar conquista</Button>}
+      </SectionCard>
+
+      {podeGerenciar && <SaveButton salvando={salvando} />}
     </form>
   )
 }

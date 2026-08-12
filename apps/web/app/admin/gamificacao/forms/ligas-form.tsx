@@ -2,13 +2,12 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Plus, Trash2, RefreshCw, Shield } from 'lucide-react'
 import type { GamConfig, LigaDef } from '@/lib/gamificacao/config'
 import { salvarLigas, rebuildGamificacao } from '../actions'
-import { SaveButton } from './_campos'
+import { SaveButton, SectionCard } from './_campos'
 
 let seq = 0
 const novoId = () => `liga_${Date.now()}_${seq++}`
@@ -36,40 +35,58 @@ export function LigasForm({ config, podeGerenciar }: { config: GamConfig; podeGe
     })
   }
 
+  const ordenadas = [...ligas].sort((a, b) => a.xp_min - b.xp_min)
+
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <p className="text-sm text-muted-foreground">As ligas são <strong>tiers por XP total acumulado</strong> (sem reset). O aluno sobe ao cruzar o XP mínimo. Ordenadas automaticamente pelo XP mínimo ao salvar.</p>
+      <SectionCard
+        titulo="Ligas & Divisões"
+        descricao="Tiers por XP total acumulado (sem reset). O aluno sobe ao cruzar o XP mínimo. A lista é reordenada pelo XP mínimo ao salvar."
+      >
+        <div className="space-y-2">
+          {ligas.map((l, i) => {
+            const posicao = ordenadas.findIndex((x) => x.id === l.id) + 1
+            return (
+              <div key={l.id} className="flex flex-wrap items-end gap-3 rounded-xl border bg-muted/20 p-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: `color-mix(in oklab, ${l.cor} 20%, transparent)`, color: l.cor }}>
+                  <Shield className="h-5 w-5" />
+                </span>
+                <label className="min-w-[160px] flex-1 space-y-1">
+                  <span className="block text-[11px] font-medium text-muted-foreground">Nome da liga</span>
+                  <Input value={l.nome} onChange={(e) => set(i, { nome: e.target.value })} disabled={!podeGerenciar} />
+                </label>
+                <label className="w-32 space-y-1">
+                  <span className="block text-[11px] font-medium text-muted-foreground">XP mínimo</span>
+                  <Input type="number" min={0} value={l.xp_min} onChange={(e) => set(i, { xp_min: Number(e.target.value || 0) })} disabled={!podeGerenciar} />
+                </label>
+                <label className="space-y-1">
+                  <span className="block text-[11px] font-medium text-muted-foreground">Cor</span>
+                  <input type="color" value={l.cor} onChange={(e) => set(i, { cor: e.target.value })} disabled={!podeGerenciar} className="block h-9 w-12 cursor-pointer rounded-lg border bg-transparent p-0.5 disabled:cursor-not-allowed" aria-label={`Cor da liga ${l.nome}`} />
+                </label>
+                <div className="flex items-center gap-2 self-end pb-0.5">
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground" title="Posição na escada de ligas">#{posicao}</span>
+                  {podeGerenciar && (
+                    <Button type="button" variant="ghost" size="icon" onClick={() => rem(i)} aria-label={`Remover ${l.nome}`} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+          {ligas.length === 0 && <p className="rounded-lg border bg-muted/30 p-4 text-center text-sm text-muted-foreground">Nenhuma liga. Adicione ao menos uma (com XP mínimo 0).</p>}
+        </div>
 
-      <div className="space-y-2">
-        {ligas.map((l, i) => (
-          <Card key={l.id} className="flex flex-wrap items-end gap-3 p-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: `color-mix(in oklab, ${l.cor} 18%, transparent)`, color: l.cor }}><Shield className="h-4 w-4" /></span>
-            <label className="flex-1 space-y-1">
-              <span className="text-[11px] text-muted-foreground">Nome</span>
-              <Input value={l.nome} onChange={(e) => set(i, { nome: e.target.value })} disabled={!podeGerenciar} />
-            </label>
-            <label className="w-32 space-y-1">
-              <span className="text-[11px] text-muted-foreground">XP mínimo</span>
-              <Input type="number" min={0} value={l.xp_min} onChange={(e) => set(i, { xp_min: Number(e.target.value || 0) })} disabled={!podeGerenciar} />
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] text-muted-foreground">Cor</span>
-              <input type="color" value={l.cor} onChange={(e) => set(i, { cor: e.target.value })} disabled={!podeGerenciar} className="block h-9 w-12 cursor-pointer rounded border bg-transparent" />
-            </label>
-            {podeGerenciar && (
-              <Button type="button" variant="ghost" size="icon" onClick={() => rem(i)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
-            )}
-          </Card>
-        ))}
-      </div>
+        {podeGerenciar && (
+          <Button type="button" variant="outline" onClick={add} className="mt-1"><Plus className="h-4 w-4" /> Adicionar liga</Button>
+        )}
+      </SectionCard>
 
       {podeGerenciar && (
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" onClick={add}><Plus className="h-4 w-4" /> Adicionar liga</Button>
           <SaveButton salvando={salvando} />
           <Button type="button" variant="secondary" onClick={onRebuild} disabled={rebuild}>
             <RefreshCw className={`h-4 w-4 ${rebuild ? 'animate-spin' : ''}`} /> Recalcular tiers dos alunos
           </Button>
+          <span className="text-xs text-muted-foreground">Rode isto após alterar os limites — recalcula a liga de todos os alunos.</span>
         </div>
       )}
     </form>
