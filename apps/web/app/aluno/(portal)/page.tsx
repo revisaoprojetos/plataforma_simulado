@@ -113,7 +113,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     const liberado = (i.regras as any)?.enunciado_liberado !== false
     const url = !liberado ? null
       : info?.pdf ? info.pdf
-      : (info?.temCaderno && i.embed_token) ? `/api/aluno/caderno-questoes?token=${encodeURIComponent(i.embed_token)}` : null
+      : (info?.temCaderno && i.embed_token) ? `/api/aluno/${info.v2 ? 'caderno-teste-questoes' : 'caderno-questoes'}?token=${encodeURIComponent(i.embed_token)}` : null
     return { ...i, grupoId: grupoPorSim.get(i.id) ?? null, enunciadoUrl: url }
   })
 
