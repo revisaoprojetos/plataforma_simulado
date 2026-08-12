@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-type Mod = { id: string; nome: string; pdfUrl?: string }
+type Mod = { id: string; nome: string; pdfUrl?: string; cadernoTeste?: { cadernoId: string; itemId: string } }
 
 function IconeMod({ nome }: { nome: string }) {
   const n = (nome ?? '').toLowerCase()
@@ -60,7 +60,26 @@ export function SessaoAcoesMenu({
   async function gerarCaderno(m: Mod) {
     // PDF importado (material pronto da empresa): baixa o arquivo direto, sem worker.
     if (m.pdfUrl) { baixar(m.pdfUrl); return }
-    if (!cadId || enviando.has(m.id)) return
+    if (enviando.has(m.id)) return
+    // Entrega V2 (item gerado): baixa direto pela rota do caderno de teste (autorizada pela sessão).
+    // Admin vê tudo liberado → gera a versão com correção (gabarito=1).
+    if (m.cadernoTeste) {
+      marcarEnviando(m.id, true)
+      const nome = nomeArquivo(m) || 'caderno'
+      try {
+        const qs = new URLSearchParams({ caderno: m.cadernoTeste.cadernoId, grupo: m.cadernoTeste.itemId, sessao: sessaoId, nome, gabarito: '1' })
+        const res = await fetch(`/api/aluno/caderno-teste-pdf?${qs.toString()}`)
+        if (!res.ok) throw new Error('falha')
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a'); a.href = url; a.download = `${nome}.pdf`
+        document.body.appendChild(a); a.click(); a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      } catch { toast.error('Não foi possível gerar o PDF agora. Tente novamente.') }
+      finally { marcarEnviando(m.id, false) }
+      return
+    }
+    if (!cadId) return
     const fallbackUrl = urlNavegador(m)
     marcarEnviando(m.id, true)
     try {
@@ -89,7 +108,7 @@ export function SessaoAcoesMenu({
           <>
             <DropdownMenuGroup>
               <DropdownMenuLabel>Material para download</DropdownMenuLabel>
-              {cadId && mods.length ? (
+              {mods.length ? (
                 // Cada modalidade gera o PDF no servidor (worker + Gotenberg); se indisponível, abre no navegador.
                 mods.map((m) => (
                   <DropdownMenuItem key={m.id} disabled={enviando.has(m.id)} onClick={() => gerarCaderno(m)}>

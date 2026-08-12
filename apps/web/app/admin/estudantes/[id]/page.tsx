@@ -17,8 +17,8 @@ import { SimuladosPendentesCard } from '@/components/admin/simulados-pendentes-c
 import { EditarEstudanteButton } from '@/components/admin/editar-estudante-button'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
-import { mesclarModalidades } from '@/lib/caderno-designer/types'
-import { enunciadoPdf } from '@/lib/caderno-designer/material'
+import { modalidadesDoAlunoV2, temEntregaV2, type EntregaSlots } from '@/lib/caderno-teste/entrega-aluno'
+import type { ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
 import { tipoDoSimulado, filtrarModsPorTipo, type TipoSimulado } from '@/lib/simulado/tipo'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -117,8 +117,8 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
   // Caderno (modelo) vinculado ao banco de cada simulado → para a coluna Ação.
   // simulado → questões (prova_questoes) → bancos (questao_pasta) → pastas.caderno_id.
   const simIds = [...new Set(reais.map((s: any) => s.simulado_id).filter(Boolean))] as string[]
-  const cadernoPorSim = new Map<string, string>()
-  const modsPorCad = new Map<string, { id: string; nome: string; pdfUrl?: string }[]>()
+  // Modalidades da ENTREGA V2 por simulado (para o download do caderno da sessão no admin).
+  const modsPorSim = new Map<string, ModalidadeAluno[]>()
   const tipoSimPorSim = new Map<string, TipoSimulado | null>()  // objetiva/discursiva/mista
   const pastaPorSim = new Map<string, string>()                 // banco que mais cobre o simulado
   const gruposPorPasta = new Map<string, GrupoBanco[]>()        // grupos de disciplinas por banco
@@ -139,34 +139,28 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
       const qTipos = qTiposRes.data, qp = qpRes.data
       for (const q of qTipos ?? []) tipoDeQ.set((q as any).id, (q as any).tipo)
       for (const [sim, qs] of qPorSim) tipoSimPorSim.set(sim, tipoDoSimulado(qs.map((q) => tipoDeQ.get(q))))
-      const pastaIds = [...new Set((qp ?? []).map((r: any) => r.pasta_id))]
-      const { data: pastas } = pastaIds.length ? await svc.from('simulado_pastas').select('id, caderno_id').in('id', pastaIds) : { data: [] as any[] }
-      const cadernoDaPasta = new Map<string, string>((pastas ?? []).filter((p: any) => p.caderno_id).map((p: any) => [p.id, p.caderno_id]))
       const pastasPorQ = new Map<string, string[]>()
       for (const r of qp ?? []) { const arr = pastasPorQ.get((r as any).questao_id) ?? []; arr.push((r as any).pasta_id); pastasPorQ.set((r as any).questao_id, arr) }
-      // para cada simulado: o banco (com caderno) e o banco (qualquer) que mais cobrem suas questões.
+      // Banco (pasta) que mais cobre cada simulado — para grupos/visual.
       for (const [sim, qs] of qPorSim) {
-        const contCad = new Map<string, number>(), contAny = new Map<string, number>()
-        for (const q of qs) for (const p of pastasPorQ.get(q) ?? []) {
-          contAny.set(p, (contAny.get(p) ?? 0) + 1)
-          if (cadernoDaPasta.has(p)) contCad.set(p, (contCad.get(p) ?? 0) + 1)
-        }
-        const melhorCad = [...contCad.entries()].sort((a, b) => b[1] - a[1])[0]
-        if (melhorCad) cadernoPorSim.set(sim, cadernoDaPasta.get(melhorCad[0])!)
+        const contAny = new Map<string, number>()
+        for (const q of qs) for (const p of pastasPorQ.get(q) ?? []) contAny.set(p, (contAny.get(p) ?? 0) + 1)
         const melhorAny = [...contAny.entries()].sort((a, b) => b[1] - a[1])[0]
         if (melhorAny) pastaPorSim.set(sim, melhorAny[0])
       }
-      // modalidades dos cadernos encontrados.
-      const cadIds = [...new Set([...cadernoPorSim.values()])]
-      if (cadIds.length) {
-        const { data: cads } = await svc.from('simulado_cadernos_designer').select('id, config').in('id', cadIds)
-        for (const c of cads ?? []) {
-          const cfg = (c as any).config
-          // Cadernos do sistema (sem o "Caderno Completo") + o Enunciado (PDF importado) como extra.
-          const sistema = mesclarModalidades(cfg?.modalidadesV2).filter((m) => m.id !== 'caderno_completo')
-          const pdf = enunciadoPdf(cfg)
-          modsPorCad.set((c as any).id, [...sistema, ...(pdf ? [{ id: 'pdf-importado', nome: pdf.nome, pdfUrl: pdf.url }] : [])])
-        }
+      // Modalidades V2: simulado.regras.banco_base_id → caderno_entrega do banco.
+      const { data: simsRegras } = await svc.from('simulado_simulados').select('id, regras').in('id', simIds)
+      const bancoPorSim = new Map<string, string>()
+      for (const sr of simsRegras ?? []) { const b = ((sr as any).regras)?.banco_base_id as string | undefined; if (b) bancoPorSim.set((sr as any).id, b) }
+      const bancoIds = [...new Set([...bancoPorSim.values()])]
+      const entregaPorBanco = new Map<string, EntregaSlots | null>()
+      if (bancoIds.length) {
+        const { data: bs } = await svc.from('simulado_pastas').select('id, caderno_entrega').in('id', bancoIds)
+        for (const p of (bs ?? []) as any[]) entregaPorBanco.set(p.id, (p.caderno_entrega ?? null) as EntregaSlots | null)
+      }
+      for (const [sim, banco] of bancoPorSim) {
+        const entrega = entregaPorBanco.get(banco)
+        if (temEntregaV2(entrega)) modsPorSim.set(sim, modalidadesDoAlunoV2(entrega))
       }
       // grupos de disciplinas das pastas usadas (tolerante: coluna pode não existir).
       const pastasUsadas = [...new Set([...pastaPorSim.values()])]
@@ -246,14 +240,13 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
       for (const d of g.disciplinas) { const v = discMap.get(d); if (v) { gac += v.ac; gtt += v.tt } }
       return { nome: g.nome, ac: gac, tt: gtt }
     }).filter((g) => g.tt > 0)
-    const cadId = cadernoPorSim.get(s.simulado_id) ?? null
     const tipoS = tipoSimPorSim.get(s.simulado_id) ?? null
     return {
       id: s.id, titulo: s.simulados?.titulo ?? '—', statusLabel: cfg.label, statusVariant: cfg.variant,
       iniciado: fmt(s.iniciado_em), finalizado: fmt(s.finalizado_em), ac, tt,
       nota: s.nota != null ? Number(s.nota) : null, posicao: s.posicao_ranking ?? null, tentativa: s.tentativa_num ?? 1,
       tempoLabel: tempoMs ? fmtDur(tempoMs) : '—', mediaLabel: tempoMs && tt ? fmtDur(Math.round(tempoMs / tt)) : '—',
-      porGrupo, porDisciplina, cadId, mods: cadId ? filtrarModsPorTipo(modsPorCad.get(cadId) ?? [], tipoS) : [], simuladoId: s.simulado_id, temResultado: tt > 0, tipo: tipoS,
+      porGrupo, porDisciplina, cadId: null, mods: filtrarModsPorTipo(modsPorSim.get(s.simulado_id) ?? [], tipoS), simuladoId: s.simulado_id, temResultado: tt > 0, tipo: tipoS,
     }
   })
 
