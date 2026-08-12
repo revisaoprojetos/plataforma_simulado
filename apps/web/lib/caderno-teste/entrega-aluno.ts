@@ -47,11 +47,14 @@ export function temEntregaV2(entrega: EntregaSlots | null | undefined): boolean 
   return usavel(e.enunciado) || usavel(e.folha) || usavel(e.diagnostico) || usavel(e.gabarito)
 }
 
-/** Carrega o `caderno_entrega` do banco (tolerante à coluna ausente). `svc` = createAdminClient, já autorizado. */
-export async function carregarEntregaBanco(svc: any, tenantId: string, bancoId: string | null | undefined): Promise<EntregaSlots | null> {
+/** Carrega o `caderno_entrega` do banco (tolerante à coluna ausente). `tenantId` opcional: com
+ *  createAdminClient passe o tenant (filtra); com createServiceClient (RLS do aluno) passe null. */
+export async function carregarEntregaBanco(svc: any, tenantId: string | null | undefined, bancoId: string | null | undefined): Promise<EntregaSlots | null> {
   if (!bancoId) return null
   try {
-    const { data } = await svc.from('simulado_pastas').select('caderno_entrega').eq('id', bancoId).eq('tenant_id', tenantId).maybeSingle()
+    let q = svc.from('simulado_pastas').select('caderno_entrega').eq('id', bancoId)
+    if (tenantId) q = q.eq('tenant_id', tenantId)
+    const { data } = await q.maybeSingle()
     return ((data as any)?.caderno_entrega ?? null) as EntregaSlots | null
   } catch { return null }
 }

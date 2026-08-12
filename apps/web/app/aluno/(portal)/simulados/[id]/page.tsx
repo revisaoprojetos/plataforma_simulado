@@ -10,6 +10,7 @@ import { montarDesempenhoAluno } from '@/lib/simulado/desempenho-aluno'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { tiposDeSimulados } from '@/lib/simulado/tipo'
 import { modalidadesDoAluno, type ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
+import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
 import { MeuSimuladoView } from '@/components/aluno/meu-simulado-view'
 import { NpsAvaliacao } from '@/components/aluno/nps-avaliacao'
 
@@ -65,8 +66,13 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
     montarComparativo(svc, id, { minhaNota: melhor.nota != null ? Number(melhor.nota) : null, minhaSessaoId: melhor.id }),
     montarDesempenhoAluno(svc, estId),
     (async (): Promise<{ cadernoId: string | null; modalidades: ModalidadeAluno[] }> => {
-      let cadernoId = ((sim.regras as any)?.caderno_id as string | undefined) ?? null
       const bancoBaseId = (sim.regras as any)?.banco_base_id as string | undefined
+      // Entrega V2 (flag por simulado): se ligada e o banco tem entrega utilizável, entrega o V2.
+      if ((sim.regras as any)?.entrega_v2 === true && bancoBaseId) {
+        const entrega = await carregarEntregaBanco(svc, null, bancoBaseId)
+        if (temEntregaV2(entrega)) return { cadernoId: null, modalidades: modalidadesDoAlunoV2(entrega) }
+      }
+      let cadernoId = ((sim.regras as any)?.caderno_id as string | undefined) ?? null
       if (!cadernoId && bancoBaseId) {
         const { data: banco } = await svc.from('simulado_pastas').select('caderno_id').eq('id', bancoBaseId).maybeSingle()
         cadernoId = ((banco as any)?.caderno_id as string | undefined) ?? null

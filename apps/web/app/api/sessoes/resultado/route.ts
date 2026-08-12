@@ -6,6 +6,7 @@ import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { modalidadesDoAluno, type ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
+import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
 
 // GET /api/sessoes/resultado?st={sessao_id}
@@ -188,7 +189,13 @@ export async function GET(request: NextRequest) {
   // Caderno vinculado + suas modalidades (para o download "como você fez" por modalidade).
   let cadernoId: string | null = null
   let modalidades: ModalidadeAluno[] = []
-  try {
+  // Entrega V2 (flag por simulado): se ligada e o banco tem entrega, usa a entrega V2.
+  const bancoBaseIdV2 = (simulado?.regras as any)?.banco_base_id as string | undefined
+  if ((simulado?.regras as any)?.entrega_v2 === true && bancoBaseIdV2) {
+    const entrega = await carregarEntregaBanco(admin, sessao.tenant_id, bancoBaseIdV2)
+    if (temEntregaV2(entrega)) modalidades = modalidadesDoAlunoV2(entrega)
+  }
+  if (!modalidades.length) try {
     const qids = questoes.map((q: any) => q.id).filter(Boolean)
     if (qids.length) {
       const { data: qp } = await admin.from('simulado_questao_pasta').select('pasta_id').in('questao_id', qids)

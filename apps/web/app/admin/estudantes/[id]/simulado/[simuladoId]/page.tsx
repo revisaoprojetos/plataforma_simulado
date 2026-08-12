@@ -7,6 +7,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { iconeBanco } from '@/lib/banco-visual'
 import { tiposDeSimulados } from '@/lib/simulado/tipo'
 import { modalidadesDoAluno, type ModalidadeAluno } from '@/lib/caderno-designer/entrega-aluno'
+import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
 import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
 import { ArrowLeft, ShieldCheck } from 'lucide-react'
 import { montarComparativo } from '@/lib/simulado/comparativo'
@@ -103,7 +104,12 @@ export default async function EstudanteSimuladoPage({ params }: { params: Promis
   // Cadernos do aluno (fonte única): Folha de Respostas, Caderno de questões,
   // Diagnóstico e o Enunciado (PDF importado). Aqui o admin vê tudo liberado.
   let modalidades: ModalidadeAluno[] = []
-  if (cadernoId) {
+  // Entrega V2 (flag por simulado): se ligada e o banco tem entrega, usa a entrega V2.
+  if ((sim.regras as any)?.entrega_v2 === true && bancoBaseId) {
+    const entrega = await carregarEntregaBanco(svc, null, bancoBaseId)
+    if (temEntregaV2(entrega)) modalidades = modalidadesDoAlunoV2(entrega)
+  }
+  if (!modalidades.length && cadernoId) {
     const { data: cad } = await svc.from('simulado_cadernos_designer').select('config').eq('id', cadernoId).maybeSingle()
     modalidades = modalidadesDoAluno((cad as any)?.config, tipo)
   }
