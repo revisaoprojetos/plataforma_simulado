@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import type { GamConfig, TituloNivel } from '@/lib/gamificacao/config'
 import { xpAcumuladoParaNivel, tituloParaNivel } from '@/lib/gamificacao/niveis'
 import { salvarXpNiveis } from '../actions'
-import { NumberField, SaveButton, SectionCard } from './_campos'
+import { NumberField, SaveBar, SectionCard } from './_campos'
 
 export function XpNiveisForm({ config, podeGerenciar }: { config: GamConfig; podeGerenciar: boolean }) {
   const [simulado, setSimulado] = useState(config.xp_regras.simulado)
@@ -42,12 +42,7 @@ export function XpNiveisForm({ config, podeGerenciar }: { config: GamConfig; pod
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      {podeGerenciar && (
-        <div className="sticky top-0 z-10 -mt-1 flex items-center justify-end gap-3 border-b bg-background/80 py-2 backdrop-blur">
-          <span className="text-xs text-muted-foreground">Aplica XP, níveis e cargos.</span>
-          <SaveButton salvando={salvando} />
-        </div>
-      )}
+      {podeGerenciar && <SaveBar salvando={salvando} hint="Aplica XP, níveis e cargos." />}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <SectionCard titulo="XP por concluir simulado" icon={Zap} className="space-y-2.5">

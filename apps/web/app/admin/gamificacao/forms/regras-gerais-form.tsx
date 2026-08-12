@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import type { GamConfig } from '@/lib/gamificacao/config'
 import { salvarRegrasGerais } from '../actions'
-import { NumberField, TextField, SaveButton, SectionCard } from './_campos'
+import { NumberField, TextField, SaveBar, SectionCard } from './_campos'
 
 export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig; podeGerenciar: boolean }) {
   const [ativo, setAtivo] = useState(config.ativo)
@@ -25,6 +25,7 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {podeGerenciar && <SaveBar salvando={salvando} hint="Ativação, streak, baú e fuso." />}
       <div className={`flex items-center justify-between gap-4 rounded-2xl border p-5 shadow-sm ${ativo ? 'border-emerald-500/40 bg-emerald-500/5' : 'bg-card'}`}>
         <div>
           <Label className="text-sm font-semibold">Gamificação ativa</Label>
@@ -50,8 +51,6 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
           <TextField label="Timezone" value={timezone} onChange={setTimezone} placeholder="America/Sao_Paulo" disabled={!podeGerenciar} />
         </div>
       </SectionCard>
-
-      {podeGerenciar && <SaveButton salvando={salvando} />}
     </form>
   )
 }

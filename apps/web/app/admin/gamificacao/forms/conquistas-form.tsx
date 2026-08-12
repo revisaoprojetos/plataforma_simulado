@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Plus, Trash2, Rocket, Flame, Zap, Trophy, Medal, Award, type LucideIcon } from 'lucide-react'
 import type { GamConfig, ConquistaDef, ConquistaRegraTipo } from '@/lib/gamificacao/config'
 import { salvarConquistas } from '../actions'
-import { SaveButton, SectionCard } from './_campos'
+import { SaveBar, SectionCard } from './_campos'
 
 let seq = 0
 const novoId = () => `c_${Date.now()}_${seq++}`
@@ -39,6 +39,7 @@ export function ConquistasForm({ config, podeGerenciar }: { config: GamConfig; p
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {podeGerenciar && <SaveBar salvando={salvando} hint="Conquistas do aluno." />}
       <SectionCard titulo="Conquistas" descricao="Desbloqueadas uma única vez ao cumprir a regra. Podem conceder XP extra ao desbloquear.">
         <div className="grid gap-3 lg:grid-cols-2">
           {lista.map((c, i) => {
@@ -87,8 +88,6 @@ export function ConquistasForm({ config, podeGerenciar }: { config: GamConfig; p
 
         {podeGerenciar && <Button type="button" variant="outline" onClick={add} className="mt-3"><Plus className="h-4 w-4" /> Adicionar conquista</Button>}
       </SectionCard>
-
-      {podeGerenciar && <SaveButton salvando={salvando} />}
     </form>
   )
 }

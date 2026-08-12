@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Plus, Trash2, Target } from 'lucide-react'
 import type { GamConfig, MissaoDef, MissaoTipo } from '@/lib/gamificacao/config'
 import { salvarMissoes } from '../actions'
-import { SaveButton, SectionCard } from './_campos'
+import { SaveBar, SectionCard } from './_campos'
 
 let seq = 0
 const novoId = () => `m_${Date.now()}_${seq++}`
@@ -36,6 +36,7 @@ export function MissoesForm({ config, podeGerenciar }: { config: GamConfig; pode
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {podeGerenciar && <SaveBar salvando={salvando} hint="Missões diárias do aluno." />}
       <SectionCard titulo="Missões diárias" descricao="Renovam à meia-noite (fuso do tenant). O aluno ganha o XP ao atingir a meta do dia.">
         <div className="space-y-2">
           {missoes.map((m, i) => (
@@ -67,8 +68,6 @@ export function MissoesForm({ config, podeGerenciar }: { config: GamConfig; pode
 
         {podeGerenciar && <Button type="button" variant="outline" onClick={add} className="mt-1"><Plus className="h-4 w-4" /> Adicionar missão</Button>}
       </SectionCard>
-
-      {podeGerenciar && <SaveButton salvando={salvando} />}
     </form>
   )
 }
