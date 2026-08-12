@@ -73,7 +73,9 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   // nas últimas 48h (incremental → barato). A cada 6h: robusto a restart do worker (não depende de
   // um único disparo diário) e a janela de 48h cobre qualquer buraco entre execuções. Só concede.
   setInterval(() => { void chamarCron('/api/cron/guru-reconcile', 'cron guru-reconcile', (j) => !!(j.resultados?.length)) }, 21_600_000)
-  console.log('[cron] agendado: encerramento + import + sync Curseduca + eventos Integrações (60s); sync grupos→bancos (180s); warm-cache (300s); guru-reconcile (6h, incremental 48h)')
+  // Gamificação: zera a sequência (streak) de quem não teve atividade ontem. De hora em hora (idempotente).
+  setInterval(() => { void chamarCron('/api/cron/gamificacao-streak', 'cron gamificacao-streak', (j) => !!j.zerados) }, 3_600_000)
+  console.log('[cron] agendado: encerramento + import + sync Curseduca + eventos Integrações (60s); sync grupos→bancos (180s); warm-cache (300s); guru-reconcile (6h, incremental 48h); gamificacao-streak (1h)')
 } else {
   console.warn('[cron] DESATIVADO — defina WEB_INTERNAL_URL e CRON_SECRET')
 }

@@ -36,6 +36,7 @@ const AREA_PERM: { prefix: string; perm: string }[] = [
   { prefix: '/admin/integracoes', perm: 'integracoes:view' },
   { prefix: '/admin/conexoes', perm: 'integracoes:view' },
   { prefix: '/admin/relatorios', perm: 'relatorios:view' },
+  { prefix: '/admin/gamificacao', perm: 'gamificacao:view' },
   { prefix: '/admin/auditoria', perm: 'auditoria:view' },
   { prefix: '/admin/administradores', perm: 'rbac:view' },
   { prefix: '/admin/api-keys', perm: 'api_keys:manage' },

@@ -11,6 +11,7 @@ export const RBAC_CATALOGO: { resource: string; action: string }[] = [
   { resource: 'matriculas', action: 'view' }, { resource: 'matriculas', action: 'create' }, { resource: 'matriculas', action: 'update' }, { resource: 'matriculas', action: 'delete' },
   { resource: 'integracoes', action: 'view' }, { resource: 'integracoes', action: 'manage' },
   { resource: 'relatorios', action: 'view' }, { resource: 'relatorios', action: 'export' },
+  { resource: 'gamificacao', action: 'view' }, { resource: 'gamificacao', action: 'manage' },
   { resource: 'auditoria', action: 'view' }, { resource: 'auditoria', action: 'export' },
   { resource: 'configuracoes', action: 'view' }, { resource: 'configuracoes', action: 'manage' },
   { resource: 'api_keys', action: 'manage' },
@@ -32,6 +33,7 @@ export const RBAC_RECURSO_LABEL: Record<string, string> = {
   console: 'Console (administração global)',
   auditoria: 'Auditoria',
   relatorios: 'Relatórios',
+  gamificacao: 'Gamificação',
   tenants: 'Plataformas',
 }
 

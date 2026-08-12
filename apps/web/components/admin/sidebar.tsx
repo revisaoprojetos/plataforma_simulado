@@ -155,6 +155,13 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'Engajamento',
+    icon: Trophy,
+    items: [
+      { label: 'Gamificação', href: '/admin/gamificacao', icon: Trophy, perm: 'gamificacao:view' },
+    ],
+  },
+  {
     label: 'Feedback',
     icon: MessagesSquare,
     items: [

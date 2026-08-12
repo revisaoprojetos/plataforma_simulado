@@ -22,6 +22,7 @@ const CATALOGO = [
   ['matriculas', 'view'], ['matriculas', 'create'], ['matriculas', 'update'], ['matriculas', 'delete'],
   ['integracoes', 'view'], ['integracoes', 'manage'],
   ['relatorios', 'view'], ['relatorios', 'export'],
+  ['gamificacao', 'view'], ['gamificacao', 'manage'],
   ['auditoria', 'view'], ['auditoria', 'export'],
   ['configuracoes', 'view'], ['configuracoes', 'manage'],
   ['api_keys', 'manage'],
