@@ -35,12 +35,12 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <SectionCard titulo="Sequência diária (streak)" className="space-y-4">
+        <SectionCard titulo="Sequência diária (streak)" descricao="Recompensa por manter dias seguidos de atividade — cresce com a sequência." className="space-y-4">
           <NumberField label="XP por dia" value={streak.por_dia} onChange={(v) => setStreak({ ...streak, por_dia: v })} suffix="XP × dias de sequência" disabled={!podeGerenciar} />
           <NumberField label="Teto do XP diário" value={streak.cap} onChange={(v) => setStreak({ ...streak, cap: v })} suffix="XP máx./dia" hint="O bônus cresce com a sequência até este limite." disabled={!podeGerenciar} />
         </SectionCard>
 
-        <SectionCard titulo="Baú de sequência" className="space-y-4">
+        <SectionCard titulo="Baú de sequência" descricao="Prêmio extra em XP concedido a cada ciclo de dias de sequência." className="space-y-4">
           <NumberField label="A cada N dias" value={chest.cada_n_dias} onChange={(v) => setChest({ ...chest, cada_n_dias: v })} suffix="dias" min={1} disabled={!podeGerenciar} />
           <NumberField label="XP do baú" value={chest.xp} onChange={(v) => setChest({ ...chest, xp: v })} suffix="XP" disabled={!podeGerenciar} />
         </SectionCard>

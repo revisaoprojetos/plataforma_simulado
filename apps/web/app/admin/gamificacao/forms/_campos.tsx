@@ -5,10 +5,31 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Loader2, Save, type LucideIcon } from 'lucide-react'
 
-/** Linha de configuração compacta: rótulo/ajuda à esquerda, input estreito + sufixo à direita. */
-export function NumberField({ label, value, onChange, min = 0, step = 1, suffix, hint, disabled }: {
-  label: string; value: number; onChange: (n: number) => void; min?: number; step?: number; suffix?: string; hint?: string; disabled?: boolean
+/**
+ * Campo numérico. Padrão: linha compacta (rótulo à esquerda, input à direita).
+ * `stacked`: rótulo em cima e input embaixo (colunas estreitas, ex.: 3 na mesma linha).
+ */
+export function NumberField({ label, value, onChange, min = 0, step = 1, suffix, hint, disabled, stacked }: {
+  label: string; value: number; onChange: (n: number) => void; min?: number; step?: number; suffix?: string; hint?: string; disabled?: boolean; stacked?: boolean
 }) {
+  const input = (
+    <Input type="number" inputMode="numeric" min={min} step={step} value={Number.isFinite(value) ? value : 0}
+      disabled={disabled} onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))} className={`${stacked ? 'w-full' : 'w-24'} text-right tabular-nums`} />
+  )
+
+  if (stacked) {
+    return (
+      <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
+        <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+        <div className="mt-1.5 flex items-center gap-1.5">
+          {input}
+          {suffix && <span className="shrink-0 text-[11px] leading-tight text-muted-foreground">{suffix}</span>}
+        </div>
+        {hint && <p className="mt-1 text-[11px] leading-tight text-muted-foreground">{hint}</p>}
+      </div>
+    )
+  }
+
   return (
     <div className="flex items-center justify-between gap-4 rounded-lg border bg-muted/20 px-3 py-2.5">
       <div className="min-w-0">
@@ -16,8 +37,7 @@ export function NumberField({ label, value, onChange, min = 0, step = 1, suffix,
         {hint && <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">{hint}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <Input type="number" inputMode="numeric" min={min} step={step} value={Number.isFinite(value) ? value : 0}
-          disabled={disabled} onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))} className="w-24 text-right tabular-nums" />
+        {input}
         {suffix && <span className="w-20 shrink-0 text-[11px] leading-tight text-muted-foreground">{suffix}</span>}
       </div>
     </div>
