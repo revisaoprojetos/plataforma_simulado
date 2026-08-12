@@ -507,7 +507,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
   const total = (temCapa ? 1 : 0) + pages.length
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
+    <div className={paginas != null ? 'caderno-pronto' : undefined} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
       {/* passe de medição (escondido) — ESPELHA a caixa de conteúdo da folha: mesma largura A4 +
           padding + border-box + fonte/cor. Assim o texto quebra no MESMO nº de linhas e as alturas
           batem (senão um bloco "cabe" na conta mas renderiza mais alto e é cortado). */}

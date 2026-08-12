@@ -224,7 +224,7 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
   } : undefined
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }} onClick={onClick}>
+    <div className={paginasOk ? 'caderno-pronto' : undefined} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }} onClick={onClick}>
       {/* destaque do bloco selecionado (CSS, sem rebake dos nós) */}
       {selectable && selBlocoId && <style>{`[data-block-id="${selBlocoId}"] > *{outline:2px solid #6d28d9!important;outline-offset:2px;border-radius:2px}`}</style>}
       {selectable && <style>{`[data-block-id]{cursor:pointer}[data-block-id]:hover > *{outline:1.5px dashed #6d28d966;outline-offset:2px}`}</style>}
