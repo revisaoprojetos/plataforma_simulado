@@ -102,7 +102,7 @@ export async function previewQuestoesBanco(bancoId: string): Promise<{ ok: boole
  * nota, %, por pilar, por disciplina, assuntos das erradas) + as DISCIPLINAS do banco (nome+chave).
  * Reusa `carregarRegistros` (mesmo motor da mala direta do editor real).
  */
-export async function dadosBancoTeste(bancoId: string): Promise<{ ok: boolean; registros: RegistroTeste[]; disciplinas: DiscBancoTeste[] }> {
+export async function dadosBancoTeste(bancoId: string, filtro?: { aluno?: string; sessao?: string }): Promise<{ ok: boolean; registros: RegistroTeste[]; disciplinas: DiscBancoTeste[] }> {
   const access = await getCurrentAccess()
   if (!access.tenantId || !bancoId) return { ok: true, registros: [], disciplinas: [] }
   const svc = createAdminClient()
@@ -110,7 +110,9 @@ export async function dadosBancoTeste(bancoId: string): Promise<{ ok: boolean; r
   const bancoNome = ((pasta as any)?.nome ?? 'Simulado') as string
   let registros: RegistroTeste[] = []
   try {
-    const regs = await carregarRegistros(svc, access.tenantId, bancoId, bancoNome, undefined, undefined, 30)
+    // Com aluno/sessão: escopa AQUELE aluno (acha mesmo fora dos 30 primeiros). Sem filtro: amostra p/ a prévia.
+    const escopado = !!(filtro?.aluno || filtro?.sessao)
+    const regs = await carregarRegistros(svc, access.tenantId, bancoId, bancoNome, filtro?.sessao, filtro?.aluno, escopado ? undefined : 30)
     registros = regs.map((r) => ({ id: r.id, nome: r.nome, vars: r.vars, respostas: r.respostas }))
   } catch { /* base sem sessões/respostas — segue sem alunos */ }
 

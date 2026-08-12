@@ -42,7 +42,7 @@ export default async function ImprimirCadernoTestePage({ params, searchParams }:
   if (bancoId) {
     if (item.modalidade === 'diagnostico') {
       try {
-        const rd = await dadosBancoTeste(bancoId)
+        const rd = await dadosBancoTeste(bancoId, { aluno: alunoId })
         disciplinas = rd.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave, pilar: d.pilar }))
         const reg = alunoId ? rd.registros.find((r) => r.id === alunoId) : rd.registros[0]
         if (reg) vars = reg.vars
@@ -52,7 +52,7 @@ export default async function ImprimirCadernoTestePage({ params, searchParams }:
       // Folha "como fez" e caderno completo precisam das MARCAÇÕES do aluno (respostas) + suas variáveis.
       if (item.modalidade === 'folha_respostas' || item.modalidade === 'caderno_completo') {
         try {
-          const rd = await dadosBancoTeste(bancoId)
+          const rd = await dadosBancoTeste(bancoId, { aluno: alunoId })
           const reg = alunoId ? rd.registros.find((r) => r.id === alunoId) : rd.registros[0]
           if (reg) { vars = { ...vars, ...reg.vars }; respostas = reg.respostas }
         } catch { /* sem sessões/respostas — folha em branco */ }
