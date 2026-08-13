@@ -57,14 +57,20 @@ export function RankingLiga({ inicial = 'total' }: { inicial?: Escopo }) {
         <p className="py-8 text-center text-sm text-muted-foreground">Ainda sem pontuação neste período. Faça um simulado para entrar no ranking! 🚀</p>
       ) : (
         <ol className="space-y-1">
-          {itens.map((it) => (
-            <li key={it.estudanteId} className={cn('flex items-center gap-3 rounded-lg px-2.5 py-2', it.eu && 'bg-primary/10 ring-1 ring-primary/30')}>
-              <span className={cn('w-6 shrink-0 text-center text-sm font-bold tabular-nums', medalha(it.posicao))}>{it.posicao}</span>
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold uppercase">{it.nome.slice(0, 1)}</span>
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">{it.nome}{it.eu && <span className="ml-1 text-xs text-primary">(você)</span>}</span>
-              <span className="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">{it.xp.toLocaleString('pt-BR')} XP</span>
-            </li>
-          ))}
+          {itens.map((it, i) => {
+            const gap = i > 0 && it.posicao > itens[i - 1].posicao + 1 // salto (top 9 → você)
+            return (
+              <div key={it.estudanteId}>
+                {gap && <li className="flex justify-center py-0.5 text-muted-foreground/60" aria-hidden>⋯</li>}
+                <li className={cn('flex items-center gap-3 rounded-lg px-2.5 py-2', it.eu && 'bg-primary/10 ring-1 ring-primary/30')}>
+                  <span className={cn('w-6 shrink-0 text-center text-sm font-bold tabular-nums', medalha(it.posicao))}>{it.posicao}</span>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold uppercase">{it.nome.slice(0, 1)}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{it.nome}{it.eu && <span className="ml-1 text-xs text-primary">(você)</span>}</span>
+                  <span className="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">{it.xp.toLocaleString('pt-BR')} XP</span>
+                </li>
+              </div>
+            )
+          })}
         </ol>
       )}
     </div>

@@ -163,7 +163,7 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
               {concluido ? <Check className="h-7 w-7" /> : atual ? <Star className="h-7 w-7" /> : <Lock className="h-6 w-6" />}
             </button>
             {/* Rótulo com fundo próprio p/ não se misturar ao pontilhado que passa atrás. */}
-            <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg bg-background/85 px-1.5 py-0.5 backdrop-blur-sm">
+            <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
               <span className={cn('block text-xs font-semibold leading-snug', bloqueado && 'text-muted-foreground')}>{n.titulo}</span>
               <span className="block text-[11px] text-muted-foreground">
                 {concluido ? `Concluído${n.acerto != null ? ` · ${n.acerto}%` : ''}` : bloqueado ? 'Bloqueado' : (n.quando ?? 'Disponível')}
@@ -407,7 +407,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
               {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
               {concluido ? <Check className="h-7 w-7" /> : atual ? <Star className="h-7 w-7" /> : <Play className="h-6 w-6" />}
             </button>
-            <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg bg-background/85 px-1.5 py-0.5 backdrop-blur-sm">
+            <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
               <span className={cn('block text-xs font-semibold leading-snug', bloqueado && 'text-muted-foreground')}>{n.titulo}</span>
               <span className="block text-[11px] text-muted-foreground">
                 {concluido ? `Concluído${n.acerto != null ? ` · ${n.acerto}%` : ''}` : (n.quando ?? 'Disponível')}
@@ -422,7 +422,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
         <span className="mx-auto flex items-center justify-center rounded-2xl border-4" style={{ width: 56, height: 56, background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
           <Trophy className="h-6 w-6" />
         </span>
-        <div className="mt-1.5 inline-block rounded-lg bg-background/85 px-2 py-0.5 backdrop-blur-sm">
+        <div className="mt-1.5 inline-block rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
           <span className="block text-xs font-semibold">Mais simulados em breve</span>
           <span className="block text-[11px] text-muted-foreground">Fique de olho — novos simulados chegam aqui.</span>
         </div>

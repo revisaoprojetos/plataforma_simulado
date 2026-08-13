@@ -137,6 +137,18 @@ export async function rankingPeriodo(svc: any, tenantId: string, desdeISO: strin
   return rows.map((r, i) => ({ estudanteId: r.estudante_id, nome: nomes.get(r.estudante_id) ?? 'Aluno', xp: Number(r.xp), posicao: i + 1, eu: r.estudante_id === eu }))
 }
 
+/**
+ * Recorta o ranking para exibir no máximo 10 linhas: se o aluno está no top 10, mostra o top 10;
+ * se não, mostra os 9 primeiros e o próprio aluno no lugar do 10º (mantendo a posição real).
+ */
+export function top10ComVoce(itens: RankingItem[], euId: string): RankingItem[] {
+  if (itens.length <= 10) return itens
+  const euIdx = itens.findIndex((i) => i.estudanteId === euId)
+  if (euIdx < 0) return itens.slice(0, 10) // aluno sem posição → só o top 10
+  if (euIdx < 10) return itens.slice(0, 10)
+  return [...itens.slice(0, 9), itens[euIdx]]
+}
+
 // ─────────── PROGRESSO DAS CONQUISTAS (barras) ───────────
 export interface ConquistaProgresso { def: ConquistaDef; atual: number; meta: number; pct: number; desbloqueada: boolean }
 
