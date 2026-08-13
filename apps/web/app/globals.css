@@ -488,7 +488,7 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 
 /* Chama preenchida com 3 LÍNGUAS de fogo independentes: cada uma sobe/encolhe em ritmo
    próprio (origem na base), então o TOPO muda de forma o tempo todo como fogo real. */
-.ico-flame-svg { width: 1.6rem; height: 1.6rem; overflow: visible; }
+.ico-flame-svg { width: 1.35rem; height: 1.35rem; overflow: visible; }
 .ico-flame-svg .flame-path { transform-box: fill-box; transform-origin: 50% 100%; }
 /* Flicker de fogo: base fixa, topo dança (scaleY/scaleX/skew em passos irregulares). */
 .group:hover .ico-flame-svg .flame-path { animation: flame-lick .5s ease-in-out infinite; }
@@ -520,13 +520,13 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 /* 4 flechas cravando alternadamente: cada lado solta uma em CIMA e uma EMBAIXO,
    alternando entre esquerda e direita (LU → RU → LD → RD). */
 /* Voo MUITO RÁPIDO (chega em ~14% do ciclo) e para seco no escudo, ficando grudada. */
-@keyframes arw-lu { /* esquerda, em cima (agora um pouco mais para baixo) */
-  0%   { opacity: 0; transform: translate(-22px, 6px) rotate(42deg) scale(.7); }
+@keyframes arw-lu { /* esquerda, em cima — mais DEITADA (voo horizontal) */
+  0%   { opacity: 0; transform: translate(-24px, 1px) rotate(68deg) scale(.7); }
   6%   { opacity: 1; }
-  14%  { transform: translate(-6px, -1px) rotate(42deg) scale(1); }
-  70%  { opacity: 1; transform: translate(-6px, -1px) rotate(42deg) scale(1); }
+  14%  { transform: translate(-6px, -1px) rotate(68deg) scale(1); }
+  70%  { opacity: 1; transform: translate(-6px, -1px) rotate(68deg) scale(1); }
   78%  { opacity: 0; }
-  100% { opacity: 0; transform: translate(-6px, -1px) rotate(42deg); }
+  100% { opacity: 0; transform: translate(-6px, -1px) rotate(68deg); }
 }
 @keyframes arw-ld { /* esquerda, embaixo */
   0%   { opacity: 0; transform: translate(-23px, 18px) rotate(42deg) scale(.7); }
@@ -536,13 +536,13 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
   78%  { opacity: 0; }
   100% { opacity: 0; transform: translate(-7px, 7px) rotate(42deg); }
 }
-@keyframes arw-ru { /* direita, em cima (um pouco mais para baixo) */
-  0%   { opacity: 0; transform: translate(22px, 6px) rotate(-42deg) scale(.7); }
+@keyframes arw-ru { /* direita, em cima — mais DEITADA (voo horizontal) */
+  0%   { opacity: 0; transform: translate(24px, 1px) rotate(-68deg) scale(.7); }
   6%   { opacity: 1; }
-  14%  { transform: translate(6px, -1px) rotate(-42deg) scale(1); }
-  70%  { opacity: 1; transform: translate(6px, -1px) rotate(-42deg) scale(1); }
+  14%  { transform: translate(6px, -1px) rotate(-68deg) scale(1); }
+  70%  { opacity: 1; transform: translate(6px, -1px) rotate(-68deg) scale(1); }
   78%  { opacity: 0; }
-  100% { opacity: 0; transform: translate(6px, -1px) rotate(-42deg); }
+  100% { opacity: 0; transform: translate(6px, -1px) rotate(-68deg); }
 }
 @keyframes arw-rd { /* direita, embaixo */
   0%   { opacity: 0; transform: translate(23px, 18px) rotate(-42deg) scale(.7); }
@@ -552,7 +552,7 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
   78%  { opacity: 0; }
   100% { opacity: 0; transform: translate(7px, 7px) rotate(-42deg); }
 }
-.group:hover .ico-arw-lu { animation: arw-lu 1.8s cubic-bezier(.12,.9,.2,1) infinite; }
-.group:hover .ico-arw-ru { animation: arw-ru 1.8s cubic-bezier(.12,.9,.2,1) infinite; animation-delay: .45s; }
-.group:hover .ico-arw-ld { animation: arw-ld 1.8s cubic-bezier(.12,.9,.2,1) infinite; animation-delay: .9s; }
-.group:hover .ico-arw-rd { animation: arw-rd 1.8s cubic-bezier(.12,.9,.2,1) infinite; animation-delay: 1.35s; }
+.group:hover .ico-arw-lu { animation: arw-lu 2.4s cubic-bezier(.12,.9,.2,1) infinite; }
+.group:hover .ico-arw-ru { animation: arw-ru 2.4s cubic-bezier(.12,.9,.2,1) infinite; animation-delay: .6s; }
+.group:hover .ico-arw-ld { animation: arw-ld 2.4s cubic-bezier(.12,.9,.2,1) infinite; animation-delay: 1.2s; }
+.group:hover .ico-arw-rd { animation: arw-rd 2.4s cubic-bezier(.12,.9,.2,1) infinite; animation-delay: 1.8s; }
