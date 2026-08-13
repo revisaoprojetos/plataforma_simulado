@@ -345,10 +345,20 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
   // Trilha aberta: mais distância vertical entre os nós e zigue-zague mais largo na horizontal.
   // Só quando fica MUITO grande (>16 nós) encurta um pouco p/ não virar um comprimento absurdo.
   const compacto = flat.length > 16
-  const rowH = compacto ? 132 : 178
-  // Zigue-zague amplo e dinâmico: cruza o eixo a cada nó (centro → extremo → centro → outro
-  // extremo), gerando o dobro de curvas que a onda suave e um raio horizontal bem maior.
-  const offs = compacto ? [0, 132, 0, -132] : [0, 154, 0, -154]
+  const rowH = compacto ? 138 : 172
+  const AMP = compacto ? 132 : 154
+  // Enrolamento orgânico tipo "estrada sinuosa": curvas fluidas e aparentemente aleatórias, porém
+  // DETERMINÍSTICAS (mesmo traçado a cada render/SSR, sem Math.random) e coerentes — soma de senos
+  // de frequências incomensuráveis + leve jitter por hash do índice, saturada p/ encostar nos
+  // extremos e arredondar as voltas como as curvas da estrada.
+  const hash = (i: number) => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s) }
+  const waveOff = (i: number) => {
+    const base = 0.66 * Math.sin(i * 0.82 + 0.7) + 0.34 * Math.sin(i * 1.57 + 2.3)
+    const jit = (hash(i) - 0.5) * 0.55
+    return Math.round(Math.max(-1, Math.min(1, (base + jit) * 1.38)) * AMP)
+  }
+  // Tensão da spline (>1/6): deixa as voltas mais "gordas"/arredondadas, como as curvas da estrada.
+  const SMOOTH = 0.22
 
   // Layout: percorre grupos empilhando divisória + nós, guardando as posições.
   const nodesL: { n: TrilhaNode; off: number; y: number }[] = []
@@ -371,7 +381,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       gi++
     } else {
       t.nodes.forEach((n) => {
-        const off = offs[gi % offs.length]
+        const off = waveOff(gi)
         nodesL.push({ n, off, y: y + R })
         // Regra anti-colisão: o passo vertical nunca deixa o rótulo (título + linha de status)
         // deste nó alcançar o ícone do próximo — cresce conforme o texto ocupa mais linhas.
@@ -389,7 +399,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
     const capa = inteira ? (normal ?? larga) : (larga ?? normal)
     segMeta.push({ id: t.id, capa, dy, total: t.total })
   })
-  const chest = { off: offs[gi % offs.length], y: y + R }
+  const chest = { off: waveOff(gi), y: y + R }
   const segmentos = segMeta.map((s, i) => ({
     id: s.id, capa: s.capa,
     yTop: s.dy + 20,                                                        // logo abaixo da divisória do grupo
@@ -437,8 +447,8 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
           const P2 = allPts[i + 1]
           const P3 = allPts[i + 2] ?? P2
           const x1 = cx(p.off), y1 = p.y, x2 = cx(P2.off), y2 = P2.y
-          const c1x = x1 + (cx(P2.off) - cx(P0.off)) / 6, c1y = y1 + (P2.y - P0.y) / 6
-          const c2x = x2 - (cx(P3.off) - cx(p.off)) / 6, c2y = y2 - (P3.y - p.y) / 6
+          const c1x = x1 + (cx(P2.off) - cx(P0.off)) * SMOOTH, c1y = y1 + (P2.y - P0.y) * SMOOTH
+          const c2x = x2 - (cx(P3.off) - cx(p.off)) * SMOOTH, c2y = y2 - (P3.y - p.y) * SMOOTH
           const done = p.estado === 'concluido'
           return <path key={i} d={`M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`} fill="none" strokeWidth={6} strokeLinecap="round" strokeDasharray="0.1 16" stroke={done ? COR : 'var(--border)'} />
         })}
