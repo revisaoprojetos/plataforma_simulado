@@ -480,16 +480,20 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
           <div key={n.id} className="absolute z-[1] flex w-max max-w-[260px] -translate-x-1/2 flex-col items-center text-center" style={{ left: cx(off), top: cyv - R }}>
             <button type="button" data-trilha-node onClick={() => setAberto(n.id)} aria-label={n.titulo}
               className={cn('relative flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
-              style={{ width: R * 2, height: R * 2, ...(ouro ? { background: 'linear-gradient(145deg, #fde68a 0%, #f59e0b 52%, #d97706 100%)', borderColor: '#b45309', color: '#fff', boxShadow: '0 0 0 2px rgba(253,230,138,.35), 0 6px 16px -4px rgba(217,119,6,.6)' }
+              style={{ width: R * 2, height: R * 2, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 13px 2px rgba(250,204,21,.5), 0 0 28px 6px rgba(250,204,21,.22), 0 6px 16px -5px rgba(217,119,6,.55)' }
                 : concluido ? { background: '#10b981', borderColor: '#059669', color: '#fff' }
                 : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
                 : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
               {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
-              {/* Coroa (só 100%) — flutua acima do ícone */}
-              {ouro && <Crown className="pointer-events-none absolute -top-5 left-1/2 h-5 w-5 -translate-x-1/2" fill="#facc15" style={{ color: '#eab308', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,.45))' }} />}
-              {/* Verniz dourado — brilho por cima do ícone 100% */}
-              {ouro && <span className="pointer-events-none absolute inset-0 rounded-full" style={{ background: 'radial-gradient(120% 90% at 30% 18%, rgba(255,255,255,.6) 0%, rgba(255,255,255,.1) 35%, transparent 60%)' }} />}
-              <span className="relative">{concluido ? <Check className="h-7 w-7" /> : atual ? <Star className="h-7 w-7" /> : <Play className="h-6 w-6" />}</span>
+              {ouro && (<>
+                {/* Coroa (só 100%) — flutua acima da moeda, dourada com contorno âmbar e leve glow */}
+                <Crown className="pointer-events-none absolute -top-[23px] left-1/2 h-[26px] w-[22px] -translate-x-1/2" fill="#ffd24a" strokeWidth={1.75} style={{ color: '#a75d09', filter: 'drop-shadow(0 1px 2px rgba(90,45,0,.5)) drop-shadow(0 0 5px rgba(250,204,21,.55))' }} />
+                {/* Disco interno da moeda (mais claro, com relevo) */}
+                <span className="pointer-events-none absolute inset-[4px] rounded-full" style={{ background: 'radial-gradient(circle at 50% 34%, #fff2b0 0%, #ffd93b 44%, #f2b800 100%)', boxShadow: 'inset 0 -3px 6px rgba(170,105,10,.5), inset 0 2px 3px rgba(255,255,255,.7)' }} />
+                {/* Faixa de brilho diagonal (verniz), recortada no círculo */}
+                <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"><span className="absolute inset-0" style={{ background: 'linear-gradient(122deg, transparent 30%, rgba(255,255,255,.7) 44%, rgba(255,255,255,.2) 55%, transparent 67%)' }} /></span>
+              </>)}
+              <span className="relative" style={ouro ? { color: '#c2680a' } : undefined}>{concluido ? <Check className="h-7 w-7" strokeWidth={ouro ? 3.25 : 2.5} /> : atual ? <Star className="h-7 w-7" /> : <Play className="h-6 w-6" />}</span>
             </button>
             {/* Rótulo cresce lateralmente (largura por conteúdo, teto 260px); título no máx. 2 linhas. */}
             <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
