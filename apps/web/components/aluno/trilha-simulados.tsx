@@ -434,8 +434,8 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
     <div ref={rootRef} className="relative mx-auto" style={{ width: LANE, height }}>
       {/* Fundo por grupo — capa do banco (quase às bordas), quadrada com fade em todas as bordas */}
       {segmentos.map((s) => s.capa && (
-        <div key={s.id} className="pointer-events-none absolute left-1/2 z-0 -translate-x-1/2 overflow-hidden" style={{ top: s.yTop, height: Math.max(0, s.yBot - s.yTop), width: coverW, WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 7%, #000 93%, transparent 100%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 7%, #000 93%, transparent 100%)' }}>
-          <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-[center_30%]" style={{ opacity: 0.45, WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 46px, #000 calc(100% - 46px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 46px, #000 calc(100% - 46px), transparent 100%)' }} />
+        <div key={s.id} className="pointer-events-none absolute left-1/2 z-0 -translate-x-1/2 overflow-hidden" style={{ top: s.yTop, height: Math.max(0, s.yBot - s.yTop), width: coverW, WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 3%, #000 97%, transparent 100%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 3%, #000 97%, transparent 100%)' }}>
+          <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-[center_30%]" style={{ opacity: 0.6, WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)' }} />
         </div>
       ))}
       {/* Conectores pontilhados — spline Catmull-Rom contínua (C1): curva fluida que passa por
