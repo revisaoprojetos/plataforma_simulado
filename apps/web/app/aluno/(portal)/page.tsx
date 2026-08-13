@@ -274,6 +274,15 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
 
   // Trilhas de simulados (estilo Duolingo): por grupo, nós concluído → atual → bloqueado.
   const baseXp = gamConfig?.ativo ? (gamConfig.xp_regras.simulado.base || 0) : 0
+  // Contagem de questões (válidas) por simulado das trilhas — para exibir "· N questões".
+  const cntQ = new Map<string, number>()
+  {
+    const idsTrilha = [...new Set(itensCat.map((i) => i.id))]
+    if (idsTrilha.length) {
+      const rows = await fetchAllByIn<any>(idsTrilha, (chunk) => svc.from('simulado_prova_questoes').select('simulado_id, anulada').in('simulado_id', chunk).order('simulado_id'))
+      for (const r of rows) if (!r.anulada) cntQ.set(r.simulado_id, (cntQ.get(r.simulado_id) ?? 0) + 1)
+    }
+  }
   const lanc = (i: any) => new Date(i.regras?.publicado_em ?? i.created_at ?? 0).getTime()
   const trilhas: Trilha[] = grupos.map((g) => {
     const its = itensCat.filter((i) => i.grupoId === g.id).sort((a, b) => lanc(a) - lanc(b))
@@ -292,7 +301,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
       const acao = done ? 'Ver resultado' : i.emAndamento ? 'Continuar' : i.refazer ? 'Refazer' : 'Fazer agora'
       const capa = visual.get(i.id)?.capa ?? null
       const nota = notas.length ? Math.max(...notas) : null
-      return { id: i.id, titulo: i.titulo, quando: i.quando, estado, acerto, nota, tentativas: notas.length, statusLabel: i.statusLabel, xp: baseXp, href, acao, capa }
+      return { id: i.id, titulo: i.titulo, quando: i.quando, estado, acerto, nota, tentativas: notas.length, statusLabel: i.statusLabel, questoes: cntQ.get(i.id) ?? 0, xp: baseXp, href, acao, capa }
     })
     return { id: g.id, nome: g.nome, cor: g.cor ?? null, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: baseXp * nodes.length, nodes }
   }).filter((tr) => tr.nodes.length > 0)
