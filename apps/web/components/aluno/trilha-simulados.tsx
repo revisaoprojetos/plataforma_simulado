@@ -360,7 +360,9 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
     dividers.push({ id: t.id, nome: t.nome, done: t.done, total: t.total, y: dy })
     y += GAP_HDR
     t.nodes.forEach((n) => {
-      const off = offs[gi % offs.length]
+      // Grupo com um único simulado → fica centralizado no eixo (off 0), no meio da coluna;
+      // a fluidez horizontal continua pelos conectores que passam por ele.
+      const off = t.nodes.length === 1 ? 0 : offs[gi % offs.length]
       nodesL.push({ n, off, y: y + R })
       // Regra anti-colisão: o passo vertical nunca deixa o rótulo (título + linha de status)
       // deste nó alcançar o ícone do próximo — cresce conforme o texto ocupa mais linhas.
