@@ -183,7 +183,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
                   return (
                     <div key={i} className="flex items-center gap-2.5 rounded-lg border px-3 py-1.5 text-[12.5px]" style={{ background: SURF, borderColor: DIV, animation: `lu-rise .4s ease ${(0.2 + i * 0.05).toFixed(2)}s both` }}>
                       <span className="flex h-6 w-6 items-center justify-center rounded-md" style={{ background: `color-mix(in oklab, ${cor} 20%, transparent)`, color: cor }}>{g.icon}</span>
-                      <span className="flex-1 text-left" style={{ color: '#cfced9' }}>{g.label}</span>
+                      <span className="flex-1 text-left text-white">{g.label}</span>
                       <span className="whitespace-nowrap font-semibold" style={{ color: cor }}>+{g.xp} XP</span>
                     </div>
                   )
