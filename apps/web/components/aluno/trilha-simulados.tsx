@@ -36,6 +36,23 @@ const COR = 'var(--brand-primary, var(--primary))'
 // Roxo dos botões dos cards de simulado de baixo (card-simulado.tsx: s.vis?.cor ?? '#6d28d9').
 const BTN = '#6d28d9'
 
+// Fecha o card lateral ao clicar fora dele (ignora cliques em nós, que trocam o card aberto).
+function useCliqueForaFechar(ativo: boolean, setAberto: (v: null) => void) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!ativo) return
+    const onDown = (e: MouseEvent) => {
+      const el = ref.current, t = e.target as HTMLElement
+      if (el && el.contains(t)) return
+      if (t.closest('[data-trilha-node]')) return
+      setAberto(null)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [ativo, setAberto])
+  return ref
+}
+
 // Card de um simulado. No hover: a info desliza (animada) até a esquerda e as ações surgem à direita.
 function NodeCard({ n, gamAtivo }: { n: TrilhaNode; gamAtivo: boolean }) {
   const infoRef = useRef<HTMLDivElement>(null)
@@ -114,6 +131,7 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
   const open = openIdx >= 0 ? t.nodes[openIdx] : null
   const openPt = openIdx >= 0 ? pts[openIdx] : null
   const side = openPt && openPt.off > 0 ? 'left' : 'right' // card no lado OPOSTO à curva (mais espaço)
+  const cardRef = useCliqueForaFechar(!!open, setAberto)
 
   return (
     <div className="relative mx-auto" style={{ width: LANE, height }}>
@@ -136,7 +154,7 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
         const sel = n.id === aberto
         return (
           <div key={n.id} data-trilha-item className="absolute -translate-x-1/2 text-center" style={{ left: cx(p.off), top: p.y - R, width: 200, marginLeft: 0 }}>
-            <button type="button" onClick={() => setAberto(n.id)} aria-label={n.titulo}
+            <button type="button" data-trilha-node onClick={() => setAberto(n.id)} aria-label={n.titulo}
               className={cn('relative mx-auto flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
               style={{ width: R * 2, height: R * 2, ...(concluido ? { background: COR, borderColor: `color-mix(in oklab, ${COR} 70%, #000)`, color: '#fff' }
                 : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
@@ -166,7 +184,7 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
 
       {/* Card do simulado — no lado com mais espaço, alinhado ao nó */}
       {open && openPt && (
-        <div key={open.id} className="absolute z-10 w-[300px] motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-200"
+        <div ref={cardRef} key={open.id} className="absolute z-10 w-[300px] motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-200"
           style={{ top: Math.max(0, Math.min(openPt.y - 60, height - 210)), ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
           <span className={cn('absolute top-14 h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} />
           <div className={cn('overflow-hidden rounded-2xl border shadow-xl motion-safe:animate-[trilha-card-pulse_2.2s_ease-in-out_infinite]', open.estado === 'atual' && 'border-primary/40')}>
@@ -343,6 +361,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
   const open = openL?.n ?? null
   const openPt = openL ? { off: openL.off, y: openL.y } : null
   const side = openPt && openPt.off > 0 ? 'left' : 'right'
+  const cardRef = useCliqueForaFechar(!!open, setAberto)
 
   if (!nodesL.length) return null
 
@@ -358,16 +377,31 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
         })}
       </svg>
 
-      {/* Divisórias de grupo (o pontilhado passa atrás; a legenda tem fundo próprio) */}
-      {dividers.map((d) => (
-        <div key={d.id} className="absolute left-1/2 z-[2] -translate-x-1/2" style={{ top: d.y }}>
-          <div className="flex items-center gap-2 rounded-full border bg-background/90 px-3 py-1 shadow-sm backdrop-blur-sm">
-            <Route className="h-3.5 w-3.5 text-primary" />
-            <span className="whitespace-nowrap text-xs font-semibold">{d.nome}</span>
-            <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-primary">{d.done}/{d.total}</span>
+      {/* Divisórias de grupo — cabeçalho de seção com linhas laterais; a legenda tem fundo próprio. */}
+      {dividers.map((d) => {
+        const pct = d.total ? Math.round((d.done / d.total) * 100) : 0
+        const completo = d.total > 0 && d.done >= d.total
+        return (
+          <div key={d.id} className="absolute left-1/2 z-[2] -translate-x-1/2" style={{ top: d.y, width: 340 }}>
+            <div className="flex items-center gap-2.5">
+              <span className="h-px flex-1" style={{ background: 'linear-gradient(to right, transparent, var(--border))' }} />
+              <div className="flex flex-col items-center gap-1 rounded-2xl border bg-card px-4 py-2 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: `color-mix(in oklab, ${COR} 16%, transparent)`, color: COR }}>
+                    {completo ? <Trophy className="h-3.5 w-3.5" /> : <Route className="h-3.5 w-3.5" />}
+                  </span>
+                  <span className="max-w-[190px] truncate whitespace-nowrap text-sm font-bold" title={d.nome}>{d.nome}</span>
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums" style={{ background: `color-mix(in oklab, ${COR} 15%, transparent)`, color: COR }}>{d.done}/{d.total}</span>
+                </div>
+                <div className="h-1 w-full overflow-hidden rounded-full" style={{ background: `color-mix(in oklab, ${COR} 14%, transparent)` }}>
+                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: COR }} />
+                </div>
+              </div>
+              <span className="h-px flex-1" style={{ background: 'linear-gradient(to left, transparent, var(--border))' }} />
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
 
       {/* Nós */}
       {nodesL.map(({ n, off, y: cyv }) => {
@@ -377,7 +411,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
         const sel = n.id === aberto
         return (
           <div key={n.id} className="absolute z-[1] -translate-x-1/2 text-center" style={{ left: cx(off), top: cyv - R, width: 200 }}>
-            <button type="button" onClick={() => setAberto(n.id)} aria-label={n.titulo}
+            <button type="button" data-trilha-node onClick={() => setAberto(n.id)} aria-label={n.titulo}
               className={cn('relative mx-auto flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
               style={{ width: R * 2, height: R * 2, ...(concluido ? { background: COR, borderColor: `color-mix(in oklab, ${COR} 70%, #000)`, color: '#fff' }
                 : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
@@ -396,16 +430,19 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       })}
 
       {/* Baú final */}
-      <div className="absolute z-[1] -translate-x-1/2 text-center" style={{ left: cx(chest.off), top: chest.y - R, width: 200 }}>
+      <div className="absolute z-[1] -translate-x-1/2 text-center" style={{ left: cx(chest.off), top: chest.y - R, width: 220 }}>
         <span className="mx-auto flex items-center justify-center rounded-2xl border-4" style={{ width: 56, height: 56, background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
           <Trophy className="h-6 w-6" />
         </span>
-        <div className="mt-1.5 inline-block rounded-lg bg-background/85 px-1.5 py-0.5 text-xs font-semibold backdrop-blur-sm">Fim da trilha</div>
+        <div className="mt-1.5 inline-block rounded-lg bg-background/85 px-2 py-0.5 backdrop-blur-sm">
+          <span className="block text-xs font-semibold">Mais simulados em breve</span>
+          <span className="block text-[11px] text-muted-foreground">Fique de olho — novos simulados chegam aqui.</span>
+        </div>
       </div>
 
       {/* Card do simulado — no lado com mais espaço, alinhado ao nó */}
       {open && openPt && (
-        <div key={open.id} className="absolute z-10 w-[300px] motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-200"
+        <div ref={cardRef} key={open.id} className="absolute z-10 w-[300px] motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-200"
           style={{ top: Math.max(0, Math.min(openPt.y - 60, height - 210)), ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
           <span className={cn('absolute top-14 h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} />
           <div className={cn('overflow-hidden rounded-2xl border shadow-xl motion-safe:animate-[trilha-card-pulse_2.2s_ease-in-out_infinite]', open.estado === 'atual' && 'border-primary/40')}>
