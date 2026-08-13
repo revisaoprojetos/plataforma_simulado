@@ -344,7 +344,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
   const nodesL: { n: TrilhaNode; off: number; y: number }[] = []
   const dividers: { id: string; nome: string; done: number; total: number; y: number }[] = []
   // Fundo por grupo: capa INTEIRA do banco (capa_url); começa abaixo da divisória e termina antes da próxima.
-  const segMeta: { id: string; capa: string | null; dy: number }[] = []
+  const segMeta: { id: string; capa: string | null; dy: number; nome: string }[] = []
   let y = PAD, gi = 0
   trilhas.forEach((t, ti) => {
     if (ti > 0) y += GAP_GRUPO
@@ -358,13 +358,14 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       gi++
     })
     const capa = t.nodes.find((n) => n.capaBanner)?.capaBanner ?? t.nodes.find((n) => n.capa)?.capa ?? null
-    segMeta.push({ id: t.id, capa, dy })
+    segMeta.push({ id: t.id, capa, dy, nome: t.nome })
   })
   const chest = { off: OFFS[gi % OFFS.length], y: y + R }
   const segmentos = segMeta.map((s, i) => ({
     id: s.id, capa: s.capa,
-    yTop: s.dy + 30,                                                         // abaixo da divisória do grupo
-    yBot: (i < segMeta.length - 1 ? segMeta[i + 1].dy - 16 : chest.y - 40),   // antes da próxima divisória (ou do baú)
+    yTop: s.dy + 20,                                                        // logo abaixo da divisória do grupo
+    yBot: (i < segMeta.length - 1 ? segMeta[i + 1].dy - 4 : chest.y - 24),   // quase encostando na próxima divisória (ou no baú)
+    escala: /semana/i.test(s.nome) ? 0.55 : 1,                               // banner muito largo (Semana...) reduz a escala
   }))
   const height = chest.y + R + 48
   const allPts = [...nodesL.map((x) => ({ off: x.off, y: x.y, estado: x.n.estado })), { off: chest.off, y: chest.y, estado: 'disponivel' as const }]
@@ -392,11 +393,10 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
 
   return (
     <div ref={rootRef} className="relative mx-auto" style={{ width: LANE, height }}>
-      {/* Fundo por grupo — capa do banco bem apagada (quase às bordas), só p/ diferenciar cada trilha */}
+      {/* Fundo por grupo — capa do banco (quase às bordas), quadrada com fade em todas as bordas */}
       {segmentos.map((s) => s.capa && (
-        <div key={s.id} className="pointer-events-none absolute left-1/2 z-0 -translate-x-1/2 overflow-hidden rounded-2xl" style={{ top: s.yTop, height: Math.max(0, s.yBot - s.yTop), width: coverW }}>
-          <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-center" style={{ opacity: 0.08 }} />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent, color-mix(in oklab, var(--background) 35%, transparent))' }} />
+        <div key={s.id} className="pointer-events-none absolute left-1/2 z-0 -translate-x-1/2 overflow-hidden" style={{ top: s.yTop, height: Math.max(0, s.yBot - s.yTop), width: coverW, WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 7%, #000 93%, transparent 100%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 7%, #000 93%, transparent 100%)' }}>
+          <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-center" style={{ opacity: 0.24, transform: s.escala !== 1 ? `scale(${s.escala})` : undefined, WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%)' }} />
         </div>
       ))}
       {/* Conectores pontilhados — contínuos, inclusive entre grupos */}
