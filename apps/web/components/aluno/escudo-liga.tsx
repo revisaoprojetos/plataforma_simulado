@@ -38,13 +38,16 @@ function Emblema({ tipo, fill }: { tipo: string; fill: string }) {
           <rect x="2.4" y="19.6" width="19.2" height="2.4" rx="0.6" fill={fill} />
         </>
       )
-    case 'martelo': // martelo da justiça na DIAGONAL (cabeça em cima-direita, cabo + punho)
+    case 'martelo': // martelo da justiça na DIAGONAL (cabeça em cima-direita) + bloco de som ao lado
       return (
-        <g transform="rotate(-42 12 12)">
-          <rect x="5.5" y="3.6" width="13" height="4.4" rx="2.2" fill={fill} />
-          <rect x="10.6" y="8" width="2.8" height="10.4" rx="1.4" fill={fill} />
-          <circle cx="12" cy="19" r="1.9" fill={fill} />
-        </g>
+        <>
+          <rect x="11.7" y="19.5" width="10.1" height="2.7" rx="1.35" fill={fill} />
+          <g transform="rotate(-42 12 12)">
+            <rect x="5.5" y="3.6" width="13" height="4.4" rx="2.2" fill={fill} />
+            <rect x="10.6" y="8" width="2.8" height="10.4" rx="1.4" fill={fill} />
+            <circle cx="12" cy="19" r="1.9" fill={fill} />
+          </g>
+        </>
       )
     case 'balanca': // balança da justiça — finial, trave em arco, cordas em V, conchas e base curvas
       return (
@@ -71,7 +74,7 @@ function Emblema({ tipo, fill }: { tipo: string; fill: string }) {
 
 // Mapeia pela liga (por NOME — o tenant pode renomear mantendo o id-semente).
 const POR_NOME: Record<string, string> = {
-  bronze: 'livro', prata: 'capelo', ouro: 'tribunal', diamante: 'martelo', ametista: 'balanca',
+  bronze: 'livro', prata: 'capelo', ouro: 'martelo', diamante: 'balanca', ametista: 'tribunal',
 }
 const norm = (s?: string) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
 
