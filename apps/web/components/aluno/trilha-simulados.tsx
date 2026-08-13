@@ -53,9 +53,9 @@ function NodeCard({ n, gamAtivo }: { n: TrilhaNode; gamAtivo: boolean }) {
 
   return (
     <div onMouseEnter={enter} onMouseLeave={leave}
-      className={cn('group relative mb-4 mr-8 flex-1 overflow-hidden rounded-2xl border p-4 text-center shadow-sm transition-all duration-200 hover:shadow-md motion-safe:hover:scale-[1.02]',
+      className={cn('group relative mb-4 mr-8 flex h-40 flex-1 items-center overflow-hidden rounded-2xl border px-5 text-center shadow-sm transition-all duration-200 hover:shadow-md motion-safe:hover:scale-[1.02]',
         img ? 'text-white' : 'bg-card', atual && 'border-primary/40')}>
-      {/* Fundo: banner comprido do banco (capa_url) + degradê p/ legibilidade */}
+      {/* Fundo: banner comprido do banco (capa_url, mesmo tamanho do card de personalizar) + degradê */}
       {img && (
         <>
           <img src={img} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -63,8 +63,8 @@ function NodeCard({ n, gamAtivo }: { n: TrilhaNode; gamAtivo: boolean }) {
         </>
       )}
 
-      {/* Info — desliza suavemente para a esquerda no hover (medido + translateX) */}
-      <div ref={infoRef} className="relative inline-block max-w-full text-left align-top transition-transform duration-300 ease-out will-change-transform" style={{ transform: `translateX(${dx}px)` }}>
+      {/* Info — centralizada; desliza suavemente para a esquerda no hover (medido + translateX) */}
+      <div ref={infoRef} className="relative mx-auto inline-block max-w-full text-left align-middle transition-transform duration-300 ease-out will-change-transform" style={{ transform: `translateX(${dx}px)` }}>
         {atual && <span className="mb-1.5 inline-block rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">Comece aqui</span>}
         <div className="font-semibold leading-snug">{n.titulo}</div>
         <div className={cn('mt-1 text-xs', txtSec)}>
@@ -134,7 +134,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
       </div>
 
       <div className="relative">
-        <ol className={cn('min-w-0 space-y-0 py-1', rolar && 'max-h-[34rem] overflow-y-auto pr-1 [scrollbar-width:thin]')}>
+        <ol className={cn('min-w-0 space-y-0 py-1', rolar && 'max-h-[55rem] overflow-y-auto pr-1 [scrollbar-width:thin]')}>
           {t.nodes.map((n, i) => {
             const concluido = n.estado === 'concluido'
             const atual = n.estado === 'atual'
