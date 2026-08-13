@@ -11,7 +11,8 @@ export type ItemSimuladoCat = ItemSimulado & { grupoId: string | null }
 export type ProgressoGrupo = Record<string, { done: number; total: number }>
 
 // Largura de cada card na fileira (deixa espiar um pedaço do próximo).
-const FILEIRA_BASIS = 'shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-3rem)/4.3)] xl:basis-[calc((100%-4rem)/5.3)]'
+// Fileira "recentes": ~4 cards + um pedaço do próximo nas telas largas (o resto rola pro lado).
+const FILEIRA_BASIS = 'shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-3rem)/4.3)] xl:basis-[calc((100%-4rem)/4.3)]'
 
 // Seções semânticas do aluno (por estado). Usadas na visão de dentro da pasta.
 const SECOES = [
