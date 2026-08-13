@@ -3,13 +3,13 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { Check, Lock, Play, Star, Route, Zap, Trophy, CircleCheck } from 'lucide-react'
+import { Check, Play, Star, Route, Zap, Trophy, CircleCheck, Download } from 'lucide-react'
 
 export interface TrilhaNode {
   id: string
   titulo: string
   quando: string | null
-  estado: 'concluido' | 'atual' | 'bloqueado'
+  estado: 'concluido' | 'atual' | 'disponivel'
   acerto: number | null
   nota: number | null
   tentativas: number
@@ -19,6 +19,7 @@ export interface TrilhaNode {
   href: string | null
   acao: string
   capa: string | null
+  cadernoUrl: string | null
 }
 export interface Trilha {
   id: string
@@ -43,7 +44,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
     <section className="space-y-4">
       <div>
         <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight"><Route className="h-5 w-5 text-primary" /> Trilhas de simulados</h2>
-        <p className="text-sm text-muted-foreground">Conclua um simulado para desbloquear o próximo.</p>
+        <p className="text-sm text-muted-foreground">Todos os simulados ficam disponíveis — faça na ordem que quiser.</p>
       </div>
 
       {trilhas.length > 1 && (
@@ -69,60 +70,58 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
         </div>
       </div>
 
-      {/* Timeline: círculo + linha à esquerda, card do simulado à direita. Máx. 5 visíveis + rolagem. */}
+      {/* Timeline: círculo + linha à esquerda, card à direita. Máx. 5 visíveis + rolagem. */}
       <div className="relative">
-        <ol className={cn('min-w-0 space-y-0', rolar && 'max-h-[34rem] overflow-y-auto pr-1 [scrollbar-width:thin]')}>
+        <ol className={cn('min-w-0 space-y-0 py-1', rolar && 'max-h-[34rem] overflow-y-auto pr-1 [scrollbar-width:thin]')}>
           {t.nodes.map((n, i) => {
             const concluido = n.estado === 'concluido'
             const atual = n.estado === 'atual'
-            const bloqueado = n.estado === 'bloqueado'
             const meta = [n.quando, n.questoes > 0 ? `${n.questoes} questões` : null].filter(Boolean).join(' · ')
             return (
               <li key={n.id} className="flex gap-4">
                 {/* Nó + conector */}
                 <div className="flex flex-col items-center pt-3">
-                  <span className={cn('relative flex shrink-0 items-center justify-center rounded-full border-4 shadow-sm', bloqueado && 'bg-muted text-muted-foreground/50')}
+                  <span className="relative flex shrink-0 items-center justify-center rounded-full border-4 shadow-sm"
                     style={{ width: 52, height: 52, ...(concluido ? { background: COR, borderColor: `color-mix(in oklab, ${COR} 70%, #000)`, color: '#fff' }
                       : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
-                      : { borderColor: 'var(--border)' }) }}>
+                      : { background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
                     {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
-                    {concluido ? <Check className="h-6 w-6" /> : atual ? <Star className="h-6 w-6" /> : <Lock className="h-5 w-5" />}
+                    {concluido ? <Check className="h-6 w-6" /> : atual ? <Star className="h-6 w-6" /> : <Play className="h-5 w-5" />}
                   </span>
                   {i < t.nodes.length - 1 && <span className="my-1 w-1 flex-1 rounded-full" style={{ minHeight: 24, background: concluido ? COR : 'var(--border)' }} />}
                 </div>
 
-                {/* Card do simulado */}
-                <div className={cn('mb-4 flex-1 rounded-2xl border p-4 text-center shadow-sm transition-colors',
-                  atual ? 'bg-card' : 'bg-muted/25', bloqueado && 'opacity-75')}
-                  style={atual ? { borderColor: `color-mix(in oklab, ${COR} 40%, transparent)` } : undefined}>
-                  {atual && <span className="mb-1.5 inline-block rounded-full border border-primary/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
-
-                  <div className="font-semibold leading-snug">{n.titulo}</div>
-
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {concluido ? <span className="inline-flex items-center gap-1"><CircleCheck className="h-3.5 w-3.5" /> Concluído</span>
-                      : bloqueado ? <span className="inline-flex items-center gap-1"><Lock className="h-3.5 w-3.5" /> Desbloqueie concluindo o anterior</span>
-                      : (meta || 'Disponível')}
+                {/* Card do simulado (hover: info desliza, ações aparecem à direita, card expande) */}
+                <div className={cn('group relative mb-4 w-full max-w-2xl flex-1 overflow-hidden rounded-2xl border bg-card p-4 text-center shadow-sm transition-all duration-200 hover:shadow-md motion-safe:hover:scale-[1.02]',
+                  atual && 'border-primary/40')}>
+                  {/* Info */}
+                  <div className="transition-transform duration-300 ease-out group-hover:-translate-x-3">
+                    {atual && <span className="mb-1.5 inline-block rounded-full border border-primary/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
+                    <div className="font-semibold leading-snug">{n.titulo}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {concluido ? <span className="inline-flex items-center gap-1"><CircleCheck className="h-3.5 w-3.5" /> Concluído</span> : (meta || 'Disponível')}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                      {concluido && n.acerto != null && <span className="inline-flex items-center gap-1 text-sm font-medium text-primary"><CircleCheck className="h-4 w-4" /> {n.acerto}% de acerto</span>}
+                      {!concluido && gamAtivo && n.xp > 0 && <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-xs font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{n.xp} XP</span>}
+                      {n.tentativas > 0 && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{n.tentativas}x</span>}
+                    </div>
                   </div>
 
-                  {concluido && n.acerto != null && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-primary"><CircleCheck className="h-4 w-4" /> {n.acerto}% de acerto</div>
-                  )}
-
-                  {gamAtivo && n.xp > 0 && !concluido && (
-                    <div className="mt-2"><span className="inline-flex items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-xs font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{n.xp} XP</span></div>
-                  )}
-
-                  {n.href && atual && (
-                    <div className="mt-3">
-                      <Link href={n.href} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-primary/50 px-5 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10">
+                  {/* Ações (aparecem no hover, deslizando da direita) */}
+                  <div className="absolute inset-y-0 right-0 flex items-center gap-2 bg-gradient-to-l from-card via-card to-transparent pl-12 pr-4 opacity-0 translate-x-4 transition-all duration-300 ease-out group-hover:translate-x-0 group-hover:opacity-100">
+                    {n.href && (
+                      <Link href={n.href} className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
                         <Play className="h-4 w-4" /> {n.acao}
                       </Link>
-                    </div>
-                  )}
-                  {n.href && concluido && (
-                    <div className="mt-2"><Link href={n.href} className="text-xs font-medium text-muted-foreground transition hover:text-foreground">Ver resultado →</Link></div>
-                  )}
+                    )}
+                    {n.cadernoUrl && (
+                      <a href={n.cadernoUrl} target="_blank" rel="noopener noreferrer" title="Baixar caderno de questões" aria-label="Baixar caderno de questões"
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                        <Download className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
                 </div>
               </li>
             )

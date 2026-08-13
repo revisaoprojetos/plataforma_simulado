@@ -286,22 +286,25 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const lanc = (i: any) => new Date(i.regras?.publicado_em ?? i.created_at ?? 0).getTime()
   const trilhas: Trilha[] = grupos.map((g) => {
     const its = itensCat.filter((i) => i.grupoId === g.id).sort((a, b) => lanc(a) - lanc(b))
-    let unlocked = true
+    // Sem bloqueio: todos os simulados ficam disponíveis em qualquer ordem. O 1º não feito
+    // ganha o destaque "atual" (Comece aqui), mas todos podem ser feitos.
+    let primeiroPendente = true
     const nodes = its.map((i) => {
       const sess = sessoesPorSim.get(i.id) ?? []
       const notas = sess.filter((s: any) => s.status === 'finalizada' && s.nota != null).map((s: any) => Number(s.nota))
       const done = feitosSet.has(i.id)
       const acerto = notas.length ? Math.round(Math.max(...notas)) : null
-      let estado: 'concluido' | 'atual' | 'bloqueado'
+      let estado: 'concluido' | 'atual' | 'disponivel'
       if (done) estado = 'concluido'
-      else if (unlocked) { estado = 'atual'; unlocked = false }
-      else estado = 'bloqueado'
-      const podeIr = i.podeFazer || i.emAndamento || i.refazer
-      const href = done ? `/aluno/simulados/${i.id}` : (podeIr && i.embed_token ? `/simulado/${i.embed_token}` : `/aluno/simulados/${i.id}`)
-      const acao = done ? 'Ver resultado' : i.emAndamento ? 'Continuar' : i.refazer ? 'Refazer' : 'Fazer agora'
+      else if (primeiroPendente) { estado = 'atual'; primeiroPendente = false }
+      else estado = 'disponivel'
+      const runner = i.embed_token ? `/simulado/${i.embed_token}` : `/aluno/simulados/${i.id}`
+      const podeRefazer = i.refazer || i.podeFazer || i.emAndamento
+      const href = done ? (podeRefazer ? runner : `/aluno/simulados/${i.id}`) : runner
+      const acao = done ? (podeRefazer ? 'Refazer' : 'Ver resultado') : i.emAndamento ? 'Continuar' : 'Fazer agora'
       const capa = visual.get(i.id)?.capa ?? null
       const nota = notas.length ? Math.max(...notas) : null
-      return { id: i.id, titulo: i.titulo, quando: i.quando, estado, acerto, nota, tentativas: notas.length, statusLabel: i.statusLabel, questoes: cntQ.get(i.id) ?? 0, xp: baseXp, href, acao, capa }
+      return { id: i.id, titulo: i.titulo, quando: i.quando, estado, acerto, nota, tentativas: notas.length, statusLabel: i.statusLabel, questoes: cntQ.get(i.id) ?? 0, xp: baseXp, href, acao, capa, cadernoUrl: i.enunciadoUrl ?? null }
     })
     return { id: g.id, nome: g.nome, cor: g.cor ?? null, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: baseXp * nodes.length, nodes }
   }).filter((tr) => tr.nodes.length > 0)
