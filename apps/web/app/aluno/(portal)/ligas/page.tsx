@@ -45,7 +45,7 @@ export default async function LigasPage() {
             const atual = resumo?.liga.id === l.id
             return (
               <div key={l.id} className={`flex items-center gap-3 rounded-xl border p-3.5 ${atual ? 'ring-2' : ''}`} style={atual ? { borderColor: l.cor, boxShadow: `inset 0 0 0 1px ${l.cor}` } : undefined}>
-                <EscudoLiga cor={l.cor} ativo={atual} className="h-11 w-11" />
+                <EscudoLiga cor={l.cor} ligaId={l.id} ativo={atual} className="h-11 w-11" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">{l.nome}</span>
