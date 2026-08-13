@@ -377,31 +377,19 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
         })}
       </svg>
 
-      {/* Divisórias de grupo — cabeçalho de seção com linhas laterais; a legenda tem fundo próprio. */}
-      {dividers.map((d) => {
-        const pct = d.total ? Math.round((d.done / d.total) * 100) : 0
-        const completo = d.total > 0 && d.done >= d.total
-        return (
-          <div key={d.id} className="absolute left-1/2 z-[2] -translate-x-1/2" style={{ top: d.y, width: 340 }}>
-            <div className="flex items-center gap-2.5">
-              <span className="h-px flex-1" style={{ background: 'linear-gradient(to right, transparent, var(--border))' }} />
-              <div className="flex flex-col items-center gap-1 rounded-2xl border bg-card px-4 py-2 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: `color-mix(in oklab, ${COR} 16%, transparent)`, color: COR }}>
-                    {completo ? <Trophy className="h-3.5 w-3.5" /> : <Route className="h-3.5 w-3.5" />}
-                  </span>
-                  <span className="max-w-[190px] truncate whitespace-nowrap text-sm font-bold" title={d.nome}>{d.nome}</span>
-                  <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums" style={{ background: `color-mix(in oklab, ${COR} 15%, transparent)`, color: COR }}>{d.done}/{d.total}</span>
-                </div>
-                <div className="h-1 w-full overflow-hidden rounded-full" style={{ background: `color-mix(in oklab, ${COR} 14%, transparent)` }}>
-                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: COR }} />
-                </div>
-              </div>
-              <span className="h-px flex-1" style={{ background: 'linear-gradient(to left, transparent, var(--border))' }} />
-            </div>
+      {/* Divisórias de grupo — estilo Duolingo: linha comprida fina + nome centralizado. */}
+      {dividers.map((d) => (
+        <div key={d.id} className="absolute left-1/2 z-[2] -translate-x-1/2" style={{ top: d.y, width: 560 }}>
+          <div className="flex items-center gap-3">
+            <span className="h-px flex-1" style={{ background: 'linear-gradient(to right, transparent, color-mix(in oklab, var(--border) 90%, transparent))' }} />
+            <span className="inline-flex max-w-[320px] items-center gap-2 whitespace-nowrap rounded-full bg-background px-3 py-0.5" title={d.nome}>
+              <span className="truncate text-sm font-bold text-muted-foreground">{d.nome}</span>
+              <span className="text-xs font-semibold tabular-nums" style={{ color: COR }}>{d.done}/{d.total}</span>
+            </span>
+            <span className="h-px flex-1" style={{ background: 'linear-gradient(to left, transparent, color-mix(in oklab, var(--border) 90%, transparent))' }} />
           </div>
-        )
-      })}
+        </div>
+      ))}
 
       {/* Nós */}
       {nodesL.map(({ n, off, y: cyv }) => {

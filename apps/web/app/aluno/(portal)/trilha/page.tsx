@@ -1,9 +1,10 @@
 import { Route } from 'lucide-react'
 import { carregarTrilhasAluno } from '@/lib/aluno/trilhas'
 import { TrilhaGigante } from '@/components/aluno/trilha-simulados'
+import { GamificacaoRail } from '@/components/aluno/gamificacao-rail'
 
 export default async function TrilhaAlunoPage() {
-  const { trilhas, gamAtivo } = await carregarTrilhasAluno()
+  const { trilhas, gamAtivo, gam } = await carregarTrilhasAluno()
   const totalSims = trilhas.reduce((a, t) => a + t.total, 0)
   const totalDone = trilhas.reduce((a, t) => a + t.done, 0)
 
@@ -22,15 +23,23 @@ export default async function TrilhaAlunoPage() {
         </p>
       </div>
 
-      {trilhas.length > 0 ? (
-        <div className="overflow-x-auto pb-10">
-          <TrilhaGigante trilhas={trilhas} gamAtivo={gamAtivo} />
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        {/* Coluna principal: a trilha gigante */}
+        <div className="min-w-0">
+          {trilhas.length > 0 ? (
+            <div className="overflow-x-auto pb-10">
+              <TrilhaGigante trilhas={trilhas} gamAtivo={gamAtivo} />
+            </div>
+          ) : (
+            <div className="rounded-2xl border bg-muted/30 p-10 text-center text-sm text-muted-foreground">
+              Assim que houver simulados disponíveis para você, eles aparecerão aqui como uma trilha.
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="rounded-2xl border bg-muted/30 p-10 text-center text-sm text-muted-foreground">
-          Assim que houver simulados disponíveis para você, eles aparecerão aqui como uma trilha.
-        </div>
-      )}
+
+        {/* Coluna direita: meta, sequência, missões, liga, conquistas (igual à Início) */}
+        {gam && <GamificacaoRail resumo={gam.resumo} missoes={gam.missoes} semana={gam.semana} conquistas={gam.conquistas} config={gam.config} />}
+      </div>
     </div>
   )
 }

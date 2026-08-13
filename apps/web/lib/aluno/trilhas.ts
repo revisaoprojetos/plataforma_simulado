@@ -7,15 +7,19 @@ import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
 import { idsSimuladosGratuitos } from '@/lib/simulado/gratuito'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getGamConfig } from '@/lib/gamificacao'
+import { resumoGamificacao, missoesHoje, atividadeSemana, conquistasProgresso, type ResumoGamificacao, type MissaoView, type DiaAtivo, type ConquistaProgresso } from '@/lib/gamificacao/leitura'
+import type { GamConfig } from '@/lib/gamificacao/config'
 import type { Trilha } from '@/components/aluno/trilha-simulados'
+
+export interface GamRail { resumo: ResumoGamificacao; missoes: MissaoView[]; semana: DiaAtivo[]; conquistas: ConquistaProgresso[]; config: GamConfig }
 
 /**
  * Monta as trilhas de simulados do aluno (por grupo/pasta, nós concluído → atual → disponível),
  * o mesmo dado usado na Início. Extraído para ser reaproveitado pela página dedicada /aluno/trilha.
  */
-export async function carregarTrilhasAluno(): Promise<{ trilhas: Trilha[]; gamAtivo: boolean; nome: string }> {
+export async function carregarTrilhasAluno(): Promise<{ trilhas: Trilha[]; gamAtivo: boolean; nome: string; gam: GamRail | null }> {
   const sessao = await getSessaoAluno()
-  if (!sessao) return { trilhas: [], gamAtivo: false, nome: 'Aluno' }
+  if (!sessao) return { trilhas: [], gamAtivo: false, nome: 'Aluno', gam: null }
   const svc = await createServiceClient()
   const estId = sessao.estudanteId
 
@@ -64,9 +68,19 @@ export async function carregarTrilhasAluno(): Promise<{ trilhas: Trilha[]; gamAt
     return { ...i, grupoId: grupoPorSim.get(i.id) ?? null, enunciadoUrl: url }
   })
 
-  // Gamificação: baseXp só quando ativo.
+  // Gamificação: baseXp só quando ativo + bundle da coluna direita (meta/sequência/missões/liga/conquistas).
   const gamConfig = await getGamConfig(svc, sessao.tenantId)
   const baseXp = gamConfig?.ativo ? (gamConfig.xp_regras.simulado.base || 0) : 0
+  let gam: GamRail | null = null
+  if (gamConfig?.ativo) {
+    const [resumo, missoes, semana, conquistas] = await Promise.all([
+      resumoGamificacao(svc, sessao.tenantId, estId, gamConfig),
+      missoesHoje(svc, sessao.tenantId, estId, gamConfig),
+      atividadeSemana(svc, sessao.tenantId, estId, gamConfig.timezone),
+      conquistasProgresso(svc, sessao.tenantId, estId, gamConfig),
+    ])
+    if (resumo) gam = { resumo, missoes, semana, conquistas, config: gamConfig }
+  }
 
   // Contagem de questões (válidas) por simulado.
   const cntQ = new Map<string, number>()
@@ -107,5 +121,5 @@ export async function carregarTrilhasAluno(): Promise<{ trilhas: Trilha[]; gamAt
     return { id: g.id, nome: g.nome, cor: g.cor ?? null, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: baseXp * nodes.length, nodes }
   }).filter((tr) => tr.nodes.length > 0)
 
-  return { trilhas, gamAtivo: !!gamConfig?.ativo, nome: sessao.nome }
+  return { trilhas, gamAtivo: !!gamConfig?.ativo, nome: sessao.nome, gam }
 }
