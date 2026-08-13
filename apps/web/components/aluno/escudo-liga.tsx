@@ -58,7 +58,7 @@ function Emblema({ tipo, fill, det }: { tipo: string; fill: string; det: string 
     case 'martelo': // martelo diagonal (cabeça c/ bandas gravadas + cabo + punho) + bloco de som
       return (
         <>
-          <rect x="2.8" y="19.5" width="10.1" height="2.7" rx="1.35" fill={fill} />
+          <rect x="1" y="19.5" width="10.1" height="2.7" rx="1.35" fill={fill} />
           <g transform="rotate(-42 12 12)">
             <rect x="5.5" y="3.6" width="13" height="4.4" rx="2.2" fill={fill} />
             <rect x="10.6" y="8" width="2.8" height="10.4" rx="1.4" fill={fill} />
