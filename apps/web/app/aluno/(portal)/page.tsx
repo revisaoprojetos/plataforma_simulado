@@ -284,8 +284,11 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     }
   }
   const lanc = (i: any) => new Date(i.regras?.publicado_em ?? i.created_at ?? 0).getTime()
+  // Ordem da trilha: prioriza a DATA no título ("DD/MM/AAAA – …"); senão, publicado_em/created_at.
+  const dataTitulo = (tit?: string) => { const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(tit || ''); return m ? Date.UTC(+m[3], +m[2] - 1, +m[1]) : null }
+  const ordKey = (i: any) => dataTitulo(i.titulo) ?? lanc(i)
   const trilhas: Trilha[] = grupos.map((g) => {
-    const its = itensCat.filter((i) => i.grupoId === g.id).sort((a, b) => lanc(a) - lanc(b))
+    const its = itensCat.filter((i) => i.grupoId === g.id).sort((a, b) => ordKey(a) - ordKey(b) || (a.titulo || '').localeCompare(b.titulo || ''))
     // Sem bloqueio: todos os simulados ficam disponíveis em qualquer ordem. O 1º não feito
     // ganha o destaque "atual" (Comece aqui), mas todos podem ser feitos.
     let primeiroPendente = true
