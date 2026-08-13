@@ -41,7 +41,8 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
   const [aberto, setAberto] = useState<string | null>(atualId)
   if (!t) return null
   const pct = t.total ? Math.round((t.done / t.total) * 100) : 0
-  const cor = t.cor || 'var(--brand-primary, var(--primary))'
+  // Mesma cor primária do botão "Fazer agora" (não a cor do grupo), p/ consistência visual.
+  const cor = 'var(--brand-primary, var(--primary))'
 
   function trocar(id: string) {
     setAtiva(id)
@@ -125,10 +126,15 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
           </span>
         </div>
 
-        {/* Card poster do simulado (direita) — compacto, estilo card de simulado */}
-        <div className="flex min-w-0 flex-1 items-start justify-center pt-2">
+        {/* Card poster do simulado (direita) — balão apontando para o nó + animação de entrada */}
+        <div className="relative min-w-0 flex-1" style={{ minHeight: H }}>
           {openNode ? (
-            <div className="w-full max-w-[300px] overflow-hidden rounded-2xl border shadow-lg">
+            <div key={openNode.id} className="absolute left-3 w-full max-w-[280px] animate-in fade-in zoom-in-95 slide-in-from-left-3 duration-300 ease-out"
+              style={{ top: Math.max(0, Math.min((pts[openIdx]?.y ?? 24) - 44, Math.max(0, H - 350))) }}>
+              {/* Ponta do balão apontando para a trilha */}
+              <span className="absolute -left-2 top-10 z-10 h-0 w-0 border-y-[9px] border-r-[10px] border-y-transparent"
+                style={{ borderRightColor: openNode.capa ? '#0e0e14' : `color-mix(in oklab, ${cor} 45%, #000)` }} />
+              <div className="overflow-hidden rounded-2xl border shadow-xl transition-transform duration-200 hover:scale-[1.02]">
               <div className="relative aspect-[4/5]">
                 {openNode.capa
                   ? <img src={openNode.capa} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -166,6 +172,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
                     </Link>
                   )}
                 </div>
+              </div>
               </div>
             </div>
           ) : (
