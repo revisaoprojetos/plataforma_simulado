@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { Check, Play, Star, Route, Zap, Trophy, CircleCheck, Download, Lock } from 'lucide-react'
+import { Check, Play, Star, Route, Zap, Trophy, CircleCheck, Download, Lock, Crown } from 'lucide-react'
 
 export interface TrilhaNode {
   id: string
@@ -472,6 +472,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       {/* Nós */}
       {nodesL.map(({ n, off, y: cyv }) => {
         const concluido = n.estado === 'concluido'
+        const ouro = concluido && n.acerto === 100   // nota 100% → tema dourado + coroa
         const atual = n.estado === 'atual'
         const bloqueado = n.estado === 'disponivel'
         const sel = n.id === aberto
@@ -479,11 +480,16 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
           <div key={n.id} className="absolute z-[1] flex w-max max-w-[260px] -translate-x-1/2 flex-col items-center text-center" style={{ left: cx(off), top: cyv - R }}>
             <button type="button" data-trilha-node onClick={() => setAberto(n.id)} aria-label={n.titulo}
               className={cn('relative flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
-              style={{ width: R * 2, height: R * 2, ...(concluido ? { background: COR, borderColor: `color-mix(in oklab, ${COR} 70%, #000)`, color: '#fff' }
+              style={{ width: R * 2, height: R * 2, ...(ouro ? { background: 'linear-gradient(145deg, #fde68a 0%, #f59e0b 52%, #d97706 100%)', borderColor: '#b45309', color: '#fff', boxShadow: '0 0 0 2px rgba(253,230,138,.35), 0 6px 16px -4px rgba(217,119,6,.6)' }
+                : concluido ? { background: '#10b981', borderColor: '#059669', color: '#fff' }
                 : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
                 : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
               {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
-              {concluido ? <Check className="h-7 w-7" /> : atual ? <Star className="h-7 w-7" /> : <Play className="h-6 w-6" />}
+              {/* Coroa (só 100%) — flutua acima do ícone */}
+              {ouro && <Crown className="pointer-events-none absolute -top-5 left-1/2 h-5 w-5 -translate-x-1/2" fill="#facc15" style={{ color: '#eab308', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,.45))' }} />}
+              {/* Verniz dourado — brilho por cima do ícone 100% */}
+              {ouro && <span className="pointer-events-none absolute inset-0 rounded-full" style={{ background: 'radial-gradient(120% 90% at 30% 18%, rgba(255,255,255,.6) 0%, rgba(255,255,255,.1) 35%, transparent 60%)' }} />}
+              <span className="relative">{concluido ? <Check className="h-7 w-7" /> : atual ? <Star className="h-7 w-7" /> : <Play className="h-6 w-6" />}</span>
             </button>
             {/* Rótulo cresce lateralmente (largura por conteúdo, teto 260px); título no máx. 2 linhas. */}
             <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
