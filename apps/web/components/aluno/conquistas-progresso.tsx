@@ -1,6 +1,6 @@
 import { Award, Check } from 'lucide-react'
 import type { ConquistaProgresso } from '@/lib/gamificacao/leitura'
-import { iconeConquista, corConquista } from '@/lib/gamificacao/icones'
+import { corConquista } from '@/lib/gamificacao/icones'
 import { ConquistaIconeFx } from '@/components/gamificacao/conquista-icone'
 
 const UNIDADE: Record<string, string> = { xp_total: 'XP', streak: 'dias', simulados_concluidos: 'simulados', nota_max: '% acerto' }
@@ -15,13 +15,12 @@ export function ConquistasProgressoLista({ itens, limite = 5 }: { itens: Conquis
       <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold"><Award className="h-4 w-4 text-primary" /> Conquistas</h3>
       <div className="space-y-3">
         {lista.map((c) => {
-          const Icon = iconeConquista(c.def.icone)
           const cor = c.def.cor || corConquista(c.def.id)
           const unidade = UNIDADE[c.def.regra?.tipo] ?? ''
           return (
             <div key={c.def.id} className="group -mx-1.5 flex items-center gap-3 rounded-xl px-1.5 py-1 transition-colors hover:bg-muted/50">
               <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-visible rounded-lg" style={{ background: `color-mix(in oklab, ${cor} 16%, transparent)`, color: cor }}>
-                {c.desbloqueada ? <ConquistaIconeFx icone={c.def.icone} className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                <ConquistaIconeFx icone={c.def.icone} className="h-4 w-4" />
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
@@ -31,7 +30,7 @@ export function ConquistasProgressoLista({ itens, limite = 5 }: { itens: Conquis
                   </span>
                 </div>
                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted-foreground/20">
-                  <div className="h-full rounded-full transition-all" style={{ width: `${c.pct}%`, background: c.desbloqueada ? 'var(--brand-accent, var(--primary))' : cor }} />
+                  <div className="h-full rounded-full transition-all duration-300 group-hover:brightness-125 group-hover:saturate-150" style={{ width: `${c.pct}%`, background: c.desbloqueada ? 'var(--brand-accent, var(--primary))' : cor }} />
                 </div>
               </div>
             </div>

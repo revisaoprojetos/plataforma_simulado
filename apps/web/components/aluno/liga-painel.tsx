@@ -1,5 +1,5 @@
-import { Shield } from 'lucide-react'
 import type { LigaDef } from '@/lib/gamificacao/config'
+import { EscudoLiga } from '@/components/aluno/escudo-liga'
 
 const fmt = (n: number) => n.toLocaleString('pt-BR')
 
@@ -10,7 +10,7 @@ export function LigaPainel({ ligas, ligaAtual, xpTotal, proximaNome, faltam }: {
   return (
     <div className="rounded-2xl border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2">
-        <Shield className="h-4 w-4" style={{ color: atual?.cor }} />
+        <EscudoLiga cor={atual?.cor ?? 'var(--muted-foreground)'} ativo fundo={false} className="h-6 w-6" />
         <h3 className="text-sm font-semibold">Liga {atual?.nome}</h3>
       </div>
       <div className="flex justify-between gap-1">
@@ -18,10 +18,7 @@ export function LigaPainel({ ligas, ligaAtual, xpTotal, proximaNome, faltam }: {
           const on = l.id === ligaAtual
           return (
             <div key={l.id} className="flex flex-1 flex-col items-center gap-1">
-              <span className={`flex h-9 w-9 items-center justify-center rounded-full border transition-transform ${on ? 'scale-110' : ''}`}
-                style={{ background: on ? `color-mix(in oklab, ${l.cor} 26%, transparent)` : 'transparent', borderColor: on ? `color-mix(in oklab, ${l.cor} 95%, transparent)` : 'var(--border)', boxShadow: on ? `0 0 11px color-mix(in oklab, ${l.cor} 55%, transparent)` : undefined }}>
-                <Shield className="h-4 w-4" fill={l.cor} style={{ color: `color-mix(in oklab, ${l.cor} 68%, #000)`, opacity: on ? 1 : 0.9 }} />
-              </span>
+              <EscudoLiga cor={l.cor} ativo={on} fundo={on} className={`h-9 w-9 transition-transform ${on ? 'scale-110' : ''}`} />
               <span className={`text-[9px] font-medium uppercase ${on ? 'text-foreground' : 'text-muted-foreground/70'}`}>{l.nome}</span>
             </div>
           )

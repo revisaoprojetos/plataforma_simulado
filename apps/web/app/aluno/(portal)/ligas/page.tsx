@@ -3,7 +3,8 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { getGamConfig } from '@/lib/gamificacao'
 import { resumoGamificacao, posicaoNaLiga } from '@/lib/gamificacao/leitura'
 import { RankingLiga } from '@/components/aluno/ranking-liga'
-import { Trophy, Shield } from 'lucide-react'
+import { EscudoLiga } from '@/components/aluno/escudo-liga'
+import { Trophy } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,9 +45,7 @@ export default async function LigasPage() {
             const atual = resumo?.liga.id === l.id
             return (
               <div key={l.id} className={`flex items-center gap-3 rounded-xl border p-3.5 ${atual ? 'ring-2' : ''}`} style={atual ? { borderColor: l.cor, boxShadow: `inset 0 0 0 1px ${l.cor}` } : undefined}>
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: `color-mix(in oklab, ${l.cor} 18%, transparent)`, color: l.cor }}>
-                  <Shield className="h-5 w-5" />
-                </span>
+                <EscudoLiga cor={l.cor} ativo={atual} className="h-11 w-11" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">{l.nome}</span>
