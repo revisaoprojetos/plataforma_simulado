@@ -12,7 +12,9 @@ export interface TituloNivel { nivel_min: number; titulo: string }
 export interface NivelCurva { tipo: string; base: number; incremento: number; nivel_max: number; titulos: TituloNivel[] }
 export interface LigaDef { id: string; nome: string; xp_min: number; cor: string }
 export type MissaoTipo = 'finalizar_simulado' | 'acertar_n' | 'praticar_n'
-export interface MissaoDef { id: string; titulo: string; tipo: MissaoTipo; meta: number; xp: number }
+export interface MissaoDef { id: string; titulo: string; tipo: MissaoTipo; meta: number; xp: number; ativa?: boolean }
+/** Como as missões aparecem por dia: 'todas' as ativas, ou 'rodizio' de N por dia. */
+export interface MissoesConfig { modo: 'todas' | 'rodizio'; por_dia: number }
 export type ConquistaRegraTipo = 'xp_total' | 'streak' | 'simulados_concluidos' | 'nota_max'
 export interface ConquistaDef { id: string; titulo: string; descricao: string; icone: string; regra: { tipo: ConquistaRegraTipo; meta: number }; xp: number }
 
@@ -24,6 +26,7 @@ export interface GamConfig {
   nivel_curva: NivelCurva
   ligas: LigaDef[]
   missoes_def: MissaoDef[]
+  missoes_config: MissoesConfig
   conquistas_def: ConquistaDef[]
 }
 
@@ -55,10 +58,16 @@ export const DEFAULT_LIGAS: LigaDef[] = [
   { id: 'diamante', nome: 'Diamante', xp_min: 5000, cor: '#8b5cf6' },
 ]
 export const DEFAULT_MISSOES: MissaoDef[] = [
-  { id: 'm_simulado', titulo: 'Complete 1 simulado', tipo: 'finalizar_simulado', meta: 1, xp: 30 },
-  { id: 'm_acertos', titulo: 'Acerte 20 questões', tipo: 'acertar_n', meta: 20, xp: 20 },
-  { id: 'm_pratica', titulo: 'Pratique 10 questões', tipo: 'praticar_n', meta: 10, xp: 15 },
+  { id: 'm_simulado', titulo: 'Complete 1 simulado', tipo: 'finalizar_simulado', meta: 1, xp: 30, ativa: true },
+  { id: 'm_simulado2', titulo: 'Complete 2 simulados', tipo: 'finalizar_simulado', meta: 2, xp: 50, ativa: true },
+  { id: 'm_acertos10', titulo: 'Acerte 10 questões', tipo: 'acertar_n', meta: 10, xp: 10, ativa: true },
+  { id: 'm_acertos', titulo: 'Acerte 20 questões', tipo: 'acertar_n', meta: 20, xp: 20, ativa: true },
+  { id: 'm_acertos30', titulo: 'Acerte 30 questões', tipo: 'acertar_n', meta: 30, xp: 30, ativa: true },
+  { id: 'm_pratica5', titulo: 'Pratique 5 questões', tipo: 'praticar_n', meta: 5, xp: 8, ativa: true },
+  { id: 'm_pratica', titulo: 'Pratique 10 questões', tipo: 'praticar_n', meta: 10, xp: 15, ativa: true },
+  { id: 'm_pratica20', titulo: 'Pratique 20 questões', tipo: 'praticar_n', meta: 20, xp: 25, ativa: true },
 ]
+export const DEFAULT_MISSOES_CONFIG: MissoesConfig = { modo: 'todas', por_dia: 3 }
 export const DEFAULT_CONQUISTAS: ConquistaDef[] = [
   { id: 'c_primeiro', titulo: 'Primeiro simulado', descricao: 'Conclua seu primeiro simulado', icone: 'rocket', regra: { tipo: 'simulados_concluidos', meta: 1 }, xp: 20 },
   { id: 'c_streak7', titulo: 'Semana em chamas', descricao: 'Mantenha 7 dias de sequência', icone: 'flame', regra: { tipo: 'streak', meta: 7 }, xp: 50 },
@@ -96,6 +105,7 @@ export const DEFAULT_CONFIG = {
   nivel_curva: DEFAULT_NIVEL_CURVA,
   ligas: DEFAULT_LIGAS,
   missoes_def: DEFAULT_MISSOES,
+  missoes_config: DEFAULT_MISSOES_CONFIG,
   conquistas_def: DEFAULT_CONQUISTAS,
 }
 
@@ -108,9 +118,11 @@ export const getGamConfig = cache(async (svc: any, tenantId: string | null): Pro
   if (!tenantId) return null
   let row: any = null
   try {
+    // select('*') é tolerante: colunas novas (ex.: missoes_config, ainda não migradas) apenas
+    // ficam ausentes no retorno e caem no default — sem quebrar o carregamento.
     const { data } = await svc
       .from('simulado_gamificacao_config')
-      .select('ativo, timezone, xp_regras, nivel_curva, ligas, missoes_def, conquistas_def')
+      .select('*')
       .eq('tenant_id', tenantId)
       .maybeSingle()
     row = data
@@ -127,6 +139,7 @@ export const getGamConfig = cache(async (svc: any, tenantId: string | null): Pro
     nivel_curva: { ...DEFAULT_NIVEL_CURVA, ...(r.nivel_curva ?? {}) },
     ligas: Array.isArray(r.ligas) && r.ligas.length ? r.ligas : DEFAULT_LIGAS,
     missoes_def: Array.isArray(r.missoes_def) ? r.missoes_def : DEFAULT_MISSOES,
+    missoes_config: { ...DEFAULT_MISSOES_CONFIG, ...(r.missoes_config ?? {}) },
     conquistas_def: Array.isArray(r.conquistas_def) ? r.conquistas_def : DEFAULT_CONQUISTAS,
   }
 })

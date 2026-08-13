@@ -1,5 +1,6 @@
 import { getGamConfig, type GamConfig, type LigaDef, type MissaoDef, type ConquistaDef } from './config'
 import { progressoNivel, ligaParaXp, proximaLiga, type ProgressoNivel } from './niveis'
+import { missoesDoDia } from './rodizio'
 import { diaLocal, inicioDaSemanaISO, inicioDoMesISO } from './datas'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 
@@ -67,7 +68,7 @@ export async function missoesHoje(svc: any, tenantId: string, estudanteId: strin
     .select('missao_id, progresso, completa')
     .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('dia', hoje)
   const porId = new Map<string, any>((data ?? []).map((r: any) => [r.missao_id, r]))
-  return (config.missoes_def ?? []).map((def) => {
+  return missoesDoDia(config.missoes_def ?? [], config.missoes_config, hoje).map((def) => {
     const p = porId.get(def.id)
     return { def, progresso: Math.min(p?.progresso ?? 0, def.meta), completa: p?.completa ?? false }
   })

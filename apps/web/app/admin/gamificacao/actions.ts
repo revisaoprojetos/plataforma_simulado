@@ -6,7 +6,7 @@ import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { rebuildCacheTenant } from '@/lib/gamificacao/cache'
-import { DEFAULT_CONFIG, type XpRegras, type NivelCurva, type LigaDef, type MissaoDef, type ConquistaDef } from '@/lib/gamificacao/config'
+import { DEFAULT_CONFIG, type XpRegras, type NivelCurva, type LigaDef, type MissaoDef, type MissoesConfig, type ConquistaDef } from '@/lib/gamificacao/config'
 
 const SEM_TENANT = '00000000-0000-0000-0000-000000000000'
 
@@ -57,8 +57,15 @@ export async function salvarConquistas(conquistas_def: ConquistaDef[]) {
   return salvarSlice({ conquistas_def })
 }
 
-export async function salvarMissoes(missoes_def: MissaoDef[]) {
-  return salvarSlice({ missoes_def })
+export async function salvarMissoes(missoes_def: MissaoDef[], missoes_config?: MissoesConfig) {
+  if (!missoes_config) return salvarSlice({ missoes_def })
+  const r = await salvarSlice({ missoes_def, missoes_config })
+  // Coluna missoes_config ainda não migrada (20260812000002) → salva só as missões e avisa.
+  if (r.error && /missoes_config|column|42703|schema cache/i.test(r.error)) {
+    const r2 = await salvarSlice({ missoes_def })
+    return r2.error ? r2 : { ok: true, aviso: 'Missões salvas, mas o rodízio exige aplicar a migração 20260812000002.' }
+  }
+  return r
 }
 
 // Recalcula nível/liga de TODOS os alunos a partir do ledger (usar após mudar limites de liga/curva).

@@ -1,5 +1,6 @@
 import { getGamConfig, type MissaoTipo } from './config'
 import { diaLocal } from './datas'
+import { missoesDoDia } from './rodizio'
 import { awardXp } from './xp'
 
 type Evento = 'finalizou_simulado' | 'acertou_questao' | 'praticou'
@@ -21,10 +22,10 @@ export async function progredirMissoes(
   const config = await getGamConfig(svc, tenantId)
   if (!config?.ativo) return
   const alvo = MAP[evento]
-  const missoes = (config.missoes_def ?? []).filter((m) => m.tipo === alvo)
-  if (!missoes.length) return
-
   const hoje = diaLocal(config.timezone)
+  // Só progride nas missões que VALEM hoje (seleção ativa + rodízio).
+  const missoes = missoesDoDia(config.missoes_def ?? [], config.missoes_config, hoje).filter((m) => m.tipo === alvo)
+  if (!missoes.length) return
   for (const m of missoes) {
     const { data: prog } = await svc
       .from('simulado_missao_progresso')
