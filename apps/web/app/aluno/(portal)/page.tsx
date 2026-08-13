@@ -1,7 +1,5 @@
-import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { BookOpen, Star, NotebookPen, ArrowRight, Sparkles, ClipboardList, UserRound } from 'lucide-react'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
 import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
@@ -12,13 +10,16 @@ import { idsSimuladosGratuitos } from '@/lib/simulado/gratuito'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } from '@/components/aluno/simulados-catalogo-aluno'
 import { SemAcessoModal } from '@/components/aluno/sem-acesso-modal'
-import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
 import { getGamConfig } from '@/lib/gamificacao'
-import { resumoGamificacao, missoesHoje, atividadeSemana } from '@/lib/gamificacao/leitura'
-import { GamificacaoHero } from '@/components/aluno/gamificacao-hero'
+import { resumoGamificacao, missoesHoje, atividadeSemana, conquistasProgresso } from '@/lib/gamificacao/leitura'
+import { NivelCard } from '@/components/aluno/nivel-card'
+import { MetaDiariaCard } from '@/components/aluno/meta-diaria-card'
 import { MissoesLista } from '@/components/aluno/missoes-lista'
 import { StreakCalendario } from '@/components/aluno/streak-calendario'
 import { TrilhaSimulados, type Trilha } from '@/components/aluno/trilha-simulados'
+import { LigaPainel } from '@/components/aluno/liga-painel'
+import { RankingLiga } from '@/components/aluno/ranking-liga'
+import { ConquistasProgressoLista } from '@/components/aluno/conquistas-progresso'
 
 export default async function AlunoHome({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
   const { pasta } = await searchParams
@@ -262,13 +263,14 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
 
   // Gamificação (hero + missões + calendário de sequência) — só quando o tenant ativou.
   const gamConfig = await getGamConfig(svc, sessao!.tenantId)
-  const [gamResumo, gamMissoes, gamSemana] = gamConfig?.ativo
+  const [gamResumo, gamMissoes, gamSemana, gamConquistas] = gamConfig?.ativo
     ? await Promise.all([
         resumoGamificacao(svc, sessao!.tenantId, estId, gamConfig),
         missoesHoje(svc, sessao!.tenantId, estId, gamConfig),
         atividadeSemana(svc, sessao!.tenantId, estId, gamConfig.timezone),
+        conquistasProgresso(svc, sessao!.tenantId, estId, gamConfig),
       ])
-    : [null, [], []]
+    : [null, [], [], []]
 
   // Trilhas de simulados (estilo Duolingo): por grupo, nós concluído → atual → bloqueado.
   const baseXp = gamConfig?.ativo ? (gamConfig.xp_regras.simulado.base || 0) : 0
@@ -293,64 +295,47 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     return { id: g.id, nome: g.nome, cor: g.cor ?? null, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: baseXp * nodes.length, nodes }
   }).filter((tr) => tr.nodes.length > 0)
 
-  const atalhos = [
-    { href: '/aluno/simulados', icon: ClipboardList, titulo: 'Meus Simulados', desc: 'Seus simulados e resultados' },
-    { href: '/aluno/recomendado', icon: Sparkles, titulo: 'Recomendado', desc: 'Questões focadas nos seus pontos fracos' },
-    { href: '/aluno/questoes', icon: BookOpen, titulo: 'Banco de questões', desc: 'Pratique questões avulsas com filtros' },
-    { href: '/aluno/favoritos', icon: Star, titulo: 'Favoritos', desc: 'Questões que você marcou' },
-    { href: '/aluno/cadernos', icon: NotebookPen, titulo: 'Cadernos', desc: 'Organize seus estudos' },
-    { href: '/aluno/perfil', icon: UserRound, titulo: 'Perfil', desc: 'Seus dados e desempenho' },
-  ].filter((a) => !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(a.href)))
+  const chest = gamConfig?.xp_regras.chest
+  const proxima = gamResumo?.proxima ?? null
 
   return (
     <div className="animate-page space-y-6">
       {/* Banners do tenant — UM carrossel só (banner + destaque + simulado) + pop-up. SÓ na Início. */}
       <BannersPortal banners={bannersSemSim.map((b) => ({ ...b, ordem: ordemGlobal.get(b.id) ?? 0, estilo: (destaquesBanner[b.id] as any)?.popupEstilo ?? null, pontas: (destaquesBanner[b.id] as any)?.popupPontas ?? null, textoPos: (destaquesBanner[b.id] as any)?.bannerTextoPos ?? null, textoCor: (destaquesBanner[b.id] as any)?.bannerTextoCor ?? null, textoTam: (destaquesBanner[b.id] as any)?.bannerTextoTam ?? null, textoX: (destaquesBanner[b.id] as any)?.bannerTextoX ?? null, textoY: (destaquesBanner[b.id] as any)?.bannerTextoY ?? null, ocultarTitulo: (destaquesBanner[b.id] as any)?.bannerOcultarTitulo ?? false, ocultarMensagem: (destaquesBanner[b.id] as any)?.bannerOcultarMensagem ?? false, freq: (destaquesBanner[b.id] as any)?.freq ?? null }))} simulados={heroSims} stats={mostrarDesempenhoBanner ? statsAluno : null} />
 
-      {/* Gamificação: hero + calendário de sequência + missões do dia. Só quando o tenant ativou. */}
-      {gamResumo && (
-        <div className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-            <GamificacaoHero nome={sessao!.nome} resumo={gamResumo} />
-            <StreakCalendario dias={gamSemana} streak={gamResumo.streakAtual} />
-          </div>
-          {gamMissoes.length > 0 && <MissoesLista missoes={gamMissoes} renova="meia-noite" />}
-        </div>
-      )}
-
-      {/* Trilhas de simulados (estilo Duolingo) */}
-      {trilhas.length > 0 && <TrilhaSimulados trilhas={trilhas} gamAtivo={!!gamResumo} />}
-
-      {/* Saudação solta. */}
-      <div>
-        <div className="mb-1.5 flex items-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--brand-accent)', boxShadow: '0 0 10px 1px color-mix(in oklab, var(--brand-accent) 60%, transparent)' }} />
-          <span className="text-[11px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand-accent)' }}>Sua área de estudos</span>
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-[2rem]">Olá, {sessao!.nome.split(' ')[0]} 👋</h1>
-        <p className="mt-1 text-muted-foreground">Bem-vindo à sua área de estudos. {recentes.length > 0 ? `Você tem ${recentes.length} simulado(s) recente(s) para fazer.` : 'Você está em dia com seus simulados.'}</p>
-      </div>
-
-      {/* Atalhos */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {atalhos.map((a) => (
-          <Link key={a.href} href={a.href}>
-            <div className="group h-full rounded-2xl border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
-              <div className="flex items-center justify-between">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><a.icon className="h-5 w-5" /></span>
-                <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        {/* ── Coluna principal: nível + trilha + recentes + cursos e pacotes ── */}
+        <div className="min-w-0 space-y-6">
+          {gamResumo ? (
+            <NivelCard nome={sessao!.nome} resumo={gamResumo} />
+          ) : (
+            <div>
+              <div className="mb-1.5 flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--brand-accent)', boxShadow: '0 0 10px 1px color-mix(in oklab, var(--brand-accent) 60%, transparent)' }} />
+                <span className="text-[11px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand-accent)' }}>Sua área de estudos</span>
               </div>
-              <div className="mt-2">
-                <div className="font-medium">{a.titulo}</div>
-                <div className="text-xs text-muted-foreground">{a.desc}</div>
-              </div>
+              <h1 className="text-2xl font-bold tracking-tight sm:text-[2rem]">Olá, {sessao!.nome.split(' ')[0]} 👋</h1>
+              <p className="mt-1 text-muted-foreground">Bem-vindo à sua área de estudos. {recentes.length > 0 ? `Você tem ${recentes.length} simulado(s) recente(s) para fazer.` : 'Você está em dia com seus simulados.'}</p>
             </div>
-          </Link>
-        ))}
-      </div>
+          )}
 
-      {/* Catálogo: simulados recentes + pastas (cursos e pacotes) + avulsos. */}
-      <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} recentes={recentes} />
+          {trilhas.length > 0 && <TrilhaSimulados trilhas={trilhas} gamAtivo={!!gamResumo} />}
+
+          <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} recentes={recentes} />
+        </div>
+
+        {/* ── Coluna direita: meta, sequência, missões, liga, conquistas ── */}
+        {gamResumo && (
+          <aside className="space-y-4">
+            {gamResumo.metaDiaXp > 0 && <MetaDiariaCard xpHoje={gamResumo.xpHoje} meta={gamResumo.metaDiaXp} />}
+            <StreakCalendario dias={gamSemana} streak={gamResumo.streakAtual} chestXp={chest?.xp ?? 0} chestCadaN={chest?.cada_n_dias ?? 0} />
+            {gamMissoes.length > 0 && <MissoesLista missoes={gamMissoes} renova="meia-noite" />}
+            <LigaPainel ligas={gamConfig!.ligas} ligaAtual={gamResumo.liga.id} xpTotal={gamResumo.xpTotal} proximaNome={proxima?.nome ?? null} faltam={proxima ? Math.max(0, proxima.xp_min - gamResumo.xpTotal) : 0} />
+            <RankingLiga inicial="total" />
+            {gamConquistas.length > 0 && <ConquistasProgressoLista itens={gamConquistas} />}
+          </aside>
+        )}
+      </div>
     </div>
   )
 }

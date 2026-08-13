@@ -137,6 +137,34 @@ export async function rankingPeriodo(svc: any, tenantId: string, desdeISO: strin
   return rows.map((r, i) => ({ estudanteId: r.estudante_id, nome: nomes.get(r.estudante_id) ?? 'Aluno', xp: Number(r.xp), posicao: i + 1, eu: r.estudante_id === eu }))
 }
 
+// ─────────── PROGRESSO DAS CONQUISTAS (barras) ───────────
+export interface ConquistaProgresso { def: ConquistaDef; atual: number; meta: number; pct: number; desbloqueada: boolean }
+
+export async function conquistasProgresso(svc: any, tenantId: string, estudanteId: string, cfg?: GamConfig | null): Promise<ConquistaProgresso[]> {
+  const config = cfg ?? (await getGamConfig(svc, tenantId))
+  if (!config?.ativo) return []
+  const defs = config.conquistas_def ?? []
+  if (!defs.length) return []
+  const [cacheRes, desbRes, sessRes] = await Promise.all([
+    svc.from('simulado_gamificacao_estudante').select('xp_total, streak_atual').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).maybeSingle(),
+    svc.from('simulado_conquista_desbloqueios').select('conquista_id').eq('tenant_id', tenantId).eq('estudante_id', estudanteId),
+    svc.from('simulado_sessoes_prova').select('simulado_id, nota').eq('estudante_id', estudanteId).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false),
+  ])
+  const unlocked = new Set((desbRes.data ?? []).map((r: any) => r.conquista_id))
+  const sess = (sessRes.data ?? []) as any[]
+  const simConcl = new Set(sess.map((s) => s.simulado_id)).size
+  const notaMax = sess.reduce((m, s) => Math.max(m, s.nota != null ? Number(s.nota) : 0), 0)
+  const stat = (t?: string) => t === 'xp_total' ? (cacheRes.data?.xp_total ?? 0) : t === 'streak' ? (cacheRes.data?.streak_atual ?? 0) : t === 'simulados_concluidos' ? simConcl : t === 'nota_max' ? Math.round(notaMax) : 0
+  const out: ConquistaProgresso[] = defs.map((d) => {
+    const atual = stat(d.regra?.tipo)
+    const meta = d.regra?.meta ?? 1
+    return { def: d, atual: Math.min(atual, meta), meta, pct: meta ? Math.min(100, Math.round((atual / meta) * 100)) : 0, desbloqueada: unlocked.has(d.id) }
+  })
+  const rank = (x: ConquistaProgresso) => (x.desbloqueada ? 2 : x.pct > 0 ? 0 : 1)
+  out.sort((a, b) => (rank(a) !== rank(b) ? rank(a) - rank(b) : b.pct - a.pct))
+  return out
+}
+
 // ─────────── ATIVIDADE DA SEMANA (calendário de sequência) ───────────
 export interface DiaAtivo { dia: string; label: string; ativo: boolean; hoje: boolean }
 const DOW = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
