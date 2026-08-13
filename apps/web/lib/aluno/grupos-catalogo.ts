@@ -1,4 +1,4 @@
-export type GrupoCatalogo = { id: string; nome: string; cor: string | null; icone: string | null; capa: string | null }
+export type GrupoCatalogo = { id: string; nome: string; cor: string | null; icone: string | null; capa: string | null; capaCard: string | null }
 
 /**
  * Resolve o "grupo" (pasta is_folder do banco) de cada simulado, para as PASTAS do catálogo
@@ -21,7 +21,7 @@ export async function resolverGruposCatalogo(
       // Visual do grupo (cor/ícone/capa) é tolerante: se as colunas não existirem, cai no select mínimo.
       let paisRows: any[] = []
       if (paiIds.length) {
-        const r = await svc.from('simulado_pastas').select('id, nome, is_folder, cor, icone, capa_url').in('id', paiIds)
+        const r = await svc.from('simulado_pastas').select('id, nome, is_folder, cor, icone, capa_url, capa_card_url').in('id', paiIds)
         if (r.error) { const r2 = await svc.from('simulado_pastas').select('id, nome, is_folder').in('id', paiIds); paisRows = r2.data ?? [] }
         else paisRows = r.data ?? []
       }
@@ -34,7 +34,7 @@ export async function resolverGruposCatalogo(
         const pai = b?.pai_id ? paiById.get(b.pai_id) : null
         const gid = pai ? (pai.id as string) : null
         grupoPorSim.set(i.id, gid)
-        if (gid && pai) usados.set(gid, { id: gid, nome: pai.nome as string, cor: pai.cor ?? null, icone: pai.icone ?? null, capa: pai.capa_url ?? null })
+        if (gid && pai) usados.set(gid, { id: gid, nome: pai.nome as string, cor: pai.cor ?? null, icone: pai.icone ?? null, capa: pai.capa_url ?? null, capaCard: pai.capa_card_url ?? null })
       }
       grupos = [...usados.values()].sort((a, b) => a.nome.localeCompare(b.nome))
     }

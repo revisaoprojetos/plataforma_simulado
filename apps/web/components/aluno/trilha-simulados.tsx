@@ -26,7 +26,8 @@ export interface Trilha {
   id: string
   nome: string
   cor: string | null
-  capa?: string | null // capa principal do banco (pasta) — usada como fundo na trilha gigante
+  capa?: string | null // imagem LARGA do banco (capa_url) — fundo p/ trilhas de 1–3 simulados
+  capaCard?: string | null // imagem NORMAL/inteira do banco (capa_card_url) — fundo p/ trilhas 4+
   total: number
   done: number
   trilhaXp: number
@@ -358,8 +359,11 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       y += ROW
       gi++
     })
-    // Capa do BANCO (banner largo / capa comprida) vinculada pela pasta; cai na capa do simulado.
-    const capa = t.capa ?? t.nodes.find((n) => n.capaBanner)?.capaBanner ?? t.nodes.find((n) => n.capa)?.capa ?? null
+    // 1–3 simulados → imagem LARGA (capa_url); 4+ → imagem NORMAL/inteira (capa_card_url).
+    const inteira = t.total > 3
+    const larga = t.capa ?? t.nodes.find((n) => n.capaBanner)?.capaBanner ?? null
+    const normal = t.capaCard ?? t.nodes.find((n) => n.capa)?.capa ?? null
+    const capa = inteira ? (normal ?? larga) : (larga ?? normal)
     segMeta.push({ id: t.id, capa, dy, total: t.total })
   })
   const chest = { off: OFFS[gi % OFFS.length], y: y + R }
