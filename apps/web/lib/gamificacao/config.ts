@@ -65,6 +65,17 @@ export const DEFAULT_CONQUISTAS: ConquistaDef[] = [
   { id: 'c_1000xp', titulo: '1000 XP', descricao: 'Acumule 1000 XP', icone: 'zap', regra: { tipo: 'xp_total', meta: 1000 }, xp: 0 },
   { id: 'c_nota100', titulo: 'Nota 100', descricao: 'Tire 100 em um simulado', icone: 'trophy', regra: { tipo: 'nota_max', meta: 100 }, xp: 40 },
   { id: 'c_maratona', titulo: 'Maratonista', descricao: 'Conclua 20 simulados', icone: 'medal', regra: { tipo: 'simulados_concluidos', meta: 20 }, xp: 60 },
+  // +10 sugeridas
+  { id: 'c_streak3', titulo: 'Aquecendo', descricao: 'Mantenha 3 dias de sequência', icone: 'flame', regra: { tipo: 'streak', meta: 3 }, xp: 15 },
+  { id: 'c_streak30', titulo: 'Inabalável', descricao: 'Mantenha 30 dias de sequência', icone: 'crown', regra: { tipo: 'streak', meta: 30 }, xp: 150 },
+  { id: 'c_simulados5', titulo: 'Ritmo de estudo', descricao: 'Conclua 5 simulados', icone: 'target', regra: { tipo: 'simulados_concluidos', meta: 5 }, xp: 30 },
+  { id: 'c_simulados50', titulo: 'Veterano', descricao: 'Conclua 50 simulados', icone: 'shield', regra: { tipo: 'simulados_concluidos', meta: 50 }, xp: 120 },
+  { id: 'c_simulados100', titulo: 'Lenda dos simulados', descricao: 'Conclua 100 simulados', icone: 'crown', regra: { tipo: 'simulados_concluidos', meta: 100 }, xp: 200 },
+  { id: 'c_2500xp', titulo: '2.500 XP', descricao: 'Acumule 2.500 XP', icone: 'sparkles', regra: { tipo: 'xp_total', meta: 2500 }, xp: 0 },
+  { id: 'c_5000xp', titulo: '5.000 XP', descricao: 'Acumule 5.000 XP', icone: 'gem', regra: { tipo: 'xp_total', meta: 5000 }, xp: 0 },
+  { id: 'c_10000xp', titulo: '10.000 XP', descricao: 'Acumule 10.000 XP', icone: 'crown', regra: { tipo: 'xp_total', meta: 10000 }, xp: 0 },
+  { id: 'c_nota80', titulo: 'Quase lá', descricao: 'Tire 80 ou mais em um simulado', icone: 'star', regra: { tipo: 'nota_max', meta: 80 }, xp: 20 },
+  { id: 'c_nota90', titulo: 'Excelência', descricao: 'Tire 90 ou mais em um simulado', icone: 'award', regra: { tipo: 'nota_max', meta: 90 }, xp: 30 },
 ]
 
 export const DEFAULT_CONFIG = {

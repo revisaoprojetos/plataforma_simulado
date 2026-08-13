@@ -1,7 +1,6 @@
-import { Rocket, Flame, Zap, Trophy, Medal, Award, Lock, type LucideIcon } from 'lucide-react'
+import { Award, Lock } from 'lucide-react'
 import type { ConquistaView } from '@/lib/gamificacao/leitura'
-
-const ICONES: Record<string, LucideIcon> = { rocket: Rocket, flame: Flame, zap: Zap, trophy: Trophy, medal: Medal }
+import { iconeConquista } from '@/lib/gamificacao/icones'
 
 /** Grade de conquistas: desbloqueadas coloridas, bloqueadas em cinza com cadeado. */
 export function ConquistasGrid({ conquistas }: { conquistas: ConquistaView[] }) {
@@ -15,7 +14,7 @@ export function ConquistasGrid({ conquistas }: { conquistas: ConquistaView[] }) 
       </div>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
         {conquistas.map((c) => {
-          const Icon = ICONES[c.def.icone] ?? Award
+          const Icon = iconeConquista(c.def.icone)
           return (
             <div
               key={c.def.id}
