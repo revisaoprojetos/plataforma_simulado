@@ -485,3 +485,57 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 @keyframes ico-arrow-r { 0% { opacity: 0; transform: translateX(8px); } 25% { opacity: 1; } 58% { opacity: 1; transform: translateX(-9px); } 64% { opacity: 0; } 100% { opacity: 0; transform: translateX(-9px); } }
 .group:hover .ico-arrow-1 { animation: ico-arrow-l .9s ease-in infinite; }
 .group:hover .ico-arrow-2 { animation: ico-arrow-r .9s ease-in infinite; animation-delay: .45s; }
+
+/* Chama por FRAMES: 3 silhuetas alternando em passos (troca a forma do topo) + flicker de movimento. */
+.ico-flame-frames { position: relative; display: inline-block; width: 1.25rem; height: 1.25rem; transform-origin: bottom center; }
+.group:hover .ico-flame-frames { animation: ico-flame .5s ease-in-out infinite; }
+.ico-flame-frames .ico-frame { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transform-origin: bottom center; }
+.ico-frame-1 { transform: scaleX(1); }
+.ico-frame-2 { transform: scaleX(-1); }
+.ico-frame-3 { transform: scaleY(1.15) skewX(6deg); }
+/* Sem hover mostra o 1º frame estático. */
+.ico-flame-frames .ico-frame-1 { opacity: 1; }
+.group:hover .ico-frame-1 { animation: ico-frameA .42s steps(1,end) infinite; }
+.group:hover .ico-frame-2 { animation: ico-frameB .42s steps(1,end) infinite; }
+.group:hover .ico-frame-3 { animation: ico-frameC .42s steps(1,end) infinite; }
+@keyframes ico-frameA { 0%,33% { opacity: 1; } 34%,100% { opacity: 0; } }
+@keyframes ico-frameB { 0%,33% { opacity: 0; } 34%,66% { opacity: 1; } 67%,100% { opacity: 0; } }
+@keyframes ico-frameC { 0%,66% { opacity: 0; } 67%,100% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .group:hover .ico-flame-frames, .group:hover .ico-frame { animation: none !important; }
+  .ico-flame-frames .ico-frame-1 { opacity: 1 !important; }
+}
+
+/* Raio caindo: despenca do alto, "atinge" e pisca algumas vezes. */
+@keyframes ico-bolt {
+  0%   { opacity: 0; transform: translateY(-70%) scale(.7); }
+  12%  { opacity: 1; transform: translateY(0) scale(1.12); }
+  18%  { transform: translateY(0) scale(1); }
+  24%  { opacity: .2; } 30% { opacity: 1; } 36% { opacity: .35; } 42% { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.group:hover .ico-bolt { animation: ico-bolt 1.1s ease-out infinite; }
+
+/* Flechas de verdade (ArrowUpRight/ArrowUpLeft) vindas das diagonais de baixo,
+   cravando no escudo e ficando grudadas um instante antes de sumir. */
+.ico-arw { position: absolute; width: 13px; height: 13px; opacity: 0; pointer-events: none; }
+.ico-arw-bl { left: -9px;  bottom: -8px; }   /* vem de baixo à esquerda, aponta ↗ */
+.ico-arw-br { right: -9px; bottom: -8px; }   /* vem de baixo à direita,  aponta ↖ */
+@keyframes ico-arw-bl {
+  0%   { opacity: 0; transform: translate(-9px, 9px) scale(.85); }
+  18%  { opacity: 1; }
+  38%  { transform: translate(2px, -2px) scale(1); }     /* crava no escudo */
+  80%  { opacity: 1; transform: translate(2px, -2px) scale(1); } /* fica grudada */
+  90%  { opacity: 0; }
+  100% { opacity: 0; transform: translate(2px, -2px); }
+}
+@keyframes ico-arw-br {
+  0%   { opacity: 0; transform: translate(9px, 9px) scale(.85); }
+  18%  { opacity: 1; }
+  38%  { transform: translate(-2px, -2px) scale(1); }
+  80%  { opacity: 1; transform: translate(-2px, -2px) scale(1); }
+  90%  { opacity: 0; }
+  100% { opacity: 0; transform: translate(-2px, -2px); }
+}
+.group:hover .ico-arw-bl { animation: ico-arw-bl 1.3s ease-in infinite; }
+.group:hover .ico-arw-br { animation: ico-arw-br 1.3s ease-in infinite; animation-delay: .55s; }

@@ -40,7 +40,7 @@ const ANIM_POR_ICONE: Record<string, string> = {
   gem: 'ico-glow',        // soltando brilho
   crown: 'ico-bob',       // flutuando
   star: 'ico-spin',       // girando
-  zap: 'ico-flash',       // piscando
+  zap: 'ico-bolt',        // raio caindo + flash
   award: 'ico-pop',       // pulsando
   target: 'ico-pop',
   brain: 'ico-heartbeat',
