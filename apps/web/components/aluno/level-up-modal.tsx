@@ -84,7 +84,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
 
       <div className={`relative z-[1] m-auto flex flex-col items-center px-6 text-center ${done ? 'gap-2.5 py-6' : 'gap-5 py-10'}`}>
         {/* Kicker */}
-        <div className="flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[0.28em]" style={{ color: L3, animation: 'lu-rise .5s ease both' }}>
+        <div className="flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[0.28em]" style={{ color: '#fff', animation: 'lu-rise .5s ease both' }}>
           <span className="h-px w-10" style={{ background: `linear-gradient(90deg, transparent, ${A})` }} />
           {done ? 'Parabéns' : 'Subindo de nível'}
           <span className="h-px w-10" style={{ background: `linear-gradient(90deg, ${A}, transparent)` }} />
@@ -128,7 +128,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
           <div className="absolute flex flex-col items-center justify-center rounded-full" style={{ inset: '13%', background: `radial-gradient(circle at 50% 26%, ${D3}, ${D2} 72%)`, border: `2px solid ${mix(55, 'transparent')}`, boxShadow: `inset 0 2px 10px rgba(255,255,255,0.10), 0 12px 34px -8px ${mix(50, 'black')}`, animation: st.pop ? 'lu-impact .5s cubic-bezier(.34,1.56,.64,1)' : 'none' }}>
             {!done && <span className="text-[11px] uppercase tracking-[0.18em]" style={{ color: L3 }}>Nível</span>}
             <span key={st.level} className="font-black leading-none tabular-nums" style={{ fontSize: numFont, color: FG, animation: 'lu-numpop .42s cubic-bezier(.34,1.56,.64,1) both' }}>{st.level}</span>
-            <span className="min-h-[13px] text-[10.5px]" style={{ color: L3 }}>{cargo(st.level)}</span>
+            <span className="min-h-[13px] text-[10.5px] font-medium" style={{ color: '#fff' }}>{cargo(st.level)}</span>
           </div>
         </div>
 
@@ -143,7 +143,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
         </div>
 
         {/* Contador de XP */}
-        <div className={`flex items-center gap-2 font-black ${done ? 'text-[19px]' : 'min-h-[30px] text-[24px]'}`} style={{ color: L2 }}>
+        <div className={`flex items-center gap-2 font-black ${done ? 'text-[19px]' : 'min-h-[30px] text-[24px]'}`} style={{ color: '#fff' }}>
           <Zap className={done ? 'h-4 w-4' : 'h-5 w-5'} style={{ color: '#fbbf24' }} />+{st.xpShown.toLocaleString('pt-BR')} XP
         </div>
 
