@@ -488,7 +488,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
         <div key={d.id} className="absolute left-1/2 z-[2] -translate-x-1/2" style={{ top: d.y, width: 580 }}>
           <div className="flex items-center gap-3">
             <span className="h-[3px] flex-1 rounded-full" style={{ background: 'linear-gradient(to right, transparent, color-mix(in oklab, var(--brand-primary, var(--primary)) 48%, transparent))' }} />
-            <span className="inline-flex max-w-[360px] items-center gap-2.5 whitespace-nowrap rounded-full border bg-card px-4 py-1.5 shadow-md" style={{ borderColor: 'color-mix(in oklab, var(--brand-primary, var(--primary)) 38%, var(--border))' }} title={d.nome}>
+            <span className="inline-flex max-w-[360px] items-center gap-2.5 whitespace-nowrap rounded-full bg-card px-4 py-1.5 shadow-md" title={d.nome}>
               <span className="truncate text-base font-extrabold tracking-tight text-foreground">{d.nome}</span>
               <span className="rounded-full px-2 py-0.5 text-xs font-bold tabular-nums text-white" style={{ background: COR }}>{d.done}/{d.total}</span>
             </span>
