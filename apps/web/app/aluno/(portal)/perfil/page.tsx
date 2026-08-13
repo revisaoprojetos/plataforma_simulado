@@ -54,7 +54,7 @@ export default async function PerfilAlunoPage() {
 
   // Nível (anel) — reaproveita o cálculo do resumo.
   const prog = gamResumo?.progresso
-  const raio = 50, circ = 2 * Math.PI * raio
+  const raio = 61, circ = 2 * Math.PI * raio
   const dash = prog ? circ * (prog.pct / 100) : 0
 
   // Ligas (divisões) por XP total, ordenadas — para a faixa "Ranking e divisões".
@@ -78,11 +78,11 @@ export default async function PerfilAlunoPage() {
           <div className="relative h-[144px] w-[144px]">
             {prog ? (
               <svg viewBox="0 0 144 144" className="absolute inset-0 h-full w-full -rotate-90">
-                <circle cx="72" cy="72" r={raio} fill="none" stroke="color-mix(in oklab, var(--muted-foreground) 22%, transparent)" strokeWidth="7" />
-                <circle cx="72" cy="72" r={raio} fill="none" stroke="var(--brand-primary, var(--primary))" strokeWidth="7" strokeLinecap="round" strokeDasharray={`${dash} ${circ}`} className="transition-all duration-700" />
+                <circle cx="72" cy="72" r={raio} fill="none" stroke="color-mix(in oklab, var(--muted-foreground) 22%, transparent)" strokeWidth="6" />
+                <circle cx="72" cy="72" r={raio} fill="none" stroke="var(--brand-primary, var(--primary))" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${dash} ${circ}`} className="transition-all duration-700" />
               </svg>
             ) : null}
-            <span className="absolute inset-[18px] flex items-center justify-center rounded-full bg-white text-4xl font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais(nome)}</span>
+            <span className="absolute inset-[20px] flex items-center justify-center rounded-full bg-white text-4xl font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais(nome)}</span>
             {prog && (
               <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full border border-primary/40 bg-background px-2.5 py-0.5 text-[11px] font-bold text-primary shadow-sm">Nv {prog.nivel}</span>
             )}
