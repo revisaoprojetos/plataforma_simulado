@@ -100,10 +100,12 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
             <circle cx="118" cy="118" r={R} fill="none" stroke={A} strokeWidth="8" strokeLinecap="round" strokeDasharray={dash}
               style={{ transition: `stroke-dasharray ${fillTrans}`, filter: `drop-shadow(0 0 8px ${mix(50, 'transparent')})` }} />
           </svg>
-          {/* ponta branca (progresso do anel) — orbita conforme o fill */}
-          <div className="absolute inset-0" style={{ transform: `rotate(${(st.fill / 100) * 360}deg)`, transition: st.fill === 0 ? 'none' : `transform ${fillTrans}` }}>
-            <div className="absolute left-1/2 rounded-full" style={{ top: `${RINGTOP}%`, width: 13, height: 13, marginLeft: -6.5, marginTop: -6.5, background: '#fff', boxShadow: `0 0 10px 2px rgba(255,255,255,.9), 0 0 18px ${mix(55, 'transparent')}` }} />
-          </div>
+          {/* ponta branca (progresso do anel) — orbita conforme o fill; some ao terminar */}
+          {!done && (
+            <div className="absolute inset-0" style={{ transform: `rotate(${(st.fill / 100) * 360}deg)`, transition: st.fill === 0 ? 'none' : `transform ${fillTrans}` }}>
+              <div className="absolute left-1/2 rounded-full" style={{ top: `${RINGTOP}%`, width: 13, height: 13, marginLeft: -6.5, marginTop: -6.5, background: '#fff', boxShadow: `0 0 10px 2px rgba(255,255,255,.9), 0 0 18px ${mix(55, 'transparent')}` }} />
+            </div>
+          )}
           {/* rajada de partículas (contida) */}
           {st.pop && (
             <div key={`b${st.burst}`} className="pointer-events-none absolute inset-0">
