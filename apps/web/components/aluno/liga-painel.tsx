@@ -10,7 +10,7 @@ export function LigaPainel({ ligas, ligaAtual, xpTotal, proximaNome, faltam }: {
   return (
     <div className="rounded-2xl border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2">
-        <EscudoLiga cor={atual?.cor ?? 'var(--muted-foreground)'} ligaId={atual?.id} ativo fundo={false} className="h-6 w-6" />
+        <EscudoLiga cor={atual?.cor ?? 'var(--muted-foreground)'} nome={atual?.nome} ativo fundo={false} className="h-6 w-6" />
         <h3 className="text-sm font-semibold">Liga {atual?.nome}</h3>
       </div>
       <div className="flex justify-between gap-1">
@@ -18,7 +18,7 @@ export function LigaPainel({ ligas, ligaAtual, xpTotal, proximaNome, faltam }: {
           const on = l.id === ligaAtual
           return (
             <div key={l.id} className="flex flex-1 flex-col items-center gap-1">
-              <EscudoLiga cor={l.cor} ligaId={l.id} ativo={on} fundo={on} className={`h-9 w-9 transition-transform ${on ? 'scale-110' : ''}`} />
+              <EscudoLiga cor={l.cor} nome={l.nome} ativo={on} fundo={on} className={`h-9 w-9 transition-transform ${on ? 'scale-110' : ''}`} />
               <span className={`text-[9px] font-medium uppercase ${on ? 'text-foreground' : 'text-muted-foreground/70'}`}>{l.nome}</span>
             </div>
           )
