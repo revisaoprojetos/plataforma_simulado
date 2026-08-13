@@ -26,6 +26,7 @@ export interface Trilha {
   id: string
   nome: string
   cor: string | null
+  capa?: string | null // capa principal do banco (pasta) — usada como fundo na trilha gigante
   total: number
   done: number
   trilhaXp: number
@@ -357,7 +358,8 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       y += ROW
       gi++
     })
-    const capa = t.nodes.find((n) => n.capaBanner)?.capaBanner ?? t.nodes.find((n) => n.capa)?.capa ?? null
+    // Prioriza a capa principal do BANCO (pasta); cai na capa do simulado se não houver.
+    const capa = t.capa ?? t.nodes.find((n) => n.capaBanner)?.capaBanner ?? t.nodes.find((n) => n.capa)?.capa ?? null
     segMeta.push({ id: t.id, capa, dy, total: t.total })
   })
   const chest = { off: OFFS[gi % OFFS.length], y: y + R }
@@ -396,7 +398,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       {/* Fundo por grupo — capa do banco (quase às bordas), quadrada com fade em todas as bordas */}
       {segmentos.map((s) => s.capa && (
         <div key={s.id} className="pointer-events-none absolute left-1/2 z-0 -translate-x-1/2 overflow-hidden" style={{ top: s.yTop, height: Math.max(0, s.yBot - s.yTop), width: coverW, WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 7%, #000 93%, transparent 100%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 7%, #000 93%, transparent 100%)' }}>
-          <img src={s.capa} alt="" loading="lazy" decoding="async" className={cn('h-full w-full object-center', s.inteira ? 'object-contain' : 'object-cover')} style={{ opacity: 0.34, WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%)' }} />
+          <img src={s.capa} alt="" loading="lazy" decoding="async" className={cn('h-full w-full object-center', s.inteira ? 'object-contain' : 'object-cover')} style={{ opacity: 0.45, WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%)' }} />
         </div>
       ))}
       {/* Conectores pontilhados — contínuos, inclusive entre grupos */}
