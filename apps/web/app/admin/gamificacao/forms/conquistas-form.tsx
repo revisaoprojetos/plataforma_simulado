@@ -90,7 +90,7 @@ export function ConquistasForm({ config, podeGerenciar }: { config: GamConfig; p
             return (
               <div key={c.id} className="group space-y-3 rounded-xl border bg-card p-3 shadow-sm">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-visible rounded-full" style={{ background: `color-mix(in oklab, ${cor} 18%, transparent)`, color: cor }}><Icon className={`h-5 w-5 ${animConquista(c.icone)}`} /></span>
+                  <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${c.icone === 'rocket' ? 'overflow-hidden' : 'overflow-visible'}`} style={{ background: `color-mix(in oklab, ${cor} 18%, transparent)`, color: cor }}><Icon className={`h-5 w-5 ${animConquista(c.icone)}`} /></span>
                   <label className="min-w-0 flex-1 space-y-1">
                     <span className="block text-[11px] font-medium text-muted-foreground">Título</span>
                     <Input value={c.titulo} onChange={(e) => setById(c.id, { titulo: e.target.value })} disabled={!podeGerenciar} />

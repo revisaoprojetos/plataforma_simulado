@@ -398,19 +398,28 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 /* ── Animações de ícone de conquista (hover do card .group) ──────────────────
    Cada conquista recebe uma classe .ico-<icone>; a animação só roda quando o
    card ancestral (.group) está em hover. Respeita prefers-reduced-motion. */
+/* Foguete: sobe até a borda do círculo e some (recortado pelo overflow-hidden do círculo),
+   reaparece pela borda de baixo e volta ao centro — sem sair do círculo. */
 @keyframes ico-rocket {
-  0%   { transform: translate(0,0) rotate(-45deg); }
-  40%  { transform: translate(180%,-180%) rotate(-45deg); opacity: 0; }
-  41%  { transform: translate(-180%,180%) rotate(-45deg); opacity: 0; }
-  100% { transform: translate(0,0) rotate(-45deg); opacity: 1; }
+  0%   { transform: translateY(0) rotate(-45deg); }
+  45%  { transform: translateY(-150%) rotate(-45deg); }
+  46%  { transform: translateY(150%) rotate(-45deg); }
+  100% { transform: translateY(0) rotate(-45deg); }
 }
+/* Chama: base fixa (transform-origin embaixo) e o topo dança/tremula como fogo. */
 @keyframes ico-flame {
-  0%,100% { transform: scale(1) rotate(-3deg); }
-  25%     { transform: scale(1.15) rotate(4deg); }
-  50%     { transform: scale(0.92) rotate(-2deg); }
-  75%     { transform: scale(1.1) rotate(3deg); }
+  0%,100% { transform: scaleY(1) scaleX(1) skewX(0deg); }
+  20%     { transform: scaleY(1.18) scaleX(0.94) skewX(-5deg); }
+  40%     { transform: scaleY(0.9) scaleX(1.06) skewX(4deg); }
+  60%     { transform: scaleY(1.14) scaleX(0.96) skewX(-3deg); }
+  80%     { transform: scaleY(0.96) scaleX(1.03) skewX(5deg); }
 }
 @keyframes ico-spin { to { transform: rotate(360deg); } }
+/* Giro na vertical (em torno do eixo Y — como uma moeda virando), com perspectiva. */
+@keyframes ico-spin-y {
+  from { transform: perspective(300px) rotateY(0deg); }
+  to   { transform: perspective(300px) rotateY(360deg); }
+}
 @keyframes ico-glow {
   0%,100% { filter: drop-shadow(0 0 0 currentColor); transform: scale(1); }
   50%     { filter: drop-shadow(0 0 7px currentColor); transform: scale(1.12); }
@@ -422,8 +431,9 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 @keyframes ico-heartbeat { 0%,100% { transform: scale(1); } 30% { transform: scale(1.25); } 45% { transform: scale(1.05); } }
 
 .group:hover .ico-rocket    { animation: ico-rocket    .9s  ease-in-out infinite; }
-.group:hover .ico-flame     { animation: ico-flame     .5s  ease-in-out infinite; }
+.group:hover .ico-flame     { animation: ico-flame     .45s ease-in-out infinite; transform-origin: bottom center; }
 .group:hover .ico-spin      { animation: ico-spin      1.2s linear      infinite; }
+.group:hover .ico-spin-y    { animation: ico-spin-y    1.2s linear      infinite; }
 .group:hover .ico-glow      { animation: ico-glow      1s   ease-in-out infinite; }
 .group:hover .ico-bob       { animation: ico-bob       .8s  ease-in-out infinite; }
 .group:hover .ico-swing     { animation: ico-swing     .7s  ease-in-out infinite; transform-origin: top center; }

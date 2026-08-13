@@ -35,7 +35,7 @@ export function corConquista(chave: string): string {
 const ANIM_POR_ICONE: Record<string, string> = {
   rocket: 'ico-rocket',   // voa para fora e volta do outro lado
   flame: 'ico-flame',     // tremor de fogo
-  trophy: 'ico-spin',     // girando
+  trophy: 'ico-spin-y',   // girando na vertical
   medal: 'ico-swing',     // balançando
   gem: 'ico-glow',        // soltando brilho
   crown: 'ico-bob',       // flutuando
