@@ -54,7 +54,7 @@ export default async function PerfilAlunoPage() {
 
   // Nível (anel) — reaproveita o cálculo do resumo.
   const prog = gamResumo?.progresso
-  const raio = 61, circ = 2 * Math.PI * raio
+  const raio = 55, circ = 2 * Math.PI * raio
   const dash = prog ? circ * (prog.pct / 100) : 0
 
   // Ligas (divisões) por XP total, ordenadas — para a faixa "Ranking e divisões".
