@@ -69,7 +69,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
   for (let l = from; l <= to; l++) steps.push({ n: l, passou: st.level >= l })
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex overflow-auto" style={{ background: 'radial-gradient(circle at 50% 34%, #1a1730 0%, #0b0912 62%)', color: FG, animation: 'lu-in .3s ease both' }}>
+    <div className="fixed inset-0 z-[200] flex overflow-hidden" style={{ background: 'radial-gradient(circle at 50% 34%, #1a1730 0%, #0b0912 62%)', color: FG, animation: 'lu-in .3s ease both' }}>
       {/* Fundo: auroras + estrelas (contidas) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute rounded-full blur-3xl" style={{ left: '18%', top: '10%', width: 520, height: 520, background: mix(45, 'transparent'), opacity: 0.5, animation: 'lu-aurora1 14s ease-in-out infinite' }} />
@@ -82,7 +82,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
       {/* Flash de tela no impacto de cada nível */}
       {st.pop && <div key={`sf${st.burst}`} className="pointer-events-none absolute inset-0 z-[2]" style={{ background: `radial-gradient(circle at 50% 32%, ${mix(60, 'transparent')} 0%, transparent 46%)`, animation: 'lu-flash .5s ease-out both' }} />}
 
-      <div style={{ animation: st.pop ? 'lu-shake .42s ease-in-out' : undefined }} className={`relative z-[1] m-auto flex flex-col items-center px-6 text-center ${done ? 'gap-2.5 py-6' : 'gap-5 py-10'}`}>
+      <div className={`relative z-[1] m-auto flex flex-col items-center px-6 text-center ${done ? 'gap-2.5 py-6' : 'gap-5 py-10'}`}>
         {/* Kicker */}
         <div className="flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[0.28em]" style={{ color: L3, animation: 'lu-rise .5s ease both' }}>
           <span className="h-px w-10" style={{ background: `linear-gradient(90deg, transparent, ${A})` }} />
@@ -91,7 +91,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
         </div>
 
         {/* Badge */}
-        <div className="relative transition-all duration-500" style={{ width: bs, height: bs }}>
+        <div className="relative transition-all duration-500" style={{ width: bs, height: bs, animation: st.pop ? 'lu-shake .42s ease-in-out' : undefined }}>
           {/* halo pulsante */}
           <div className="absolute rounded-full blur-2xl" style={{ inset: '4%', background: `radial-gradient(circle, ${mix(55, 'transparent')}, transparent 70%)`, animation: 'lu-halo 2.6s ease-in-out infinite' }} />
           {/* órbita de acento girando */}
@@ -158,17 +158,17 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
 
             {st.promoted && (
               <div className="relative w-full max-w-[440px]" style={{ animation: 'lu-rise .45s ease .16s both', WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%)', maskImage: 'linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%)' }}>
-                {/* corpo amarelo (fade nas pontas via máscara do wrapper) */}
-                <div className="flex items-center justify-center gap-2.5 px-6 py-3.5" style={{ background: `linear-gradient(135deg, ${amix(96, '#000')}, ${amix(72, '#000')})` }}>
-                  <span className="flex h-8 w-8 items-center justify-center rounded-md" style={{ background: 'rgba(0,0,0,0.16)', color: '#241a04' }}><Medal className="h-4 w-4" /></span>
-                  <div className="text-left">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'rgba(28,20,4,0.72)' }}>Novo cargo</div>
-                    <div className="whitespace-nowrap text-base font-bold" style={{ color: '#1a1303' }}>{st.promoted}</div>
+                {/* corpo amarelo (fade nas pontas via máscara do wrapper) — texto branco */}
+                <div className="flex items-center justify-center gap-2.5 px-6 py-3.5" style={{ background: `linear-gradient(135deg, ${amix(82, '#120d05')}, ${amix(54, '#120d05')})` }}>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-md" style={{ background: 'rgba(255,255,255,0.18)', color: '#fff' }}><Medal className="h-4 w-4" /></span>
+                  <div className="text-left" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/85">Novo cargo</div>
+                    <div className="whitespace-nowrap text-base font-bold text-white">{st.promoted}</div>
                   </div>
                 </div>
-                {/* costura pontilhada quadrada (topo/base), levemente para dentro e em movimento */}
-                <div className="absolute inset-x-4 top-[4px] h-[3px]" style={{ backgroundImage: 'repeating-linear-gradient(to right, rgba(0,0,0,0.45) 0 3px, transparent 3px 12px)', animation: 'lu-stitch 1.1s linear infinite' }} />
-                <div className="absolute inset-x-4 bottom-[4px] h-[3px]" style={{ backgroundImage: 'repeating-linear-gradient(to right, rgba(0,0,0,0.45) 0 3px, transparent 3px 12px)', animation: 'lu-stitch 1.1s linear infinite reverse' }} />
+                {/* costura pontilhada quadrada (topo p/ um lado, base p/ o outro) — branca */}
+                <div className="absolute inset-x-4 top-[4px] h-[3px]" style={{ backgroundImage: 'repeating-linear-gradient(to right, rgba(255,255,255,0.7) 0 3px, transparent 3px 12px)', animation: 'lu-stitch 1.05s linear infinite' }} />
+                <div className="absolute inset-x-4 bottom-[4px] h-[3px]" style={{ backgroundImage: 'repeating-linear-gradient(to right, rgba(255,255,255,0.7) 0 3px, transparent 3px 12px)', animation: 'lu-stitch 1.05s linear infinite reverse' }} />
               </div>
             )}
 
