@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { Check, Play, Star, Route, Zap, Trophy, CircleCheck, Download, Lock, Crown } from 'lucide-react'
+import { Check, Play, Star, Route, Zap, Trophy, CircleCheck, Download, Crown } from 'lucide-react'
+import { BauTrilha } from '@/components/aluno/bau-trilha'
 
 export interface TrilhaNode {
   id: string
@@ -167,7 +168,6 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
         const concluido = n.estado === 'concluido'
         const ouro = concluido && n.acerto === 100   // 100% → tema dourado + coroa
         const atual = n.estado === 'atual'
-        const bloqueado = n.estado === 'disponivel'
         const sel = n.id === aberto
         return (
           <div key={n.id} data-trilha-item className="absolute -translate-x-1/2 text-center" style={{ left: cx(p.off), top: p.y - R, width: 200, marginLeft: 0 }}>
@@ -183,28 +183,22 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
                 <span className="pointer-events-none absolute inset-[4px] rounded-full" style={{ background: 'radial-gradient(circle at 50% 34%, #fff2b0 0%, #ffd93b 44%, #f2b800 100%)', boxShadow: 'inset 0 -3px 6px rgba(170,105,10,.5), inset 0 2px 3px rgba(255,255,255,.7)' }} />
                 <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"><span className="absolute inset-0" style={{ background: 'linear-gradient(122deg, transparent 30%, rgba(255,255,255,.7) 44%, rgba(255,255,255,.2) 55%, transparent 67%)' }} /></span>
               </>)}
-              <span className="relative" style={ouro ? { color: '#c2680a' } : undefined}>{concluido ? <Check className="h-7 w-7" strokeWidth={ouro ? 3.25 : 2.5} /> : atual ? <Star className="h-7 w-7" /> : <Lock className="h-6 w-6" />}</span>
+              <span className="relative" style={ouro ? { color: '#c2680a' } : undefined}>{concluido ? <Check className="h-7 w-7" strokeWidth={ouro ? 3.25 : 2.5} /> : atual ? <Star className="h-7 w-7" /> : <Play className="h-6 w-6" />}</span>
             </button>
             {/* Rótulo com fundo próprio p/ não se misturar ao pontilhado que passa atrás. */}
             <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
-              <span className={cn('block text-xs font-semibold leading-snug', bloqueado && 'text-muted-foreground')}>{n.titulo}</span>
+              <span className="block text-xs font-semibold leading-snug">{n.titulo}</span>
               <span className="block text-[11px] text-muted-foreground">
-                {concluido ? `Concluído${n.acerto != null ? ` · ${n.acerto}%` : ''}` : bloqueado ? 'Bloqueado' : (n.quando ?? 'Disponível')}
+                {concluido ? `Concluído${n.acerto != null ? ` · ${n.acerto}%` : ''}` : (n.quando ?? 'Disponível')}
               </span>
             </div>
           </div>
         )
       })}
 
-      {/* Baú */}
-      <div className="absolute -translate-x-1/2 text-center" style={{ left: cx(chest.off), top: chest.y - R, width: 200 }}>
-        <span className="mx-auto flex items-center justify-center rounded-2xl border-4" style={{ width: 56, height: 56, ...(t.done >= t.total ? { background: 'var(--brand-accent, #f59e0b)', borderColor: 'color-mix(in oklab, var(--brand-accent, #f59e0b) 70%, #000)', color: '#fff' } : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
-          <Trophy className="h-6 w-6" />
-        </span>
-        <div className="mt-1.5 inline-block rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
-          <span className="block text-xs font-semibold">Baú da trilha</span>
-          <span className="block text-[11px] text-muted-foreground">{t.done >= t.total ? 'Liberado! 🎉' : `${gamAtivo && t.trilhaXp > 0 ? `+${t.trilhaXp} XP` : 'Complete a trilha'}`}</span>
-        </div>
+      {/* Baú resgatável — liberado quando todos os simulados da trilha estão concluídos */}
+      <div className="absolute z-[3] -translate-x-1/2" style={{ left: cx(chest.off), top: chest.y - R, width: 200 }}>
+        <BauTrilha grupoId={t.id} xp={t.trilhaXp} liberado={t.total > 0 && t.done >= t.total} gamAtivo={gamAtivo} />
       </div>
 
       {/* Card do simulado — no lado com mais espaço, alinhado ao nó */}
@@ -215,16 +209,15 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
           <div className={cn('overflow-hidden rounded-2xl border bg-card shadow-xl motion-safe:animate-[trilha-card-pulse_2.2s_ease-in-out_infinite]', open.estado === 'atual' && 'border-primary/40')}>
             {open.capaBanner && <div className="relative h-28"><img src={open.capaBanner} alt="" className="absolute inset-0 h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" /></div>}
             <div className="space-y-2 p-4">
-              {open.estado === 'atual' && <span className="inline-block rounded-full border border-primary/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
               <div className="font-semibold leading-tight">{open.titulo}</div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 {open.estado === 'concluido' ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><CircleCheck className="h-3.5 w-3.5" /> Concluído</span>
-                  : open.estado === 'disponivel' ? <span className="inline-flex items-center gap-1"><Lock className="h-3.5 w-3.5" /> Desbloqueie concluindo o anterior</span>
                   : [open.quando, open.questoes > 0 ? `${open.questoes} questões` : null].filter(Boolean).join(' · ')}
                 {open.acerto != null && <span className="inline-flex items-center gap-1"><Trophy className="h-3.5 w-3.5" /> {open.acerto}%</span>}
                 {gamAtivo && open.xp > 0 && open.estado !== 'concluido' && <span className="inline-flex items-center gap-1 font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{open.xp} XP</span>}
+                {open.estado === 'atual' && <span className="inline-flex items-center rounded-full border border-primary/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
               </div>
-              {open.href && open.estado !== 'disponivel' && (
+              {open.href && (
                 <div className="mt-1 flex items-center gap-2">
                   <Link href={open.href} style={{ ['--btn' as any]: BTN }}
                     className="group/btn relative inline-flex flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-xl border-[1.5px] border-[var(--btn)] px-4 py-2 text-sm font-semibold text-[var(--btn)] transition-all duration-300 hover:scale-[1.02] hover:text-white">
@@ -569,13 +562,13 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
           <div className={cn('overflow-hidden rounded-2xl border bg-card shadow-xl motion-safe:animate-[trilha-card-pulse_2.2s_ease-in-out_infinite]', open.estado === 'atual' && 'border-primary/40')}>
             {open.capaBanner && <div className="relative h-28"><img src={open.capaBanner} alt="" className="absolute inset-0 h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" /></div>}
             <div className="space-y-2 p-4">
-              {open.estado === 'atual' && <span className="inline-block rounded-full border border-primary/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
               <div className="font-semibold leading-tight">{open.titulo}</div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 {open.estado === 'concluido' ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><CircleCheck className="h-3.5 w-3.5" /> Concluído</span>
                   : [open.quando, open.questoes > 0 ? `${open.questoes} questões` : null].filter(Boolean).join(' · ')}
                 {open.acerto != null && <span className="inline-flex items-center gap-1"><Trophy className="h-3.5 w-3.5" /> {open.acerto}%</span>}
                 {gamAtivo && open.xp > 0 && open.estado !== 'concluido' && <span className="inline-flex items-center gap-1 font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{open.xp} XP</span>}
+                {open.estado === 'atual' && <span className="inline-flex items-center rounded-full border border-primary/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
               </div>
               {open.href && (
                 <div className="mt-1 flex items-center gap-2">

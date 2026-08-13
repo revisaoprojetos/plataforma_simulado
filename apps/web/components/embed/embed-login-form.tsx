@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { BookOpen, Loader2, Clock, Calendar } from 'lucide-react'
+import { BookOpen, Loader2, Clock, Calendar, ChevronLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { FitaTopo } from '@/components/prova/fita-topo'
@@ -261,6 +261,10 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
   return (
     <div className="relative flex min-h-screen items-start justify-center bg-background p-4 py-10 sm:py-14" style={hudCssVars(coresLogin, dark) as React.CSSProperties}>
       <div className="w-full max-w-3xl animate-in fade-in slide-in-from-bottom-4 space-y-6 duration-500">
+        {/* Voltar para o início do portal */}
+        <a href="/aluno" className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <ChevronLeft className="h-4 w-4" /> Voltar
+        </a>
         {/* Cabeçalho: status + título + logo + tema */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">

@@ -328,6 +328,11 @@
   0%, 100% { transform: scale(1.1) rotate(-6deg); }
   50% { transform: scale(1.18) rotate(6deg); }
 }
+/* Baú da trilha liberado p/ resgate: pulsa com um glow dourado (só box-shadow, não mexe no layout). */
+@keyframes bau-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,.55); }
+  50% { box-shadow: 0 0 17px 6px rgba(245,158,11,.55); }
+}
 /* Modelo PADRÃO de entrada dos cards: sobe 16px + fade, curva suave (.2,.8,.2,1). */
 @keyframes riseIn {
   from { opacity: 0; transform: translateY(16px); }

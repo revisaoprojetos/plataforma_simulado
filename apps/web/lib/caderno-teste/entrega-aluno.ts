@@ -49,7 +49,7 @@ export function modalidadesDoAlunoV2(entrega: EntregaSlots | null | undefined): 
   if (usavel(e.enunciado)) out.push(slot('enunciado', 'Caderno de Questões', { semGab: true, comGab: false }, e.enunciado))
   if (usavel(e.folha)) out.push(slot('folha', 'Folha de Respostas', { semGab: true, comGab: true }, e.folha))
   if (usavel(e.diagnostico)) out.push(slot('diagnostico', 'Diagnóstico', { semGab: false, comGab: true }, e.diagnostico))
-  if (usavel(e.gabarito)) out.push(slot('gabarito', e.gabarito.pdfNome || 'Gabarito Comentado', { semGab: false, comGab: true }, e.gabarito))
+  if (usavel(e.gabarito)) out.push(slot('gabarito', 'Gabarito Comentado', { semGab: false, comGab: true }, e.gabarito))
   return out
 }
 
