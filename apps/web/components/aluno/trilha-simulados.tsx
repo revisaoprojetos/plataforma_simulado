@@ -106,7 +106,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
 
   // Altura animada do caminho: ao trocar de trilha, transiciona o max-height até o tamanho
   // da nova trilha (ou o teto de rolagem), em vez de "pular" seco.
-  const olRef = useRef<HTMLOListElement>(null)
+  const olRef = useRef<HTMLDivElement>(null)
   const [maxH, setMaxH] = useState<number | null>(null)
   useEffect(() => {
     const el = olRef.current
@@ -146,12 +146,13 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
       </div>
 
       <div className="relative">
-        <ol ref={olRef} className="min-w-0 space-y-0 overflow-y-auto py-1 pr-1 transition-[max-height] duration-500 ease-out [scrollbar-width:thin]" style={{ maxHeight: maxH ?? undefined }}>
+        <div ref={olRef} className="min-w-0 overflow-y-auto py-1 pr-1 transition-[max-height] duration-700 ease-out [scrollbar-width:thin]" style={{ maxHeight: maxH ?? undefined }}>
+        <div key={ativa} className="min-w-0 space-y-0 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-700">
           {t.nodes.map((n, i) => {
             const concluido = n.estado === 'concluido'
             const atual = n.estado === 'atual'
             return (
-              <li key={n.id} className="flex gap-4">
+              <div key={n.id} className="flex gap-4">
                 <div className="flex flex-col items-center pt-3">
                   <span className="relative flex shrink-0 items-center justify-center rounded-full border-4 shadow-sm"
                     style={{ width: 52, height: 52, ...(concluido ? { background: COR, borderColor: `color-mix(in oklab, ${COR} 70%, #000)`, color: '#fff' }
@@ -164,19 +165,20 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
                 </div>
 
                 <NodeCard n={n} gamAtivo={gamAtivo} />
-              </li>
+              </div>
             )
           })}
 
-          <li className="flex items-center gap-4">
+          <div className="flex items-center gap-4">
             <div className="flex w-[52px] justify-center">
               <span className="flex items-center justify-center rounded-full border-4" style={{ width: 48, height: 48, ...(t.done >= t.total ? { background: 'var(--brand-accent, #f59e0b)', borderColor: 'color-mix(in oklab, var(--brand-accent, #f59e0b) 70%, #000)', color: '#fff' } : { borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
                 <Trophy className="h-5 w-5" />
               </span>
             </div>
             <span className="text-xs text-muted-foreground">{t.done >= t.total ? 'Trilha concluída! 🎉' : `Conclua os ${t.total} para o troféu da trilha.`}</span>
-          </li>
-        </ol>
+          </div>
+        </div>
+        </div>
         {rolar && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 rounded-b-2xl bg-gradient-to-t from-background to-transparent" />}
       </div>
     </section>
