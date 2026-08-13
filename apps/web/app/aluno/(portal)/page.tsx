@@ -346,7 +346,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
 
         {/* ── Coluna direita: meta, sequência, missões, liga, conquistas ── */}
         {gamResumo && (
-          <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:pr-1 lg:[scrollbar-width:thin]">
+          <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
             {gamResumo.metaDiaXp > 0 && <MetaDiariaCard xpHoje={gamResumo.xpHoje} meta={gamResumo.metaDiaXp} />}
             <StreakCalendario dias={gamSemana} streak={gamResumo.streakAtual} chestXp={chest?.xp ?? 0} chestCadaN={chest?.cada_n_dias ?? 0} />
             {gamMissoes.length > 0 && <MissoesLista missoes={gamMissoes} renova="meia-noite" />}
