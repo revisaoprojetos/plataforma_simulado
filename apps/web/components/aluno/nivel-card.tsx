@@ -30,7 +30,7 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
             <span className="font-semibold">Nível {p.nivel}{p.titulo ? ` · ${p.titulo}` : ''}</span>
             <span className="ml-2 text-xs text-muted-foreground tabular-nums">{fmt(p.xpNoNivel)} / {fmt(p.xpDoNivel)} XP</span>
           </div>
-          <div className="h-2.5 w-full max-w-md overflow-hidden rounded-full bg-muted">
+          <div className="h-2.5 w-full max-w-md overflow-hidden rounded-full ring-1 ring-black/10 dark:ring-white/10" style={{ background: 'color-mix(in oklab, var(--brand-primary, var(--primary)) 16%, transparent)' }}>
             <div className="h-full rounded-full transition-all duration-700" style={{ width: `${p.pct}%`, background: 'var(--brand-primary, var(--primary))' }} />
           </div>
         </div>

@@ -144,9 +144,12 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
               {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
               {concluido ? <Check className="h-7 w-7" /> : atual ? <Star className="h-7 w-7" /> : <Lock className="h-6 w-6" />}
             </button>
-            <div className={cn('mt-1.5 text-xs font-semibold leading-snug', bloqueado && 'text-muted-foreground')}>{n.titulo}</div>
-            <div className="text-[11px] text-muted-foreground">
-              {concluido ? `Concluído${n.acerto != null ? ` · ${n.acerto}%` : ''}` : bloqueado ? 'Bloqueado' : (n.quando ?? 'Disponível')}
+            {/* Rótulo com fundo próprio p/ não se misturar ao pontilhado que passa atrás. */}
+            <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg bg-background/85 px-1.5 py-0.5 backdrop-blur-sm">
+              <span className={cn('block text-xs font-semibold leading-snug', bloqueado && 'text-muted-foreground')}>{n.titulo}</span>
+              <span className="block text-[11px] text-muted-foreground">
+                {concluido ? `Concluído${n.acerto != null ? ` · ${n.acerto}%` : ''}` : bloqueado ? 'Bloqueado' : (n.quando ?? 'Disponível')}
+              </span>
             </div>
           </div>
         )
@@ -303,5 +306,139 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
         {rolar && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 rounded-b-2xl bg-gradient-to-t from-background to-transparent" />}
       </div>
     </section>
+  )
+}
+
+// ── Trilha GIGANTE: todas as trilhas em UM caminho serpenteado contínuo, dividido por grupo,
+// com o pontilhado seguindo entre os grupos. Usado na página dedicada /aluno/trilha.
+const GAP_HDR = 58   // altura reservada p/ a divisória (nome do grupo)
+const GAP_GRUPO = 44 // respiro extra entre grupos (o pontilhado continua nele)
+
+export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAtivo: boolean }) {
+  const flat = trilhas.flatMap((t) => t.nodes)
+  const atualId = flat.find((n) => n.estado === 'atual')?.id ?? flat[0]?.id ?? null
+  const [aberto, setAberto] = useState<string | null>(atualId)
+  const cx = (off: number) => LANE / 2 + off
+
+  // Layout: percorre grupos empilhando divisória + nós, guardando as posições.
+  const nodesL: { n: TrilhaNode; off: number; y: number }[] = []
+  const dividers: { id: string; nome: string; done: number; total: number; y: number }[] = []
+  let y = PAD, gi = 0
+  trilhas.forEach((t, ti) => {
+    if (ti > 0) y += GAP_GRUPO
+    dividers.push({ id: t.id, nome: t.nome, done: t.done, total: t.total, y })
+    y += GAP_HDR
+    t.nodes.forEach((n) => {
+      const off = OFFS[gi % OFFS.length]
+      nodesL.push({ n, off, y: y + R })
+      y += ROW
+      gi++
+    })
+  })
+  const chest = { off: OFFS[gi % OFFS.length], y: y + R }
+  const height = chest.y + R + 48
+  const allPts = [...nodesL.map((x) => ({ off: x.off, y: x.y, estado: x.n.estado })), { off: chest.off, y: chest.y, estado: 'disponivel' as const }]
+
+  const openL = nodesL.find((x) => x.n.id === aberto) ?? null
+  const open = openL?.n ?? null
+  const openPt = openL ? { off: openL.off, y: openL.y } : null
+  const side = openPt && openPt.off > 0 ? 'left' : 'right'
+
+  if (!nodesL.length) return null
+
+  return (
+    <div className="relative mx-auto" style={{ width: LANE, height }}>
+      {/* Conectores pontilhados — contínuos, inclusive entre grupos */}
+      <svg className="absolute left-0 top-0" width={LANE} height={height} aria-hidden>
+        {allPts.slice(0, -1).map((p, i) => {
+          const nx = allPts[i + 1]
+          const x0 = cx(p.off), y0 = p.y, x1 = cx(nx.off), y1 = nx.y, m = (y0 + y1) / 2
+          const done = p.estado === 'concluido'
+          return <path key={i} d={`M ${x0} ${y0} C ${x0} ${m}, ${x1} ${m}, ${x1} ${y1}`} fill="none" strokeWidth={6} strokeLinecap="round" strokeDasharray="0.1 16" stroke={done ? COR : 'var(--border)'} />
+        })}
+      </svg>
+
+      {/* Divisórias de grupo (o pontilhado passa atrás; a legenda tem fundo próprio) */}
+      {dividers.map((d) => (
+        <div key={d.id} className="absolute left-1/2 z-[2] -translate-x-1/2" style={{ top: d.y }}>
+          <div className="flex items-center gap-2 rounded-full border bg-background/90 px-3 py-1 shadow-sm backdrop-blur-sm">
+            <Route className="h-3.5 w-3.5 text-primary" />
+            <span className="whitespace-nowrap text-xs font-semibold">{d.nome}</span>
+            <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-primary">{d.done}/{d.total}</span>
+          </div>
+        </div>
+      ))}
+
+      {/* Nós */}
+      {nodesL.map(({ n, off, y: cyv }) => {
+        const concluido = n.estado === 'concluido'
+        const atual = n.estado === 'atual'
+        const bloqueado = n.estado === 'disponivel'
+        const sel = n.id === aberto
+        return (
+          <div key={n.id} className="absolute z-[1] -translate-x-1/2 text-center" style={{ left: cx(off), top: cyv - R, width: 200 }}>
+            <button type="button" onClick={() => setAberto(n.id)} aria-label={n.titulo}
+              className={cn('relative mx-auto flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
+              style={{ width: R * 2, height: R * 2, ...(concluido ? { background: COR, borderColor: `color-mix(in oklab, ${COR} 70%, #000)`, color: '#fff' }
+                : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
+                : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
+              {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
+              {concluido ? <Check className="h-7 w-7" /> : atual ? <Star className="h-7 w-7" /> : <Play className="h-6 w-6" />}
+            </button>
+            <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg bg-background/85 px-1.5 py-0.5 backdrop-blur-sm">
+              <span className={cn('block text-xs font-semibold leading-snug', bloqueado && 'text-muted-foreground')}>{n.titulo}</span>
+              <span className="block text-[11px] text-muted-foreground">
+                {concluido ? `Concluído${n.acerto != null ? ` · ${n.acerto}%` : ''}` : (n.quando ?? 'Disponível')}
+              </span>
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Baú final */}
+      <div className="absolute z-[1] -translate-x-1/2 text-center" style={{ left: cx(chest.off), top: chest.y - R, width: 200 }}>
+        <span className="mx-auto flex items-center justify-center rounded-2xl border-4" style={{ width: 56, height: 56, background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
+          <Trophy className="h-6 w-6" />
+        </span>
+        <div className="mt-1.5 inline-block rounded-lg bg-background/85 px-1.5 py-0.5 text-xs font-semibold backdrop-blur-sm">Fim da trilha</div>
+      </div>
+
+      {/* Card do simulado — no lado com mais espaço, alinhado ao nó */}
+      {open && openPt && (
+        <div key={open.id} className="absolute z-10 w-[300px] motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-200"
+          style={{ top: Math.max(0, Math.min(openPt.y - 60, height - 210)), ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
+          <span className={cn('absolute top-14 h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} />
+          <div className={cn('overflow-hidden rounded-2xl border shadow-xl motion-safe:animate-[trilha-card-pulse_2.2s_ease-in-out_infinite]', open.estado === 'atual' && 'border-primary/40')}>
+            {open.capaBanner && <div className="relative h-20"><img src={open.capaBanner} alt="" className="absolute inset-0 h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" /></div>}
+            <div className="space-y-2 p-4">
+              {open.estado === 'atual' && <span className="inline-block rounded-full border border-primary/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
+              <div className="font-semibold leading-tight">{open.titulo}</div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                {open.estado === 'concluido' ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><CircleCheck className="h-3.5 w-3.5" /> Concluído</span>
+                  : [open.quando, open.questoes > 0 ? `${open.questoes} questões` : null].filter(Boolean).join(' · ')}
+                {open.acerto != null && <span className="inline-flex items-center gap-1"><Trophy className="h-3.5 w-3.5" /> {open.acerto}%</span>}
+                {gamAtivo && open.xp > 0 && open.estado !== 'concluido' && <span className="inline-flex items-center gap-1 font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{open.xp} XP</span>}
+              </div>
+              {open.href && (
+                <div className="mt-1 flex items-center gap-2">
+                  <Link href={open.href} style={{ ['--btn' as any]: BTN }}
+                    className="group/btn relative inline-flex flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-xl border-[1.5px] border-[var(--btn)] px-4 py-2 text-sm font-semibold text-[var(--btn)] transition-all duration-300 hover:scale-[1.02] hover:text-white">
+                    <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" style={{ background: `linear-gradient(135deg, ${BTN}, color-mix(in oklab, ${BTN} 72%, #000))` }} />
+                    <span className="relative z-10 inline-flex items-center gap-1.5">{open.estado === 'atual' && <Play className="h-4 w-4" />}{open.acao}</span>
+                  </Link>
+                  {open.cadernoUrl && (
+                    <a href={open.cadernoUrl} target="_blank" rel="noopener noreferrer" title="Baixar caderno de questões" aria-label="Baixar caderno de questões"
+                      className="group/dl relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border-[1.5px] border-white/80 text-white transition-all hover:scale-[1.03]">
+                      <span className="absolute inset-0 bg-white opacity-0 transition-opacity duration-300 group-hover/dl:opacity-100" />
+                      <Download className="relative z-10 h-4 w-4 text-white transition-colors group-hover/dl:text-[color:var(--btn,#6d28d9)]" />
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
