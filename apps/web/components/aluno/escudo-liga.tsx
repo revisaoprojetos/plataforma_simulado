@@ -31,25 +31,29 @@ function Emblema({ tipo, fill }: { tipo: string; fill: string }) {
           <rect x="2.5" y="19.4" width="19" height="2.6" rx="0.6" fill={fill} />
         </>
       )
-    case 'martelo': // martelo da justiça (cabeça + cabo) + bloco de som
+    case 'martelo': // martelo da justiça na DIAGONAL (cabeça grande + cabo longo) quase batendo no bloco
       return (
         <>
-          <rect x="3.6" y="3.2" width="16.8" height="4.9" rx="2.45" fill={fill} />
-          <rect x="10.3" y="8.1" width="3.4" height="9.1" rx="1.6" fill={fill} />
-          <rect x="4.8" y="18.6" width="14.4" height="3.2" rx="1.4" fill={fill} />
+          <g transform="rotate(30 12 12)">
+            <rect x="4.8" y="13.4" width="14.4" height="5.3" rx="2.65" fill={fill} />
+            <rect x="10.3" y="2.6" width="3.4" height="11.4" rx="1.7" fill={fill} />
+          </g>
+          <rect x="4.3" y="20.3" width="15.4" height="2.7" rx="1.35" fill={fill} />
         </>
       )
-    case 'balanca': // balança da justiça (poste + trave + conchas + base)
+    case 'balanca': // balança da justiça — trave em arco, cordas em V, conchas e base curvas
       return (
         <>
-          <circle cx="12" cy="3" r="1.35" fill={fill} />
-          <rect x="11.2" y="4.2" width="1.6" height="15.2" fill={fill} />
-          <rect x="3.4" y="5.6" width="17.2" height="1.5" rx="0.7" fill={fill} />
-          <rect x="3.6" y="6.9" width="0.8" height="3.5" fill={fill} />
-          <rect x="19.6" y="6.9" width="0.8" height="3.5" fill={fill} />
-          <path d="M0.8 10.4Q0.8 15 4 15 7.2 15 7.2 10.4Z" fill={fill} />
-          <path d="M16.8 10.4Q16.8 15 20 15 23.2 15 23.2 10.4Z" fill={fill} />
-          <path d="M8.3 19.4 15.7 19.4 16.9 22.4 7.1 22.4Z" fill={fill} />
+          <circle cx="12" cy="2.7" r="1.35" fill={fill} />
+          <path d="M3.2 5.4Q12 3.6 20.8 5.4L20.5 7Q12 5.3 3.5 7Z" fill={fill} />
+          <rect x="11.25" y="4" width="1.5" height="14.6" rx="0.6" fill={fill} />
+          <path d="M7 18.6Q12 17 17 18.6L18.3 21.9Q12 20.4 5.7 21.9Z" fill={fill} />
+          <path d="M4 6.5Q2.6 8.9 2.3 10.6" fill="none" stroke={fill} strokeWidth="0.95" strokeLinecap="round" />
+          <path d="M4 6.5Q5.4 8.9 5.7 10.6" fill="none" stroke={fill} strokeWidth="0.95" strokeLinecap="round" />
+          <path d="M20 6.5Q18.6 8.9 18.3 10.6" fill="none" stroke={fill} strokeWidth="0.95" strokeLinecap="round" />
+          <path d="M20 6.5Q21.4 8.9 21.7 10.6" fill="none" stroke={fill} strokeWidth="0.95" strokeLinecap="round" />
+          <path d="M1.4 10.5Q4 16.3 6.6 10.5Q4 12.1 1.4 10.5Z" fill={fill} />
+          <path d="M17.4 10.5Q20 16.3 22.6 10.5Q20 12.1 17.4 10.5Z" fill={fill} />
         </>
       )
     default: // escudo (fallback)
