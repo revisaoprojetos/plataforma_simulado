@@ -18,7 +18,7 @@ export interface MissaoDef { id: string; titulo: string; tipo: MissaoTipo; meta:
 /** Como as missões aparecem por dia: 'todas' as ativas, ou 'rodizio' de N por dia. */
 export interface MissoesConfig { modo: 'todas' | 'rodizio'; por_dia: number }
 export type ConquistaRegraTipo = 'xp_total' | 'streak' | 'simulados_concluidos' | 'nota_max'
-export interface ConquistaDef { id: string; titulo: string; descricao: string; icone: string; regra: { tipo: ConquistaRegraTipo; meta: number }; xp: number }
+export interface ConquistaDef { id: string; titulo: string; descricao: string; icone: string; cor?: string; regra: { tipo: ConquistaRegraTipo; meta: number }; xp: number }
 
 export interface GamConfig {
   tenantId: string

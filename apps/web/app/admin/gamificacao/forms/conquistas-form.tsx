@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Plus, Trash2, Search, Sparkles, Award } from 'lucide-react'
 import type { GamConfig, ConquistaDef, ConquistaRegraTipo } from '@/lib/gamificacao/config'
 import { DEFAULT_CONQUISTAS } from '@/lib/gamificacao/config'
-import { iconeConquista, ICONE_OPCOES } from '@/lib/gamificacao/icones'
+import { iconeConquista, ICONE_OPCOES, corConquista } from '@/lib/gamificacao/icones'
 import { salvarConquistas } from '../actions'
 import { SaveBar, SectionCard } from './_campos'
 import { useUnsavedGuard } from '@/components/admin/use-unsaved-guard'
@@ -86,10 +86,11 @@ export function ConquistasForm({ config, podeGerenciar }: { config: GamConfig; p
         <div className="grid gap-3 lg:grid-cols-2">
           {visiveis.map((c) => {
             const Icon = iconeConquista(c.icone)
+            const cor = c.cor || corConquista(c.id)
             return (
               <div key={c.id} className="space-y-3 rounded-xl border bg-card p-3 shadow-sm">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"><Icon className="h-5 w-5" /></span>
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: `color-mix(in oklab, ${cor} 18%, transparent)`, color: cor }}><Icon className="h-5 w-5" /></span>
                   <label className="min-w-0 flex-1 space-y-1">
                     <span className="block text-[11px] font-medium text-muted-foreground">Título</span>
                     <Input value={c.titulo} onChange={(e) => setById(c.id, { titulo: e.target.value })} disabled={!podeGerenciar} />
@@ -103,10 +104,13 @@ export function ConquistasForm({ config, podeGerenciar }: { config: GamConfig; p
                 </label>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <label className="space-y-1">
-                    <span className="block text-[11px] font-medium text-muted-foreground">Ícone</span>
-                    <select className={selectCls} value={c.icone} onChange={(e) => setById(c.id, { icone: e.target.value })} disabled={!podeGerenciar}>
-                      {ICONE_OPCOES.map((ic) => <option key={ic.v} value={ic.v}>{ic.label}</option>)}
-                    </select>
+                    <span className="block text-[11px] font-medium text-muted-foreground">Ícone / cor</span>
+                    <div className="flex gap-1.5">
+                      <select className={selectCls} value={c.icone} onChange={(e) => setById(c.id, { icone: e.target.value })} disabled={!podeGerenciar}>
+                        {ICONE_OPCOES.map((ic) => <option key={ic.v} value={ic.v}>{ic.label}</option>)}
+                      </select>
+                      <input type="color" value={cor} onChange={(e) => setById(c.id, { cor: e.target.value })} disabled={!podeGerenciar} className="h-9 w-10 shrink-0 cursor-pointer rounded-lg border bg-transparent p-0.5 disabled:cursor-not-allowed" aria-label={`Cor de ${c.titulo}`} />
+                    </div>
                   </label>
                   <label className="space-y-1">
                     <span className="block text-[11px] font-medium text-muted-foreground">Regra</span>

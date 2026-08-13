@@ -22,3 +22,11 @@ export const ICONE_LABEL: Record<string, string> = {
 export const ICONE_OPCOES = Object.keys(ICONES_CONQUISTA).map((v) => ({ v, label: ICONE_LABEL[v] ?? v }))
 
 export const iconeConquista = (chave: string): LucideIcon => ICONES_CONQUISTA[chave] ?? Award
+
+// Paleta padrão + cor determinística por chave (fallback quando a conquista não tem cor definida).
+export const CORES_CONQUISTA = ['#f59e0b', '#0ea5e9', '#8b5cf6', '#10b981', '#ef4444', '#ec4899', '#14b8a6', '#6366f1', '#f97316', '#84cc16']
+export function corConquista(chave: string): string {
+  let h = 0
+  for (let i = 0; i < chave.length; i++) h = (h * 31 + chave.charCodeAt(i)) >>> 0
+  return CORES_CONQUISTA[h % CORES_CONQUISTA.length]
+}

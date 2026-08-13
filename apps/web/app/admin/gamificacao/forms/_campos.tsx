@@ -61,11 +61,13 @@ export function TextField({ label, value, onChange, placeholder, disabled }: {
  */
 export function SectionCard({ titulo, descricao, icon: Icon, tom, children, className }: { titulo: string; descricao?: string; icon?: LucideIcon; tom?: string; children: React.ReactNode; className?: string }) {
   return (
-    <section className={`rounded-2xl border bg-card p-5 shadow-sm ${className ?? ''}`}>
-      <div className="mb-4 flex items-start gap-3">
+    <section className={`overflow-hidden rounded-2xl border bg-card p-5 shadow-sm ${className ?? ''}`}>
+      {/* Cabeçalho com faixa de fundo na cor do card (bleed até as bordas do topo). */}
+      <div className="-mx-5 -mt-5 mb-4 flex items-start gap-3 px-5 pb-4 pt-5"
+        style={tom ? { background: `linear-gradient(180deg, color-mix(in oklab, ${tom} 12%, transparent), transparent)` } : undefined}>
         {Icon && (
           <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${tom ? '' : 'bg-primary/10 text-primary'}`}
-            style={tom ? { background: `color-mix(in oklab, ${tom} 18%, transparent)`, color: tom } : undefined}>
+            style={tom ? { background: `color-mix(in oklab, ${tom} 20%, transparent)`, color: tom } : undefined}>
             <Icon style={{ width: 18, height: 18 }} />
           </span>
         )}
