@@ -45,9 +45,9 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
         const promoveu = cargo(next) !== cargo(lvl)
         setSt((s) => ({ ...s, level: next, fill: 0, pop: true, burst: s.burst + 1, promoted: promoveu ? cargo(next) : s.promoted }))
         later(() => setSt((s) => ({ ...s, pop: false })), 460)
-        if (next < to) later(() => step(next), multi ? 360 : 480)
-        else later(() => setSt((s) => ({ ...s, playing: false, done: true, fill: 100, xpTarget: sessionXp })), 140)
-      }, multi ? 780 : 1080)
+        if (next < to) later(() => step(next), multi ? 380 : 520)
+        else later(() => setSt((s) => ({ ...s, playing: false, done: true, fill: 100, xpTarget: sessionXp })), 160)
+      }, multi ? 1000 : 1450)
     }
     later(() => step(from), 450)
     return () => { timers.current.forEach(clearTimeout); clearInterval(xpInt.current) }
@@ -60,7 +60,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
   const numFont = done ? 40 : 66
   const dash = `${((st.fill / 100) * CIRC).toFixed(1)} ${CIRC.toFixed(1)}`
   // Enche desacelerando bastante no fim; reset (fill=0) é instantâneo (sem "voltar").
-  const fillTrans = st.fill === 0 ? 'none' : `${multi ? '.8s' : '1.15s'} cubic-bezier(.12,.92,.06,1)`
+  const fillTrans = st.fill === 0 ? 'none' : `${multi ? '.95s' : '1.35s'} cubic-bezier(.1,.94,.04,1)`
   const steps: { n: number; passou: boolean }[] = []
   for (let l = from; l <= to; l++) steps.push({ n: l, passou: st.level >= l })
 
@@ -75,7 +75,10 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
         ))}
       </div>
 
-      <div className={`relative z-[1] m-auto flex flex-col items-center px-6 text-center ${done ? 'gap-2.5 py-6' : 'gap-5 py-10'}`}>
+      {/* Flash de tela no impacto de cada nível */}
+      {st.pop && <div key={`sf${st.burst}`} className="pointer-events-none absolute inset-0 z-[2]" style={{ background: `radial-gradient(circle at 50% 32%, ${mix(60, 'transparent')} 0%, transparent 46%)`, animation: 'lu-flash .5s ease-out both' }} />}
+
+      <div style={{ animation: st.pop ? 'lu-shake .42s ease-in-out' : undefined }} className={`relative z-[1] m-auto flex flex-col items-center px-6 text-center ${done ? 'gap-2.5 py-6' : 'gap-5 py-10'}`}>
         {/* Kicker */}
         <div className="flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[0.28em]" style={{ color: L3, animation: 'lu-rise .5s ease both' }}>
           <span className="h-px w-10" style={{ background: `linear-gradient(90deg, transparent, ${A})` }} />
@@ -109,8 +112,8 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
           {/* rajada de partículas (contida) */}
           {st.pop && (
             <div key={`b${st.burst}`} className="pointer-events-none absolute inset-0">
-              {Array.from({ length: 20 }).map((_, i) => {
-                const ang = (i / 20) * Math.PI * 2, dist = 100 + (i % 3) * 22
+              {Array.from({ length: 24 }).map((_, i) => {
+                const ang = (i / 24) * Math.PI * 2, dist = 104 + (i % 3) * 26
                 return <span key={i} className="absolute left-1/2 top-1/2 rounded-full" style={{ width: 8, height: 8, marginLeft: -4, marginTop: -4, background: i % 2 ? L2 : A, boxShadow: `0 0 8px ${mix(50, 'transparent')}`, ['--bx' as any]: `${(Math.cos(ang) * dist).toFixed(0)}px`, ['--by' as any]: `${(Math.sin(ang) * dist).toFixed(0)}px`, animation: 'lu-burst .8s ease-out both' }} />
               })}
             </div>
@@ -150,11 +153,21 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
             </div>
 
             {st.promoted && (
-              <div className="flex w-full max-w-[440px] items-center justify-center gap-2.5 rounded-xl border px-4 py-2.5" style={{ background: D4, borderColor: mix(45, 'transparent'), boxShadow: `0 0 26px -10px ${mix(50, 'transparent')}`, animation: 'lu-rise .45s ease .16s both' }}>
-                <span className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: mix(28, 'transparent'), color: L2 }}><Medal className="h-4 w-4" /></span>
-                <div className="text-left">
-                  <div className="text-[10px] uppercase tracking-[0.16em]" style={{ color: L3 }}>Novo cargo</div>
-                  <div className="whitespace-nowrap text-base font-bold" style={{ color: L1 }}>{st.promoted}</div>
+              <div className="relative w-full max-w-[440px]" style={{ animation: 'lu-rise .45s ease .16s both' }}>
+                {/* costura superior (traços inclinados p/ um lado) */}
+                <div className="absolute inset-x-3 top-0 h-[7px]" style={{ backgroundImage: `repeating-linear-gradient(62deg, ${L2} 0 2px, transparent 2px 8px)`, WebkitMaskImage: 'linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent)', maskImage: 'linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent)', opacity: 0.85 }} />
+                {/* costura inferior (traços inclinados p/ o outro lado) */}
+                <div className="absolute inset-x-3 bottom-0 h-[7px]" style={{ backgroundImage: `repeating-linear-gradient(-62deg, ${L2} 0 2px, transparent 2px 8px)`, WebkitMaskImage: 'linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent)', maskImage: 'linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent)', opacity: 0.85 }} />
+                {/* bordas laterais com fade (topo/base transparentes) */}
+                <div className="absolute left-0 top-2 bottom-2 w-px" style={{ background: `linear-gradient(180deg, transparent, ${mix(55, 'transparent')} 24%, ${mix(55, 'transparent')} 76%, transparent)` }} />
+                <div className="absolute right-0 top-2 bottom-2 w-px" style={{ background: `linear-gradient(180deg, transparent, ${mix(55, 'transparent')} 24%, ${mix(55, 'transparent')} 76%, transparent)` }} />
+                {/* corpo quadrado */}
+                <div className="flex items-center justify-center gap-2.5 px-5 py-3.5" style={{ background: D4, boxShadow: `0 0 26px -12px ${mix(50, 'transparent')}` }}>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-md" style={{ background: mix(28, 'transparent'), color: L2 }}><Medal className="h-4 w-4" /></span>
+                  <div className="text-left">
+                    <div className="text-[10px] uppercase tracking-[0.16em]" style={{ color: L3 }}>Novo cargo</div>
+                    <div className="whitespace-nowrap text-base font-bold" style={{ color: L1 }}>{st.promoted}</div>
+                  </div>
                 </div>
               </div>
             )}
