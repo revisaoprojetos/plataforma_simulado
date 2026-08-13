@@ -14,14 +14,12 @@ import { Palette, Trash2, Copy, ExternalLink, MoreVertical, Check, Loader2, List
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { excluirBanco, duplicarBanco } from '@/app/admin/banco-questoes/actions'
-import { iconeBanco } from '@/lib/banco-visual'
 
 export function BancoCard({ id, nome, total, estudantes = 0, cor, icone, capa, tipo, onMover }: { id: string; nome: string; total: number; estudantes?: number; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null; onMover?: () => void }) {
   const [confirmar, setConfirmar] = useState(false)
   const [pending, start] = useTransition()
   const router = useRouter()
 
-  const Icon = iconeBanco(icone)
   const c = cor ?? '#6d28d9'
 
   function copiar() {
@@ -47,20 +45,11 @@ export function BancoCard({ id, nome, total, estudantes = 0, cor, icone, capa, t
       ) : (
         <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
       )}
-      {/* Ícone-marca d'água quando não há capa */}
-      {!capa && <Icon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
       {/* Degradê para legibilidade do texto */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
 
       {/* Link cobre o card inteiro */}
       <Link href={`/admin/banco-questoes/${id}`} className="absolute inset-0 z-10" aria-label={nome} />
-
-      {/* Chip do ícone (topo esquerdo) */}
-      <div className="pointer-events-none absolute left-3 top-3 z-20">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: c }}>
-          <Icon className="h-4 w-4" />
-        </span>
-      </div>
 
       {/* Ações (topo direito) */}
       <div className="absolute right-2 top-2 z-30">

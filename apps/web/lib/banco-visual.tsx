@@ -11,6 +11,9 @@ export const BANCO_ICONES: Record<string, React.ComponentType<{ className?: stri
   estrela: Star, alvo: Target, lista: ListChecks,
 }
 
-export function iconeBanco(icone?: string | null) {
-  return (icone && BANCO_ICONES[icone]) || FolderOpen
+// Ícones de banco/pasta REMOVIDOS — retorna um componente vazio (não renderiza nada) para
+// zerar a "utilidade" dos ícones em todo o app sem precisar editar cada consumidor.
+const SemIcone: React.ComponentType<{ className?: string }> = () => null
+export function iconeBanco(_icone?: string | null): React.ComponentType<{ className?: string }> {
+  return SemIcone
 }

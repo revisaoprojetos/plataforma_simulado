@@ -57,7 +57,7 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
 
   const capa = (b: any) => (b.capa_card_url ?? b.capa_url) ?? null
   const bancosOut = bancosNivel.map((b) => ({ id: b.id, nome: b.nome, total: contagem.get(b.id) ?? 0, estudantes: contEstudantes.get(b.id) ?? 0, cor: b.cor ?? null, icone: b.icone ?? null, capa: capa(b), tipo: b.tipo ?? null }))
-  const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), count: bancosPorPasta.get(f.id) ?? 0 }))
+  const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), capaLarga: f.capa_url ?? null, count: bancosPorPasta.get(f.id) ?? 0 }))
   const destinos = folders.map((f) => ({ id: f.id, nome: f.nome }))
 
   return (

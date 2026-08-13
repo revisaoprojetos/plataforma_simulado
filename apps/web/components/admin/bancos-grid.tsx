@@ -11,13 +11,12 @@ import { BancoCard } from '@/components/admin/banco-card'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { moverBancoParaPasta, excluirPastaFolder, duplicarPastaFolder } from '@/app/admin/banco-questoes/actions'
-import { iconeBanco } from '@/lib/banco-visual'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { Database, Search, FolderPlus, Folder, FolderOpen, ChevronLeft, MoreVertical, Trash2, X, Check, Loader2, FolderInput, Palette, Copy } from 'lucide-react'
 
 type Banco = { id: string; nome: string; total: number; estudantes?: number; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null }
-type Pasta = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; count: number }
+type Pasta = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; capaLarga?: string | null; count: number }
 type Destino = { id: string; nome: string }
 
 export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }: {
@@ -113,7 +112,7 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
       {movendo && <MoverBancoDialog banco={movendo} destinos={destinos} atualId={atual?.id ?? null} onClose={() => setMovendo(null)} />}
       {editandoPasta && (
         <EditarPastaDialog
-          pasta={{ id: editandoPasta.id, nome: editandoPasta.nome, cor: editandoPasta.cor ?? null, icone: editandoPasta.icone ?? null, capa: editandoPasta.capa ?? null }}
+          pasta={{ id: editandoPasta.id, nome: editandoPasta.nome, cor: editandoPasta.cor ?? null, capa: editandoPasta.capa ?? null, capaLarga: editandoPasta.capaLarga ?? null }}
           onClose={() => setEditandoPasta(null)}
           onSaved={() => router.refresh()}
         />
@@ -128,7 +127,6 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
 /** Card de PASTA (folder) — imagem/cor + nome + quantos bancos tem dentro. Clicar abre a pasta. */
 function FolderCard({ f, onExcluir, onPersonalizar, onDuplicar }: { f: Pasta; onExcluir: () => void; onPersonalizar: () => void; onDuplicar: () => void }) {
   const c = f.cor ?? '#6d28d9'
-  const Icon = iconeBanco(f.icone)
   return (
     <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
       {f.capa ? (
@@ -136,14 +134,8 @@ function FolderCard({ f, onExcluir, onPersonalizar, onDuplicar }: { f: Pasta; on
       ) : (
         <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
       )}
-      {!f.capa && <Icon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
       <Link href={`/admin/banco-questoes?pasta=${f.id}`} className="absolute inset-0 z-10" aria-label={f.nome} />
-      <div className="pointer-events-none absolute left-3 top-3 z-20">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: c }}>
-          <Icon className="h-4 w-4" />
-        </span>
-      </div>
       <div className="absolute right-2 top-2 z-30">
         <DropdownMenu>
           <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 outline-none transition-colors hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Ações da pasta">

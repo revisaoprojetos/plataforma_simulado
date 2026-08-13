@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { atualizarBanco } from '@/app/admin/banco-questoes/actions'
-import { BANCO_CORES, BANCO_ICONES, iconeBanco } from '@/lib/banco-visual'
+import { BANCO_CORES } from '@/lib/banco-visual'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, Check, ImagePlus, Trash2, RefreshCw, Palette } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -35,7 +35,6 @@ export function BancoPersonalizar({ banco }: { banco: Banco }) {
   const cardInputRef = useRef<HTMLInputElement>(null)
   const [nome, setNome] = useState(banco.nome)
   const [cor, setCor] = useState<string | null>(banco.cor)
-  const [icone, setIcone] = useState<string>(banco.icone && BANCO_ICONES[banco.icone] ? banco.icone : 'folder')
   const [capa, setCapa] = useState<string | null>(banco.capa_url)
   const [capaCard, setCapaCard] = useState<string | null>(banco.capa_card_url)
   const [salvando, setSalvando] = useState(false)
@@ -43,7 +42,6 @@ export function BancoPersonalizar({ banco }: { banco: Banco }) {
   const [processandoCard, setProcessandoCard] = useState(false)
 
   const c = cor ?? '#6d28d9'
-  const Preview = iconeBanco(icone)
   // O card (pôster) usa a imagem própria; se vazia, cai para a capa do banner.
   const imgCard = capaCard ?? capa
 
@@ -51,7 +49,8 @@ export function BancoPersonalizar({ banco }: { banco: Banco }) {
     if (!f) return
     if (!f.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
     setProcessando(true)
-    try { setCapa(await redimensionar(f)) } catch { toast.error('Falha ao processar a imagem.') } finally { setProcessando(false) }
+    // Banner largo (capa comprida) — resolução maior p/ imagens largas manterem nitidez.
+    try { setCapa(await redimensionar(f, 2800)) } catch { toast.error('Falha ao processar a imagem.') } finally { setProcessando(false) }
   }
 
   async function onFileCard(f: File | null) {
@@ -65,7 +64,7 @@ export function BancoPersonalizar({ banco }: { banco: Banco }) {
   async function salvar() {
     if (!nome.trim()) { toast.error('Informe um nome.'); return }
     setSalvando(true)
-    const r = await atualizarBanco(banco.id, nome, cor, icone, capa, capaCard)
+    const r = await atualizarBanco(banco.id, nome, cor, null, capa, capaCard)
     setSalvando(false)
     if (r.ok) { toast.success('Personalização salva'); router.refresh() } else toast.error(r.error ?? 'Erro ao salvar')
   }
@@ -90,7 +89,7 @@ export function BancoPersonalizar({ banco }: { banco: Banco }) {
 
           {/* Capa */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Imagem de capa</label>
+            <label className="text-xs font-medium text-muted-foreground">Imagem de capa (banner largo / capa comprida)</label>
             <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
             {capa ? (
               <div className="relative overflow-hidden rounded-xl border">
@@ -105,7 +104,7 @@ export function BancoPersonalizar({ banco }: { banco: Banco }) {
                 className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:opacity-60">
                 {processando ? <Loader2 className="h-7 w-7 animate-spin" /> : <ImagePlus className="h-7 w-7" />}
                 <span className="text-sm font-medium">{processando ? 'Processando…' : 'Adicionar imagem de capa'}</span>
-                <span className="text-xs">Usada no banner largo do topo do banco.</span>
+                <span className="text-xs">Banner largo (capa comprida) — topo do banco e fundo na trilha. Alta resolução.</span>
               </button>
             )}
           </div>
@@ -150,20 +149,6 @@ export function BancoPersonalizar({ banco }: { banco: Banco }) {
             </div>
           </div>
 
-          {/* Ícone */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Ícone</label>
-            <div className="grid grid-cols-6 gap-2 sm:grid-cols-8 lg:grid-cols-6">
-              {Object.entries(BANCO_ICONES).map(([key, Ic]) => (
-                <button key={key} type="button" onClick={() => setIcone(key)}
-                  className={cn('flex h-11 items-center justify-center rounded-lg border transition-colors', icone === key ? 'border-transparent text-white' : 'text-muted-foreground hover:bg-muted')}
-                  style={icone === key ? { background: c } : undefined}>
-                  <Ic className="h-5 w-5" />
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="flex justify-end">
             <button type="button" onClick={salvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
               {salvando && <Loader2 className="h-4 w-4 animate-spin" />} Salvar personalização
@@ -181,11 +166,7 @@ export function BancoPersonalizar({ banco }: { banco: Banco }) {
           ) : (
             <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
           )}
-          {!imgCard && <Preview className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
-          <span className="absolute left-3 top-3 flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: c }}>
-            <Preview className="h-4 w-4" />
-          </span>
           <div className="absolute inset-x-0 bottom-0 p-4">
             <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">Banco de questões</p>
             <h3 className="mt-0.5 line-clamp-2 text-lg font-bold leading-tight text-white drop-shadow-sm">{nome || 'Nome do banco'}</h3>

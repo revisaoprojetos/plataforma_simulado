@@ -358,14 +358,8 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       y += ROW
       gi++
     })
-    // 1–3 simulados → CAPA COMPRIDA (banner largo); 4+ → CAPA GRANDE do banco (imagem inteira).
-    const inteira = t.total > 3
-    const capaBanco = t.capa ?? null
-    const capaBanner = t.nodes.find((n) => n.capaBanner)?.capaBanner ?? null
-    const capaPoster = t.nodes.find((n) => n.capa)?.capa ?? null
-    const capa = inteira
-      ? (capaBanco ?? capaBanner ?? capaPoster)   // capa grande do banco, mostrada inteira
-      : (capaBanner ?? capaBanco ?? capaPoster)   // capa comprida (banner largo)
+    // Capa do BANCO (banner largo / capa comprida) vinculada pela pasta; cai na capa do simulado.
+    const capa = t.capa ?? t.nodes.find((n) => n.capaBanner)?.capaBanner ?? t.nodes.find((n) => n.capa)?.capa ?? null
     segMeta.push({ id: t.id, capa, dy, total: t.total })
   })
   const chest = { off: OFFS[gi % OFFS.length], y: y + R }

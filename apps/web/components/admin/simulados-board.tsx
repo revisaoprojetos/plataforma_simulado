@@ -592,7 +592,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
       {movendo && <MoverSimuladoDialog simulado={movendo} destinos={destinos} atualId={atual?.id ?? null} onClose={() => setMovendo(null)} />}
       {editandoPasta && (
         <EditarPastaDialog
-          pasta={{ id: editandoPasta.id, nome: editandoPasta.nome, cor: editandoPasta.cor ?? null, icone: editandoPasta.icone ?? null, capa: editandoPasta.capa ?? null }}
+          pasta={{ id: editandoPasta.id, nome: editandoPasta.nome, cor: editandoPasta.cor ?? null, capa: editandoPasta.capa ?? null, capaLarga: (editandoPasta as any).capaLarga ?? null }}
           onClose={() => setEditandoPasta(null)}
           onSaved={() => router.refresh()}
         />
