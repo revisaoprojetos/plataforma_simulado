@@ -488,7 +488,7 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 
 /* Chama preenchida com 3 LÍNGUAS de fogo independentes: cada uma sobe/encolhe em ritmo
    próprio (origem na base), então o TOPO muda de forma o tempo todo como fogo real. */
-.ico-flame-svg { width: 2rem; height: 2rem; overflow: visible; }
+.ico-flame-svg { width: 1.6rem; height: 1.6rem; overflow: visible; }
 .ico-flame-svg .flame-path { transform-box: fill-box; transform-origin: 50% 100%; }
 /* Flicker de fogo: base fixa, topo dança (scaleY/scaleX/skew em passos irregulares). */
 .group:hover .ico-flame-svg .flame-path { animation: flame-lick .5s ease-in-out infinite; }
