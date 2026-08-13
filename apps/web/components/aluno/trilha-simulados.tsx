@@ -165,6 +165,7 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
       {t.nodes.map((n, i) => {
         const p = pts[i]
         const concluido = n.estado === 'concluido'
+        const ouro = concluido && n.acerto === 100   // 100% → tema dourado + coroa
         const atual = n.estado === 'atual'
         const bloqueado = n.estado === 'disponivel'
         const sel = n.id === aberto
@@ -172,11 +173,17 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
           <div key={n.id} data-trilha-item className="absolute -translate-x-1/2 text-center" style={{ left: cx(p.off), top: p.y - R, width: 200, marginLeft: 0 }}>
             <button type="button" data-trilha-node onClick={() => setAberto(n.id)} aria-label={n.titulo}
               className={cn('relative mx-auto flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
-              style={{ width: R * 2, height: R * 2, ...(concluido ? { background: COR, borderColor: `color-mix(in oklab, ${COR} 70%, #000)`, color: '#fff' }
+              style={{ width: R * 2, height: R * 2, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 13px 2px rgba(250,204,21,.5), 0 0 28px 6px rgba(250,204,21,.22), 0 6px 16px -5px rgba(217,119,6,.55)' }
+                : concluido ? { background: '#10b981', borderColor: '#059669', color: '#fff' }
                 : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
                 : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
               {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
-              {concluido ? <Check className="h-7 w-7" /> : atual ? <Star className="h-7 w-7" /> : <Lock className="h-6 w-6" />}
+              {ouro && (<>
+                <Crown className="pointer-events-none absolute -top-[23px] left-1/2 h-[26px] w-[22px] -translate-x-1/2" fill="#ffd24a" strokeWidth={1.75} style={{ color: '#a75d09', filter: 'drop-shadow(0 1px 2px rgba(90,45,0,.5)) drop-shadow(0 0 5px rgba(250,204,21,.55))' }} />
+                <span className="pointer-events-none absolute inset-[4px] rounded-full" style={{ background: 'radial-gradient(circle at 50% 34%, #fff2b0 0%, #ffd93b 44%, #f2b800 100%)', boxShadow: 'inset 0 -3px 6px rgba(170,105,10,.5), inset 0 2px 3px rgba(255,255,255,.7)' }} />
+                <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"><span className="absolute inset-0" style={{ background: 'linear-gradient(122deg, transparent 30%, rgba(255,255,255,.7) 44%, rgba(255,255,255,.2) 55%, transparent 67%)' }} /></span>
+              </>)}
+              <span className="relative" style={ouro ? { color: '#c2680a' } : undefined}>{concluido ? <Check className="h-7 w-7" strokeWidth={ouro ? 3.25 : 2.5} /> : atual ? <Star className="h-7 w-7" /> : <Lock className="h-6 w-6" />}</span>
             </button>
             {/* Rótulo com fundo próprio p/ não se misturar ao pontilhado que passa atrás. */}
             <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
@@ -194,8 +201,10 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
         <span className="mx-auto flex items-center justify-center rounded-2xl border-4" style={{ width: 56, height: 56, ...(t.done >= t.total ? { background: 'var(--brand-accent, #f59e0b)', borderColor: 'color-mix(in oklab, var(--brand-accent, #f59e0b) 70%, #000)', color: '#fff' } : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
           <Trophy className="h-6 w-6" />
         </span>
-        <div className="mt-1.5 text-xs font-semibold">Baú da trilha</div>
-        <div className="text-[11px] text-muted-foreground">{t.done >= t.total ? 'Liberado! 🎉' : `${gamAtivo && t.trilhaXp > 0 ? `+${t.trilhaXp} XP` : 'Complete a trilha'}`}</div>
+        <div className="mt-1.5 inline-block rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
+          <span className="block text-xs font-semibold">Baú da trilha</span>
+          <span className="block text-[11px] text-muted-foreground">{t.done >= t.total ? 'Liberado! 🎉' : `${gamAtivo && t.trilhaXp > 0 ? `+${t.trilhaXp} XP` : 'Complete a trilha'}`}</span>
+        </div>
       </div>
 
       {/* Card do simulado — no lado com mais espaço, alinhado ao nó */}
@@ -311,7 +320,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
               acompanha o rolamento. Cobre toda a altura da trilha; fade lateral + topo/base. */}
           {capaFundo && (
             <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-2xl" style={{ WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)' }}>
-              <img src={capaFundo} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-[center_30%] opacity-90 dark:opacity-[0.75]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)' }} />
+              <img src={capaFundo} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-[center_30%] opacity-100 dark:opacity-[0.75]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)' }} />
             </div>
           )}
           {caminho ? (
@@ -319,18 +328,25 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
           ) : (<>
           {t.nodes.map((n, i) => {
             const concluido = n.estado === 'concluido'
+            const ouro = concluido && n.acerto === 100
             const atual = n.estado === 'atual'
             return (
               <div key={n.id} data-trilha-item className="flex gap-4">
                 <div className="flex flex-col items-center pt-3">
                   <span className="relative flex shrink-0 items-center justify-center rounded-full border-4 shadow-sm"
-                    style={{ width: 52, height: 52, ...(concluido ? { background: COR, borderColor: `color-mix(in oklab, ${COR} 70%, #000)`, color: '#fff' }
+                    style={{ width: 52, height: 52, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 11px 2px rgba(250,204,21,.5), 0 5px 14px -5px rgba(217,119,6,.55)' }
+                      : concluido ? { background: '#10b981', borderColor: '#059669', color: '#fff' }
                       : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
                       : { background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
                     {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
-                    {concluido ? <Check className="h-6 w-6" /> : atual ? <Star className="h-6 w-6" /> : <Play className="h-5 w-5" />}
+                    {ouro && (<>
+                      <Crown className="pointer-events-none absolute -top-[19px] left-1/2 h-[22px] w-[19px] -translate-x-1/2" fill="#ffd24a" strokeWidth={1.75} style={{ color: '#a75d09', filter: 'drop-shadow(0 1px 2px rgba(90,45,0,.5)) drop-shadow(0 0 4px rgba(250,204,21,.55))' }} />
+                      <span className="pointer-events-none absolute inset-[3px] rounded-full" style={{ background: 'radial-gradient(circle at 50% 34%, #fff2b0 0%, #ffd93b 44%, #f2b800 100%)', boxShadow: 'inset 0 -2px 5px rgba(170,105,10,.5), inset 0 2px 3px rgba(255,255,255,.7)' }} />
+                      <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"><span className="absolute inset-0" style={{ background: 'linear-gradient(122deg, transparent 30%, rgba(255,255,255,.7) 44%, rgba(255,255,255,.2) 55%, transparent 67%)' }} /></span>
+                    </>)}
+                    <span className="relative" style={ouro ? { color: '#c2680a' } : undefined}>{concluido ? <Check className="h-6 w-6" strokeWidth={ouro ? 3 : 2.5} /> : atual ? <Star className="h-6 w-6" /> : <Play className="h-5 w-5" />}</span>
                   </span>
-                  {i < t.nodes.length - 1 && <span className="my-1 flex-1" style={{ width: 6, minHeight: 24, backgroundImage: `radial-gradient(circle, ${concluido ? COR : 'var(--border)'} 40%, transparent 44%)`, backgroundSize: '6px 12px', backgroundRepeat: 'repeat-y' }} />}
+                  {i < t.nodes.length - 1 && <span className="my-1 flex-1" style={{ width: 6, minHeight: 24, backgroundImage: `radial-gradient(circle, ${concluido ? '#10b981' : 'var(--border)'} 40%, transparent 44%)`, backgroundSize: '6px 12px', backgroundRepeat: 'repeat-y' }} />}
                 </div>
 
                 <NodeCard n={n} gamAtivo={gamAtivo} />
@@ -462,7 +478,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       {/* Fundo por grupo — capa do banco (quase às bordas), quadrada com fade em todas as bordas */}
       {segmentos.map((s) => s.capa && (
         <div key={s.id} className="pointer-events-none absolute left-1/2 z-0 -translate-x-1/2 overflow-hidden" style={{ top: s.yTop, height: Math.max(0, s.yBot - s.yTop), width: coverW, WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)' }}>
-          <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-[center_30%] opacity-90 dark:opacity-[0.75]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)' }} />
+          <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-[center_30%] opacity-100 dark:opacity-[0.75]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)' }} />
         </div>
       ))}
       {/* Conectores pontilhados — spline Catmull-Rom contínua (C1): curva fluida que passa por
