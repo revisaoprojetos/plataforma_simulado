@@ -16,21 +16,30 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
   const [titulo, setTitulo] = useState(p.titulo)
   const [cargoFx, setCargoFx] = useState(false)
   const [cargoKey, setCargoKey] = useState(0)
-  const [shards, setShards] = useState<{ sx: string; sy: string; r: string; d: string }[]>([])
+  const [shards, setShards] = useState<{ sx: string; sy: string; fall: string; r1: string; r2: string; d: string; w: number; h: number }[]>([])
 
   useEffect(() => {
     const onCargo = (e: Event) => {
       const { titulo: t } = (e as CustomEvent<{ titulo: string }>).detail
       if (t) setTitulo(t)
-      // Estilhaços da "casca" saindo em todas as direções.
-      setShards(Array.from({ length: 12 }, (_, i) => {
-        const a = (i / 12) * Math.PI * 2 + (Math.random() - 0.5) * 0.5
-        const dist = 42 + Math.random() * 46
-        return { sx: `${(Math.cos(a) * dist).toFixed(0)}px`, sy: `${(Math.sin(a) * dist * 0.7).toFixed(0)}px`, r: `${(Math.random() * 220 - 110).toFixed(0)}deg`, d: (0.34 + Math.random() * 0.14).toFixed(2) }
+      // Casca: MUITOS estilhaços estourando p/ fora e depois caindo devagar (só liberam após a carga).
+      setShards(Array.from({ length: 26 }, (_, i) => {
+        const a = (i / 26) * Math.PI * 2 + (Math.random() - 0.5) * 0.6
+        const dist = 34 + Math.random() * 52
+        return {
+          sx: `${(Math.cos(a) * dist).toFixed(0)}px`,
+          sy: `${(Math.sin(a) * dist * 0.5 - 12).toFixed(0)}px`, // viés p/ cima → depois cai
+          fall: `${(150 + Math.random() * 150).toFixed(0)}px`,
+          r1: `${(Math.random() * 160 - 80).toFixed(0)}deg`,
+          r2: `${(Math.random() * 400 - 200).toFixed(0)}deg`,
+          d: (0.7 + Math.random() * 0.35).toFixed(2),
+          w: 4 + Math.round(Math.random() * 4),
+          h: 3 + Math.round(Math.random() * 3),
+        }
       }))
       setCargoKey((k) => k + 1)
       setCargoFx(true)
-      setTimeout(() => setCargoFx(false), 2200)
+      setTimeout(() => setCargoFx(false), 3200)
     }
     window.addEventListener('nivel:cargo', onCargo)
     return () => window.removeEventListener('nivel:cargo', onCargo)
@@ -77,37 +86,32 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
       </div>
 
       <div className="relative rounded-2xl border bg-gradient-to-br from-card to-muted/30 p-5 shadow-sm">
-        {/* chip "Cargo desbloqueado!" ao voltar do level up */}
-        {cargoFx && (
-          <div key={`chip${cargoKey}`} className="pointer-events-none absolute left-1/2 top-2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-bold"
-            style={{ background: 'color-mix(in oklab, var(--brand-accent, var(--primary)) 22%, transparent)', color: 'var(--brand-accent, var(--primary))', border: '1px solid color-mix(in oklab, var(--brand-accent, var(--primary)) 45%, transparent)', animation: 'nc-cargo-chip 2.2s ease-out both' }}>
-            ✦ Cargo desbloqueado!
-          </div>
-        )}
         <div className="flex flex-col items-center gap-2">
           <span className="flex h-14 w-14 items-center justify-center rounded-full border-4 text-xl font-bold tabular-nums transition-transform"
             style={{ borderColor: 'var(--brand-primary, var(--primary))', color: 'var(--brand-primary, var(--primary))', animation: cargoFx ? 'nc-pulse 1.1s ease-out' : undefined }}>
             {nivel}
           </span>
-          <div className="relative text-center text-sm" style={cargoFx ? { animation: 'nc-line-shake .6s ease-in-out' } : undefined}>
+          <div className="relative text-center text-sm" style={cargoFx ? { animation: 'nc-line-shake .9s ease-in-out' } : undefined}>
             <span className="font-semibold">Nível {nivel}{titulo ? ' · ' : ''}</span>
             {titulo && (
-              <span className="font-semibold" style={{ color: cargoFx ? 'var(--brand-accent, var(--primary))' : undefined, textShadow: cargoFx ? '0 0 13px color-mix(in oklab, var(--brand-accent, var(--primary)) 60%, transparent)' : undefined, transition: 'color .45s ease, text-shadow .45s ease' }}>{titulo}</span>
+              <span className="font-semibold" style={{ color: cargoFx ? 'var(--brand-accent, var(--primary))' : undefined, textShadow: cargoFx ? '0 0 13px color-mix(in oklab, var(--brand-accent, var(--primary)) 60%, transparent)' : undefined, transition: 'color .5s ease, text-shadow .5s ease' }}>{titulo}</span>
             )}
             <span className="ml-2 text-xs text-muted-foreground tabular-nums">{fmt(p.xpNoNivel)} / {fmt(p.xpDoNivel)} XP</span>
 
-            {/* Casca rachando: crack + brilho passando + estilhaços (só ao trocar de cargo). */}
+            {/* Canalizando → casca estoura e cai devagar (só ao trocar de cargo). */}
             {cargoFx && (
               <span key={`fx${cargoKey}`} className="pointer-events-none absolute inset-0 z-10 block">
-                {/* rachadura */}
-                <span className="absolute left-1/2 top-1/2 h-[2px] w-[72%]" style={{ transformOrigin: 'center', background: 'linear-gradient(90deg, transparent, #fff, transparent)', animation: 'nc-crack .5s ease-out .34s both' }} />
+                {/* carga de energia (charge) crescendo antes de estourar */}
+                <span className="absolute left-1/2 top-1/2 h-8 w-8 rounded-full" style={{ background: 'radial-gradient(circle, color-mix(in oklab, var(--brand-accent, var(--primary)) 75%, transparent), transparent 70%)', filter: 'blur(2px)', animation: 'nc-charge .9s ease-in both' }} />
+                {/* rachadura (estoura ao fim da carga) */}
+                <span className="absolute left-1/2 top-1/2 h-[2px] w-[76%]" style={{ transformOrigin: 'center', background: 'linear-gradient(90deg, transparent, #fff, transparent)', animation: 'nc-crack .5s ease-out .82s both' }} />
                 {/* brilho passando pela linha */}
                 <span className="absolute inset-y-0 -inset-x-3 overflow-hidden">
-                  <span className="absolute inset-y-0 w-1/3" style={{ background: 'linear-gradient(100deg, transparent, rgba(255,255,255,.6), transparent)', animation: 'nc-sweep .8s ease-out .4s both' }} />
+                  <span className="absolute inset-y-0 w-1/3" style={{ background: 'linear-gradient(100deg, transparent, rgba(255,255,255,.6), transparent)', animation: 'nc-sweep .85s ease-out .85s both' }} />
                 </span>
-                {/* estilhaços da casca */}
+                {/* estilhaços da casca — estouram e caem devagar */}
                 {shards.map((s, i) => (
-                  <span key={i} className="absolute left-1/2 top-1/2 rounded-[1px]" style={{ width: 6, height: 3, marginLeft: -3, marginTop: -1.5, background: 'var(--brand-accent, var(--primary))', boxShadow: '0 0 6px color-mix(in oklab, var(--brand-accent, var(--primary)) 55%, transparent)', ['--sx' as any]: s.sx, ['--sy' as any]: s.sy, ['--r' as any]: s.r, animation: `nc-shard .7s ease-out ${s.d}s both` }} />
+                  <span key={i} className="absolute left-1/2 top-1/2 rounded-[1px]" style={{ width: s.w, height: s.h, marginLeft: -s.w / 2, marginTop: -s.h / 2, background: 'var(--brand-accent, var(--primary))', boxShadow: '0 0 6px color-mix(in oklab, var(--brand-accent, var(--primary)) 55%, transparent)', ['--sx' as any]: s.sx, ['--sy' as any]: s.sy, ['--fall' as any]: s.fall, ['--r1' as any]: s.r1, ['--r2' as any]: s.r2, animation: `nc-fall 2.1s cubic-bezier(.3,.4,.5,1) ${s.d}s both` }} />
                 ))}
               </span>
             )}

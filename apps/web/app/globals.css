@@ -275,13 +275,18 @@
 @keyframes lu-float { 0% { transform: translate(-50%, 0); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(-50%, -60px); opacity: 0; } }
 @keyframes lu-marchx { from { transform: translateX(0); } to { transform: translateX(12px); } }
 /* Desbloqueio de cargo no NivelCard (ao voltar do level up). */
-@keyframes nc-cargo-chip { 0% { transform: translateY(6px) scale(.9); opacity: 0; } 18% { transform: translateY(0) scale(1); opacity: 1; } 82% { opacity: 1; } 100% { transform: translateY(-6px); opacity: 0; } }
 @keyframes nc-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--brand-accent, var(--primary)) 55%, transparent); } 100% { box-shadow: 0 0 0 16px transparent; } }
-/* Tremida da linha inteira, depois "casca rachando" (estilhaços) e brilho no cargo. */
-@keyframes nc-line-shake { 0%,100% { transform: translate(0,0) } 10% { transform: translate(-3px,1px) } 22% { transform: translate(3px,-2px) } 34% { transform: translate(-4px,-1px) } 46% { transform: translate(4px,2px) } 58% { transform: translate(-3px,1px) } 70% { transform: translate(2px,-1px) } 82% { transform: translate(-1px,1px) } }
-@keyframes nc-shard { 0% { transform: translate(0,0) rotate(0deg) scale(1); opacity: 0 } 12% { opacity: 1 } 100% { transform: translate(var(--sx), var(--sy)) rotate(var(--r)) scale(.35); opacity: 0 } }
-@keyframes nc-crack { 0% { opacity: 0; transform: translate(-50%,-50%) scaleX(.15) } 22% { opacity: .95 } 100% { opacity: 0; transform: translate(-50%,-50%) scaleX(1.15) } }
-@keyframes nc-shine { 0% { background-position: 220% 0 } 100% { background-position: -80% 0 } }
+/* Tremida crescente (canalizando) → carga de energia → casca estoura e cai devagar. */
+@keyframes nc-line-shake { 0% { transform: translate(0,0) } 12% { transform: translate(-1px,0) } 24% { transform: translate(1px,-1px) } 36% { transform: translate(-2px,1px) } 48% { transform: translate(2px,-1px) } 60% { transform: translate(-3px,1px) } 70% { transform: translate(3px,-2px) } 80% { transform: translate(-4px,1px) } 88% { transform: translate(4px,-1px) } 94% { transform: translate(-2px,1px) } 100% { transform: translate(0,0) } }
+@keyframes nc-charge { 0% { opacity: 0; transform: translate(-50%,-50%) scale(.4) } 72% { opacity: .85; transform: translate(-50%,-50%) scale(1.02) } 90% { opacity: 1; transform: translate(-50%,-50%) scale(1.16) } 100% { opacity: 0; transform: translate(-50%,-50%) scale(1.55) } }
+@keyframes nc-crack { 0% { opacity: 0; transform: translate(-50%,-50%) scaleX(.12) } 30% { opacity: 1 } 100% { opacity: 0; transform: translate(-50%,-50%) scaleX(1.25) } }
+/* estilhaços: estouram para fora e depois CAEM devagar (gravidade), sumindo no fim */
+@keyframes nc-fall {
+  0% { transform: translate(0,0) rotate(0deg) scale(1); opacity: 0 }
+  10% { opacity: 1 }
+  26% { transform: translate(var(--sx), var(--sy)) rotate(var(--r1)) scale(1) }
+  100% { transform: translate(calc(var(--sx) * .55), calc(var(--sy) + var(--fall))) rotate(var(--r2)) scale(.7); opacity: 0 }
+}
 @keyframes nc-sweep { 0% { transform: translateX(-130%) } 100% { transform: translateX(340%) } }
 
 /* Celebração de XP: pontos voam de fora (--sx,--sy) até o card de nível e "somem" ao chegar. */
