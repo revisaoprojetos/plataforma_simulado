@@ -357,10 +357,8 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       y += ROW
       gi++
     })
-    const curta = t.total <= 2
-    const capa = curta
-      ? (t.nodes.find((n) => n.capaBanner)?.capaBanner ?? t.nodes.find((n) => n.capa)?.capa ?? null)
-      : (t.nodes.find((n) => n.capa)?.capa ?? t.nodes.find((n) => n.capaBanner)?.capaBanner ?? null)
+    // Sempre a capa INTEIRA do banco (capa_url = capaBanner); a do card é recortada/pequena.
+    const capa = t.nodes.find((n) => n.capaBanner)?.capaBanner ?? t.nodes.find((n) => n.capa)?.capa ?? null
     segmentos.push({ id: t.id, capa, yTop: dy - 8, yBot: y - 6 })
   })
   const chest = { off: OFFS[gi % OFFS.length], y: y + R }
