@@ -284,7 +284,11 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
       </div>
 
       <div className="relative">
-        <div ref={olRef} className="min-w-0 overflow-y-auto py-1 pr-1 transition-[max-height] duration-700 ease-out [scrollbar-width:thin]" style={{ maxHeight: maxH ?? undefined }}>
+        {/* Fundo sutil (para não ficar branco total) + textura pontilhada leve. */}
+        <div className="pointer-events-none absolute inset-0 rounded-2xl border border-border/50" style={{ background: 'color-mix(in oklab, var(--muted) 26%, transparent)', backgroundImage: 'radial-gradient(color-mix(in oklab, var(--border) 55%, transparent) 0.6px, transparent 0.6px)', backgroundSize: '18px 18px' }} />
+        {/* Linha do meio (divisória vertical) quase chegando nas bordas. */}
+        <div className="pointer-events-none absolute inset-y-8 left-1/2 w-px -translate-x-1/2" style={{ background: 'linear-gradient(180deg, transparent, color-mix(in oklab, var(--border) 85%, transparent) 12%, color-mix(in oklab, var(--border) 85%, transparent) 88%, transparent)' }} />
+        <div ref={olRef} className="relative z-[1] min-w-0 overflow-y-auto py-2 pr-1 transition-[max-height] duration-700 ease-out [scrollbar-width:thin]" style={{ maxHeight: maxH ?? undefined }}>
         <div key={ativa} className="min-w-0 space-y-0 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-700">
           {caminho ? (
             <TrilhaCaminho t={t} gamAtivo={gamAtivo} />
