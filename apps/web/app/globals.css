@@ -288,6 +288,7 @@
   100% { transform: translate(calc(var(--sx) * .55), calc(var(--sy) + var(--fall))) rotate(var(--r2)) scale(.7); opacity: 0 }
 }
 @keyframes nc-sweep { 0% { transform: translateX(-130%) } 100% { transform: translateX(340%) } }
+@keyframes nc-cargo-pop { 0% { transform: scale(.55); opacity: 0; } 60% { transform: scale(1.16); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 
 /* Celebração de XP: pontos voam de fora (--sx,--sy) até o card de nível e "somem" ao chegar. */
 @keyframes xp-para-nivel {

@@ -93,7 +93,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
         </div>
 
         {/* Badge */}
-        <div className="relative transition-all duration-500" style={{ width: bs, height: bs, animation: st.pop ? 'lu-shake .42s ease-in-out' : undefined }}>
+        <div className="relative transition-all duration-[900ms] ease-[cubic-bezier(.4,0,.2,1)]" style={{ width: bs, height: bs, animation: st.pop ? 'lu-shake .42s ease-in-out' : undefined }}>
           {/* halo pulsante */}
           <div className="absolute rounded-full blur-2xl" style={{ inset: '4%', background: `radial-gradient(circle, ${mix(55, 'transparent')}, transparent 70%)`, animation: 'lu-halo 2.6s ease-in-out infinite' }} />
           {/* órbita de acento girando */}
@@ -129,7 +129,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
           {/* disco */}
           <div className="absolute flex flex-col items-center justify-center rounded-full" style={{ inset: '13%', background: `radial-gradient(circle at 50% 26%, ${D3}, ${D2} 72%)`, border: `2px solid ${mix(55, 'transparent')}`, boxShadow: `inset 0 2px 10px rgba(255,255,255,0.10), 0 12px 34px -8px ${mix(50, 'black')}`, animation: st.pop ? 'lu-impact .5s cubic-bezier(.34,1.56,.64,1)' : 'none' }}>
             {!done && <span className="text-[11px] uppercase tracking-[0.18em]" style={{ color: L3 }}>Nível</span>}
-            <span key={st.level} className="font-black leading-none tabular-nums" style={{ fontSize: numFont, color: FG, animation: 'lu-numpop .42s cubic-bezier(.34,1.56,.64,1) both' }}>{st.level}</span>
+            <span key={st.level} className="font-black leading-none tabular-nums" style={{ fontSize: numFont, color: FG, transition: 'font-size .9s cubic-bezier(.4,0,.2,1)', animation: 'lu-numpop .42s cubic-bezier(.34,1.56,.64,1) both' }}>{st.level}</span>
             <span className="min-h-[13px] text-[10.5px] font-medium" style={{ color: '#fff' }}>{cargo(st.level)}</span>
           </div>
         </div>
@@ -151,15 +151,15 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
 
         {done && (
           <div className="flex flex-col items-center gap-2.5">
-            <h2 className="m-0 bg-clip-text text-[21px] font-black text-transparent" style={{ backgroundImage: `linear-gradient(100deg, ${FG} 42%, ${L2} 50%, ${FG} 58%)`, backgroundSize: '220% 100%', WebkitBackgroundClip: 'text', animation: 'lu-rise .45s ease both, lu-shimmer 3.2s linear .8s infinite' }}>
+            <h2 className="m-0 bg-clip-text text-[21px] font-black text-transparent" style={{ backgroundImage: `linear-gradient(100deg, ${FG} 42%, ${L2} 50%, ${FG} 58%)`, backgroundSize: '220% 100%', WebkitBackgroundClip: 'text', animation: 'lu-rise .7s ease .2s both, lu-shimmer 3.2s linear 1.1s infinite' }}>
               {span === 1 ? `Você alcançou o nível ${to}!` : `Você subiu ${span} níveis de uma vez!`}
             </h2>
-            <div className="text-[13px]" style={{ color: MUT, animation: 'lu-rise .45s ease .08s both' }}>
+            <div className="text-[13px]" style={{ color: MUT, animation: 'lu-rise .7s ease .4s both' }}>
               {span === 1 ? 'Continue assim para manter o ritmo' : `Do nível ${from} ao ${to} de uma vez`}
             </div>
 
             {st.promoted && (
-              <div className="relative w-full max-w-[440px]" style={{ animation: 'lu-rise .45s ease .16s both', WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%)', maskImage: 'linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%)' }}>
+              <div className="relative w-full max-w-[440px]" style={{ animation: 'lu-rise .7s ease .6s both', WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%)', maskImage: 'linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%)' }}>
                 {/* corpo amarelo (fade nas pontas via máscara do wrapper) — texto branco */}
                 <div className="flex items-center justify-center gap-2.5 px-6 py-3.5" style={{ background: `linear-gradient(135deg, ${amix(82, '#120d05')}, ${amix(54, '#120d05')})` }}>
                   <span className="flex h-8 w-8 items-center justify-center rounded-md" style={{ background: 'rgba(255,255,255,0.18)', color: '#fff' }}><Medal className="h-4 w-4" /></span>
@@ -183,7 +183,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
                 {gains.map((g, i) => {
                   const cor = g.cor ?? PALETA[i % PALETA.length]
                   return (
-                    <div key={i} className="flex items-center gap-2.5 rounded-lg border px-3 py-1.5 text-[12.5px]" style={{ background: SURF, borderColor: DIV, animation: `lu-rise .4s ease ${(0.2 + i * 0.05).toFixed(2)}s both` }}>
+                    <div key={i} className="flex items-center gap-2.5 rounded-lg border px-3 py-1.5 text-[12.5px]" style={{ background: SURF, borderColor: DIV, animation: `lu-rise .6s ease ${(0.8 + i * 0.14).toFixed(2)}s both` }}>
                       <span className="flex h-6 w-6 items-center justify-center rounded-md" style={{ background: `color-mix(in oklab, ${cor} 20%, transparent)`, color: cor }}>{g.icon}</span>
                       <span className="flex-1 text-left text-white">{g.label}</span>
                       <span className="whitespace-nowrap font-semibold" style={{ color: cor }}>+{g.xp} XP</span>
@@ -194,7 +194,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
             )}
 
             {unlocked.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-2" style={{ animation: 'lu-rise .45s ease .3s both' }}>
+              <div className="flex flex-wrap justify-center gap-2" style={{ animation: 'lu-rise .6s ease 1.5s both' }}>
                 {unlocked.map((u, i) => (
                   <div key={i} title={u.desc} className="flex items-center gap-2 rounded-lg border px-3 py-1.5" style={{ background: D4, borderColor: mix(40, 'transparent') }}>
                     <span style={{ color: L3 }}>{u.icon}</span>
@@ -207,14 +207,14 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
               </div>
             )}
 
-            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11.5px]" style={{ color: MUT, animation: 'lu-rise .45s ease .36s both' }}>
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11.5px]" style={{ color: MUT, animation: 'lu-rise .6s ease 1.7s both' }}>
               <span className="inline-flex items-center gap-1.5"><Zap className="h-3.5 w-3.5" style={{ color: '#fbbf24' }} />{totalXp.toLocaleString('pt-BR')} XP acumulado</span>
               <span className="inline-flex items-center gap-1.5"><Trophy className="h-3.5 w-3.5" style={{ color: '#f59e0b' }} />{badgesLabel} conquistas</span>
               <span className="inline-flex items-center gap-1.5"><Flame className="h-3.5 w-3.5" style={{ color: '#fb923c' }} />{streak} dias</span>
             </div>
 
             <button type="button" onClick={fechar} className="mt-0.5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-110"
-              style={{ background: `linear-gradient(135deg, ${A}, ${mix(78, 'black')})`, boxShadow: `0 10px 30px -8px ${mix(55, 'transparent')}`, animation: 'lu-rise .45s ease .42s both' }}>
+              style={{ background: `linear-gradient(135deg, ${A}, ${mix(78, 'black')})`, boxShadow: `0 10px 30px -8px ${mix(55, 'transparent')}`, animation: 'lu-rise .6s ease 1.95s both' }}>
               <Sparkles className="h-4 w-4" /> Continuar estudando <ArrowRight className="h-4 w-4" />
             </button>
           </div>

@@ -15,13 +15,16 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
   const [nivel, setNivel] = useState(p.nivel)
   const [titulo, setTitulo] = useState(p.titulo)
   const [cargoFx, setCargoFx] = useState(false)
+  const [revelado, setRevelado] = useState(false)
   const [cargoKey, setCargoKey] = useState(0)
   const [shards, setShards] = useState<{ sx: string; sy: string; fall: string; r1: string; r2: string; d: string; w: number; h: number }[]>([])
 
   useEffect(() => {
     const onCargo = (e: Event) => {
       const { titulo: t } = (e as CustomEvent<{ titulo: string }>).detail
-      if (t) setTitulo(t)
+      // Evolução: mantém o cargo ANTIGO canalizando/tremendo; troca só quando a rachadura estoura.
+      setRevelado(false)
+      setTimeout(() => { if (t) setTitulo(t); setRevelado(true) }, 900)
       // Casca: MUITOS estilhaços estourando p/ fora e depois caindo devagar (só liberam após a carga).
       setShards(Array.from({ length: 26 }, (_, i) => {
         const a = (i / 26) * Math.PI * 2 + (Math.random() - 0.5) * 0.6
@@ -39,7 +42,7 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
       }))
       setCargoKey((k) => k + 1)
       setCargoFx(true)
-      setTimeout(() => setCargoFx(false), 3200)
+      setTimeout(() => { setCargoFx(false); setRevelado(false) }, 3400)
     }
     window.addEventListener('nivel:cargo', onCargo)
     return () => window.removeEventListener('nivel:cargo', onCargo)
@@ -94,7 +97,7 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
           <div className="relative text-center text-sm" style={cargoFx ? { animation: 'nc-line-shake .9s ease-in-out' } : undefined}>
             <span className="font-semibold">Nível {nivel}{titulo ? ' · ' : ''}</span>
             {titulo && (
-              <span className="font-semibold" style={{ color: cargoFx ? 'var(--brand-accent, var(--primary))' : undefined, textShadow: cargoFx ? '0 0 13px color-mix(in oklab, var(--brand-accent, var(--primary)) 60%, transparent)' : undefined, transition: 'color .5s ease, text-shadow .5s ease' }}>{titulo}</span>
+              <span key={`t${cargoKey}-${revelado ? 1 : 0}`} className="inline-block font-semibold" style={{ color: revelado ? 'var(--brand-accent, var(--primary))' : undefined, textShadow: revelado ? '0 0 14px color-mix(in oklab, var(--brand-accent, var(--primary)) 62%, transparent)' : undefined, transition: 'color .5s ease, text-shadow .5s ease', animation: revelado ? 'nc-cargo-pop .6s cubic-bezier(.34,1.56,.64,1) both' : undefined }}>{titulo}</span>
             )}
             <span className="ml-2 text-xs text-muted-foreground tabular-nums">{fmt(p.xpNoNivel)} / {fmt(p.xpDoNivel)} XP</span>
 
