@@ -255,6 +255,11 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
   if (!t) return null
   const pct = t.total ? Math.round((t.done / t.total) * 100) : 0
 
+  // Mesma imagem de fundo da trilha gigante, agora por trilha na Início (1–3 → capa larga; 4+ → inteira).
+  const largaFundo = t.capa ?? t.nodes.find((n) => n.capaBanner)?.capaBanner ?? null
+  const normalFundo = t.capaCard ?? t.nodes.find((n) => n.capa)?.capa ?? null
+  const capaFundo = t.total > 3 ? (normalFundo ?? largaFundo) : (largaFundo ?? normalFundo)
+
   return (
     <section className="space-y-4">
       <div>
@@ -288,6 +293,12 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
       <div className="relative">
         {/* Fundo cinza sutil + fade na base (quebra a divisão com a divisória de baixo). */}
         <div className="pointer-events-none absolute inset-0 rounded-2xl" style={{ background: 'color-mix(in oklab, var(--muted) 68%, transparent)', WebkitMaskImage: 'linear-gradient(180deg, #000 0%, #000 80%, transparent 100%)', maskImage: 'linear-gradient(180deg, #000 0%, #000 80%, transparent 100%)' }} />
+        {/* Imagem de fundo do banco (mesma da trilha gigante), por trilha ativa; fade lateral + base. */}
+        {capaFundo && (
+          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl" style={{ WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)' }}>
+            <img src={capaFundo} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-[center_30%]" style={{ opacity: 0.5, WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 26px, #000 78%, transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 26px, #000 78%, transparent 100%)' }} />
+          </div>
+        )}
         <div ref={olRef} className="trilha-scroll relative z-[1] min-w-0 overflow-y-auto py-2 pr-1 transition-[max-height] duration-700 ease-out" style={{ maxHeight: maxH ?? undefined }}>
         <div key={ativa} className="min-w-0 space-y-0 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-700">
           {caminho ? (
