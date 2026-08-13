@@ -313,7 +313,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
       const nota = notas.length ? Math.max(...notas) : null
       return { id: i.id, titulo: i.titulo, quando: i.quando, estado, acerto, nota, tentativas: notas.length, statusLabel: i.statusLabel, questoes: cntQ.get(i.id) ?? 0, xp: baseXp, href, acao, capa, capaBanner, cadernoUrl: i.enunciadoUrl ?? null }
     })
-    return { id: g.id, nome: g.nome, cor: g.cor ?? null, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: baseXp * nodes.length, nodes }
+    return { id: g.id, nome: g.nome, cor: g.cor ?? null, capa: (g as any).capa ?? null, capaCard: (g as any).capaCard ?? null, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: baseXp * nodes.length, nodes }
   }).filter((tr) => tr.nodes.length > 0)
 
   const chest = gamConfig?.xp_regras.chest
