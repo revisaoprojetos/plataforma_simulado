@@ -92,7 +92,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
                 </div>
 
                 {/* Card do simulado (hover: info desliza, ações aparecem à direita, card expande) */}
-                <div className={cn('group relative mb-4 w-full max-w-3xl flex-1 overflow-hidden rounded-2xl border bg-card p-4 text-center shadow-sm transition-all duration-200 hover:shadow-md motion-safe:hover:scale-[1.02]',
+                <div className={cn('group relative mb-4 mr-8 flex-1 overflow-hidden rounded-2xl border bg-card p-4 text-center shadow-sm transition-all duration-200 hover:shadow-md motion-safe:hover:scale-[1.02]',
                   atual && 'border-primary/40')}>
                   {/* Info */}
                   <div className="transition-transform duration-300 ease-out group-hover:-translate-x-3">
