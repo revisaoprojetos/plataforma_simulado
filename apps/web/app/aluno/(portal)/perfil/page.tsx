@@ -54,7 +54,7 @@ export default async function PerfilAlunoPage() {
 
   // Nível (anel) — reaproveita o cálculo do resumo.
   const prog = gamResumo?.progresso
-  const raio = 42, circ = 2 * Math.PI * raio
+  const raio = 50, circ = 2 * Math.PI * raio
   const dash = prog ? circ * (prog.pct / 100) : 0
 
   // Ligas (divisões) por XP total, ordenadas — para a faixa "Ranking e divisões".
@@ -63,7 +63,7 @@ export default async function PerfilAlunoPage() {
   return (
     <div className="animate-page space-y-6">
       {/* ── Cabeçalho: avatar + nível, dados, barra de XP e chips ── */}
-      <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/[0.10] via-card to-card px-6 pb-6 pt-9 shadow-sm sm:px-8">
+      <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/[0.10] via-card to-card px-6 pb-5 pt-7 shadow-sm sm:px-7">
         <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 h-64 w-64 rounded-full bg-primary/25 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--brand-accent) 75%, transparent), transparent)' }} />
 
@@ -75,20 +75,20 @@ export default async function PerfilAlunoPage() {
 
         <div className="relative flex flex-col items-center text-center">
           {/* Avatar com anel de nível + badge Nv */}
-          <div className="relative h-[124px] w-[124px]">
+          <div className="relative h-[144px] w-[144px]">
             {prog ? (
-              <svg viewBox="0 0 124 124" className="absolute inset-0 h-full w-full -rotate-90">
-                <circle cx="62" cy="62" r={raio} fill="none" stroke="color-mix(in oklab, var(--muted-foreground) 22%, transparent)" strokeWidth="6" />
-                <circle cx="62" cy="62" r={raio} fill="none" stroke="var(--brand-primary, var(--primary))" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${dash} ${circ}`} className="transition-all duration-700" />
+              <svg viewBox="0 0 144 144" className="absolute inset-0 h-full w-full -rotate-90">
+                <circle cx="72" cy="72" r={raio} fill="none" stroke="color-mix(in oklab, var(--muted-foreground) 22%, transparent)" strokeWidth="7" />
+                <circle cx="72" cy="72" r={raio} fill="none" stroke="var(--brand-primary, var(--primary))" strokeWidth="7" strokeLinecap="round" strokeDasharray={`${dash} ${circ}`} className="transition-all duration-700" />
               </svg>
             ) : null}
-            <span className="absolute inset-[16px] flex items-center justify-center rounded-full bg-white text-3xl font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais(nome)}</span>
+            <span className="absolute inset-[18px] flex items-center justify-center rounded-full bg-white text-4xl font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais(nome)}</span>
             {prog && (
-              <span className="absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-primary/40 bg-background px-2.5 py-0.5 text-[11px] font-bold text-primary shadow-sm">Nv {prog.nivel}</span>
+              <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full border border-primary/40 bg-background px-2.5 py-0.5 text-[11px] font-bold text-primary shadow-sm">Nv {prog.nivel}</span>
             )}
           </div>
 
-          <h1 className="mt-4 truncate text-2xl font-bold tracking-tight sm:text-[2rem]">{nome}</h1>
+          <h1 className="mt-2 truncate text-2xl font-bold tracking-tight sm:text-[2rem]">{nome}</h1>
 
           <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
             {contatos.map((c, i) => (
@@ -98,7 +98,7 @@ export default async function PerfilAlunoPage() {
 
           {/* Barra de XP do nível */}
           {prog && (
-            <div className="mt-4 w-full max-w-md">
+            <div className="mt-3 w-full max-w-md">
               <div className="h-2 overflow-hidden rounded-full ring-1 ring-black/10 dark:ring-white/10" style={{ background: 'color-mix(in oklab, var(--brand-primary, var(--primary)) 16%, transparent)' }}>
                 <div className="h-full rounded-full transition-all duration-700" style={{ width: `${prog.pct}%`, background: 'var(--brand-primary, var(--primary))' }} />
               </div>
