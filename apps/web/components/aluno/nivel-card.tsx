@@ -21,8 +21,9 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
 
   useEffect(() => {
     const onCargo = (e: Event) => {
-      const { titulo: t } = (e as CustomEvent<{ titulo: string }>).detail
-      // Evolução: mantém o cargo ANTIGO canalizando/tremendo; troca só quando a rachadura estoura.
+      const { anterior, titulo: t } = (e as CustomEvent<{ anterior?: string; titulo: string }>).detail
+      // Evolução: mostra o cargo ANTIGO canalizando/tremendo; troca p/ o novo só quando a rachadura estoura.
+      if (anterior) setTitulo(anterior)
       setRevelado(false)
       setTimeout(() => { if (t) setTitulo(t); setRevelado(true) }, 900)
       // Casca: MUITOS estilhaços estourando p/ fora e depois caindo devagar (só liberam após a carga).

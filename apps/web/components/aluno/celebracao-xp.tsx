@@ -190,8 +190,9 @@ export function CelebracaoXp() {
         const de = progressoNivel(xpAcumuladoParaNivel(m.to, m.curva), m.curva)
         window.dispatchEvent(new CustomEvent('nivel:encher', { detail: { de, para } }))
         const cargoDepois = tituloParaNivel(m.to, m.curva.titulos)
-        if (cargoDepois && cargoDepois !== tituloParaNivel(m.from, m.curva.titulos)) {
-          window.dispatchEvent(new CustomEvent('nivel:cargo', { detail: { titulo: cargoDepois } }))
+        const cargoAntes = tituloParaNivel(m.from, m.curva.titulos)
+        if (cargoDepois && cargoDepois !== cargoAntes) {
+          window.dispatchEvent(new CustomEvent('nivel:cargo', { detail: { anterior: cargoAntes, titulo: cargoDepois } }))
         }
         const alvo = document.querySelector('[data-nivel-alvo]') as HTMLElement | null
         const reduz = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
