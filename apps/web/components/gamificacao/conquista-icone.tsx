@@ -19,11 +19,9 @@ function Flecha({ className }: { className?: string }) {
 export function ConquistaIconeFx({ icone, className = 'h-5 w-5' }: { icone: string; className?: string }) {
   if (icone === 'flame') {
     return (
-      <svg viewBox="0 0 24 24" className="ico-flame-svg" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round" aria-hidden>
-        {/* Contorno (vazado): corpo em gota com fundo redondo + línguas menores no topo. */}
-        <path className="flame-t1" d="M12 3.5 C 15.5 8 17.5 11 17.5 14.5 A5.5 5.5 0 0 1 6.5 14.5 C 6.5 11 8.5 8 12 3.5 Z" />
-        <path className="flame-t2" d="M9.2 5 C 10.4 7 10.8 8.4 10.8 9.8 A2 2 0 0 1 6.8 9.8 C 6.8 8.2 7.8 6.6 9.2 5 Z" />
-        <path className="flame-t3" d="M14.8 5 C 13.6 7 13.2 8.4 13.2 9.8 A2 2 0 0 0 17.2 9.8 C 17.2 8.2 16.2 6.6 14.8 5 Z" />
+      <svg viewBox="0 0 24 24" className="ico-flame-svg" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        {/* Contorno ÚNICO (vazado), base redonda — sem sobreposição. Flicker de fogo no hover. */}
+        <path className="flame-path" d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
       </svg>
     )
   }

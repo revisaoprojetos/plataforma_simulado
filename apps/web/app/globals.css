@@ -489,16 +489,18 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 /* Chama preenchida com 3 LÍNGUAS de fogo independentes: cada uma sobe/encolhe em ritmo
    próprio (origem na base), então o TOPO muda de forma o tempo todo como fogo real. */
 .ico-flame-svg { width: 2rem; height: 2rem; overflow: visible; }
-.ico-flame-svg path { transform-box: fill-box; transform-origin: 50% 100%; }
-.group:hover .ico-flame-svg .flame-t1 { animation: flame-t1 .55s ease-in-out infinite; }
-.group:hover .ico-flame-svg .flame-t2 { animation: flame-t2 .43s ease-in-out infinite; }
-.group:hover .ico-flame-svg .flame-t3 { animation: flame-t3 .49s ease-in-out infinite; }
-/* Corpo: respira de leve mantendo o fundo redondo (sem skew). Línguas: flicker forte no topo. */
-@keyframes flame-t1 { 0%,100% { transform: scaleY(1)   scaleX(1); } 50% { transform: scaleY(1.1)  scaleX(.98); } }
-@keyframes flame-t2 { 0%,100% { transform: scaleY(.8)  scaleX(1); } 45% { transform: scaleY(1.35) scaleX(.85) translateX(-1px); } 70% { transform: scaleY(1) scaleX(1); } }
-@keyframes flame-t3 { 0%,100% { transform: scaleY(1)   scaleX(1); } 40% { transform: scaleY(.7)  scaleX(1.1); } 65% { transform: scaleY(1.3) scaleX(.9) translateX(1px); } }
+.ico-flame-svg .flame-path { transform-box: fill-box; transform-origin: 50% 100%; }
+/* Flicker de fogo: base fixa, topo dança (scaleY/scaleX/skew em passos irregulares). */
+.group:hover .ico-flame-svg .flame-path { animation: flame-lick .5s ease-in-out infinite; }
+@keyframes flame-lick {
+  0%,100% { transform: scaleY(1)    scaleX(1)   skewX(0deg); }
+  15%     { transform: scaleY(1.2)  scaleX(.92) skewX(-6deg); }
+  35%     { transform: scaleY(.93)  scaleX(1.07) skewX(5deg); }
+  55%     { transform: scaleY(1.15) scaleX(.95) skewX(-4deg); }
+  78%     { transform: scaleY(.97)  scaleX(1.04) skewX(3deg); }
+}
 @media (prefers-reduced-motion: reduce) {
-  .group:hover .ico-flame-svg path { animation: none !important; }
+  .group:hover .ico-flame-svg .flame-path { animation: none !important; }
 }
 
 /* Raio caindo: despenca do alto, "atinge" e pisca algumas vezes. */
@@ -517,39 +519,40 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .ico-arw { position: absolute; left: 50%; top: 50%; width: 9px; height: 12px; margin: -6px 0 0 -4.5px; opacity: 0; pointer-events: none; }
 /* 4 flechas cravando alternadamente: cada lado solta uma em CIMA e uma EMBAIXO,
    alternando entre esquerda e direita (LU → RU → LD → RD). */
-@keyframes arw-lu { /* esquerda, em cima */
-  0%   { opacity: 0; transform: translate(-17px, 4px) rotate(42deg) scale(.7); }
-  16%  { opacity: 1; }
-  36%  { transform: translate(-6px, -5px) rotate(42deg) scale(1); }
-  64%  { opacity: 1; transform: translate(-6px, -5px) rotate(42deg) scale(1); }
-  74%  { opacity: 0; }
-  100% { opacity: 0; transform: translate(-6px, -5px) rotate(42deg); }
+/* Voo MUITO RÁPIDO (chega em ~14% do ciclo) e para seco no escudo, ficando grudada. */
+@keyframes arw-lu { /* esquerda, em cima (agora um pouco mais para baixo) */
+  0%   { opacity: 0; transform: translate(-22px, 6px) rotate(42deg) scale(.7); }
+  6%   { opacity: 1; }
+  14%  { transform: translate(-6px, -1px) rotate(42deg) scale(1); }
+  70%  { opacity: 1; transform: translate(-6px, -1px) rotate(42deg) scale(1); }
+  78%  { opacity: 0; }
+  100% { opacity: 0; transform: translate(-6px, -1px) rotate(42deg); }
 }
 @keyframes arw-ld { /* esquerda, embaixo */
-  0%   { opacity: 0; transform: translate(-18px, 16px) rotate(42deg) scale(.7); }
-  16%  { opacity: 1; }
-  36%  { transform: translate(-7px, 6px) rotate(42deg) scale(1); }
-  64%  { opacity: 1; transform: translate(-7px, 6px) rotate(42deg) scale(1); }
-  74%  { opacity: 0; }
-  100% { opacity: 0; transform: translate(-7px, 6px) rotate(42deg); }
+  0%   { opacity: 0; transform: translate(-23px, 18px) rotate(42deg) scale(.7); }
+  6%   { opacity: 1; }
+  14%  { transform: translate(-7px, 7px) rotate(42deg) scale(1); }
+  70%  { opacity: 1; transform: translate(-7px, 7px) rotate(42deg) scale(1); }
+  78%  { opacity: 0; }
+  100% { opacity: 0; transform: translate(-7px, 7px) rotate(42deg); }
 }
-@keyframes arw-ru { /* direita, em cima */
-  0%   { opacity: 0; transform: translate(17px, 4px) rotate(-42deg) scale(.7); }
-  16%  { opacity: 1; }
-  36%  { transform: translate(6px, -5px) rotate(-42deg) scale(1); }
-  64%  { opacity: 1; transform: translate(6px, -5px) rotate(-42deg) scale(1); }
-  74%  { opacity: 0; }
-  100% { opacity: 0; transform: translate(6px, -5px) rotate(-42deg); }
+@keyframes arw-ru { /* direita, em cima (um pouco mais para baixo) */
+  0%   { opacity: 0; transform: translate(22px, 6px) rotate(-42deg) scale(.7); }
+  6%   { opacity: 1; }
+  14%  { transform: translate(6px, -1px) rotate(-42deg) scale(1); }
+  70%  { opacity: 1; transform: translate(6px, -1px) rotate(-42deg) scale(1); }
+  78%  { opacity: 0; }
+  100% { opacity: 0; transform: translate(6px, -1px) rotate(-42deg); }
 }
 @keyframes arw-rd { /* direita, embaixo */
-  0%   { opacity: 0; transform: translate(18px, 16px) rotate(-42deg) scale(.7); }
-  16%  { opacity: 1; }
-  36%  { transform: translate(7px, 6px) rotate(-42deg) scale(1); }
-  64%  { opacity: 1; transform: translate(7px, 6px) rotate(-42deg) scale(1); }
-  74%  { opacity: 0; }
-  100% { opacity: 0; transform: translate(7px, 6px) rotate(-42deg); }
+  0%   { opacity: 0; transform: translate(23px, 18px) rotate(-42deg) scale(.7); }
+  6%   { opacity: 1; }
+  14%  { transform: translate(7px, 7px) rotate(-42deg) scale(1); }
+  70%  { opacity: 1; transform: translate(7px, 7px) rotate(-42deg) scale(1); }
+  78%  { opacity: 0; }
+  100% { opacity: 0; transform: translate(7px, 7px) rotate(-42deg); }
 }
-.group:hover .ico-arw-lu { animation: arw-lu 1.6s ease-in infinite; }
-.group:hover .ico-arw-ru { animation: arw-ru 1.6s ease-in infinite; animation-delay: .4s; }
-.group:hover .ico-arw-ld { animation: arw-ld 1.6s ease-in infinite; animation-delay: .8s; }
-.group:hover .ico-arw-rd { animation: arw-rd 1.6s ease-in infinite; animation-delay: 1.2s; }
+.group:hover .ico-arw-lu { animation: arw-lu 1.8s cubic-bezier(.12,.9,.2,1) infinite; }
+.group:hover .ico-arw-ru { animation: arw-ru 1.8s cubic-bezier(.12,.9,.2,1) infinite; animation-delay: .45s; }
+.group:hover .ico-arw-ld { animation: arw-ld 1.8s cubic-bezier(.12,.9,.2,1) infinite; animation-delay: .9s; }
+.group:hover .ico-arw-rd { animation: arw-rd 1.8s cubic-bezier(.12,.9,.2,1) infinite; animation-delay: 1.35s; }
