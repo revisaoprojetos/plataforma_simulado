@@ -343,8 +343,8 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
   // Layout: percorre grupos empilhando divisória + nós, guardando as posições.
   const nodesL: { n: TrilhaNode; off: number; y: number }[] = []
   const dividers: { id: string; nome: string; done: number; total: number; y: number }[] = []
-  // Fundo por grupo: capa comprida (banner) p/ trilhas curtas (≤2), capa normal (pôster) p/ maiores.
-  const segmentos: { id: string; capa: string | null; yTop: number; yBot: number }[] = []
+  // Fundo por grupo: capa INTEIRA do banco (capa_url); começa abaixo da divisória e termina antes da próxima.
+  const segMeta: { id: string; capa: string | null; dy: number }[] = []
   let y = PAD, gi = 0
   trilhas.forEach((t, ti) => {
     if (ti > 0) y += GAP_GRUPO
@@ -357,11 +357,15 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       y += ROW
       gi++
     })
-    // Sempre a capa INTEIRA do banco (capa_url = capaBanner); a do card é recortada/pequena.
     const capa = t.nodes.find((n) => n.capaBanner)?.capaBanner ?? t.nodes.find((n) => n.capa)?.capa ?? null
-    segmentos.push({ id: t.id, capa, yTop: dy - 8, yBot: y - 6 })
+    segMeta.push({ id: t.id, capa, dy })
   })
   const chest = { off: OFFS[gi % OFFS.length], y: y + R }
+  const segmentos = segMeta.map((s, i) => ({
+    id: s.id, capa: s.capa,
+    yTop: s.dy + 30,                                                         // abaixo da divisória do grupo
+    yBot: (i < segMeta.length - 1 ? segMeta[i + 1].dy - 16 : chest.y - 40),   // antes da próxima divisória (ou do baú)
+  }))
   const height = chest.y + R + 48
   const allPts = [...nodesL.map((x) => ({ off: x.off, y: x.y, estado: x.n.estado })), { off: chest.off, y: chest.y, estado: 'disponivel' as const }]
 
@@ -371,15 +375,28 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
   const side = openPt && openPt.off > 0 ? 'left' : 'right'
   const cardRef = useCliqueForaFechar(!!open, setAberto)
 
+  // Mede a largura da coluna p/ as capas de fundo chegarem quase às bordas.
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [larguraCol, setLarguraCol] = useState(0)
+  useEffect(() => {
+    const el = rootRef.current?.parentElement
+    if (!el) return
+    const ro = new ResizeObserver(() => setLarguraCol(el.clientWidth))
+    ro.observe(el)
+    setLarguraCol(el.clientWidth)
+    return () => ro.disconnect()
+  }, [])
+  const coverW = larguraCol > LANE ? Math.min(larguraCol - 20, 1200) : LANE
+
   if (!nodesL.length) return null
 
   return (
-    <div className="relative mx-auto" style={{ width: LANE, height }}>
-      {/* Fundo por grupo — capa do banco bem apagada, só p/ diferenciar cada trilha */}
+    <div ref={rootRef} className="relative mx-auto" style={{ width: LANE, height }}>
+      {/* Fundo por grupo — capa do banco bem apagada (quase às bordas), só p/ diferenciar cada trilha */}
       {segmentos.map((s) => s.capa && (
-        <div key={s.id} className="pointer-events-none absolute left-0 z-0 overflow-hidden rounded-2xl" style={{ top: s.yTop, height: Math.max(0, s.yBot - s.yTop), width: LANE }}>
+        <div key={s.id} className="pointer-events-none absolute left-1/2 z-0 -translate-x-1/2 overflow-hidden rounded-2xl" style={{ top: s.yTop, height: Math.max(0, s.yBot - s.yTop), width: coverW }}>
           <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-center" style={{ opacity: 0.08 }} />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent, color-mix(in oklab, var(--background) 40%, transparent))' }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent, color-mix(in oklab, var(--background) 35%, transparent))' }} />
         </div>
       ))}
       {/* Conectores pontilhados — contínuos, inclusive entre grupos */}
