@@ -131,11 +131,11 @@ const LANE = 300, ROW = 150, R = 30, PAD = 34
 const OFFS = [0, 66, 98, 66, 0, -66, -98, -66]
 
 function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
-  const atualId = t.nodes.find((n) => n.estado === 'atual')?.id ?? t.nodes[0]?.id ?? null
-  const [aberto, setAberto] = useState<string | null>(atualId)
+  // Início: nenhum card aberto ao entrar — só abre quando o aluno clica em um nó.
+  const [aberto, setAberto] = useState<string | null>(null)
   const cx = (off: number) => LANE / 2 + off
   const pts = t.nodes.map((_, i) => ({ off: OFFS[i % OFFS.length], y: PAD + i * ROW + R }))
-  const chest = { off: OFFS[t.nodes.length % OFFS.length], y: PAD + t.nodes.length * ROW + R }
+  const chest = { off: 0, y: PAD + t.nodes.length * ROW + R } // baú centralizado (não fica sob o card lateral)
   const height = chest.y + R + 48
   const allPts = [...pts, chest]
   const openIdx = t.nodes.findIndex((n) => n.id === aberto)
@@ -419,7 +419,9 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
     }
     segMeta.push({ id: t.id, capa: capaFundoTrilha(t), dy, total: t.total })
   })
-  const chest = { off: waveOff(gi), y: y + R }
+  // Baú SEMPRE centralizado (off 0): é só o marcador de fim e, no centro, nunca fica sob o card
+  // lateral do último simulado (que abre em LANE+20).
+  const chest = { off: 0, y: y + R }
   const segmentos = segMeta.map((s, i) => ({
     id: s.id, capa: s.capa,
     yTop: s.dy + 20,                                                        // logo abaixo da divisória do grupo
