@@ -14,6 +14,20 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
   const barRef = useRef<HTMLDivElement>(null)
   const [nivel, setNivel] = useState(p.nivel)
   const [titulo, setTitulo] = useState(p.titulo)
+  const [cargoFx, setCargoFx] = useState(false)
+  const [cargoKey, setCargoKey] = useState(0)
+
+  useEffect(() => {
+    const onCargo = (e: Event) => {
+      const { titulo: t } = (e as CustomEvent<{ titulo: string }>).detail
+      if (t) setTitulo(t)
+      setCargoKey((k) => k + 1)
+      setCargoFx(true)
+      setTimeout(() => setCargoFx(false), 2200)
+    }
+    window.addEventListener('nivel:cargo', onCargo)
+    return () => window.removeEventListener('nivel:cargo', onCargo)
+  }, [])
 
   useEffect(() => {
     const onEncher = (e: Event) => {
@@ -55,14 +69,24 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
         </p>
       </div>
 
-      <div className="rounded-2xl border bg-gradient-to-br from-card to-muted/30 p-5 shadow-sm">
+      <div className="relative rounded-2xl border bg-gradient-to-br from-card to-muted/30 p-5 shadow-sm">
+        {/* chip "Cargo desbloqueado!" ao voltar do level up */}
+        {cargoFx && (
+          <div key={`chip${cargoKey}`} className="pointer-events-none absolute left-1/2 top-2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-bold"
+            style={{ background: 'color-mix(in oklab, var(--brand-accent, var(--primary)) 22%, transparent)', color: 'var(--brand-accent, var(--primary))', border: '1px solid color-mix(in oklab, var(--brand-accent, var(--primary)) 45%, transparent)', animation: 'nc-cargo-chip 2.2s ease-out both' }}>
+            ✦ Cargo desbloqueado!
+          </div>
+        )}
         <div className="flex flex-col items-center gap-2">
           <span className="flex h-14 w-14 items-center justify-center rounded-full border-4 text-xl font-bold tabular-nums transition-transform"
-            style={{ borderColor: 'var(--brand-primary, var(--primary))', color: 'var(--brand-primary, var(--primary))' }}>
+            style={{ borderColor: 'var(--brand-primary, var(--primary))', color: 'var(--brand-primary, var(--primary))', animation: cargoFx ? 'nc-pulse 1.1s ease-out' : undefined }}>
             {nivel}
           </span>
           <div className="text-center text-sm">
-            <span className="font-semibold">Nível {nivel}{titulo ? ` · ${titulo}` : ''}</span>
+            <span className="font-semibold">Nível {nivel}{titulo ? ' · ' : ''}</span>
+            {titulo && (
+              <span key={`c${cargoKey}`} className="inline-block font-semibold" style={cargoFx ? { animation: 'nc-cargo .7s cubic-bezier(.34,1.56,.64,1) both', color: 'var(--brand-accent, var(--primary))', textShadow: '0 0 12px color-mix(in oklab, var(--brand-accent, var(--primary)) 55%, transparent)' } : undefined}>{titulo}</span>
+            )}
             <span className="ml-2 text-xs text-muted-foreground tabular-nums">{fmt(p.xpNoNivel)} / {fmt(p.xpDoNivel)} XP</span>
           </div>
           {/* alvo das partículas de XP = a própria barra */}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ClipboardList, Zap, Award, Flame, Gift, Route, Target } from 'lucide-react'
-import { progressoNivel, xpAcumuladoParaNivel } from '@/lib/gamificacao/niveis'
+import { progressoNivel, xpAcumuladoParaNivel, tituloParaNivel } from '@/lib/gamificacao/niveis'
 import { LevelUpModal, type GanhoXp } from '@/components/aluno/level-up-modal'
 import type { NivelCurva } from '@/lib/gamificacao/config'
 
@@ -25,6 +25,25 @@ const COR: Record<string, string> = {
   simulado: '#38bdf8', missao: '#34d399', conquista: '#fbbf24', streak: '#fb923c', chest: '#a78bfa', pratica: '#22d3ee', trilha: '#f472b6',
 }
 
+// Monta as partículas (origem por tipo: 'missao' → card de missões; demais → canto sup. direito).
+function montarParticulas(novos: Evento[]): Particula[] {
+  const sum = novos.reduce((a, e) => a + e.xp, 0) || 1
+  const topRight = { x: window.innerWidth - 36, y: 30 }
+  const missaoEl = document.querySelector('[data-missoes-card]') as HTMLElement | null
+  const missaoPt = missaoEl ? (() => { const m = missaoEl.getBoundingClientRect(); return { x: m.left + m.width / 2, y: m.top + m.height / 2 } })() : topRight
+  const pontoDe = (origem: string) => (origem === 'missao' ? missaoPt : topRight)
+  const porOrigem = new Map<string, number>()
+  for (const e of novos) porOrigem.set(e.origem, (porOrigem.get(e.origem) ?? 0) + e.xp)
+  const totalN = Math.min(46, 16 + Math.round(sum / 3))
+  const out: Particula[] = []
+  for (const [origem, xp] of porOrigem) {
+    const p = pontoDe(origem)
+    const cnt = Math.max(6, Math.round(totalN * (xp / sum)))
+    for (let i = 0; i < cnt; i++) out.push({ sx: p.x + (Math.random() - 0.5) * 90, sy: p.y + (Math.random() - 0.5) * 70, delay: Math.random() * 650, dur: 1600 + Math.random() * 600, curva: (Math.random() - 0.5) * 180 })
+  }
+  return out
+}
+
 /**
  * Orquestra a celebração de XP na Início:
  *  - Se o aluno SUBIU de nível (ou é o 1º acesso pós-deploy com XP acumulado) → modal de Level Up
@@ -37,7 +56,7 @@ export function CelebracaoXp() {
   const [modo, setModo] = useState<
     | null
     | { tipo: 'particulas'; particulas: Particula[]; xp: number }
-    | { tipo: 'levelup'; from: number; to: number; curva: NivelCurva; gains: GanhoXp[]; xpGanho: number; totalXp: number; streak: number; badges: string; logo: string | null }
+    | { tipo: 'levelup'; from: number; to: number; curva: NivelCurva; gains: GanhoXp[]; xpGanho: number; totalXp: number; streak: number; badges: string; logo: string | null; novos: Evento[] }
   >(null)
   const alvoRef = useRef<HTMLElement | null>(null)
   const spanRefs = useRef<(HTMLSpanElement | null)[]>([])
@@ -84,7 +103,7 @@ export function CelebracaoXp() {
           if (cancelado) return false
           marcar(novos)
           try { localStorage.setItem(nivelKey, String(atual)) } catch {}
-          setModo({ tipo: 'levelup', from: stored, to: atual, curva, gains, xpGanho, totalXp: r.xpTotal, streak: r.streak ?? 0, badges: `${r.badges?.unlocked ?? 0} de ${r.badges?.total ?? 0}`, logo: r.logo ?? null })
+          setModo({ tipo: 'levelup', from: stored, to: atual, curva, gains, xpGanho, totalXp: r.xpTotal, streak: r.streak ?? 0, badges: `${r.badges?.unlocked ?? 0} de ${r.badges?.total ?? 0}`, logo: r.logo ?? null, novos })
           return true
         }
 
@@ -104,24 +123,9 @@ export function CelebracaoXp() {
         window.dispatchEvent(new CustomEvent('nivel:encher', { detail: { de, para } }))
         if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return true
 
-        const topRight = { x: window.innerWidth - 36, y: 30 }
-        const missaoEl = document.querySelector('[data-missoes-card]') as HTMLElement | null
-        const missaoPt = missaoEl ? (() => { const m = missaoEl.getBoundingClientRect(); return { x: m.left + m.width / 2, y: m.top + m.height / 2 } })() : topRight
-        const pontoDe = (origem: string) => (origem === 'missao' ? missaoPt : topRight)
-        const porOrigem = new Map<string, number>()
-        for (const e of novos) porOrigem.set(e.origem, (porOrigem.get(e.origem) ?? 0) + e.xp)
-        const totalN = Math.min(46, 16 + Math.round(sum / 3))
-        const particulas: Particula[] = []
-        for (const [origem, xp] of porOrigem) {
-          const p = pontoDe(origem)
-          const cnt = Math.max(6, Math.round(totalN * (xp / sum)))
-          for (let i = 0; i < cnt; i++) {
-            particulas.push({ sx: p.x + (Math.random() - 0.5) * 90, sy: p.y + (Math.random() - 0.5) * 70, delay: Math.random() * 650, dur: 1600 + Math.random() * 600, curva: (Math.random() - 0.5) * 180 })
-          }
-        }
         alvoRef.current = alvo
         spanRefs.current = []
-        setModo({ tipo: 'particulas', particulas, xp: sum })
+        setModo({ tipo: 'particulas', particulas: montarParticulas(novos), xp: sum })
         return true
       } catch { return false }
     }
@@ -178,7 +182,28 @@ export function CelebracaoXp() {
   if (!modo || typeof document === 'undefined') return null
 
   if (modo.tipo === 'levelup') {
-    return <LevelUpModal from={modo.from} to={modo.to} curva={modo.curva} gains={modo.gains} unlocked={[]} xpGanho={modo.xpGanho} totalXp={modo.totalXp} streak={modo.streak} badgesLabel={modo.badges} logo={modo.logo} onClose={() => setModo(null)} />
+    const m = modo
+    // Ao fechar o level-up: volta para a Início com XP voando p/ a barra + desbloqueio do cargo.
+    const aoFechar = () => {
+      try {
+        const para = progressoNivel(m.totalXp, m.curva)
+        const de = progressoNivel(xpAcumuladoParaNivel(m.to, m.curva), m.curva)
+        window.dispatchEvent(new CustomEvent('nivel:encher', { detail: { de, para } }))
+        const cargoDepois = tituloParaNivel(m.to, m.curva.titulos)
+        if (cargoDepois && cargoDepois !== tituloParaNivel(m.from, m.curva.titulos)) {
+          window.dispatchEvent(new CustomEvent('nivel:cargo', { detail: { titulo: cargoDepois } }))
+        }
+        const alvo = document.querySelector('[data-nivel-alvo]') as HTMLElement | null
+        const reduz = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        if (alvo && m.novos.length && !reduz) {
+          alvoRef.current = alvo; spanRefs.current = []
+          setModo({ tipo: 'particulas', particulas: montarParticulas(m.novos), xp: m.novos.reduce((a, e) => a + e.xp, 0) })
+          return
+        }
+      } catch {}
+      setModo(null)
+    }
+    return <LevelUpModal from={m.from} to={m.to} curva={m.curva} gains={m.gains} unlocked={[]} xpGanho={m.xpGanho} totalXp={m.totalXp} streak={m.streak} badgesLabel={m.badges} logo={m.logo} onClose={aoFechar} />
   }
 
   return createPortal(
