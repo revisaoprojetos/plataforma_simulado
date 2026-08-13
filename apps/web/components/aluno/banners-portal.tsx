@@ -114,6 +114,8 @@ export function BannersPortal({ banners, simulados = [], stats }: { banners: Ban
   function fecharPopup() {
     if (popup && (popup.freq ?? 'login') === 'uma_vez') { try { localStorage.setItem('popup-visto-' + popup.id, '1') } catch {} }
     setPopup(null)
+    // Avisa a celebração de XP/level-up para só aparecer DEPOIS do pop-up de entrada.
+    try { window.dispatchEvent(new CustomEvent('portal:popup-fechado')) } catch {}
   }
 
   // Fecha no Esc enquanto o pop-up estiver aberto.
@@ -141,7 +143,7 @@ export function BannersPortal({ banners, simulados = [], stats }: { banners: Ban
       )}
 
       {popup && typeof document !== 'undefined' && createPortal(
-        <div role="dialog" aria-modal="true" aria-label={popup.titulo ?? 'Aviso'}
+        <div role="dialog" aria-modal="true" aria-label={popup.titulo ?? 'Aviso'} data-portal-popup
           className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={fecharPopup}>
           <PopupCard banner={popup} onFechar={fecharPopup} />
         </div>,

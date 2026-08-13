@@ -31,7 +31,8 @@ export async function GET() {
       svc.from('simulado_tenants').select('tema').eq('id', sessao.tenantId).maybeSingle(),
     ])
     const tema = (tenantRow?.tema ?? {}) as any
-    const logo = tema.logo_dark_url || tema.logo_url || null
+    // Prioriza a "logo grande" configurada na Aparência; cai na logo normal se não houver.
+    const logo = tema.logo_grande_url || tema.logo_dark_url || tema.logo_url || null
 
     const eventos = ((evs ?? []) as any[])
       .filter((e) => Number(e.xp) > 0)

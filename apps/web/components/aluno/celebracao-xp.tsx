@@ -52,6 +52,15 @@ export function CelebracaoXp() {
 
     const marcar = (novos: Evento[]) => { for (const e of novos) { try { localStorage.setItem(`xpceleb:${e.chave}`, '1') } catch {} } }
 
+    // Espera o pop-up de entrada (banner pós-login) fechar antes de mostrar a celebração.
+    const aguardarPopup = (): Promise<void> => new Promise((resolve) => {
+      if (cancelado || typeof document === 'undefined' || !document.querySelector('[data-portal-popup]')) return resolve()
+      let done = false
+      const fim = () => { if (done) return; done = true; window.removeEventListener('portal:popup-fechado', fim); clearTimeout(t); setTimeout(resolve, 350) }
+      window.addEventListener('portal:popup-fechado', fim)
+      const t = setTimeout(fim, 20000)
+    })
+
     const rodar = async (): Promise<boolean> => {
       try {
         const r = await fetch('/api/aluno/gamificacao/celebracao').then((x) => x.json())
@@ -71,6 +80,8 @@ export function CelebracaoXp() {
           for (const e of novos) porOrigem.set(e.origem, (porOrigem.get(e.origem) ?? 0) + e.xp)
           const gains: GanhoXp[] = [...porOrigem.entries()].map(([origem, xp]) => ({ icon: ICO[origem] ?? <Zap className="h-4 w-4" />, label: LABEL[origem] ?? 'XP', xp, cor: COR[origem] }))
           const xpGanho = gains.length ? gains.reduce((a, g) => a + g.xp, 0) : Math.max(0, r.xpTotal - xpAcumuladoParaNivel(stored, curva))
+          await aguardarPopup()
+          if (cancelado) return false
           marcar(novos)
           try { localStorage.setItem(nivelKey, String(atual)) } catch {}
           setModo({ tipo: 'levelup', from: stored, to: atual, curva, gains, xpGanho, totalXp: r.xpTotal, streak: r.streak ?? 0, badges: `${r.badges?.unlocked ?? 0} de ${r.badges?.total ?? 0}`, logo: r.logo ?? null })
@@ -87,6 +98,8 @@ export function CelebracaoXp() {
         const sum = novos.reduce((a, e) => a + e.xp, 0)
         const de = progressoNivel(Math.max(0, r.xpTotal - sum), curva)
         const para = progressoNivel(r.xpTotal, curva)
+        await aguardarPopup()
+        if (cancelado) return false
         marcar(novos)
         window.dispatchEvent(new CustomEvent('nivel:encher', { detail: { de, para } }))
         if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return true
