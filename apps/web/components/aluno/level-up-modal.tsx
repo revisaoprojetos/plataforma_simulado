@@ -13,6 +13,9 @@ const A = 'var(--brand-primary, var(--primary))'
 const mix = (pct: number, com: string) => `color-mix(in oklab, ${A} ${pct}%, ${com})`
 const C100 = mix(30, 'white'), C200 = mix(55, 'white'), C300 = mix(70, 'white')
 const C700 = mix(80, 'black'), C800 = mix(68, 'black'), C900 = mix(55, 'black')
+// Paleta ESCURA fixa da celebração (não usa tokens do tema claro/escuro — sempre fundo escuro).
+const BG = '#0b0b14', FG = '#f4f4f8', MUT = '#9a9aad'
+const SURF = 'rgba(255,255,255,0.05)', DIV = 'rgba(255,255,255,0.10)', TRACK = 'rgba(255,255,255,0.12)'
 
 type Confete = { left: string; size: string; color: string; radius: string; dur: string; delay: string }
 type St = { level: number; fill: number; playing: boolean; done: boolean; badgePop: boolean; promoted: string | null; confetti: Confete[]; flash: boolean; shaking: boolean; xpShown: number; xpTarget: number }
@@ -67,14 +70,19 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
   const stepsArr: { label: number; hasLine: boolean; lineColor: string; bg: string; border: string; color: string }[] = []
   for (let l = from; l <= to; l++) {
     const passou = st.level >= l
-    stepsArr.push({ label: l, hasLine: l > from, lineColor: passou ? C700 : 'var(--border)', bg: passou ? C800 : 'transparent', border: passou ? C700 : 'var(--border)', color: passou ? C100 : 'var(--muted-foreground)' })
+    stepsArr.push({ label: l, hasLine: l > from, lineColor: passou ? C700 : DIV, bg: passou ? C800 : 'transparent', border: passou ? C700 : DIV, color: passou ? C100 : MUT })
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex overflow-auto" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+    <div className="fixed inset-0 z-[200] flex overflow-auto" style={{ background: BG, color: FG }}>
       {/* Backdrop: glow + raios */}
       <div className="pointer-events-none fixed inset-0" style={{ background: `radial-gradient(circle at 50% 40%, ${C900} 0%, transparent 52%)`, animation: 'lvl-glow 3.2s ease-in-out infinite' }} />
       <div className="pointer-events-none fixed" style={{ left: '50%', top: '40%', width: 960, height: 960, margin: '-480px 0 0 -480px', background: `repeating-conic-gradient(from 0deg, transparent 0deg 26deg, ${mix(32, 'transparent')} 26deg 30deg)`, WebkitMaskImage: 'radial-gradient(circle, black 0%, transparent 60%)', maskImage: 'radial-gradient(circle, black 0%, transparent 60%)', animation: 'lvl-spin 46s linear infinite' }} />
+
+      {/* Embers (fagulhas subindo) */}
+      {Array.from({ length: 14 }).map((_, i) => (
+        <div key={`e${i}`} className="pointer-events-none fixed rounded-full" style={{ bottom: '-2vh', left: `${4 + i * 7 + (i % 3) * 2}%`, width: 3 + (i % 4), height: 3 + (i % 4), background: i % 2 ? C700 : mix(50, 'black'), filter: 'blur(1px)', animation: `lvl-ember ${5 + (i % 5)}s linear ${(i * 0.6).toFixed(1)}s infinite` }} />
+      ))}
 
       {/* Confete */}
       {st.confetti.map((c, i) => (
@@ -94,10 +102,10 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
           {/* Badge cluster */}
           <div className="relative transition-transform duration-300" style={{ width: 230, height: 230, transform: `scale(${st.badgePop ? 1.28 : 1})`, transitionTimingFunction: 'cubic-bezier(.34,1.56,.64,1)' }}>
             <div className="absolute inset-0 rounded-full" style={{ border: `1px dashed ${C800}`, animation: 'lvl-spin 24s linear infinite' }} />
-            <div className="absolute rounded-full" style={{ inset: 8, border: '1px dashed var(--border)', animation: 'lvl-spin-rev 34s linear infinite' }} />
+            <div className="absolute rounded-full" style={{ inset: 8, border: `1px dashed ${DIV}`, animation: 'lvl-spin-rev 34s linear infinite' }} />
             {/* XP ring */}
             <svg viewBox="0 0 230 230" className="absolute inset-0" style={{ transform: 'rotate(-90deg)' }}>
-              <circle cx="115" cy="115" r="96" fill="none" stroke="var(--muted)" strokeWidth="9" />
+              <circle cx="115" cy="115" r="96" fill="none" stroke={TRACK} strokeWidth="9" />
               <circle cx="115" cy="115" r="96" fill="none" stroke={A} strokeWidth="9" strokeLinecap="round" strokeDasharray={dash}
                 style={{ transition: `stroke-dasharray ${multi ? '.72s' : '1s'} cubic-bezier(.05,.75,.15,1)`, filter: st.fill >= 100 ? `drop-shadow(0 0 12px ${C700})` : 'none' }} />
             </svg>
@@ -133,10 +141,10 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
 
           {st.done && (
             <div className="flex flex-col items-center gap-3">
-              <h2 className="m-0 bg-clip-text text-2xl font-extrabold text-transparent" style={{ backgroundImage: `linear-gradient(100deg, var(--foreground) 40%, ${C200} 50%, var(--foreground) 60%)`, backgroundSize: '200% 100%', WebkitBackgroundClip: 'text', animation: 'lvl-rise .5s ease both, lvl-shimmer 3s linear 1s infinite' }}>
+              <h2 className="m-0 bg-clip-text text-2xl font-extrabold text-transparent" style={{ backgroundImage: `linear-gradient(100deg, ${FG} 40%, ${C200} 50%, ${FG} 60%)`, backgroundSize: '200% 100%', WebkitBackgroundClip: 'text', animation: 'lvl-rise .5s ease both, lvl-shimmer 3s linear 1s infinite' }}>
                 {span === 1 ? `Você alcançou o nível ${to}!` : `Você subiu ${span} níveis de uma vez!`}
               </h2>
-              <div className="text-sm" style={{ color: 'var(--muted-foreground)', animation: 'lvl-rise .5s ease .1s both' }}>
+              <div className="text-sm" style={{ color: MUT, animation: 'lvl-rise .5s ease .1s both' }}>
                 {span === 1 ? 'Continue para manter a sequência' : `Do nível ${from} ao ${to}`}
               </div>
 
@@ -153,9 +161,9 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
               {gains.length > 0 && (
                 <div className="flex w-[340px] max-w-[86vw] flex-col gap-1.5" style={{ animation: 'lvl-rise .5s ease .25s both' }}>
                   {gains.map((g, i) => (
-                    <div key={i} className="flex items-center gap-2.5 rounded-lg border px-3 py-2 text-[13px]" style={{ background: 'color-mix(in oklab, var(--card) 75%, transparent)', borderColor: 'var(--border)' }}>
+                    <div key={i} className="flex items-center gap-2.5 rounded-lg border px-3 py-2 text-[13px]" style={{ background: SURF, borderColor: DIV }}>
                       <span className="w-[18px] text-center" style={{ color: C300 }}>{g.icon}</span>
-                      <span className="flex-1 text-left text-muted-foreground">{g.label}</span>
+                      <span className="flex-1 text-left" style={{ color: MUT }}>{g.label}</span>
                       <span className="whitespace-nowrap font-medium" style={{ color: C200 }}>+{g.xp} XP</span>
                     </div>
                   ))}
@@ -176,7 +184,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
                 </div>
               )}
 
-              <div className="flex gap-4 text-xs" style={{ color: 'var(--muted-foreground)', animation: 'lvl-rise .5s ease .35s both' }}>
+              <div className="flex gap-4 text-xs" style={{ color: MUT, animation: 'lvl-rise .5s ease .35s both' }}>
                 <span className="inline-flex items-center gap-1.5"><Zap className="h-3.5 w-3.5" style={{ color: C300 }} />{totalXp.toLocaleString('pt-BR')} XP acumulado</span>
                 <span className="inline-flex items-center gap-1.5"><Medal className="h-3.5 w-3.5" style={{ color: C300 }} />{badgesLabel} conquistas</span>
                 <span className="inline-flex items-center gap-1.5"><Flame className="h-3.5 w-3.5" style={{ color: C300 }} />{streak} dias</span>
@@ -188,7 +196,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
               </button>
             </div>
           )}
-          {st.playing && <div className="text-[13px] uppercase tracking-[0.1em]" style={{ color: 'var(--muted-foreground)' }}>Ganhando XP…</div>}
+          {st.playing && <div className="text-[13px] uppercase tracking-[0.1em]" style={{ color: MUT }}>Ganhando XP…</div>}
         </div>
       </div>
     </div>,
@@ -197,7 +205,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
 }
 
 function makeConfetti(count: number): Confete[] {
-  const ramp = [A, C300, C700, C200, 'var(--muted-foreground)']
+  const ramp = [A, C300, C700, C200, '#c9c9d6']
   return Array.from({ length: count }, (_, i) => ({
     left: (rand(i, 'l') * 100).toFixed(1) + '%',
     size: (5 + rand(i, 's') * 8).toFixed(0) + 'px',
