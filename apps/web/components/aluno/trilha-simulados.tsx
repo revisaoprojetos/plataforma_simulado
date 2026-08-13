@@ -346,7 +346,9 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
   // Só quando fica MUITO grande (>16 nós) encurta um pouco p/ não virar um comprimento absurdo.
   const compacto = flat.length > 16
   const rowH = compacto ? 132 : 178
-  const offs = compacto ? [0, 86, 122, 86, 0, -86, -122, -86] : [0, 94, 132, 94, 0, -94, -132, -94]
+  // Zigue-zague amplo e dinâmico: cruza o eixo a cada nó (centro → extremo → centro → outro
+  // extremo), gerando o dobro de curvas que a onda suave e um raio horizontal bem maior.
+  const offs = compacto ? [0, 132, 0, -132] : [0, 154, 0, -154]
 
   // Layout: percorre grupos empilhando divisória + nós, guardando as posições.
   const nodesL: { n: TrilhaNode; off: number; y: number }[] = []
@@ -359,19 +361,27 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
     const dy = y
     dividers.push({ id: t.id, nome: t.nome, done: t.done, total: t.total, y: dy })
     y += GAP_HDR
-    t.nodes.forEach((n) => {
-      // Grupo com um único simulado → fica centralizado no eixo (off 0), no meio da coluna;
-      // a fluidez horizontal continua pelos conectores que passam por ele.
-      const off = t.nodes.length === 1 ? 0 : offs[gi % offs.length]
-      nodesL.push({ n, off, y: y + R })
-      // Regra anti-colisão: o passo vertical nunca deixa o rótulo (título + linha de status)
-      // deste nó alcançar o ícone do próximo — cresce conforme o texto ocupa mais linhas.
-      const linhas = Math.min(2, Math.max(1, Math.ceil((n.titulo?.length ?? 0) / 20)))
-      const alturaRotulo = 46 + (linhas - 1) * 16
-      const passoMin = 2 * R + alturaRotulo + 22
-      y += Math.max(rowH, passoMin)
+    if (t.nodes.length === 1) {
+      // Grupo com um único simulado → ícone centralizado no eixo (off 0) E verticalmente no meio
+      // da faixa do grupo (espaço simétrico acima/abaixo), seguindo só a fluidez horizontal.
+      const VPAD = 66
+      y += VPAD
+      nodesL.push({ n: t.nodes[0], off: 0, y: y + R })
+      y += 2 * R + VPAD
       gi++
-    })
+    } else {
+      t.nodes.forEach((n) => {
+        const off = offs[gi % offs.length]
+        nodesL.push({ n, off, y: y + R })
+        // Regra anti-colisão: o passo vertical nunca deixa o rótulo (título + linha de status)
+        // deste nó alcançar o ícone do próximo — cresce conforme o texto ocupa mais linhas.
+        const linhas = Math.min(2, Math.max(1, Math.ceil((n.titulo?.length ?? 0) / 20)))
+        const alturaRotulo = 46 + (linhas - 1) * 16
+        const passoMin = 2 * R + alturaRotulo + 22
+        y += Math.max(rowH, passoMin)
+        gi++
+      })
+    }
     // 1–3 simulados → imagem LARGA (capa_url); 4+ → imagem NORMAL/inteira (capa_card_url).
     const inteira = t.total > 3
     const larga = t.capa ?? t.nodes.find((n) => n.capaBanner)?.capaBanner ?? null
@@ -455,17 +465,18 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
         const bloqueado = n.estado === 'disponivel'
         const sel = n.id === aberto
         return (
-          <div key={n.id} className="absolute z-[1] -translate-x-1/2 text-center" style={{ left: cx(off), top: cyv - R, width: 200 }}>
+          <div key={n.id} className="absolute z-[1] flex w-max max-w-[260px] -translate-x-1/2 flex-col items-center text-center" style={{ left: cx(off), top: cyv - R }}>
             <button type="button" data-trilha-node onClick={() => setAberto(n.id)} aria-label={n.titulo}
-              className={cn('relative mx-auto flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
+              className={cn('relative flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
               style={{ width: R * 2, height: R * 2, ...(concluido ? { background: COR, borderColor: `color-mix(in oklab, ${COR} 70%, #000)`, color: '#fff' }
                 : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
                 : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
               {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
               {concluido ? <Check className="h-7 w-7" /> : atual ? <Star className="h-7 w-7" /> : <Play className="h-6 w-6" />}
             </button>
+            {/* Rótulo cresce lateralmente (largura por conteúdo, teto 260px); título no máx. 2 linhas. */}
             <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
-              <span className={cn('block text-xs font-semibold leading-snug', bloqueado && 'text-muted-foreground')}>{n.titulo}</span>
+              <span className={cn('block text-xs font-semibold leading-snug [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden', bloqueado && 'text-muted-foreground')} title={n.titulo}>{n.titulo}</span>
               <span className="block text-[11px] text-muted-foreground">
                 {concluido ? `Concluído${n.acerto != null ? ` · ${n.acerto}%` : ''}` : (n.quando ?? 'Disponível')}
               </span>
