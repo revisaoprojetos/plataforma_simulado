@@ -72,8 +72,6 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
     <div className="fixed inset-0 z-[200] flex overflow-hidden" style={{ background: 'radial-gradient(circle at 50% 34%, #1a1730 0%, #0b0912 62%)', color: FG, animation: 'lu-in .3s ease both' }}>
       {/* Fundo: auroras + estrelas (contidas) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        {/* logo grande do tenant (Aparência) como marca-d'água de fundo */}
-        {logo && <img src={logo} alt="" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none" style={{ width: 'min(80vw, 900px)', maxHeight: '78vh', objectFit: 'contain', opacity: 0.08, filter: 'grayscale(1) brightness(1.7)', animation: 'lu-halo 8s ease-in-out infinite' }} />}
         <div className="absolute rounded-full blur-3xl" style={{ left: '18%', top: '10%', width: 520, height: 520, background: mix(45, 'transparent'), opacity: 0.5, animation: 'lu-aurora1 14s ease-in-out infinite' }} />
         <div className="absolute rounded-full blur-3xl" style={{ right: '12%', top: '30%', width: 460, height: 460, background: mix(35, 'transparent'), opacity: 0.4, animation: 'lu-aurora2 18s ease-in-out infinite' }} />
         {Array.from({ length: 34 }).map((_, i) => (
