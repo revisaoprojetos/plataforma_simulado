@@ -18,9 +18,9 @@ export function LigaPainel({ ligas, ligaAtual, xpTotal, proximaNome, faltam }: {
           const on = l.id === ligaAtual
           return (
             <div key={l.id} className="flex flex-1 flex-col items-center gap-1">
-              <span className={`flex h-9 w-9 items-center justify-center rounded-full border ${on ? 'ring-2 ring-primary/40' : ''}`}
-                style={{ background: on ? `color-mix(in oklab, ${l.cor} 18%, transparent)` : 'var(--muted)', color: on ? l.cor : 'var(--muted-foreground)', borderColor: on ? l.cor : 'transparent' }}>
-                <Shield className="h-4 w-4" />
+              <span className={`flex h-9 w-9 items-center justify-center rounded-full border transition-transform ${on ? 'scale-110' : ''}`}
+                style={{ background: on ? `color-mix(in oklab, ${l.cor} 26%, transparent)` : 'transparent', borderColor: on ? `color-mix(in oklab, ${l.cor} 95%, transparent)` : 'var(--border)', boxShadow: on ? `0 0 11px color-mix(in oklab, ${l.cor} 55%, transparent)` : undefined }}>
+                <Shield className="h-4 w-4" fill={l.cor} style={{ color: `color-mix(in oklab, ${l.cor} 68%, #000)`, opacity: on ? 1 : 0.9 }} />
               </span>
               <span className={`text-[9px] font-medium uppercase ${on ? 'text-foreground' : 'text-muted-foreground/70'}`}>{l.nome}</span>
             </div>

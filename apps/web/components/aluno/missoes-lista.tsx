@@ -24,7 +24,7 @@ export function MissoesLista({ missoes, renova }: { missoes: MissaoView[]; renov
                   <span className="shrink-0 text-xs font-semibold text-primary">+{m.def.xp} XP</span>
                 </div>
                 <div className="mt-1 flex items-center gap-2">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted-foreground/20">
                     <div className={`h-full rounded-full transition-all ${m.completa ? 'bg-emerald-500' : 'bg-primary'}`} style={{ width: `${pct}%` }} />
                   </div>
                   <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{Math.min(m.progresso, m.def.meta)}/{m.def.meta}</span>

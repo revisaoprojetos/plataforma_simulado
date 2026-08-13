@@ -316,6 +316,18 @@
   0%, 100% { box-shadow: 0 12px 28px -8px rgba(0,0,0,.35), 0 0 0 0 color-mix(in oklab, var(--brand-primary, var(--primary)) 50%, transparent); }
   50% { box-shadow: 0 12px 28px -8px rgba(0,0,0,.35), 0 0 22px 6px color-mix(in oklab, var(--brand-primary, var(--primary)) 34%, transparent); }
 }
+/* Gamificação — chama dos dias ativos da sequência: bruxuleia (escala + leve giro). */
+@keyframes streak-flame {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.16) rotate(-5deg); }
+  55% { transform: scale(1.05) rotate(4deg); }
+  80% { transform: scale(1.12) rotate(-2deg); }
+}
+/* Gamificação — ícone de conquista no hover: balança e pulsa. */
+@keyframes conquista-wiggle {
+  0%, 100% { transform: scale(1.1) rotate(-6deg); }
+  50% { transform: scale(1.18) rotate(6deg); }
+}
 /* Modelo PADRÃO de entrada dos cards: sobe 16px + fade, curva suave (.2,.8,.2,1). */
 @keyframes riseIn {
   from { opacity: 0; transform: translateY(16px); }
