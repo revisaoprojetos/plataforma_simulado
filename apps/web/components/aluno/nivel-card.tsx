@@ -16,11 +16,18 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
   const [titulo, setTitulo] = useState(p.titulo)
   const [cargoFx, setCargoFx] = useState(false)
   const [cargoKey, setCargoKey] = useState(0)
+  const [shards, setShards] = useState<{ sx: string; sy: string; r: string; d: string }[]>([])
 
   useEffect(() => {
     const onCargo = (e: Event) => {
       const { titulo: t } = (e as CustomEvent<{ titulo: string }>).detail
       if (t) setTitulo(t)
+      // Estilhaços da "casca" saindo em todas as direções.
+      setShards(Array.from({ length: 12 }, (_, i) => {
+        const a = (i / 12) * Math.PI * 2 + (Math.random() - 0.5) * 0.5
+        const dist = 42 + Math.random() * 46
+        return { sx: `${(Math.cos(a) * dist).toFixed(0)}px`, sy: `${(Math.sin(a) * dist * 0.7).toFixed(0)}px`, r: `${(Math.random() * 220 - 110).toFixed(0)}deg`, d: (0.34 + Math.random() * 0.14).toFixed(2) }
+      }))
       setCargoKey((k) => k + 1)
       setCargoFx(true)
       setTimeout(() => setCargoFx(false), 2200)
@@ -82,12 +89,28 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
             style={{ borderColor: 'var(--brand-primary, var(--primary))', color: 'var(--brand-primary, var(--primary))', animation: cargoFx ? 'nc-pulse 1.1s ease-out' : undefined }}>
             {nivel}
           </span>
-          <div className="text-center text-sm">
+          <div className="relative text-center text-sm" style={cargoFx ? { animation: 'nc-line-shake .6s ease-in-out' } : undefined}>
             <span className="font-semibold">Nível {nivel}{titulo ? ' · ' : ''}</span>
             {titulo && (
-              <span key={`c${cargoKey}`} className="inline-block font-semibold" style={cargoFx ? { animation: 'nc-cargo .7s cubic-bezier(.34,1.56,.64,1) both', color: 'var(--brand-accent, var(--primary))', textShadow: '0 0 12px color-mix(in oklab, var(--brand-accent, var(--primary)) 55%, transparent)' } : undefined}>{titulo}</span>
+              <span className="font-semibold" style={{ color: cargoFx ? 'var(--brand-accent, var(--primary))' : undefined, textShadow: cargoFx ? '0 0 13px color-mix(in oklab, var(--brand-accent, var(--primary)) 60%, transparent)' : undefined, transition: 'color .45s ease, text-shadow .45s ease' }}>{titulo}</span>
             )}
             <span className="ml-2 text-xs text-muted-foreground tabular-nums">{fmt(p.xpNoNivel)} / {fmt(p.xpDoNivel)} XP</span>
+
+            {/* Casca rachando: crack + brilho passando + estilhaços (só ao trocar de cargo). */}
+            {cargoFx && (
+              <span key={`fx${cargoKey}`} className="pointer-events-none absolute inset-0 z-10 block">
+                {/* rachadura */}
+                <span className="absolute left-1/2 top-1/2 h-[2px] w-[72%]" style={{ transformOrigin: 'center', background: 'linear-gradient(90deg, transparent, #fff, transparent)', animation: 'nc-crack .5s ease-out .34s both' }} />
+                {/* brilho passando pela linha */}
+                <span className="absolute inset-y-0 -inset-x-3 overflow-hidden">
+                  <span className="absolute inset-y-0 w-1/3" style={{ background: 'linear-gradient(100deg, transparent, rgba(255,255,255,.6), transparent)', animation: 'nc-sweep .8s ease-out .4s both' }} />
+                </span>
+                {/* estilhaços da casca */}
+                {shards.map((s, i) => (
+                  <span key={i} className="absolute left-1/2 top-1/2 rounded-[1px]" style={{ width: 6, height: 3, marginLeft: -3, marginTop: -1.5, background: 'var(--brand-accent, var(--primary))', boxShadow: '0 0 6px color-mix(in oklab, var(--brand-accent, var(--primary)) 55%, transparent)', ['--sx' as any]: s.sx, ['--sy' as any]: s.sy, ['--r' as any]: s.r, animation: `nc-shard .7s ease-out ${s.d}s both` }} />
+                ))}
+              </span>
+            )}
           </div>
           {/* alvo das partículas de XP = a própria barra */}
           <div data-nivel-alvo className="h-2.5 w-full max-w-md overflow-hidden rounded-full ring-1 ring-black/10 dark:ring-white/10" style={{ background: 'color-mix(in oklab, var(--brand-primary, var(--primary)) 16%, transparent)' }}>

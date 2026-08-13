@@ -275,9 +275,14 @@
 @keyframes lu-float { 0% { transform: translate(-50%, 0); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(-50%, -60px); opacity: 0; } }
 @keyframes lu-marchx { from { transform: translateX(0); } to { transform: translateX(12px); } }
 /* Desbloqueio de cargo no NivelCard (ao voltar do level up). */
-@keyframes nc-cargo { 0% { transform: scale(.7); opacity: 0; } 55% { transform: scale(1.14); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 @keyframes nc-cargo-chip { 0% { transform: translateY(6px) scale(.9); opacity: 0; } 18% { transform: translateY(0) scale(1); opacity: 1; } 82% { opacity: 1; } 100% { transform: translateY(-6px); opacity: 0; } }
 @keyframes nc-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--brand-accent, var(--primary)) 55%, transparent); } 100% { box-shadow: 0 0 0 16px transparent; } }
+/* Tremida da linha inteira, depois "casca rachando" (estilhaços) e brilho no cargo. */
+@keyframes nc-line-shake { 0%,100% { transform: translate(0,0) } 10% { transform: translate(-3px,1px) } 22% { transform: translate(3px,-2px) } 34% { transform: translate(-4px,-1px) } 46% { transform: translate(4px,2px) } 58% { transform: translate(-3px,1px) } 70% { transform: translate(2px,-1px) } 82% { transform: translate(-1px,1px) } }
+@keyframes nc-shard { 0% { transform: translate(0,0) rotate(0deg) scale(1); opacity: 0 } 12% { opacity: 1 } 100% { transform: translate(var(--sx), var(--sy)) rotate(var(--r)) scale(.35); opacity: 0 } }
+@keyframes nc-crack { 0% { opacity: 0; transform: translate(-50%,-50%) scaleX(.15) } 22% { opacity: .95 } 100% { opacity: 0; transform: translate(-50%,-50%) scaleX(1.15) } }
+@keyframes nc-shine { 0% { background-position: 220% 0 } 100% { background-position: -80% 0 } }
+@keyframes nc-sweep { 0% { transform: translateX(-130%) } 100% { transform: translateX(340%) } }
 
 /* Celebração de XP: pontos voam de fora (--sx,--sy) até o card de nível e "somem" ao chegar. */
 @keyframes xp-para-nivel {
