@@ -20,10 +20,12 @@ export interface MissoesConfig { modo: 'todas' | 'rodizio'; por_dia: number }
 export type ConquistaRegraTipo = 'xp_total' | 'streak' | 'simulados_concluidos' | 'nota_max'
 export interface ConquistaDef { id: string; titulo: string; descricao: string; icone: string; cor?: string; regra: { tipo: ConquistaRegraTipo; meta: number }; xp: number }
 
+export type TrilhaEstilo = 'cards' | 'caminho'
 export interface GamConfig {
   tenantId: string
   ativo: boolean
   timezone: string
+  trilha_estilo: TrilhaEstilo
   xp_regras: XpRegras
   nivel_curva: NivelCurva
   ligas: LigaDef[]
@@ -105,6 +107,7 @@ export const DEFAULT_CONQUISTAS: ConquistaDef[] = [
 export const DEFAULT_CONFIG = {
   ativo: false,
   timezone: 'America/Sao_Paulo',
+  trilha_estilo: 'cards' as TrilhaEstilo,
   xp_regras: DEFAULT_XP_REGRAS,
   nivel_curva: DEFAULT_NIVEL_CURVA,
   ligas: DEFAULT_LIGAS,
@@ -140,6 +143,7 @@ export const getGamConfig = cache(async (svc: any, tenantId: string | null): Pro
     tenantId,
     ativo: r.ativo === true,
     timezone: r.timezone || DEFAULT_CONFIG.timezone,
+    trilha_estilo: (r.trilha_estilo === 'caminho' ? 'caminho' : 'cards') as TrilhaEstilo,
     xp_regras: {
       simulado: { ...DEFAULT_XP_REGRAS.simulado, ...(xr.simulado ?? {}) },
       pratica: { ...DEFAULT_XP_REGRAS.pratica, ...(xr.pratica ?? {}) },

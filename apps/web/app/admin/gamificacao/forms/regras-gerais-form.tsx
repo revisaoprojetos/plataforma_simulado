@@ -4,8 +4,9 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { Power, Flame, Gift, Shield, CalendarDays, Target, Clock, Sparkles } from 'lucide-react'
-import type { GamConfig } from '@/lib/gamificacao/config'
+import { Power, Flame, Gift, Shield, CalendarDays, Target, Clock, Sparkles, Route, Check } from 'lucide-react'
+import type { GamConfig, TrilhaEstilo } from '@/lib/gamificacao/config'
+import { cn } from '@/lib/utils'
 import { salvarRegrasGerais } from '../actions'
 import { NumberField, TextField, SaveBar } from './_campos'
 import { useUnsavedGuard } from '@/components/admin/use-unsaved-guard'
@@ -40,16 +41,22 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
   const [chest, setChest] = useState(config.xp_regras.chest)
   const [fimSemana, setFimSemana] = useState(config.xp_regras.fim_semana)
   const [metaDia, setMetaDia] = useState(config.xp_regras.meta_dia)
+  const [trilhaEstilo, setTrilhaEstilo] = useState<TrilhaEstilo>(config.trilha_estilo)
   const [salvando, start] = useTransition()
-  const { dirty, markSaved } = useUnsavedGuard({ ativo, timezone, streak, chest, fimSemana, metaDia })
+  const { dirty, markSaved } = useUnsavedGuard({ ativo, timezone, streak, chest, fimSemana, metaDia, trilhaEstilo })
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     start(async () => {
-      const r = await salvarRegrasGerais({ ativo, timezone, streak, chest, fim_semana: fimSemana, meta_dia: metaDia })
-      if (r?.error) toast.error(r.error); else { toast.success('Regras gerais salvas.'); markSaved() }
+      const r: any = await salvarRegrasGerais({ ativo, timezone, streak, chest, fim_semana: fimSemana, meta_dia: metaDia, trilha_estilo: trilhaEstilo })
+      if (r?.error) toast.error(r.error); else { toast.success(r?.aviso ?? 'Regras gerais salvas.'); markSaved() }
     })
   }
+
+  const ESTILOS: { v: TrilhaEstilo; nome: string; desc: string }[] = [
+    { v: 'cards', nome: 'Cards', desc: 'Cards largos com capa do banco, hover revela ações.' },
+    { v: 'caminho', nome: 'Caminho (Duolingo)', desc: 'Nós centrais em caminho vertical, com desbloqueio em sequência.' },
+  ]
   const dis = !podeGerenciar
 
   return (
@@ -100,7 +107,33 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
         </RuleCard>
       </div>
 
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Sparkles className="h-3.5 w-3.5" /> O bônus de fim de semana e a meta diária valem para XP de simulados e prática. A meta diária depende da migração 20260812000003.</p>
+      {/* Estilo (designer) da trilha no portal do aluno */}
+      <div className="rounded-2xl border bg-card p-5 shadow-sm">
+        <div className="mb-3 flex items-start gap-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: 'color-mix(in oklab, #6366f1 18%, transparent)', color: '#6366f1' }}><Route style={{ width: 18, height: 18 }} /></span>
+          <div>
+            <h3 className="text-sm font-semibold leading-tight">Estilo da trilha</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">Como a trilha de simulados aparece na Início do aluno.</p>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {ESTILOS.map((e) => {
+            const on = trilhaEstilo === e.v
+            return (
+              <button key={e.v} type="button" disabled={dis} onClick={() => setTrilhaEstilo(e.v)}
+                className={cn('rounded-xl border p-3 text-left transition-colors', on ? 'border-primary/50 bg-primary/[0.06]' : 'hover:bg-muted/50', dis && 'cursor-not-allowed opacity-60')}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold">{e.nome}</span>
+                  {on ? <span className="inline-flex items-center gap-1 text-xs font-medium text-primary"><Check className="h-3.5 w-3.5" /> selecionado</span> : <span className="text-[11px] text-muted-foreground">selecionar</span>}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{e.desc}</p>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Sparkles className="h-3.5 w-3.5" /> O bônus de fim de semana e a meta diária valem para XP de simulados e prática. A meta diária depende da migração 20260812000003; o estilo da trilha, da 20260813000000.</p>
     </form>
   )
 }

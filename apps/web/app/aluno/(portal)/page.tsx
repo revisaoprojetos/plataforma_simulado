@@ -339,7 +339,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
             </div>
           )}
 
-          {trilhas.length > 0 && <TrilhaSimulados trilhas={trilhas} gamAtivo={!!gamResumo} />}
+          {trilhas.length > 0 && <TrilhaSimulados trilhas={trilhas} gamAtivo={!!gamResumo} estilo={gamConfig?.trilha_estilo ?? 'cards'} />}
 
           <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} recentes={recentes} />
         </div>
