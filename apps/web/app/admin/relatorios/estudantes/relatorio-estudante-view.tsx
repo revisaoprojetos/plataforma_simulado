@@ -16,7 +16,7 @@ export type DadosRelatorioEstudante = {
   historico: { simulado: string; quando: string; nota: number | null; acerto: number; tempo: string; simuladoId?: string; sessaoId?: string }[]
 }
 
-export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, historicoHrefBase, semTurma, semTendencia }: { d: DadosRelatorioEstudante; print?: boolean; semCabecalho?: boolean; historicoLink?: boolean; historicoHrefBase?: string; semTurma?: boolean; semTendencia?: boolean }) {
+export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, historicoHrefBase, semTurma, semTendencia, semKpis }: { d: DadosRelatorioEstudante; print?: boolean; semCabecalho?: boolean; historicoLink?: boolean; historicoHrefBase?: string; semTurma?: boolean; semTendencia?: boolean; semKpis?: boolean }) {
   const nota = (n: number | null) => (n == null ? '—' : n.toFixed(1).replace('.', ','))
   const sobe = d.evolucao.length >= 2 && d.evolucao[d.evolucao.length - 1].nota >= d.evolucao[0].nota
   const temTend = d.evolucao.length >= 2
@@ -43,6 +43,7 @@ export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, 
           subtitulo="Evolução e desempenho vs. a turma" acoes={print ? undefined : <BotaoExportar onClick={exportar} />} />
       )}
 
+      {!semKpis && (
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <KpiCard label="Simulados feitos" valor={d.simulados} icon={<ClipboardList className="h-4 w-4" />} tom="primary" />
         <KpiCard label="Nota média" valor={nota(d.notaMedia)} sub={semTendencia ? undefined : `melhor ${nota(d.melhorNota)}`} icon={<Trophy className="h-4 w-4" />} tom="amber" />
@@ -54,6 +55,7 @@ export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, 
           <KpiCard label="Tendência" valor={!temTend ? '—' : sobe ? 'Subindo' : 'Caindo'} icon={!temTend ? <Minus className="h-4 w-4" /> : sobe ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />} tom={!temTend ? 'slate' : sobe ? 'emerald' : 'rose'} />
         )}
       </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
         {/* Coluna esquerda: evolução da NOTA + evolução do ACERTO (novo). */}

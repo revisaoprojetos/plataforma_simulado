@@ -4,17 +4,16 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
 import { montarRelatorioEstudante } from '@/app/admin/relatorios/estudantes/_dados'
 import { RelatorioEstudanteView } from '@/app/admin/relatorios/estudantes/relatorio-estudante-view'
-import { Mail, Phone, IdCard, BarChart3, ArrowRight } from 'lucide-react'
+import { KpiCard } from '@/components/admin/relatorios/viz'
+import { Mail, Phone, IdCard, BarChart3, ArrowRight, Flame, Zap, Trophy, ClipboardList, Target, Clock, Award, Medal } from 'lucide-react'
 import { getGamConfig } from '@/lib/gamificacao'
-import { resumoGamificacao, conquistasDoAluno, missoesHoje } from '@/lib/gamificacao/leitura'
-import { GamificacaoHero } from '@/components/aluno/gamificacao-hero'
+import { resumoGamificacao, conquistasDoAluno, posicaoNaLiga } from '@/lib/gamificacao/leitura'
 import { ConquistasGrid } from '@/components/aluno/conquistas-grid'
-import { MissoesLista } from '@/components/aluno/missoes-lista'
 
 export const dynamic = 'force-dynamic'
-
 export const metadata = { title: 'Meu perfil' }
 
+const fmt = (n: number) => n.toLocaleString('pt-BR')
 function iniciais(nome: string) {
   return nome.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || 'A'
 }
@@ -25,9 +24,9 @@ function mascararCpf(cpf?: string | null) {
 }
 
 /**
- * Perfil do estudante: dados pessoais + o MESMO relatório de desempenho do admin
- * (KPIs, evolução, acerto por disciplina aluno×turma, histórico), escopado ao próprio
- * estudante (id vem da sessão assinada — sem IDOR). Absorve os KPIs que saíram da home.
+ * Perfil do estudante: cabeçalho (dados + nível/liga/streak) → KPIs → conquistas →
+ * ranking & divisões → gráficos e histórico (mesmo motor do admin), escopado ao próprio
+ * estudante (id da sessão assinada — sem IDOR).
  */
 export default async function PerfilAlunoPage() {
   const sessao = await getSessaoAluno()
@@ -35,12 +34,11 @@ export default async function PerfilAlunoPage() {
 
   const svc = createAdminClient()
   const gamConfig = await getGamConfig(svc, sessao.tenantId)
-  const [{ data: est }, dados, gamResumo, gamConquistas, gamMissoes] = await Promise.all([
+  const [{ data: est }, dados, gamResumo, gamConquistas] = await Promise.all([
     svc.from('simulado_estudantes').select('nome, email, cpf, telefone').eq('id', sessao.estudanteId).maybeSingle(),
     montarRelatorioEstudante(svc, sessao.estudanteId, sessao.tenantId),
     gamConfig?.ativo ? resumoGamificacao(svc, sessao.tenantId, sessao.estudanteId, gamConfig) : Promise.resolve(null),
     gamConfig?.ativo ? conquistasDoAluno(svc, sessao.tenantId, sessao.estudanteId, gamConfig) : Promise.resolve([]),
-    gamConfig?.ativo ? missoesHoje(svc, sessao.tenantId, sessao.estudanteId, gamConfig) : Promise.resolve([]),
   ])
 
   const nome = est?.nome ?? sessao.nome
@@ -51,43 +49,130 @@ export default async function PerfilAlunoPage() {
     est?.telefone && { icon: Phone, label: est.telefone },
   ].filter(Boolean) as { icon: any; label: string }[]
 
+  const pos = gamResumo ? await posicaoNaLiga(svc, sessao.tenantId, gamResumo.liga.id, gamResumo.xpTotal) : null
+  const nota = (n: number | null) => (n == null ? '—' : n.toFixed(1).replace('.', ','))
+
+  // Nível (anel) — reaproveita o cálculo do resumo.
+  const prog = gamResumo?.progresso
+  const raio = 30, circ = 2 * Math.PI * raio
+  const dash = prog ? circ * (prog.pct / 100) : 0
+
+  // Ligas (divisões) por XP total, ordenadas — para a faixa "Ranking e divisões".
+  const ligas = [...(gamConfig?.ligas ?? [])].sort((a, b) => a.xp_min - b.xp_min)
+
   return (
     <div className="animate-page space-y-6">
-      {/* Cabeçalho do perfil */}
-      <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/[0.10] via-card to-card p-6 shadow-sm sm:p-7">
+      {/* ── Cabeçalho: avatar + nível, dados, barra de XP e chips ── */}
+      <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/[0.10] via-card to-card p-6 shadow-sm sm:p-8">
         <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 h-64 w-64 rounded-full bg-primary/25 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--brand-accent) 75%, transparent), transparent)' }} />
-        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center">
-          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white text-xl font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais(nome)}</span>
-          <div className="min-w-0 flex-1">
-            <div className="mb-1 flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--brand-accent)' }} />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand-accent)' }}>Meu perfil</span>
-            </div>
-            <h1 className="truncate text-2xl font-bold tracking-tight sm:text-[2rem]">{nome}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
-              {contatos.map((c, i) => (
-                <span key={i} className="inline-flex items-center gap-1.5"><c.icon className="h-4 w-4" /> {c.label}</span>
-              ))}
-            </div>
+
+        <div className="relative flex flex-col items-center text-center">
+          {/* Avatar com anel de nível + badge Nv */}
+          <div className="relative h-[88px] w-[88px]">
+            {prog ? (
+              <svg viewBox="0 0 88 88" className="absolute inset-0 h-full w-full -rotate-90">
+                <circle cx="44" cy="44" r={raio} fill="none" stroke="color-mix(in oklab, var(--muted-foreground) 22%, transparent)" strokeWidth="5" />
+                <circle cx="44" cy="44" r={raio} fill="none" stroke="var(--brand-primary, var(--primary))" strokeWidth="5" strokeLinecap="round" strokeDasharray={`${dash} ${circ}`} className="transition-all duration-700" />
+              </svg>
+            ) : null}
+            <span className="absolute inset-[14px] flex items-center justify-center rounded-full bg-white text-xl font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais(nome)}</span>
+            {prog && (
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-primary/40 bg-background px-2 py-0.5 text-[10px] font-bold text-primary shadow-sm">Nv {prog.nivel}</span>
+            )}
           </div>
+
+          <div className="mt-4 flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--brand-accent)' }} />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand-accent)' }}>Meu perfil</span>
+          </div>
+          <h1 className="mt-1 truncate text-2xl font-bold tracking-tight sm:text-[2rem]">{nome}</h1>
+
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
+            {contatos.map((c, i) => (
+              <span key={i} className="inline-flex items-center gap-1.5"><c.icon className="h-4 w-4" /> {c.label}</span>
+            ))}
+          </div>
+
+          {/* Barra de XP do nível */}
+          {prog && (
+            <div className="mt-4 w-full max-w-md">
+              <div className="h-2 overflow-hidden rounded-full ring-1 ring-black/10 dark:ring-white/10" style={{ background: 'color-mix(in oklab, var(--brand-primary, var(--primary)) 16%, transparent)' }}>
+                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${prog.pct}%`, background: 'var(--brand-primary, var(--primary))' }} />
+              </div>
+              <div className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">{fmt(prog.xpNoNivel)} / {fmt(prog.xpDoNivel)} XP</div>
+            </div>
+          )}
+
+          {/* Chips: sequência · XP · liga */}
+          {gamResumo && (
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <Chip icon={<Flame className="h-3.5 w-3.5 text-orange-500" />}>{gamResumo.streakAtual} {gamResumo.streakAtual === 1 ? 'dia' : 'dias'}</Chip>
+              <Chip icon={<Zap className="h-3.5 w-3.5" style={{ color: 'var(--brand-accent, var(--primary))' }} />}>{fmt(gamResumo.xpTotal)} XP</Chip>
+              <Link href="/aluno/ligas"><Chip icon={<Trophy className="h-3.5 w-3.5" style={{ color: gamResumo.liga.cor }} />} hover>Liga {gamResumo.liga.nome}{pos ? ` · ${pos}º` : ''}</Chip></Link>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Gamificação — nível/liga/streak + conquistas + missões do dia (quando ativo) */}
-      {gamResumo && (
-        <div className="space-y-4">
-          <GamificacaoHero nome={nome} resumo={gamResumo} />
-          <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-            <ConquistasGrid conquistas={gamConquistas} />
-            {gamMissoes.length > 0 ? <MissoesLista missoes={gamMissoes} renova="meia-noite" /> : <div className="hidden lg:block" />}
-          </div>
-        </div>
-      )}
-
-      {/* Desempenho — KPIs, gráficos e histórico (mesmo motor do admin) */}
       {dados && dados.simulados > 0 ? (
-        <RelatorioEstudanteView d={dados} semCabecalho historicoLink semTurma semTendencia />
+        <>
+          {/* ── KPIs ── */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <KpiCard label="Simulados feitos" valor={dados.simulados} icon={<ClipboardList className="h-4 w-4" />} tom="primary" />
+            <KpiCard label="Nota média" valor={nota(dados.notaMedia)} icon={<Trophy className="h-4 w-4" />} tom="amber" />
+            <KpiCard label="Acerto médio" valor={dados.acertoMedio != null ? `${dados.acertoMedio}%` : '—'} icon={<Target className="h-4 w-4" />} tom="emerald" />
+            <KpiCard label="Tempo médio" valor={dados.tempoMedioMin != null ? `${dados.tempoMedioMin}min` : '—'} icon={<Clock className="h-4 w-4" />} tom="violet" />
+            <KpiCard label="Melhor nota" valor={nota(dados.melhorNota)} icon={<Award className="h-4 w-4" />} tom="amber" />
+            {gamResumo && (
+              <KpiCard label="XP este mês" valor={fmt(gamResumo.xpMes)} sub={pos ? `${pos}º na Liga ${gamResumo.liga.nome}` : undefined} icon={<Zap className="h-4 w-4" />} tom="primary" />
+            )}
+          </div>
+
+          {/* ── Conquistas ── */}
+          {gamConquistas.length > 0 && <ConquistasGrid conquistas={gamConquistas} />}
+
+          {/* ── Ranking e divisões ── */}
+          {gamResumo && ligas.length > 0 && (
+            <div className="rounded-2xl border bg-card p-4 shadow-sm">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="flex items-center gap-2 text-sm font-semibold"><Medal className="h-4 w-4 text-primary" /> Ranking e divisões</h3>
+                {pos && <span className="text-[11px] text-muted-foreground">você está em <span className="font-semibold text-foreground">{pos}º</span> na {gamResumo.liga.nome}</span>}
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                {ligas.map((lg, i) => {
+                  const prox = ligas[i + 1] ?? null
+                  const atual = lg.id === gamResumo.liga.id
+                  const faixa = prox ? `${fmt(lg.xp_min)} – ${fmt(prox.xp_min - 1)} XP` : `${fmt(lg.xp_min)}+ XP`
+                  const pctFaixa = atual && prox ? Math.min(100, Math.round(((gamResumo.xpTotal - lg.xp_min) / Math.max(1, prox.xp_min - lg.xp_min)) * 100)) : 0
+                  const faltam = atual && prox ? Math.max(0, prox.xp_min - gamResumo.xpTotal) : 0
+                  return (
+                    <div key={lg.id} className={`rounded-xl border p-3 transition-colors ${atual ? 'ring-2' : ''}`} style={atual ? { borderColor: lg.cor, boxShadow: `0 0 0 1px ${lg.cor}`, ['--tw-ring-color' as any]: `color-mix(in oklab, ${lg.cor} 45%, transparent)` } : undefined}>
+                      <div className="flex items-center gap-2">
+                        <Trophy className="h-4 w-4" style={{ color: lg.cor }} />
+                        <span className="text-sm font-semibold">{lg.nome}</span>
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">{faixa}</div>
+                      {atual && (
+                        <div className="mt-2">
+                          <div className="h-1.5 overflow-hidden rounded-full" style={{ background: `color-mix(in oklab, ${lg.cor} 16%, transparent)` }}>
+                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${prox ? pctFaixa : 100}%`, background: lg.cor }} />
+                          </div>
+                          <div className="mt-1 text-[11px] font-medium tabular-nums" style={{ color: lg.cor }}>
+                            {fmt(gamResumo.xpTotal)} XP{prox ? ` — faltam ${fmt(faltam)} XP para ${prox.nome}` : ' — divisão máxima 🎉'}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Gráficos + histórico (mesmo motor do admin, sem os KPIs já exibidos acima) ── */}
+          <RelatorioEstudanteView d={dados} semCabecalho semKpis historicoLink semTurma semTendencia />
+        </>
       ) : (
         <div className="rounded-2xl border bg-muted/30 p-10 text-center">
           <BarChart3 className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
@@ -99,5 +184,13 @@ export default async function PerfilAlunoPage() {
         </div>
       )}
     </div>
+  )
+}
+
+function Chip({ icon, children, hover }: { icon: React.ReactNode; children: React.ReactNode; hover?: boolean }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-medium shadow-sm ${hover ? 'transition-colors hover:border-primary/40 hover:bg-muted/50' : ''}`}>
+      {icon}{children}
+    </span>
   )
 }
