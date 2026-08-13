@@ -45,8 +45,8 @@ const ANIM_POR_ICONE: Record<string, string> = {
   target: 'ico-pop',
   brain: 'ico-heartbeat',
   heart: 'ico-heartbeat',
-  sparkles: 'ico-glow',
-  shield: 'ico-bob',
+  sparkles: 'ico-glow',    // + faíscas (via ConquistaIconeFx)
+  shield: 'ico-shake',     // + flechas (via ConquistaIconeFx)
   book: 'ico-bob',
   graduation: 'ico-bob',
   calendar: 'ico-bob',

@@ -1,6 +1,7 @@
 import { Award, Lock } from 'lucide-react'
 import type { ConquistaView } from '@/lib/gamificacao/leitura'
-import { iconeConquista, corConquista, animConquista } from '@/lib/gamificacao/icones'
+import { iconeConquista, corConquista } from '@/lib/gamificacao/icones'
+import { ConquistaIconeFx } from '@/components/gamificacao/conquista-icone'
 
 /** Grade de conquistas: desbloqueadas coloridas, bloqueadas em cinza com cadeado. */
 export function ConquistasGrid({ conquistas }: { conquistas: ConquistaView[] }) {
@@ -25,7 +26,7 @@ export function ConquistasGrid({ conquistas }: { conquistas: ConquistaView[] }) 
             >
               <span className={`relative flex h-11 w-11 items-center justify-center rounded-full ${c.def.icone === 'rocket' ? 'overflow-hidden' : 'overflow-visible'} ${c.desbloqueada ? '' : 'bg-muted text-muted-foreground'}`}
                 style={c.desbloqueada ? { background: `color-mix(in oklab, ${cor} 18%, transparent)`, color: cor } : undefined}>
-                <Icon className={`h-5 w-5 ${c.desbloqueada ? animConquista(c.def.icone) : ''}`} />
+                {c.desbloqueada ? <ConquistaIconeFx icone={c.def.icone} /> : <Icon className="h-5 w-5" />}
                 {!c.desbloqueada && <Lock className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-background p-0.5 text-muted-foreground" />}
               </span>
               <span className="line-clamp-2 text-[11px] font-medium leading-tight">{c.def.titulo}</span>
