@@ -342,6 +342,11 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
   const [aberto, setAberto] = useState<string | null>(atualId)
   const cx = (off: number) => LANE / 2 + off
 
+  // Trilha muito grande → curvas maiores + linhas mais curtas (encurta o comprimento total).
+  const compacto = flat.length > 12
+  const rowH = compacto ? 108 : ROW
+  const offs = compacto ? [0, 78, 110, 78, 0, -78, -110, -78] : OFFS
+
   // Layout: percorre grupos empilhando divisória + nós, guardando as posições.
   const nodesL: { n: TrilhaNode; off: number; y: number }[] = []
   const dividers: { id: string; nome: string; done: number; total: number; y: number }[] = []
@@ -354,9 +359,9 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
     dividers.push({ id: t.id, nome: t.nome, done: t.done, total: t.total, y: dy })
     y += GAP_HDR
     t.nodes.forEach((n) => {
-      const off = OFFS[gi % OFFS.length]
+      const off = offs[gi % offs.length]
       nodesL.push({ n, off, y: y + R })
-      y += ROW
+      y += rowH
       gi++
     })
     // 1–3 simulados → imagem LARGA (capa_url); 4+ → imagem NORMAL/inteira (capa_card_url).
@@ -366,12 +371,11 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
     const capa = inteira ? (normal ?? larga) : (larga ?? normal)
     segMeta.push({ id: t.id, capa, dy, total: t.total })
   })
-  const chest = { off: OFFS[gi % OFFS.length], y: y + R }
+  const chest = { off: offs[gi % offs.length], y: y + R }
   const segmentos = segMeta.map((s, i) => ({
     id: s.id, capa: s.capa,
     yTop: s.dy + 20,                                                        // logo abaixo da divisória do grupo
     yBot: (i < segMeta.length - 1 ? segMeta[i + 1].dy - 4 : chest.y - 24),   // quase encostando na próxima divisória (ou no baú)
-    inteira: s.total > 3,                                                    // >3 simulados → imagem INTEIRA do banco (não recortada)
   }))
   const height = chest.y + R + 48
   const allPts = [...nodesL.map((x) => ({ off: x.off, y: x.y, estado: x.n.estado })), { off: chest.off, y: chest.y, estado: 'disponivel' as const }]
@@ -402,7 +406,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       {/* Fundo por grupo — capa do banco (quase às bordas), quadrada com fade em todas as bordas */}
       {segmentos.map((s) => s.capa && (
         <div key={s.id} className="pointer-events-none absolute left-1/2 z-0 -translate-x-1/2 overflow-hidden" style={{ top: s.yTop, height: Math.max(0, s.yBot - s.yTop), width: coverW, WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 7%, #000 93%, transparent 100%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 7%, #000 93%, transparent 100%)' }}>
-          <img src={s.capa} alt="" loading="lazy" decoding="async" className={cn('h-full w-full object-center', s.inteira ? 'object-contain' : 'object-cover')} style={{ opacity: 0.45, WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%)' }} />
+          <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-center" style={{ opacity: 0.45, WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 46px, #000 calc(100% - 46px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 46px, #000 calc(100% - 46px), transparent 100%)' }} />
         </div>
       ))}
       {/* Conectores pontilhados — contínuos, inclusive entre grupos */}
