@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { Check, Play, Star, Route, Zap, Trophy, CircleCheck, Download } from 'lucide-react'
@@ -102,6 +102,18 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
   if (!t) return null
   const pct = t.total ? Math.round((t.done / t.total) * 100) : 0
   const rolar = t.nodes.length > 3
+  const TETO = 576 // px (máx. ~3 cards + início do 4º)
+
+  // Altura animada do caminho: ao trocar de trilha, transiciona o max-height até o tamanho
+  // da nova trilha (ou o teto de rolagem), em vez de "pular" seco.
+  const olRef = useRef<HTMLOListElement>(null)
+  const [maxH, setMaxH] = useState<number | null>(null)
+  useEffect(() => {
+    const el = olRef.current
+    if (!el) return
+    const alvo = t.nodes.length > 3 ? TETO : el.scrollHeight
+    setMaxH(alvo)
+  }, [ativa, t.nodes.length])
 
   return (
     <section className="space-y-4">
@@ -134,7 +146,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
       </div>
 
       <div className="relative">
-        <ol className={cn('min-w-0 space-y-0 py-1', rolar && 'max-h-[36rem] overflow-y-auto pr-1 [scrollbar-width:thin]')}>
+        <ol ref={olRef} className="min-w-0 space-y-0 overflow-y-auto py-1 pr-1 transition-[max-height] duration-500 ease-out [scrollbar-width:thin]" style={{ maxHeight: maxH ?? undefined }}>
           {t.nodes.map((n, i) => {
             const concluido = n.estado === 'concluido'
             const atual = n.estado === 'atual'
