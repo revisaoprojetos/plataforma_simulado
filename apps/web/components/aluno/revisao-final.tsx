@@ -20,7 +20,6 @@ import {
   Trophy,
   RefreshCw,
   Loader2,
-  ArrowLeft,
 } from 'lucide-react'
 import { FitaTopo } from '@/components/prova/fita-topo'
 import { ThemeToggle } from '@/components/prova/theme-toggle'
@@ -352,12 +351,12 @@ export function RevisaoFinal({
           <div className="flex items-center gap-1.5">
             {onToggleDark && <ThemeToggle dark={!!dark} onToggle={onToggleDark} />}
             <a href={urlInicio} className="hud-btn inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium" style={STYLE_INICIO}>
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Voltar ao início
+              <RefreshCw className="h-3.5 w-3.5" />
+              Refazer simulado
             </a>
             <a href={urlSimulados} className="hud-btn inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium" style={STYLE_VOLTAR}>
               <Home className="h-3.5 w-3.5" />
-              Meus simulados
+              Início da plataforma
             </a>
           </div>
         </div>

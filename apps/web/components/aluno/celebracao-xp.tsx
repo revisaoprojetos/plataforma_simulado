@@ -28,18 +28,20 @@ export function CelebracaoXp() {
     if (jaRodou.current) return
     jaRodou.current = true
     let cancelado = false
+    const timers: any[] = []
 
-    const timer = setTimeout(async () => {
+    // Tenta rodar a celebração; retorna true se havia XP novo (mesmo que só encha a barra).
+    const rodar = async (): Promise<boolean> => {
       try {
         const r = await fetch('/api/aluno/gamificacao/celebracao').then((x) => x.json())
-        if (cancelado || !r?.eventos?.length || !r.curva) return
+        if (cancelado || !r?.eventos?.length || !r.curva) return false
         const novos: Evento[] = r.eventos.filter((e: Evento) => {
           try { return !localStorage.getItem(`xpceleb:${e.chave}`) } catch { return false }
         })
-        if (!novos.length) return
+        if (!novos.length) return false
 
         const alvo = document.querySelector('[data-nivel-alvo]') as HTMLElement | null
-        if (!alvo) return
+        if (!alvo) return false
 
         const sum = novos.reduce((a, e) => a + e.xp, 0)
         const para = progressoNivel(r.xpTotal, r.curva)
@@ -47,7 +49,7 @@ export function CelebracaoXp() {
         for (const e of novos) { try { localStorage.setItem(`xpceleb:${e.chave}`, '1') } catch {} }
 
         window.dispatchEvent(new CustomEvent('nivel:encher', { detail: { de, para } }))
-        if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+        if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return true
 
         // Ponto de origem por tipo (coords de viewport).
         const topRight = { x: window.innerWidth - 36, y: 30 }
@@ -76,10 +78,19 @@ export function CelebracaoXp() {
         alvoRef.current = alvo
         spanRefs.current = []
         setAtivo({ particulas, xp: sum })
-      } catch { /* silencioso */ }
-    }, 700)
+        return true
+      } catch { return false }
+    }
 
-    return () => { cancelado = true; clearTimeout(timer) }
+    // 1ª tentativa após a página assentar; se o XP ainda não foi contabilizado (award assíncrono
+    // logo após finalizar), tenta de novo uma vez.
+    timers.push(setTimeout(async () => {
+      if (cancelado) return
+      if (await rodar()) return
+      timers.push(setTimeout(() => { if (!cancelado) rodar() }, 1800))
+    }, 700))
+
+    return () => { cancelado = true; timers.forEach(clearTimeout) }
   }, [])
 
   // Animação por rAF: cada ponto interpola (com arco) da sua origem até a barra VIVA.
