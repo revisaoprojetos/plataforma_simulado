@@ -10,7 +10,7 @@ import { Loader2, Check, ImagePlus, Trash2, RefreshCw, Palette } from 'lucide-re
 import { cn } from '@/lib/utils'
 
 /** Redimensiona a imagem no cliente e devolve um data URL leve (JPEG). */
-async function redimensionar(file: File, max = 900): Promise<string> {
+async function redimensionar(file: File, max = 1600): Promise<string> {
   const bitmap = await createImageBitmap(file)
   const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
   const w = Math.round(bitmap.width * scale)
@@ -19,8 +19,10 @@ async function redimensionar(file: File, max = 900): Promise<string> {
   canvas.width = w; canvas.height = h
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('canvas')
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(bitmap, 0, 0, w, h)
-  return canvas.toDataURL('image/jpeg', 0.72)
+  return canvas.toDataURL('image/jpeg', 0.86)
 }
 
 type Banco = { id: string; nome: string; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; total: number }
@@ -55,7 +57,7 @@ export function BancoPersonalizar({ banco }: { banco: Banco }) {
     if (!f.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
     setProcessandoCard(true)
     // Pôster é vertical (4:5) → redimensiona um pouco maior para manter nitidez.
-    try { setCapaCard(await redimensionar(f, 1000)) } catch { toast.error('Falha ao processar a imagem.') } finally { setProcessandoCard(false) }
+    try { setCapaCard(await redimensionar(f, 1400)) } catch { toast.error('Falha ao processar a imagem.') } finally { setProcessandoCard(false) }
   }
 
   async function salvar() {

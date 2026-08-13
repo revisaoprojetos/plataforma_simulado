@@ -58,13 +58,13 @@ function NodeCard({ n, gamAtivo }: { n: TrilhaNode; gamAtivo: boolean }) {
       {/* Fundo: banner comprido do banco (capa_url, mesmo tamanho do card de personalizar) + degradê */}
       {img && (
         <>
-          <img src={img} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/30" />
+          <img src={img} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-[1.03]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/40 to-black/10" />
         </>
       )}
 
       {/* Info — centralizada; desliza suavemente para a esquerda no hover (medido + translateX) */}
-      <div ref={infoRef} className="relative mx-auto inline-block max-w-full text-left align-middle transition-transform duration-300 ease-out will-change-transform" style={{ transform: `translateX(${dx}px)` }}>
+      <div ref={infoRef} className={cn('relative mx-auto inline-block max-w-full text-left align-middle transition-transform duration-300 ease-out will-change-transform', img && '[text-shadow:0_1px_3px_rgba(0,0,0,0.7)]')} style={{ transform: `translateX(${dx}px)` }}>
         {atual && <span className="mb-1.5 inline-block rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">Comece aqui</span>}
         <div className="font-semibold leading-snug">{n.titulo}</div>
         <div className={cn('mt-1 text-xs', txtSec)}>
