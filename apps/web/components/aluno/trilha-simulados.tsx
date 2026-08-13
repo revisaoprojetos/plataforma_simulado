@@ -372,11 +372,12 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
     dividers.push({ id: t.id, nome: t.nome, done: t.done, total: t.total, y: dy })
     y += GAP_HDR
     if (t.nodes.length === 1) {
-      // Grupo com um único simulado → ícone centralizado no eixo (off 0) E verticalmente no meio
-      // da faixa do grupo (espaço simétrico acima/abaixo), seguindo só a fluidez horizontal.
+      // Grupo com um único simulado → segue o mesmo meandro lateral (waveOff) p/ acompanhar as
+      // curvas acentuadas da trilha, e fica verticalmente centralizado na faixa do grupo
+      // (espaço simétrico acima/abaixo).
       const VPAD = 66
       y += VPAD
-      nodesL.push({ n: t.nodes[0], off: 0, y: y + R })
+      nodesL.push({ n: t.nodes[0], off: waveOff(gi), y: y + R })
       y += 2 * R + VPAD
       gi++
     } else {
@@ -441,7 +442,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
           cada ícone entrando/saindo pelas laterais, em vez de subir/descer reto. Cada segmento é
           um path próprio p/ manter a cor (concluído x pendente), mas as tangentes são compartilhadas
           com os vizinhos → sem "quebras" nas junções. */}
-      <svg className="absolute left-0 top-0" width={LANE} height={height} aria-hidden>
+      <svg className="absolute left-0 top-0 overflow-visible" width={LANE} height={height} aria-hidden>
         {allPts.slice(0, -1).map((p, i) => {
           const P0 = allPts[i - 1] ?? p
           const P2 = allPts[i + 1]
