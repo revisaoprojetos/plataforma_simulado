@@ -482,16 +482,17 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
         })}
       </svg>
 
-      {/* Divisórias de grupo — estilo Duolingo: linha comprida fina + nome centralizado. */}
+      {/* Divisórias de grupo — destacadas: pílula (card + borda da marca + sombra), nome forte e
+          contador em chip sólido; linhas mais grossas e tingidas pela marca. */}
       {dividers.map((d) => (
-        <div key={d.id} className="absolute left-1/2 z-[2] -translate-x-1/2" style={{ top: d.y, width: 560 }}>
+        <div key={d.id} className="absolute left-1/2 z-[2] -translate-x-1/2" style={{ top: d.y, width: 580 }}>
           <div className="flex items-center gap-3">
-            <span className="h-px flex-1" style={{ background: 'linear-gradient(to right, transparent, color-mix(in oklab, var(--border) 90%, transparent))' }} />
-            <span className="inline-flex max-w-[320px] items-center gap-2 whitespace-nowrap rounded-full bg-background px-3 py-0.5" title={d.nome}>
-              <span className="truncate text-sm font-bold text-muted-foreground">{d.nome}</span>
-              <span className="text-xs font-semibold tabular-nums" style={{ color: COR }}>{d.done}/{d.total}</span>
+            <span className="h-[3px] flex-1 rounded-full" style={{ background: 'linear-gradient(to right, transparent, color-mix(in oklab, var(--brand-primary, var(--primary)) 48%, transparent))' }} />
+            <span className="inline-flex max-w-[360px] items-center gap-2.5 whitespace-nowrap rounded-full border bg-card px-4 py-1.5 shadow-md" style={{ borderColor: 'color-mix(in oklab, var(--brand-primary, var(--primary)) 38%, var(--border))' }} title={d.nome}>
+              <span className="truncate text-base font-extrabold tracking-tight text-foreground">{d.nome}</span>
+              <span className="rounded-full px-2 py-0.5 text-xs font-bold tabular-nums text-white" style={{ background: COR }}>{d.done}/{d.total}</span>
             </span>
-            <span className="h-px flex-1" style={{ background: 'linear-gradient(to left, transparent, color-mix(in oklab, var(--border) 90%, transparent))' }} />
+            <span className="h-[3px] flex-1 rounded-full" style={{ background: 'linear-gradient(to left, transparent, color-mix(in oklab, var(--brand-primary, var(--primary)) 48%, transparent))' }} />
           </div>
         </div>
       ))}
