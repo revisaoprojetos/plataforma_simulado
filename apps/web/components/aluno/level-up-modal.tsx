@@ -167,8 +167,8 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
                   </div>
                 </div>
                 {/* costura pontilhada quadrada (topo p/ um lado, base p/ o outro) — branca, animada */}
-                <div className="absolute inset-x-4 top-[4px] h-[3px]" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.75) 0 3px, transparent 3px)', backgroundSize: '12px 3px', backgroundRepeat: 'repeat-x', animation: 'lu-stitch 1.05s linear infinite' }} />
-                <div className="absolute inset-x-4 bottom-[4px] h-[3px]" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.75) 0 3px, transparent 3px)', backgroundSize: '12px 3px', backgroundRepeat: 'repeat-x', animation: 'lu-stitch 1.05s linear infinite reverse' }} />
+                <div className="lu-costura absolute inset-x-4 top-[4px] h-[3px]" />
+                <div className="lu-costura rev absolute inset-x-4 bottom-[4px] h-[3px]" />
               </div>
             )}
 

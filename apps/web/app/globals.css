@@ -273,6 +273,9 @@
 @keyframes lu-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 @keyframes lu-float { 0% { transform: translate(-50%, 0); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(-50%, -60px); opacity: 0; } }
 @keyframes lu-stitch { from { background-position: 0 0; } to { background-position: 12px 0; } }
+/* Costura pontilhada animada (classe fixa → o React não reinicia a animação a cada render). */
+.lu-costura { background-image: linear-gradient(to right, rgba(255,255,255,.78) 0 3px, transparent 3px); background-size: 12px 100%; background-repeat: repeat-x; animation: lu-stitch 1s linear infinite; }
+.lu-costura.rev { animation-direction: reverse; }
 
 /* Celebração de XP: pontos voam de fora (--sx,--sy) até o card de nível e "somem" ao chegar. */
 @keyframes xp-para-nivel {
