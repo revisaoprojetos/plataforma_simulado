@@ -20,6 +20,7 @@ import { TrilhaSimulados, type Trilha } from '@/components/aluno/trilha-simulado
 import { LigaPainel } from '@/components/aluno/liga-painel'
 import { RankingLiga } from '@/components/aluno/ranking-liga'
 import { ConquistasProgressoLista } from '@/components/aluno/conquistas-progresso'
+import { CelebracaoXp } from '@/components/aluno/celebracao-xp'
 
 export default async function AlunoHome({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
   const { pasta } = await searchParams
@@ -320,6 +321,8 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
 
   return (
     <div className="animate-page space-y-6">
+      {/* Celebração de XP (partículas voando para o card de nível) quando há XP recém-contabilizado. */}
+      {gamResumo && <CelebracaoXp />}
       {/* Banners do tenant — UM carrossel só (banner + destaque + simulado) + pop-up. SÓ na Início. */}
       <BannersPortal banners={bannersSemSim.map((b) => ({ ...b, ordem: ordemGlobal.get(b.id) ?? 0, estilo: (destaquesBanner[b.id] as any)?.popupEstilo ?? null, pontas: (destaquesBanner[b.id] as any)?.popupPontas ?? null, textoPos: (destaquesBanner[b.id] as any)?.bannerTextoPos ?? null, textoCor: (destaquesBanner[b.id] as any)?.bannerTextoCor ?? null, textoTam: (destaquesBanner[b.id] as any)?.bannerTextoTam ?? null, textoX: (destaquesBanner[b.id] as any)?.bannerTextoX ?? null, textoY: (destaquesBanner[b.id] as any)?.bannerTextoY ?? null, ocultarTitulo: (destaquesBanner[b.id] as any)?.bannerOcultarTitulo ?? false, ocultarMensagem: (destaquesBanner[b.id] as any)?.bannerOcultarMensagem ?? false, freq: (destaquesBanner[b.id] as any)?.freq ?? null }))} simulados={heroSims} stats={mostrarDesempenhoBanner ? statsAluno : null} />
 
