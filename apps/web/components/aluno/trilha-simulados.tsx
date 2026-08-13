@@ -362,7 +362,12 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
     t.nodes.forEach((n) => {
       const off = offs[gi % offs.length]
       nodesL.push({ n, off, y: y + R })
-      y += rowH
+      // Regra anti-colisão: o passo vertical nunca deixa o rótulo (título + linha de status)
+      // deste nó alcançar o ícone do próximo — cresce conforme o texto ocupa mais linhas.
+      const linhas = Math.min(2, Math.max(1, Math.ceil((n.titulo?.length ?? 0) / 20)))
+      const alturaRotulo = 46 + (linhas - 1) * 16
+      const passoMin = 2 * R + alturaRotulo + 22
+      y += Math.max(rowH, passoMin)
       gi++
     })
     // 1–3 simulados → imagem LARGA (capa_url); 4+ → imagem NORMAL/inteira (capa_card_url).
@@ -410,13 +415,20 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
           <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-[center_30%]" style={{ opacity: 0.45, WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 46px, #000 calc(100% - 46px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 46px, #000 calc(100% - 46px), transparent 100%)' }} />
         </div>
       ))}
-      {/* Conectores pontilhados — contínuos, inclusive entre grupos */}
+      {/* Conectores pontilhados — spline Catmull-Rom contínua (C1): curva fluida que passa por
+          cada ícone entrando/saindo pelas laterais, em vez de subir/descer reto. Cada segmento é
+          um path próprio p/ manter a cor (concluído x pendente), mas as tangentes são compartilhadas
+          com os vizinhos → sem "quebras" nas junções. */}
       <svg className="absolute left-0 top-0" width={LANE} height={height} aria-hidden>
         {allPts.slice(0, -1).map((p, i) => {
-          const nx = allPts[i + 1]
-          const x0 = cx(p.off), y0 = p.y, x1 = cx(nx.off), y1 = nx.y, m = (y0 + y1) / 2
+          const P0 = allPts[i - 1] ?? p
+          const P2 = allPts[i + 1]
+          const P3 = allPts[i + 2] ?? P2
+          const x1 = cx(p.off), y1 = p.y, x2 = cx(P2.off), y2 = P2.y
+          const c1x = x1 + (cx(P2.off) - cx(P0.off)) / 6, c1y = y1 + (P2.y - P0.y) / 6
+          const c2x = x2 - (cx(P3.off) - cx(p.off)) / 6, c2y = y2 - (P3.y - p.y) / 6
           const done = p.estado === 'concluido'
-          return <path key={i} d={`M ${x0} ${y0} C ${x0} ${m}, ${x1} ${m}, ${x1} ${y1}`} fill="none" strokeWidth={6} strokeLinecap="round" strokeDasharray="0.1 16" stroke={done ? COR : 'var(--border)'} />
+          return <path key={i} d={`M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`} fill="none" strokeWidth={6} strokeLinecap="round" strokeDasharray="0.1 16" stroke={done ? COR : 'var(--border)'} />
         })}
       </svg>
 
