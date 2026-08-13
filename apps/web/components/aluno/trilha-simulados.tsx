@@ -164,7 +164,7 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
         <div key={open.id} className="absolute z-10 w-[300px] motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-200"
           style={{ top: Math.max(0, Math.min(openPt.y - 60, height - 210)), ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
           <span className={cn('absolute top-14 h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} />
-          <div className={cn('overflow-hidden rounded-2xl border shadow-xl', open.estado === 'atual' && 'border-primary/40')}>
+          <div className={cn('overflow-hidden rounded-2xl border shadow-xl motion-safe:animate-[trilha-card-pulse_2.2s_ease-in-out_infinite]', open.estado === 'atual' && 'border-primary/40')}>
             {open.capaBanner && <div className="relative h-20"><img src={open.capaBanner} alt="" className="absolute inset-0 h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" /></div>}
             <div className="space-y-2 p-4">
               {open.estado === 'atual' && <span className="inline-block rounded-full border border-primary/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
@@ -177,10 +177,19 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
                 {gamAtivo && open.xp > 0 && open.estado !== 'concluido' && <span className="inline-flex items-center gap-1 font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{open.xp} XP</span>}
               </div>
               {open.href && open.estado !== 'disponivel' && (
-                <Link href={open.href} className={cn('mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition',
-                  open.estado === 'atual' ? 'bg-primary text-primary-foreground hover:opacity-90' : 'border hover:bg-muted')}>
-                  {open.estado === 'atual' && <Play className="h-4 w-4" />}{open.acao}
-                </Link>
+                <div className="mt-1 flex items-center gap-2">
+                  <Link href={open.href} className="group/btn relative inline-flex flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-xl border-[1.5px] border-[var(--brand-primary,var(--primary))] px-4 py-2 text-sm font-semibold text-[var(--brand-primary,var(--primary))] transition-all duration-300 hover:scale-[1.02] hover:text-white">
+                    <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" style={{ background: `linear-gradient(135deg, ${COR}, color-mix(in oklab, ${COR} 72%, #000))` }} />
+                    <span className="relative z-10 inline-flex items-center gap-1.5">{open.estado === 'atual' && <Play className="h-4 w-4" />}{open.acao}</span>
+                  </Link>
+                  {open.cadernoUrl && (
+                    <a href={open.cadernoUrl} target="_blank" rel="noopener noreferrer" title="Baixar caderno de questões" aria-label="Baixar caderno de questões"
+                      className="group/dl relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border-[1.5px] border-[var(--brand-primary,var(--primary))] text-[var(--brand-primary,var(--primary))] transition-all hover:scale-[1.03] hover:text-white">
+                      <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/dl:opacity-100" style={{ background: COR }} />
+                      <Download className="relative z-10 h-4 w-4" />
+                    </a>
+                  )}
+                </div>
               )}
             </div>
           </div>
