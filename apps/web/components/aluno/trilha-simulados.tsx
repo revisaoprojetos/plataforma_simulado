@@ -101,7 +101,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
   const t = trilhas.find((x) => x.id === ativa) ?? trilhas[0]
   if (!t) return null
   const pct = t.total ? Math.round((t.done / t.total) * 100) : 0
-  const rolar = t.nodes.length > 5
+  const rolar = t.nodes.length > 3
 
   return (
     <section className="space-y-4">
@@ -134,7 +134,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
       </div>
 
       <div className="relative">
-        <ol className={cn('min-w-0 space-y-0 py-1', rolar && 'max-h-[55rem] overflow-y-auto pr-1 [scrollbar-width:thin]')}>
+        <ol className={cn('min-w-0 space-y-0 py-1', rolar && 'max-h-[36rem] overflow-y-auto pr-1 [scrollbar-width:thin]')}>
           {t.nodes.map((n, i) => {
             const concluido = n.estado === 'concluido'
             const atual = n.estado === 'atual'
