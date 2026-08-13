@@ -14,7 +14,7 @@ const mix = (pct: number, com: string) => `color-mix(in oklab, ${A} ${pct}%, ${c
 const C100 = mix(30, 'white'), C200 = mix(55, 'white'), C300 = mix(70, 'white')
 const C700 = mix(80, 'black'), C800 = mix(68, 'black'), C900 = mix(55, 'black')
 // Paleta ESCURA fixa da celebração (não usa tokens do tema claro/escuro — sempre fundo escuro).
-const BG = '#0b0b14', FG = '#f4f4f8', MUT = '#9a9aad'
+const FG = '#f4f4f8', MUT = '#9a9aad'
 const SURF = 'rgba(255,255,255,0.05)', DIV = 'rgba(255,255,255,0.10)', TRACK = 'rgba(255,255,255,0.12)'
 
 type Confete = { left: string; size: string; color: string; radius: string; dur: string; delay: string }
@@ -74,20 +74,26 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex overflow-auto" style={{ background: BG, color: FG }}>
-      {/* Backdrop: glow + raios */}
-      <div className="pointer-events-none fixed inset-0" style={{ background: `radial-gradient(circle at 50% 40%, ${C900} 0%, transparent 52%)`, animation: 'lvl-glow 3.2s ease-in-out infinite' }} />
-      <div className="pointer-events-none fixed" style={{ left: '50%', top: '40%', width: 960, height: 960, margin: '-480px 0 0 -480px', background: `repeating-conic-gradient(from 0deg, transparent 0deg 26deg, ${mix(32, 'transparent')} 26deg 30deg)`, WebkitMaskImage: 'radial-gradient(circle, black 0%, transparent 60%)', maskImage: 'radial-gradient(circle, black 0%, transparent 60%)', animation: 'lvl-spin 46s linear infinite' }} />
-
-      {/* Embers (fagulhas subindo) */}
-      {Array.from({ length: 14 }).map((_, i) => (
-        <div key={`e${i}`} className="pointer-events-none fixed rounded-full" style={{ bottom: '-2vh', left: `${4 + i * 7 + (i % 3) * 2}%`, width: 3 + (i % 4), height: 3 + (i % 4), background: i % 2 ? C700 : mix(50, 'black'), filter: 'blur(1px)', animation: `lvl-ember ${5 + (i % 5)}s linear ${(i * 0.6).toFixed(1)}s infinite` }} />
-      ))}
-
-      {/* Confete */}
-      {st.confetti.map((c, i) => (
-        <div key={i} className="pointer-events-none fixed top-0" style={{ left: c.left, width: c.size, height: c.size, background: c.color, borderRadius: c.radius, animation: `lvl-confetti ${c.dur} linear ${c.delay} both` }} />
-      ))}
+    <div className="fixed inset-0 z-[200] flex overflow-auto" style={{ background: 'radial-gradient(circle at 50% 38%, #1c1c3a 0%, #0d0d1a 62%)', color: FG }}>
+      {/* Camadas decorativas — filhas ABSOLUTAS p/ o overflow-hidden recortar (fixed escaparia). */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {/* glow central pulsando */}
+        <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 50% 38%, ${mix(35, 'transparent')} 0%, transparent 52%)`, animation: 'lvl-glow 3.2s ease-in-out infinite' }} />
+        {/* feixes de fundo: giram (horário) + pulsam */}
+        <div className="absolute" style={{ left: '50%', top: '38%', width: 1100, height: 1100, marginLeft: -550, marginTop: -550, background: `repeating-conic-gradient(from 0deg, transparent 0deg 24deg, ${mix(26, 'transparent')} 24deg 30deg)`, WebkitMaskImage: 'radial-gradient(circle, black 6%, transparent 58%)', maskImage: 'radial-gradient(circle, black 6%, transparent 58%)', animation: 'lvl-spin 44s linear infinite, lvl-glow 3.4s ease-in-out infinite' }} />
+        {/* pontos ambientes (estrelas fracas) */}
+        {Array.from({ length: 26 }).map((_, i) => (
+          <div key={`d${i}`} className="absolute rounded-full" style={{ left: `${(rand(i, 'x') * 100).toFixed(1)}%`, top: `${(rand(i, 'y') * 100).toFixed(1)}%`, width: 2 + (i % 2), height: 2 + (i % 2), background: i % 3 ? mix(60, 'white') : '#fff', opacity: 0.12 + rand(i, 'o') * 0.16, animation: `lvl-glow ${3 + (i % 4)}s ease-in-out ${(i * 0.2).toFixed(1)}s infinite` }} />
+        ))}
+        {/* embers (fagulhas subindo) */}
+        {Array.from({ length: 14 }).map((_, i) => (
+          <div key={`e${i}`} className="absolute rounded-full" style={{ bottom: '-2vh', left: `${4 + i * 7 + (i % 3) * 2}%`, width: 3 + (i % 4), height: 3 + (i % 4), background: i % 2 ? C700 : mix(50, 'black'), filter: 'blur(1px)', animation: `lvl-ember ${5 + (i % 5)}s linear ${(i * 0.6).toFixed(1)}s infinite` }} />
+        ))}
+        {/* confete */}
+        {st.confetti.map((c, i) => (
+          <div key={i} className="absolute top-0" style={{ left: c.left, width: c.size, height: c.size, background: c.color, borderRadius: c.radius, animation: `lvl-confetti ${c.dur} linear ${c.delay} both` }} />
+        ))}
+      </div>
       {/* Flash */}
       {st.flash && <div className="pointer-events-none fixed inset-0 z-[4]" style={{ background: `radial-gradient(circle at 50% 42%, ${C800} 0%, transparent 60%)`, animation: 'lvl-flash .35s ease-out both' }} />}
 
@@ -149,7 +155,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
               </div>
 
               {st.promoted && (
-                <div className="flex w-screen max-w-[640px] origin-center items-center justify-center gap-3 py-3.5 shadow-md" style={{ background: C900, animation: 'lvl-band .55s cubic-bezier(.2,.8,.2,1) .2s both' }}>
+                <div className="flex w-full max-w-[460px] origin-center items-center justify-center gap-3 rounded-xl border px-5 py-3.5 shadow-md" style={{ background: mix(20, '#0d0d1a'), borderColor: C700, animation: 'lvl-band .55s cubic-bezier(.2,.8,.2,1) .2s both' }}>
                   <Medal className="h-6 w-6" style={{ color: C200 }} />
                   <div className="text-left">
                     <div className="text-[10.5px] uppercase tracking-[0.14em]" style={{ color: C300 }}>Novo cargo</div>
@@ -190,9 +196,9 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
                 <span className="inline-flex items-center gap-1.5"><Flame className="h-3.5 w-3.5" style={{ color: C300 }} />{streak} dias</span>
               </div>
 
-              <button type="button" onClick={onClose} className="mt-1 inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-                style={{ background: A, animation: 'lvl-rise .5s ease .4s both' }}>
-                Continuar estudando <ArrowRight className="h-4 w-4" />
+              <button type="button" onClick={onClose} className="mt-1 inline-flex items-center gap-2 rounded-lg border px-5 py-2.5 text-sm font-semibold transition hover:bg-white/5"
+                style={{ borderColor: C700, color: C100, background: 'rgba(255,255,255,0.03)', animation: 'lvl-rise .5s ease .4s both' }}>
+                <ArrowRight className="h-4 w-4" /> Continuar estudando
               </button>
             </div>
           )}
