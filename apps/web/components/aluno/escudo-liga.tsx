@@ -4,21 +4,19 @@ import { cn } from '@/lib/utils'
 // mais escuro) p/ os detalhes. Autorados com detalhe e escalados (vetor) p/ caber no círculo.
 function Emblema({ tipo, fill, det }: { tipo: string; fill: string; det: string }) {
   switch (tipo) {
-    case 'livro': // livro de Direito em pé (capa + páginas) + lombada e louro gravados
+    case 'livro': // caderno/livro ABERTO (duas páginas) + lombada e linhas gravadas
       return (
         <>
-          <path d="M6.2 18.6 H18 L17 20.9 H7.2 Z" fill={fill} />
-          <path d="M6.6 2.9 H17.6 A0.8 0.8 0 0 1 18.4 3.7 V19 H7 A2.6 2.6 0 0 1 4.4 16.4 V5.5 A2.6 2.6 0 0 1 7 2.9 Z" fill={fill} />
-          <g fill="none" stroke={det} strokeWidth="0.75" strokeLinecap="round">
-            <path d="M7.9 3.5 V18.4" strokeWidth="1" />
-            <path d="M11.7 15 Q9.3 14.4 8.7 12" />
-            <path d="M11.7 15 Q14.1 14.4 14.7 12" />
-          </g>
-          <g fill={det} stroke="none">
-            <ellipse cx="9.2" cy="13.8" rx="0.95" ry="0.46" transform="rotate(42 9.2 13.8)" />
-            <ellipse cx="8.7" cy="12.3" rx="0.9" ry="0.44" transform="rotate(58 8.7 12.3)" />
-            <ellipse cx="14.2" cy="13.8" rx="0.95" ry="0.46" transform="rotate(-42 14.2 13.8)" />
-            <ellipse cx="14.7" cy="12.3" rx="0.9" ry="0.44" transform="rotate(-58 14.7 12.3)" />
+          <path d="M12 6.4C9.4 4.6 5.8 4.4 2.8 5.4V18.9C5.8 17.9 9.4 18.1 12 19.9Z" fill={fill} />
+          <path d="M12 6.4C14.6 4.6 18.2 4.4 21.2 5.4V18.9C18.2 17.9 14.6 18.1 12 19.9Z" fill={fill} />
+          <g fill="none" stroke={det} strokeWidth="0.6" strokeLinecap="round">
+            <path d="M12 6.9 V19.2" strokeWidth="0.85" />
+            <path d="M4.6 8.4 Q7.9 7.9 10.6 9" />
+            <path d="M4.6 11 Q7.9 10.5 10.6 11.6" />
+            <path d="M4.6 13.6 Q7.9 13.1 10.6 14.2" />
+            <path d="M19.4 8.4 Q16.1 7.9 13.4 9" />
+            <path d="M19.4 11 Q16.1 10.5 13.4 11.6" />
+            <path d="M19.4 13.6 Q16.1 13.1 13.4 14.2" />
           </g>
         </>
       )
@@ -60,7 +58,7 @@ function Emblema({ tipo, fill, det }: { tipo: string; fill: string; det: string 
     case 'martelo': // martelo diagonal (cabeça c/ bandas gravadas + cabo + punho) + bloco de som
       return (
         <>
-          <rect x="6.4" y="19.5" width="10.1" height="2.7" rx="1.35" fill={fill} />
+          <rect x="2.8" y="19.5" width="10.1" height="2.7" rx="1.35" fill={fill} />
           <g transform="rotate(-42 12 12)">
             <rect x="5.5" y="3.6" width="13" height="4.4" rx="2.2" fill={fill} />
             <rect x="10.6" y="8" width="2.8" height="10.4" rx="1.4" fill={fill} />
