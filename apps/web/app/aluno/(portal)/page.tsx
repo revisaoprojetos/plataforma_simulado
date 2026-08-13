@@ -345,7 +345,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
           {trilhas.length > 0 && <TrilhaSimulados trilhas={trilhas} gamAtivo={!!gamResumo} estilo={gamConfig?.trilha_estilo ?? 'cards'} visiveis={gamConfig?.trilha_visiveis ?? 3} />}
 
           {/* Divisória horizontal (quase às bordas) separando a trilha dos simulados recentes. */}
-          {trilhas.length > 0 && <div className="mx-auto h-px w-[92%]" style={{ background: 'linear-gradient(90deg, transparent, var(--border), var(--border), transparent)' }} />}
+          {trilhas.length > 0 && <div className="mx-auto h-px w-[92%]" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--foreground) 24%, transparent) 18%, color-mix(in oklab, var(--foreground) 24%, transparent) 82%, transparent)' }} />}
 
           <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} recentes={recentes} />
         </div>

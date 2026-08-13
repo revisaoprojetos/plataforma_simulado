@@ -284,8 +284,8 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
       </div>
 
       <div className="relative">
-        {/* Fundo bem levemente cinza — só p/ dar contraste no tema claro. */}
-        <div className="pointer-events-none absolute inset-0 rounded-2xl" style={{ background: 'color-mix(in oklab, var(--muted) 50%, transparent)' }} />
+        {/* Fundo cinza sutil + fade na base (quebra a divisão com a divisória de baixo). */}
+        <div className="pointer-events-none absolute inset-0 rounded-2xl" style={{ background: 'color-mix(in oklab, var(--muted) 68%, transparent)', WebkitMaskImage: 'linear-gradient(180deg, #000 0%, #000 80%, transparent 100%)', maskImage: 'linear-gradient(180deg, #000 0%, #000 80%, transparent 100%)' }} />
         <div ref={olRef} className="trilha-scroll relative z-[1] min-w-0 overflow-y-auto py-2 pr-1 transition-[max-height] duration-700 ease-out" style={{ maxHeight: maxH ?? undefined }}>
         <div key={ativa} className="min-w-0 space-y-0 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-700">
           {caminho ? (
