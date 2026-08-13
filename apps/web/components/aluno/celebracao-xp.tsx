@@ -37,7 +37,7 @@ export function CelebracaoXp() {
   const [modo, setModo] = useState<
     | null
     | { tipo: 'particulas'; particulas: Particula[]; xp: number }
-    | { tipo: 'levelup'; from: number; to: number; curva: NivelCurva; gains: GanhoXp[]; xpGanho: number; totalXp: number; streak: number; badges: string }
+    | { tipo: 'levelup'; from: number; to: number; curva: NivelCurva; gains: GanhoXp[]; xpGanho: number; totalXp: number; streak: number; badges: string; logo: string | null }
   >(null)
   const alvoRef = useRef<HTMLElement | null>(null)
   const spanRefs = useRef<(HTMLSpanElement | null)[]>([])
@@ -73,7 +73,7 @@ export function CelebracaoXp() {
           const xpGanho = gains.length ? gains.reduce((a, g) => a + g.xp, 0) : Math.max(0, r.xpTotal - xpAcumuladoParaNivel(stored, curva))
           marcar(novos)
           try { localStorage.setItem(nivelKey, String(atual)) } catch {}
-          setModo({ tipo: 'levelup', from: stored, to: atual, curva, gains, xpGanho, totalXp: r.xpTotal, streak: r.streak ?? 0, badges: `${r.badges?.unlocked ?? 0} de ${r.badges?.total ?? 0}` })
+          setModo({ tipo: 'levelup', from: stored, to: atual, curva, gains, xpGanho, totalXp: r.xpTotal, streak: r.streak ?? 0, badges: `${r.badges?.unlocked ?? 0} de ${r.badges?.total ?? 0}`, logo: r.logo ?? null })
           return true
         }
 
@@ -165,7 +165,7 @@ export function CelebracaoXp() {
   if (!modo || typeof document === 'undefined') return null
 
   if (modo.tipo === 'levelup') {
-    return <LevelUpModal from={modo.from} to={modo.to} curva={modo.curva} gains={modo.gains} unlocked={[]} xpGanho={modo.xpGanho} totalXp={modo.totalXp} streak={modo.streak} badgesLabel={modo.badges} onClose={() => setModo(null)} />
+    return <LevelUpModal from={modo.from} to={modo.to} curva={modo.curva} gains={modo.gains} unlocked={[]} xpGanho={modo.xpGanho} totalXp={modo.totalXp} streak={modo.streak} badgesLabel={modo.badges} logo={modo.logo} onClose={() => setModo(null)} />
   }
 
   return createPortal(

@@ -27,9 +27,9 @@ type St = { level: number; fill: number; playing: boolean; done: boolean; pop: b
 
 /** Modal de subida de nível (v2): halo/órbita, anel de XP enchendo (com ponta branca) e desacelerando
  * no fim, impacto forte ao completar cada nível, e a área de informações compacta ao terminar. */
-export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalXp, streak, badgesLabel, onClose }: {
+export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalXp, streak, badgesLabel, logo, onClose }: {
   from: number; to: number; curva: NivelCurva; gains: GanhoXp[]; unlocked: ConquistaUp[]
-  xpGanho: number; totalXp: number; streak: number; badgesLabel: string; onClose: () => void
+  xpGanho: number; totalXp: number; streak: number; badgesLabel: string; logo?: string | null; onClose: () => void
 }) {
   const [st, setSt] = useState<St>({ level: from, fill: 0, playing: true, done: false, pop: false, promoted: null, xpShown: 0, xpTarget: 0, burst: 0 })
   const timers = useRef<any[]>([])
@@ -72,6 +72,8 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
     <div className="fixed inset-0 z-[200] flex overflow-hidden" style={{ background: 'radial-gradient(circle at 50% 34%, #1a1730 0%, #0b0912 62%)', color: FG, animation: 'lu-in .3s ease both' }}>
       {/* Fundo: auroras + estrelas (contidas) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {/* logo do tenant como marca-d'água de fundo */}
+        {logo && <img src={logo} alt="" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none" style={{ width: 'min(58vw, 620px)', opacity: 0.05, filter: 'grayscale(1) brightness(1.6)', animation: 'lu-halo 6s ease-in-out infinite' }} />}
         <div className="absolute rounded-full blur-3xl" style={{ left: '18%', top: '10%', width: 520, height: 520, background: mix(45, 'transparent'), opacity: 0.5, animation: 'lu-aurora1 14s ease-in-out infinite' }} />
         <div className="absolute rounded-full blur-3xl" style={{ right: '12%', top: '30%', width: 460, height: 460, background: mix(35, 'transparent'), opacity: 0.4, animation: 'lu-aurora2 18s ease-in-out infinite' }} />
         {Array.from({ length: 34 }).map((_, i) => (
@@ -166,9 +168,13 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
                     <div className="whitespace-nowrap text-base font-bold text-white">{st.promoted}</div>
                   </div>
                 </div>
-                {/* costura pontilhada quadrada (topo p/ um lado, base p/ o outro) — branca, animada */}
-                <div className="lu-costura absolute inset-x-4 top-[4px] h-[3px]" />
-                <div className="lu-costura rev absolute inset-x-4 bottom-[4px] h-[3px]" />
+                {/* costura pontilhada quadrada (topo p/ um lado, base p/ o outro) — branca, animada via translateX */}
+                <div className="absolute inset-x-4 top-[4px] h-[3px] overflow-hidden">
+                  <div className="absolute inset-y-0 -left-3 right-0" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.78) 0 3px, transparent 3px)', backgroundSize: '12px 100%', backgroundRepeat: 'repeat-x', animation: 'lu-marchx 1s linear infinite' }} />
+                </div>
+                <div className="absolute inset-x-4 bottom-[4px] h-[3px] overflow-hidden">
+                  <div className="absolute inset-y-0 -left-3 right-0" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.78) 0 3px, transparent 3px)', backgroundSize: '12px 100%', backgroundRepeat: 'repeat-x', animation: 'lu-marchx 1s linear infinite reverse' }} />
+                </div>
               </div>
             )}
 

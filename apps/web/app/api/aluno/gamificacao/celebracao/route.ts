@@ -18,7 +18,7 @@ export async function GET() {
     if (!config?.ativo) return NextResponse.json({ ok: true, eventos: [], xpTotal: 0, curva: null })
 
     const desde = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
-    const [{ data: evs }, { data: cache }, { count: desbCount }] = await Promise.all([
+    const [{ data: evs }, { data: cache }, { count: desbCount }, { data: tenantRow }] = await Promise.all([
       svc.from('simulado_xp_eventos')
         .select('origem, ref_id, xp, criado_em')
         .eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId)
@@ -28,7 +28,10 @@ export async function GET() {
         .limit(50),
       svc.from('simulado_gamificacao_estudante').select('xp_total, streak_atual').eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId).maybeSingle(),
       svc.from('simulado_conquista_desbloqueios').select('conquista_id', { count: 'exact', head: true }).eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId),
+      svc.from('simulado_tenants').select('tema').eq('id', sessao.tenantId).maybeSingle(),
     ])
+    const tema = (tenantRow?.tema ?? {}) as any
+    const logo = tema.logo_dark_url || tema.logo_url || null
 
     const eventos = ((evs ?? []) as any[])
       .filter((e) => Number(e.xp) > 0)
@@ -42,6 +45,7 @@ export async function GET() {
       curva: config.nivel_curva,
       streak: cache?.streak_atual ?? 0,
       badges: { unlocked: desbCount ?? 0, total: (config.conquistas_def ?? []).length },
+      logo,
     })
   } catch {
     return NextResponse.json({ ok: true, eventos: [], xpTotal: 0, curva: null })
