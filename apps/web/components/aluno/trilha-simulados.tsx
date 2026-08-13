@@ -143,6 +143,11 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
   const openPt = openIdx >= 0 ? pts[openIdx] : null
   const side = openPt && openPt.off > 0 ? 'left' : 'right' // card no lado OPOSTO à curva (mais espaço)
   const cardRef = useCliqueForaFechar(!!open, setAberto)
+  // Card centralizado no nó + seta apontando dinamicamente p/ o nó (mede a altura real do card).
+  const [cardH, setCardH] = useState(240)
+  useEffect(() => { if (open && cardRef.current) setCardH(cardRef.current.offsetHeight) }, [open?.id])
+  const cardTop = openPt ? Math.max(0, Math.min(openPt.y - cardH / 2, height - cardH)) : 0
+  const arrowY = openPt ? Math.max(24, Math.min(openPt.y - cardTop, cardH - 24)) : 0
 
   return (
     <div className="relative mx-auto" style={{ width: LANE, height }}>
@@ -195,9 +200,9 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
 
       {/* Card do simulado — no lado com mais espaço, alinhado ao nó */}
       {open && openPt && (
-        <div ref={cardRef} key={open.id} className="absolute z-10 w-[400px] motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-200"
-          style={{ top: Math.max(0, Math.min(openPt.y - 60, height - 210)), ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
-          <span className={cn('absolute top-14 h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} />
+        <div ref={cardRef} key={open.id} className="group/card absolute z-10 w-[400px] transition-transform duration-200 will-change-transform motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:hover:scale-[1.03]"
+          style={{ top: cardTop, ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
+          <span className={cn('absolute h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} style={{ top: arrowY - 6 }} />
           <div className={cn('overflow-hidden rounded-2xl border bg-card shadow-xl motion-safe:animate-[trilha-card-pulse_2.2s_ease-in-out_infinite]', open.estado === 'atual' && 'border-primary/40')}>
             {open.capaBanner && <div className="relative h-28"><img src={open.capaBanner} alt="" className="absolute inset-0 h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" /></div>}
             <div className="space-y-2 p-4">
@@ -428,6 +433,12 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
   const openPt = openL ? { off: openL.off, y: openL.y } : null
   const side = openPt && openPt.off > 0 ? 'left' : 'right'
   const cardRef = useCliqueForaFechar(!!open, setAberto)
+  // Card centralizado no nó + seta apontando dinamicamente p/ o nó (mede a altura real do card).
+  // Quando o card encosta na borda (nó no topo/base), a seta desliza para continuar apontando.
+  const [cardH, setCardH] = useState(240)
+  useEffect(() => { if (open && cardRef.current) setCardH(cardRef.current.offsetHeight) }, [open?.id])
+  const cardTop = openPt ? Math.max(0, Math.min(openPt.y - cardH / 2, height - cardH)) : 0
+  const arrowY = openPt ? Math.max(24, Math.min(openPt.y - cardTop, cardH - 24)) : 0
 
   // Mede a largura da coluna p/ as capas de fundo chegarem quase às bordas.
   const rootRef = useRef<HTMLDivElement>(null)
@@ -533,9 +544,9 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
 
       {/* Card do simulado — no lado com mais espaço, alinhado ao nó */}
       {open && openPt && (
-        <div ref={cardRef} key={open.id} className="absolute z-10 w-[400px] motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-200"
-          style={{ top: Math.max(0, Math.min(openPt.y - 60, height - 210)), ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
-          <span className={cn('absolute top-14 h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} />
+        <div ref={cardRef} key={open.id} className="group/card absolute z-10 w-[400px] transition-transform duration-200 will-change-transform motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:hover:scale-[1.03]"
+          style={{ top: cardTop, ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
+          <span className={cn('absolute h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} style={{ top: arrowY - 6 }} />
           <div className={cn('overflow-hidden rounded-2xl border bg-card shadow-xl motion-safe:animate-[trilha-card-pulse_2.2s_ease-in-out_infinite]', open.estado === 'atual' && 'border-primary/40')}>
             {open.capaBanner && <div className="relative h-28"><img src={open.capaBanner} alt="" className="absolute inset-0 h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" /></div>}
             <div className="space-y-2 p-4">
