@@ -67,20 +67,20 @@ export function CelebracaoXp() {
         const dist = 360 + (i % 5) * 70
         const sx = Math.cos(ang) * dist
         const sy = Math.sin(ang) * dist * 0.72
-        const delay = (i % 9) * 65
+        const delay = (i % 9) * 60
         return (
-          <span key={i} className="absolute -ml-1 -mt-1 h-2.5 w-2.5 rounded-full"
+          <span key={i} className="absolute -ml-[6px] -mt-[6px] h-3 w-3 rounded-full"
             style={{
               left: cx, top: cy,
               ['--sx' as any]: `${sx}px`, ['--sy' as any]: `${sy}px`,
               background: 'var(--brand-primary, var(--primary))',
-              boxShadow: '0 0 9px 2px color-mix(in oklab, var(--brand-primary, var(--primary)) 60%, transparent)',
-              animation: `xp-para-nivel 1150ms cubic-bezier(.45,.05,.25,1) ${delay}ms both`,
+              boxShadow: '0 0 12px 3px color-mix(in oklab, var(--brand-primary, var(--primary)) 70%, transparent)',
+              animation: `xp-para-nivel 1200ms cubic-bezier(.45,.05,.25,1) ${delay}ms both`,
             }} />
         )
       })}
-      <span className="absolute text-base font-extrabold text-primary drop-shadow"
-        style={{ left: cx, top: cy - 40, animation: 'xp-label 1700ms ease-out both' }}>+{xp.toLocaleString('pt-BR')} XP</span>
+      <span className="absolute -mt-2 text-lg font-extrabold text-primary drop-shadow"
+        style={{ left: cx, top: cy, animation: 'xp-label 1800ms ease-out both' }}>+{xp.toLocaleString('pt-BR')} XP</span>
     </div>,
     document.body,
   )

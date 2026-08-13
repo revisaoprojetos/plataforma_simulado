@@ -21,18 +21,19 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
       const bar = barRef.current
       if (!bar || !de || !para) return
       const snap = (pct: number) => { bar.style.transition = 'none'; bar.style.width = `${pct}%`; void bar.offsetWidth }
-      const anima = (pct: number, ms: number) => { bar.style.transition = `width ${ms}ms cubic-bezier(.4,0,.2,1)`; bar.style.width = `${pct}%` }
+      const anima = (pct: number, ms: number) => { bar.style.transition = `width ${ms}ms cubic-bezier(.35,0,.25,1)`; bar.style.width = `${pct}%` }
 
       snap(de.pct)
+      // pequeno atraso p/ os pontinhos começarem a chegar antes de a barra encher (fica sincronizado).
       if (de.nivel === para.nivel) {
-        requestAnimationFrame(() => anima(para.pct, 1500))
+        setTimeout(() => anima(para.pct, 1400), 350)
       } else {
         // Subiu de nível: enche até 100, reseta e enche até o novo pct; troca o número no meio.
-        requestAnimationFrame(() => anima(100, 850))
+        setTimeout(() => anima(100, 800), 350)
         setTimeout(() => {
           setNivel(para.nivel); setTitulo(para.titulo)
-          snap(0); requestAnimationFrame(() => anima(para.pct, 1000))
-        }, 900)
+          snap(0); requestAnimationFrame(() => anima(para.pct, 950))
+        }, 1200)
       }
     }
     window.addEventListener('nivel:encher', onEncher)
@@ -56,7 +57,7 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
 
       <div className="rounded-2xl border bg-gradient-to-br from-card to-muted/30 p-5 shadow-sm">
         <div className="flex flex-col items-center gap-2">
-          <span data-nivel-alvo className="flex h-14 w-14 items-center justify-center rounded-full border-4 text-xl font-bold tabular-nums transition-transform"
+          <span className="flex h-14 w-14 items-center justify-center rounded-full border-4 text-xl font-bold tabular-nums transition-transform"
             style={{ borderColor: 'var(--brand-primary, var(--primary))', color: 'var(--brand-primary, var(--primary))' }}>
             {nivel}
           </span>
@@ -64,7 +65,8 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
             <span className="font-semibold">Nível {nivel}{titulo ? ` · ${titulo}` : ''}</span>
             <span className="ml-2 text-xs text-muted-foreground tabular-nums">{fmt(p.xpNoNivel)} / {fmt(p.xpDoNivel)} XP</span>
           </div>
-          <div className="h-2.5 w-full max-w-md overflow-hidden rounded-full ring-1 ring-black/10 dark:ring-white/10" style={{ background: 'color-mix(in oklab, var(--brand-primary, var(--primary)) 16%, transparent)' }}>
+          {/* alvo das partículas de XP = a própria barra */}
+          <div data-nivel-alvo className="h-2.5 w-full max-w-md overflow-hidden rounded-full ring-1 ring-black/10 dark:ring-white/10" style={{ background: 'color-mix(in oklab, var(--brand-primary, var(--primary)) 16%, transparent)' }}>
             <div ref={barRef} className="h-full rounded-full transition-all duration-700" style={{ width: `${p.pct}%`, background: 'var(--brand-primary, var(--primary))' }} />
           </div>
         </div>
