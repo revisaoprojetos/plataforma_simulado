@@ -30,3 +30,28 @@ export function corConquista(chave: string): string {
   for (let i = 0; i < chave.length; i++) h = (h * 31 + chave.charCodeAt(i)) >>> 0
   return CORES_CONQUISTA[h % CORES_CONQUISTA.length]
 }
+
+// Animação de hover por ícone (classes .ico-* definidas em globals.css; rodam no hover do card .group).
+const ANIM_POR_ICONE: Record<string, string> = {
+  rocket: 'ico-rocket',   // voa para fora e volta do outro lado
+  flame: 'ico-flame',     // tremor de fogo
+  trophy: 'ico-spin',     // girando
+  medal: 'ico-swing',     // balançando
+  gem: 'ico-glow',        // soltando brilho
+  crown: 'ico-bob',       // flutuando
+  star: 'ico-spin',       // girando
+  zap: 'ico-flash',       // piscando
+  award: 'ico-pop',       // pulsando
+  target: 'ico-pop',
+  brain: 'ico-heartbeat',
+  heart: 'ico-heartbeat',
+  sparkles: 'ico-glow',
+  shield: 'ico-bob',
+  book: 'ico-bob',
+  graduation: 'ico-bob',
+  calendar: 'ico-bob',
+  clock: 'ico-spin',
+  thumbs: 'ico-pop',
+  check: 'ico-pop',
+}
+export const animConquista = (chave: string): string => ANIM_POR_ICONE[chave] ?? 'ico-bob'

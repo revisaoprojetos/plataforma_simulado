@@ -1,6 +1,6 @@
 import { Award, Lock } from 'lucide-react'
 import type { ConquistaView } from '@/lib/gamificacao/leitura'
-import { iconeConquista, corConquista } from '@/lib/gamificacao/icones'
+import { iconeConquista, corConquista, animConquista } from '@/lib/gamificacao/icones'
 
 /** Grade de conquistas: desbloqueadas coloridas, bloqueadas em cinza com cadeado. */
 export function ConquistasGrid({ conquistas }: { conquistas: ConquistaView[] }) {
@@ -20,12 +20,12 @@ export function ConquistasGrid({ conquistas }: { conquistas: ConquistaView[] }) 
             <div
               key={c.def.id}
               title={`${c.def.titulo} — ${c.def.descricao}`}
-              className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 text-center transition-colors ${c.desbloqueada ? '' : 'opacity-55'}`}
+              className={`group flex flex-col items-center gap-1.5 rounded-xl border p-3 text-center transition-colors ${c.desbloqueada ? '' : 'opacity-55'}`}
               style={c.desbloqueada ? { borderColor: `color-mix(in oklab, ${cor} 35%, transparent)`, background: `color-mix(in oklab, ${cor} 7%, transparent)` } : undefined}
             >
-              <span className={`relative flex h-11 w-11 items-center justify-center rounded-full ${c.desbloqueada ? '' : 'bg-muted'}`}
+              <span className={`relative flex h-11 w-11 items-center justify-center overflow-visible rounded-full ${c.desbloqueada ? '' : 'bg-muted text-muted-foreground'}`}
                 style={c.desbloqueada ? { background: `color-mix(in oklab, ${cor} 18%, transparent)`, color: cor } : undefined}>
-                <span className={c.desbloqueada ? '' : 'text-muted-foreground'}><Icon className="h-5 w-5" /></span>
+                <Icon className={`h-5 w-5 ${c.desbloqueada ? animConquista(c.def.icone) : ''}`} />
                 {!c.desbloqueada && <Lock className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-background p-0.5 text-muted-foreground" />}
               </span>
               <span className="line-clamp-2 text-[11px] font-medium leading-tight">{c.def.titulo}</span>

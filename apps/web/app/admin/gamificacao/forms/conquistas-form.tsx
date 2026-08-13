@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Plus, Trash2, Search, Sparkles, Award } from 'lucide-react'
 import type { GamConfig, ConquistaDef, ConquistaRegraTipo } from '@/lib/gamificacao/config'
 import { DEFAULT_CONQUISTAS } from '@/lib/gamificacao/config'
-import { iconeConquista, ICONE_OPCOES, corConquista } from '@/lib/gamificacao/icones'
+import { iconeConquista, ICONE_OPCOES, corConquista, animConquista } from '@/lib/gamificacao/icones'
 import { salvarConquistas } from '../actions'
 import { SaveBar, SectionCard } from './_campos'
 import { useUnsavedGuard } from '@/components/admin/use-unsaved-guard'
@@ -88,9 +88,9 @@ export function ConquistasForm({ config, podeGerenciar }: { config: GamConfig; p
             const Icon = iconeConquista(c.icone)
             const cor = c.cor || corConquista(c.id)
             return (
-              <div key={c.id} className="space-y-3 rounded-xl border bg-card p-3 shadow-sm">
+              <div key={c.id} className="group space-y-3 rounded-xl border bg-card p-3 shadow-sm">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: `color-mix(in oklab, ${cor} 18%, transparent)`, color: cor }}><Icon className="h-5 w-5" /></span>
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-visible rounded-full" style={{ background: `color-mix(in oklab, ${cor} 18%, transparent)`, color: cor }}><Icon className={`h-5 w-5 ${animConquista(c.icone)}`} /></span>
                   <label className="min-w-0 flex-1 space-y-1">
                     <span className="block text-[11px] font-medium text-muted-foreground">Título</span>
                     <Input value={c.titulo} onChange={(e) => setById(c.id, { titulo: e.target.value })} disabled={!podeGerenciar} />
