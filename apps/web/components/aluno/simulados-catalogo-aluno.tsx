@@ -42,7 +42,7 @@ function SecoesGrid({ itens }: { itens: ItemSimuladoCat[] }) {
               <h2 className="font-semibold">{sec.titulo}</h2>
               <span className="text-sm text-muted-foreground">({arr.length})</span>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {arr.map((s) => <CardSimulado key={s.id} s={s} />)}
             </div>
           </section>
@@ -59,13 +59,15 @@ function CardPasta({ g, count, prog }: { g: GrupoCatalogo; count: number; prog?:
   const total = prog?.total ?? count
   const done = prog?.done ?? 0
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
+  // Card pôster (4:5) → usa a imagem NORMAL/inteira do banco (capa_card_url); só cai na larga se não houver.
+  const capa = g.capaCard ?? g.capa ?? null
   return (
     <Link href={`/aluno?pasta=${g.id}`}
       className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
-      {g.capa
-        ? <img src={g.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+      {capa
+        ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
-      {!g.capa && <Icon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
+      {!capa && <Icon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
 
@@ -145,7 +147,7 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
       {grupos.length > 0 && (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold"><FolderOpen className="h-4 w-4 text-primary" /> Cursos e pacotes</h2>
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {grupos.map((g) => <CardPasta key={g.id} g={g} count={contar(g.id)} prog={progresso?.[g.id]} />)}
           </div>
         </section>
