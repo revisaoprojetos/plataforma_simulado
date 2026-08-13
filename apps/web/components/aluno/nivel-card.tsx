@@ -51,7 +51,7 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
 
   useEffect(() => {
     const onEncher = (e: Event) => {
-      const { de, para } = (e as CustomEvent<{ de: ProgressoNivel; para: ProgressoNivel }>).detail
+      const { de, para, manterCargo } = (e as CustomEvent<{ de: ProgressoNivel; para: ProgressoNivel; manterCargo?: boolean }>).detail
       const bar = barRef.current
       if (!bar || !de || !para) return
       const snap = (pct: number) => { bar.style.transition = 'none'; bar.style.width = `${pct}%`; void bar.offsetWidth }
@@ -65,7 +65,8 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
         // Subiu de nível: enche até 100, reseta e enche até o novo pct; troca o número no meio.
         setTimeout(() => anima(100, 1200), 500)
         setTimeout(() => {
-          setNivel(para.nivel); setTitulo(para.titulo)
+          setNivel(para.nivel)
+          if (!manterCargo) setTitulo(para.titulo) // manterCargo: o cargo só transforma DEPOIS do level-up
           snap(0); requestAnimationFrame(() => anima(para.pct, 1200))
         }, 1750)
       }

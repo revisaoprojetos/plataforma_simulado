@@ -32,6 +32,7 @@ export interface Trilha {
   total: number
   done: number
   trilhaXp: number
+  bauResgatado?: boolean // baú já resgatado (evento de chest no ledger) — vem do servidor
   nodes: TrilhaNode[]
 }
 
@@ -198,7 +199,7 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
 
       {/* Baú resgatável — liberado quando todos os simulados da trilha estão concluídos */}
       <div className="absolute z-[3] -translate-x-1/2" style={{ left: cx(chest.off), top: chest.y - R, width: 200 }}>
-        <BauTrilha grupoId={t.id} xp={t.trilhaXp} liberado={t.total > 0 && t.done >= t.total} gamAtivo={gamAtivo} />
+        <BauTrilha grupoId={t.id} xp={t.trilhaXp} liberado={t.total > 0 && t.done >= t.total} gamAtivo={gamAtivo} resgatadoServidor={t.bauResgatado ?? false} />
       </div>
 
       {/* Card do simulado — no lado com mais espaço, alinhado ao nó */}

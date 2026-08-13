@@ -21,7 +21,7 @@ export function GamificacaoRail({ resumo, missoes, semana, conquistas, config }:
   return (
     <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
       {resumo.metaDiaXp > 0 && <MetaDiariaCard xpHoje={resumo.xpHoje} meta={resumo.metaDiaXp} />}
-      <StreakCalendario dias={semana} streak={resumo.streakAtual} chestXp={chest?.xp ?? 0} chestCadaN={chest?.cada_n_dias ?? 0} />
+      <StreakCalendario dias={semana} streak={resumo.streakAtual} feitoHoje={resumo.feitoHoje} chestXp={chest?.xp ?? 0} chestCadaN={chest?.cada_n_dias ?? 0} />
       {missoes.length > 0 && <MissoesLista missoes={missoes} renova="meia-noite" />}
       <LigaPainel ligas={config.ligas} ligaAtual={resumo.liga.id} xpTotal={resumo.xpTotal} proximaNome={proxima?.nome ?? null} faltam={proxima ? Math.max(0, proxima.xp_min - resumo.xpTotal) : 0} />
       <RankingLiga inicial="total" />

@@ -288,6 +288,15 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   // Ordem da trilha: prioriza a DATA no título ("DD/MM/AAAA – …"); senão, publicado_em/created_at.
   const dataTitulo = (tit?: string) => { const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(tit || ''); return m ? Date.UTC(+m[3], +m[2] - 1, +m[1]) : null }
   const ordKey = (i: any) => dataTitulo(i.titulo) ?? lanc(i)
+  // Baús de trilha já resgatados (evento de chest no ledger) — estado autoritativo do servidor.
+  let bausResgatados = new Set<string>()
+  if (gamConfig?.ativo) {
+    try {
+      const { data } = await svc.from('simulado_xp_eventos').select('ref_id').eq('tenant_id', sessao!.tenantId).eq('estudante_id', estId).eq('origem', 'chest').like('ref_id', 'trilha:%')
+      bausResgatados = new Set((data ?? []).map((r: any) => String(r.ref_id).slice('trilha:'.length)))
+    } catch { /* tolerante */ }
+  }
+
   const trilhas: Trilha[] = grupos.map((g) => {
     const its = itensCat.filter((i) => i.grupoId === g.id).sort((a, b) => ordKey(a) - ordKey(b) || (a.titulo || '').localeCompare(b.titulo || ''))
     // Sem bloqueio: todos os simulados ficam disponíveis em qualquer ordem. O 1º não feito
@@ -313,7 +322,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
       const nota = notas.length ? Math.max(...notas) : null
       return { id: i.id, titulo: i.titulo, quando: i.quando, estado, acerto, nota, tentativas: notas.length, statusLabel: i.statusLabel, questoes: cntQ.get(i.id) ?? 0, xp: baseXp, href, acao, capa, capaBanner, cadernoUrl: i.enunciadoUrl ?? null }
     })
-    return { id: g.id, nome: g.nome, cor: g.cor ?? null, capa: (g as any).capa ?? null, capaCard: (g as any).capaCard ?? null, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: baseXp * nodes.length, nodes }
+    return { id: g.id, nome: g.nome, cor: g.cor ?? null, capa: (g as any).capa ?? null, capaCard: (g as any).capaCard ?? null, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: baseXp * nodes.length, bauResgatado: bausResgatados.has(g.id), nodes }
   }).filter((tr) => tr.nodes.length > 0)
 
   const chest = gamConfig?.xp_regras.chest
@@ -354,7 +363,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
         {gamResumo && (
           <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
             {gamResumo.metaDiaXp > 0 && <MetaDiariaCard xpHoje={gamResumo.xpHoje} meta={gamResumo.metaDiaXp} />}
-            <StreakCalendario dias={gamSemana} streak={gamResumo.streakAtual} chestXp={chest?.xp ?? 0} chestCadaN={chest?.cada_n_dias ?? 0} />
+            <StreakCalendario dias={gamSemana} streak={gamResumo.streakAtual} feitoHoje={gamResumo.feitoHoje} chestXp={chest?.xp ?? 0} chestCadaN={chest?.cada_n_dias ?? 0} />
             {gamMissoes.length > 0 && <MissoesLista missoes={gamMissoes} renova="meia-noite" />}
             <LigaPainel ligas={gamConfig!.ligas} ligaAtual={gamResumo.liga.id} xpTotal={gamResumo.xpTotal} proximaNome={proxima?.nome ?? null} faltam={proxima ? Math.max(0, proxima.xp_min - gamResumo.xpTotal) : 0} />
             <RankingLiga inicial="total" />

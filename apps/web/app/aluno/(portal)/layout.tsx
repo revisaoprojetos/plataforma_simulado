@@ -11,7 +11,6 @@ import { resolverLoginConfig } from '@/lib/login-config'
 import { NavProgress } from '@/components/admin/nav-progress'
 import { TelaManutencao } from '@/components/aluno/tela-manutencao'
 import { MonitorManutencao } from '@/components/aluno/monitor-manutencao'
-import { GamificacaoPing } from '@/components/aluno/gamificacao-ping'
 import { getGamConfig } from '@/lib/gamificacao'
 import { resumoGamificacao } from '@/lib/gamificacao/leitura'
 import type { ProgressoAluno } from '@/components/aluno/aluno-sidebar'
@@ -63,7 +62,6 @@ export default async function AlunoPortalLayout({ children }: { children: React.
     <>
       {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
       <MonitorManutencao inicial={{ inicio: manut.inicio, avisos: manut.avisos }} />
-      <GamificacaoPing />
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
           <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} logoEstilo={t.logo_estilo ?? 'arredondado'} logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'} usuarioNome={sessao.nome} usuarioEmail={sessao.email} counts={counts} loginConfig={resolverLoginConfig(t.login)} progresso={progresso} />

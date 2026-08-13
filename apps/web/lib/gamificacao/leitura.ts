@@ -14,6 +14,7 @@ export interface ResumoGamificacao {
   proxima: LigaDef | null
   streakAtual: number
   streakMaior: number
+  feitoHoje: boolean
   xpSemana: number
   xpMes: number
   xpHoje: number
@@ -36,7 +37,7 @@ export async function resumoGamificacao(svc: any, tenantId: string, estudanteId:
   if (!config?.ativo) return null
   const { data: row } = await svc
     .from('simulado_gamificacao_estudante')
-    .select('xp_total, nivel, liga, streak_atual, streak_maior')
+    .select('xp_total, nivel, liga, streak_atual, streak_maior, ultimo_dia_ativo')
     .eq('tenant_id', tenantId).eq('estudante_id', estudanteId)
     .maybeSingle()
   const xpTotal = row?.xp_total ?? 0
@@ -54,6 +55,7 @@ export async function resumoGamificacao(svc: any, tenantId: string, estudanteId:
     proxima: proximaLiga(xpTotal, config.ligas),
     streakAtual: row?.streak_atual ?? 0,
     streakMaior: row?.streak_maior ?? 0,
+    feitoHoje: (row?.ultimo_dia_ativo ?? null) === diaLocal(config.timezone),
     xpSemana,
     xpMes,
     xpHoje,
