@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { Check, Lock, Play, Star, Route, Zap, Trophy } from 'lucide-react'
+import { Check, Lock, Play, Star, Route, Zap, Trophy, BookOpen } from 'lucide-react'
 
 export interface TrilhaNode {
   id: string
@@ -14,6 +14,7 @@ export interface TrilhaNode {
   xp: number
   href: string | null
   acao: string
+  capa: string | null
 }
 export interface Trilha {
   id: string
@@ -25,24 +26,33 @@ export interface Trilha {
   nodes: TrilhaNode[]
 }
 
-// Deslocamento horizontal dos nós — dá o serpenteado estilo Duolingo.
-const OFF = [0, 54, 82, 54, 0, -54, -82, -54]
+const SP = 104          // espaçamento vertical entre nós
+const R = 28            // raio do nó
+const XS = [46, 92]     // x alternado (serpenteado) dentro da coluna do caminho
+const WPATH = 138       // largura da coluna do caminho
 
 export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAtivo: boolean }) {
   const [ativa, setAtiva] = useState(trilhas[0]?.id)
   const t = trilhas.find((x) => x.id === ativa) ?? trilhas[0]
-  const atualId = t?.nodes.find((n) => n.estado === 'atual')?.id ?? null
+  const atualId = t?.nodes.find((n) => n.estado === 'atual')?.id ?? t?.nodes[0]?.id ?? null
   const [aberto, setAberto] = useState<string | null>(atualId)
   if (!t) return null
   const pct = t.total ? Math.round((t.done / t.total) * 100) : 0
   const cor = t.cor || 'var(--brand-primary, var(--primary))'
 
-  // Ao trocar de trilha, reabre o nó atual dela.
   function trocar(id: string) {
     setAtiva(id)
     const tr = trilhas.find((x) => x.id === id)
-    setAberto(tr?.nodes.find((n) => n.estado === 'atual')?.id ?? null)
+    setAberto(tr?.nodes.find((n) => n.estado === 'atual')?.id ?? tr?.nodes[0]?.id ?? null)
   }
+
+  // Posições dos nós (serpenteado) + nó do troféu no fim.
+  const pts = t.nodes.map((_, i) => ({ x: XS[i % 2], y: 24 + i * SP }))
+  const troyY = 24 + t.nodes.length * SP
+  const troyX = XS[t.nodes.length % 2]
+  const H = troyY + R + 16
+  const openIdx = t.nodes.findIndex((n) => n.id === aberto)
+  const openNode = openIdx >= 0 ? t.nodes[openIdx] : null
 
   return (
     <section className="space-y-4">
@@ -74,61 +84,75 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
         </div>
       </div>
 
-      {/* Caminho serpenteado */}
-      <div className="relative rounded-2xl border bg-gradient-to-b from-muted/20 to-transparent py-6">
-        <div className="pointer-events-none absolute left-1/2 top-6 bottom-6 w-1 -translate-x-1/2 rounded-full bg-border/60" />
-        <div className="relative flex flex-col items-center gap-6">
+      <div className="flex gap-4 rounded-2xl border bg-gradient-to-br from-muted/20 to-transparent p-4">
+        {/* Caminho (esquerda) */}
+        <div className="relative shrink-0" style={{ width: WPATH, height: H }}>
+          <svg className="absolute inset-0 h-full w-full" style={{ overflow: 'visible' }} aria-hidden>
+            {pts.map((p, i) => {
+              const next = i < pts.length - 1 ? pts[i + 1] : { x: troyX, y: troyY }
+              const done = t.nodes[i].estado === 'concluido'
+              return <line key={i} x1={p.x} y1={p.y} x2={next.x} y2={next.y} stroke={done ? cor : 'var(--border)'} strokeWidth={5} strokeLinecap="round" />
+            })}
+          </svg>
+
           {t.nodes.map((n, i) => {
+            const p = pts[i]
             const concluido = n.estado === 'concluido'
             const atual = n.estado === 'atual'
             const bloqueado = n.estado === 'bloqueado'
-            const off = OFF[i % OFF.length]
-            const open = aberto === n.id
+            const sel = n.id === aberto
             return (
-              <div key={n.id} className="flex w-full flex-col items-center" style={{ transform: `translateX(${off}px)` }}>
-                <button type="button" onClick={() => setAberto(open ? null : n.id)} aria-label={n.titulo}
-                  className={cn('relative flex h-16 w-16 items-center justify-center rounded-full border-4 shadow-md transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                    atual && 'animate-bounce', bloqueado && 'bg-muted text-muted-foreground/50')}
-                  style={concluido ? { background: cor, borderColor: `color-mix(in oklab, ${cor} 70%, #000)`, color: '#fff' }
+              <button key={n.id} type="button" onClick={() => setAberto(n.id)} aria-label={n.titulo}
+                className={cn('absolute flex items-center justify-center rounded-full border-4 shadow-md transition-transform hover:scale-105 focus:outline-none',
+                  atual && !sel && 'animate-bounce', bloqueado && 'bg-muted text-muted-foreground/50', sel && 'ring-4 ring-primary/30')}
+                style={{ width: R * 2, height: R * 2, left: p.x - R, top: p.y - R,
+                  ...(concluido ? { background: cor, borderColor: `color-mix(in oklab, ${cor} 70%, #000)`, color: '#fff' }
                     : atual ? { background: `color-mix(in oklab, ${cor} 18%, var(--card))`, borderColor: cor, color: cor }
-                    : { borderColor: 'var(--border)' }}>
-                  {concluido ? <Check className="h-7 w-7" /> : atual ? <Star className="h-7 w-7" /> : <Lock className="h-6 w-6" />}
-                </button>
-
-                {/* Popup do nó */}
-                {open && (
-                  <div className="relative z-10 mt-3 w-full max-w-xs" style={{ transform: `translateX(${-off}px)` }}>
-                    <div className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-l border-t bg-card" style={{ marginLeft: off }} />
-                    <div className="rounded-2xl border bg-card p-4 text-center shadow-lg" style={atual ? { borderColor: `color-mix(in oklab, ${cor} 45%, transparent)` } : undefined}>
-                      {atual && <span className="mb-1 inline-block rounded-full border border-primary/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
-                      <div className="font-semibold">{n.titulo}</div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        {concluido ? <>Concluído{n.acerto != null ? ` · ${n.acerto}% de acerto` : ''}</>
-                          : bloqueado ? 'Desbloqueie concluindo o anterior'
-                          : (n.quando ?? 'Disponível')}
-                      </div>
-                      {n.href && !bloqueado && (
-                        <Link href={n.href} className={cn('mt-3 inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition',
-                          atual ? 'w-full bg-primary text-primary-foreground hover:opacity-90' : 'border hover:bg-muted')}>
-                          {atual && <Play className="h-4 w-4" />}{n.acao}{gamAtivo && atual && n.xp > 0 ? ` · +${n.xp} XP` : ''}
-                        </Link>
-                      )}
-                      {bloqueado && gamAtivo && n.xp > 0 && (
-                        <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"><Zap className="h-3.5 w-3.5" /> +{n.xp} XP</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+                    : { borderColor: 'var(--border)' }) }}>
+                {concluido ? <Check className="h-7 w-7" /> : atual ? <Star className="h-7 w-7" /> : <Lock className="h-6 w-6" />}
+              </button>
             )
           })}
-          {/* Troféu final da trilha */}
-          <div className="flex flex-col items-center" style={{ transform: `translateX(${OFF[t.nodes.length % OFF.length]}px)` }}>
-            <span className={cn('flex h-14 w-14 items-center justify-center rounded-full border-4', t.done >= t.total ? 'text-white' : 'bg-muted text-muted-foreground/50')}
-              style={t.done >= t.total ? { background: 'var(--brand-accent, #f59e0b)', borderColor: 'color-mix(in oklab, var(--brand-accent, #f59e0b) 70%, #000)' } : { borderColor: 'var(--border)' }}>
-              <Trophy className="h-6 w-6" />
-            </span>
-          </div>
+
+          {/* Troféu final */}
+          <span className="absolute flex items-center justify-center rounded-full border-4"
+            style={{ width: 52, height: 52, left: troyX - 26, top: troyY - 26,
+              ...(t.done >= t.total ? { background: 'var(--brand-accent, #f59e0b)', borderColor: 'color-mix(in oklab, var(--brand-accent, #f59e0b) 70%, #000)', color: '#fff' } : { borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
+            <Trophy className="h-6 w-6" />
+          </span>
+        </div>
+
+        {/* Info do simulado (direita) */}
+        <div className="relative min-w-0 flex-1" style={{ minHeight: Math.min(H, 260) }}>
+          {openNode ? (
+            <div className="absolute inset-x-0 overflow-hidden rounded-2xl border bg-card shadow-lg"
+              style={{ top: Math.max(0, Math.min((pts[openIdx]?.y ?? 24) - 28, H - 240)) }}>
+              {openNode.capa
+                ? <div className="relative h-24 w-full"><img src={openNode.capa} alt="" className="h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" /></div>
+                : <div className="flex h-24 w-full items-center justify-center" style={{ background: `color-mix(in oklab, ${cor} 22%, var(--muted))` }}><BookOpen className="h-8 w-8 text-white/80" /></div>}
+              <div className="space-y-2 p-4">
+                {openNode.estado === 'atual' && <span className="inline-block rounded-full border border-primary/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
+                <div className="font-semibold leading-tight">{openNode.titulo}</div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  {openNode.estado === 'concluido'
+                    ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><Check className="h-3.5 w-3.5" /> Concluído</span>
+                    : openNode.estado === 'bloqueado'
+                    ? <span className="inline-flex items-center gap-1"><Lock className="h-3.5 w-3.5" /> Desbloqueie concluindo o anterior</span>
+                    : <span>{openNode.quando ?? 'Disponível'}</span>}
+                  {openNode.acerto != null && <span className="inline-flex items-center gap-1"><Trophy className="h-3.5 w-3.5" /> {openNode.acerto}% de acerto</span>}
+                  {gamAtivo && openNode.xp > 0 && <span className="inline-flex items-center gap-1 font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{openNode.xp} XP</span>}
+                </div>
+                {openNode.href && openNode.estado !== 'bloqueado' && (
+                  <Link href={openNode.href} className={cn('mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition',
+                    openNode.estado === 'atual' ? 'bg-primary text-primary-foreground hover:opacity-90' : 'border hover:bg-muted')}>
+                    {openNode.estado === 'atual' && <Play className="h-4 w-4" />}{openNode.acao}
+                  </Link>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Selecione um simulado na trilha.</div>
+          )}
         </div>
       </div>
     </section>
