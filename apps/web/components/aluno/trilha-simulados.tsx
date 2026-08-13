@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { Check, Lock, Play, Star, Route, Zap, Trophy, ChevronRight } from 'lucide-react'
@@ -36,6 +36,24 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
   const t = trilhas.find((x) => x.id === ativa) ?? trilhas[0]
   const inicial = t?.nodes.find((n) => n.estado === 'atual')?.id ?? t?.nodes[0]?.id ?? null
   const [aberto, setAberto] = useState<string | null>(inicial)
+  // Alinha a ponta do balão (setinha) à altura exata do nó selecionado.
+  const nodeRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [tailTop, setTailTop] = useState(40)
+  useEffect(() => {
+    function medir() {
+      const node = nodeRefs.current[aberto ?? '']
+      const wrap = wrapRef.current
+      if (!node || !wrap) return
+      const nr = node.getBoundingClientRect()
+      const wr = wrap.getBoundingClientRect()
+      const y = nr.top + nr.height / 2 - wr.top
+      setTailTop(Math.max(14, Math.min(y, wr.height - 14)))
+    }
+    medir()
+    window.addEventListener('resize', medir)
+    return () => window.removeEventListener('resize', medir)
+  }, [aberto, ativa])
   if (!t) return null
   const pct = t.total ? Math.round((t.done / t.total) * 100) : 0
   const open = t.nodes.find((n) => n.id === aberto) ?? null
@@ -88,8 +106,8 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
               <li key={n.id} className="flex gap-3">
                 {/* Nó + conector */}
                 <div className="flex flex-col items-center">
-                  <button type="button" onClick={() => setAberto(n.id)} aria-label={n.titulo}
-                    className="relative flex h-13 w-13 shrink-0 items-center justify-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary"
+                  <button type="button" ref={(el) => { nodeRefs.current[n.id] = el }} onClick={() => setAberto(n.id)} aria-label={n.titulo}
+                    className="relative flex shrink-0 items-center justify-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary"
                     style={{ width: 52, height: 52 }}>
                     {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
                     <span className={cn('flex h-full w-full items-center justify-center rounded-full border-4 shadow-sm', bloqueado && 'bg-muted text-muted-foreground/50', sel && 'ring-4 ring-primary/25')}
@@ -131,13 +149,13 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
           </li>
         </ol>
 
-        {/* ── Card do simulado (direita, sticky) ── */}
-        <div className="lg:sticky lg:top-4 lg:self-start">
+        {/* ── Card do simulado (direita) ── */}
+        <div className="lg:self-start">
           {open ? (
-            <div key={open.id} className="relative motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:slide-in-from-left-3 duration-300 ease-out">
-              {/* Ponta do balão apontando para a trilha */}
-              <span className="absolute -left-2 top-10 z-10 hidden h-0 w-0 border-y-[9px] border-r-[10px] border-y-transparent lg:block"
-                style={{ borderRightColor: open.capa ? '#0e0e14' : `color-mix(in oklab, ${COR} 45%, #000)` }} />
+            <div key={open.id} ref={wrapRef} className="relative motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:slide-in-from-left-3 duration-300 ease-out">
+              {/* Ponta do balão apontando exatamente para o nó selecionado na trilha */}
+              <span className="absolute -left-2 z-10 hidden h-0 w-0 border-y-[9px] border-r-[10px] border-y-transparent lg:block"
+                style={{ top: tailTop - 9, borderRightColor: open.capa ? '#0e0e14' : `color-mix(in oklab, ${COR} 45%, #000)` }} />
               <div className="overflow-hidden rounded-2xl border shadow-xl transition-transform duration-200 hover:scale-[1.015]">
                 <div className="relative aspect-[4/5]">
                   {open.capa
