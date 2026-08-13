@@ -255,20 +255,20 @@
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: none; }
 }
-/* ===== Level Up (modal de subida de nível) ===== */
-@keyframes lvl-confetti { 0% { transform: translateY(-6vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(106vh) rotate(720deg); opacity: .7; } }
-@keyframes lvl-glow { 0%,100% { opacity: .45; } 50% { opacity: .9; } }
-@keyframes lvl-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes lvl-spin-rev { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
-@keyframes lvl-rise { from { transform: translateY(18px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-@keyframes lvl-shake { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-8px,4px); } 40% { transform: translate(7px,-5px); } 60% { transform: translate(-6px,-3px); } 80% { transform: translate(5px,4px); } }
-@keyframes lvl-flash { 0% { opacity: .9; } 100% { opacity: 0; } }
-@keyframes lvl-numpop { 0% { transform: scale(.3) rotate(-16deg); opacity: 0; } 55% { transform: scale(1.22) rotate(4deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
-@keyframes lvl-ringburst { 0% { transform: scale(.7); opacity: .9; } 100% { transform: scale(1.6); opacity: 0; } }
-@keyframes lvl-floatup { 0% { transform: translate(-50%,0); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(-50%,-64px); opacity: 0; } }
-@keyframes lvl-ember { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: .7; } 85% { opacity: .5; } 100% { transform: translateY(-46vh); opacity: 0; } }
-@keyframes lvl-band { 0% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
-@keyframes lvl-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+/* ===== Level Up v2 (modal de subida de nível — animações contidas e estáveis) ===== */
+@keyframes lu-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lu-rise { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes lu-pop { 0% { transform: scale(1); } 40% { transform: scale(1.16); } 100% { transform: scale(1); } }
+@keyframes lu-numpop { 0% { transform: scale(.4); opacity: 0; } 55% { transform: scale(1.18); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes lu-ringpulse { 0% { transform: scale(.85); opacity: .85; } 100% { transform: scale(1.7); opacity: 0; } }
+@keyframes lu-halo { 0%,100% { transform: scale(1); opacity: .5; } 50% { transform: scale(1.08); opacity: .85; } }
+@keyframes lu-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes lu-aurora1 { 0%,100% { transform: translate(-14%,-8%) scale(1); } 50% { transform: translate(10%,6%) scale(1.25); } }
+@keyframes lu-aurora2 { 0%,100% { transform: translate(12%,10%) scale(1.1); } 50% { transform: translate(-10%,-6%) scale(.9); } }
+@keyframes lu-twinkle { 0%,100% { opacity: .12; } 50% { opacity: .5; } }
+@keyframes lu-burst { 0% { transform: translate(0,0) scale(1); opacity: 1; } 100% { transform: translate(var(--bx), var(--by)) scale(.3); opacity: 0; } }
+@keyframes lu-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes lu-float { 0% { transform: translate(-50%, 0); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(-50%, -60px); opacity: 0; } }
 
 /* Celebração de XP: pontos voam de fora (--sx,--sy) até o card de nível e "somem" ao chegar. */
 @keyframes xp-para-nivel {
