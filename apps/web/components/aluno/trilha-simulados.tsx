@@ -208,9 +208,9 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
                   </Link>
                   {open.cadernoUrl && (
                     <a href={open.cadernoUrl} target="_blank" rel="noopener noreferrer" title="Baixar caderno de questões" aria-label="Baixar caderno de questões"
-                      className="group/dl relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border-[1.5px] border-white/80 text-white transition-all hover:scale-[1.03]">
-                      <span className="absolute inset-0 bg-white opacity-0 transition-opacity duration-300 group-hover/dl:opacity-100" />
-                      <Download className="relative z-10 h-4 w-4 text-white transition-colors group-hover/dl:text-[color:var(--btn,#6d28d9)]" />
+                      className="group/dl relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border-[1.5px] border-muted-foreground/40 text-muted-foreground transition-all hover:scale-[1.03] hover:border-white hover:text-white">
+                      <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/dl:opacity-100" style={{ background: 'color-mix(in oklab, var(--muted-foreground) 55%, transparent)' }} />
+                      <Download className="relative z-10 h-4 w-4 transition-colors" />
                     </a>
                   )}
                 </div>
@@ -453,9 +453,9 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
                   </Link>
                   {open.cadernoUrl && (
                     <a href={open.cadernoUrl} target="_blank" rel="noopener noreferrer" title="Baixar caderno de questões" aria-label="Baixar caderno de questões"
-                      className="group/dl relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border-[1.5px] border-white/80 text-white transition-all hover:scale-[1.03]">
-                      <span className="absolute inset-0 bg-white opacity-0 transition-opacity duration-300 group-hover/dl:opacity-100" />
-                      <Download className="relative z-10 h-4 w-4 text-white transition-colors group-hover/dl:text-[color:var(--btn,#6d28d9)]" />
+                      className="group/dl relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border-[1.5px] border-muted-foreground/40 text-muted-foreground transition-all hover:scale-[1.03] hover:border-white hover:text-white">
+                      <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/dl:opacity-100" style={{ background: 'color-mix(in oklab, var(--muted-foreground) 55%, transparent)' }} />
+                      <Download className="relative z-10 h-4 w-4 transition-colors" />
                     </a>
                   )}
                 </div>
