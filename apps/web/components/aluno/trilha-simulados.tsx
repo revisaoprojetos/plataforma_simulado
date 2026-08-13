@@ -343,10 +343,13 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
   // Layout: percorre grupos empilhando divisória + nós, guardando as posições.
   const nodesL: { n: TrilhaNode; off: number; y: number }[] = []
   const dividers: { id: string; nome: string; done: number; total: number; y: number }[] = []
+  // Fundo por grupo: capa comprida (banner) p/ trilhas curtas (≤2), capa normal (pôster) p/ maiores.
+  const segmentos: { id: string; capa: string | null; yTop: number; yBot: number }[] = []
   let y = PAD, gi = 0
   trilhas.forEach((t, ti) => {
     if (ti > 0) y += GAP_GRUPO
-    dividers.push({ id: t.id, nome: t.nome, done: t.done, total: t.total, y })
+    const dy = y
+    dividers.push({ id: t.id, nome: t.nome, done: t.done, total: t.total, y: dy })
     y += GAP_HDR
     t.nodes.forEach((n) => {
       const off = OFFS[gi % OFFS.length]
@@ -354,6 +357,11 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       y += ROW
       gi++
     })
+    const curta = t.total <= 2
+    const capa = curta
+      ? (t.nodes.find((n) => n.capaBanner)?.capaBanner ?? t.nodes.find((n) => n.capa)?.capa ?? null)
+      : (t.nodes.find((n) => n.capa)?.capa ?? t.nodes.find((n) => n.capaBanner)?.capaBanner ?? null)
+    segmentos.push({ id: t.id, capa, yTop: dy - 8, yBot: y - 6 })
   })
   const chest = { off: OFFS[gi % OFFS.length], y: y + R }
   const height = chest.y + R + 48
@@ -369,6 +377,13 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
 
   return (
     <div className="relative mx-auto" style={{ width: LANE, height }}>
+      {/* Fundo por grupo — capa do banco bem apagada, só p/ diferenciar cada trilha */}
+      {segmentos.map((s) => s.capa && (
+        <div key={s.id} className="pointer-events-none absolute left-0 z-0 overflow-hidden rounded-2xl" style={{ top: s.yTop, height: Math.max(0, s.yBot - s.yTop), width: LANE }}>
+          <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-center" style={{ opacity: 0.08 }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent, color-mix(in oklab, var(--background) 40%, transparent))' }} />
+        </div>
+      ))}
       {/* Conectores pontilhados — contínuos, inclusive entre grupos */}
       <svg className="absolute left-0 top-0" width={LANE} height={height} aria-hidden>
         {allPts.slice(0, -1).map((p, i) => {
