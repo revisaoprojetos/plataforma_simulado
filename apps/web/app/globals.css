@@ -257,6 +257,7 @@
 }
 /* ===== Level Up v2 (modal de subida de nível — animações contidas e estáveis) ===== */
 @keyframes lu-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lu-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(.96); } }
 @keyframes lu-rise { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 @keyframes lu-pop { 0% { transform: scale(1); } 40% { transform: scale(1.16); } 100% { transform: scale(1); } }
 @keyframes lu-numpop { 0% { transform: scale(.4); opacity: 0; } 55% { transform: scale(1.18); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }

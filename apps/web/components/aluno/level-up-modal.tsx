@@ -32,6 +32,8 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
   xpGanho: number; totalXp: number; streak: number; badgesLabel: string; logo?: string | null; onClose: () => void
 }) {
   const [st, setSt] = useState<St>({ level: from, fill: 0, playing: true, done: false, pop: false, promoted: null, xpShown: 0, xpTarget: 0, burst: 0 })
+  const [saindo, setSaindo] = useState(false)
+  const fechar = () => { setSaindo(true); setTimeout(onClose, 380) }
   const timers = useRef<any[]>([])
   const xpInt = useRef<any>(null)
   const later = (fn: () => void, ms: number) => timers.current.push(setTimeout(fn, ms))
@@ -69,7 +71,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
   for (let l = from; l <= to; l++) steps.push({ n: l, passou: st.level >= l })
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex overflow-hidden" style={{ background: 'radial-gradient(circle at 50% 34%, #1a1730 0%, #0b0912 62%)', color: FG, animation: 'lu-in .3s ease both' }}>
+    <div className="fixed inset-0 z-[200] flex overflow-hidden" style={{ background: 'radial-gradient(circle at 50% 34%, #1a1730 0%, #0b0912 62%)', color: FG, animation: saindo ? 'lu-out .38s cubic-bezier(.4,0,.2,1) forwards' : 'lu-in .3s ease both' }}>
       {/* Fundo: auroras + estrelas (contidas) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute rounded-full blur-3xl" style={{ left: '18%', top: '10%', width: 520, height: 520, background: mix(45, 'transparent'), opacity: 0.5, animation: 'lu-aurora1 14s ease-in-out infinite' }} />
@@ -211,7 +213,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
               <span className="inline-flex items-center gap-1.5"><Flame className="h-3.5 w-3.5" style={{ color: '#fb923c' }} />{streak} dias</span>
             </div>
 
-            <button type="button" onClick={onClose} className="mt-0.5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-110"
+            <button type="button" onClick={fechar} className="mt-0.5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-110"
               style={{ background: `linear-gradient(135deg, ${A}, ${mix(78, 'black')})`, boxShadow: `0 10px 30px -8px ${mix(55, 'transparent')}`, animation: 'lu-rise .45s ease .42s both' }}>
               <Sparkles className="h-4 w-4" /> Continuar estudando <ArrowRight className="h-4 w-4" />
             </button>
