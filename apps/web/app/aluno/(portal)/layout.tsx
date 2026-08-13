@@ -12,6 +12,9 @@ import { NavProgress } from '@/components/admin/nav-progress'
 import { TelaManutencao } from '@/components/aluno/tela-manutencao'
 import { MonitorManutencao } from '@/components/aluno/monitor-manutencao'
 import { GamificacaoPing } from '@/components/aluno/gamificacao-ping'
+import { getGamConfig } from '@/lib/gamificacao'
+import { resumoGamificacao } from '@/lib/gamificacao/leitura'
+import type { ProgressoAluno } from '@/components/aluno/aluno-sidebar'
 
 export default async function AlunoPortalLayout({ children }: { children: React.ReactNode }) {
   const sessao = await getSessaoAluno()
@@ -34,6 +37,17 @@ export default async function AlunoPortalLayout({ children }: { children: React.
     if ((favs ?? 0) > 0) counts['/aluno/favoritos'] = favs ?? 0
   } catch { /* contagens são opcionais */ }
 
+  // Progresso de gamificação para a sidebar ("Seu progresso") — tolerante e só quando ativo.
+  let progresso: ProgressoAluno | null = null
+  try {
+    const svc = await createServiceClient()
+    const cfg = await getGamConfig(svc, sessao.tenantId)
+    if (cfg?.ativo) {
+      const r = await resumoGamificacao(svc, sessao.tenantId, sessao.estudanteId, cfg)
+      if (r) progresso = { streak: r.streakAtual, xpTotal: r.xpTotal, nivel: r.progresso.nivel, liga: r.liga.nome, ligaCor: r.liga.cor }
+    }
+  } catch { /* opcional */ }
+
   // Manutenção da plataforma: bloqueia o PORTAL (não o runner do simulado, que é outro layout).
   const manut = normalizarManutencao(t.manutencao_sistema)
   if (emManutencaoAgora(manut)) {
@@ -52,7 +66,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       <GamificacaoPing />
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
-          <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} logoEstilo={t.logo_estilo ?? 'arredondado'} logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'} usuarioNome={sessao.nome} usuarioEmail={sessao.email} counts={counts} loginConfig={resolverLoginConfig(t.login)} />
+          <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} logoEstilo={t.logo_estilo ?? 'arredondado'} logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'} usuarioNome={sessao.nome} usuarioEmail={sessao.email} counts={counts} loginConfig={resolverLoginConfig(t.login)} progresso={progresso} />
           <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
             <SidebarEdgeToggle />
             <Suspense fallback={null}><NavProgress /></Suspense>

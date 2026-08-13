@@ -14,9 +14,11 @@ import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } fro
 import { SemAcessoModal } from '@/components/aluno/sem-acesso-modal'
 import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
 import { getGamConfig } from '@/lib/gamificacao'
-import { resumoGamificacao, missoesHoje } from '@/lib/gamificacao/leitura'
+import { resumoGamificacao, missoesHoje, atividadeSemana } from '@/lib/gamificacao/leitura'
 import { GamificacaoHero } from '@/components/aluno/gamificacao-hero'
 import { MissoesLista } from '@/components/aluno/missoes-lista'
+import { StreakCalendario } from '@/components/aluno/streak-calendario'
+import { TrilhaSimulados, type Trilha } from '@/components/aluno/trilha-simulados'
 
 export default async function AlunoHome({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
   const { pasta } = await searchParams
@@ -258,14 +260,38 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     )
   }
 
-  // Gamificação (hero + missões do dia) — só quando o tenant ativou; leituras leves (cache + janela).
+  // Gamificação (hero + missões + calendário de sequência) — só quando o tenant ativou.
   const gamConfig = await getGamConfig(svc, sessao!.tenantId)
-  const [gamResumo, gamMissoes] = gamConfig?.ativo
+  const [gamResumo, gamMissoes, gamSemana] = gamConfig?.ativo
     ? await Promise.all([
         resumoGamificacao(svc, sessao!.tenantId, estId, gamConfig),
         missoesHoje(svc, sessao!.tenantId, estId, gamConfig),
+        atividadeSemana(svc, sessao!.tenantId, estId, gamConfig.timezone),
       ])
-    : [null, []]
+    : [null, [], []]
+
+  // Trilhas de simulados (estilo Duolingo): por grupo, nós concluído → atual → bloqueado.
+  const baseXp = gamConfig?.ativo ? (gamConfig.xp_regras.simulado.base || 0) : 0
+  const lanc = (i: any) => new Date(i.regras?.publicado_em ?? i.created_at ?? 0).getTime()
+  const trilhas: Trilha[] = grupos.map((g) => {
+    const its = itensCat.filter((i) => i.grupoId === g.id).sort((a, b) => lanc(a) - lanc(b))
+    let unlocked = true
+    const nodes = its.map((i) => {
+      const sess = sessoesPorSim.get(i.id) ?? []
+      const notas = sess.filter((s: any) => s.status === 'finalizada' && s.nota != null).map((s: any) => Number(s.nota))
+      const done = feitosSet.has(i.id)
+      const acerto = notas.length ? Math.round(Math.max(...notas)) : null
+      let estado: 'concluido' | 'atual' | 'bloqueado'
+      if (done) estado = 'concluido'
+      else if (unlocked) { estado = 'atual'; unlocked = false }
+      else estado = 'bloqueado'
+      const podeIr = i.podeFazer || i.emAndamento || i.refazer
+      const href = done ? `/aluno/simulados/${i.id}` : (podeIr && i.embed_token ? `/simulado/${i.embed_token}` : `/aluno/simulados/${i.id}`)
+      const acao = done ? 'Ver resultado' : i.emAndamento ? 'Continuar' : i.refazer ? 'Refazer' : 'Fazer agora'
+      return { id: i.id, titulo: i.titulo, quando: i.quando, estado, acerto, xp: baseXp, href, acao }
+    })
+    return { id: g.id, nome: g.nome, cor: g.cor ?? null, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: baseXp * nodes.length, nodes }
+  }).filter((tr) => tr.nodes.length > 0)
 
   const atalhos = [
     { href: '/aluno/simulados', icon: ClipboardList, titulo: 'Meus Simulados', desc: 'Seus simulados e resultados' },
@@ -281,13 +307,19 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
       {/* Banners do tenant — UM carrossel só (banner + destaque + simulado) + pop-up. SÓ na Início. */}
       <BannersPortal banners={bannersSemSim.map((b) => ({ ...b, ordem: ordemGlobal.get(b.id) ?? 0, estilo: (destaquesBanner[b.id] as any)?.popupEstilo ?? null, pontas: (destaquesBanner[b.id] as any)?.popupPontas ?? null, textoPos: (destaquesBanner[b.id] as any)?.bannerTextoPos ?? null, textoCor: (destaquesBanner[b.id] as any)?.bannerTextoCor ?? null, textoTam: (destaquesBanner[b.id] as any)?.bannerTextoTam ?? null, textoX: (destaquesBanner[b.id] as any)?.bannerTextoX ?? null, textoY: (destaquesBanner[b.id] as any)?.bannerTextoY ?? null, ocultarTitulo: (destaquesBanner[b.id] as any)?.bannerOcultarTitulo ?? false, ocultarMensagem: (destaquesBanner[b.id] as any)?.bannerOcultarMensagem ?? false, freq: (destaquesBanner[b.id] as any)?.freq ?? null }))} simulados={heroSims} stats={mostrarDesempenhoBanner ? statsAluno : null} />
 
-      {/* Gamificação: hero (nível/liga/streak/XP) + missões do dia. Só quando o tenant ativou. */}
+      {/* Gamificação: hero + calendário de sequência + missões do dia. Só quando o tenant ativou. */}
       {gamResumo && (
-        <div className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
-          <GamificacaoHero nome={sessao!.nome} resumo={gamResumo} />
-          {gamMissoes.length > 0 ? <MissoesLista missoes={gamMissoes} renova="meia-noite" /> : <div className="hidden lg:block" />}
+        <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+            <GamificacaoHero nome={sessao!.nome} resumo={gamResumo} />
+            <StreakCalendario dias={gamSemana} streak={gamResumo.streakAtual} />
+          </div>
+          {gamMissoes.length > 0 && <MissoesLista missoes={gamMissoes} renova="meia-noite" />}
         </div>
       )}
+
+      {/* Trilhas de simulados (estilo Duolingo) */}
+      {trilhas.length > 0 && <TrilhaSimulados trilhas={trilhas} gamAtivo={!!gamResumo} />}
 
       {/* Saudação solta. */}
       <div>

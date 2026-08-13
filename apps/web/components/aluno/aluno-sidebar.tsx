@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { type LoginConfig } from '@/lib/login-config'
-import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy } from 'lucide-react'
+import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy, Flame, Zap } from 'lucide-react'
 import {
   Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter,
@@ -47,12 +47,14 @@ function iniciais(nome: string) {
   return nome.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || 'A'
 }
 
+export interface ProgressoAluno { streak: number; xpTotal: number; nivel: number; liga: string; ligaCor: string }
+
 export function AlunoSidebar({
   logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none',
-  usuarioNome = 'Aluno', usuarioEmail, counts, loginConfig,
+  usuarioNome = 'Aluno', usuarioEmail, counts, loginConfig, progresso,
 }: {
   logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string
-  usuarioNome?: string; usuarioEmail?: string | null; counts?: Record<string, number>; loginConfig: LoginConfig
+  usuarioNome?: string; usuarioEmail?: string | null; counts?: Record<string, number>; loginConfig: LoginConfig; progresso?: ProgressoAluno | null
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -121,6 +123,17 @@ export function AlunoSidebar({
       {/* RODAPÉ: perfil + notificações + tema + ajuda + sair (absorveu a antiga topbar).
           Colapsado → coluna centrada de ícones; o texto some com fade+colapso suave. */}
       <SidebarFooter className="gap-2 border-t border-sidebar-border p-3 transition-[padding] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:p-2 [&_svg]:text-[color:var(--sidebar-icon)] [&_button:hover_svg]:text-[color:var(--sidebar-icon-active)]">
+        {/* SEU PROGRESSO (gamificação) — some quando a sidebar está recolhida. */}
+        {progresso && (
+          <Link href="/aluno/ligas" className="mb-1 block rounded-xl border border-white/10 bg-white/5 p-2.5 transition-colors hover:bg-white/10 group-data-[collapsible=icon]:hidden">
+            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/50">Seu progresso</div>
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="inline-flex items-center gap-1" title="Sequência"><Flame className="h-3.5 w-3.5 text-orange-400" /> <span className="font-semibold tabular-nums">{progresso.streak}</span></span>
+              <span className="inline-flex items-center gap-1" title="XP total"><Zap className="h-3.5 w-3.5 text-amber-300" /> <span className="font-semibold tabular-nums">{progresso.xpTotal.toLocaleString('pt-BR')}</span></span>
+              <span className="inline-flex items-center gap-1" title={`Liga ${progresso.liga}`}><Trophy className="h-3.5 w-3.5" style={{ color: progresso.ligaCor }} /> <span className="font-semibold">{progresso.liga}</span></span>
+            </div>
+          </Link>
+        )}
         <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
           {/* Card do perfil (avatar + nome + email) — todo clicável, no estilo dos botões Ajuda/Sair. */}
           <Link href="/aluno/perfil" title="Meu perfil" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1.5 pr-2.5 transition-colors hover:bg-white/10 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:p-0">

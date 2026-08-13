@@ -137,4 +137,26 @@ export async function rankingPeriodo(svc: any, tenantId: string, desdeISO: strin
   return rows.map((r, i) => ({ estudanteId: r.estudante_id, nome: nomes.get(r.estudante_id) ?? 'Aluno', xp: Number(r.xp), posicao: i + 1, eu: r.estudante_id === eu }))
 }
 
+// ─────────── ATIVIDADE DA SEMANA (calendário de sequência) ───────────
+export interface DiaAtivo { dia: string; label: string; ativo: boolean; hoje: boolean }
+const DOW = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+
+/** Últimos 7 dias (na tz do tenant) marcando quais tiveram atividade (evento de XP). */
+export async function atividadeSemana(svc: any, tenantId: string, estudanteId: string, tz: string): Promise<DiaAtivo[]> {
+  const desde = new Date(Date.now() - 7 * 86_400_000).toISOString()
+  let ativos = new Set<string>()
+  try {
+    const { data } = await svc.from('simulado_xp_eventos').select('criado_em').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).gte('criado_em', desde).limit(1000)
+    ativos = new Set((data ?? []).map((r: any) => diaLocal(tz, new Date(r.criado_em))))
+  } catch { /* tolerante */ }
+  const hoje = diaLocal(tz)
+  const out: DiaAtivo[] = []
+  for (let i = 6; i >= 0; i--) {
+    const dia = diaLocal(tz, new Date(Date.now() - i * 86_400_000))
+    const dow = new Date(dia + 'T00:00:00Z').getUTCDay()
+    out.push({ dia, label: DOW[dow], ativo: ativos.has(dia), hoje: dia === hoje })
+  }
+  return out
+}
+
 export { inicioDaSemanaISO, inicioDoMesISO }
