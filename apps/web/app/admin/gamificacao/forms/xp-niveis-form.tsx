@@ -47,7 +47,7 @@ export function XpNiveisForm({ config, podeGerenciar }: { config: GamConfig; pod
       {podeGerenciar && <SaveBar salvando={salvando} dirty={dirty} hint="Aplica XP, níveis e cargos." />}
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <SectionCard titulo="XP por concluir simulado" icon={Zap} descricao="XP que o aluno ganha ao finalizar cada simulado (base + acertos + bônus por nota).">
+        <SectionCard titulo="XP por concluir simulado" icon={Zap} tom="#f59e0b" descricao="XP que o aluno ganha ao finalizar cada simulado (base + acertos + bônus por nota).">
           <div className="grid grid-cols-3 gap-2.5">
             <NumberField stacked label="XP base (por concluir)" value={simulado.base} onChange={(v) => setSimulado({ ...simulado, base: v })} suffix="XP" hint="Fixo por finalizar, mesmo sem acertar." disabled={!podeGerenciar} />
             <NumberField stacked label="XP por acerto" value={simulado.por_acerto} onChange={(v) => setSimulado({ ...simulado, por_acerto: v })} suffix="XP / acerto" hint="Multiplicado pelo nº de questões corretas." disabled={!podeGerenciar} />
@@ -55,7 +55,7 @@ export function XpNiveisForm({ config, podeGerenciar }: { config: GamConfig; pod
           </div>
         </SectionCard>
 
-        <SectionCard titulo="XP por praticar (Banco de Questões)" icon={BookOpen} descricao="XP ao acertar questões na prática avulsa do banco, com bônus em disciplinas fracas.">
+        <SectionCard titulo="XP por praticar (Banco de Questões)" icon={BookOpen} tom="#0ea5e9" descricao="XP ao acertar questões na prática avulsa do banco, com bônus em disciplinas fracas.">
           <div className="grid grid-cols-2 gap-2.5">
             <NumberField stacked label="XP por acerto na prática" value={pratica.por_acerto} onChange={(v) => setPratica({ ...pratica, por_acerto: v })} suffix="XP" hint="Por questão acertada no banco (repetível)." disabled={!podeGerenciar} />
             <NumberField stacked label="Bônus em disciplina fraca" value={pratica.bonus_disc_fraca} onChange={(v) => setPratica({ ...pratica, bonus_disc_fraca: v })} suffix="XP extra" hint="Quando o aproveitamento na disciplina está abaixo de 50%." disabled={!podeGerenciar} />
@@ -64,7 +64,7 @@ export function XpNiveisForm({ config, podeGerenciar }: { config: GamConfig; pod
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
-        <SectionCard titulo="Curva de níveis" icon={TrendingUp} descricao="Custo do nível n→n+1 = base + (n−1) × incremento. Cresce a cada nível." className="flex flex-col lg:h-[34rem]">
+        <SectionCard titulo="Curva de níveis" icon={TrendingUp} tom="#8b5cf6" descricao="Custo do nível n→n+1 = base + (n−1) × incremento. Cresce a cada nível." className="flex flex-col lg:h-[34rem]">
           <div className="grid grid-cols-3 gap-2.5">
             <NumberField stacked label="Custo base (1→2)" value={curva.base} onChange={(v) => setCurva({ ...curva, base: v })} suffix="XP" hint="XP para sair do nível 1 para o 2." disabled={!podeGerenciar} />
             <NumberField stacked label="Incremento" value={curva.incremento} onChange={(v) => setCurva({ ...curva, incremento: v })} suffix="XP" hint="Quanto o custo sobe a cada nível." disabled={!podeGerenciar} />
@@ -94,7 +94,7 @@ export function XpNiveisForm({ config, podeGerenciar }: { config: GamConfig; pod
           </div>
         </SectionCard>
 
-        <SectionCard titulo="Cargos por nível" icon={Briefcase} descricao="Título exibido ao aluno a partir de cada nível (ex.: Aprendiz → Júnior → Sênior → Promotor → Advogado). Vale até o próximo cargo." className="flex flex-col lg:h-[34rem]">
+        <SectionCard titulo="Cargos por nível" icon={Briefcase} tom="#10b981" descricao="Título exibido ao aluno a partir de cada nível (ex.: Aprendiz → Júnior → Sênior → Promotor → Advogado). Vale até o próximo cargo." className="flex flex-col lg:h-[34rem]">
           <div className="min-h-0 max-h-[24rem] flex-1 space-y-2 overflow-auto rounded-lg border bg-muted/10 p-2 lg:max-h-none">
             {[...titulos].sort((a, b) => a.nivel_min - b.nivel_min).map((t) => {
               const i = titulos.indexOf(t)

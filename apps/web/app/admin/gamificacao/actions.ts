@@ -42,11 +42,11 @@ export async function salvarXpNiveis(d: { simulado: XpRegras['simulado']; pratic
   return salvarSlice({ xp_regras: { ...xp, simulado: d.simulado, pratica: d.pratica }, nivel_curva: d.nivel_curva })
 }
 
-export async function salvarRegrasGerais(d: { ativo: boolean; timezone: string; streak: XpRegras['streak']; chest: XpRegras['chest'] }) {
+export async function salvarRegrasGerais(d: { ativo: boolean; timezone: string; streak: XpRegras['streak']; chest: XpRegras['chest']; fim_semana: XpRegras['fim_semana']; meta_dia: XpRegras['meta_dia'] }) {
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { error: 'Tenant não resolvido.' }
   const xp = await xpRegrasAtual(createAdminClient(), tenantId)
-  return salvarSlice({ ativo: d.ativo, timezone: d.timezone, xp_regras: { ...xp, streak: d.streak, chest: d.chest } })
+  return salvarSlice({ ativo: d.ativo, timezone: d.timezone, xp_regras: { ...xp, streak: d.streak, chest: d.chest, fim_semana: d.fim_semana, meta_dia: d.meta_dia } })
 }
 
 export async function salvarLigas(ligas: LigaDef[]) {

@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Trash2, Search, Sparkles } from 'lucide-react'
+import { Plus, Trash2, Search, Sparkles, Award } from 'lucide-react'
 import type { GamConfig, ConquistaDef, ConquistaRegraTipo } from '@/lib/gamificacao/config'
 import { DEFAULT_CONQUISTAS } from '@/lib/gamificacao/config'
 import { iconeConquista, ICONE_OPCOES } from '@/lib/gamificacao/icones'
@@ -63,7 +63,7 @@ export function ConquistasForm({ config, podeGerenciar }: { config: GamConfig; p
     <form onSubmit={onSubmit} className="space-y-4">
       {podeGerenciar && <SaveBar salvando={salvando} dirty={dirty} hint="Conquistas do aluno." />}
 
-      <SectionCard titulo="Conquistas" descricao="Desbloqueadas uma única vez ao cumprir a regra. Podem conceder XP extra ao desbloquear.">
+      <SectionCard titulo="Conquistas" icon={Award} tom="#8b5cf6" descricao="Desbloqueadas uma única vez ao cumprir a regra. Podem conceder XP extra ao desbloquear.">
         {/* Barra de busca + filtro + ações */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="relative min-w-[200px] flex-1">

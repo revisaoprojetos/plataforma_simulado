@@ -59,7 +59,7 @@ export function MissoesForm({ config, podeGerenciar }: { config: GamConfig; pode
       {podeGerenciar && <SaveBar salvando={salvando} dirty={dirty} hint="Missões diárias do aluno." />}
 
       {/* Exibição / rodízio */}
-      <SectionCard titulo="Como as missões aparecem" icon={CalendarClock} descricao="Escolha exibir todas as ativas ou fazer um rodízio de algumas por dia (renova à meia-noite, no fuso do tenant).">
+      <SectionCard titulo="Como as missões aparecem" icon={CalendarClock} tom="#f59e0b" descricao="Escolha exibir todas as ativas ou fazer um rodízio de algumas por dia (renova à meia-noite, no fuso do tenant).">
         <div className="flex flex-wrap items-end gap-4">
           <label className="space-y-1">
             <span className="block text-[11px] font-medium text-muted-foreground">Modo</span>
@@ -91,7 +91,7 @@ export function MissoesForm({ config, podeGerenciar }: { config: GamConfig; pode
       </SectionCard>
 
       {/* Catálogo de missões */}
-      <SectionCard titulo="Missões" descricao="Ative/desative para escolher quais entram no rodízio. O aluno ganha o XP ao atingir a meta.">
+      <SectionCard titulo="Missões" icon={Target} tom="#8b5cf6" descricao="Ative/desative para escolher quais entram no rodízio. O aluno ganha o XP ao atingir a meta.">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">{missoes.length} missão(ões) · {ativas.length} ativa(s)</span>
           {podeGerenciar && (

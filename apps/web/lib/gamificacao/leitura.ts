@@ -16,6 +16,8 @@ export interface ResumoGamificacao {
   streakMaior: number
   xpSemana: number
   xpMes: number
+  xpHoje: number
+  metaDiaXp: number
 }
 
 async function somaPeriodo(svc: any, tenantId: string, estudanteId: string, desdeISO: string): Promise<number> {
@@ -38,9 +40,10 @@ export async function resumoGamificacao(svc: any, tenantId: string, estudanteId:
     .eq('tenant_id', tenantId).eq('estudante_id', estudanteId)
     .maybeSingle()
   const xpTotal = row?.xp_total ?? 0
-  const [xpSemana, xpMes] = await Promise.all([
+  const [xpSemana, xpMes, xpHoje] = await Promise.all([
     somaPeriodo(svc, tenantId, estudanteId, inicioDaSemanaISO()),
     somaPeriodo(svc, tenantId, estudanteId, inicioDoMesISO()),
+    svc.rpc('rpc_xp_dia', { p_tenant: tenantId, p_estudante: estudanteId, p_tz: config.timezone }).then((r: any) => Number(r?.data ?? 0)).catch(() => 0),
   ])
   return {
     ativo: true,
@@ -53,6 +56,8 @@ export async function resumoGamificacao(svc: any, tenantId: string, estudanteId:
     streakMaior: row?.streak_maior ?? 0,
     xpSemana,
     xpMes,
+    xpHoje,
+    metaDiaXp: config.xp_regras.meta_dia?.xp ?? 0,
   }
 }
 

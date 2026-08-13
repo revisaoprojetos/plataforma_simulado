@@ -1,7 +1,9 @@
 import { getGamConfig } from './config'
-import { diaLocal, diaAnterior } from './datas'
+import { diaLocal } from './datas'
 import { ensureCacheRow } from './cache'
 import { awardXp } from './xp'
+
+const diaNum = (dia: string) => Math.floor(Date.parse(dia + 'T00:00:00Z') / 86_400_000)
 
 /**
  * Registra atividade diária do aluno e mantém a sequência (streak). Idempotente por dia:
@@ -22,8 +24,13 @@ export async function registrarAtividade(svc: any, { tenantId, estudanteId }: { 
   const ultimo: string | null = row?.ultimo_dia_ativo ?? null
   if (ultimo === hoje) return // já contou hoje
 
+  // Tolerância (grace): mantém a sequência se o intervalo desde a última atividade couber na folga.
+  const tol = Math.max(0, config.xp_regras.streak.tolerancia_dias ?? 0)
   let streak = 1
-  if (ultimo && ultimo === diaAnterior(hoje)) streak = (row?.streak_atual ?? 0) + 1
+  if (ultimo) {
+    const gap = diaNum(hoje) - diaNum(ultimo)
+    if (gap >= 1 && gap <= 1 + tol) streak = (row?.streak_atual ?? 0) + 1
+  }
   const maior = Math.max(row?.streak_maior ?? 0, streak)
 
   await ensureCacheRow(svc, tenantId, estudanteId)

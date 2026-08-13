@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Trash2, RefreshCw, Shield, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, RefreshCw, Shield, ChevronRight, Trophy } from 'lucide-react'
 import type { GamConfig, LigaDef } from '@/lib/gamificacao/config'
 import { salvarLigas, rebuildGamificacao } from '../actions'
 import { SaveBar, SectionCard } from './_campos'
@@ -62,6 +62,8 @@ export function LigasForm({ config, podeGerenciar }: { config: GamConfig; podeGe
 
       <SectionCard
         titulo="Ligas & Divisões"
+        icon={Trophy}
+        tom="#f59e0b"
         descricao="Tiers por XP total acumulado (sem reset). O aluno sobe ao cruzar o XP mínimo. A ordem é automática pelo XP mínimo."
       >
         {/* Prévia da progressão */}

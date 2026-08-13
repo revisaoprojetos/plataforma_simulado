@@ -55,12 +55,20 @@ export function TextField({ label, value, onChange, placeholder, disabled }: {
   )
 }
 
-/** Seção padrão da área de gamificação: cabeçalho com ícone + título/descrição + conteúdo, em card. */
-export function SectionCard({ titulo, descricao, icon: Icon, children, className }: { titulo: string; descricao?: string; icon?: LucideIcon; children: React.ReactNode; className?: string }) {
+/**
+ * Seção padrão da área de gamificação: cabeçalho com ícone (colorido via `tom`) + título/descrição.
+ * `tom` = cor do ícone (com fundo suave); sem `tom`, usa a cor primária.
+ */
+export function SectionCard({ titulo, descricao, icon: Icon, tom, children, className }: { titulo: string; descricao?: string; icon?: LucideIcon; tom?: string; children: React.ReactNode; className?: string }) {
   return (
     <section className={`rounded-2xl border bg-card p-5 shadow-sm ${className ?? ''}`}>
       <div className="mb-4 flex items-start gap-3">
-        {Icon && <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4" /></span>}
+        {Icon && (
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${tom ? '' : 'bg-primary/10 text-primary'}`}
+            style={tom ? { background: `color-mix(in oklab, ${tom} 18%, transparent)`, color: tom } : undefined}>
+            <Icon style={{ width: 18, height: 18 }} />
+          </span>
+        )}
         <div>
           <h3 className="text-sm font-semibold leading-tight">{titulo}</h3>
           {descricao && <p className="mt-0.5 text-xs text-muted-foreground">{descricao}</p>}

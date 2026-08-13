@@ -18,17 +18,19 @@ export async function POST(req: NextRequest) {
   if (!autorizado(req)) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 })
   try {
     const svc = createAdminClient()
-    const { data: configs } = await svc.from('simulado_gamificacao_config').select('tenant_id, timezone, ativo').eq('ativo', true)
+    const { data: configs } = await svc.from('simulado_gamificacao_config').select('tenant_id, timezone, ativo, xp_regras').eq('ativo', true)
     let zerados = 0
     for (const c of (configs ?? []) as any[]) {
-      const ontem = diaAnterior(diaLocal(c.timezone))
-      // Sem atividade em "ontem" nem "hoje" → sequência quebrada.
+      const tol = Math.max(0, c.xp_regras?.streak?.tolerancia_dias ?? 0)
+      // Limite = hoje - (1 + tolerância). Sem atividade desde então → sequência quebrada.
+      let limite = diaAnterior(diaLocal(c.timezone))
+      for (let i = 0; i < tol; i++) limite = diaAnterior(limite)
       const { data: upd } = await svc
         .from('simulado_gamificacao_estudante')
         .update({ streak_atual: 0, atualizado_em: new Date().toISOString() })
         .eq('tenant_id', c.tenant_id)
         .gt('streak_atual', 0)
-        .lt('ultimo_dia_ativo', ontem)
+        .lt('ultimo_dia_ativo', limite)
         .select('id')
       zerados += upd?.length ?? 0
     }

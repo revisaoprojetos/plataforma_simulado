@@ -4,8 +4,10 @@ import { cache } from 'react'
 export interface XpRegras {
   simulado: { base: number; por_acerto: number; bonus_nota_max: number }
   pratica: { por_acerto: number; bonus_disc_fraca: number }
-  streak: { por_dia: number; cap: number }
+  streak: { por_dia: number; cap: number; tolerancia_dias: number }
   chest: { cada_n_dias: number; xp: number }
+  fim_semana: { ativo: boolean; multiplicador: number }
+  meta_dia: { xp: number; bonus: number }
 }
 /** Cargo/título exibido a partir de um nível (ex.: nível 6+ = "Júnior"). */
 export interface TituloNivel { nivel_min: number; titulo: string }
@@ -35,8 +37,10 @@ export interface GamConfig {
 export const DEFAULT_XP_REGRAS: XpRegras = {
   simulado: { base: 20, por_acerto: 2, bonus_nota_max: 30 },
   pratica: { por_acerto: 5, bonus_disc_fraca: 3 },
-  streak: { por_dia: 10, cap: 50 },
+  streak: { por_dia: 10, cap: 50, tolerancia_dias: 0 },
   chest: { cada_n_dias: 7, xp: 100 },
+  fim_semana: { ativo: false, multiplicador: 2 },
+  meta_dia: { xp: 50, bonus: 0 },
 }
 export const DEFAULT_TITULOS: TituloNivel[] = [
   { nivel_min: 1, titulo: 'Aprendiz' },
@@ -131,11 +135,19 @@ export const getGamConfig = cache(async (svc: any, tenantId: string | null): Pro
     return { tenantId, ...DEFAULT_CONFIG, ativo: false }
   }
   const r = row ?? {}
+  const xr = r.xp_regras ?? {}
   return {
     tenantId,
     ativo: r.ativo === true,
     timezone: r.timezone || DEFAULT_CONFIG.timezone,
-    xp_regras: { ...DEFAULT_XP_REGRAS, ...(r.xp_regras ?? {}) },
+    xp_regras: {
+      simulado: { ...DEFAULT_XP_REGRAS.simulado, ...(xr.simulado ?? {}) },
+      pratica: { ...DEFAULT_XP_REGRAS.pratica, ...(xr.pratica ?? {}) },
+      streak: { ...DEFAULT_XP_REGRAS.streak, ...(xr.streak ?? {}) },
+      chest: { ...DEFAULT_XP_REGRAS.chest, ...(xr.chest ?? {}) },
+      fim_semana: { ...DEFAULT_XP_REGRAS.fim_semana, ...(xr.fim_semana ?? {}) },
+      meta_dia: { ...DEFAULT_XP_REGRAS.meta_dia, ...(xr.meta_dia ?? {}) },
+    },
     nivel_curva: { ...DEFAULT_NIVEL_CURVA, ...(r.nivel_curva ?? {}) },
     ligas: Array.isArray(r.ligas) && r.ligas.length ? r.ligas : DEFAULT_LIGAS,
     missoes_def: Array.isArray(r.missoes_def) ? r.missoes_def : DEFAULT_MISSOES,

@@ -1,4 +1,4 @@
-import { Flame, Zap, Trophy, ChevronRight } from 'lucide-react'
+import { Flame, Zap, Trophy, ChevronRight, Target } from 'lucide-react'
 import Link from 'next/link'
 import type { ResumoGamificacao } from '@/lib/gamificacao/leitura'
 
@@ -9,7 +9,8 @@ function fmt(n: number) { return n.toLocaleString('pt-BR') }
  * e XP da semana/mês. Componente de exibição puro (server-rendered).
  */
 export function GamificacaoHero({ nome, resumo }: { nome: string; resumo: ResumoGamificacao }) {
-  const { progresso, liga, proxima, streakAtual, xpTotal, xpSemana, xpMes } = resumo
+  const { progresso, liga, proxima, streakAtual, xpTotal, xpSemana, xpMes, xpHoje, metaDiaXp } = resumo
+  const metaPct = metaDiaXp > 0 ? Math.min(100, Math.round((xpHoje / metaDiaXp) * 100)) : 0
   const raio = 34
   const circ = 2 * Math.PI * raio
   const dash = circ * (progresso.pct / 100)
@@ -60,6 +61,19 @@ export function GamificacaoHero({ nome, resumo }: { nome: string; resumo: Resumo
           <Metrica icon={<Zap className="h-4 w-4" style={{ color: 'var(--brand-accent, var(--primary))' }} />} valor={fmt(xpSemana)} label="XP" sub="esta semana" tituloExtra={`Mês: ${fmt(xpMes)} XP`} />
         </div>
       </div>
+
+      {/* Meta diária */}
+      {metaDiaXp > 0 && (
+        <div className="border-t bg-muted/20 px-5 py-3">
+          <div className="mb-1 flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1.5 font-medium"><Target className="h-3.5 w-3.5 text-primary" /> Meta diária</span>
+            <span className="tabular-nums text-muted-foreground">{fmt(xpHoje)} / {fmt(metaDiaXp)} XP{metaPct >= 100 ? ' · concluída 🎉' : ''}</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${metaPct}%`, background: metaPct >= 100 ? 'var(--brand-accent, var(--primary))' : 'var(--brand-primary, var(--primary))' }} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
