@@ -76,6 +76,17 @@ export const DEFAULT_CONQUISTAS: ConquistaDef[] = [
   { id: 'c_10000xp', titulo: '10.000 XP', descricao: 'Acumule 10.000 XP', icone: 'crown', regra: { tipo: 'xp_total', meta: 10000 }, xp: 0 },
   { id: 'c_nota80', titulo: 'Quase lá', descricao: 'Tire 80 ou mais em um simulado', icone: 'star', regra: { tipo: 'nota_max', meta: 80 }, xp: 20 },
   { id: 'c_nota90', titulo: 'Excelência', descricao: 'Tire 90 ou mais em um simulado', icone: 'award', regra: { tipo: 'nota_max', meta: 90 }, xp: 30 },
+  // +10 sugeridas (2ª leva)
+  { id: 'c_xp500', titulo: 'Primeiros 500 XP', descricao: 'Acumule 500 XP', icone: 'zap', regra: { tipo: 'xp_total', meta: 500 }, xp: 0 },
+  { id: 'c_xp25000', titulo: '25.000 XP', descricao: 'Acumule 25.000 XP', icone: 'crown', regra: { tipo: 'xp_total', meta: 25000 }, xp: 0 },
+  { id: 'c_streak14', titulo: 'Duas semanas', descricao: 'Mantenha 14 dias de sequência', icone: 'flame', regra: { tipo: 'streak', meta: 14 }, xp: 80 },
+  { id: 'c_streak60', titulo: 'Dois meses de foco', descricao: 'Mantenha 60 dias de sequência', icone: 'gem', regra: { tipo: 'streak', meta: 60 }, xp: 250 },
+  { id: 'c_streak100', titulo: 'Cem dias', descricao: 'Mantenha 100 dias de sequência', icone: 'crown', regra: { tipo: 'streak', meta: 100 }, xp: 400 },
+  { id: 'c_simulados10', titulo: 'Dez simulados', descricao: 'Conclua 10 simulados', icone: 'medal', regra: { tipo: 'simulados_concluidos', meta: 10 }, xp: 50 },
+  { id: 'c_simulados25', titulo: 'Constância', descricao: 'Conclua 25 simulados', icone: 'shield', regra: { tipo: 'simulados_concluidos', meta: 25 }, xp: 80 },
+  { id: 'c_simulados200', titulo: 'Imparável', descricao: 'Conclua 200 simulados', icone: 'trophy', regra: { tipo: 'simulados_concluidos', meta: 200 }, xp: 300 },
+  { id: 'c_nota70', titulo: 'No caminho', descricao: 'Tire 70 ou mais em um simulado', icone: 'star', regra: { tipo: 'nota_max', meta: 70 }, xp: 15 },
+  { id: 'c_nota95', titulo: 'Quase perfeito', descricao: 'Tire 95 ou mais em um simulado', icone: 'award', regra: { tipo: 'nota_max', meta: 95 }, xp: 35 },
 ]
 
 export const DEFAULT_CONFIG = {
