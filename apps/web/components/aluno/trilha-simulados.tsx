@@ -19,6 +19,7 @@ export interface TrilhaNode {
   href: string | null
   acao: string
   capa: string | null
+  capaBanner: string | null
   cadernoUrl: string | null
 }
 export interface Trilha {
@@ -47,26 +48,38 @@ function NodeCard({ n, gamAtivo }: { n: TrilhaNode; gamAtivo: boolean }) {
   }
   const leave = () => setDx(0)
 
+  const img = n.capaBanner
+  const txtSec = img ? 'text-white/85' : 'text-muted-foreground'
+
   return (
     <div onMouseEnter={enter} onMouseLeave={leave}
-      className={cn('group relative mb-4 mr-8 flex-1 overflow-hidden rounded-2xl border bg-card p-4 text-center shadow-sm transition-all duration-200 hover:shadow-md motion-safe:hover:scale-[1.02]',
-        atual && 'border-primary/40')}>
+      className={cn('group relative mb-4 mr-8 flex-1 overflow-hidden rounded-2xl border p-4 text-center shadow-sm transition-all duration-200 hover:shadow-md motion-safe:hover:scale-[1.02]',
+        img ? 'text-white' : 'bg-card', atual && 'border-primary/40')}>
+      {/* Fundo: banner comprido do banco (capa_url) + degradê p/ legibilidade */}
+      {img && (
+        <>
+          <img src={img} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/30" />
+        </>
+      )}
+
       {/* Info — desliza suavemente para a esquerda no hover (medido + translateX) */}
-      <div ref={infoRef} className="inline-block max-w-full text-left align-top transition-transform duration-300 ease-out will-change-transform" style={{ transform: `translateX(${dx}px)` }}>
-        {atual && <span className="mb-1.5 inline-block rounded-full border border-primary/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
+      <div ref={infoRef} className="relative inline-block max-w-full text-left align-top transition-transform duration-300 ease-out will-change-transform" style={{ transform: `translateX(${dx}px)` }}>
+        {atual && <span className="mb-1.5 inline-block rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">Comece aqui</span>}
         <div className="font-semibold leading-snug">{n.titulo}</div>
-        <div className="mt-1 text-xs text-muted-foreground">
+        <div className={cn('mt-1 text-xs', txtSec)}>
           {concluido ? <span className="inline-flex items-center gap-1"><CircleCheck className="h-3.5 w-3.5" /> Concluído</span> : (meta || 'Disponível')}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          {concluido && n.acerto != null && <span className="inline-flex items-center gap-1 text-sm font-medium text-primary"><CircleCheck className="h-4 w-4" /> {n.acerto}% de acerto</span>}
-          {!concluido && gamAtivo && n.xp > 0 && <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-xs font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{n.xp} XP</span>}
-          {n.tentativas > 0 && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{n.tentativas}x</span>}
+          {concluido && n.acerto != null && <span className={cn('inline-flex items-center gap-1 text-sm font-medium', img ? 'text-white' : 'text-primary')}><CircleCheck className="h-4 w-4" /> {n.acerto}% de acerto</span>}
+          {!concluido && gamAtivo && n.xp > 0 && <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold', img ? 'bg-white/15 text-white' : 'border border-primary/40 text-primary')}><Zap className="h-3.5 w-3.5" /> +{n.xp} XP</span>}
+          {n.tentativas > 0 && <span className={cn('rounded-full px-2 py-0.5 text-[11px]', img ? 'bg-white/15 text-white/85' : 'bg-muted text-muted-foreground')}>{n.tentativas}x</span>}
         </div>
       </div>
 
       {/* Ações — surgem no hover deslizando da direita */}
-      <div className="absolute inset-y-0 right-0 flex items-center gap-2.5 bg-gradient-to-l from-card via-card to-transparent pl-14 pr-4 opacity-0 translate-x-4 transition-all duration-300 ease-out group-hover:translate-x-0 group-hover:opacity-100">
+      <div className={cn('absolute inset-y-0 right-0 flex items-center gap-2.5 pl-14 pr-4 opacity-0 translate-x-4 transition-all duration-300 ease-out group-hover:translate-x-0 group-hover:opacity-100',
+        img ? 'bg-gradient-to-l from-black/90 via-black/80 to-transparent' : 'bg-gradient-to-l from-card via-card to-transparent')}>
         {n.href && (
           <Link href={n.href} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90">
             <Play className="h-5 w-5" /> {n.acao}

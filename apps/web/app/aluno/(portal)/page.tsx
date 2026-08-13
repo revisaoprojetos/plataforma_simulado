@@ -302,9 +302,12 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
       const podeRefazer = i.refazer || i.podeFazer || i.emAndamento
       const href = done ? (podeRefazer ? runner : `/aluno/simulados/${i.id}`) : runner
       const acao = done ? (podeRefazer ? 'Refazer' : 'Ver resultado') : i.emAndamento ? 'Continuar' : 'Fazer agora'
-      const capa = visual.get(i.id)?.capa ?? null
+      const vis = visual.get(i.id)
+      const capa = vis?.capa ?? null
+      // Banner "comprido" do banco (capa_url) — encaixa no card largo da trilha como fundo.
+      const capaBanner = vis?.capaBanner ?? vis?.capa ?? null
       const nota = notas.length ? Math.max(...notas) : null
-      return { id: i.id, titulo: i.titulo, quando: i.quando, estado, acerto, nota, tentativas: notas.length, statusLabel: i.statusLabel, questoes: cntQ.get(i.id) ?? 0, xp: baseXp, href, acao, capa, cadernoUrl: i.enunciadoUrl ?? null }
+      return { id: i.id, titulo: i.titulo, quando: i.quando, estado, acerto, nota, tentativas: notas.length, statusLabel: i.statusLabel, questoes: cntQ.get(i.id) ?? 0, xp: baseXp, href, acao, capa, capaBanner, cadernoUrl: i.enunciadoUrl ?? null }
     })
     return { id: g.id, nome: g.nome, cor: g.cor ?? null, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: baseXp * nodes.length, nodes }
   }).filter((tr) => tr.nodes.length > 0)
