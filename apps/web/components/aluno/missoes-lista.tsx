@@ -5,7 +5,7 @@ import type { MissaoView } from '@/lib/gamificacao/leitura'
 export function MissoesLista({ missoes, renova }: { missoes: MissaoView[]; renova?: string }) {
   if (!missoes.length) return null
   return (
-    <div className="rounded-2xl border bg-card p-4 shadow-sm">
+    <div data-missoes-card className="rounded-2xl border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-sm font-semibold"><Target className="h-4 w-4 text-primary" /> Missões de hoje</h3>
         {renova && <span className="text-[11px] text-muted-foreground">renova em {renova}</span>}
