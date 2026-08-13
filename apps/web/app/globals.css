@@ -272,6 +272,7 @@
 @keyframes lu-burst { 0% { transform: translate(0,0) scale(1); opacity: 1; } 100% { transform: translate(var(--bx), var(--by)) scale(.3); opacity: 0; } }
 @keyframes lu-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 @keyframes lu-float { 0% { transform: translate(-50%, 0); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(-50%, -60px); opacity: 0; } }
+@keyframes lu-stitch { from { background-position: 0 0; } to { background-position: 12px 0; } }
 
 /* Celebração de XP: pontos voam de fora (--sx,--sy) até o card de nível e "somem" ao chegar. */
 @keyframes xp-para-nivel {

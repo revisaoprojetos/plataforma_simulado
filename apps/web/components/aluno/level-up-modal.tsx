@@ -6,16 +6,20 @@ import { Zap, Medal, ArrowRight, Flame, Trophy, Sparkles } from 'lucide-react'
 import { tituloParaNivel } from '@/lib/gamificacao/niveis'
 import type { NivelCurva } from '@/lib/gamificacao/config'
 
-export type GanhoXp = { icon: React.ReactNode; label: string; xp: number }
+export type GanhoXp = { icon: React.ReactNode; label: string; xp: number; cor?: string }
 export type ConquistaUp = { icon: React.ReactNode; title: string; desc: string }
 
 // Paleta ESCURA própria (independe do tema claro/escuro).
 const A = 'var(--brand-primary, var(--primary))'
+const ACC = 'var(--brand-accent, #f59e0b)'
 const mix = (p: number, c: string) => `color-mix(in oklab, ${A} ${p}%, ${c})`
+const amix = (p: number, c: string) => `color-mix(in oklab, ${ACC} ${p}%, ${c})`
 const L1 = mix(28, 'white'), L2 = mix(52, 'white'), L3 = mix(72, 'white')
 const D2 = mix(60, '#0a0a14'), D3 = mix(38, '#0a0a14'), D4 = mix(22, '#0a0a14')
 const FG = '#f3f2fb', MUT = '#a7a6bd', SURF = 'rgba(255,255,255,0.045)', DIV = 'rgba(255,255,255,0.10)', TRACK = 'rgba(255,255,255,0.10)'
 const R = 90, CIRC = 2 * Math.PI * R
+// Paleta variada p/ os ícones de pontuação (fallback quando o ganho não traz cor própria).
+const PALETA = ['#38bdf8', '#34d399', '#fbbf24', '#fb923c', '#a78bfa', '#22d3ee', '#f472b6', '#f87171']
 // Posição (em %) da borda do anel a partir do topo → onde fica a "ponta" (bolinha branca).
 const RINGTOP = 50 - (R / 118) * 50
 
@@ -140,7 +144,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
 
         {/* Contador de XP */}
         <div className={`flex items-center gap-2 font-black ${done ? 'text-[19px]' : 'min-h-[30px] text-[24px]'}`} style={{ color: L2 }}>
-          <Zap className={done ? 'h-4 w-4' : 'h-5 w-5'} style={{ color: L3 }} />+{st.xpShown.toLocaleString('pt-BR')} XP
+          <Zap className={done ? 'h-4 w-4' : 'h-5 w-5'} style={{ color: '#fbbf24' }} />+{st.xpShown.toLocaleString('pt-BR')} XP
         </div>
 
         {done && (
@@ -153,34 +157,33 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
             </div>
 
             {st.promoted && (
-              <div className="relative w-full max-w-[440px]" style={{ animation: 'lu-rise .45s ease .16s both' }}>
-                {/* costura superior (traços inclinados p/ um lado) */}
-                <div className="absolute inset-x-3 top-0 h-[7px]" style={{ backgroundImage: `repeating-linear-gradient(62deg, ${L2} 0 2px, transparent 2px 8px)`, WebkitMaskImage: 'linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent)', maskImage: 'linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent)', opacity: 0.85 }} />
-                {/* costura inferior (traços inclinados p/ o outro lado) */}
-                <div className="absolute inset-x-3 bottom-0 h-[7px]" style={{ backgroundImage: `repeating-linear-gradient(-62deg, ${L2} 0 2px, transparent 2px 8px)`, WebkitMaskImage: 'linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent)', maskImage: 'linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent)', opacity: 0.85 }} />
-                {/* bordas laterais com fade (topo/base transparentes) */}
-                <div className="absolute left-0 top-2 bottom-2 w-px" style={{ background: `linear-gradient(180deg, transparent, ${mix(55, 'transparent')} 24%, ${mix(55, 'transparent')} 76%, transparent)` }} />
-                <div className="absolute right-0 top-2 bottom-2 w-px" style={{ background: `linear-gradient(180deg, transparent, ${mix(55, 'transparent')} 24%, ${mix(55, 'transparent')} 76%, transparent)` }} />
-                {/* corpo quadrado */}
-                <div className="flex items-center justify-center gap-2.5 px-5 py-3.5" style={{ background: D4, boxShadow: `0 0 26px -12px ${mix(50, 'transparent')}` }}>
-                  <span className="flex h-8 w-8 items-center justify-center rounded-md" style={{ background: mix(28, 'transparent'), color: L2 }}><Medal className="h-4 w-4" /></span>
+              <div className="relative w-full max-w-[440px]" style={{ animation: 'lu-rise .45s ease .16s both', WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%)', maskImage: 'linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%)' }}>
+                {/* corpo amarelo (fade nas pontas via máscara do wrapper) */}
+                <div className="flex items-center justify-center gap-2.5 px-6 py-3.5" style={{ background: `linear-gradient(135deg, ${amix(96, '#000')}, ${amix(72, '#000')})` }}>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-md" style={{ background: 'rgba(0,0,0,0.16)', color: '#241a04' }}><Medal className="h-4 w-4" /></span>
                   <div className="text-left">
-                    <div className="text-[10px] uppercase tracking-[0.16em]" style={{ color: L3 }}>Novo cargo</div>
-                    <div className="whitespace-nowrap text-base font-bold" style={{ color: L1 }}>{st.promoted}</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'rgba(28,20,4,0.72)' }}>Novo cargo</div>
+                    <div className="whitespace-nowrap text-base font-bold" style={{ color: '#1a1303' }}>{st.promoted}</div>
                   </div>
                 </div>
+                {/* costura pontilhada quadrada (topo/base), levemente para dentro e em movimento */}
+                <div className="absolute inset-x-4 top-[4px] h-[3px]" style={{ backgroundImage: 'repeating-linear-gradient(to right, rgba(0,0,0,0.45) 0 3px, transparent 3px 12px)', animation: 'lu-stitch 1.1s linear infinite' }} />
+                <div className="absolute inset-x-4 bottom-[4px] h-[3px]" style={{ backgroundImage: 'repeating-linear-gradient(to right, rgba(0,0,0,0.45) 0 3px, transparent 3px 12px)', animation: 'lu-stitch 1.1s linear infinite reverse' }} />
               </div>
             )}
 
             {gains.length > 0 && (
               <div className="flex w-[340px] max-w-[88vw] flex-col gap-1.5">
-                {gains.map((g, i) => (
-                  <div key={i} className="flex items-center gap-2.5 rounded-lg border px-3 py-1.5 text-[12.5px]" style={{ background: SURF, borderColor: DIV, animation: `lu-rise .4s ease ${(0.2 + i * 0.05).toFixed(2)}s both` }}>
-                    <span className="flex h-6 w-6 items-center justify-center rounded-md" style={{ background: mix(20, 'transparent'), color: L3 }}>{g.icon}</span>
-                    <span className="flex-1 text-left" style={{ color: '#cfced9' }}>{g.label}</span>
-                    <span className="whitespace-nowrap font-semibold" style={{ color: L2 }}>+{g.xp} XP</span>
-                  </div>
-                ))}
+                {gains.map((g, i) => {
+                  const cor = g.cor ?? PALETA[i % PALETA.length]
+                  return (
+                    <div key={i} className="flex items-center gap-2.5 rounded-lg border px-3 py-1.5 text-[12.5px]" style={{ background: SURF, borderColor: DIV, animation: `lu-rise .4s ease ${(0.2 + i * 0.05).toFixed(2)}s both` }}>
+                      <span className="flex h-6 w-6 items-center justify-center rounded-md" style={{ background: `color-mix(in oklab, ${cor} 20%, transparent)`, color: cor }}>{g.icon}</span>
+                      <span className="flex-1 text-left" style={{ color: '#cfced9' }}>{g.label}</span>
+                      <span className="whitespace-nowrap font-semibold" style={{ color: cor }}>+{g.xp} XP</span>
+                    </div>
+                  )
+                })}
               </div>
             )}
 
@@ -199,9 +202,9 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
             )}
 
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11.5px]" style={{ color: MUT, animation: 'lu-rise .45s ease .36s both' }}>
-              <span className="inline-flex items-center gap-1.5"><Zap className="h-3.5 w-3.5" style={{ color: L3 }} />{totalXp.toLocaleString('pt-BR')} XP acumulado</span>
-              <span className="inline-flex items-center gap-1.5"><Trophy className="h-3.5 w-3.5" style={{ color: L3 }} />{badgesLabel} conquistas</span>
-              <span className="inline-flex items-center gap-1.5"><Flame className="h-3.5 w-3.5" style={{ color: L3 }} />{streak} dias</span>
+              <span className="inline-flex items-center gap-1.5"><Zap className="h-3.5 w-3.5" style={{ color: '#fbbf24' }} />{totalXp.toLocaleString('pt-BR')} XP acumulado</span>
+              <span className="inline-flex items-center gap-1.5"><Trophy className="h-3.5 w-3.5" style={{ color: '#f59e0b' }} />{badgesLabel} conquistas</span>
+              <span className="inline-flex items-center gap-1.5"><Flame className="h-3.5 w-3.5" style={{ color: '#fb923c' }} />{streak} dias</span>
             </div>
 
             <button type="button" onClick={onClose} className="mt-0.5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-110"

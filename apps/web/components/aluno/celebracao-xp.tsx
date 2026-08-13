@@ -21,6 +21,9 @@ const LABEL: Record<string, string> = {
   simulado: 'Simulados concluídos', missao: 'Missões diárias', conquista: 'Conquistas desbloqueadas',
   streak: 'Sequência diária', chest: 'Baú de sequência', pratica: 'Prática de questões', trilha: 'Bônus de trilha',
 }
+const COR: Record<string, string> = {
+  simulado: '#38bdf8', missao: '#34d399', conquista: '#fbbf24', streak: '#fb923c', chest: '#a78bfa', pratica: '#22d3ee', trilha: '#f472b6',
+}
 
 /**
  * Orquestra a celebração de XP na Início:
@@ -66,7 +69,7 @@ export function CelebracaoXp() {
         if (atual > stored) {
           const porOrigem = new Map<string, number>()
           for (const e of novos) porOrigem.set(e.origem, (porOrigem.get(e.origem) ?? 0) + e.xp)
-          const gains: GanhoXp[] = [...porOrigem.entries()].map(([origem, xp]) => ({ icon: ICO[origem] ?? <Zap className="h-4 w-4" />, label: LABEL[origem] ?? 'XP', xp }))
+          const gains: GanhoXp[] = [...porOrigem.entries()].map(([origem, xp]) => ({ icon: ICO[origem] ?? <Zap className="h-4 w-4" />, label: LABEL[origem] ?? 'XP', xp, cor: COR[origem] }))
           const xpGanho = gains.length ? gains.reduce((a, g) => a + g.xp, 0) : Math.max(0, r.xpTotal - xpAcumuladoParaNivel(stored, curva))
           marcar(novos)
           try { localStorage.setItem(nivelKey, String(atual)) } catch {}
