@@ -26,6 +26,7 @@ export interface GamConfig {
   ativo: boolean
   timezone: string
   trilha_estilo: TrilhaEstilo
+  trilha_visiveis: number
   xp_regras: XpRegras
   nivel_curva: NivelCurva
   ligas: LigaDef[]
@@ -108,6 +109,7 @@ export const DEFAULT_CONFIG = {
   ativo: false,
   timezone: 'America/Sao_Paulo',
   trilha_estilo: 'cards' as TrilhaEstilo,
+  trilha_visiveis: 3,
   xp_regras: DEFAULT_XP_REGRAS,
   nivel_curva: DEFAULT_NIVEL_CURVA,
   ligas: DEFAULT_LIGAS,
@@ -144,6 +146,7 @@ export const getGamConfig = cache(async (svc: any, tenantId: string | null): Pro
     ativo: r.ativo === true,
     timezone: r.timezone || DEFAULT_CONFIG.timezone,
     trilha_estilo: (r.trilha_estilo === 'caminho' ? 'caminho' : 'cards') as TrilhaEstilo,
+    trilha_visiveis: Number.isFinite(Number(r.trilha_visiveis)) ? Math.max(0, Math.trunc(Number(r.trilha_visiveis))) : 3,
     xp_regras: {
       simulado: { ...DEFAULT_XP_REGRAS.simulado, ...(xr.simulado ?? {}) },
       pratica: { ...DEFAULT_XP_REGRAS.pratica, ...(xr.pratica ?? {}) },

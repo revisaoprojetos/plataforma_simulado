@@ -42,13 +42,14 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
   const [fimSemana, setFimSemana] = useState(config.xp_regras.fim_semana)
   const [metaDia, setMetaDia] = useState(config.xp_regras.meta_dia)
   const [trilhaEstilo, setTrilhaEstilo] = useState<TrilhaEstilo>(config.trilha_estilo)
+  const [trilhaVisiveis, setTrilhaVisiveis] = useState<number>(config.trilha_visiveis)
   const [salvando, start] = useTransition()
-  const { dirty, markSaved } = useUnsavedGuard({ ativo, timezone, streak, chest, fimSemana, metaDia, trilhaEstilo })
+  const { dirty, markSaved } = useUnsavedGuard({ ativo, timezone, streak, chest, fimSemana, metaDia, trilhaEstilo, trilhaVisiveis })
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     start(async () => {
-      const r: any = await salvarRegrasGerais({ ativo, timezone, streak, chest, fim_semana: fimSemana, meta_dia: metaDia, trilha_estilo: trilhaEstilo })
+      const r: any = await salvarRegrasGerais({ ativo, timezone, streak, chest, fim_semana: fimSemana, meta_dia: metaDia, trilha_estilo: trilhaEstilo, trilha_visiveis: trilhaVisiveis })
       if (r?.error) toast.error(r.error); else { toast.success(r?.aviso ?? 'Regras gerais salvas.'); markSaved() }
     })
   }
@@ -130,6 +131,9 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
               </button>
             )
           })}
+        </div>
+        <div className="mt-3 max-w-xs">
+          <NumberField label="Simulados visíveis (0 = todos)" value={trilhaVisiveis} onChange={(v) => setTrilhaVisiveis(Math.max(0, v))} suffix="antes de rolar" min={0} hint="Ex.: 3 mostra 3 + início do 4º; 0 mostra a trilha inteira sem rolagem." disabled={dis} />
         </div>
       </div>
 

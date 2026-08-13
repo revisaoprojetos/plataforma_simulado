@@ -96,25 +96,129 @@ function NodeCard({ n, gamAtivo }: { n: TrilhaNode; gamAtivo: boolean }) {
   )
 }
 
-export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards' }: { trilhas: Trilha[]; gamAtivo: boolean; estilo?: 'cards' | 'caminho' }) {
+// ── Design "caminho": trilha serpenteada (SVG curvo), nós clicáveis; card aparece no lado com mais espaço.
+const LANE = 300, ROW = 150, R = 30, PAD = 34
+const OFFS = [0, 66, 98, 66, 0, -66, -98, -66]
+
+function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
+  const atualId = t.nodes.find((n) => n.estado === 'atual')?.id ?? t.nodes[0]?.id ?? null
+  const [aberto, setAberto] = useState<string | null>(atualId)
+  const cx = (off: number) => LANE / 2 + off
+  const pts = t.nodes.map((_, i) => ({ off: OFFS[i % OFFS.length], y: PAD + i * ROW + R }))
+  const chest = { off: OFFS[t.nodes.length % OFFS.length], y: PAD + t.nodes.length * ROW + R }
+  const height = chest.y + R + 48
+  const allPts = [...pts, chest]
+  const openIdx = t.nodes.findIndex((n) => n.id === aberto)
+  const open = openIdx >= 0 ? t.nodes[openIdx] : null
+  const openPt = openIdx >= 0 ? pts[openIdx] : null
+  const side = openPt && openPt.off > 0 ? 'left' : 'right' // card no lado OPOSTO à curva (mais espaço)
+
+  return (
+    <div className="relative mx-auto" style={{ width: LANE, height }}>
+      {/* Conectores em curva */}
+      <svg className="absolute left-0 top-0" width={LANE} height={height} aria-hidden>
+        {allPts.slice(0, -1).map((p, i) => {
+          const n = allPts[i + 1]
+          const x0 = cx(p.off), y0 = p.y, x1 = cx(n.off), y1 = n.y, m = (y0 + y1) / 2
+          const done = t.nodes[i]?.estado === 'concluido'
+          return <path key={i} d={`M ${x0} ${y0} C ${x0} ${m}, ${x1} ${m}, ${x1} ${y1}`} fill="none" strokeWidth={6} strokeLinecap="round" strokeDasharray="0.1 16" stroke={done ? COR : 'var(--border)'} />
+        })}
+      </svg>
+
+      {/* Nós */}
+      {t.nodes.map((n, i) => {
+        const p = pts[i]
+        const concluido = n.estado === 'concluido'
+        const atual = n.estado === 'atual'
+        const bloqueado = n.estado === 'disponivel'
+        const sel = n.id === aberto
+        return (
+          <div key={n.id} data-trilha-item className="absolute -translate-x-1/2 text-center" style={{ left: cx(p.off), top: p.y - R, width: 200, marginLeft: 0 }}>
+            <button type="button" onClick={() => setAberto(n.id)} aria-label={n.titulo}
+              className={cn('relative mx-auto flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
+              style={{ width: R * 2, height: R * 2, ...(concluido ? { background: COR, borderColor: `color-mix(in oklab, ${COR} 70%, #000)`, color: '#fff' }
+                : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
+                : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
+              {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
+              {concluido ? <Check className="h-7 w-7" /> : atual ? <Star className="h-7 w-7" /> : <Lock className="h-6 w-6" />}
+            </button>
+            <div className={cn('mt-1.5 text-xs font-semibold leading-snug', bloqueado && 'text-muted-foreground')}>{n.titulo}</div>
+            <div className="text-[11px] text-muted-foreground">
+              {concluido ? `Concluído${n.acerto != null ? ` · ${n.acerto}%` : ''}` : bloqueado ? 'Bloqueado' : (n.quando ?? 'Disponível')}
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Baú */}
+      <div className="absolute -translate-x-1/2 text-center" style={{ left: cx(chest.off), top: chest.y - R, width: 200 }}>
+        <span className="mx-auto flex items-center justify-center rounded-2xl border-4" style={{ width: 56, height: 56, ...(t.done >= t.total ? { background: 'var(--brand-accent, #f59e0b)', borderColor: 'color-mix(in oklab, var(--brand-accent, #f59e0b) 70%, #000)', color: '#fff' } : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
+          <Trophy className="h-6 w-6" />
+        </span>
+        <div className="mt-1.5 text-xs font-semibold">Baú da trilha</div>
+        <div className="text-[11px] text-muted-foreground">{t.done >= t.total ? 'Liberado! 🎉' : `${gamAtivo && t.trilhaXp > 0 ? `+${t.trilhaXp} XP` : 'Complete a trilha'}`}</div>
+      </div>
+
+      {/* Card do simulado — no lado com mais espaço, alinhado ao nó */}
+      {open && openPt && (
+        <div key={open.id} className="absolute z-10 w-[300px] motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-200"
+          style={{ top: Math.max(0, Math.min(openPt.y - 60, height - 210)), ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
+          <span className={cn('absolute top-14 h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} />
+          <div className={cn('overflow-hidden rounded-2xl border shadow-xl', open.estado === 'atual' && 'border-primary/40')}>
+            {open.capaBanner && <div className="relative h-20"><img src={open.capaBanner} alt="" className="absolute inset-0 h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" /></div>}
+            <div className="space-y-2 p-4">
+              {open.estado === 'atual' && <span className="inline-block rounded-full border border-primary/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
+              <div className="font-semibold leading-tight">{open.titulo}</div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                {open.estado === 'concluido' ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><CircleCheck className="h-3.5 w-3.5" /> Concluído</span>
+                  : open.estado === 'disponivel' ? <span className="inline-flex items-center gap-1"><Lock className="h-3.5 w-3.5" /> Desbloqueie concluindo o anterior</span>
+                  : [open.quando, open.questoes > 0 ? `${open.questoes} questões` : null].filter(Boolean).join(' · ')}
+                {open.acerto != null && <span className="inline-flex items-center gap-1"><Trophy className="h-3.5 w-3.5" /> {open.acerto}%</span>}
+                {gamAtivo && open.xp > 0 && open.estado !== 'concluido' && <span className="inline-flex items-center gap-1 font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{open.xp} XP</span>}
+              </div>
+              {open.href && open.estado !== 'disponivel' && (
+                <Link href={open.href} className={cn('mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition',
+                  open.estado === 'atual' ? 'bg-primary text-primary-foreground hover:opacity-90' : 'border hover:bg-muted')}>
+                  {open.estado === 'atual' && <Play className="h-4 w-4" />}{open.acao}
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis = 3 }: { trilhas: Trilha[]; gamAtivo: boolean; estilo?: 'cards' | 'caminho'; visiveis?: number }) {
   const caminho = estilo === 'caminho'
   const [ativa, setAtiva] = useState(trilhas[0]?.id)
   const t = trilhas.find((x) => x.id === ativa) ?? trilhas[0]
-  if (!t) return null
-  const pct = t.total ? Math.round((t.done / t.total) * 100) : 0
-  const rolar = t.nodes.length > 3
-  const TETO = caminho ? 560 : 576 // px (máx. ~3 nós + início do 4º)
+  const rolar = t ? visiveis > 0 && t.nodes.length > visiveis : false
 
-  // Altura animada do caminho: ao trocar de trilha, transiciona o max-height até o tamanho
-  // da nova trilha (ou o teto de rolagem), em vez de "pular" seco.
+  // Altura animada: mostra `visiveis` simulados (0 = todos) medindo o N-ésimo nó; transiciona
+  // ao trocar de trilha/estilo em vez de "pular" seco.
   const olRef = useRef<HTMLDivElement>(null)
   const [maxH, setMaxH] = useState<number | null>(null)
   useEffect(() => {
     const el = olRef.current
     if (!el) return
-    const alvo = t.nodes.length > 3 ? TETO : el.scrollHeight
-    setMaxH(alvo)
-  }, [ativa, t.nodes.length])
+    const medir = () => {
+      if (visiveis <= 0) { setMaxH(el.scrollHeight); return }
+      const items = el.querySelectorAll('[data-trilha-item]')
+      if (items.length <= visiveis) { setMaxH(el.scrollHeight); return }
+      const nth = items[visiveis] as HTMLElement
+      const h = nth.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop + 28 // + "pedaço" do próximo
+      setMaxH(Math.round(h))
+    }
+    medir()
+    const raf = requestAnimationFrame(medir)
+    window.addEventListener('resize', medir)
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', medir) }
+  }, [ativa, estilo, visiveis, t?.nodes.length])
+
+  if (!t) return null
+  const pct = t.total ? Math.round((t.done / t.total) * 100) : 0
 
   return (
     <section className="space-y-4">
@@ -150,59 +254,13 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards' }: { trilh
         <div ref={olRef} className="min-w-0 overflow-y-auto py-1 pr-1 transition-[max-height] duration-700 ease-out [scrollbar-width:thin]" style={{ maxHeight: maxH ?? undefined }}>
         <div key={ativa} className="min-w-0 space-y-0 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-700">
           {caminho ? (
-            <div className="flex flex-col items-center pt-1">
-              {t.nodes.map((n, i) => {
-                const concluido = n.estado === 'concluido'
-                const atual = n.estado === 'atual'
-                const bloqueado = n.estado === 'disponivel' // no caminho, pendentes (menos o atual) ficam bloqueados
-                return (
-                  <div key={n.id} className="flex w-full flex-col items-center">
-                    {atual && (
-                      <div className="relative mb-2 rounded-full border border-primary/50 bg-card px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-primary shadow-sm">
-                        Comece aqui
-                        <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-b border-r border-primary/50 bg-card" />
-                      </div>
-                    )}
-                    <span className="relative flex items-center justify-center rounded-full border-4 shadow-sm"
-                      style={{ width: 60, height: 60, ...(concluido ? { background: COR, borderColor: `color-mix(in oklab, ${COR} 70%, #000)`, color: '#fff' }
-                        : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
-                        : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
-                      {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
-                      {concluido ? <Check className="h-7 w-7" /> : atual ? <Star className="h-7 w-7" /> : <Lock className="h-6 w-6" />}
-                    </span>
-                    <div className="mt-2 max-w-[18rem] text-center">
-                      <div className={cn('text-sm font-semibold leading-snug', bloqueado && 'text-muted-foreground')}>{n.titulo}</div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        {concluido ? <span className="inline-flex items-center gap-1"><CircleCheck className="h-3.5 w-3.5" /> Concluído{n.acerto != null ? ` · ${n.acerto}% de acerto` : ''}</span>
-                          : bloqueado ? <span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" /> Desbloqueie concluindo o anterior</span>
-                          : [n.quando, n.questoes > 0 ? `${n.questoes} questões` : null].filter(Boolean).join(' · ') || 'Disponível'}
-                      </div>
-                    </div>
-                    {atual && (
-                      <div className="mt-2 flex flex-col items-center gap-2">
-                        {gamAtivo && n.xp > 0 && <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-xs font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{n.xp} XP</span>}
-                        {n.href && <Link href={n.href} className="inline-flex items-center gap-1.5 rounded-xl border border-primary/50 px-5 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10"><Play className="h-4 w-4" /> {n.acao}</Link>}
-                      </div>
-                    )}
-                    {i < t.nodes.length - 1 && <span className="my-3 h-6 w-1 rounded-full" style={{ background: concluido ? COR : 'var(--border)' }} />}
-                  </div>
-                )
-              })}
-              <span className="my-3 h-6 w-1 rounded-full" style={{ background: t.done >= t.total ? 'var(--brand-accent, #f59e0b)' : 'var(--border)' }} />
-              <div className="flex flex-col items-center text-center">
-                <span className="flex items-center justify-center rounded-2xl border-4" style={{ width: 56, height: 56, ...(t.done >= t.total ? { background: 'var(--brand-accent, #f59e0b)', borderColor: 'color-mix(in oklab, var(--brand-accent, #f59e0b) 70%, #000)', color: '#fff' } : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
-                  <Trophy className="h-6 w-6" />
-                </span>
-                <div className="mt-2 text-sm font-semibold">Baú da trilha</div>
-                <div className="text-xs text-muted-foreground">{t.done >= t.total ? 'Recompensa liberada! 🎉' : `Complete a trilha${gamAtivo && t.trilhaXp > 0 ? ` · +${t.trilhaXp} XP` : ''}`}</div>
-              </div>
-            </div>
+            <TrilhaCaminho t={t} gamAtivo={gamAtivo} />
           ) : (<>
           {t.nodes.map((n, i) => {
             const concluido = n.estado === 'concluido'
             const atual = n.estado === 'atual'
             return (
-              <div key={n.id} className="flex gap-4">
+              <div key={n.id} data-trilha-item className="flex gap-4">
                 <div className="flex flex-col items-center pt-3">
                   <span className="relative flex shrink-0 items-center justify-center rounded-full border-4 shadow-sm"
                     style={{ width: 52, height: 52, ...(concluido ? { background: COR, borderColor: `color-mix(in oklab, ${COR} 70%, #000)`, color: '#fff' }
@@ -211,7 +269,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards' }: { trilh
                     {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
                     {concluido ? <Check className="h-6 w-6" /> : atual ? <Star className="h-6 w-6" /> : <Play className="h-5 w-5" />}
                   </span>
-                  {i < t.nodes.length - 1 && <span className="my-1 w-1 flex-1 rounded-full" style={{ minHeight: 24, background: concluido ? COR : 'var(--border)' }} />}
+                  {i < t.nodes.length - 1 && <span className="my-1 flex-1" style={{ width: 6, minHeight: 24, backgroundImage: `radial-gradient(circle, ${concluido ? COR : 'var(--border)'} 40%, transparent 44%)`, backgroundSize: '6px 12px', backgroundRepeat: 'repeat-y' }} />}
                 </div>
 
                 <NodeCard n={n} gamAtivo={gamAtivo} />

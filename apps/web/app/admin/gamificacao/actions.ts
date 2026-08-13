@@ -42,17 +42,20 @@ export async function salvarXpNiveis(d: { simulado: XpRegras['simulado']; pratic
   return salvarSlice({ xp_regras: { ...xp, simulado: d.simulado, pratica: d.pratica }, nivel_curva: d.nivel_curva })
 }
 
-export async function salvarRegrasGerais(d: { ativo: boolean; timezone: string; streak: XpRegras['streak']; chest: XpRegras['chest']; fim_semana: XpRegras['fim_semana']; meta_dia: XpRegras['meta_dia']; trilha_estilo?: 'cards' | 'caminho' }) {
+export async function salvarRegrasGerais(d: { ativo: boolean; timezone: string; streak: XpRegras['streak']; chest: XpRegras['chest']; fim_semana: XpRegras['fim_semana']; meta_dia: XpRegras['meta_dia']; trilha_estilo?: 'cards' | 'caminho'; trilha_visiveis?: number }) {
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { error: 'Tenant não resolvido.' }
   const xp = await xpRegrasAtual(createAdminClient(), tenantId)
   const base = { ativo: d.ativo, timezone: d.timezone, xp_regras: { ...xp, streak: d.streak, chest: d.chest, fim_semana: d.fim_semana, meta_dia: d.meta_dia } }
-  if (!d.trilha_estilo) return salvarSlice(base)
-  const r = await salvarSlice({ ...base, trilha_estilo: d.trilha_estilo })
-  // Coluna trilha_estilo ainda não migrada (20260813000000) → salva o resto e avisa.
-  if (r.error && /trilha_estilo|column|42703|schema cache/i.test(r.error)) {
+  const extra: Record<string, unknown> = {}
+  if (d.trilha_estilo) extra.trilha_estilo = d.trilha_estilo
+  if (d.trilha_visiveis != null) extra.trilha_visiveis = Math.max(0, Math.trunc(d.trilha_visiveis))
+  if (!Object.keys(extra).length) return salvarSlice(base)
+  const r = await salvarSlice({ ...base, ...extra })
+  // Colunas trilha_estilo/trilha_visiveis ainda não migradas → salva o resto e avisa.
+  if (r.error && /trilha_estilo|trilha_visiveis|column|42703|schema cache/i.test(r.error)) {
     const r2 = await salvarSlice(base)
-    return r2.error ? r2 : { ok: true, aviso: 'Salvo. O estilo da trilha exige aplicar a migração 20260813000000.' }
+    return r2.error ? r2 : { ok: true, aviso: 'Salvo. O estilo/exibição da trilha exige aplicar as migrações 20260813000000/…001.' }
   }
   return r
 }
