@@ -52,14 +52,14 @@ export async function POST(request: NextRequest) {
     .maybeSingle()
   const metodo = (cfg?.metodo_identificacao as string) ?? 'email'
 
-  // deletado=false + limit(1): ignora cadastro soft-deletado e tolera e-mail duplicado
-  // (senão o .maybeSingle() falha com 2 linhas → "cadastro não encontrado" indevido).
+  // Identifica por e-mail PRINCIPAL ou por qualquer SECUNDÁRIO (mesmo perfil). deletado=false +
+  // limit(1): ignora cadastro soft-deletado e tolera e-mail duplicado (senão 2 linhas quebrariam).
   const { data: estudantesMatch } = await supabase
     .from('simulado_estudantes')
     .select('id, nome, email, cpf, telefone')
     .eq('tenant_id', tenantId)
     .eq('deletado', false)
-    .ilike('email', email)
+    .or(`email.ilike.${email},emails_secundarios.cs.{${email}}`)
     .order('id')
     .limit(1)
   const estudante = estudantesMatch?.[0]

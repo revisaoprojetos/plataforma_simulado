@@ -110,13 +110,15 @@ export async function POST(request: NextRequest) {
   // 2. Identidade: buscar o estudante por e-mail (+ 2º fator) ANTES das checagens de janela/acesso,
   //    porque um TESTADOR pula essas checagens (mas ainda precisa provar quem é).
   const metodo = (simulado.metodo_identificacao as string) ?? 'email'
-  // deletado=false + limit(1): ignora cadastros soft-deletados e tolera duplicata (mesmo e-mail).
+  // Identifica por e-mail PRINCIPAL ou por qualquer SECUNDÁRIO (mesmo perfil). deletado=false +
+  // limit(1): ignora cadastros soft-deletados e tolera duplicata (mesmo e-mail).
+  const emailNorm = email.toLowerCase().trim()
   const { data: estudantesMatch } = await supabase
     .from('simulado_estudantes')
     .select('id, nome, email, user_id, cpf, telefone, classificacao')
     .eq('tenant_id', simulado.tenant_id)
     .eq('deletado', false)
-    .ilike('email', email.toLowerCase().trim())
+    .or(`email.ilike.${emailNorm},emails_secundarios.cs.{${emailNorm}}`)
     .order('id')
     .limit(1)
   const estudante = estudantesMatch?.[0]

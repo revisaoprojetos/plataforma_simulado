@@ -86,12 +86,14 @@ export async function executarImport(
     // PAGINA com fetchAll: com >1000 estudantes o PostgREST cortaria em ~1000 e alunos além
     // disso não seriam reconhecidos → o import criaria DUPLICATAS de quem já existe.
     const existentes = await fetchAll<any>(() =>
-      svc.from('simulado_estudantes').select('id, email, cpf, telefone, classificacao, matricula_externa').eq('tenant_id', g.tenantId).eq('deletado', false).order('id', { ascending: true }))
+      svc.from('simulado_estudantes').select('id, email, emails_secundarios, cpf, telefone, classificacao, matricula_externa').eq('tenant_id', g.tenantId).eq('deletado', false).order('id', { ascending: true }))
     const porEmail = new Map<string, string>(), porCpf = new Map<string, string>(), porExt = new Map<string, string>()
     const recPorId = new Map<string, any>()
     for (const e of existentes ?? []) {
       recPorId.set((e as any).id, e)
       if ((e as any).email) porEmail.set(String((e as any).email).toLowerCase(), (e as any).id)
+      // e-mails secundários também apontam para o mesmo estudante (dedup os reconhece).
+      for (const se of ((e as any).emails_secundarios ?? [])) if (se) porEmail.set(String(se).toLowerCase(), (e as any).id)
       if ((e as any).cpf) porCpf.set(String((e as any).cpf).replace(/\D/g, ''), (e as any).id)
       if ((e as any).matricula_externa) porExt.set(String((e as any).matricula_externa), (e as any).id)
     }
@@ -115,6 +117,20 @@ export async function executarImport(
       if (ex) {
         idsResolvidos.push(ex); jaExistiam++
         const rec = recPorId.get(ex)
+        // Promoção de e-mail: o e-mail que veio da Curseduca vira o PRINCIPAL e o anterior vai para
+        // secundários (mesmo perfil/nota). Preserva secundários já existentes (não perde nenhum).
+        if (rec && m.email) {
+          const novo = String(m.email).toLowerCase().trim()
+          const atual = String(rec.email ?? '').toLowerCase().trim()
+          if (novo && novo !== atual) {
+            const sec = new Set<string>(((rec.emails_secundarios as string[]) ?? []).map((s) => String(s).toLowerCase()))
+            if (atual) sec.add(atual)
+            sec.delete(novo)
+            const { error: ePromo } = await svc.from('simulado_estudantes')
+              .update({ email: novo, emails_secundarios: [...sec] }).eq('id', ex).eq('tenant_id', g.tenantId)
+            if (!ePromo) { rec.email = novo; rec.emails_secundarios = [...sec]; porEmail.set(novo, ex); if (atual) porEmail.set(atual, ex) }
+          }
+        }
         if (rec && (!rec.cpf || !rec.telefone || !rec.classificacao)) paraBackfill.push({ estudanteId: ex, curseducaId: m.id })
         continue
       }
