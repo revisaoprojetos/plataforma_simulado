@@ -33,6 +33,8 @@ export interface Trilha {
 }
 
 const COR = 'var(--brand-primary, var(--primary))'
+// Roxo dos botões dos cards de simulado de baixo (card-simulado.tsx: s.vis?.cor ?? '#6d28d9').
+const BTN = '#6d28d9'
 
 // Card de um simulado. No hover: a info desliza (animada) até a esquerda e as ações surgem à direita.
 function NodeCard({ n, gamAtivo }: { n: TrilhaNode; gamAtivo: boolean }) {
@@ -178,15 +180,16 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
               </div>
               {open.href && open.estado !== 'disponivel' && (
                 <div className="mt-1 flex items-center gap-2">
-                  <Link href={open.href} className="group/btn relative inline-flex flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-xl border-[1.5px] border-[var(--brand-primary,var(--primary))] px-4 py-2 text-sm font-semibold text-[var(--brand-primary,var(--primary))] transition-all duration-300 hover:scale-[1.02] hover:text-white">
-                    <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" style={{ background: `linear-gradient(135deg, ${COR}, color-mix(in oklab, ${COR} 72%, #000))` }} />
+                  <Link href={open.href} style={{ ['--btn' as any]: BTN }}
+                    className="group/btn relative inline-flex flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-xl border-[1.5px] border-[var(--btn)] px-4 py-2 text-sm font-semibold text-[var(--btn)] transition-all duration-300 hover:scale-[1.02] hover:text-white">
+                    <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" style={{ background: `linear-gradient(135deg, ${BTN}, color-mix(in oklab, ${BTN} 72%, #000))` }} />
                     <span className="relative z-10 inline-flex items-center gap-1.5">{open.estado === 'atual' && <Play className="h-4 w-4" />}{open.acao}</span>
                   </Link>
                   {open.cadernoUrl && (
                     <a href={open.cadernoUrl} target="_blank" rel="noopener noreferrer" title="Baixar caderno de questões" aria-label="Baixar caderno de questões"
-                      className="group/dl relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border-[1.5px] border-[var(--brand-primary,var(--primary))] text-[var(--brand-primary,var(--primary))] transition-all hover:scale-[1.03] hover:text-white">
-                      <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/dl:opacity-100" style={{ background: COR }} />
-                      <Download className="relative z-10 h-4 w-4" />
+                      className="group/dl relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border-[1.5px] border-white/80 text-white transition-all hover:scale-[1.03]">
+                      <span className="absolute inset-0 bg-white opacity-0 transition-opacity duration-300 group-hover/dl:opacity-100" />
+                      <Download className="relative z-10 h-4 w-4 text-white transition-colors group-hover/dl:text-[color:var(--btn,#6d28d9)]" />
                     </a>
                   )}
                 </div>
