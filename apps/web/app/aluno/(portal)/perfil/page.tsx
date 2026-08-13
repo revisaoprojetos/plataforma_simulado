@@ -54,7 +54,7 @@ export default async function PerfilAlunoPage() {
 
   // Nível (anel) — reaproveita o cálculo do resumo.
   const prog = gamResumo?.progresso
-  const raio = 44, circ = 2 * Math.PI * raio
+  const raio = 42, circ = 2 * Math.PI * raio
   const dash = prog ? circ * (prog.pct / 100) : 0
 
   // Ligas (divisões) por XP total, ordenadas — para a faixa "Ranking e divisões".
@@ -63,57 +63,57 @@ export default async function PerfilAlunoPage() {
   return (
     <div className="animate-page space-y-6">
       {/* ── Cabeçalho: avatar + nível, dados, barra de XP e chips ── */}
-      <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/[0.10] via-card to-card p-6 shadow-sm sm:p-8">
+      <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/[0.10] via-card to-card px-6 pb-6 pt-9 shadow-sm sm:px-8">
         <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 h-64 w-64 rounded-full bg-primary/25 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--brand-accent) 75%, transparent), transparent)' }} />
 
-        <div className="relative flex flex-col items-center gap-5 text-center sm:flex-row sm:items-center sm:text-left">
-          {/* Avatar com anel de nível + badge Nv (maior) */}
-          <div className="relative h-[128px] w-[128px] shrink-0">
+        {/* "Meu perfil" no canto superior esquerdo */}
+        <div className="absolute left-5 top-4 flex items-center gap-2 sm:left-6">
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--brand-accent)' }} />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand-accent)' }}>Meu perfil</span>
+        </div>
+
+        <div className="relative flex flex-col items-center text-center">
+          {/* Avatar com anel de nível + badge Nv */}
+          <div className="relative h-[124px] w-[124px]">
             {prog ? (
-              <svg viewBox="0 0 128 128" className="absolute inset-0 h-full w-full -rotate-90">
-                <circle cx="64" cy="64" r={raio} fill="none" stroke="color-mix(in oklab, var(--muted-foreground) 22%, transparent)" strokeWidth="6" />
-                <circle cx="64" cy="64" r={raio} fill="none" stroke="var(--brand-primary, var(--primary))" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${dash} ${circ}`} className="transition-all duration-700" />
+              <svg viewBox="0 0 124 124" className="absolute inset-0 h-full w-full -rotate-90">
+                <circle cx="62" cy="62" r={raio} fill="none" stroke="color-mix(in oklab, var(--muted-foreground) 22%, transparent)" strokeWidth="6" />
+                <circle cx="62" cy="62" r={raio} fill="none" stroke="var(--brand-primary, var(--primary))" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${dash} ${circ}`} className="transition-all duration-700" />
               </svg>
             ) : null}
-            <span className="absolute inset-[18px] flex items-center justify-center rounded-full bg-white text-3xl font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais(nome)}</span>
+            <span className="absolute inset-[16px] flex items-center justify-center rounded-full bg-white text-3xl font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais(nome)}</span>
             {prog && (
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-primary/40 bg-background px-2.5 py-0.5 text-[11px] font-bold text-primary shadow-sm">Nv {prog.nivel}</span>
+              <span className="absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-primary/40 bg-background px-2.5 py-0.5 text-[11px] font-bold text-primary shadow-sm">Nv {prog.nivel}</span>
             )}
           </div>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-center gap-2 sm:justify-start">
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--brand-accent)' }} />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand-accent)' }}>Meu perfil</span>
-            </div>
-            <h1 className="mt-1 truncate text-2xl font-bold tracking-tight sm:text-[2rem]">{nome}</h1>
+          <h1 className="mt-4 truncate text-2xl font-bold tracking-tight sm:text-[2rem]">{nome}</h1>
 
-            <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground sm:justify-start">
-              {contatos.map((c, i) => (
-                <span key={i} className="inline-flex items-center gap-1.5"><c.icon className="h-4 w-4" /> {c.label}</span>
-              ))}
-            </div>
-
-            {/* Barra de XP do nível */}
-            {prog && (
-              <div className="mt-4 w-full max-w-md">
-                <div className="h-2 overflow-hidden rounded-full ring-1 ring-black/10 dark:ring-white/10" style={{ background: 'color-mix(in oklab, var(--brand-primary, var(--primary)) 16%, transparent)' }}>
-                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${prog.pct}%`, background: 'var(--brand-primary, var(--primary))' }} />
-                </div>
-                <div className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">{fmt(prog.xpNoNivel)} / {fmt(prog.xpDoNivel)} XP</div>
-              </div>
-            )}
-
-            {/* Chips: sequência · XP · liga */}
-            {gamResumo && (
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                <Chip icon={<Flame className="h-3.5 w-3.5 text-orange-500" />}>{gamResumo.streakAtual} {gamResumo.streakAtual === 1 ? 'dia' : 'dias'}</Chip>
-                <Chip icon={<Zap className="h-3.5 w-3.5" style={{ color: 'var(--brand-accent, var(--primary))' }} />}>{fmt(gamResumo.xpTotal)} XP</Chip>
-                <Link href="/aluno/ligas"><Chip icon={<Trophy className="h-3.5 w-3.5" style={{ color: gamResumo.liga.cor }} />} hover>Liga {gamResumo.liga.nome}{pos ? ` · ${pos}º` : ''}</Chip></Link>
-              </div>
-            )}
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
+            {contatos.map((c, i) => (
+              <span key={i} className="inline-flex items-center gap-1.5"><c.icon className="h-4 w-4" /> {c.label}</span>
+            ))}
           </div>
+
+          {/* Barra de XP do nível */}
+          {prog && (
+            <div className="mt-4 w-full max-w-md">
+              <div className="h-2 overflow-hidden rounded-full ring-1 ring-black/10 dark:ring-white/10" style={{ background: 'color-mix(in oklab, var(--brand-primary, var(--primary)) 16%, transparent)' }}>
+                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${prog.pct}%`, background: 'var(--brand-primary, var(--primary))' }} />
+              </div>
+              <div className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">{fmt(prog.xpNoNivel)} / {fmt(prog.xpDoNivel)} XP</div>
+            </div>
+          )}
+
+          {/* Chips: sequência · XP · liga */}
+          {gamResumo && (
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <Chip icon={<Flame className="h-3.5 w-3.5 text-orange-500" />}>{gamResumo.streakAtual} {gamResumo.streakAtual === 1 ? 'dia' : 'dias'}</Chip>
+              <Chip icon={<Zap className="h-3.5 w-3.5" style={{ color: 'var(--brand-accent, var(--primary))' }} />}>{fmt(gamResumo.xpTotal)} XP</Chip>
+              <Link href="/aluno/ligas"><Chip icon={<Trophy className="h-3.5 w-3.5" style={{ color: gamResumo.liga.cor }} />} hover>Liga {gamResumo.liga.nome}{pos ? ` · ${pos}º` : ''}</Chip></Link>
+            </div>
+          )}
         </div>
       </div>
 
