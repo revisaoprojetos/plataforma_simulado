@@ -66,8 +66,8 @@ export function CelebracaoXp() {
             particulas.push({
               sx: p.x + (Math.random() - 0.5) * 90,
               sy: p.y + (Math.random() - 0.5) * 70,
-              delay: Math.random() * 420,
-              dur: 900 + Math.random() * 350,
+              delay: Math.random() * 650,
+              dur: 1600 + Math.random() * 600,
               curva: (Math.random() - 0.5) * 180,
             })
           }
@@ -87,7 +87,7 @@ export function CelebracaoXp() {
     if (!ativo) return
     let raf = 0
     let t0 = 0
-    const FIM = 2100
+    const FIM = 3100
     const frame = (now: number) => {
       if (!t0) t0 = now
       const t = now - t0
@@ -112,7 +112,7 @@ export function CelebracaoXp() {
         })
         const lab = labelRef.current
         if (lab) {
-          const lt = t / 1700
+          const lt = t / 2600
           lab.style.transform = `translate(${bx}px, ${by - 26 - 64 * Math.min(1, lt)}px)`
           lab.style.opacity = lt < 0.15 ? String(lt / 0.15) : lt > 0.8 ? String(Math.max(0, (1 - lt) / 0.2)) : '1'
         }

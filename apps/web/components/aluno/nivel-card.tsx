@@ -26,14 +26,14 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
       snap(de.pct)
       // pequeno atraso p/ os pontinhos começarem a chegar antes de a barra encher (fica sincronizado).
       if (de.nivel === para.nivel) {
-        setTimeout(() => anima(para.pct, 1400), 350)
+        setTimeout(() => anima(para.pct, 2000), 500)
       } else {
         // Subiu de nível: enche até 100, reseta e enche até o novo pct; troca o número no meio.
-        setTimeout(() => anima(100, 800), 350)
+        setTimeout(() => anima(100, 1200), 500)
         setTimeout(() => {
           setNivel(para.nivel); setTitulo(para.titulo)
-          snap(0); requestAnimationFrame(() => anima(para.pct, 950))
-        }, 1200)
+          snap(0); requestAnimationFrame(() => anima(para.pct, 1200))
+        }, 1750)
       }
     }
     window.addEventListener('nivel:encher', onEncher)
