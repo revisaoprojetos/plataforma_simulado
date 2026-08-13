@@ -291,7 +291,8 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
       const href = done ? `/aluno/simulados/${i.id}` : (podeIr && i.embed_token ? `/simulado/${i.embed_token}` : `/aluno/simulados/${i.id}`)
       const acao = done ? 'Ver resultado' : i.emAndamento ? 'Continuar' : i.refazer ? 'Refazer' : 'Fazer agora'
       const capa = visual.get(i.id)?.capa ?? null
-      return { id: i.id, titulo: i.titulo, quando: i.quando, estado, acerto, xp: baseXp, href, acao, capa }
+      const nota = notas.length ? Math.max(...notas) : null
+      return { id: i.id, titulo: i.titulo, quando: i.quando, estado, acerto, nota, tentativas: notas.length, statusLabel: i.statusLabel, xp: baseXp, href, acao, capa }
     })
     return { id: g.id, nome: g.nome, cor: g.cor ?? null, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: baseXp * nodes.length, nodes }
   }).filter((tr) => tr.nodes.length > 0)

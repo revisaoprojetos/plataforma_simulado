@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { Check, Lock, Play, Star, Route, Zap, Trophy, BookOpen } from 'lucide-react'
+import { Check, Lock, Play, Star, Route, Zap, Trophy } from 'lucide-react'
 
 export interface TrilhaNode {
   id: string
@@ -11,6 +11,9 @@ export interface TrilhaNode {
   quando: string | null
   estado: 'concluido' | 'atual' | 'bloqueado'
   acerto: number | null
+  nota: number | null
+  tentativas: number
+  statusLabel: string
   xp: number
   href: string | null
   acao: string
@@ -104,7 +107,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
             return (
               <button key={n.id} type="button" onClick={() => setAberto(n.id)} aria-label={n.titulo}
                 className={cn('absolute flex items-center justify-center rounded-full border-4 shadow-md transition-transform hover:scale-105 focus:outline-none',
-                  atual && !sel && 'animate-bounce', bloqueado && 'bg-muted text-muted-foreground/50', sel && 'ring-4 ring-primary/30')}
+                  sel && 'animate-bounce', bloqueado && 'bg-muted text-muted-foreground/50', sel && 'ring-4 ring-primary/30')}
                 style={{ width: R * 2, height: R * 2, left: p.x - R, top: p.y - R,
                   ...(concluido ? { background: cor, borderColor: `color-mix(in oklab, ${cor} 70%, #000)`, color: '#fff' }
                     : atual ? { background: `color-mix(in oklab, ${cor} 18%, var(--card))`, borderColor: cor, color: cor }
@@ -122,32 +125,47 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
           </span>
         </div>
 
-        {/* Info do simulado (direita) */}
-        <div className="relative min-w-0 flex-1" style={{ minHeight: Math.min(H, 260) }}>
+        {/* Card poster do simulado (direita) — compacto, estilo card de simulado */}
+        <div className="flex min-w-0 flex-1 items-start justify-center pt-2">
           {openNode ? (
-            <div className="absolute inset-x-0 overflow-hidden rounded-2xl border bg-card shadow-lg"
-              style={{ top: Math.max(0, Math.min((pts[openIdx]?.y ?? 24) - 28, H - 240)) }}>
-              {openNode.capa
-                ? <div className="relative h-24 w-full"><img src={openNode.capa} alt="" className="h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" /></div>
-                : <div className="flex h-24 w-full items-center justify-center" style={{ background: `color-mix(in oklab, ${cor} 22%, var(--muted))` }}><BookOpen className="h-8 w-8 text-white/80" /></div>}
-              <div className="space-y-2 p-4">
-                {openNode.estado === 'atual' && <span className="inline-block rounded-full border border-primary/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
-                <div className="font-semibold leading-tight">{openNode.titulo}</div>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  {openNode.estado === 'concluido'
-                    ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><Check className="h-3.5 w-3.5" /> Concluído</span>
-                    : openNode.estado === 'bloqueado'
-                    ? <span className="inline-flex items-center gap-1"><Lock className="h-3.5 w-3.5" /> Desbloqueie concluindo o anterior</span>
-                    : <span>{openNode.quando ?? 'Disponível'}</span>}
-                  {openNode.acerto != null && <span className="inline-flex items-center gap-1"><Trophy className="h-3.5 w-3.5" /> {openNode.acerto}% de acerto</span>}
-                  {gamAtivo && openNode.xp > 0 && <span className="inline-flex items-center gap-1 font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{openNode.xp} XP</span>}
-                </div>
-                {openNode.href && openNode.estado !== 'bloqueado' && (
-                  <Link href={openNode.href} className={cn('mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition',
-                    openNode.estado === 'atual' ? 'bg-primary text-primary-foreground hover:opacity-90' : 'border hover:bg-muted')}>
-                    {openNode.estado === 'atual' && <Play className="h-4 w-4" />}{openNode.acao}
-                  </Link>
+            <div className="w-full max-w-[300px] overflow-hidden rounded-2xl border shadow-lg">
+              <div className="relative aspect-[4/5]">
+                {openNode.capa
+                  ? <img src={openNode.capa} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                  : <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, color-mix(in oklab, ${cor} 45%, #000), #0b0b12)` }} />}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/10" />
+
+                {/* Nota (concluído) */}
+                {openNode.estado === 'concluido' && openNode.nota != null && (
+                  <div className="absolute right-3 top-3 text-right leading-none text-white drop-shadow">
+                    <div className="text-2xl font-extrabold tabular-nums">{openNode.nota.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-widest text-white/70">Nota</div>
+                  </div>
                 )}
+                {openNode.estado === 'atual' && (
+                  <span className="absolute left-3 top-3 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">Comece aqui</span>
+                )}
+
+                {/* Rodapé */}
+                <div className="absolute inset-x-0 bottom-0 space-y-2 p-4 text-white">
+                  <div className="flex items-center gap-1.5 text-xs">
+                    {openNode.estado === 'concluido' ? <><Check className="h-3.5 w-3.5" /> <span className="font-semibold uppercase tracking-wide">Concluído</span></>
+                      : openNode.estado === 'bloqueado' ? <><Lock className="h-3.5 w-3.5" /> <span className="font-medium">Bloqueado</span></>
+                      : <span className="inline-flex items-center gap-1 text-white/80"><Play className="h-3.5 w-3.5" /> Disponível</span>}
+                  </div>
+                  <div className="text-base font-bold leading-tight">{openNode.titulo}</div>
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-white/80">
+                    {openNode.tentativas > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5"><Trophy className="h-3 w-3" /> {openNode.tentativas}x</span>}
+                    {openNode.statusLabel && <span className="rounded-full bg-white/15 px-2 py-0.5">{openNode.statusLabel}</span>}
+                    {gamAtivo && openNode.xp > 0 && openNode.estado !== 'concluido' && <span className="inline-flex items-center gap-1 rounded-full bg-primary/80 px-2 py-0.5 font-semibold"><Zap className="h-3 w-3" /> +{openNode.xp} XP</span>}
+                  </div>
+                  {openNode.href && openNode.estado !== 'bloqueado' && (
+                    <Link href={openNode.href} className={cn('mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition',
+                      openNode.estado === 'atual' ? 'bg-primary text-primary-foreground hover:opacity-90' : 'bg-white/15 text-white hover:bg-white/25')}>
+                      {openNode.estado === 'atual' ? <><Play className="h-4 w-4" /> {openNode.acao}</> : <>{openNode.acao} →</>}
+                    </Link>
+                  )}
+                </div>
               </div>
             </div>
           ) : (
