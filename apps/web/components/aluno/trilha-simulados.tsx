@@ -342,10 +342,11 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
   const [aberto, setAberto] = useState<string | null>(atualId)
   const cx = (off: number) => LANE / 2 + off
 
-  // Trilha muito grande → curvas maiores + linhas mais curtas (encurta o comprimento total).
-  const compacto = flat.length > 12
-  const rowH = compacto ? 108 : ROW
-  const offs = compacto ? [0, 78, 110, 78, 0, -78, -110, -78] : OFFS
+  // Trilha aberta: mais distância vertical entre os nós e zigue-zague mais largo na horizontal.
+  // Só quando fica MUITO grande (>16 nós) encurta um pouco p/ não virar um comprimento absurdo.
+  const compacto = flat.length > 16
+  const rowH = compacto ? 132 : 178
+  const offs = compacto ? [0, 86, 122, 86, 0, -86, -122, -86] : [0, 94, 132, 94, 0, -94, -132, -94]
 
   // Layout: percorre grupos empilhando divisória + nós, guardando as posições.
   const nodesL: { n: TrilhaNode; off: number; y: number }[] = []
