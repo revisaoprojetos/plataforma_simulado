@@ -311,7 +311,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
               acompanha o rolamento. Cobre toda a altura da trilha; fade lateral + topo/base. */}
           {capaFundo && (
             <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-2xl" style={{ WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)' }}>
-              <img src={capaFundo} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-[center_30%] opacity-100 dark:opacity-[0.6]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)' }} />
+              <img src={capaFundo} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-[center_30%] opacity-90 dark:opacity-[0.75]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)' }} />
             </div>
           )}
           {caminho ? (
@@ -462,7 +462,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       {/* Fundo por grupo — capa do banco (quase às bordas), quadrada com fade em todas as bordas */}
       {segmentos.map((s) => s.capa && (
         <div key={s.id} className="pointer-events-none absolute left-1/2 z-0 -translate-x-1/2 overflow-hidden" style={{ top: s.yTop, height: Math.max(0, s.yBot - s.yTop), width: coverW, WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)' }}>
-          <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-[center_30%] opacity-100 dark:opacity-[0.6]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)' }} />
+          <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-[center_30%] opacity-90 dark:opacity-[0.75]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)' }} />
         </div>
       ))}
       {/* Conectores pontilhados — spline Catmull-Rom contínua (C1): curva fluida que passa por
