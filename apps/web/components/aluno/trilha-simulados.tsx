@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { Check, Play, Star, Route, Zap, Trophy, CircleCheck, Download } from 'lucide-react'
@@ -32,6 +32,56 @@ export interface Trilha {
 }
 
 const COR = 'var(--brand-primary, var(--primary))'
+
+// Card de um simulado. No hover: a info desliza (animada) até a esquerda e as ações surgem à direita.
+function NodeCard({ n, gamAtivo }: { n: TrilhaNode; gamAtivo: boolean }) {
+  const infoRef = useRef<HTMLDivElement>(null)
+  const [dx, setDx] = useState(0)
+  const concluido = n.estado === 'concluido'
+  const atual = n.estado === 'atual'
+  const meta = [n.quando, n.questoes > 0 ? `${n.questoes} questões` : null].filter(Boolean).join(' · ')
+
+  function enter() {
+    const el = infoRef.current
+    if (el) setDx(-Math.max(0, el.offsetLeft - 16)) // desloca a info até ~16px da borda esquerda
+  }
+  const leave = () => setDx(0)
+
+  return (
+    <div onMouseEnter={enter} onMouseLeave={leave}
+      className={cn('group relative mb-4 mr-8 flex-1 overflow-hidden rounded-2xl border bg-card p-4 text-center shadow-sm transition-all duration-200 hover:shadow-md motion-safe:hover:scale-[1.02]',
+        atual && 'border-primary/40')}>
+      {/* Info — desliza suavemente para a esquerda no hover (medido + translateX) */}
+      <div ref={infoRef} className="inline-block max-w-full text-left align-top transition-transform duration-300 ease-out will-change-transform" style={{ transform: `translateX(${dx}px)` }}>
+        {atual && <span className="mb-1.5 inline-block rounded-full border border-primary/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
+        <div className="font-semibold leading-snug">{n.titulo}</div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          {concluido ? <span className="inline-flex items-center gap-1"><CircleCheck className="h-3.5 w-3.5" /> Concluído</span> : (meta || 'Disponível')}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {concluido && n.acerto != null && <span className="inline-flex items-center gap-1 text-sm font-medium text-primary"><CircleCheck className="h-4 w-4" /> {n.acerto}% de acerto</span>}
+          {!concluido && gamAtivo && n.xp > 0 && <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-xs font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{n.xp} XP</span>}
+          {n.tentativas > 0 && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{n.tentativas}x</span>}
+        </div>
+      </div>
+
+      {/* Ações — surgem no hover deslizando da direita */}
+      <div className="absolute inset-y-0 right-0 flex items-center gap-2.5 bg-gradient-to-l from-card via-card to-transparent pl-14 pr-4 opacity-0 translate-x-4 transition-all duration-300 ease-out group-hover:translate-x-0 group-hover:opacity-100">
+        {n.href && (
+          <Link href={n.href} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90">
+            <Play className="h-5 w-5" /> {n.acao}
+          </Link>
+        )}
+        {n.cadernoUrl && (
+          <a href={n.cadernoUrl} target="_blank" rel="noopener noreferrer" title="Baixar caderno de questões" aria-label="Baixar caderno de questões"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-muted-foreground transition hover:bg-muted hover:text-foreground">
+            <Download className="h-5 w-5" />
+          </a>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAtivo: boolean }) {
   const [ativa, setAtiva] = useState(trilhas[0]?.id)
@@ -70,16 +120,13 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
         </div>
       </div>
 
-      {/* Timeline: círculo + linha à esquerda, card à direita. Máx. 5 visíveis + rolagem. */}
       <div className="relative">
         <ol className={cn('min-w-0 space-y-0 py-1', rolar && 'max-h-[34rem] overflow-y-auto pr-1 [scrollbar-width:thin]')}>
           {t.nodes.map((n, i) => {
             const concluido = n.estado === 'concluido'
             const atual = n.estado === 'atual'
-            const meta = [n.quando, n.questoes > 0 ? `${n.questoes} questões` : null].filter(Boolean).join(' · ')
             return (
               <li key={n.id} className="flex gap-4">
-                {/* Nó + conector */}
                 <div className="flex flex-col items-center pt-3">
                   <span className="relative flex shrink-0 items-center justify-center rounded-full border-4 shadow-sm"
                     style={{ width: 52, height: 52, ...(concluido ? { background: COR, borderColor: `color-mix(in oklab, ${COR} 70%, #000)`, color: '#fff' }
@@ -91,43 +138,11 @@ export function TrilhaSimulados({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamA
                   {i < t.nodes.length - 1 && <span className="my-1 w-1 flex-1 rounded-full" style={{ minHeight: 24, background: concluido ? COR : 'var(--border)' }} />}
                 </div>
 
-                {/* Card do simulado (hover: info desliza, ações aparecem à direita, card expande) */}
-                <div className={cn('group relative mb-4 mr-8 flex-1 overflow-hidden rounded-2xl border bg-card p-4 text-center shadow-sm transition-all duration-200 hover:shadow-md motion-safe:hover:scale-[1.02]',
-                  atual && 'border-primary/40')}>
-                  {/* Info — no hover alinha totalmente à esquerda para dar lugar às ações */}
-                  <div className="text-center transition-all duration-300 ease-out group-hover:text-left">
-                    {atual && <span className="mb-1.5 inline-block rounded-full border border-primary/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
-                    <div className="font-semibold leading-snug">{n.titulo}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {concluido ? <span className="inline-flex items-center gap-1"><CircleCheck className="h-3.5 w-3.5" /> Concluído</span> : (meta || 'Disponível')}
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center justify-center gap-2 group-hover:justify-start">
-                      {concluido && n.acerto != null && <span className="inline-flex items-center gap-1 text-sm font-medium text-primary"><CircleCheck className="h-4 w-4" /> {n.acerto}% de acerto</span>}
-                      {!concluido && gamAtivo && n.xp > 0 && <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-xs font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{n.xp} XP</span>}
-                      {n.tentativas > 0 && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{n.tentativas}x</span>}
-                    </div>
-                  </div>
-
-                  {/* Ações (aparecem no hover, deslizando da direita) */}
-                  <div className="absolute inset-y-0 right-0 flex items-center gap-2.5 bg-gradient-to-l from-card via-card to-transparent pl-14 pr-4 opacity-0 translate-x-4 transition-all duration-300 ease-out group-hover:translate-x-0 group-hover:opacity-100">
-                    {n.href && (
-                      <Link href={n.href} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90">
-                        <Play className="h-5 w-5" /> {n.acao}
-                      </Link>
-                    )}
-                    {n.cadernoUrl && (
-                      <a href={n.cadernoUrl} target="_blank" rel="noopener noreferrer" title="Baixar caderno de questões" aria-label="Baixar caderno de questões"
-                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-muted-foreground transition hover:bg-muted hover:text-foreground">
-                        <Download className="h-5 w-5" />
-                      </a>
-                    )}
-                  </div>
-                </div>
+                <NodeCard n={n} gamAtivo={gamAtivo} />
               </li>
             )
           })}
 
-          {/* Troféu final */}
           <li className="flex items-center gap-4">
             <div className="flex w-[52px] justify-center">
               <span className="flex items-center justify-center rounded-full border-4" style={{ width: 48, height: 48, ...(t.done >= t.total ? { background: 'var(--brand-accent, #f59e0b)', borderColor: 'color-mix(in oklab, var(--brand-accent, #f59e0b) 70%, #000)', color: '#fff' } : { borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
