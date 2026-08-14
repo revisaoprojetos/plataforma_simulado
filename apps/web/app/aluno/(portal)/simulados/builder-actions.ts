@@ -149,6 +149,51 @@ export async function adicionarQuestao(simuladoId: string, questaoId: string): P
   return { ok: true }
 }
 
+const MODOS_PESSOAIS = ['estudo', 'prova', 'revisao'] as const
+
+/** Cria o simulado JÁ com a configuração (nome/tipo/tempo) e as questões escolhidas, em lote. */
+export async function criarMeuSimuladoCompleto(input: { nome: string; modo?: string; tempo?: number | null; questaoIds: string[] }): Promise<{ id?: string; adicionadas?: number; error?: string }> {
+  const { svc, estudanteId, tenantId } = await ctx()
+  const titulo = (input.nome || '').trim() || 'Meu simulado'
+  const modo = (MODOS_PESSOAIS as readonly string[]).includes(input.modo || '') ? input.modo : 'estudo'
+  const tempo = input.tempo && input.tempo > 0 ? Math.min(Math.round(input.tempo), 600) : null
+  const { data, error } = await svc.from('simulado_simulados').insert({
+    tenant_id: tenantId, owner_estudante_id: estudanteId, titulo,
+    modo_aplicacao: 'aberto', status: 'rascunho', tempo_limite_min: tempo,
+    regras: { modo_pessoal: modo }, created_at: new Date().toISOString(),
+  }).select('id').single()
+  if (error || !data) return { error: error?.message ?? 'Não foi possível criar.' }
+  const simuladoId = (data as any).id as string
+  const acess = new Set(await questaoIdsAcessiveis(svc, estudanteId))
+  const validos = [...new Set(input.questaoIds ?? [])].filter((id) => acess.has(id))
+  let adicionadas = 0
+  if (validos.length) {
+    const rows = validos.map((qid, i) => ({ tenant_id: tenantId, simulado_id: simuladoId, questao_id: qid, ordem: i }))
+    const { error: e2 } = await svc.from('simulado_prova_questoes').insert(rows)
+    if (!e2) adicionadas = rows.length
+  }
+  revalidatePath('/aluno/simulados')
+  return { id: simuladoId, adicionadas }
+}
+
+/** Adiciona VÁRIAS questões de uma vez (import em lote) a um simulado existente do aluno. */
+export async function adicionarQuestoes(simuladoId: string, questaoIds: string[]): Promise<{ adicionadas?: number; error?: string }> {
+  const { svc, estudanteId, tenantId } = await ctx()
+  const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)
+  if (!sim) return { error: 'Simulado não encontrado.' }
+  const acess = new Set(await questaoIdsAcessiveis(svc, estudanteId))
+  const { data: jaData } = await svc.from('simulado_prova_questoes').select('questao_id, ordem').eq('simulado_id', simuladoId)
+  const ja = new Set((jaData ?? []).map((r: any) => r.questao_id))
+  let ordem = Math.max(-1, ...((jaData ?? []).map((r: any) => Number(r.ordem) || 0)))
+  const novos = [...new Set(questaoIds ?? [])].filter((id) => acess.has(id) && !ja.has(id))
+  if (!novos.length) return { adicionadas: 0 }
+  const rows = novos.map((qid) => ({ tenant_id: tenantId, simulado_id: simuladoId, questao_id: qid, ordem: ++ordem }))
+  const { error } = await svc.from('simulado_prova_questoes').insert(rows)
+  if (error) return { error: error.message }
+  revalidatePath(`/aluno/simulados/personalizados/${simuladoId}`)
+  return { adicionadas: rows.length }
+}
+
 export async function removerQuestao(simuladoId: string, questaoId: string): Promise<{ ok?: boolean; error?: string }> {
   const { svc, estudanteId, tenantId } = await ctx()
   const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)

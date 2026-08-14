@@ -1,26 +1,22 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Wand2, Plus, Trash2, Loader2, FileQuestion, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { listarMeusSimulados, criarMeuSimulado, excluirMeuSimulado, type MeuSimuladoResumo } from '@/app/aluno/(portal)/simulados/builder-actions'
+import { listarMeusSimulados, excluirMeuSimulado, type MeuSimuladoResumo } from '@/app/aluno/(portal)/simulados/builder-actions'
 
 /** Aba "Personalizados": lista os simulados criados pelo próprio aluno + criar/abrir/excluir. */
 export function PersonalizadosLista() {
   const router = useRouter()
   const [itens, setItens] = useState<MeuSimuladoResumo[] | null>(null)
-  const [criando, startCriar] = useTransition()
 
   const carregar = () => listarMeusSimulados().then(setItens).catch(() => setItens([]))
   useEffect(() => { carregar() }, [])
 
-  const criar = () => startCriar(async () => {
-    const r = await criarMeuSimulado('Meu simulado')
-    if (r.error || !r.id) { toast.error(r.error ?? 'Não foi possível criar.'); return }
-    router.push(`/aluno/simulados/personalizados/${r.id}`)
-  })
+  // Abre o criador em etapas (configuração → questões → prévia).
+  const criar = () => router.push('/aluno/simulados/personalizados/novo')
 
   const excluir = async (s: MeuSimuladoResumo) => {
     const ok = await confirmar({ titulo: 'Excluir simulado', mensagem: `Excluir "${s.titulo}"? Isso não pode ser desfeito.`, confirmar: 'Excluir', destrutivo: true })
@@ -38,9 +34,9 @@ export function PersonalizadosLista() {
           <Wand2 className="h-4 w-4 text-primary" /> Seus simulados
           {itens && <span className="text-xs font-normal text-muted-foreground">({itens.length})</span>}
         </h2>
-        <button type="button" onClick={criar} disabled={criando}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60">
-          {criando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Criar simulado
+        <button type="button" onClick={criar}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
+          <Plus className="h-4 w-4" /> Criar simulado
         </button>
       </div>
 
@@ -55,9 +51,9 @@ export function PersonalizadosLista() {
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
             Escolha as questões que quiser (dos simulados que você tem acesso), organize e depois faça — no seu ritmo.
           </p>
-          <button type="button" onClick={criar} disabled={criando}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-60">
-            {criando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Criar simulado
+          <button type="button" onClick={criar}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90">
+            <Plus className="h-4 w-4" /> Criar simulado
           </button>
         </div>
       ) : (
