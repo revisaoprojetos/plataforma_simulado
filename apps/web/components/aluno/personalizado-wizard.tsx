@@ -44,7 +44,7 @@ export function PersonalizadoWizard() {
   return (
     // Na etapa de seleção o wizard ocupa a altura da tela (dvh, adapta a aparelhos) para o card
     // de questões preencher até perto da barra inferior; nas outras etapas é fluxo normal.
-    <div className={cn('flex flex-col gap-5', etapa === 'selecao' && 'h-[calc(100dvh-8.5rem)]')}>
+    <div className={cn('flex flex-col gap-5', etapa === 'selecao' && 'h-[calc(100dvh-5rem)] -mb-12')}>
       <div className="flex items-center gap-3">
         <Link href="/aluno/simulados" className="shrink-0 rounded-lg border p-2 text-muted-foreground transition-colors hover:text-foreground" aria-label="Voltar"><ArrowLeft className="h-4 w-4" /></Link>
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Criar simulado</h1>
