@@ -99,7 +99,8 @@ export function PersonalizadoWizard() {
       )}
 
       {etapa === 'selecao' && (
-        <div className="flex h-[calc(100dvh-15rem)] min-h-[26rem] flex-col overflow-hidden rounded-2xl border bg-card">
+        // Altura por dvh (adapta a cada aparelho) + respiro da barra inferior no mobile.
+        <div className="mb-2 flex h-[calc(100dvh-16.5rem)] min-h-[22rem] flex-col overflow-hidden rounded-2xl border bg-card">
           <SeletorQuestoes onConcluir={concluirSelecao} onCancelar={() => setEtapa('config')} textoConcluir="Concluir" />
         </div>
       )}

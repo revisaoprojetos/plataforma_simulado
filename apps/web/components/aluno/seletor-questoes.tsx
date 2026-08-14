@@ -1,16 +1,22 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Loader2, Check } from 'lucide-react'
+import { Search, Loader2, Check, ChevronDown, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { questoesAcessiveis, type QuestaoDisponivel } from '@/app/aluno/(portal)/simulados/builder-actions'
+import { questoesAcessiveis, type QuestaoDisponivel, type OpcoesFiltro } from '@/app/aluno/(portal)/simulados/builder-actions'
 
-const MAX_MOSTRAR = 100 // teto renderizado — refine a busca p/ ver as demais
+const MAX_MOSTRAR = 100 // teto renderizado — refine os filtros p/ ver as demais
+
+const tipoLabel = (t: string) => (t === 'objetiva' ? 'Objetiva' : t === 'discursiva' ? 'Discursiva' : t.charAt(0).toUpperCase() + t.slice(1))
+const difLabel = (d: string) => ({ facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' } as Record<string, string>)[d] ?? (d.charAt(0).toUpperCase() + d.slice(1))
+
+type Filtros = { disciplina: string; assunto: string; banca: string; ano: string; tipo: string; dificuldade: string }
+const F0: Filtros = { disciplina: '', assunto: '', banca: '', ano: '', tipo: '', dificuldade: '' }
 
 /**
  * Seletor de questões (das que o aluno tem acesso): clicar num item MARCA/desmarca um check
- * (só estado local, sem tocar o servidor). "Concluir" chama onConcluir com as escolhidas — o pai
- * faz o import em lote e mostra o estado "Importando…". Reusado no wizard e no editor.
+ * (estado local, sem tocar o servidor). Filtros em "pills" que quebram em várias linhas.
+ * "Concluir" chama onConcluir com as escolhidas — o pai importa em lote ("Importando…").
  */
 export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoConcluir = 'Concluir' }: {
   jaEscolhidas?: Set<string>
@@ -19,43 +25,89 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
   textoConcluir?: string
 }) {
   const ja = jaEscolhidas ?? new Set<string>()
-  const [dados, setDados] = useState<{ questoes: QuestaoDisponivel[]; disciplinas: { id: string; nome: string }[]; truncado: boolean } | null>(null)
+  const [dados, setDados] = useState<{ questoes: QuestaoDisponivel[]; filtros: OpcoesFiltro; truncado: boolean } | null>(null)
   const [termo, setTermo] = useState('')
-  const [disc, setDisc] = useState('')
+  const [f, setF] = useState<Filtros>(F0)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [importando, setImportando] = useState(false)
 
-  useEffect(() => { questoesAcessiveis().then(setDados).catch(() => setDados({ questoes: [], disciplinas: [], truncado: false })) }, [])
+  useEffect(() => { questoesAcessiveis().then(setDados).catch(() => setDados({ questoes: [], filtros: { disciplinas: [], assuntos: [], bancas: [], anos: [], tipos: [], dificuldades: [] }, truncado: false })) }, [])
+
+  // Assuntos dependem da disciplina escolhida (mostra só os dela).
+  const assuntosOpc = useMemo(() => {
+    const all = dados?.filtros.assuntos ?? []
+    return f.disciplina ? all.filter((a) => a.disciplinaId === f.disciplina) : all
+  }, [dados, f.disciplina])
 
   const filtradas = useMemo(() => {
     if (!dados) return []
     const t = termo.trim().toLowerCase()
-    return dados.questoes.filter((q) => (!disc || q.disciplinaId === disc) && (!t || q.enunciado.toLowerCase().includes(t)))
-  }, [dados, termo, disc])
+    return dados.questoes.filter((q) =>
+      (!f.disciplina || q.disciplinaId === f.disciplina) &&
+      (!f.assunto || q.assuntoId === f.assunto) &&
+      (!f.banca || q.bancaId === f.banca) &&
+      (!f.ano || String(q.ano) === f.ano) &&
+      (!f.tipo || q.tipo === f.tipo) &&
+      (!f.dificuldade || q.dificuldade === f.dificuldade) &&
+      (!t || q.enunciado.toLowerCase().includes(t)))
+  }, [dados, termo, f])
   const mostradas = filtradas.slice(0, MAX_MOSTRAR)
   const porId = useMemo(() => new Map((dados?.questoes ?? []).map((q) => [q.id, q])), [dados])
+  const algumFiltro = termo.trim() !== '' || Object.values(f).some(Boolean)
 
-  const toggle = (id: string) => {
-    if (ja.has(id)) return
-    setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
-  }
+  const toggle = (id: string) => { if (ja.has(id)) return; setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
   const concluir = async () => {
     setImportando(true)
     const escolhidas = [...sel].map((id) => porId.get(id)).filter(Boolean) as QuestaoDisponivel[]
     try { await onConcluir(escolhidas) } finally { setImportando(false) }
   }
+  const op = dados?.filtros
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-col gap-2 border-b p-3 sm:flex-row">
-        <div className="relative flex-1">
+      <div className="space-y-2 border-b p-3">
+        <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input value={termo} onChange={(e) => setTermo(e.target.value)} placeholder="Buscar no enunciado…" className="w-full rounded-lg border bg-transparent py-2 pl-8 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary" />
         </div>
-        <select value={disc} onChange={(e) => setDisc(e.target.value)} className="h-9 rounded-lg border bg-transparent px-2 text-sm">
-          <option value="">Todas as disciplinas</option>
-          {dados?.disciplinas.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
-        </select>
+        {/* Filtros em pills — quebram em 2+ linhas quando não cabem. */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {!!op?.disciplinas.length && (
+            <Pill valor={f.disciplina} onChange={(v) => setF((s) => ({ ...s, disciplina: v, assunto: '' }))} rotulo="Disciplina">
+              {op.disciplinas.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
+            </Pill>
+          )}
+          {!!assuntosOpc.length && (
+            <Pill valor={f.assunto} onChange={(v) => setF((s) => ({ ...s, assunto: v }))} rotulo="Assunto">
+              {assuntosOpc.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}
+            </Pill>
+          )}
+          {!!op?.bancas.length && (
+            <Pill valor={f.banca} onChange={(v) => setF((s) => ({ ...s, banca: v }))} rotulo="Banca">
+              {op.bancas.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
+            </Pill>
+          )}
+          {!!op?.anos.length && (
+            <Pill valor={f.ano} onChange={(v) => setF((s) => ({ ...s, ano: v }))} rotulo="Ano">
+              {op.anos.map((a) => <option key={a} value={String(a)}>{a}</option>)}
+            </Pill>
+          )}
+          {!!op?.tipos.length && (
+            <Pill valor={f.tipo} onChange={(v) => setF((s) => ({ ...s, tipo: v }))} rotulo="Tipo">
+              {op.tipos.map((t) => <option key={t} value={t}>{tipoLabel(t)}</option>)}
+            </Pill>
+          )}
+          {!!op?.dificuldades.length && (
+            <Pill valor={f.dificuldade} onChange={(v) => setF((s) => ({ ...s, dificuldade: v }))} rotulo="Dificuldade">
+              {op.dificuldades.map((d) => <option key={d} value={d}>{difLabel(d)}</option>)}
+            </Pill>
+          )}
+          {algumFiltro && (
+            <button type="button" onClick={() => { setTermo(''); setF(F0) }} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+              <X className="h-3 w-3" /> Limpar
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
@@ -63,7 +115,7 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
           <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando questões…</div>
         ) : !filtradas.length ? (
           <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-            {dados.questoes.length === 0 ? 'Você ainda não tem acesso a questões de nenhum simulado.' : 'Nenhuma questão para esta busca/filtro.'}
+            {dados.questoes.length === 0 ? 'Você ainda não tem acesso a questões de nenhum simulado.' : 'Nenhuma questão para esses filtros.'}
           </div>
         ) : (
           <>
@@ -82,9 +134,11 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="line-clamp-2 block text-foreground">{q.enunciado || '(sem enunciado)'}</span>
-                        <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                           {q.disciplina && <span className="rounded-full bg-muted px-2 py-0.5">{q.disciplina}</span>}
+                          {q.banca && <span>{q.banca}</span>}
                           {q.ano && <span>{q.ano}</span>}
+                          {q.dificuldade && <span className="capitalize">{difLabel(q.dificuldade)}</span>}
                           {jaTem && <span className="text-emerald-600 dark:text-emerald-400">já no simulado</span>}
                         </span>
                       </span>
@@ -94,7 +148,7 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
               })}
             </ul>
             {filtradas.length > MAX_MOSTRAR && (
-              <p className="mt-3 text-center text-xs text-muted-foreground">Mostrando {MAX_MOSTRAR} de {filtradas.length}. Refine a busca para ver as demais.</p>
+              <p className="mt-3 text-center text-xs text-muted-foreground">Mostrando {MAX_MOSTRAR} de {filtradas.length}. Refine os filtros para ver as demais.</p>
             )}
           </>
         )}
@@ -110,6 +164,21 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Filtro "pill": select nativo estilizado como chip; realça quando ativo. */
+function Pill({ valor, onChange, rotulo, children }: { valor: string; onChange: (v: string) => void; rotulo: string; children: React.ReactNode }) {
+  return (
+    <div className="relative">
+      <select value={valor} onChange={(e) => onChange(e.target.value)}
+        className={cn('h-8 max-w-[9.5rem] cursor-pointer appearance-none truncate rounded-full border py-0 pl-3 pr-7 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary',
+          valor ? 'border-primary/40 bg-primary/10 text-foreground' : 'border-border bg-card text-muted-foreground hover:bg-muted')}>
+        <option value="">{rotulo}</option>
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
     </div>
   )
 }

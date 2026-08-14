@@ -105,32 +105,71 @@ export async function questoesDoMeuSimulado(simuladoId: string): Promise<{ titul
   return { titulo: (sim as any).titulo, itens: pqs.map((p) => ({ questaoId: p.questao_id, ordem: p.ordem, enunciado: limpar(qmap.get(p.questao_id)?.enunciado) })) }
 }
 
-export type QuestaoDisponivel = { id: string; enunciado: string; disciplinaId: string | null; disciplina: string | null; ano: number | null; tipo: string | null }
+export type QuestaoDisponivel = {
+  id: string; enunciado: string
+  disciplinaId: string | null; disciplina: string | null
+  assuntoId: string | null; assunto: string | null
+  bancaId: string | null; banca: string | null
+  ano: number | null; tipo: string | null; dificuldade: string | null
+}
+export type OpcoesFiltro = {
+  disciplinas: { id: string; nome: string }[]
+  assuntos: { id: string; nome: string; disciplinaId: string | null }[]
+  bancas: { id: string; nome: string }[]
+  anos: number[]
+  tipos: string[]
+  dificuldades: string[]
+}
 
 const CAP_ACESSIVEIS = 2500 // teto de questões carregadas no seletor (busca/filtro é client-side)
 
 /**
- * TODAS as questões que o aluno pode escolher (dos simulados a que tem acesso), UMA vez.
- * O modal filtra/pagina no cliente — evita re-buscar o banco a cada tecla. Limitado a CAP_ACESSIVEIS.
+ * TODAS as questões que o aluno pode escolher (dos simulados a que tem acesso), UMA vez, com os
+ * metadados p/ filtrar (disciplina/assunto/banca/ano/tipo/dificuldade) + as opções de cada filtro.
+ * O seletor filtra/pagina no cliente — evita re-buscar o banco a cada tecla. Limitado a CAP_ACESSIVEIS.
  */
-export async function questoesAcessiveis(): Promise<{ questoes: QuestaoDisponivel[]; disciplinas: { id: string; nome: string }[]; truncado: boolean }> {
+export async function questoesAcessiveis(): Promise<{ questoes: QuestaoDisponivel[]; filtros: OpcoesFiltro; truncado: boolean }> {
   const { svc, estudanteId, tenantId } = await ctx()
+  const vazio: OpcoesFiltro = { disciplinas: [], assuntos: [], bancas: [], anos: [], tipos: [], dificuldades: [] }
   const qidsAll = await questaoIdsAcessiveis(svc, estudanteId)
-  if (!qidsAll.length) return { questoes: [], disciplinas: [], truncado: false }
+  if (!qidsAll.length) return { questoes: [], filtros: vazio, truncado: false }
   const truncado = qidsAll.length > CAP_ACESSIVEIS
   const qids = truncado ? qidsAll.slice(0, CAP_ACESSIVEIS) : qidsAll
-  const rows = await fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questoes').select('id, enunciado, disciplina_id, ano, tipo').eq('tenant_id', tenantId).in('id', chunk))
-  const disc = [...new Set(rows.map((m) => m.disciplina_id).filter(Boolean))]
-  const discNomes = new Map<string, string>()
-  if (disc.length) {
-    const ds = await fetchAllByIn<any>(disc, (c) => svc.from('simulado_disciplinas').select('id, nome').in('id', c))
-    for (const d of ds) discNomes.set(d.id, d.nome)
+  const rows = await fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questoes').select('id, enunciado, disciplina_id, assunto_id, banca_id, ano, tipo, nivel_dificuldade').eq('tenant_id', tenantId).in('id', chunk))
+
+  // Resolve nomes de disciplina/assunto/banca em lote.
+  const idsDe = (campo: string) => [...new Set(rows.map((r) => r[campo]).filter(Boolean))] as string[]
+  const nome = async (tabela: string, ids: string[], extra = '') => {
+    const m = new Map<string, any>()
+    if (ids.length) { const ds = await fetchAllByIn<any>(ids, (c) => svc.from(tabela).select(`id, nome${extra}`).in('id', c)); for (const d of ds) m.set(d.id, d) }
+    return m
   }
-  const limpar = (s: string) => (s ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200)
-  const questoes = rows
-    .map((m) => ({ id: m.id, enunciado: limpar(m.enunciado), disciplinaId: m.disciplina_id ?? null, disciplina: m.disciplina_id ? (discNomes.get(m.disciplina_id) ?? null) : null, ano: m.ano ?? null, tipo: m.tipo ?? null }))
-    .sort((a, b) => a.enunciado.localeCompare(b.enunciado, 'pt-BR'))
-  return { questoes, disciplinas: [...discNomes.entries()].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')), truncado }
+  const [discM, assuntoM, bancaM] = await Promise.all([
+    nome('simulado_disciplinas', idsDe('disciplina_id')),
+    nome('simulado_assuntos', idsDe('assunto_id'), ', disciplina_id'),
+    nome('simulado_bancas', idsDe('banca_id')),
+  ])
+  const limpar = (s: string) => (s ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220)
+
+  const questoes: QuestaoDisponivel[] = rows.map((m) => ({
+    id: m.id, enunciado: limpar(m.enunciado),
+    disciplinaId: m.disciplina_id ?? null, disciplina: m.disciplina_id ? (discM.get(m.disciplina_id)?.nome ?? null) : null,
+    assuntoId: m.assunto_id ?? null, assunto: m.assunto_id ? (assuntoM.get(m.assunto_id)?.nome ?? null) : null,
+    bancaId: m.banca_id ?? null, banca: m.banca_id ? (bancaM.get(m.banca_id)?.nome ?? null) : null,
+    ano: m.ano ?? null, tipo: m.tipo ?? null, dificuldade: m.nivel_dificuldade ?? null,
+  })).sort((a, b) => a.enunciado.localeCompare(b.enunciado, 'pt-BR'))
+
+  // Opções distintas p/ os filtros (só o que aparece nas questões acessíveis).
+  const distintos = <T,>(arr: T[], key: (x: T) => string | number | null) => [...new Map(arr.filter((x) => key(x) != null).map((x) => [key(x), x])).values()]
+  const filtros: OpcoesFiltro = {
+    disciplinas: distintos(questoes, (q) => q.disciplinaId).map((q) => ({ id: q.disciplinaId!, nome: q.disciplina ?? '—' })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+    assuntos: distintos(questoes, (q) => q.assuntoId).map((q) => ({ id: q.assuntoId!, nome: q.assunto ?? '—', disciplinaId: q.disciplinaId })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+    bancas: distintos(questoes, (q) => q.bancaId).map((q) => ({ id: q.bancaId!, nome: q.banca ?? '—' })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+    anos: [...new Set(questoes.map((q) => q.ano).filter((a): a is number => a != null))].sort((a, b) => b - a),
+    tipos: [...new Set(questoes.map((q) => q.tipo).filter((t): t is string => !!t))].sort(),
+    dificuldades: [...new Set(questoes.map((q) => q.dificuldade).filter((d): d is string => !!d))],
+  }
+  return { questoes, filtros, truncado }
 }
 
 export async function adicionarQuestao(simuladoId: string, questaoId: string): Promise<{ ok?: boolean; error?: string }> {
