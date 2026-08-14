@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, Lock, LayoutGrid, Rows3, Wand2, Plus } from 'lucide-react'
+import { CheckCircle2, Lock, LayoutGrid, Rows3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { FileiraHorizontal } from '@/components/fileira-horizontal'
+import { PersonalizadosLista } from '@/components/aluno/personalizados-lista'
 import type { VisualSim } from '@/lib/aluno/simulado-visual'
 
 export type MeuSimuladoItem = {
@@ -125,31 +126,8 @@ export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoIte
           </div>
         </section>
       ) : (
-        <PersonalizadosVazio />
+        <PersonalizadosLista />
       )}
     </div>
-  )
-}
-
-/** Aba "Personalizados": simulados criados pelo próprio aluno. Placeholder até o construtor entrar. */
-function PersonalizadosVazio() {
-  return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold"><Wand2 className="h-4 w-4 text-primary" /> Seus simulados</h2>
-        <button type="button" disabled title="Em breve"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground opacity-60">
-          <Plus className="h-4 w-4" /> Criar simulado
-        </button>
-      </div>
-      <div className="rounded-2xl border border-dashed p-8 text-center">
-        <Wand2 className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
-        <h3 className="text-base font-semibold">Monte seus próprios simulados</h3>
-        <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-          Em breve você poderá criar simulados personalizados com as questões que quiser, organizá-los em pastas
-          e escolher tempo, modo e regras — e baixar o caderno pronto.
-        </p>
-      </div>
-    </section>
   )
 }

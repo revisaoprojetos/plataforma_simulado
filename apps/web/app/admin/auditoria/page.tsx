@@ -123,7 +123,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
     estIdsQ = (data ?? []).map((e: any) => e.id)
   }
   if (like && (view === 'sessoes' || view === 'eventos')) {
-    const { data } = await supabase.from('simulado_simulados').select('id').eq('tenant_id', tid).ilike('titulo', `%${like}%`).limit(200)
+    const { data } = await supabase.from('simulado_simulados').select('id').eq('tenant_id', tid).is('owner_estudante_id', null).ilike('titulo', `%${like}%`).limit(200)
     simIdsQ = (data ?? []).map((s: any) => s.id)
   }
 

@@ -163,7 +163,7 @@ export async function deleteTenantAction(id: string, confirmNome: string): Promi
   // Bloqueia se houver conteúdo real.
   const [{ count: estudantes }, { count: simulados }] = await Promise.all([
     svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('tenant_id', id),
-    svc.from('simulado_simulados').select('id', { count: 'exact', head: true }).eq('tenant_id', id),
+    svc.from('simulado_simulados').select('id', { count: 'exact', head: true }).eq('tenant_id', id).is('owner_estudante_id', null),
   ])
   if ((estudantes ?? 0) > 0 || (simulados ?? 0) > 0) {
     return { ok: false, error: `Plataforma não está vazia (${estudantes ?? 0} estudante(s), ${simulados ?? 0} simulado(s)). Remova o conteúdo antes de excluir.` }

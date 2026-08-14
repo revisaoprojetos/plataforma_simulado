@@ -39,17 +39,19 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
   // Contagens, RBAC, banners, embed e destinos de banner — tudo depende só de `id`, num só round-trip.
   const [
     { count: usuarios }, { count: estudantes }, { count: simulados }, rbac, bannersRes, embedRow,
-    pastasDest, simsDest,
+    pastasDest, simsDest, capasRow,
   ] = await Promise.all([
     svc.from('simulado_tenant_acessos').select('user_id', { count: 'exact', head: true }).eq('tenant_id', id),
     svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('tenant_id', id),
-    svc.from('simulado_simulados').select('id', { count: 'exact', head: true }).eq('tenant_id', id),
+    svc.from('simulado_simulados').select('id', { count: 'exact', head: true }).eq('tenant_id', id).is('owner_estudante_id', null),
     listarAdministradores(id),
     svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor, ativo, ordem').eq('tenant_id', id).order('ordem', { ascending: true }).order('criado_em', { ascending: false }).then((r) => r.data ?? [], () => []),
     svc.from('simulado_embed_config').select('ativo, origens_permitidas, metodo_identificacao, otp_email').eq('tenant_id', id).maybeSingle().then((r) => r.data, () => null),
     // Destinos rápidos para linkar um banner: pastas (folders) + simulados publicados. Tolerante ao schema.
     svc.from('simulado_pastas').select('id, nome, folder_area').eq('tenant_id', id).eq('is_folder', true).eq('deletado', false).order('nome', { ascending: true }).then((r: any) => (r.data ?? []).filter((f: any) => f.folder_area !== 'caderno'), () => []),
-    svc.from('simulado_simulados').select('id, titulo, embed_token').eq('tenant_id', id).eq('deletado', false).eq('status', 'publicado').order('created_at', { ascending: false }).limit(60).then((r: any) => r.data ?? [], () => []),
+    svc.from('simulado_simulados').select('id, titulo, embed_token').eq('tenant_id', id).eq('deletado', false).eq('status', 'publicado').is('owner_estudante_id', null).order('created_at', { ascending: false }).limit(60).then((r: any) => r.data ?? [], () => []),
+    // Capas largas já existentes (bancos/pastas) — modelos de fundo para a personalização do aluno.
+    svc.from('simulado_pastas').select('capa_url, capa_card_url').eq('tenant_id', id).eq('deletado', false).limit(80).then((r: any) => r.data ?? [], () => []),
   ])
 
   const embedConfig = {
@@ -62,6 +64,11 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
     ...(pastasDest as any[]).map((f) => ({ label: f.nome as string, href: `/aluno/simulado?pasta=${f.id}`, grupo: 'Pastas' })),
     ...(simsDest as any[]).filter((s) => s.embed_token).map((s) => ({ label: s.titulo as string, href: `/simulado/${s.embed_token}`, grupo: 'Simulados' })),
   ])
+  // Capas largas do sistema (pastas/bancos + banners) — modelos prontos p/ fundo do card de perfil.
+  const capasSistema = [...new Set([
+    ...((capasRow as any[]) ?? []).flatMap((p) => [p.capa_url, p.capa_card_url]),
+    ...((bannersRes as any[]) ?? []).map((b) => b.imagem_url),
+  ].filter((u): u is string => typeof u === 'string' && !!u))]
 
   // Badge de estado (4 valores): Ativa (todos) · Só admin · Só super-admin · Oculta.
   const estado = t.ativo
@@ -111,6 +118,7 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
         embedConfig={embedConfig}
         salvarEmbed={salvarEmbed}
         rbacErro={rbac.ok ? null : (rbac.error ?? 'Não foi possível carregar os acessos.')}
+        capasSistema={capasSistema}
       />
     </div>
   )

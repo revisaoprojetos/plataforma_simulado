@@ -66,7 +66,7 @@ export default async function IntegracaoProviderPage({ params }: { params: Promi
       return { data: r.data }
     })(),
     svc.from('simulado_grupos').select('id, nome, is_mestre').eq('tenant_id', tid).eq('deletado', false).order('nome'),
-    svc.from('simulado_simulados').select('id, titulo').eq('tenant_id', tid).eq('deletado', false).order('titulo'),
+    svc.from('simulado_simulados').select('id, titulo').eq('tenant_id', tid).eq('deletado', false).is('owner_estudante_id', null).order('titulo'),
     // Bancos (simulado_pastas): a "pasta" que LIBERA os simulados dela (via banco_base_id).
     (async () => { try { return await svc.from('simulado_pastas').select('id, nome').eq('tenant_id', tid).order('nome') } catch { return { data: [] } } })(),
     // Pré-carrega o último payload recebido → a aba Mapa JSON abre INSTANTÂNEA (sem round-trip).

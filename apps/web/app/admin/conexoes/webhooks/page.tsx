@@ -34,7 +34,7 @@ export default async function WebhooksPage() {
   if (r.error) precisaMigrar = /webhook_saida|relation|does not exist/i.test(r.error.message)
   else webhooks = r.data ?? []
 
-  const { data: sims } = await svc.from('simulado_simulados').select('id, titulo').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('titulo')
+  const { data: sims } = await svc.from('simulado_simulados').select('id, titulo').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').is('owner_estudante_id', null).order('titulo')
 
   // Automações (aba n8n) — tolerante se a tabela ainda não foi migrada.
   let automacoes: any[] = []
