@@ -42,7 +42,9 @@ export function PersonalizadoWizard() {
   }
 
   return (
-    <div className="space-y-5">
+    // Na etapa de seleção o wizard ocupa a altura da tela (dvh, adapta a aparelhos) para o card
+    // de questões preencher até perto da barra inferior; nas outras etapas é fluxo normal.
+    <div className={cn('flex flex-col gap-5', etapa === 'selecao' && 'h-[calc(100dvh-8.5rem)]')}>
       <div className="flex items-center gap-3">
         <Link href="/aluno/simulados" className="shrink-0 rounded-lg border p-2 text-muted-foreground transition-colors hover:text-foreground" aria-label="Voltar"><ArrowLeft className="h-4 w-4" /></Link>
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Criar simulado</h1>
@@ -99,8 +101,8 @@ export function PersonalizadoWizard() {
       )}
 
       {etapa === 'selecao' && (
-        // Altura por dvh (adapta a cada aparelho) + respiro da barra inferior no mobile.
-        <div className="mb-2 flex h-[calc(100dvh-16.5rem)] min-h-[22rem] flex-col overflow-hidden rounded-2xl border bg-card">
+        // flex-1: preenche o espaço restante até o fim (com o respiro que o dvh do wizard deixa).
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border bg-card">
           <SeletorQuestoes onConcluir={concluirSelecao} onCancelar={() => setEtapa('config')} textoConcluir="Concluir" />
         </div>
       )}
