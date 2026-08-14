@@ -7,6 +7,7 @@ import { ArrowLeft, GraduationCap, Timer, Eye, Check, Pencil } from 'lucide-reac
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { SeletorQuestoes } from '@/components/aluno/seletor-questoes'
+import { SeletorTempo, formatarTempo } from '@/components/aluno/seletor-tempo'
 import { criarMeuSimuladoCompleto, type QuestaoDisponivel } from '@/app/aluno/(portal)/simulados/builder-actions'
 
 type Modo = 'estudo' | 'prova' | 'revisao'
@@ -26,7 +27,7 @@ export function PersonalizadoWizard() {
   const [etapa, setEtapa] = useState<Etapa>('config')
   const [nome, setNome] = useState('Meu simulado')
   const [modo, setModo] = useState<Modo>('estudo')
-  const [tempo, setTempo] = useState('')
+  const [tempoMin, setTempoMin] = useState(300) // base 5h
   const [escolhidas, setEscolhidas] = useState<QuestaoDisponivel[]>([])
   const [simuladoId, setSimuladoId] = useState<string | null>(null)
 
@@ -35,7 +36,7 @@ export function PersonalizadoWizard() {
   // Cria o simulado JÁ com a config e as questões (import em lote) — o "Importando…" é mostrado
   // pelo próprio SeletorQuestoes enquanto esta promessa resolve.
   const concluirSelecao = async (qs: QuestaoDisponivel[]) => {
-    const r = await criarMeuSimuladoCompleto({ nome, modo, tempo: tempo ? Number(tempo) : null, questaoIds: qs.map((q) => q.id) })
+    const r = await criarMeuSimuladoCompleto({ nome, modo, tempo: tempoMin || null, questaoIds: qs.map((q) => q.id) })
     if (r.error || !r.id) { toast.error(r.error ?? 'Não foi possível criar.'); return }
     setEscolhidas(qs); setSimuladoId(r.id); setEtapa('previa')
   }
@@ -87,10 +88,9 @@ export function PersonalizadoWizard() {
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Tempo (minutos)</label>
-            <input value={tempo} onChange={(e) => setTempo(e.target.value.replace(/\D/g, '').slice(0, 3))} inputMode="numeric" placeholder="Sem limite"
-              className="w-40 rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary" />
-            <p className="text-xs text-muted-foreground">Deixe em branco para sem limite de tempo.</p>
+            <span className="block text-sm font-medium">Tempo</span>
+            <SeletorTempo minutos={tempoMin} onChange={setTempoMin} />
+            <p className="text-xs text-muted-foreground">Toque para ajustar as horas e minutos.</p>
           </div>
           <div className="flex justify-end">
             <button type="button" onClick={irSelecao} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">Escolher questões</button>
@@ -111,7 +111,7 @@ export function PersonalizadoWizard() {
               <h2 className="text-base font-bold tracking-tight">{nome}</h2>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span className="rounded-full bg-muted px-2 py-0.5 capitalize">{TIPOS.find((t) => t.id === modo)?.nome}</span>
-                <span>{tempo ? `${tempo} min` : 'Sem limite'}</span>
+                <span>{formatarTempo(tempoMin)}</span>
                 <span>{escolhidas.length} {escolhidas.length === 1 ? 'questão' : 'questões'}</span>
               </div>
             </div>
