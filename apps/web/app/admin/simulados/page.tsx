@@ -21,7 +21,8 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
   {
     const base = 'id, titulo, status, data_inicio, data_fim, modo_aplicacao, tempo_limite_min, embed_token, created_at, regras'
     // fetchAll: tenant com >1000 simulados truncava o board. Tolerante à coluna pasta_id ausente.
-    const buscar = (cols: string) => fetchAll<any>(() => supabase.from('simulado_simulados').select(cols).eq('deletado', false).eq('tenant_id', tid).order('created_at', { ascending: false }).order('id', { ascending: true }))
+    // owner_estudante_id IS NULL: só simulados OFICIAIS (os do construtor pessoal do aluno ficam de fora).
+    const buscar = (cols: string) => fetchAll<any>(() => supabase.from('simulado_simulados').select(cols).eq('deletado', false).eq('tenant_id', tid).is('owner_estudante_id', null).order('created_at', { ascending: false }).order('id', { ascending: true }))
     try {
       simulados = await buscar(`${base}, pasta_id`)
     } catch (e: any) {

@@ -21,6 +21,10 @@ import { LigaPainel } from '@/components/aluno/liga-painel'
 import { RankingLiga } from '@/components/aluno/ranking-liga'
 import { ConquistasProgressoLista } from '@/components/aluno/conquistas-progresso'
 import { CelebracaoXp } from '@/components/aluno/celebracao-xp'
+import { MascoteTour } from '@/components/mascote/mascote-tour'
+import { getCurrentTenant } from '@/lib/tenant'
+import { AlertTriangle } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default async function AlunoHome({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
   const { pasta } = await searchParams
@@ -31,7 +35,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const [{ data: mats }, { data: acs }, { data: sessAll }, { data: banRows }, { data: tenantRow }] = await Promise.all([
     svc.from('simulado_matriculas').select('simulado_id, liberado').eq('estudante_id', estId),
     svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', estId),
-    svc.from('simulado_sessoes_prova').select('simulado_id, status, nota').eq('estudante_id', estId).eq('is_teste', false).eq('deletado', false),
+    svc.from('simulado_sessoes_prova').select('simulado_id, status, nota, finalizado_em').eq('estudante_id', estId).eq('is_teste', false).eq('deletado', false),
     // Mesma ordenação do console (ordem asc, empate por criado_em DESC) para o carrossel bater com a lista de Avisos.
     svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor').eq('tenant_id', sessao!.tenantId).eq('ativo', true).order('ordem', { ascending: true }).order('criado_em', { ascending: false }),
     svc.from('simulado_tenants').select('tema').eq('id', sessao!.tenantId).maybeSingle(),
@@ -185,7 +189,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
       const bancoToFolder = new Map<string, string>()
       for (const f of pastaIds) bancoToFolder.set(f, f)
       for (const bc of bancos as any[]) if (bc.pai_id) bancoToFolder.set(bc.id, bc.pai_id)
-      const simsT = await fetchAll<{ regras: any }>(() => svc.from('simulado_simulados').select('regras').eq('tenant_id', sessao!.tenantId).eq('deletado', false).eq('status', 'publicado').order('id', { ascending: true }))
+      const simsT = await fetchAll<{ regras: any }>(() => svc.from('simulado_simulados').select('regras').eq('tenant_id', sessao!.tenantId).eq('deletado', false).eq('status', 'publicado').is('owner_estudante_id', null).order('id', { ascending: true }))
       for (const s of simsT as any[]) { const bb = (s.regras as any)?.banco_base_id; const f = bb ? bancoToFolder.get(bb) : null; if (f) pastaCount.set(f, (pastaCount.get(f) ?? 0) + 1) }
     }
 
@@ -262,6 +266,10 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     )
   }
 
+  // Assistente/mascote (config do tenant) — usada no tour de novidades da gamificação.
+  const tenant = await getCurrentTenant()
+  const assistente = ((tenant?.tema as any)?.assistente ?? {}) as { ativo?: boolean; nome?: string }
+
   // Gamificação (hero + missões + calendário de sequência) — só quando o tenant ativou.
   const gamConfig = await getGamConfig(svc, sessao!.tenantId)
   const [gamResumo, gamMissoes, gamSemana, gamConquistas] = gamConfig?.ativo
@@ -328,14 +336,43 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const chest = gamConfig?.xp_regras.chest
   const proxima = gamResumo?.proxima ?? null
 
+  // Aviso de mudança de gabarito na home: simulados que o aluno FEZ e que tiveram anulação/troca
+  // de gabarito DEPOIS da sessão dele (nota recalculada). Deriva de simulado_recorrecoes.
+  let avisosGabarito: { id: string; titulo: string }[] = []
+  if (feitosSet.size) {
+    const ultimaPorSim = new Map<string, number>()
+    for (const s of (sessAll ?? []) as any[]) {
+      if (s.status !== 'finalizada' || !s.finalizado_em) continue
+      const t = new Date(s.finalizado_em).getTime()
+      if (!ultimaPorSim.has(s.simulado_id) || t > ultimaPorSim.get(s.simulado_id)!) ultimaPorSim.set(s.simulado_id, t)
+    }
+    const { data: recs } = await svc.from('simulado_recorrecoes').select('simulado_id, executado_em').in('simulado_id', [...feitosSet])
+    const afetados = new Set<string>()
+    for (const r of (recs ?? []) as any[]) {
+      const fin = ultimaPorSim.get(r.simulado_id)
+      if (fin && r.executado_em && new Date(r.executado_em).getTime() > fin) afetados.add(r.simulado_id)
+    }
+    avisosGabarito = sims.filter((s) => afetados.has(s.id)).map((s) => ({ id: s.id, titulo: s.titulo }))
+  }
+
   return (
     <div className="animate-page space-y-6">
+      {avisosGabarito.length > 0 && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p className="font-semibold">Mudança de gabarito em {avisosGabarito.length === 1 ? 'um simulado que você fez' : `${avisosGabarito.length} simulados que você fez`}</p>
+            <p className="text-xs opacity-90">{avisosGabarito.map((a) => a.titulo).join(' · ')} — sua nota já foi recalculada; confira o resultado atualizado.</p>
+          </div>
+        </div>
+      )}
       {/* Celebração de XP (partículas voando para o card de nível) quando há XP recém-contabilizado. */}
-      {gamResumo && <CelebracaoXp />}
+      {gamResumo && <CelebracaoXp assistenteAtivo={assistente.ativo !== false} />}
+      {gamResumo && assistente.ativo !== false && <MascoteTour nome={assistente.nome || 'Capi'} ativo temSimulado={feitosSet.size > 0} nivel={gamResumo.nivel} />}
       {/* Banners do tenant — UM carrossel só (banner + destaque + simulado) + pop-up. SÓ na Início. */}
       <BannersPortal banners={bannersSemSim.map((b) => ({ ...b, ordem: ordemGlobal.get(b.id) ?? 0, estilo: (destaquesBanner[b.id] as any)?.popupEstilo ?? null, pontas: (destaquesBanner[b.id] as any)?.popupPontas ?? null, textoPos: (destaquesBanner[b.id] as any)?.bannerTextoPos ?? null, textoCor: (destaquesBanner[b.id] as any)?.bannerTextoCor ?? null, textoTam: (destaquesBanner[b.id] as any)?.bannerTextoTam ?? null, textoX: (destaquesBanner[b.id] as any)?.bannerTextoX ?? null, textoY: (destaquesBanner[b.id] as any)?.bannerTextoY ?? null, ocultarTitulo: (destaquesBanner[b.id] as any)?.bannerOcultarTitulo ?? false, ocultarMensagem: (destaquesBanner[b.id] as any)?.bannerOcultarMensagem ?? false, freq: (destaquesBanner[b.id] as any)?.freq ?? null }))} simulados={heroSims} stats={mostrarDesempenhoBanner ? statsAluno : null} />
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className={cn('grid items-start gap-6', gamResumo && 'lg:grid-cols-[minmax(0,1fr)_340px]')}>
         {/* ── Coluna principal: nível + trilha + recentes + cursos e pacotes ── */}
         <div className="min-w-0 space-y-6">
           {gamResumo ? (
@@ -347,27 +384,27 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
                 <span className="text-[11px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand-accent)' }}>Sua área de estudos</span>
               </div>
               <h1 className="text-2xl font-bold tracking-tight sm:text-[2rem]">Olá, {sessao!.nome.split(' ')[0]} 👋</h1>
-              <p className="mt-1 text-muted-foreground">Bem-vindo à sua área de estudos. {recentes.length > 0 ? `Você tem ${recentes.length} simulado(s) recente(s) para fazer.` : 'Você está em dia com seus simulados.'}</p>
+              <p className="mt-1 text-muted-foreground">Bem-vindo à sua área de estudos.</p>
             </div>
           )}
 
-          {trilhas.length > 0 && <TrilhaSimulados trilhas={trilhas} gamAtivo={!!gamResumo} estilo={gamConfig?.trilha_estilo ?? 'cards'} visiveis={gamConfig?.trilha_visiveis ?? 3} />}
+          {gamResumo && trilhas.length > 0 && <TrilhaSimulados trilhas={trilhas} gamAtivo={!!gamResumo} estilo={gamConfig?.trilha_estilo ?? 'cards'} visiveis={gamConfig?.trilha_visiveis ?? 3} />}
 
           {/* Divisória horizontal (quase às bordas) separando a trilha dos simulados recentes. */}
-          {trilhas.length > 0 && <div className="mx-auto h-px w-[92%]" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--foreground) 24%, transparent) 18%, color-mix(in oklab, var(--foreground) 24%, transparent) 82%, transparent)' }} />}
+          {gamResumo && trilhas.length > 0 && <div className="mx-auto h-px w-[92%]" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--foreground) 24%, transparent) 18%, color-mix(in oklab, var(--foreground) 24%, transparent) 82%, transparent)' }} />}
 
-          <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} recentes={recentes} />
+          <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} recentes={recentes} full={!gamResumo} recentesConcluidos={recentes.length === 0 && feitosSet.size > 0} />
         </div>
 
         {/* ── Coluna direita: meta, sequência, missões, liga, conquistas ── */}
         {gamResumo && (
           <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-            {gamResumo.metaDiaXp > 0 && <MetaDiariaCard xpHoje={gamResumo.xpHoje} meta={gamResumo.metaDiaXp} />}
-            <StreakCalendario dias={gamSemana} streak={gamResumo.streakAtual} feitoHoje={gamResumo.feitoHoje} chestXp={chest?.xp ?? 0} chestCadaN={chest?.cada_n_dias ?? 0} />
-            {gamMissoes.length > 0 && <MissoesLista missoes={gamMissoes} renova="meia-noite" />}
+            {gamResumo.metaDiaXp > 0 && <div data-tour="meta"><MetaDiariaCard xpHoje={gamResumo.xpHoje} meta={gamResumo.metaDiaXp} /></div>}
+            <div data-tour="sequencia"><StreakCalendario dias={gamSemana} streak={gamResumo.streakAtual} feitoHoje={gamResumo.feitoHoje} chestXp={chest?.xp ?? 0} chestCadaN={chest?.cada_n_dias ?? 0} /></div>
+            {gamMissoes.length > 0 && <div data-tour="missoes"><MissoesLista missoes={gamMissoes} renova="meia-noite" /></div>}
             <LigaPainel ligas={gamConfig!.ligas} ligaAtual={gamResumo.liga.id} xpTotal={gamResumo.xpTotal} proximaNome={proxima?.nome ?? null} faltam={proxima ? Math.max(0, proxima.xp_min - gamResumo.xpTotal) : 0} />
-            <RankingLiga inicial="total" />
-            {gamConquistas.length > 0 && <ConquistasProgressoLista itens={gamConquistas} />}
+            <div data-tour="ranking"><RankingLiga inicial="total" /></div>
+            {gamConquistas.length > 0 && <div data-tour="conquistas"><ConquistasProgressoLista itens={gamConquistas} /></div>}
           </aside>
         )}
       </div>

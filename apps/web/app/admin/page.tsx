@@ -25,11 +25,11 @@ async function getDados(tenantId: string) {
     notaMedia,
   ] = await Promise.all([
     svc.from('simulado_questoes').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false),
-    svc.from('simulado_simulados').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('status', 'publicado'),
+    svc.from('simulado_simulados').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('status', 'publicado').is('owner_estudante_id', null),
     svc.from('simulado_estudantes').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false),
     svc.from('simulado_sessoes_prova').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('is_teste', false).gte('iniciado_em', hojeIso),
     montarDashboardSerie(svc, tenantId, 'semana'),
-    svc.from('simulado_simulados').select('id, titulo, status, modo_aplicacao, created_at').match(t).eq('deletado', false).order('created_at', { ascending: false }).limit(5),
+    svc.from('simulado_simulados').select('id, titulo, status, modo_aplicacao, created_at').match(t).eq('deletado', false).is('owner_estudante_id', null).order('created_at', { ascending: false }).limit(5),
     // Nota média = agregação sobre TODAS as notas finalizadas. Como a agregação do
     // PostgREST está desabilitada e não temos RPC, o cálculo ainda percorre as notas
     // (fetchAll), mas fica MEMOIZADO no Redis (TTL) — no cache-hit o dashboard não
