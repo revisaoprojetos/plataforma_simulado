@@ -35,7 +35,8 @@ const INSTRUCOES: [string, string][] = [
   ['Número', 'Número/ordem da questão (opcional).'],
   ['Enunciado', 'O texto da pergunta. Obrigatório.'],
   ['Alternativa A–E', 'As opções de resposta. Deixe em branco as que não usar.'],
-  ['Alternativa Correta', 'A letra da resposta certa (A, B, C, D ou E) — ou "Certo"/"Errado" nas questões Certo/Errado.'],
+  ['Alternativa Correta', 'A letra da resposta certa (A, B, C, D ou E) — ou "Certo"/"Errado" nas questões Certo/Errado — ou "ANULADA".'],
+  ['ANULADA (na coluna Alternativa Correta)', 'Marca a questão como anulada: o ponto é garantido a TODOS que fizerem o simulado e a questão aparece na prova com as alternativas, porém bloqueada para resposta. Reimportar com "ANULADA" também anula uma questão já existente.'],
   ['Alternativas Incorretas', 'Letras das erradas (opcional; apenas informativo — a correta já define as demais).'],
   ['Grupo · Categoria · Assunto Detalhe · Pilar 1 · Pilar 2', 'Classificações livres da questão.'],
   ['Disciplina · Assunto Principal · Banca · Órgão · Cargo', 'São criados automaticamente no sistema se ainda não existirem.'],
@@ -92,7 +93,7 @@ async function baixarModelo() {
       for (let r = 2; r <= 300; r++) ws.getCell(r, ci).dataValidation = { type: 'list', allowBlank: true, formulae: [`"${opcoes}"`] }
     }
     lista('Nível', 'facil,medio,dificil')
-    lista('Alternativa Correta', 'A,B,C,D,E,Certo,Errado')
+    lista('Alternativa Correta', 'A,B,C,D,E,Certo,Errado,ANULADA')
     lista('Tipo', 'objetiva,Certo/Errado')
 
     // Aba de instruções.
@@ -166,6 +167,7 @@ export function ImportarQuestoesTab({ bancoId = null, onDone }: { bancoId?: stri
   const podeImportar = !!resumo && resumo.novas + resumo.jaExistem > 0
   const LETRAS = ['A', 'B', 'C', 'D', 'E']
   const gabaritoDe = (q: QuestaoImport) => {
+    if (q.anulada) return 'Anulada'
     const a = q.alternativas.find((x) => x.correta)
     return a ? (LETRAS[a.ordem] ?? '—') : '—'
   }

@@ -8,6 +8,8 @@ import { registrarAudit } from '@/lib/audit'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { softDelete } from '@/lib/soft-delete'
 import { tipoEhCertoErrado, alternativasSaoCertoErrado } from '@/lib/simulado/formato'
+import { executarRecorrecao, contarSessoesRecorrecao, type RecorrecaoJob } from '@/lib/simulado/recorrecao'
+import { enfileirarRecorrecao } from '@/lib/queue/recorrecao-queue'
 import type { AnaliseImport, QuestaoImport, AltImport, ResultadoImport } from './import-types'
 import type { HudCores, HudPorPagina } from '@/lib/caderno-designer/types'
 
@@ -17,7 +19,32 @@ async function guard() {
   }
   const access = await getCurrentAccess()
   if (!access.tenantId) return { ok: false as const, error: 'Tenant não resolvido.' }
-  return { ok: true as const, tenantId: access.tenantId }
+  return { ok: true as const, tenantId: access.tenantId, atorId: access.userId ?? null }
+}
+
+/**
+ * Propaga a anulação marcada no BANCO (`simulado_questoes.anulada`) para TODOS os simulados que
+ * usam a questão: dispara uma re-correção (anulacao, política pontua_todos) por (simulado, questão).
+ * pontua_todos só ADICIONA ponto (ninguém perde nota). Igual ao botão "Anular" do admin: ≤ SYNC_MAX
+ * sessões roda inline; acima, vai para a fila (worker) — sem fila, cai para inline.
+ */
+async function propagarAnulacaoBanco(svc: ReturnType<typeof createAdminClient>, tenantId: string, atorId: string | null, questaoIds: string[]): Promise<void> {
+  const SYNC_MAX = Number(process.env.RECORRECAO_SYNC_MAX ?? 200)
+  for (const questaoId of questaoIds) {
+    const { data: pqs } = await svc
+      .from('simulado_prova_questoes')
+      .select('simulado_id')
+      .eq('tenant_id', tenantId)
+      .eq('questao_id', questaoId)
+      .not('anulada', 'is', true) // pula os que já estão anulados naquele simulado
+    const simuladoIds = [...new Set(((pqs ?? []) as any[]).map((r) => r.simulado_id as string))]
+    for (const simuladoId of simuladoIds) {
+      const job: RecorrecaoJob = { tipo: 'anulacao', tenantId, atorId, simuladoId, questaoId, motivo: 'Anulada na importação da planilha', politica: 'pontua_todos' }
+      const n = await contarSessoesRecorrecao(svc, simuladoId, tenantId).catch(() => 0)
+      if (n <= SYNC_MAX) { await executarRecorrecao(svc, job); continue }
+      try { await enfileirarRecorrecao(job) } catch { await executarRecorrecao(svc, job) }
+    }
+  }
 }
 
 /** Cria um banco (pasta) de questões. `paiId` = pasta (folder) onde ele nasce (null = raiz). */
@@ -535,10 +562,12 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
     const difRaw = norm(get('dificuldade'))
     const dif = difRaw.startsWith('fac') ? 'facil' : difRaw.startsWith('dif') ? 'dificil' : difRaw.startsWith('med') ? 'medio' : null
     const anoNum = parseInt(get('ano'), 10)
-    // Gabarito: aceita letra (A–E) OU "Certo"/"Errado".
+    // Gabarito: aceita letra (A–E) OU "Certo"/"Errado" OU "ANULADA".
     const corretaNorm = norm(get('correta'))
-    const corretaLetra = corretaNorm.replace(/[^a-e]/g, '').charAt(0)
-    const corretaCE = corretaNorm.startsWith('cert') ? 'certo' : corretaNorm.startsWith('err') ? 'errado' : null
+    // "ANULADA"/"ANULAR" → questão anulada: ponto garantido a todos, sem alternativa correta.
+    const anulada = corretaNorm.startsWith('anul')
+    const corretaLetra = anulada ? '' : corretaNorm.replace(/[^a-e]/g, '').charAt(0)
+    const corretaCE = anulada ? null : (corretaNorm.startsWith('cert') ? 'certo' : corretaNorm.startsWith('err') ? 'errado' : null)
     let alternativas: AltImport[] = []
     letras.forEach((L, i) => {
       const t = get('alt_' + L)
@@ -555,8 +584,8 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
     if (formato === 'certo_errado' && alternativas.length === 0) {
       const certoCerto = corretaCE ? corretaCE === 'certo' : corretaLetra !== 'b'
       alternativas = [
-        { texto: 'Certo', correta: certoCerto, ordem: 0, lei: null, comentario: get('com_a') || null },
-        { texto: 'Errado', correta: !certoCerto, ordem: 1, lei: null, comentario: get('com_b') || null },
+        { texto: 'Certo', correta: anulada ? false : certoCerto, ordem: 0, lei: null, comentario: get('com_a') || null },
+        { texto: 'Errado', correta: anulada ? false : !certoCerto, ordem: 1, lei: null, comentario: get('com_b') || null },
       ]
     }
 
@@ -564,7 +593,8 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
     if (!enunciado) erro = 'Enunciado vazio'
     else if (tipo === 'objetiva') {
       if (alternativas.length < 2) erro = 'Menos de 2 alternativas'
-      else if (!alternativas.some((a) => a.correta)) erro = 'Alternativa correta não indicada'
+      // Anulada não exige alternativa correta (o enunciado + assertivas aparecem, mas bloqueados).
+      else if (!anulada && !alternativas.some((a) => a.correta)) erro = 'Alternativa correta não indicada'
     }
 
     out.push({
@@ -574,7 +604,7 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
       pilar_1: get('pilar_1') || null, pilar_2: get('pilar_2') || null,
       banca: get('banca') || null, orgao: get('orgao') || null, cargo: get('cargo') || null,
       ano: Number.isFinite(anoNum) ? anoNum : null, nivel_dificuldade: dif,
-      comentario_professor: converterMarcacao(get('comentario')) || null, alternativas, erro,
+      comentario_professor: converterMarcacao(get('comentario')) || null, anulada, alternativas, erro,
     })
   }
   return out
@@ -641,6 +671,7 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
   const svc = createAdminClient()
 
   const idsParaVincular: string[] = []
+  const anuladaIds = new Set<string>() // questões marcadas ANULADA (novas + reimportadas) → propagar
   // Ordem final desejada (coluna "Número" do CSV; empate desfeito pela ordem de leitura).
   const ordenados: { n: number; seq: number; id: string }[] = []
   let criadas = 0, jaExistiam = 0
@@ -652,7 +683,12 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
 
   for (const q of questoes) {
     if (q.erro) continue
-    if (q.jaExiste && q.questaoIdExistente) { idsParaVincular.push(q.questaoIdExistente); registrarOrdem(q.questaoIdExistente, q.numero); jaExistiam++; continue }
+    if (q.jaExiste && q.questaoIdExistente) {
+      idsParaVincular.push(q.questaoIdExistente); registrarOrdem(q.questaoIdExistente, q.numero); jaExistiam++
+      // Re-import marcando ANULADA atualiza a questão existente no banco (para propagar depois).
+      if (q.anulada) { anuladaIds.add(q.questaoIdExistente); await svc.from('simulado_questoes').update({ anulada: true }).eq('id', q.questaoIdExistente).eq('tenant_id', g.tenantId) }
+      continue
+    }
 
     const banca_id = await resolveNome(svc, 'simulado_bancas', g.tenantId, q.banca)
     const orgao_id = await resolveNome(svc, 'simulado_orgaos', g.tenantId, q.orgao)
@@ -668,7 +704,7 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
     const extra: Record<string, unknown> = {
       numero: q.numero ?? null, grupo: q.grupo ?? null, categoria: q.categoria ?? null,
       assunto_detalhe: q.assunto_detalhe ?? null, pilar_1: q.pilar_1 ?? null, pilar_2: q.pilar_2 ?? null, cargo: q.cargo ?? null,
-      formato: q.formato ?? 'multipla',
+      formato: q.formato ?? 'multipla', anulada: q.anulada === true,
     }
     // Insere a questão. Se alguma coluna nova ainda não existir no banco, remove SÓ ela e tenta de novo
     // (não perde os outros campos). Assim funciona antes e depois das migrations.
@@ -696,6 +732,7 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
       }
     }
     idsParaVincular.push(novaId); registrarOrdem(novaId, q.numero); criadas++
+    if (q.anulada) anuladaIds.add(novaId)
   }
 
   // Vincula ao banco (ignora as já vinculadas) — só quando há banco de destino.
@@ -724,7 +761,14 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
     } catch { /* coluna ordem_questoes pode não existir ainda — ignora */ }
   }
 
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_questoes', entidadeId: bancoId ?? 'sistema', depois: { importadas: criadas, jaExistiam, vinculadas } })
+  // Propaga anulações marcadas no banco para os simulados que já usam essas questões:
+  // cada sessão finalizada é re-corrigida (ponto garantido a todos). Best-effort — não derruba o import.
+  if (anuladaIds.size) {
+    try { await propagarAnulacaoBanco(svc, g.tenantId, g.atorId, [...anuladaIds]) }
+    catch (e) { console.error('[import] propagação de anulação falhou:', (e as any)?.message) }
+  }
+
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_questoes', entidadeId: bancoId ?? 'sistema', depois: { importadas: criadas, jaExistiam, vinculadas, anuladas: anuladaIds.size } })
   revalidatePath('/admin/questoes')
   if (bancoId) revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return { ok: true, criadas, jaExistiam, vinculadas }

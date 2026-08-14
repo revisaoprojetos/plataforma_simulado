@@ -4,6 +4,7 @@ import { registrarAudit } from '@/lib/audit'
 import { rankearSimulado } from '@/lib/ranking'
 import { contextoNota, calcularNotaSessao } from '@/lib/simulado/nota'
 import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
+import { criarNotificacoesEmMassa } from '@/lib/notificacoes/criar'
 
 /**
  * Núcleo da RE-CORREÇÃO (anular / trocar gabarito / remover), extraído das server
@@ -28,6 +29,22 @@ export type RecorrecaoJob =
   | { tipo: 'anulacao'; tenantId: string; simuladoId: string; questaoId: string; motivo: string; politica: Politica; atorId?: string | null }
   | { tipo: 'troca_alternativa'; tenantId: string; simuladoId: string; questaoId: string; novaAlternativaId: string; motivo: string; atorId?: string | null }
   | { tipo: 'remocao'; tenantId: string; simuladoId: string; questaoId: string; atorId?: string | null }
+
+/**
+ * Notifica TODOS os alunos que fizeram o simulado (sessão finalizada) sobre a mudança de gabarito.
+ * Best-effort — nunca derruba a re-correção. O sino do portal lê `simulado_notificacoes`; as faixas
+ * (resultado/revisão + home) derivam de `simulado_recorrecoes`.
+ */
+async function notificarMudancaGabarito(svc: SupabaseClient, tenantId: string, simuladoId: string, estudanteIds: (string | null)[], tipo: 'anulacao' | 'troca'): Promise<void> {
+  const ids = [...new Set(estudanteIds.filter((x): x is string => !!x))]
+  if (!ids.length) return
+  const { data: sim } = await svc.from('simulado_simulados').select('titulo').eq('id', simuladoId).maybeSingle()
+  const titulo = (sim as any)?.titulo ?? 'simulado'
+  const mensagem = tipo === 'anulacao'
+    ? `Uma questão do simulado "${titulo}" foi anulada — o ponto foi garantido a todos e sua nota foi recalculada.`
+    : `O gabarito do simulado "${titulo}" foi atualizado e sua nota foi recalculada.`
+  await criarNotificacoesEmMassa(svc, tenantId, ids, { tipo: 'alerta', titulo: 'Gabarito atualizado', mensagem, link: '/aluno' })
+}
 
 /** Dispatcher: roda a operação de re-correção pelo tipo. Idempotência/validação como nas actions originais. */
 export async function executarRecorrecao(svc: SupabaseClient, job: RecorrecaoJob): Promise<Resultado> {
@@ -125,6 +142,7 @@ async function anularCore(svc: SupabaseClient, job: Extract<RecorrecaoJob, { tip
 
   await registrarAudit({ operacao: 'ANULAR', entidade: 'simulado_prova_questoes', entidadeId: vinculo.id, depois: { questao_id: questaoId, politica, motivo }, atorId, tenantId })
   await invalidarRelatorios(tenantId)
+  await notificarMudancaGabarito(svc, tenantId, simuladoId, lista.map((s: any) => s.estudante_id), 'anulacao')
   return { ok: true, afetados: lista.length }
 }
 
@@ -230,6 +248,7 @@ async function trocarCore(svc: SupabaseClient, job: Extract<RecorrecaoJob, { tip
 
   await registrarAudit({ operacao: 'RECORRIGIR', entidade: 'simulado_prova_questoes', entidadeId: vinculo.id, depois: { questao_id: questaoId, nova_alternativa_id: novaAlternativaId, motivo }, atorId, tenantId })
   await invalidarRelatorios(tenantId)
+  await notificarMudancaGabarito(svc, tenantId, simuladoId, lista.map((s: any) => s.estudante_id), 'troca')
   return { ok: true, afetados: lista.length }
 }
 

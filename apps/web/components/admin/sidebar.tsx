@@ -41,6 +41,7 @@ import {
   Megaphone,
   LogOut,
   Building2,
+  Tag,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -111,6 +112,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Aplicação de Simulado', href: '/admin/simulados', icon: ClipboardList, perm: 'simulados:view' },
       { label: 'Questões', href: '/admin/questoes', icon: BookOpen, perm: 'questoes:view' },
+      { label: 'Etiquetas', href: '/admin/etiquetas', icon: Tag, perm: 'questoes:view' },
       { label: 'Banco de Simulado', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
       { label: 'Correção (discursivas)', href: '/admin/correcao', icon: PenLine, perm: 'questoes:view' },
       { label: 'Cadernos', href: '/admin/cadernos-teste', icon: FileText, perm: 'questoes:view' },

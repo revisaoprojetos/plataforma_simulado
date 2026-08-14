@@ -23,6 +23,7 @@ const CURRENT_POLICY_VERSION = '1.0'
 const AREA_PERM: { prefix: string; perm: string }[] = [
   { prefix: '/admin/simulados', perm: 'simulados:view' },
   { prefix: '/admin/questoes', perm: 'questoes:view' },
+  { prefix: '/admin/etiquetas', perm: 'questoes:view' },
   { prefix: '/admin/banco-questoes', perm: 'questoes:view' },
   { prefix: '/admin/cadernos', perm: 'questoes:view' },
   { prefix: '/admin/correcao', perm: 'questoes:view' },

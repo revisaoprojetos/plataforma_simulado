@@ -11,6 +11,7 @@ export type QuestaoRevisao = {
   comentario: string | null
   respondida: boolean
   acertou: boolean | null
+  anulada: boolean
   alternativas: AltRevisao[]
 }
 
@@ -21,8 +22,8 @@ export type QuestaoRevisao = {
 export async function montarRevisao(svc: SupabaseClient, simuladoId: string, sessaoId: string, revelar: boolean): Promise<QuestaoRevisao[]> {
   const { data: pq } = await svc
     .from('simulado_prova_questoes')
-    .select('ordem, questao_id, questoes:simulado_questoes(id, enunciado, comentario_professor, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, correta))')
-    .eq('simulado_id', simuladoId).eq('anulada', false).order('ordem')
+    .select('ordem, anulada, questao_id, questoes:simulado_questoes(id, enunciado, comentario_professor, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, correta))')
+    .eq('simulado_id', simuladoId).order('ordem')
   const { data: resp } = await svc
     .from('simulado_respostas_objetivas')
     .select('questao_id, alternativa_id, correta, snapshot_gabarito')
@@ -35,6 +36,7 @@ export async function montarRevisao(svc: SupabaseClient, simuladoId: string, ses
 
   return ((pq ?? []) as any[]).map((r) => {
     const q = r.questoes ?? {}
+    const anulada = r.anulada === true
     const info = respPorQ.get(q.id)
     const alts = [...(q.alternativas ?? [])].sort((a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0)).map((a: any, i: number) => ({
       letra: String.fromCharCode(65 + i),
@@ -48,7 +50,9 @@ export async function montarRevisao(svc: SupabaseClient, simuladoId: string, ses
       disciplina: q.disciplinas?.nome ?? null,
       comentario: revelar ? (q.comentario_professor ? strip(q.comentario_professor) : null) : null,
       respondida: !!info,
-      acertou: revelar ? (info ? info.correta : null) : null,
+      // Anulada = ponto garantido a todos.
+      acertou: anulada ? true : (revelar ? (info ? info.correta : null) : null),
+      anulada,
       alternativas: alts,
     }
   })

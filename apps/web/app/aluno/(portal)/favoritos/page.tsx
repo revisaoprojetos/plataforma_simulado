@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { QuestaoCard } from '@/components/aluno/questao-card'
+import { etiquetasPorQuestao } from '@/lib/aluno/etiquetas-questao'
 import { Star } from 'lucide-react'
 
 export default async function AlunoFavoritosPage() {
@@ -26,6 +27,7 @@ export default async function AlunoFavoritosPage() {
     ? await svc.from('simulado_disciplinas').select('id, nome').in('id', discIds)
     : { data: [] as any[] }
   const discMap = new Map((discNomes ?? []).map((d: any) => [d.id, d.nome]))
+  const etiquetasMap = await etiquetasPorQuestao(svc, sessao!.tenantId, ids)
 
   const altMap = new Map<string, any[]>()
   for (const a of alts ?? []) {
@@ -47,6 +49,7 @@ export default async function AlunoFavoritosPage() {
       ano: x.ano ?? null,
       comentario_professor: x.comentario_professor ?? null,
       favorito: true,
+      etiquetas: etiquetasMap.get(x.id) ?? [],
       alternativas: (altMap.get(x.id) ?? []).map((a) => ({ id: a.id, texto: a.texto, ordem: a.ordem ?? 0, correta: !!a.correta })),
     }))
 

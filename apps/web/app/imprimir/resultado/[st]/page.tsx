@@ -28,14 +28,16 @@ export default async function ResultadoImprimirPage({ params, searchParams }: { 
     svc.from('simulado_estudantes').select('nome').eq('id', sessao.estudante_id).maybeSingle(),
     svc.from('simulado_sessoes_prova').select('estudante_id').eq('simulado_id', sessao.simulado_id).eq('is_teste', false).eq('status', 'finalizada'),
     svc.from('simulado_prova_questoes')
-      .select('ordem, questoes:simulado_questoes(id, tipo, enunciado, comentario_professor, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, correta))')
-      .eq('simulado_id', sessao.simulado_id).eq('anulada', false).order('ordem'),
+      .select('ordem, anulada, questoes:simulado_questoes(id, tipo, enunciado, comentario_professor, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, correta))')
+      .eq('simulado_id', sessao.simulado_id).order('ordem'),
     svc.from('simulado_respostas_objetivas').select('questao_id, alternativa_id, correta').eq('sessao_id', st),
     svc.from('simulado_respostas_discursivas').select('questao_id, texto, status, nota, feedback').eq('sessao_id', st),
   ])
   const totalParticipantes = new Set((partRows ?? []).map((p: any) => p.estudante_id)).size
   const respMap = new Map((respostas ?? []).map((r: any) => [r.questao_id, r]))
   const discMap = new Map((discResp ?? []).map((d: any) => [d.questao_id, d]))
+  // Anuladas: continuam no total e valem ponto pra todos (não contam como erro/branco).
+  const anuladaSet = new Set<string>((sq ?? []).filter((r: any) => r.anulada === true).map((r: any) => r.questoes?.id).filter(Boolean))
 
   const regras = (simulado?.regras as { liberar_gabarito?: string }) ?? {}
   const liberar = regras.liberar_gabarito ?? 'apos_janela'
@@ -48,7 +50,7 @@ export default async function ResultadoImprimirPage({ params, searchParams }: { 
   const completo = mod === 'completo'
 
   const total = (sq ?? []).length
-  const acertos = (respostas ?? []).filter((r: any) => r.correta).length
+  const acertos = (respostas ?? []).filter((r: any) => r.correta && !anuladaSet.has(r.questao_id)).length + anuladaSet.size
 
   // Desempenho por matéria.
   const agg = new Map<string, { acertos: number; total: number }>()
@@ -57,7 +59,7 @@ export default async function ResultadoImprimirPage({ params, searchParams }: { 
     const disc = q?.disciplinas?.nome ?? 'Sem matéria'
     const cur = agg.get(disc) ?? { acertos: 0, total: 0 }
     cur.total += 1
-    if (respMap.get(q?.id)?.correta) cur.acertos += 1
+    if ((row as any).anulada === true || respMap.get(q?.id)?.correta) cur.acertos += 1
     agg.set(disc, cur)
   }
 
@@ -105,12 +107,13 @@ export default async function ResultadoImprimirPage({ params, searchParams }: { 
         <div className="space-y-4">
           {(sq ?? []).map((row: any, idx: number) => {
             const q = row.questoes
+            const anulada = row.anulada === true
             const resp = respMap.get(q?.id)
             const alts = (q?.alternativas ?? []).slice().sort((a: any, b: any) => a.ordem - b.ordem)
             const d = q?.tipo === 'discursiva' ? discMap.get(q?.id) : null
             return (
               <div key={q?.id} className="qa text-[15px] leading-relaxed">
-                <p className="mb-1"><strong>{idx + 1}.</strong> <MarkdownContent inline>{q?.enunciado}</MarkdownContent></p>
+                <p className="mb-1"><strong>{idx + 1}.</strong> <MarkdownContent inline>{q?.enunciado}</MarkdownContent>{anulada && <span className="ml-1 text-xs italic text-black/60">— anulada (ponto garantido)</span>}</p>
                 {q?.tipo === 'discursiva' ? (
                   <div className="ml-4 space-y-1">
                     <p className="text-xs uppercase tracking-wide text-black/50">Resposta discursiva</p>

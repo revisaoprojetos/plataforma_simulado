@@ -48,6 +48,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Tempo esgotado — a prova não aceita mais respostas.', expirado: true }, { status: 409 })
   }
 
+  // Questão anulada NÃO aceita resposta (ponto garantido a todos). Ignora silenciosamente —
+  // defesa de servidor caso o cliente tente marcar mesmo com a UI bloqueada.
+  const { data: pqAnulada } = await supabase
+    .from('simulado_prova_questoes')
+    .select('anulada')
+    .eq('simulado_id', sessao.simulado_id)
+    .eq('questao_id', questao_id)
+    .maybeSingle()
+  if (pqAnulada?.anulada === true) {
+    return NextResponse.json({ saved: false, anulada: true })
+  }
+
   // Valida a alternativa e já resolve a LETRA (por ordem) para armazenar — assim a
   // exibição (caderno, gabarito, mala direta) lê o valor pronto, sem recalcular.
   const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']

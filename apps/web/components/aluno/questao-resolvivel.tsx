@@ -28,6 +28,7 @@ export interface QuestaoAluno {
   ano?: number | null
   comentario_professor?: string | null
   favorito: boolean
+  etiquetas?: { nome: string; cor: string | null }[]
   alternativas: AltAluno[]
 }
 
@@ -88,6 +89,9 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
             {questao.assunto && <span className="rounded-full bg-muted px-2 py-0.5">{questao.assunto}</span>}
             {questao.banca && <span className="rounded-full bg-muted px-2 py-0.5">{questao.banca}</span>}
             {questao.ano && <span className="rounded-full bg-muted px-2 py-0.5">{questao.ano}</span>}
+            {questao.etiquetas?.map((e) => (
+              <span key={e.nome} className="rounded-full px-2 py-0.5 font-medium" style={{ background: `${e.cor ?? '#64748b'}22`, color: e.cor ?? '#64748b' }}>{e.nome}</span>
+            ))}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <AddToCaderno questaoId={questao.id} />

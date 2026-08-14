@@ -5,6 +5,7 @@ import { QuestaoCard } from '@/components/aluno/questao-card'
 import { QuestoesFiltrosAluno, type FiltrosParams } from '@/components/aluno/questoes-filtros-aluno'
 import { PaginationControls } from '@/components/admin/pagination-controls'
 import { fetchAll } from '@/lib/supabase/fetch-all'
+import { etiquetasPorQuestao } from '@/lib/aluno/etiquetas-questao'
 import { Target, CheckCircle2, Percent } from 'lucide-react'
 
 const POR_PAGINA = 10
@@ -104,6 +105,7 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
   const bancaMap = new Map((bancaNomes ?? []).map((b: any) => [b.id, b.nome]))
   const assuntoMap = new Map((assuntoNomes ?? []).map((a: any) => [a.id, a.nome]))
   const favSet = new Set((favs ?? []).map((f: any) => f.questao_id))
+  const etiquetasMap = await etiquetasPorQuestao(svc, tid, ids)
 
   const lista: QuestaoAluno[] = (questoes ?? []).map((x: any) => ({
     id: x.id,
@@ -117,6 +119,7 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
     ano: x.ano ?? null,
     comentario_professor: x.comentario_professor ?? null,
     favorito: favSet.has(x.id),
+    etiquetas: etiquetasMap.get(x.id) ?? [],
     alternativas: (altMap.get(x.id) ?? []).map((a) => ({ id: a.id, texto: a.texto, ordem: a.ordem ?? 0, correta: !!a.correta })),
   }))
 

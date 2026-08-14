@@ -37,6 +37,7 @@ export type QuestaoAgregada = {
   acertou: number
   errou: number
   branco: number
+  anulada: boolean
 }
 
 /**
@@ -54,10 +55,12 @@ export async function montarResultadoAluno(
 
   const { data: pq } = await svc
     .from('simulado_prova_questoes')
-    .select('ordem, questao_id, questoes:simulado_questoes(id, enunciado, comentario_professor, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, correta))')
-    .eq('simulado_id', simuladoId).eq('anulada', false).order('ordem')
+    .select('ordem, anulada, questao_id, questoes:simulado_questoes(id, enunciado, comentario_professor, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, correta))')
+    .eq('simulado_id', simuladoId).order('ordem')
   const questoesRaw = (pq ?? []) as any[]
   const totalQuestoes = questoesRaw.length
+  // Anuladas continuam no total e valem ponto para TODOS (não contam como erro/branco).
+  const anuladaSet = new Set<string>(questoesRaw.filter((r) => r.anulada === true).map((r) => r.questao_id))
   const discDeQ = new Map<string, string>()
   for (const r of questoesRaw) discDeQ.set(r.questao_id, r.questoes?.disciplinas?.nome ?? 'Sem disciplina')
 
@@ -81,9 +84,17 @@ export async function montarResultadoAluno(
     let acertos = 0
     const disc = new Map<string, { ac: number; tt: number }>()
     for (const [qid, r] of respMap) {
+      if (anuladaSet.has(qid)) continue // anuladas tratadas abaixo (ponto pra todos)
       const dn = discDeQ.get(qid) ?? 'Sem disciplina'
       const d = disc.get(dn) ?? { ac: 0, tt: 0 }
       d.tt++; if (r.correta) { d.ac++; acertos++ }
+      disc.set(dn, d)
+    }
+    // Anuladas: acerto garantido a todos (entram no total e na disciplina).
+    for (const qid of anuladaSet) {
+      const dn = discDeQ.get(qid) ?? 'Sem disciplina'
+      const d = disc.get(dn) ?? { ac: 0, tt: 0 }
+      d.tt++; d.ac++; acertos++
       disc.set(dn, d)
     }
     const tempoMs = s.iniciado_em && s.finalizado_em ? new Date(s.finalizado_em).getTime() - new Date(s.iniciado_em).getTime() : 0
@@ -99,6 +110,7 @@ export async function montarResultadoAluno(
   // Questões agregadas entre todas as tentativas.
   const questoes: QuestaoAgregada[] = questoesRaw.map((r) => {
     const q = r.questoes ?? {}
+    const anulada = r.anulada === true
     const alts = [...(q.alternativas ?? [])].sort((a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0))
     const letraDe = new Map<string, string>()
     const altsOut: AltAgregada[] = alts.map((a: any, i: number) => {
@@ -107,20 +119,25 @@ export async function montarResultadoAluno(
       return { letra, texto: strip(a.texto), correta: revelarGabarito && !!a.correta, escolhas: 0 }
     })
     let acertou = 0, errou = 0, branco = 0
-    for (const s of sessoes) {
-      const resp = (bySessao.get(s.id) ?? new Map<string, any>()).get(q.id)
-      const escolhida = resp?.alternativa_id ?? resp?.snapshot_gabarito?.alternativa_id ?? null
-      if (!resp || escolhida == null) { branco++; continue }
-      const letra = letraDe.get(escolhida)
-      if (letra) { const alt = altsOut.find((a) => a.letra === letra); if (alt) alt.escolhas++ }
-      if (resp.correta) acertou++; else errou++
+    if (anulada) {
+      // Ponto garantido: conta como acerto em todas as tentativas, sem erro/branco.
+      acertou = sessoes.length
+    } else {
+      for (const s of sessoes) {
+        const resp = (bySessao.get(s.id) ?? new Map<string, any>()).get(q.id)
+        const escolhida = resp?.alternativa_id ?? resp?.snapshot_gabarito?.alternativa_id ?? null
+        if (!resp || escolhida == null) { branco++; continue }
+        const letra = letraDe.get(escolhida)
+        if (letra) { const alt = altsOut.find((a) => a.letra === letra); if (alt) alt.escolhas++ }
+        if (resp.correta) acertou++; else errou++
+      }
     }
     return {
       ordem: (r.ordem ?? 0) + 1,
       enunciado: strip(q.enunciado) || '(sem enunciado)',
       disciplina: q.disciplinas?.nome ?? null,
       comentario: revelarGabarito ? (q.comentario_professor ? strip(q.comentario_professor) : null) : null,
-      alternativas: altsOut, acertou, errou, branco,
+      alternativas: altsOut, acertou, errou, branco, anulada,
     }
   })
 

@@ -71,9 +71,15 @@ export async function createSimuladoAction(data: SimuladoData) {
   // Compõe a prova com as questões escolhidas (dos bancos), na ordem selecionada.
   const ids = [...new Set((data.questaoIds ?? []).filter(Boolean))]
   if (ids.length) {
-    await supabase.from('simulado_prova_questoes').insert(
-      ids.map((questao_id, i) => ({ tenant_id: tenantId, simulado_id: simulado.id, questao_id, ordem: i })),
-    )
+    // Herança do banco: questões marcadas anuladas (simulado_questoes.anulada) entram JÁ anuladas
+    // neste simulado (ponto garantido a todos). Tolerante à coluna ausente.
+    const { data: anulRows } = await supabase.from('simulado_questoes').select('id').eq('tenant_id', tenantId).eq('anulada', true).in('id', ids)
+    const anulSet = new Set(((anulRows ?? []) as any[]).map((r) => r.id as string))
+    const rows = ids.map((questao_id, i) => ({ tenant_id: tenantId, simulado_id: simulado.id, questao_id, ordem: i, ...(anulSet.has(questao_id) ? { anulada: true } : {}) }))
+    const ins = await supabase.from('simulado_prova_questoes').insert(rows)
+    if (ins.error && /anulada/i.test(ins.error.message)) {
+      await supabase.from('simulado_prova_questoes').insert(ids.map((questao_id, i) => ({ tenant_id: tenantId, simulado_id: simulado.id, questao_id, ordem: i })))
+    }
   }
 
   // Matricula os estudantes: herdados do banco base (inclui os passaportes SÓ se o grupo
@@ -561,12 +567,14 @@ export async function addQuestaoToSimulado(simuladoId: string, questaoId: string
     .maybeSingle()
   const proximaOrdem = (((maxRow?.ordem as number) ?? -1) + 1)
 
-  const { error } = await supabase.from('simulado_prova_questoes').insert({
-    tenant_id: tenantId,
-    simulado_id: simuladoId,
-    questao_id: questaoId,
-    ordem: proximaOrdem,
-  })
+  // Herança do banco: se a questão está anulada no banco, entra já anulada neste simulado.
+  const { data: anulRow } = await supabase.from('simulado_questoes').select('anulada').eq('id', questaoId).eq('tenant_id', tenantId).maybeSingle()
+  const row: Record<string, unknown> = { tenant_id: tenantId, simulado_id: simuladoId, questao_id: questaoId, ordem: proximaOrdem }
+  if ((anulRow as any)?.anulada === true) row.anulada = true
+  let { error } = await supabase.from('simulado_prova_questoes').insert(row)
+  if (error && /anulada/i.test(error.message)) {
+    ;({ error } = await supabase.from('simulado_prova_questoes').insert({ tenant_id: tenantId, simulado_id: simuladoId, questao_id: questaoId, ordem: proximaOrdem }))
+  }
 
   if (error) return { error: error.message }
   revalidatePath(`/admin/simulados/${simuladoId}`)

@@ -20,6 +20,7 @@ import {
   Trophy,
   RefreshCw,
   Loader2,
+  AlertTriangle,
 } from 'lucide-react'
 import { FitaTopo } from '@/components/prova/fita-topo'
 import { ThemeToggle } from '@/components/prova/theme-toggle'
@@ -77,6 +78,7 @@ interface Resultado {
   gabarito_liberado: boolean
   nota_liberada?: boolean
   caderno_liberado?: boolean
+  aviso_gabarito?: { total: number; anuladas: number; trocas: number; ultima: string | null } | null
   questoes: QuestaoRev[]
 }
 
@@ -363,6 +365,20 @@ export function RevisaoFinal({
       </header>
 
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">
+        {data?.aviso_gabarito && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">Houve mudança de gabarito neste simulado</p>
+              <p className="text-xs opacity-90">
+                {[
+                  data.aviso_gabarito.anuladas ? `${data.aviso_gabarito.anuladas} quest${data.aviso_gabarito.anuladas > 1 ? 'ões' : 'ão'} anulada${data.aviso_gabarito.anuladas > 1 ? 's' : ''}` : '',
+                  data.aviso_gabarito.trocas ? `${data.aviso_gabarito.trocas} alteração${data.aviso_gabarito.trocas > 1 ? 'ões' : ''} de gabarito` : '',
+                ].filter(Boolean).join(' · ')} — sua nota já foi recalculada.
+              </p>
+            </div>
+          </div>
+        )}
         {/* Resumo — dados do aluno + tempos + marcadas/em branco + downloads */}
         <Card className="relative overflow-hidden">
           <FitaTopo />

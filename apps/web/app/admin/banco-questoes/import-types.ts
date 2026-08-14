@@ -27,6 +27,7 @@ export interface QuestaoImport {
   ano?: number | null
   nivel_dificuldade?: string | null
   comentario_professor?: string | null
+  anulada?: boolean // gabarito veio como "ANULADA" → ponto garantido a todos + bloqueada na prova
   alternativas: AltImport[]
   // Preenchidos na análise:
   jaExiste?: boolean

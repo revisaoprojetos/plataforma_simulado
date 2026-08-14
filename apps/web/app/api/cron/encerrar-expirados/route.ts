@@ -7,6 +7,7 @@ import { dadosProgressao } from '@/lib/webhooks/payload'
 import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
 import { publicarAoVivo } from '@/lib/realtime/pubsub'
 import { onSimuladoFinalizado } from '@/lib/gamificacao'
+import { contextoNota, calcularNota, type NotaContexto } from '@/lib/simulado/nota'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,23 +28,21 @@ function autorizado(req: NextRequest): boolean {
 type AnyClient = ReturnType<typeof createAdminClient>
 type SessaoMin = { id: string; simulado_id: string; tenant_id: string | null; estudante_id?: string | null; iniciado_em?: string | null }
 
-async function totalValidas(svc: AnyClient, simuladoId: string, cache: Map<string, number>): Promise<number> {
+// Contexto de nota canônico (total + anuladas com política) por simulado, memoizado no lote.
+// Alinha o auto-encerramento à MESMA nota do finalizar manual/re-correção: anuladas
+// pontua_todos valem ponto pra TODOS (inclusive quem foi auto-finalizado por tempo/janela).
+async function getCtx(svc: AnyClient, simuladoId: string, cache: Map<string, NotaContexto>): Promise<NotaContexto> {
   const cached = cache.get(simuladoId)
   if (cached !== undefined) return cached
-  const { count } = await svc
-    .from('simulado_prova_questoes')
-    .select('*', { count: 'exact', head: true })
-    .eq('simulado_id', simuladoId)
-    .eq('anulada', false)
-  const t = count ?? 0
-  cache.set(simuladoId, t)
-  return t
+  const ctx = await contextoNota(svc as any, simuladoId)
+  cache.set(simuladoId, ctx)
+  return ctx
 }
 
 async function processar() {
   const svc = createAdminClient()
   const agora = new Date().toISOString()
-  const totalCache = new Map<string, number>()
+  const ctxCache = new Map<string, NotaContexto>()
   const afetados = new Set<string>()
   const tenantsAfetados = new Set<string>() // p/ invalidar o cache de relatórios (1x por tenant, no fim)
   let simuladosEncerrados = 0
@@ -97,21 +96,30 @@ async function processar() {
 
   // ── Pré-carrega os acertos de TODAS as sessões a finalizar em UMA leitura em lote
   //    (antes era 1 leitura de respostas por sessão → milhares de round-trips no fim da janela). ──
-  const acertosPorSessao = new Map<string, number>()
+  const respostasPorSessao = new Map<string, { questao_id: string; correta: boolean }[]>()
   if (lista.length) {
     const ids = lista.map((s) => s.id)
     const resp = await fetchAllByIn<any>(ids, (chunk) =>
-      svc.from('simulado_respostas_objetivas').select('sessao_id, correta').in('sessao_id', chunk).order('sessao_id'))
-    for (const r of resp) if (r.correta) acertosPorSessao.set(r.sessao_id, (acertosPorSessao.get(r.sessao_id) ?? 0) + 1)
+      svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).order('sessao_id'))
+    for (const r of resp) {
+      const arr = respostasPorSessao.get(r.sessao_id) ?? []
+      arr.push({ questao_id: r.questao_id, correta: !!r.correta })
+      respostasPorSessao.set(r.sessao_id, arr)
+    }
   }
 
   // ── Finaliza em LOTES PARALELOS (idempotente por status='em_andamento') ──
   const eventos: any[] = []
   let sessoesEncerradas = 0
   const finalizar = async (s: SessaoMin) => {
-    const total = await totalValidas(svc, s.simulado_id, totalCache)
-    const acertos = acertosPorSessao.get(s.id) ?? 0
-    const nota = total > 0 ? Math.round((acertos / total) * 100 * 100) / 100 : 0 // escala 0–100 (mesma fórmula de antes)
+    const ctx = await getCtx(svc, s.simulado_id, ctxCache)
+    const resp = respostasPorSessao.get(s.id) ?? []
+    const nota = calcularNota(resp, ctx)
+    // acertos/total canônicos (p/ gamificação): anuladas pontua_todos contam como acerto e ficam no total.
+    const anuladaVals = [...ctx.anuladas.values()]
+    const total = ctx.totalQuestoes - anuladaVals.filter((p) => p === 'desconsidera').length
+    const acertos = resp.filter((r) => r.correta && !ctx.anuladas.has(r.questao_id)).length
+      + anuladaVals.filter((p) => p === 'pontua_todos').length
     const { data: upd } = await svc
       .from('simulado_sessoes_prova')
       .update({ status: 'finalizada', finalizado_em: new Date().toISOString(), nota })

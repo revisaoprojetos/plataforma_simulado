@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { QuestaoCard } from '@/components/aluno/questao-card'
+import { etiquetasPorQuestao } from '@/lib/aluno/etiquetas-questao'
 import { ArrowLeft, NotebookPen } from 'lucide-react'
 
 export default async function CadernoDetalhePage({ params }: { params: Promise<{ id: string }> }) {
@@ -38,6 +39,7 @@ export default async function CadernoDetalhePage({ params }: { params: Promise<{
     : { data: [] as any[] }
   const discMap = new Map((discNomes ?? []).map((d: any) => [d.id, d.nome]))
   const favSet = new Set((favs ?? []).map((f: any) => f.questao_id))
+  const etiquetasMap = await etiquetasPorQuestao(svc, sessao!.tenantId, ids)
   const altMap = new Map<string, any[]>()
   for (const a of alts ?? []) {
     const arr = altMap.get(a.questao_id) ?? []; arr.push(a); altMap.set(a.questao_id, arr)
@@ -52,6 +54,7 @@ export default async function CadernoDetalhePage({ params }: { params: Promise<{
     ano: x.ano ?? null,
     comentario_professor: x.comentario_professor ?? null,
     favorito: favSet.has(x.id),
+    etiquetas: etiquetasMap.get(x.id) ?? [],
     alternativas: (altMap.get(x.id) ?? []).map((a) => ({ id: a.id, texto: a.texto, ordem: a.ordem ?? 0, correta: !!a.correta })),
   }))
 

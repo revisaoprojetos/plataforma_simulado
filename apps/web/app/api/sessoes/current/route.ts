@@ -36,10 +36,10 @@ export async function GET(request: NextRequest) {
   // Tolerante à coluna imagem_url (pode não ter sido migrada ainda): tenta com ela, cai sem.
   const selQ = (cols: string) => supabase
     .from('simulado_prova_questoes')
-    .select(`ordem, questoes:simulado_questoes(${cols})`)
+    .select(`ordem, anulada, questoes:simulado_questoes(${cols})`)
     .eq('simulado_id', sessao.simulado_id)
-    // Tolerante a null: exclui só as explicitamente anuladas (dados migrados vêm com anulada=null).
-    .not('anulada', 'is', true)
+    // Anuladas NÃO são mais escondidas: aparecem no runner com as assertivas, porém
+    // bloqueadas para resposta (ponto garantido a todos). A flag `anulada` vai no payload.
     .order('ordem')
   let sqr = await selQ('id, tipo, enunciado, imagem_url, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem)')
   if (sqr.error && /imagem_url|column/i.test(sqr.error.message)) {
@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
   const questoes = (sq ?? []).map((row: any) => ({
     id: row.questoes?.id,
     tipo: row.questoes?.tipo ?? 'objetiva',
+    anulada: row.anulada === true,
     enunciado: row.questoes?.enunciado ?? '',
     disciplina: row.questoes?.disciplinas?.nome ?? null,
     imagem_url: row.questoes?.imagem_url ?? null,

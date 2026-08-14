@@ -66,11 +66,26 @@ export async function GET(request: NextRequest) {
   const liberacoes = resolverLiberacoes(simulado?.regras as any, simulado ?? {}, { classificacao })
   const gabaritoLiberado = liberacoes.gabaritoLiberado
 
+  // Avisos de mudança de gabarito (anulação/troca) neste simulado → faixa no topo da revisão.
+  const { data: recs } = await supabase
+    .from('simulado_recorrecoes')
+    .select('tipo, executado_em')
+    .eq('simulado_id', sessao.simulado_id)
+    .order('executado_em', { ascending: false })
+  const recorrecoes = (recs ?? []) as any[]
+  const avisoGabarito = recorrecoes.length
+    ? {
+        total: recorrecoes.length,
+        anuladas: recorrecoes.filter((r) => r.tipo === 'anulacao').length,
+        trocas: recorrecoes.filter((r) => r.tipo === 'troca_alternativa').length,
+        ultima: recorrecoes[0]?.executado_em ?? null,
+      }
+    : null
+
   const { data: sq } = await supabase
     .from('simulado_prova_questoes')
-    .select('ordem, questoes:simulado_questoes(id, tipo, enunciado, comentario_professor, disciplina_id, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem))')
+    .select('ordem, anulada, questoes:simulado_questoes(id, tipo, enunciado, comentario_professor, disciplina_id, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem))')
     .eq('simulado_id', sessao.simulado_id)
-    .eq('anulada', false)
     .order('ordem')
 
   const { data: respostas } = await supabase
@@ -100,8 +115,12 @@ export async function GET(request: NextRequest) {
   }
 
   const respMap = new Map((respostas ?? []).map((r) => [r.questao_id as string, r]))
+  // Questões anuladas continuam no total e valem ponto para TODOS (não contam como erro/branco).
+  const anuladaSet = new Set<string>(
+    (sq ?? []).filter((row: any) => row.anulada === true).map((row: any) => row.questoes?.id).filter(Boolean),
+  )
   const total = (sq ?? []).length
-  const acertos = (respostas ?? []).filter((r) => r.correta).length
+  const acertos = (respostas ?? []).filter((r) => r.correta && !anuladaSet.has(r.questao_id as string)).length + anuladaSet.size
 
   // Estatística por matéria/disciplina (só quando o gabarito está liberado).
   let statsPorDisciplina: Array<{ disciplina: string; acertos: number; total: number; percentual: number }> = []
@@ -113,7 +132,8 @@ export async function GET(request: NextRequest) {
       const resp = respMap.get(q?.id)
       const cur = agg.get(disc) ?? { acertos: 0, total: 0 }
       cur.total += 1
-      if (resp?.correta) cur.acertos += 1
+      // Anulada = acerto garantido para todos naquela disciplina.
+      if ((row as any).anulada === true || resp?.correta) cur.acertos += 1
       agg.set(disc, cur)
     }
     statsPorDisciplina = [...agg.entries()]
@@ -128,6 +148,7 @@ export async function GET(request: NextRequest) {
 
   const questoes = (sq ?? []).map((row: any, idx: number) => {
     const q = row.questoes
+    const anulada = row.anulada === true
     const resp = respMap.get(q?.id)
     const correta_id = corretasMap.get(q?.id) ?? null
     const d = discMap.get(q?.id)
@@ -135,9 +156,11 @@ export async function GET(request: NextRequest) {
       numero: idx + 1,
       id: q?.id,
       tipo: q?.tipo ?? 'objetiva',
+      anulada,
       enunciado: q?.enunciado ?? '',
       resposta_aluno: resp?.alternativa_id ?? null,
-      acertou: gabaritoLiberado ? resp?.correta ?? false : null,
+      // Anulada = ponto garantido (independe do gabarito estar liberado).
+      acertou: anulada ? true : (gabaritoLiberado ? resp?.correta ?? false : null),
       // Justificativa (comentário do professor) — só revelada com o gabarito.
       justificativa: gabaritoLiberado ? (q?.comentario_professor ?? null) : null,
       // Para discursiva: a resposta escrita + estado da correção.
@@ -157,7 +180,8 @@ export async function GET(request: NextRequest) {
 
   // Marcadas / em branco + tempo (para a tela de encerramento).
   const marcadas = questoes.filter((q: any) => q.tipo === 'discursiva' ? !!q.discursiva?.texto : !!q.resposta_aluno).length
-  const emBranco = Math.max(0, total - marcadas)
+  // Anuladas não são "em branco" (ponto garantido) — saem da contagem de não respondidas.
+  const emBranco = Math.max(0, total - marcadas - anuladaSet.size)
   let tempo: string | null = null
   if (sessao.iniciado_em && sessao.finalizado_em) {
     const seg = Math.max(0, Math.floor((new Date(sessao.finalizado_em as string).getTime() - new Date(sessao.iniciado_em as string).getTime()) / 1000))
@@ -215,6 +239,7 @@ export async function GET(request: NextRequest) {
     gabarito_liberado: gabaritoLiberado,
     nota_liberada: liberacoes.notaLiberada,
     caderno_liberado: liberacoes.cadernoParaAluno,
+    aviso_gabarito: avisoGabarito,
     questoes,
   })
 }

@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { QuestaoCard } from '@/components/aluno/questao-card'
+import { etiquetasPorQuestao } from '@/lib/aluno/etiquetas-questao'
 import { Card, CardContent } from '@/components/ui/card'
 import { Sparkles, Target, Lightbulb } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -83,6 +84,7 @@ export default async function RecomendadoPage() {
     const altMap = new Map<string, any[]>()
     for (const a of alts ?? []) { const arr = altMap.get(a.questao_id) ?? []; arr.push(a); altMap.set(a.questao_id, arr) }
     const favSet = new Set((favs ?? []).map((f: any) => f.questao_id))
+    const etiquetasMap = await etiquetasPorQuestao(svc, sessao!.tenantId, ids)
 
     recomendadas = escolhidas.map((q: any) => ({
       id: q.id,
@@ -93,6 +95,7 @@ export default async function RecomendadoPage() {
       ano: q.ano ?? null,
       comentario_professor: q.comentario_professor ?? null,
       favorito: favSet.has(q.id),
+      etiquetas: etiquetasMap.get(q.id) ?? [],
       alternativas: (altMap.get(q.id) ?? []).map((a) => ({ id: a.id, texto: a.texto, ordem: a.ordem ?? 0, correta: !!a.correta })),
     }))
   }

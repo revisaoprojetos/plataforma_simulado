@@ -30,6 +30,7 @@ interface Alternativa {
 interface Questao {
   id: string
   tipo?: string
+  anulada?: boolean
   enunciado: string
   imagem_url?: string | null
   alternativas: Alternativa[]
@@ -191,12 +192,15 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
   }, [sessao?.id])
 
   function handleResponder(questaoId: string, alternativaId: string) {
+    // Questão anulada é bloqueada para resposta (ponto garantido a todos).
+    if (sessao?.questoes.find((x) => x.id === questaoId)?.anulada) return
     setRespostas((prev) => ({ ...prev, [questaoId]: alternativaId }))
     autoSave(questaoId, alternativaId)
   }
 
   // Discursiva: salva com debounce (não a cada tecla).
   function handleDiscursiva(questaoId: string, texto: string) {
+    if (sessao?.questoes.find((x) => x.id === questaoId)?.anulada) return // anulada = bloqueada
     setRespDiscursivas((prev) => ({ ...prev, [questaoId]: texto }))
     if (discTimers.current[questaoId]) clearTimeout(discTimers.current[questaoId])
     discTimers.current[questaoId] = setTimeout(async () => {
@@ -274,7 +278,8 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
   const questaoAtual = sessao.questoes[questaoIndex]
   const totalQuestoes = sessao.questoes.length
   const respondidaDe = (q: Questao) =>
-    q.tipo === 'discursiva' ? !!respDiscursivas[q.id]?.trim() : !!respostas[q.id]
+    // Anulada não é respondível — conta como "concluída" para o progresso chegar a 100%.
+    q.anulada ? true : (q.tipo === 'discursiva' ? !!respDiscursivas[q.id]?.trim() : !!respostas[q.id])
   const totalRespondidas = sessao.questoes.filter(respondidaDe).length
   const progresso = (totalRespondidas / totalQuestoes) * 100
   const timerWarning = segundosRestantes !== null && segundosRestantes < 300
@@ -344,6 +349,12 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
 
         <Card>
           <CardContent className="pt-5">
+            {questaoAtual.anulada && (
+              <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                Questão anulada — ponto garantido a todos. As alternativas ficam bloqueadas.
+              </div>
+            )}
             <p className="leading-relaxed text-sm">{questaoAtual.enunciado}</p>
             {questaoAtual.imagem_url && (
               <div className="mt-4 overflow-hidden rounded-lg border bg-muted/30 p-2">
@@ -370,22 +381,26 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
           <div className="space-y-2">
             {questaoAtual.alternativas.map((alt, i) => {
               const isSelected = respostas[questaoAtual.id] === alt.id
+              const bloqueada = !!questaoAtual.anulada
               return (
                 <button
                   key={alt.id}
                   onClick={() => handleResponder(questaoAtual.id, alt.id)}
+                  disabled={bloqueada}
                   className={cn(
-                    'w-full rounded-lg border p-3.5 text-left transition-all hover:border-primary/50',
-                    isSelected
-                      ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                      : 'border-border bg-card hover:bg-muted/30'
+                    'w-full rounded-lg border p-3.5 text-left transition-all',
+                    bloqueada
+                      ? 'cursor-not-allowed border-border bg-muted/30 opacity-60'
+                      : isSelected
+                        ? 'border-primary bg-primary/5 hover:border-primary/50 dark:bg-primary/10'
+                        : 'border-border bg-card hover:border-primary/50 hover:bg-muted/30'
                   )}
                 >
                   <div className="flex items-start gap-2.5">
                     <span
                       className={cn(
                         'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs font-bold',
-                        isSelected
+                        isSelected && !bloqueada
                           ? 'border-primary bg-primary text-primary-foreground'
                           : 'border-muted-foreground/30 text-muted-foreground'
                       )}
@@ -425,11 +440,13 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
                     'h-6 w-6 rounded text-xs font-medium transition-colors',
                     atual
                       ? 'bg-primary text-primary-foreground'
+                      : q.anulada
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
                       : respondida
                       ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
                   )}
-                  title={`Questão ${i + 1}`}
+                  title={q.anulada ? `Questão ${i + 1} — anulada (ponto garantido)` : `Questão ${i + 1}`}
                 >
                   {i + 1}
                 </button>
@@ -482,14 +499,17 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
                   <button
                     key={q.id}
                     onClick={() => { setQuestaoIndex(i); setShowRevisao(false) }}
+                    title={q.anulada ? 'Anulada — ponto garantido' : undefined}
                     className={cn(
                       'flex h-9 w-9 items-center justify-center rounded-md text-xs font-medium',
-                      respondida
+                      q.anulada
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                        : respondida
                         ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400'
                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
                     )}
                   >
-                    {respondida ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
+                    {q.anulada ? '★' : respondida ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
                   </button>
                 )
               })}
