@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Trophy, CheckCircle2, ArrowRight, Lock, LayoutGrid, Rows3 } from 'lucide-react'
+import { CheckCircle2, Lock, LayoutGrid, Rows3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { FileiraHorizontal } from '@/components/fileira-horizontal'
@@ -51,14 +51,12 @@ function CardConcluido({ s }: { s: MeuSimuladoItem }) {
         <span className="pointer-events-none absolute right-3 top-3 z-20 inline-flex items-center gap-1 rounded-lg bg-black/45 px-2 py-1 text-[10px] font-medium text-white/80 backdrop-blur" title="A nota será liberada pelo professor"><Lock className="h-3 w-3" /> Nota</span>
       )}
 
+      {/* Modalidade (Aberto/Agendado/Prazo) — canto superior esquerdo. */}
+      <span className="pointer-events-none absolute left-3 top-3 z-20 rounded-lg bg-black/45 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/85 backdrop-blur">{modoLabel(s.modo_aplicacao)}</span>
+
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
         <span className="mb-1 inline-flex items-center gap-1 rounded-md bg-black/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/85 backdrop-blur"><CheckCircle2 className="h-3 w-3" /> Concluído</span>
         <h3 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{s.titulo}</h3>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur"><Trophy className="h-3 w-3" /> {s.tentativas}x</span>
-          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">{modoLabel(s.modo_aplicacao)}</span>
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-white">Ver resultado <ArrowRight className="h-3 w-3" /></span>
-        </div>
       </div>
     </div>
   )
@@ -83,7 +81,6 @@ export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoIte
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Meus simulados</h1>
-          <p className="text-muted-foreground">Seus simulados concluídos — com notas e resultados. Os liberados para fazer estão em <Link href="/aluno/simulado" className="font-medium text-primary hover:underline">Simulados</Link>.</p>
         </div>
         {temCatalogo && (
           <div className="flex shrink-0 gap-1 rounded-lg bg-muted p-1">
@@ -107,7 +104,7 @@ export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoIte
             </FileiraHorizontal>
           ))}
           {avulsos.length > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {avulsos.map((s) => <CardConcluido key={s.id} s={s} />)}
             </div>
           )}
