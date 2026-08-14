@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Clock } from 'lucide-react'
+import { Clock, ChevronUp, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /** "05:00 hr" (HH:MM) ou "Sem limite" a partir de minutos (0/negativo = sem limite). */
@@ -38,7 +38,7 @@ export function SeletorTempo({ minutos, onChange }: { minutos: number; onChange:
             <h3 className="text-center text-sm font-semibold">Tempo do simulado</h3>
             <div className={cn('mt-4 flex items-center justify-center gap-2 transition-opacity', semLimite && 'pointer-events-none opacity-40')}>
               <Roda valor={h} max={12} onChange={setH} label="horas" />
-              <span className="pb-5 text-3xl font-bold text-muted-foreground">:</span>
+              <span className="-mt-2 text-3xl font-bold text-muted-foreground">:</span>
               <Roda valor={m} max={59} onChange={setM} label="minutos" />
             </div>
             <label className="mt-5 flex cursor-pointer items-center justify-center gap-2 text-sm">
@@ -57,28 +57,57 @@ export function SeletorTempo({ minutos, onChange }: { minutos: number; onChange:
   )
 }
 
-/** Roda estilo despertador: número central grande + vizinhos esmaecidos (acima/abaixo) com
- *  degradê nas bordas. Toque num vizinho ou role a roda para mudar. */
+const ITEM = 34 // altura de cada número (px)
+
+/** Roda estilo despertador ARRASTÁVEL: número central grande + vizinhos esmaecidos com degradê.
+ *  Arraste (toque/mouse) para rolar seguindo o dedo (com animação de snap ao soltar); role o mouse;
+ *  ou use as setas ↑/↓. Horas 0–12, minutos 0–59 (com wrap). */
 function Roda({ valor, max, onChange, label }: { valor: number; max: number; onChange: (v: number) => void; label: string }) {
   const wrap = (v: number) => ((v % (max + 1)) + (max + 1)) % (max + 1)
   const fmt = (v: number) => String(v).padStart(2, '0')
+  const [drag, setDrag] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const start = useRef(0)
+
+  const onDown = (e: React.PointerEvent) => { setDragging(true); start.current = e.clientY; try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* ok */ } }
+  const onMove = (e: React.PointerEvent) => { if (dragging) setDrag(e.clientY - start.current) }
+  const finish = () => {
+    if (!dragging) return
+    const passos = Math.round(drag / ITEM)
+    if (passos) onChange(wrap(valor - passos))
+    setDragging(false)
+    setDrag(drag - passos * ITEM) // resíduo → anima suave até 0 (snap)
+    requestAnimationFrame(() => requestAnimationFrame(() => setDrag(0)))
+  }
+  const passo = (d: number) => onChange(wrap(valor + d))
+  const itens = [-3, -2, -1, 0, 1, 2, 3].map((o) => ({ o, v: wrap(valor + o) }))
+
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative h-36 w-16 select-none overflow-hidden" role="spinbutton" aria-label={label} aria-valuenow={valor} aria-valuemin={0} aria-valuemax={max}
-        onWheel={(e) => onChange(wrap(valor + (e.deltaY > 0 ? 1 : -1)))}>
-        {/* faixa do selecionado (centro) */}
-        <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 h-11 -translate-y-1/2 rounded-lg bg-primary/5 ring-1 ring-primary/25" />
-        {/* degradê topo/base */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-card via-card/85 to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-12 bg-gradient-to-t from-card via-card/85 to-transparent" />
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <button type="button" tabIndex={-1} onClick={() => onChange(wrap(valor - 2))} className="h-7 text-base font-medium tabular-nums text-muted-foreground/25">{fmt(wrap(valor - 2))}</button>
-          <button type="button" tabIndex={-1} onClick={() => onChange(wrap(valor - 1))} className="h-8 text-xl font-semibold tabular-nums text-muted-foreground/55">{fmt(wrap(valor - 1))}</button>
-          <div className="flex h-11 items-center text-3xl font-bold tabular-nums text-foreground">{fmt(valor)}</div>
-          <button type="button" tabIndex={-1} onClick={() => onChange(wrap(valor + 1))} className="h-8 text-xl font-semibold tabular-nums text-muted-foreground/55">{fmt(wrap(valor + 1))}</button>
-          <button type="button" tabIndex={-1} onClick={() => onChange(wrap(valor + 2))} className="h-7 text-base font-medium tabular-nums text-muted-foreground/25">{fmt(wrap(valor + 2))}</button>
+    <div className="flex select-none flex-col items-center">
+      <button type="button" onClick={() => passo(1)} aria-label={`Aumentar ${label}`} className="rounded-md p-0.5 text-muted-foreground transition-colors hover:text-foreground"><ChevronUp className="h-5 w-5" /></button>
+      <div className="relative w-16 touch-none overflow-hidden" style={{ height: ITEM * 3, touchAction: 'none' }}
+        role="spinbutton" aria-label={label} aria-valuenow={valor} aria-valuemin={0} aria-valuemax={max}
+        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={finish} onPointerCancel={finish} onPointerLeave={finish}
+        onWheel={(e) => passo(e.deltaY > 0 ? -1 : 1)}>
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 rounded-lg bg-primary/5 ring-1 ring-primary/25" style={{ height: ITEM }} />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-card via-card/85 to-transparent" style={{ height: ITEM }} />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-card via-card/85 to-transparent" style={{ height: ITEM }} />
+        <div className="absolute inset-0 flex flex-col items-center justify-center will-change-transform"
+          style={{ transform: `translateY(${drag}px)`, transition: dragging ? 'none' : 'transform 240ms cubic-bezier(0.22,1,0.36,1)' }}>
+          {itens.map(({ o, v }) => {
+            const pos = o * ITEM + drag
+            const dist = Math.abs(pos)
+            const central = dist < ITEM / 2
+            return (
+              <div key={o} style={{ height: ITEM, opacity: Math.max(0.18, 1 - dist / 60) }}
+                className={cn('flex items-center justify-center tabular-nums', central ? 'text-3xl font-bold text-foreground' : 'text-xl font-semibold text-muted-foreground')}>
+                {fmt(v)}
+              </div>
+            )
+          })}
         </div>
       </div>
+      <button type="button" onClick={() => passo(-1)} aria-label={`Diminuir ${label}`} className="rounded-md p-0.5 text-muted-foreground transition-colors hover:text-foreground"><ChevronDown className="h-5 w-5" /></button>
       <span className="mt-1 text-xs text-muted-foreground">{label}</span>
     </div>
   )
