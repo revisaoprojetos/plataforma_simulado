@@ -320,7 +320,7 @@ export function CurseducaImport({ grupos, sistema, extra }: { grupos: GrupoCurse
         )}
 
         <button type="button" onClick={importar} disabled={sel.size === 0 || importando}
-          className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-violet-600 px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:shadow-primary/40 disabled:opacity-60 disabled:shadow-none">
+          className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-primary/80 px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:shadow-primary/40 disabled:opacity-60 disabled:shadow-none">
           {importando
             ? <><Loader2 className="h-4 w-4 animate-spin" /> {jobStatus ? `Em segundo plano (${jobStatus})…` : 'Importando…'}</>
             : <><DownloadCloud className="h-4 w-4 transition-transform group-hover:translate-y-0.5" /> {destino === 'nenhum' ? 'Importar (sem grupo)' : destino === 'por_canal' ? 'Importar · 1 grupo por canal' : 'Importar no grupo'}</>}

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { Save, RotateCcw, ImageIcon, Loader2, Bell, Moon, Sun, Menu, Upload, X, Copy, Check, ClipboardPaste, Palette, ChevronDown, PanelLeft, LayoutGrid, Sparkles, Trash2, Monitor, BookOpen, ClipboardList, Users, Activity, GraduationCap, BarChart3, Database, PenLine, LayoutDashboard, ClipboardCheck, MessagesSquare, SlidersHorizontal, FileText } from 'lucide-react'
+import { Save, RotateCcw, ImageIcon, Loader2, Bell, Moon, Sun, Menu, Upload, X, Copy, Check, ClipboardPaste, Palette, ChevronDown, PanelLeft, LayoutGrid, Sparkles, Trash2, Monitor, BookOpen, ClipboardList, Users, Activity, GraduationCap, BarChart3, Database, PenLine, LayoutDashboard, ClipboardCheck, MessagesSquare, SlidersHorizontal, FileText, Search, Trophy, Zap, Flame, Star } from 'lucide-react'
 
 /**
  * Lê uma variável CSS do sistema e converte para hex. Renderiza a cor (lab,
@@ -336,7 +336,10 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
     const id = 'cfg-theme-live'
     let el = document.getElementById(id) as HTMLStyleElement | null
     if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el) }
-    const sel = modoEdicao === 'dark' ? '.dark' : ':root:not(.dark)'
+    // Especificidade MAIOR que o tema do tenant (que também usa :root:not(.dark)/.dark e vem depois
+    // no DOM). Sem isso, as SUPERFÍCIES (card, fundo, texto) do tenant sobrescreviam o preview ao vivo
+    // — o botão/primária mudava, mas card/texto não.
+    const sel = modoEdicao === 'dark' ? 'html:root.dark' : 'html:root:not(.dark)'
     el.textContent = `${sel}{${cssVarsFromCores(c)}}`
   }, [c, modoEdicao])
   useEffect(() => () => { document.getElementById('cfg-theme-live')?.remove() }, [])
@@ -604,6 +607,12 @@ function LogoRow({ label, desc, value, onChange, onRemove, frame, bg, inicial, i
 /** Prévia do dashboard com as cores aplicadas. */
 function Preview({ t, cores }: { t: Tema; cores: Cores }) {
   const c = cores
+  const [tela, setTela] = useState<'dashboard' | 'estudantes' | 'perfil'>('dashboard')
+  const TELAS = [
+    { id: 'dashboard' as const, nome: 'Dashboard', icon: LayoutDashboard },
+    { id: 'estudantes' as const, nome: 'Estudantes', icon: GraduationCap },
+    { id: 'perfil' as const, nome: 'Perfil', icon: Users },
+  ]
   const menu = [
     { nome: 'Dashboard', icon: LayoutDashboard, ativo: true },
     { nome: 'Simulado', icon: BookOpen, sub: [
@@ -616,10 +625,6 @@ function Preview({ t, cores }: { t: Tema; cores: Cores }) {
     { nome: 'Alunos', icon: GraduationCap }, { nome: 'Análise', icon: BarChart3 },
     { nome: 'Auditoria', icon: ClipboardCheck }, { nome: 'Feedback', icon: MessagesSquare },
     { nome: 'Configuração', icon: SlidersHorizontal },
-  ]
-  const stats = [
-    { icon: BookOpen, val: '4', label: 'Questões' }, { icon: ClipboardList, val: '1', label: 'Simulados' },
-    { icon: Users, val: '1', label: 'Estudantes' }, { icon: Activity, val: '0', label: 'Sessões hoje' },
   ]
   const fgBtn = contraste(c.btn)
   return (
@@ -672,82 +677,206 @@ function Preview({ t, cores }: { t: Tema; cores: Cores }) {
             <span className="h-6 w-6 rounded-full" style={{ background: c.accent }} />
           </div>
         </div>
-        {/* conteúdo: Dashboard */}
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
-          <div>
-            <h2 className="text-lg font-bold leading-tight" style={{ color: c.titulo }}>Dashboard</h2>
-            <p className="text-[11px] opacity-60">Visão geral da plataforma</p>
-          </div>
+        {/* seletor de telas do preview — deixa a montagem cobrir mais blocos/cards/textos */}
+        <div className="flex items-center gap-1 px-3 pt-2" style={{ background: c.bg }}>
+          {TELAS.map((s) => {
+            const on = tela === s.id
+            return (
+              <button key={s.id} type="button" onClick={() => setTela(s.id)}
+                className="flex items-center gap-1.5 rounded-t-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors"
+                style={on ? { background: c.card, color: c.titulo, borderBottom: `2px solid ${c.btn}` } : { color: c.text, opacity: 0.5 }}>
+                <s.icon className="h-3 w-3" /> {s.nome}
+              </button>
+            )
+          })}
+        </div>
 
-          {/* stat cards em gradiente */}
-          <div className="grid grid-cols-4 gap-3">
-            {stats.map((s) => (
-              <div key={s.label} className="relative overflow-hidden rounded-xl p-3" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
-                <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${c.btn}1f, transparent 70%)` }} />
-                <s.icon className="absolute -right-2 -top-2 h-12 w-12" style={{ color: c.btn, opacity: 0.08 }} />
-                <div className="relative flex items-center gap-2.5">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-sm" style={{ background: c.btn, color: fgBtn }}><s.icon className="h-5 w-5" /></span>
-                  <div className="min-w-0">
-                    <p className="text-xl font-bold leading-none">{s.val}</p>
-                    <p className="mt-0.5 truncate text-[8px] font-medium uppercase tracking-wide opacity-60">{s.label}</p>
-                  </div>
-                </div>
+        {/* conteúdo da tela selecionada */}
+        <div className="flex-1 overflow-y-auto p-4" style={{ borderTop: `1px solid ${c.cborder}` }}>
+          {tela === 'dashboard' && <TelaDashboard c={c} fgBtn={fgBtn} />}
+          {tela === 'estudantes' && <TelaEstudantes c={c} fgBtn={fgBtn} />}
+          {tela === 'perfil' && <TelaPerfil c={c} fgBtn={fgBtn} />}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type PrevScreen = { c: Cores; fgBtn: string }
+
+/** Dashboard admin — espelha a tela real: ações no topo, KPIs (texto+ícone canto), gráfico Semana/Mês e a linha Desempenho + Últimos simulados. */
+function TelaDashboard({ c, fgBtn }: PrevScreen) {
+  const cards: [any, string, string, string][] = [
+    [BookOpen, 'Questões', '4', 'no banco'],
+    [ClipboardList, 'Simulados ativos', '1', 'publicados'],
+    [Users, 'Estudantes', '1', 'cadastrados'],
+    [Activity, 'Sessões hoje', '0', '0 nos últimos 7 dias'],
+  ]
+  const sims: [string, string, string, string][] = [
+    ['Concurso TJ Rascunho', 'Janela fixa', '#94a3b8', 'Rascunho'],
+    ['Simulado OAB 2026', 'Prazo relativo', '#f59e0b', 'Encerrado'],
+    ['Simulado Teste THEME', 'Aberto', '#22c55e', 'Publicado'],
+  ]
+  return (
+    <div className="space-y-5">
+      {/* cabeçalho + ações */}
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-bold leading-tight" style={{ color: c.titulo }}>Dashboard</h2>
+          <p className="text-[11px] opacity-60">Visão geral da plataforma</p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-medium" style={{ borderColor: c.cborder }}>+ Nova questão</span>
+          <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold" style={{ background: c.btn, color: fgBtn }}>+ Novo simulado</span>
+        </div>
+      </div>
+
+      {/* KPIs: texto à esquerda, ícone em quadrado gradiente no canto (igual ao real) */}
+      <div className="grid grid-cols-4 gap-3">
+        {cards.map(([Icon, titulo, val, sub]) => (
+          <div key={titulo} className="relative overflow-hidden rounded-2xl p-3" style={{ background: `linear-gradient(135deg, ${c.btn}14, ${c.card} 45%)`, border: `1px solid ${c.cborder}` }}>
+            <div className="absolute -right-5 -top-6 h-16 w-16 rounded-full" style={{ background: `${c.btn}1f`, filter: 'blur(12px)' }} />
+            <div className="relative flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-[8px] font-medium uppercase tracking-wide opacity-60">{titulo}</p>
+                <p className="mt-1 text-2xl font-bold leading-none tabular-nums" style={{ color: c.titulo }}>{val}</p>
+                <p className="mt-1 truncate text-[8px] opacity-55">{sub}</p>
+              </div>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl shadow-sm" style={{ background: `linear-gradient(135deg, ${c.btn}, ${c.btn}b0)`, color: fgBtn }}><Icon className="h-4 w-4" /></span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* gráfico com filtro Semana/Mês + barras duplas (iniciados/feitos) */}
+      <div className="overflow-hidden rounded-2xl" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
+        <div className="flex items-center justify-between border-b px-3 py-2.5" style={{ borderColor: c.cborder }}>
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: `${c.btn}1f`, color: c.btn }}><Activity className="h-4 w-4" /></span>
+            <div className="leading-tight"><p className="text-[12px] font-semibold">Simulados por dia</p><p className="text-[9px] opacity-60">Iniciados e feitos</p></div>
+          </div>
+          <div className="flex rounded-lg p-0.5 text-[8px] font-medium" style={{ background: c.tabBg }}>
+            <span className="rounded-md px-2 py-0.5" style={{ background: c.tabAtivo, color: c.tabTexto }}>Semana</span>
+            <span className="px-2 py-0.5 opacity-60">Mês</span>
+          </div>
+        </div>
+        <div className="p-3">
+          <div className="relative flex h-[104px] items-end gap-2">
+            {[0, 1, 2, 3].map((i) => <div key={i} className="absolute inset-x-0 border-t border-dashed" style={{ top: `${i * 33}%`, borderColor: c.cborder }} />)}
+            {[30, 12, 78, 22, 90, 60, 100].map((b, i) => (
+              <div key={i} className="relative flex flex-1 items-end justify-center gap-0.5">
+                <div className="w-1/2 rounded-t" style={{ height: `${b}%`, background: c.btn }} />
+                <div className="w-1/2 rounded-t" style={{ height: `${Math.round(b * 0.6)}%`, background: `${c.btn}66` }} />
               </div>
             ))}
           </div>
+          <div className="mt-1 flex gap-2 text-[8px] opacity-50">{['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'].map((d) => <span key={d} className="flex-1 text-center">{d}</span>)}</div>
+        </div>
+      </div>
 
-          {/* gráfico */}
-          <div className="overflow-hidden rounded-xl" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
-            <div className="flex items-center gap-2 border-b px-3 py-2.5" style={{ background: `linear-gradient(90deg, ${c.btn}1f, transparent 55%)`, borderColor: c.cborder }}>
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: c.btn, color: fgBtn }}><Activity className="h-4 w-4" /></span>
-              <div className="leading-tight">
-                <p className="text-[12px] font-semibold">Sessões nos últimos 7 dias</p>
-                <p className="text-[9px] opacity-60">Sessões de prova iniciadas por dia</p>
-              </div>
-            </div>
-            <div className="p-3">
-              <div className="flex gap-2">
-                <div className="flex w-5 flex-col justify-between text-right text-[8px] opacity-50" style={{ height: 120 }}>
-                  {[160, 120, 80, 40, 0].map((y) => <span key={y}>{y}</span>)}
-                </div>
-                <div className="relative flex-1">
-                  <div className="absolute inset-0 flex flex-col justify-between">
-                    {[0, 1, 2, 3, 4].map((i) => <div key={i} className="border-t border-dashed" style={{ borderColor: c.cborder }} />)}
-                  </div>
-                  <div className="relative flex h-[120px] items-end gap-2">
-                    {[22, 8, 84, 16, 98, 142, 150].map((b, i) => <div key={i} className="flex-1 rounded-t" style={{ height: `${(b / 160) * 100}%`, background: c.btn }} />)}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-1 flex gap-2">
-                <div className="w-5" />
-                <div className="flex flex-1 gap-2 text-[8px] opacity-50">
-                  {['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'].map((d) => <span key={d} className="flex-1 text-center">{d}</span>)}
-                </div>
-              </div>
-            </div>
+      {/* linha de baixo: Desempenho (nota média) + Últimos simulados */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="flex flex-col overflow-hidden rounded-2xl" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
+          <div className="flex items-center gap-2 border-b px-3 py-2.5" style={{ borderColor: c.cborder }}>
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: `${c.btn}1f`, color: c.btn }}><Trophy className="h-4 w-4" /></span>
+            <div className="leading-tight"><p className="text-[11px] font-semibold">Desempenho</p><p className="text-[8px] opacity-60">Sessões finalizadas</p></div>
           </div>
-
-          {/* últimos simulados */}
-          <div className="overflow-hidden rounded-xl" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
-            <div className="flex items-center gap-2 border-b px-3 py-2.5" style={{ background: `linear-gradient(90deg, ${c.btn}1f, transparent 55%)`, borderColor: c.cborder }}>
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: c.btn, color: fgBtn }}><ClipboardList className="h-4 w-4" /></span>
-              <div className="leading-tight">
-                <p className="text-[12px] font-semibold">Últimos simulados</p>
-                <p className="text-[9px] opacity-60">Os 5 mais recentes</p>
-              </div>
-            </div>
-            {([['Concurso TJ Rascunho', '#94a3b8', 'Rascunho'], ['Simulado OAB 2026', '#f59e0b', 'Encerrado'], ['Simulado Teste THEME', '#22c55e', 'Publicado']] as [string, string, string][]).map(([n, cor, st], i) => (
-              <div key={n} className="flex items-center justify-between px-3 py-2.5" style={i > 0 ? { borderTop: `1px solid ${c.cborder}` } : undefined}>
-                <div className="min-w-0">
-                  <p className="truncate text-[11px] font-medium">{n}</p>
-                  <p className="text-[8px] opacity-50">Criado em 26/06/2026</p>
-                </div>
+          <div className="flex flex-1 flex-col items-center justify-center gap-1 px-3 py-5">
+            <p className="text-4xl font-bold leading-none tabular-nums" style={{ color: c.btn }}>23,5</p>
+            <p className="text-[8px] font-medium uppercase tracking-wide opacity-60">nota média geral</p>
+            <span className="mt-2 inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[9px] font-medium" style={{ borderColor: c.cborder, color: c.btn }}>Ver relatórios →</span>
+          </div>
+        </div>
+        <div className="col-span-2 overflow-hidden rounded-2xl" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
+          <div className="flex items-center gap-2 border-b px-3 py-2.5" style={{ borderColor: c.cborder }}>
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: `${c.btn}1f`, color: c.btn }}><ClipboardList className="h-4 w-4" /></span>
+            <div className="leading-tight"><p className="text-[11px] font-semibold">Últimos simulados</p><p className="text-[8px] opacity-60">Os 5 mais recentes</p></div>
+          </div>
+          <div className="space-y-1.5 p-2.5">
+            {sims.map(([n, modo, cor, st]) => (
+              <div key={n} className="flex items-center justify-between gap-2 rounded-xl p-2.5" style={{ border: `1px solid ${c.cborder}` }}>
+                <div className="min-w-0"><p className="truncate text-[11px] font-medium">{n}</p><p className="text-[8px] opacity-55">{modo} · criado em 26/06/2026</p></div>
                 <span className="shrink-0 rounded-full px-2 py-0.5 text-[8px] font-medium" style={{ background: `${cor}22`, color: cor }}>{st}</span>
               </div>
             ))}
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** Lista de estudantes: KPIs + busca + tabela com avatares e badges. */
+function TelaEstudantes({ c, fgBtn }: PrevScreen) {
+  const kpis = [['13.669', 'Estudantes'], ['1.296', 'Passaporte'], ['1.034', 'Ativos']]
+  const alunos: [string, string, string, string][] = [
+    ['Joao', 'joao@gmail.com', 'Passaporte', '#a855f7'],
+    ['Maria Silva', 'maria@gmail.com', 'Vitalício', '#f59e0b'],
+    ['Willian João', 'willian@gmail.com', 'Estudante', '#64748b'],
+  ]
+  return (
+    <div className="space-y-3">
+      <div><h2 className="text-lg font-bold leading-tight" style={{ color: c.titulo }}>Estudantes</h2><p className="text-[11px] opacity-60">Gerencie os alunos</p></div>
+      <div className="grid grid-cols-3 gap-2">
+        {kpis.map(([v, l]) => (
+          <div key={l} className="rounded-xl p-2.5" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
+            <p className="text-lg font-bold leading-none" style={{ color: c.titulo }}>{v}</p>
+            <p className="mt-0.5 text-[8px] font-medium uppercase tracking-wide opacity-60">{l}</p>
+          </div>
+        ))}
+      </div>
+      <div className="overflow-hidden rounded-xl" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
+        <div className="flex items-center gap-2 border-b p-2" style={{ borderColor: c.cborder }}>
+          <div className="flex flex-1 items-center gap-1.5 rounded-lg px-2 py-1.5" style={{ background: c.inputBg, border: `1px solid ${c.cborder}` }}>
+            <Search className="h-3 w-3 opacity-50" /><span className="text-[10px] opacity-50">Buscar por nome, e-mail…</span>
+          </div>
+          <span className="rounded-lg px-2.5 py-1.5 text-[10px] font-semibold" style={{ background: c.btn, color: fgBtn }}>+ Novo</span>
+        </div>
+        {alunos.map(([nome, email, plano, cor], i) => (
+          <div key={nome} className="flex items-center gap-2.5 px-3 py-2" style={i > 0 ? { borderTop: `1px solid ${c.cborder}` } : undefined}>
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: `${c.btn}22`, color: c.btn }}>{nome.slice(0, 1)}</span>
+            <div className="min-w-0 flex-1"><p className="truncate text-[11px] font-medium">{nome}</p><p className="truncate text-[8px] opacity-50">{email}</p></div>
+            <span className="shrink-0 rounded-full px-2 py-0.5 text-[8px] font-bold uppercase" style={{ background: `${cor}22`, color: cor }}>{plano}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Perfil do aluno: card com avatar/nível + KPIs (lado do aluno). */
+function TelaPerfil({ c, fgBtn }: PrevScreen) {
+  const chips: [any, string][] = [[Flame, '5 dias'], [Zap, '1.863 XP'], [Trophy, 'Liga Ouro']]
+  const kpis: [any, string, string][] = [[ClipboardList, '23', 'Simulados'], [Star, '23.5', 'Nota média'], [Trophy, '100', 'Melhor nota'], [BarChart3, '39%', 'Acerto']]
+  return (
+    <div className="space-y-3">
+      <div className="relative overflow-hidden rounded-2xl p-4" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
+        <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${c.btn}22, transparent 60%)` }} />
+        <div className="relative flex items-center gap-3">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-lg font-bold" style={{ background: c.btn, color: fgBtn }}>JO</span>
+          <div className="min-w-0">
+            <h2 className="text-base font-bold leading-tight" style={{ color: c.titulo }}>João</h2>
+            <p className="text-[10px] opacity-60">joao@gmail.com</p>
+          </div>
+        </div>
+        <div className="relative mt-3">
+          <div className="mb-1 flex justify-between text-[9px] opacity-60"><span>Nível 9 · Júnior</span><span>223 / 340 XP</span></div>
+          <div className="h-2 overflow-hidden rounded-full" style={{ background: `${c.btn}22` }}><div className="h-full rounded-full" style={{ width: '62%', background: c.btn }} /></div>
+        </div>
+        <div className="relative mt-2.5 flex flex-wrap gap-1.5">
+          {chips.map(([Icon, txt], i) => (
+            <span key={i} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-medium" style={{ background: c.bg, border: `1px solid ${c.cborder}` }}><Icon className="h-2.5 w-2.5" style={{ color: c.btn }} /> {txt}</span>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {kpis.map(([Icon, v, l], i) => (
+          <div key={i} className="rounded-xl p-2.5" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg" style={{ background: `${c.btn}1f`, color: c.btn }}><Icon className="h-3.5 w-3.5" /></span>
+            <p className="mt-1.5 text-base font-bold leading-none" style={{ color: c.titulo }}>{v}</p>
+            <p className="mt-0.5 text-[7px] font-medium uppercase tracking-wide opacity-60">{l}</p>
+          </div>
+        ))}
       </div>
     </div>
   )

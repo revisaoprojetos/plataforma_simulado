@@ -525,7 +525,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {!atual && (
-            <div className="flex gap-1 rounded-lg bg-muted p-1">
+            <div className="flex gap-1 rounded-lg bg-[var(--tab-bg,var(--muted))] p-1">
               {([['pastas', 'Pastas', FolderTree], ['status', 'Status', Rows3]] as const).map(([v, label, Icon]) => (
                 <button key={v} type="button" onClick={() => setVista(v)} aria-pressed={vista === v}
                   className={cn('inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors',
@@ -535,7 +535,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
               ))}
             </div>
           )}
-          <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
+          <div className="flex flex-wrap gap-1 rounded-lg bg-[var(--tab-bg,var(--muted))] p-1">
             {filtros.map((f) => (
               <button key={f.v} onClick={() => setModo(f.v)}
                 className={cn('rounded-md px-3 py-1 text-sm font-medium transition-colors',

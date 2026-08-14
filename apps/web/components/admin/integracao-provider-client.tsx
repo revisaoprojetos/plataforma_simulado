@@ -353,7 +353,7 @@ function MapaJson({ provider, inicial }: { provider: Provider; inicial?: { mapa:
         </div>
       </div>
       {/* Barra de progresso */}
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-gradient-to-r from-primary to-violet-500 transition-all" style={{ width: `${pct}%` }} /></div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-gradient-to-r from-primary to-primary/80 transition-all" style={{ width: `${pct}%` }} /></div>
 
       {/* Identificação do payload atual (mesma regra do motor) */}
       {payload != null && (

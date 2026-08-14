@@ -62,7 +62,7 @@ export function LixeiraClient({ itens }: { itens: LixeiraItem[] }) {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar item…" className="pl-8" />
         </div>
-        <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
+        <div className="flex flex-wrap gap-1 rounded-lg bg-[var(--tab-bg,var(--muted))] p-1">
           {abas.map((a) => (
             <button key={a.k} onClick={() => setAba(a.k)}
               className={cn('rounded-md px-3 py-1 text-sm font-medium transition-colors', aba === a.k ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:bg-[var(--tab-active,var(--background))] hover:text-[color:var(--tab-active-foreground,var(--foreground))]')}>

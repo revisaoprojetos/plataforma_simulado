@@ -158,7 +158,7 @@ export function CurseducaSync({ grupos, sistema, regras }: { grupos: GrupoCursed
             </div>
 
             <button type="button" onClick={criar} disabled={pending || sel.size === 0}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-violet-600 px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-60">
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-primary/80 px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-60">
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Criar sincronização
             </button>
             <p className="text-[11px] text-muted-foreground">O sistema reimporta esses grupos no intervalo escolhido. Novos alunos na Curseduca passam a aparecer sozinhos.</p>
