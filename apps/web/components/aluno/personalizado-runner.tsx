@@ -20,7 +20,7 @@ type Resultado = { nota: number; acertos: number; total: number }
 
 /** Runner de um simulado personalizado, nos 3 modos: Estudo (feedback na hora), Prova
  *  (cronometrada, resultado no fim) e Revisão (ver gabarito sob demanda). */
-export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
+export function PersonalizadoRunner({ sessao, onSair }: { sessao: SessaoPessoal; onSair?: () => void }) {
   const router = useRouter()
   const { modo } = sessao
   const total = sessao.questoes.length
@@ -262,8 +262,8 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
       {/* Header: [esquerda: sair/modo] · [centro: título + criado] · [direita: timer + finalizar] */}
       <header className="flex items-center gap-2 border-b bg-card px-3 py-2.5 sm:px-5">
         <div className="flex flex-1 items-center gap-2">
-          <button type="button" onClick={() => router.push(`/aluno/simulados/personalizados/${sessao.simuladoId}`)}
-            className="shrink-0 rounded-lg border p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Sair"><ArrowLeft className="h-4 w-4" /></button>
+          <button type="button" onClick={() => (onSair ? onSair() : router.push('/aluno/simulados'))}
+            className="shrink-0 rounded-lg border p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Voltar"><ArrowLeft className="h-4 w-4" /></button>
           <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:flex"><Icon className="h-5 w-5" /></span>
         </div>
         <div className="flex min-w-0 flex-col items-center px-1 text-center">

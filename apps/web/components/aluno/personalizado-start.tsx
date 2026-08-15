@@ -35,7 +35,7 @@ export function PersonalizadoStart({ resumo }: { resumo: ResumoPessoal }) {
     setSessao(r.sessao)
   }
 
-  if (sessao) return <PersonalizadoRunner sessao={sessao} />
+  if (sessao) return <PersonalizadoRunner sessao={sessao} onSair={() => setSessao(null)} />
 
   const { Icon } = MODO[resumo.modo]
   const max = Math.max(1, ...resumo.porDisciplina.map((d) => d.count))
@@ -56,9 +56,9 @@ export function PersonalizadoStart({ resumo }: { resumo: ResumoPessoal }) {
     // Tela cheia imersiva; --primary := --brand-primary (roxo forte do sistema, vinculado à personalização).
     <div className="fixed inset-0 z-50 overflow-y-auto bg-muted dark:bg-background" style={{ ['--primary' as any]: 'var(--brand-primary)' }}>
       <div className="mx-auto flex max-w-2xl flex-col gap-4 px-3 py-5 sm:px-4">
-      <button type="button" onClick={() => router.push(`/aluno/simulados/personalizados/${resumo.simuladoId}`)}
+      <button type="button" onClick={() => router.back()}
         className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> Voltar ao editor
+        <ArrowLeft className="h-4 w-4" /> Voltar
       </button>
 
       {/* HERO animado */}
