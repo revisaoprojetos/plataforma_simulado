@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle2, Lock, LayoutGrid, Rows3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -69,7 +70,9 @@ function CardConcluido({ s }: { s: MeuSimuladoItem }) {
  */
 export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoItem[]; grupos: Grupo[] }) {
   const temCatalogo = grupos.length > 0
-  const [aba, setAba] = useState<'revisao' | 'personalizados'>('revisao')
+  // Aba inicial via URL (?aba=personalizados) — usado pelo "Voltar" da tela de fazer personalizado.
+  const abaInicial = useSearchParams().get('aba') === 'personalizados' ? 'personalizados' : 'revisao'
+  const [aba, setAba] = useState<'revisao' | 'personalizados'>(abaInicial)
   const [vista, setVista] = useState<'quadro' | 'catalogo'>('catalogo')
   useEffect(() => { const v = localStorage.getItem('aluno-meus-simulados-vista'); if (v === 'catalogo' || v === 'quadro') setVista(v) }, [])
   useEffect(() => { localStorage.setItem('aluno-meus-simulados-vista', vista) }, [vista])
@@ -112,6 +115,11 @@ export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoIte
       {aba === 'revisao' ? (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Concluídos ({itens.length})</h2>
+          {itens.length === 0 && (
+            <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+              Você ainda não concluiu nenhum simulado. Veja os disponíveis em <Link href="/aluno/simulado" className="font-medium text-primary hover:underline">Simulados</Link>.
+            </div>
+          )}
           <div className="space-y-4">
             {fileiras.map(({ g, its }) => (
               <FileiraHorizontal key={g.id} titulo={g.nome} count={its.length}>

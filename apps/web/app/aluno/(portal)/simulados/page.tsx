@@ -1,7 +1,5 @@
-import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { ClipboardList } from 'lucide-react'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
@@ -54,20 +52,8 @@ export default async function MeusSimuladosPage() {
     // Mais recente → mais antigo (mesma antiguidade do catálogo).
     .sort((a: any, b: any) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
 
-  if (concluidos.length === 0) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Meus simulados</h1>
-          <p className="text-muted-foreground">Seus simulados concluídos — com notas e resultados. Os liberados para fazer estão em <Link href="/aluno/simulado" className="font-medium text-primary hover:underline">Simulados</Link>.</p>
-        </div>
-        <div className="rounded-2xl border border-dashed p-10 text-center">
-          <ClipboardList className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
-          <p className="text-muted-foreground">Você ainda não concluiu nenhum simulado. Veja os disponíveis em <Link href="/aluno/simulado" className="font-medium text-primary hover:underline">Simulado</Link>.</p>
-        </div>
-      </div>
-    )
-  }
+  // Sempre renderiza o catálogo (com as abas) — mesmo sem concluídos, para a aba "Personalizados"
+  // continuar acessível (ex.: "Voltar" da tela de fazer personalizado). A aba Revisão mostra o vazio.
 
   // Visual (capa/cor) + grupo (pasta) de cada concluído — leituras independentes, em PARALELO.
   const [visual, { grupoPorSim, grupos }] = await Promise.all([

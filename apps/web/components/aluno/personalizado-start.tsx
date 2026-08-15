@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Play, Loader2, GraduationCap, Timer, Eye, ListChecks, Layers, BookOpen, Download, ListOrdered, Sparkles } from 'lucide-react'
+import { ArrowLeft, Play, Loader2, GraduationCap, Timer, Eye, ListChecks, Layers, BookOpen, Download, ListOrdered, Sparkles, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
+import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 import { formatarTempo } from '@/components/aluno/seletor-tempo'
 import { PersonalizadoRunner } from '@/components/aluno/personalizado-runner'
@@ -28,11 +29,19 @@ export function PersonalizadoStart({ resumo }: { resumo: ResumoPessoal }) {
 
   useEffect(() => { const t = setTimeout(() => setAnimar(true), 60); return () => clearTimeout(t) }, [])
 
-  const iniciar = async () => {
+  const iniciar = async (reiniciar = false) => {
     setCarregando(true)
-    const r = await abrirSessaoPessoal(resumo.simuladoId)
+    const r = await abrirSessaoPessoal(resumo.simuladoId, reiniciar)
     if (r.error || !r.sessao) { toast.error(r.error ?? 'Não foi possível iniciar.'); setCarregando(false); return }
     setSessao(r.sessao)
+  }
+  const reiniciar = async () => {
+    const ok = await confirmar({
+      titulo: 'Reiniciar simulado',
+      mensagem: 'Isso descarta a tentativa em andamento (respostas e tempo) e começa do zero. Não pode ser desfeito.',
+      confirmar: 'Reiniciar', destrutivo: true,
+    })
+    if (ok) await iniciar(true)
   }
 
   if (sessao) return <PersonalizadoRunner sessao={sessao} onSair={() => setSessao(null)} />
@@ -56,7 +65,7 @@ export function PersonalizadoStart({ resumo }: { resumo: ResumoPessoal }) {
     // Tela cheia imersiva; --primary := --brand-primary (roxo forte do sistema, vinculado à personalização).
     <div className="fixed inset-0 z-50 overflow-y-auto bg-muted dark:bg-background" style={{ ['--primary' as any]: 'var(--brand-primary)' }}>
       <div className="mx-auto flex max-w-2xl flex-col gap-4 px-3 py-5 sm:px-4">
-      <button type="button" onClick={() => router.back()}
+      <button type="button" onClick={() => router.push('/aluno/simulados?aba=personalizados')}
         className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Voltar
       </button>
@@ -130,7 +139,14 @@ export function PersonalizadoStart({ resumo }: { resumo: ResumoPessoal }) {
           className="inline-flex items-center justify-center gap-1.5 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted">
           <Download className="h-4 w-4" /> Baixar caderno de questões
         </a>
-        <button type="button" onClick={iniciar} disabled={carregando}
+        {/* Reiniciar — só quando há tentativa em andamento; abre confirmação */}
+        {continuar && (
+          <button type="button" onClick={reiniciar} disabled={carregando}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-70">
+            <RotateCcw className="h-4 w-4" /> Reiniciar
+          </button>
+        )}
+        <button type="button" onClick={() => iniciar()} disabled={carregando}
           className="group inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-base font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-95 hover:shadow-md disabled:opacity-70 sm:py-2.5">
           {carregando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5 transition-transform group-hover:scale-110" />}
           {continuar ? `Continuar (${resumo.respondidas}/${resumo.total})` : 'Iniciar simulado'}

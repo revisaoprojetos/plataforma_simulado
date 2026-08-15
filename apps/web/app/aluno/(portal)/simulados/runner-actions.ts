@@ -36,7 +36,7 @@ export type SessaoPessoal = {
  * Abre (retoma ou cria) a sessão do simulado pessoal e devolve as questões com gabarito +
  * as respostas já salvas. Escopado por tenant + owner_estudante_id (service role, sem RLS).
  */
-export async function abrirSessaoPessoal(simuladoId: string): Promise<{ sessao?: SessaoPessoal; error?: string }> {
+export async function abrirSessaoPessoal(simuladoId: string, reiniciar = false): Promise<{ sessao?: SessaoPessoal; error?: string }> {
   const { svc, estudanteId, tenantId } = await ctx()
 
   // 1. Simulado do próprio aluno (dono).
@@ -121,10 +121,16 @@ export async function abrirSessaoPessoal(simuladoId: string): Promise<{ sessao?:
   })
 
   // 3. Retoma a sessão aberta ou cria uma nova tentativa.
-  const { data: aberta } = await svc.from('simulado_sessoes_prova')
+  let { data: aberta } = await svc.from('simulado_sessoes_prova')
     .select('id, status, iniciado_em')
     .eq('simulado_id', simuladoId).eq('estudante_id', estudanteId).eq('is_teste', false).neq('status', 'finalizada')
     .order('iniciado_em', { ascending: false }).limit(1).maybeSingle()
+
+  // Reiniciar: descarta a tentativa em andamento (soft-delete) para começar do zero.
+  if (reiniciar && aberta) {
+    await svc.from('simulado_sessoes_prova').update({ deletado: true, deletado_em: new Date().toISOString() }).eq('id', (aberta as any).id)
+    aberta = null
+  }
 
   let sessaoId: string, iniciadoEm: string, status: string
   if (aberta) {
