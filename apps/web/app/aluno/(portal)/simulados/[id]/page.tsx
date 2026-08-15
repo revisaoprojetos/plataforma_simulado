@@ -2,8 +2,9 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { ChevronLeft, Lock } from 'lucide-react'
+import { ChevronLeft, Lock, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { montarItensSimulado } from '@/lib/aluno/simulado-item'
 import { montarComparativo } from '@/lib/simulado/comparativo'
 import { montarResultadoAluno, type SessaoInput } from '@/lib/simulado/resultado-aluno'
 import { montarDesempenhoAluno } from '@/lib/simulado/desempenho-aluno'
@@ -25,7 +26,7 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
   // Simulado + sessões finalizadas do aluno em paralelo (as sessões definem o early-return).
   const [{ data: sim }, { data: sess }] = await Promise.all([
     // owner_estudante_id IS NULL: esta é a tela de resultado OFICIAL — simulados pessoais têm fluxo próprio (Personalizados).
-    svc.from('simulado_simulados').select('id, titulo, regras, status, data_fim, embed_token').eq('id', id).is('owner_estudante_id', null).maybeSingle(),
+    svc.from('simulado_simulados').select('id, titulo, regras, status, modo_aplicacao, data_inicio, data_fim, embed_token, created_at').eq('id', id).is('owner_estudante_id', null).maybeSingle(),
     svc.from('simulado_sessoes_prova')
       .select('id, status, nota, iniciado_em, finalizado_em, posicao_ranking, tentativa_num')
       .eq('estudante_id', estId).eq('simulado_id', id).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada'),
@@ -43,16 +44,25 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
   // Melhor tentativa (nota; desempate pela mais recente) — usada no hero e no comparativo.
   const melhor = [...finalizadas].sort((a, b) => (Number(b.nota ?? -1) - Number(a.nota ?? -1)) || (new Date(b.finalizado_em ?? 0).getTime() - new Date(a.finalizado_em ?? 0).getTime()))[0]
 
-  // Independentes: classificação (p/ liberações), tipo do simulado e avaliação NPS — em paralelo.
-  const [{ data: estRow }, tipo, avResult] = await Promise.all([
+  // Independentes: classificação (p/ liberações), tipo do simulado, avaliação NPS e acessos avulsos
+  // (prazo, p/ o "Refazer") — em paralelo.
+  const [{ data: estRow }, tipo, avResult, { data: acessos }] = await Promise.all([
     svc.from('simulado_estudantes').select('classificacao').eq('id', estId).maybeSingle(),
     tiposDeSimulados(svc, [id]).then((m) => m.get(id) ?? null),
     // NPS: tolerante — se a tabela simulado_avaliacoes ainda não foi migrada (avErr), não mostra o card.
     svc.from('simulado_avaliacoes').select('id').eq('estudante_id', estId).eq('simulado_id', id).maybeSingle()
       .then((r) => ({ avRow: r.data, avErr: r.error })),
+    svc.from('simulado_acessos').select('expira_em').eq('estudante_id', estId).eq('simulado_id', id),
   ])
   const { notaLiberada, gabaritoLiberado, cadernoParaAluno } = resolverLiberacoes(sim.regras as any, sim, { classificacao: (estRow as any)?.classificacao ?? null })
   const mostrarNps = !avResult.avErr && !avResult.avRow
+
+  // Refazer (parte interna): pode abrir nova tentativa agora? Deriva do MESMO estado dos cards
+  // (janela aberta, publicado, com token e vagas) — o botão saiu da FRENTE do card para cá.
+  const expira = ((acessos ?? []) as any[]).reduce<string | null>((max, a) => (a.expira_em && (!max || new Date(a.expira_em) > new Date(max))) ? a.expira_em : max, null)
+  const estadoSim = montarItensSimulado([sim], new Map([[id, finalizadas]]), new Map([[id, expira]]), new Map())[0]
+  const podeRefazer = !!(estadoSim?.refazer && estadoSim?.podeFazer)
+  const refazerHref = podeRefazer && sim.embed_token ? `/simulado/${sim.embed_token}` : null
 
   const sessoesInput: SessaoInput[] = finalizadas.map((s) => ({
     id: s.id, tentativa_num: s.tentativa_num, nota: s.nota, iniciado_em: s.iniciado_em, finalizado_em: s.finalizado_em, posicao_ranking: s.posicao_ranking,
@@ -88,14 +98,21 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
             <h1 className="truncate text-2xl font-bold tracking-tight sm:text-3xl">{sim.titulo}</h1>
             {finalizadas.length > 1 && <p className="mt-1 text-sm text-muted-foreground">{finalizadas.length} tentativas realizadas</p>}
           </div>
-          <div className="shrink-0 text-right">
+          <div className="flex shrink-0 flex-col items-end gap-3">
             {notaLiberada ? (
-              <>
+              <div className="text-right">
                 <div className={cn('text-4xl font-extrabold tabular-nums', melhor.nota != null && notaTone(Number(melhor.nota)))}>{nota(melhor.nota)}</div>
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">melhor nota</div>
-              </>
+              </div>
             ) : (
               <div className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground"><Lock className="h-3.5 w-3.5" /> Aguardando liberação</div>
+            )}
+            {/* Refazer — agora na PARTE INTERNA (saiu da frente do card). */}
+            {podeRefazer && refazerHref && (
+              <a href={refazerHref}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90">
+                <RotateCcw className="h-4 w-4" /> Refazer simulado
+              </a>
             )}
           </div>
         </div>
