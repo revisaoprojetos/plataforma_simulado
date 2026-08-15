@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Check, X, Eye, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, FileText, Scissors, Bold, Italic, Underline, List, Baseline, Highlighter } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, X, Eye, EyeOff, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, FileText, Scissors, Bold, Italic, Underline, List, Baseline, Highlighter } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -38,6 +38,7 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   // Tesoura: alternativas "eliminadas" (riscadas) por questão — só ajuda visual, client-side.
   const [eliminadas, setEliminadas] = useState<Set<string>>(new Set())
   const eliminar = (id: string) => setEliminadas((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const [mostrarTempo, setMostrarTempo] = useState(true) // ocultar/mostrar o temporizador
   // Barra lateral de ferramentas (desktop, docada à direita) + seções internas (anotações e comentário,
   // independentes, ambos podem ficar abertos). No mobile vira um card colapsável (ferrAberta).
   const [sidebarAberta, setSidebarAberta] = useState(false)
@@ -238,9 +239,14 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
         </div>
         <div className="flex flex-1 items-center justify-end gap-2">
           {restante != null && (
-            <span className={cn('flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold tabular-nums',
-              restante <= 60 ? 'bg-destructive/10 text-destructive' : 'bg-muted text-foreground')}>
-              <Timer className={cn('h-4 w-4', restante <= 60 && 'animate-pulse')} /> {formatarSeg(Math.max(0, restante))}
+            <span className={cn('flex shrink-0 items-center gap-1.5 rounded-full py-1.5 pl-3 pr-2 text-sm font-bold tabular-nums',
+              restante <= 60 && mostrarTempo ? 'bg-destructive/10 text-destructive' : 'bg-muted text-foreground')}>
+              <Timer className={cn('h-4 w-4', restante <= 60 && mostrarTempo && 'animate-pulse')} />
+              {mostrarTempo ? formatarSeg(Math.max(0, restante)) : '--:--'}
+              <button type="button" onClick={() => setMostrarTempo((v) => !v)} title={mostrarTempo ? 'Ocultar tempo' : 'Mostrar tempo'} aria-label={mostrarTempo ? 'Ocultar tempo' : 'Mostrar tempo'}
+                className="ml-0.5 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground">
+                {mostrarTempo ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              </button>
             </span>
           )}
           {/* Finalizar sempre visível, à direita do timer */}
@@ -250,9 +256,9 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
           </button>
         </div>
       </header>
-      {/* Progresso — barra fina full-width sob o header */}
+      {/* Progresso — avança com as questões RESPONDIDAS (não com o número da questão atual) */}
       <div className="h-1 w-full bg-muted">
-        <div className="h-full bg-primary transition-all duration-300 ease-out" style={{ width: `${Math.round(((idx + 1) / total) * 100)}%` }} />
+        <div className="h-full bg-primary transition-all duration-300 ease-out" style={{ width: `${Math.round((respondidas / Math.max(1, total)) * 100)}%` }} />
       </div>
 
       {/* Conteúdo (rolagem própria) + BARRA LATERAL de ferramentas docada à direita no desktop */}
@@ -301,7 +307,7 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
               {/* Tesoura — elimina/restaura a alternativa (só antes de revelar) */}
               {!revelado && (
                 <button type="button" onClick={() => eliminar(alt.id)} title={cortada ? 'Restaurar alternativa' : 'Eliminar (tesoura)'} aria-label={cortada ? 'Restaurar alternativa' : 'Eliminar alternativa'}
-                  className={cn('flex w-9 shrink-0 items-center justify-center rounded-xl border transition-colors sm:w-10',
+                  className={cn('flex h-9 w-9 shrink-0 self-center items-center justify-center rounded-full border transition-colors sm:h-10 sm:w-10',
                     cortada ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground')}>
                   <Scissors className={cn('h-4 w-4 transition-transform', cortada && '-rotate-12')} />
                 </button>
