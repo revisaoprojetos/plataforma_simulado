@@ -25,7 +25,7 @@ const ehDiagnostico = (nome: string) => /diagn[oó]stico/i.test(nome)
 const porDiagFim = (a: { nome: string }, b: { nome: string }) => (ehDiagnostico(a.nome) ? 1 : 0) - (ehDiagnostico(b.nome) ? 1 : 0)
 
 export function MeuSimuladoView({
-  tentativas, questoes, comparativo, desempenho, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false, ocultarComparativo = false, cadernosInline = false, nps,
+  tentativas, questoes, comparativo, desempenho, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false, ocultarComparativo = false, cadernosInline = false, feedback,
 }: {
   tentativas: TentativaResumo[]
   questoes: QuestaoAgregada[]
@@ -45,8 +45,8 @@ export function MeuSimuladoView({
   ocultarComparativo?: boolean
   /** Downloads da tentativa INLINE (abaixo do texto) em vez do menu ⋮ + modal (ex.: simulado pessoal). */
   cadernosInline?: boolean
-  /** Card opcional (ex.: NPS "Como foi sua experiência?") exibido ACIMA da lista de tentativas. */
-  nps?: ReactNode
+  /** Conteúdo opcional da aba "Avaliação" (NPS + report). Quando presente, cria a aba. */
+  feedback?: ReactNode
 }) {
   const router = useRouter()
   const ordenadas = useMemo(() => [...tentativas].sort((a, b) => (a.n ?? 0) - (b.n ?? 0)), [tentativas])
@@ -163,6 +163,7 @@ export function MeuSimuladoView({
         <TabsTrigger value="geral"><LayoutDashboard className="h-4 w-4" /> Visão geral</TabsTrigger>
         <TabsTrigger value="questoes"><ClipboardCheck className="h-4 w-4" /> Questões</TabsTrigger>
         {!ocultarComparativo && <TabsTrigger value="turma"><Users className="h-4 w-4" /> Comparativo</TabsTrigger>}
+        {feedback && <TabsTrigger value="avaliacao"><MessageSquare className="h-4 w-4" /> Avaliação</TabsTrigger>}
       </TabsList>
 
       <TabsContent value="geral" className="pt-1">
@@ -251,9 +252,8 @@ export function MeuSimuladoView({
             )}
           </div>
 
-          {/* DIREITA: NPS (opcional) + histórico do simulado selecionado */}
-          <div className="lg:col-span-1 space-y-4">
-            {nps}
+          {/* DIREITA: histórico do simulado selecionado */}
+          <div className="lg:col-span-1">
             <div className="overflow-hidden rounded-2xl border bg-card shadow-sm lg:sticky lg:top-4">
               <div className="border-b bg-muted/25 px-4 py-3">
                 <div className="flex items-center gap-2">
@@ -358,6 +358,9 @@ export function MeuSimuladoView({
           {notaLiberada ? <ComparativoTurma c={comparativo} /> : <Bloqueado titulo="Comparativo indisponível" msg="O comparativo com a turma aparece quando o resultado for liberado." />}
         </TabsContent>
       )}
+
+      {/* AVALIAÇÃO — feedback (NPS) + report; fica fora da Visão geral p/ deixá-la mais limpa. */}
+      {feedback && <TabsContent value="avaliacao" className="pt-1">{feedback}</TabsContent>}
     </Tabs>
 
     {/* MODAL — download de cadernos (sem gabarito × com gabarito) */}

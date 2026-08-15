@@ -12,7 +12,7 @@ import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { tiposDeSimulados } from '@/lib/simulado/tipo'
 import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
 import { MeuSimuladoView } from '@/components/aluno/meu-simulado-view'
-import { NpsAvaliacao } from '@/components/aluno/nps-avaliacao'
+import { AvaliacaoSimulado } from '@/components/aluno/avaliacao-simulado'
 
 const notaTone = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
 const nota = (n: number | null) => (n == null ? '—' : Number(n).toFixed(1).replace('.', ','))
@@ -132,7 +132,7 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
         simuladoId={id}
         simuladoTitulo={sim.titulo}
         cadernosInline
-        nps={mostrarNps ? <NpsAvaliacao sessaoId={melhor.id} compact /> : undefined}
+        feedback={<AvaliacaoSimulado sessaoId={melhor.id} mostrarNps={mostrarNps} />}
       />
     </div>
   )

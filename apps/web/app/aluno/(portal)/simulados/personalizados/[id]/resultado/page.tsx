@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { montarResultadoAluno, type SessaoInput } from '@/lib/simulado/resultado-aluno'
 import { MeuSimuladoView } from '@/components/aluno/meu-simulado-view'
 import { ExcluirPersonalizadoButton } from '@/components/aluno/excluir-personalizado-button'
-import { NpsAvaliacao } from '@/components/aluno/nps-avaliacao'
+import { AvaliacaoSimulado } from '@/components/aluno/avaliacao-simulado'
 import type { Comparativo } from '@/lib/simulado/comparativo'
 
 export const dynamic = 'force-dynamic'
@@ -99,7 +99,7 @@ export default async function ResultadoPersonalizadoPage({ params }: { params: P
         simuladoTitulo={sim.titulo}
         ocultarComparativo
         cadernosInline
-        nps={<NpsAvaliacao sessaoId={melhor.id} compact />}
+        feedback={<AvaliacaoSimulado sessaoId={melhor.id} />}
       />
     </div>
   )
