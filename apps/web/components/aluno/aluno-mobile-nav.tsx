@@ -104,14 +104,19 @@ export function AlunoMobileNav({ navMode, logo, nome = 'Área do Aluno', subtitu
   }
 
   // ─────────────────────────── OPÇÃO A — barra inferior (tabs) ───────────────────────────
-  // Ícones do Lucide são de TRAÇO (fill:none). Preencher o interior no ativo vira um borrão
-  // sólido e apaga os detalhes — então o ativo é só cor accent + traço mais grosso + leve escala.
+  // Estilo do ícone da tab bar. Ícones do Lucide são de TRAÇO — para o ativo ficar preenchido MAS
+  // com os detalhes à mostra (estilo Instagram), pinta-se o corpo com a cor accent e o traço com a
+  // cor do fundo da barra: as linhas internas (porta, listas, badalo) aparecem "recortadas".
+  const estiloIcone = (ativo: boolean): React.CSSProperties =>
+    ativo
+      ? { fill: 'var(--brand-accent, var(--primary))', stroke: 'var(--sidebar)' }
+      : { fill: 'none' }
   const Cell = ({ icon: Icon, ativo, dot, label, ...rest }: { icon: LucideIcon; ativo: boolean; dot?: boolean; label: string } & React.ComponentProps<'button'>) => (
     <button aria-label={label} className="relative flex flex-1 items-center justify-center py-3.5 outline-none active:scale-95" {...rest}>
       <Icon
         className={cn('h-[26px] w-[26px] transition-transform', ativo ? 'scale-110' : 'text-sidebar-foreground/45')}
-        strokeWidth={ativo ? 2.25 : 2}
-        style={{ fill: 'none', ...(ativo ? { color: 'var(--brand-accent, var(--primary))' } : {}) }}
+        strokeWidth={2}
+        style={estiloIcone(ativo)}
       />
       {dot && <span className="absolute right-[calc(50%-16px)] top-2.5 h-2 w-2 rounded-full ring-2 ring-[color:var(--sidebar)]" style={{ background: 'var(--brand-accent, var(--primary))' }} />}
     </button>
@@ -121,12 +126,12 @@ export function AlunoMobileNav({ navMode, logo, nome = 'Área do Aluno', subtitu
     <>
       <nav aria-label="Navegação" className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] text-sidebar-foreground shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.5)] md:hidden">
         <Link href="/aluno" className="flex flex-1 items-center justify-center py-3.5 active:scale-95" aria-label="Início">
-          <Home className={cn('h-[26px] w-[26px] transition-transform', inicioAtivo ? 'scale-110' : 'text-sidebar-foreground/45')} strokeWidth={inicioAtivo ? 2.25 : 2} style={{ fill: 'none', ...(inicioAtivo ? { color: 'var(--brand-accent, var(--primary))' } : {}) }} />
+          <Home className={cn('h-[26px] w-[26px] transition-transform', inicioAtivo ? 'scale-110' : 'text-sidebar-foreground/45')} strokeWidth={2} style={estiloIcone(inicioAtivo)} />
         </Link>
         <Cell icon={ClipboardList} ativo={emSimulados} label="Simulados" onClick={() => setPopup((v) => !v)} />
         <Link href="/aluno/notificacoes" className="flex flex-1 items-center justify-center py-3.5 active:scale-95" aria-label="Notificações">
           <span className="relative flex items-center justify-center">
-            <Bell className={cn('h-[26px] w-[26px] transition-transform', notifAtivo ? 'scale-110' : 'text-sidebar-foreground/45')} strokeWidth={notifAtivo ? 2.25 : 2} style={{ fill: 'none', ...(notifAtivo ? { color: 'var(--brand-accent, var(--primary))' } : {}) }} />
+            <Bell className={cn('h-[26px] w-[26px] transition-transform', notifAtivo ? 'scale-110' : 'text-sidebar-foreground/45')} strokeWidth={2} style={estiloIcone(notifAtivo)} />
             {naoLidas > 0 && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full ring-2 ring-[color:var(--sidebar)]" style={{ background: 'var(--brand-accent, var(--primary))' }} />}
           </span>
         </Link>
