@@ -126,28 +126,35 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
 
   // Seções de ferramentas: Anotações (editor rico) + Comentário (SEM revelar o gabarito).
   // preencher=true (barra do desktop): a área de Anotações cresce até o fim.
+  // Abrir/fechar desliza via grid-template-rows 0fr↔1fr (anima nos dois sentidos, mantém o preenchimento).
   const renderFerramentas = (preencher: boolean) => (
     <div className={cn('flex flex-col gap-2', preencher && 'min-h-0 flex-1')}>
+      {/* Anotações */}
       <div className={cn('flex flex-col overflow-hidden rounded-xl border', preencher && anotAberta && 'min-h-0 flex-1')}>
         <button type="button" onClick={() => setAnotAberta((v) => !v)} className="flex w-full shrink-0 items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
           <StickyNote className="h-4 w-4 text-primary" /> Anotações
           <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !anotAberta && '-rotate-90')} />
         </button>
-        {anotAberta && (
-          <EditorAnotacao key={q.id} valor={anotacoes[q.id] ?? ''} fill={preencher}
-            onChange={(html) => setAnotacoes((a) => ({ ...a, [q.id]: html }))} />
-        )}
+        <div className={cn('grid transition-[grid-template-rows] duration-300 ease-out', anotAberta ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]', preencher && anotAberta && 'min-h-0 flex-1')}>
+          <div className={cn('overflow-hidden', preencher && anotAberta && 'flex min-h-0 flex-1 flex-col')}>
+            <EditorAnotacao key={q.id} valor={anotacoes[q.id] ?? ''} fill={preencher}
+              onChange={(html) => setAnotacoes((a) => ({ ...a, [q.id]: html }))} />
+          </div>
+        </div>
       </div>
+      {/* Comentário do professor */}
       <div className="shrink-0 overflow-hidden rounded-xl border">
-        <button type="button" onClick={() => setComentAberto((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
+        <button type="button" onClick={() => setComentAberto((v) => !v)} className="flex w-full shrink-0 items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
           <Lightbulb className="h-4 w-4 text-primary" /> Comentário do professor
           <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !comentAberto && '-rotate-90')} />
         </button>
-        {comentAberto && (
-          <div className="max-h-64 overflow-y-auto border-t p-3 text-sm">
-            {q.comentario ? <MarkdownContent className="leading-relaxed text-foreground">{q.comentario}</MarkdownContent> : <span className="text-muted-foreground">Sem comentário para esta questão.</span>}
+        <div className={cn('grid transition-[grid-template-rows] duration-300 ease-out', comentAberto ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+          <div className="overflow-hidden">
+            <div className="max-h-64 overflow-y-auto border-t p-3 text-sm">
+              {q.comentario ? <MarkdownContent className="leading-relaxed text-foreground">{q.comentario}</MarkdownContent> : <span className="text-muted-foreground">Sem comentário para esta questão.</span>}
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   )
@@ -378,8 +385,8 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   )
 }
 
-const CORES_TEXTO = ['#ef4444', '#f59e0b', '#10b981', '#2563eb', '#7c3aed', '#111827']
-const CORES_MARCA = ['#fde047', '#86efac', '#f9a8d4', '#93c5fd', '#d8b4fe']
+const CORES_TEXTO = ['#111827', '#ef4444', '#f97316', '#f59e0b', '#22c55e', '#10b981', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#6b7280']
+const CORES_MARCA = ['#fef08a', '#fde68a', '#fed7aa', '#fecaca', '#bbf7d0', '#a7f3d0', '#99f6e4', '#a5f3fc', '#bfdbfe', '#c7d2fe', '#ddd6fe', '#f5d0fe', '#fbcfe8', '#e5e7eb']
 
 /** Editor de anotações "estilo Word" (contenteditable + execCommand): negrito, itálico, sublinhado,
  *  marcadores, cor do texto e marca-texto. Remonta por questão (key) e salva o HTML em onChange. */
@@ -403,11 +410,11 @@ function EditorAnotacao({ valor, onChange, fill }: { valor: string; onChange: (h
         <BtnFmt title="Marcadores" onClick={() => exec('insertUnorderedList')}><List className="h-3.5 w-3.5" /></BtnFmt>
         <span className="mx-0.5 h-4 w-px bg-border" />
         <div className="relative">
-          <BtnFmt title="Cor do texto" onClick={() => setPaleta((p) => (p === 'texto' ? null : 'texto'))}><Baseline className="h-3.5 w-3.5" /></BtnFmt>
+          <BtnFmt title="Cor do texto" ativo={paleta === 'texto'} onClick={() => setPaleta((p) => (p === 'texto' ? null : 'texto'))}><Baseline className="h-3.5 w-3.5" /></BtnFmt>
           {paleta === 'texto' && <Paleta cores={CORES_TEXTO} onPick={(c) => exec('foreColor', c)} />}
         </div>
         <div className="relative">
-          <BtnFmt title="Marca-texto" onClick={() => setPaleta((p) => (p === 'marca' ? null : 'marca'))}><Highlighter className="h-3.5 w-3.5" /></BtnFmt>
+          <BtnFmt title="Marca-texto" ativo={paleta === 'marca'} onClick={() => setPaleta((p) => (p === 'marca' ? null : 'marca'))}><Highlighter className="h-3.5 w-3.5" /></BtnFmt>
           {paleta === 'marca' && <Paleta cores={CORES_MARCA} onLimpar={() => exec('hiliteColor', 'transparent')} onPick={(c) => exec('hiliteColor', c)} />}
         </div>
       </div>
@@ -419,13 +426,16 @@ function EditorAnotacao({ valor, onChange, fill }: { valor: string; onChange: (h
   )
 }
 
-function BtnFmt({ children, onClick, title }: { children: ReactNode; onClick: () => void; title: string }) {
-  return <button type="button" title={title} onMouseDown={(e) => e.preventDefault()} onClick={onClick} className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">{children}</button>
+function BtnFmt({ children, onClick, title, ativo }: { children: ReactNode; onClick: () => void; title: string; ativo?: boolean }) {
+  return <button type="button" title={title} onMouseDown={(e) => e.preventDefault()} onClick={onClick}
+    className={cn('rounded p-1.5 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary',
+      ativo ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>{children}</button>
 }
 
+/** Paleta de cores em grade, ancorada à DIREITA (cresce para a esquerda, sem vazar o painel). */
 function Paleta({ cores, onPick, onLimpar }: { cores: string[]; onPick: (c: string) => void; onLimpar?: () => void }) {
   return (
-    <div className="absolute left-0 top-full z-20 mt-1 flex items-center gap-1 rounded-lg border bg-card p-1.5 shadow-lg">
+    <div className="absolute right-0 top-full z-20 mt-1 grid w-max grid-cols-7 gap-1 rounded-lg border bg-card p-1.5 shadow-lg">
       {cores.map((c) => <button key={c} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(c)} title={c} className="h-5 w-5 rounded ring-1 ring-black/10 transition-transform hover:scale-110" style={{ background: c }} />)}
       {onLimpar && <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onLimpar} title="Sem marcação" className="flex h-5 w-5 items-center justify-center rounded border text-muted-foreground hover:bg-muted"><X className="h-3 w-3" /></button>}
     </div>
