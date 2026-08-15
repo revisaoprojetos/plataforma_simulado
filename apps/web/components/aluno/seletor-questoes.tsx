@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Loader2, Check, ChevronDown, X } from 'lucide-react'
+import { Search, Loader2, Check, ChevronDown, X, ClipboardList } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { questoesAcessiveis, type QuestaoDisponivel, type OpcoesFiltro } from '@/app/aluno/(portal)/simulados/builder-actions'
 
@@ -10,8 +10,8 @@ const MAX_MOSTRAR = 100 // teto renderizado — refine os filtros p/ ver as dema
 const tipoLabel = (t: string) => (t === 'objetiva' ? 'Objetiva' : t === 'discursiva' ? 'Discursiva' : t.charAt(0).toUpperCase() + t.slice(1))
 const difLabel = (d: string) => ({ facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' } as Record<string, string>)[d] ?? (d.charAt(0).toUpperCase() + d.slice(1))
 
-type Filtros = { disciplina: string; assunto: string; banca: string; ano: string; tipo: string; dificuldade: string }
-const F0: Filtros = { disciplina: '', assunto: '', banca: '', ano: '', tipo: '', dificuldade: '' }
+type Filtros = { disciplina: string; assunto: string; banca: string; simulado: string; ano: string; tipo: string; dificuldade: string }
+const F0: Filtros = { disciplina: '', assunto: '', banca: '', simulado: '', ano: '', tipo: '', dificuldade: '' }
 
 /**
  * Seletor de questões (das que o aluno tem acesso): clicar num item MARCA/desmarca um check
@@ -31,7 +31,7 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [importando, setImportando] = useState(false)
 
-  useEffect(() => { questoesAcessiveis().then(setDados).catch(() => setDados({ questoes: [], filtros: { disciplinas: [], assuntos: [], bancas: [], anos: [], tipos: [], dificuldades: [] }, truncado: false })) }, [])
+  useEffect(() => { questoesAcessiveis().then(setDados).catch(() => setDados({ questoes: [], filtros: { disciplinas: [], assuntos: [], bancas: [], anos: [], tipos: [], dificuldades: [], simulados: [] }, truncado: false })) }, [])
 
   // Assuntos dependem da disciplina escolhida (mostra só os dela).
   const assuntosOpc = useMemo(() => {
@@ -46,6 +46,7 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
       (!f.disciplina || q.disciplinaId === f.disciplina) &&
       (!f.assunto || q.assuntoId === f.assunto) &&
       (!f.banca || q.bancaId === f.banca) &&
+      (!f.simulado || q.simuladoId === f.simulado) &&
       (!f.ano || String(q.ano) === f.ano) &&
       (!f.tipo || q.tipo === f.tipo) &&
       (!f.dificuldade || q.dificuldade === f.dificuldade) &&
@@ -85,6 +86,11 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
           {!!op?.bancas.length && (
             <Pill valor={f.banca} onChange={(v) => setF((s) => ({ ...s, banca: v }))} rotulo="Banca">
               {op.bancas.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
+            </Pill>
+          )}
+          {!!op?.simulados.length && (
+            <Pill valor={f.simulado} onChange={(v) => setF((s) => ({ ...s, simulado: v }))} rotulo="Simulado">
+              {op.simulados.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
             </Pill>
           )}
           {!!op?.anos.length && (
@@ -133,14 +139,16 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
                         {(jaTem || marcada) && <Check className="h-3.5 w-3.5" />}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="line-clamp-2 block text-foreground">{q.enunciado || '(sem enunciado)'}</span>
-                        <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                          {q.disciplina && <span className="rounded-full bg-muted px-2 py-0.5">{q.disciplina}</span>}
-                          {q.banca && <span>{q.banca}</span>}
-                          {q.ano && <span>{q.ano}</span>}
-                          {q.dificuldade && <span className="capitalize">{difLabel(q.dificuldade)}</span>}
+                        {/* Infos no topo: tag do simulado + disciplina/banca/ano/dificuldade. */}
+                        <span className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                          {q.simulado && <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary"><ClipboardList className="h-3 w-3 shrink-0" /> <span className="truncate">{q.simulado}</span></span>}
+                          {q.disciplina && <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">{q.disciplina}</span>}
+                          {q.banca && <span className="text-muted-foreground">{q.banca}</span>}
+                          {q.ano && <span className="text-muted-foreground">{q.ano}</span>}
+                          {q.dificuldade && <span className="capitalize text-muted-foreground">{difLabel(q.dificuldade)}</span>}
                           {jaTem && <span className="text-emerald-600 dark:text-emerald-400">já no simulado</span>}
                         </span>
+                        <span className="line-clamp-2 block text-foreground">{q.enunciado || '(sem enunciado)'}</span>
                       </span>
                     </button>
                   </li>
