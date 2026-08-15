@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -25,7 +25,7 @@ const ehDiagnostico = (nome: string) => /diagn[oó]stico/i.test(nome)
 const porDiagFim = (a: { nome: string }, b: { nome: string }) => (ehDiagnostico(a.nome) ? 1 : 0) - (ehDiagnostico(b.nome) ? 1 : 0)
 
 export function MeuSimuladoView({
-  tentativas, questoes, comparativo, desempenho, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false, ocultarComparativo = false, cadernosInline = false,
+  tentativas, questoes, comparativo, desempenho, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false, ocultarComparativo = false, cadernosInline = false, nps,
 }: {
   tentativas: TentativaResumo[]
   questoes: QuestaoAgregada[]
@@ -45,6 +45,8 @@ export function MeuSimuladoView({
   ocultarComparativo?: boolean
   /** Downloads da tentativa INLINE (abaixo do texto) em vez do menu ⋮ + modal (ex.: simulado pessoal). */
   cadernosInline?: boolean
+  /** Card opcional (ex.: NPS "Como foi sua experiência?") exibido ACIMA da lista de tentativas. */
+  nps?: ReactNode
 }) {
   const router = useRouter()
   const ordenadas = useMemo(() => [...tentativas].sort((a, b) => (a.n ?? 0) - (b.n ?? 0)), [tentativas])
@@ -249,8 +251,9 @@ export function MeuSimuladoView({
             )}
           </div>
 
-          {/* DIREITA: histórico do simulado selecionado */}
-          <div className="lg:col-span-1">
+          {/* DIREITA: NPS (opcional) + histórico do simulado selecionado */}
+          <div className="lg:col-span-1 space-y-4">
+            {nps}
             <div className="overflow-hidden rounded-2xl border bg-card shadow-sm lg:sticky lg:top-4">
               <div className="border-b bg-muted/25 px-4 py-3">
                 <div className="flex items-center gap-2">

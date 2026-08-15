@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
  * prova embed). Autentica pelo `sessaoId` via /api/sessoes/avaliar — serve os dois contextos.
  * Nota 0–10 (recomendaria?) + comentário opcional. Some após enviar (mostra agradecimento).
  */
-export function NpsAvaliacao({ sessaoId }: { sessaoId?: string | null }) {
+export function NpsAvaliacao({ sessaoId, compact = false }: { sessaoId?: string | null; compact?: boolean }) {
   const [nota, setNota] = useState<number | null>(null)
   const [comentario, setComentario] = useState('')
   const [enviado, setEnviado] = useState(false)
@@ -55,20 +55,21 @@ export function NpsAvaliacao({ sessaoId }: { sessaoId?: string | null }) {
         : 'border-rose-500 bg-rose-500 text-white'
 
   return (
-    <div className="rounded-2xl border bg-card p-5 shadow-sm">
+    <div className={cn('rounded-2xl border bg-card shadow-sm', compact ? 'p-4' : 'p-5')}>
       <div className="flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary"><Star className="h-4 w-4" /></span>
-        <div>
-          <h3 className="text-sm font-semibold">Como foi sua experiência?</h3>
-          <p className="text-xs text-muted-foreground">De 0 a 10, o quanto você recomendaria este simulado?</p>
+        <span className={cn('flex shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary', compact ? 'h-7 w-7' : 'h-8 w-8')}><Star className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} /></span>
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold leading-tight">Como foi sua experiência?</h3>
+          <p className={cn('text-muted-foreground', compact ? 'text-[11px] leading-tight' : 'text-xs')}>De 0 a 10, o quanto você recomendaria este simulado?</p>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-1.5">
+      <div className={cn('flex flex-wrap gap-1.5', compact ? 'mt-3' : 'mt-4')}>
         {Array.from({ length: 11 }).map((_, i) => (
           <button key={i} type="button" onClick={() => setNota(i)}
             className={cn(
-              'h-9 w-9 rounded-lg border text-sm font-bold tabular-nums transition',
+              'rounded-lg border text-sm font-bold tabular-nums transition',
+              compact ? 'h-8 w-8' : 'h-9 w-9',
               nota === i ? corSel(i) : 'border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground',
             )}>
             {i}
@@ -81,10 +82,10 @@ export function NpsAvaliacao({ sessaoId }: { sessaoId?: string | null }) {
 
       <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} maxLength={1000}
         placeholder="Quer contar o porquê? (opcional)"
-        className="mt-3 w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
+        className={cn('w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring', compact ? 'mt-2.5' : 'mt-3')} />
 
       <button type="button" onClick={enviar} disabled={pending}
-        className="mt-3 inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60">
+        className={cn('inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60', compact ? 'mt-2.5 w-full' : 'mt-3')}>
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Enviar avaliação
       </button>
     </div>

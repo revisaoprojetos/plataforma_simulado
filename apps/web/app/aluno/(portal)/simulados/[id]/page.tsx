@@ -118,8 +118,6 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
         </div>
       </div>
 
-      {mostrarNps && <NpsAvaliacao sessaoId={melhor.id} />}
-
       <MeuSimuladoView
         tentativas={tentativas}
         questoes={questoes}
@@ -134,6 +132,7 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
         simuladoId={id}
         simuladoTitulo={sim.titulo}
         cadernosInline
+        nps={mostrarNps ? <NpsAvaliacao sessaoId={melhor.id} compact /> : undefined}
       />
     </div>
   )
