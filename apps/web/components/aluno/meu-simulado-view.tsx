@@ -22,7 +22,7 @@ const fmtData = (d?: string | null) => (d ? new Date(d).toLocaleDateString('pt-B
 const nota = (n: number | null) => (n == null ? '—' : Number(n).toFixed(1).replace('.', ','))
 
 export function MeuSimuladoView({
-  tentativas, questoes, comparativo, desempenho, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false, ocultarComparativo = false,
+  tentativas, questoes, comparativo, desempenho, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false, ocultarComparativo = false, cadernosInline = false,
 }: {
   tentativas: TentativaResumo[]
   questoes: QuestaoAgregada[]
@@ -40,6 +40,8 @@ export function MeuSimuladoView({
   adminMode?: boolean
   /** Esconde a tab "Comparativo" (ex.: simulado PESSOAL do aluno — não há turma). */
   ocultarComparativo?: boolean
+  /** Downloads da tentativa INLINE (abaixo do texto) em vez do menu ⋮ + modal (ex.: simulado pessoal). */
+  cadernosInline?: boolean
 }) {
   const router = useRouter()
   const ordenadas = useMemo(() => [...tentativas].sort((a, b) => (a.n ?? 0) - (b.n ?? 0)), [tentativas])
@@ -246,56 +248,72 @@ export function MeuSimuladoView({
 
           {/* DIREITA: histórico do simulado selecionado */}
           <div className="lg:col-span-1">
-            <div className="overflow-hidden rounded-2xl border bg-card lg:sticky lg:top-4">
-              <div className="border-b px-4 py-3">
+            <div className="overflow-hidden rounded-2xl border bg-card shadow-sm lg:sticky lg:top-4">
+              <div className="border-b bg-muted/25 px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <ListChecks className="h-4 w-4 text-primary" />
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary"><ListChecks className="h-4 w-4" /></span>
                   <h3 className="text-sm font-semibold">Tentativas</h3>
-                  <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{selTents.size}/{tentativas.length}</span>
+                  <span className="ml-auto rounded-full bg-background px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground shadow-sm">{selTents.size}/{tentativas.length}</span>
                 </div>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">Marque tentativas para comparar no gráfico.</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Marque tentativas para comparar no gráfico.</p>
                 {tentativas.length > 1 && (
-                  <div className="mt-2 flex gap-2">
-                    <button type="button" onClick={selTodasTent} className={cn('flex-1 rounded-lg border px-2 py-1 text-xs font-medium transition-colors', todasTentMarcadas ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>Selecionar todas</button>
-                    <button type="button" onClick={limparTent} className={cn('flex-1 rounded-lg border px-2 py-1 text-xs font-medium transition-colors', nenhumaTentMarcada ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>Limpar</button>
+                  <div className="mt-2.5 flex gap-2">
+                    <button type="button" onClick={selTodasTent} className={cn('flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors', todasTentMarcadas ? 'border-primary bg-primary/10 text-primary' : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground')}>Selecionar todas</button>
+                    <button type="button" onClick={limparTent} className={cn('flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors', nenhumaTentMarcada ? 'border-primary bg-primary/10 text-primary' : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground')}>Limpar</button>
                   </div>
                 )}
               </div>
 
-              <div className="max-h-[560px] overflow-y-auto">
-                {/* Tentativas deste simulado — multi-seleção + kebab de download */}
-                <div>
-                  <div className="divide-y">
-                    {ordenadas.map((t) => {
-                      const on = selTents.has(t.id)
-                      return (
-                        <div key={t.id} className={cn('flex items-center gap-1 pr-2 transition-colors', on ? 'bg-primary/5' : 'hover:bg-muted/50')}>
-                          <button type="button" onClick={() => toggleTent(t.id)} className="flex min-w-0 flex-1 items-center gap-2.5 py-2.5 pl-3 text-left">
-                            <CheckBox on={on} />
-                            <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-bold tabular-nums', on ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>#{t.n}</span>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-medium leading-tight">Tentativa {t.n}</p>
-                              <p className="text-[11px] text-muted-foreground">{fmtData(t.finalizado)}</p>
-                            </div>
-                            {notaLiberada
-                              ? <span className={cn('shrink-0 text-sm font-bold tabular-nums', t.nota != null && notaTone(Number(t.nota)))}>{nota(t.nota)}</span>
-                              : <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                          </button>
+              {/* Tentativas — cards com multi-seleção; downloads INLINE (pessoal) ou no ⋮ (oficial). */}
+              <div className="max-h-[560px] space-y-2 overflow-y-auto p-2.5">
+                {ordenadas.map((t) => {
+                  const on = selTents.has(t.id)
+                  return (
+                    <div key={t.id} className={cn('overflow-hidden rounded-xl border transition-all', on ? 'border-primary/40 bg-primary/[0.04] shadow-sm' : 'border-transparent bg-muted/30 hover:border-border hover:bg-muted/50')}>
+                      <div className="flex items-center gap-2 p-2">
+                        <button type="button" onClick={() => toggleTent(t.id)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+                          <CheckBox on={on} />
+                          <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold tabular-nums transition-colors', on ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-background text-muted-foreground')}>#{t.n}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold leading-tight">Tentativa {t.n}</p>
+                            <p className="text-[11px] text-muted-foreground">{fmtData(t.finalizado)}</p>
+                          </div>
+                          {notaLiberada
+                            ? <span className={cn('shrink-0 text-base font-bold tabular-nums', t.nota != null && notaTone(Number(t.nota)))}>{nota(t.nota)}</span>
+                            : <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                        </button>
+                        {!cadernosInline && (
                           <button type="button" onClick={() => setModalTent(t)} title="Material para download"
                             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground">
                             <MoreVertical className="h-4 w-4" />
                           </button>
-                          {adminMode && (
-                            <button type="button" onClick={() => apagarTentativa(t.id, t.n ?? 0)} disabled={apagando === t.id} title="Apagar tentativa"
-                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50">
-                              {apagando === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                            </button>
+                        )}
+                        {adminMode && (
+                          <button type="button" onClick={() => apagarTentativa(t.id, t.n ?? 0)} disabled={apagando === t.id} title="Apagar tentativa"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50">
+                            {apagando === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Downloads INLINE — abaixo do texto da tentativa (no lugar do menu ⋮). */}
+                      {cadernosInline && (
+                        <div className="flex flex-wrap items-center gap-1.5 border-t border-dashed border-border/70 px-2.5 pb-2.5 pt-2">
+                          <a href={`${gabaritoUrl(t.id)}?sem=1`} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground">
+                            <ScrollText className="h-3.5 w-3.5" /> Prova que você fez
+                          </a>
+                          {gabaritoLiberado && (
+                            <a href={gabaritoUrl(t.id)} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/[0.06] px-2 py-1 text-[11px] font-semibold text-primary shadow-sm transition-colors hover:bg-primary/10">
+                              <FileText className="h-3.5 w-3.5" /> Com correção
+                            </a>
                           )}
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>

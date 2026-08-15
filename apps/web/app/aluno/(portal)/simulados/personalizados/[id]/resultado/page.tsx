@@ -97,6 +97,7 @@ export default async function ResultadoPersonalizadoPage({ params }: { params: P
         simuladoId={id}
         simuladoTitulo={sim.titulo}
         ocultarComparativo
+        cadernosInline
       />
     </div>
   )
