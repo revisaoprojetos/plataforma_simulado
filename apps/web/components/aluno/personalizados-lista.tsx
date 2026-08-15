@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Wand2, Plus, Trash2, Loader2, FileQuestion, ChevronRight } from 'lucide-react'
+import { Wand2, Plus, Trash2, Loader2, FileQuestion, ChevronRight, Play } from 'lucide-react'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { listarMeusSimulados, excluirMeuSimulado, type MeuSimuladoResumo } from '@/app/aluno/(portal)/simulados/builder-actions'
@@ -73,7 +73,15 @@ export function PersonalizadosLista() {
                 <span className="inline-flex items-center gap-1"><FileQuestion className="h-3.5 w-3.5" /> {s.questoes} {s.questoes === 1 ? 'questão' : 'questões'}</span>
                 {s.status === 'rascunho' && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 font-medium text-amber-600 dark:text-amber-400">Rascunho</span>}
               </div>
-              <div className="relative z-0 mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary">Abrir <ChevronRight className="h-3.5 w-3.5" /></div>
+              <div className="relative z-10 mt-3 flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">Abrir <ChevronRight className="h-3.5 w-3.5" /></span>
+                {s.questoes > 0 && (
+                  <button type="button" onClick={() => router.push(`/aluno/simulados/personalizados/${s.id}/fazer`)}
+                    className="pointer-events-auto inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90">
+                    <Play className="h-3.5 w-3.5" /> Fazer
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

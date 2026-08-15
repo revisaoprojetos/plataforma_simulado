@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowLeft, Plus, Trash2, Loader2, Play, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { SeletorQuestoes } from '@/components/aluno/seletor-questoes'
@@ -12,6 +13,7 @@ import { adicionarQuestoes, removerQuestao, renomearMeuSimulado, type QuestaoEsc
 export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensIniciais }: {
   simuladoId: string; titulo: string; itensIniciais: QuestaoEscolhida[]
 }) {
+  const router = useRouter()
   const [titulo, setTitulo] = useState(tituloIni)
   const [itens, setItens] = useState<QuestaoEscolhida[]>(itensIniciais)
   const [modal, setModal] = useState(false)
@@ -37,8 +39,9 @@ export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensInicia
             className="w-full rounded-lg border bg-transparent px-3 py-2 text-lg font-bold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Nome do simulado" />
           {salvandoNome && <Loader2 className="absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />}
         </div>
-        <button type="button" disabled title="Fazer o simulado — em breve"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground opacity-60">
+        <button type="button" onClick={() => router.push(`/aluno/simulados/personalizados/${simuladoId}/fazer`)}
+          disabled={itens.length === 0} title={itens.length === 0 ? 'Adicione questões para fazer' : 'Fazer o simulado'}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60">
           <Play className="h-4 w-4" /> <span className="hidden sm:inline">Fazer</span>
         </button>
       </div>

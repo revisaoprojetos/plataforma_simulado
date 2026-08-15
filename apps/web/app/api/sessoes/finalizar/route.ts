@@ -42,6 +42,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
   }
 
+  // Simulado PESSOAL (owner_estudante_id) → estudo/prática do próprio aluno: calcula a nota, mas
+  // NÃO dispara efeitos de simulado oficial (webhook, gamificação/XP, ranking, painel ao vivo).
+  const { data: donoRow } = await supabase
+    .from('simulado_simulados')
+    .select('owner_estudante_id')
+    .eq('id', sessao.simulado_id)
+    .maybeSingle()
+  const pessoal = !!(donoRow as any)?.owner_estudante_id
+
   // ── RECONCILIAÇÃO (só enquanto a sessão está aberta) ────────────────────────
   // Garante que TUDO que o aluno marcou esteja salvo antes da correção.
   let recuperadas = 0
@@ -126,18 +135,23 @@ export async function POST(request: NextRequest) {
       tipo: 'finalizou',
     })
 
-    await rankearSimulado(supabase, sessao.simulado_id)
-    void publicarAoVivo(sessao.simulado_id) // realtime: painel "Ao Vivo" (Fase 2)
+    if (!pessoal) {
+      await rankearSimulado(supabase, sessao.simulado_id)
+      void publicarAoVivo(sessao.simulado_id) // realtime: painel "Ao Vivo" (Fase 2)
 
-    // Notifica sistemas externos (webhooks/n8n): estudante finalizou. Fire-and-forget: não segura
-    // a resposta ao aluno pela entrega/retry do webhook (só o dadosProgressao, um read rápido, é aguardado).
-    void dispararWebhook(sessao.tenant_id, 'estudante.finalizou',
-      await dadosProgressao(supabase, sessao, { nota: Math.round(nota * 100) / 100, acertos, total: totalQ }))
+      // Notifica sistemas externos (webhooks/n8n): estudante finalizou. Fire-and-forget: não segura
+      // a resposta ao aluno pela entrega/retry do webhook (só o dadosProgressao, um read rápido, é aguardado).
+      void dispararWebhook(sessao.tenant_id, 'estudante.finalizou',
+        await dadosProgressao(supabase, sessao, { nota: Math.round(nota * 100) / 100, acertos, total: totalQ }))
+    }
   }
 
   // Gamificação (XP/streak/missões/conquistas). FORA do guard de status: idempotente pela dedupe
   // do ledger (refId=sessao_id) — seguro mesmo se o auto-encerramento já tiver finalizado. Fire-and-forget.
-  void onSimuladoFinalizado(supabase, { tenantId: sessao.tenant_id, estudanteId: sessao.estudante_id, sessaoId: sessao_id, nota, acertos, total: totalQ })
+  // Simulado pessoal NÃO pontua gamificação (evita "farmar" XP com prova própria).
+  if (!pessoal) {
+    void onSimuladoFinalizado(supabase, { tenantId: sessao.tenant_id, estudanteId: sessao.estudante_id, sessaoId: sessao_id, nota, acertos, total: totalQ })
+  }
 
   // Posição final do aluno (após o recálculo).
   const { data: ranked } = await supabase
