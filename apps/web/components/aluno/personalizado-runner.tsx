@@ -173,23 +173,27 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
     </div>
   )
 
-  // BARRA LATERAL (desktop): docada à direita, altura cheia; recolhe para um trilho de ícones.
+  // BARRA LATERAL (desktop): trilho fixo (w-14) docado à direita; ao expandir, o painel abre como
+  // OVERLAY POR CIMA do conteúdo (não empurra o simulado).
   const sidebar = (
-    <aside className={cn('hidden h-full shrink-0 flex-col overflow-y-auto border-l bg-card transition-[width] duration-200 lg:flex', sidebarAberta ? 'w-80' : 'w-14')}>
-      {sidebarAberta ? (
-        <div className="space-y-3 p-3">
-          <div className="flex items-center justify-between">
+    <aside className="relative hidden h-full w-14 shrink-0 border-l bg-card lg:block">
+      {/* Trilho de ícones (sempre no fluxo) */}
+      <div className="flex flex-col items-center gap-1 py-3">
+        <button type="button" onClick={() => setSidebarAberta((v) => !v)} title={sidebarAberta ? 'Recolher barra' : 'Expandir barra'} className={cn('rounded-md p-2 transition-colors hover:bg-muted', sidebarAberta ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+          {sidebarAberta ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
+        </button>
+        <div className="my-1 h-px w-6 bg-border" />
+        <button type="button" onClick={() => { setSidebarAberta(true); setAnotAberta(true) }} title="Anotações" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><StickyNote className="h-5 w-5" /></button>
+        <button type="button" onClick={() => { setSidebarAberta(true); setComentAberto(true) }} title="Comentário do professor" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Lightbulb className="h-5 w-5" /></button>
+      </div>
+      {/* Painel expandido — OVERLAY à esquerda do trilho, por cima do conteúdo */}
+      {sidebarAberta && (
+        <div className="absolute right-full top-0 z-30 flex h-full w-80 flex-col overflow-y-auto border-l bg-card shadow-2xl duration-200 animate-in slide-in-from-right-4">
+          <div className="flex items-center justify-between border-b p-3">
             <span className="text-xs font-semibold text-muted-foreground">Ferramentas</span>
             <button type="button" onClick={() => setSidebarAberta(false)} title="Recolher barra" className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><PanelRightClose className="h-4 w-4" /></button>
           </div>
-          {secoesFerr}
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-1 py-3">
-          <button type="button" onClick={() => setSidebarAberta(true)} title="Expandir barra" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><PanelRightOpen className="h-5 w-5" /></button>
-          <div className="my-1 h-px w-6 bg-border" />
-          <button type="button" onClick={() => { setSidebarAberta(true); setAnotAberta(true) }} title="Anotações" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><StickyNote className="h-5 w-5" /></button>
-          <button type="button" onClick={() => { setSidebarAberta(true); setComentAberto(true) }} title="Comentário do professor" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Lightbulb className="h-5 w-5" /></button>
+          <div className="space-y-3 p-3">{secoesFerr}</div>
         </div>
       )}
     </aside>
