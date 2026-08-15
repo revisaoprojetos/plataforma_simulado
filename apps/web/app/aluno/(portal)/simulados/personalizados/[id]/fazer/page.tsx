@@ -1,14 +1,14 @@
 import { redirect } from 'next/navigation'
-import { abrirSessaoPessoal } from '../../../runner-actions'
-import { PersonalizadoRunner } from '@/components/aluno/personalizado-runner'
+import { resumoSimuladoPessoal } from '../../../runner-actions'
+import { PersonalizadoStart } from '@/components/aluno/personalizado-start'
 
 export const dynamic = 'force-dynamic'
 
-/** "Fazer" um simulado personalizado do aluno (Fase 2). A action valida a posse e abre/retoma a
- *  sessão; sem questões (ou não sendo do aluno), volta ao editor/lista. */
+/** "Fazer" um simulado personalizado (Fase 2): mostra a TELA DE INÍCIO (HUD) com o resumo; a sessão
+ *  só é aberta ao clicar em Iniciar (o timer do modo Prova começa aí). Sem questões/posse → volta. */
 export default async function FazerPersonalizadoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const r = await abrirSessaoPessoal(id)
-  if (r.error || !r.sessao) redirect(`/aluno/simulados/personalizados/${id}`)
-  return <PersonalizadoRunner sessao={r.sessao} />
+  const r = await resumoSimuladoPessoal(id)
+  if (r.error || !r.resumo) redirect(`/aluno/simulados/personalizados/${id}`)
+  return <PersonalizadoStart resumo={r.resumo} />
 }

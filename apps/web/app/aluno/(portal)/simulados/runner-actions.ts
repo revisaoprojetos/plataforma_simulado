@@ -124,3 +124,86 @@ export async function abrirSessaoPessoal(simuladoId: string): Promise<{ sessao?:
 
   return { sessao: { sessaoId, simuladoId, titulo: (sim as any).titulo as string, modo, tempoLimiteMin: (sim as any).tempo_limite_min ?? null, iniciadoEm, status, questoes, respostas, secoes } }
 }
+
+export type ResumoPessoal = {
+  simuladoId: string; titulo: string; modo: ModoPessoal; tempoLimiteMin: number | null
+  total: number; porDisciplina: { nome: string; count: number }[]
+  secoes: { nome: string; count: number }[]; temSecoes: boolean
+  emAndamento: boolean; respondidas: number
+}
+
+/** Resumo do simulado pessoal para a TELA DE INÍCIO (HUD) — sem criar sessão (o timer do modo
+ *  Prova só deve começar ao clicar em Iniciar). Traz total, quebra por matéria e seções. */
+export async function resumoSimuladoPessoal(simuladoId: string): Promise<{ resumo?: ResumoPessoal; error?: string }> {
+  const { svc, estudanteId, tenantId } = await ctx()
+  const { data: sim } = await svc.from('simulado_simulados')
+    .select('id, titulo, regras, tempo_limite_min')
+    .eq('id', simuladoId).eq('tenant_id', tenantId).eq('owner_estudante_id', estudanteId).eq('deletado', false).maybeSingle()
+  if (!sim) return { error: 'Simulado não encontrado.' }
+  const regras = ((sim as any).regras ?? {}) as Record<string, unknown>
+  const modo = (['estudo', 'prova', 'revisao'] as const).includes(regras.modo_pessoal as ModoPessoal) ? (regras.modo_pessoal as ModoPessoal) : 'estudo'
+
+  const pqs = await fetchAll<any>(() => svc.from('simulado_prova_questoes').select('questao_id, ordem').eq('simulado_id', simuladoId).eq('tenant_id', tenantId).order('ordem', { ascending: true }))
+  if (!pqs.length) return { error: 'Adicione ao menos uma questão antes de fazer.' }
+  const qids = pqs.map((p) => p.questao_id)
+
+  const qrows = await fetchAllByIn<any>(qids, (c) => svc.from('simulado_questoes').select('id, disciplina_id').in('id', c))
+  const discIds = [...new Set(qrows.map((q) => q.disciplina_id).filter(Boolean))] as string[]
+  const discM = new Map<string, string>()
+  if (discIds.length) { const ds = await fetchAllByIn<any>(discIds, (c) => svc.from('simulado_disciplinas').select('id, nome').in('id', c)); for (const d of ds) discM.set(d.id, d.nome) }
+  const cont = new Map<string, number>()
+  for (const q of qrows) { const nome = q.disciplina_id ? (discM.get(q.disciplina_id) ?? 'Sem disciplina') : 'Sem disciplina'; cont.set(nome, (cont.get(nome) ?? 0) + 1) }
+  const porDisciplina = [...cont.entries()].map(([nome, count]) => ({ nome, count })).sort((a, b) => b.count - a.count)
+
+  const presentes = new Set(qids); const seen = new Set<string>()
+  const secoes = (Array.isArray(regras.secoes) ? regras.secoes : [])
+    .map((s: any) => ({ nome: String(s?.nome ?? '').trim() || 'Seção', count: (Array.isArray(s?.questaoIds) ? s.questaoIds : []).filter((id: string) => presentes.has(id) && !seen.has(id) && seen.add(id)).length }))
+
+  const { data: aberta } = await svc.from('simulado_sessoes_prova').select('id')
+    .eq('simulado_id', simuladoId).eq('estudante_id', estudanteId).eq('is_teste', false).neq('status', 'finalizada')
+    .order('iniciado_em', { ascending: false }).limit(1).maybeSingle()
+  let respondidas = 0
+  if (aberta) { const { data: r } = await svc.from('simulado_respostas_objetivas').select('questao_id').eq('sessao_id', (aberta as any).id); respondidas = (r ?? []).length }
+
+  return { resumo: { simuladoId, titulo: (sim as any).titulo as string, modo, tempoLimiteMin: (sim as any).tempo_limite_min ?? null, total: qids.length, porDisciplina, secoes, temSecoes: secoes.length > 0, emAndamento: !!aberta, respondidas } }
+}
+
+export type QuestaoCaderno = { numero: number; secao: string | null; disciplina: string | null; enunciado: string; alternativas: string[] }
+
+/** Questões do simulado pessoal para o CADERNO imprimível (sem gabarito). Na ordem do layout. */
+export async function cadernoSimuladoPessoal(simuladoId: string): Promise<{ titulo?: string; questoes?: QuestaoCaderno[]; error?: string }> {
+  const { svc, estudanteId, tenantId } = await ctx()
+  const { data: sim } = await svc.from('simulado_simulados').select('id, titulo, regras').eq('id', simuladoId).eq('tenant_id', tenantId).eq('owner_estudante_id', estudanteId).eq('deletado', false).maybeSingle()
+  if (!sim) return { error: 'Simulado não encontrado.' }
+  const pqs = await fetchAll<any>(() => svc.from('simulado_prova_questoes').select('questao_id, ordem').eq('simulado_id', simuladoId).eq('tenant_id', tenantId).order('ordem', { ascending: true }))
+  if (!pqs.length) return { error: 'Sem questões.' }
+  const qids = pqs.map((p) => p.questao_id)
+
+  let qrows: any[]
+  try { qrows = await fetchAllByIn<any>(qids, (c) => svc.from('simulado_questoes').select('id, enunciado, disciplina_id').in('id', c)) }
+  catch { qrows = [] }
+  const qmap = new Map(qrows.map((q) => [q.id, q]))
+  const altRows = await fetchAllByIn<any>(qids, (c) => svc.from('simulado_alternativas').select('questao_id, texto, ordem').in('questao_id', c))
+  const altsByQ = new Map<string, { texto: string; ordem: number }[]>()
+  for (const a of altRows) { const arr = altsByQ.get(a.questao_id) ?? []; arr.push({ texto: a.texto ?? '', ordem: a.ordem ?? 0 }); altsByQ.set(a.questao_id, arr) }
+  const discIds = [...new Set(qrows.map((q) => q.disciplina_id).filter(Boolean))] as string[]
+  const discM = new Map<string, string>()
+  if (discIds.length) { const ds = await fetchAllByIn<any>(discIds, (c) => svc.from('simulado_disciplinas').select('id, nome').in('id', c)); for (const d of ds) discM.set(d.id, d.nome) }
+
+  const secPorQ = new Map<string, string>()
+  const seen = new Set<string>()
+  for (const s of (Array.isArray((sim as any).regras?.secoes) ? (sim as any).regras.secoes : [])) {
+    for (const id of (Array.isArray(s?.questaoIds) ? s.questaoIds : [])) if (!seen.has(id)) { seen.add(id); secPorQ.set(id, String(s?.nome ?? '').trim() || 'Seção') }
+  }
+
+  const questoes: QuestaoCaderno[] = pqs.map((p, i) => {
+    const q = qmap.get(p.questao_id) ?? {}
+    return {
+      numero: i + 1, secao: secPorQ.get(p.questao_id) ?? null,
+      disciplina: q.disciplina_id ? (discM.get(q.disciplina_id) ?? null) : null,
+      enunciado: (q.enunciado as string) ?? '',
+      alternativas: (altsByQ.get(p.questao_id) ?? []).sort((a, b) => a.ordem - b.ordem).map((a) => a.texto),
+    }
+  })
+  return { titulo: (sim as any).titulo as string, questoes }
+}
