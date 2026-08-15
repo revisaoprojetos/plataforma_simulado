@@ -37,7 +37,8 @@ export async function montarDesempenhoAluno(svc: SupabaseClient, estId: string):
 
   const sess = sessAll ?? []
   const [sims, pq] = await Promise.all([
-    fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_simulados').select('id, titulo, regras, status, data_fim').in('id', chunk).eq('deletado', false).order('id', { ascending: true })),
+    // owner_estudante_id IS NULL: estatísticas oficiais NÃO contam simulados pessoais do aluno.
+    fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_simulados').select('id, titulo, regras, status, data_fim').in('id', chunk).eq('deletado', false).is('owner_estudante_id', null).order('id', { ascending: true })),
     fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_prova_questoes').select('simulado_id, questao_id, questoes:simulado_questoes(disciplinas:simulado_disciplinas(nome))').in('simulado_id', chunk).eq('anulada', false).order('questao_id', { ascending: true })),
   ])
 

@@ -30,7 +30,9 @@ export default async function MeusSimuladosPage() {
   let simulados: any[] = []
   const sessoesPorSim = new Map<string, any[]>()
   if (ids.length) {
-    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, modo_aplicacao, status, data_inicio, data_fim, embed_token, regras, created_at').in('id', ids).eq('deletado', false)
+    // owner_estudante_id IS NULL: NÃO trazer simulados PESSOAIS do aluno (aba Personalizados) para
+    // o catálogo oficial — a sessão do runner pessoal poderia arrastá-los para "Concluídos".
+    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, modo_aplicacao, status, data_inicio, data_fim, embed_token, regras, created_at').in('id', ids).eq('deletado', false).is('owner_estudante_id', null)
     simulados = sims ?? []
     for (const s of (sessAll ?? []) as any[]) { const arr = sessoesPorSim.get(s.simulado_id) ?? []; arr.push(s); sessoesPorSim.set(s.simulado_id, arr) }
   }

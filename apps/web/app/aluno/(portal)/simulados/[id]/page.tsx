@@ -24,7 +24,8 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
 
   // Simulado + sessões finalizadas do aluno em paralelo (as sessões definem o early-return).
   const [{ data: sim }, { data: sess }] = await Promise.all([
-    svc.from('simulado_simulados').select('id, titulo, regras, status, data_fim, embed_token').eq('id', id).maybeSingle(),
+    // owner_estudante_id IS NULL: esta é a tela de resultado OFICIAL — simulados pessoais têm fluxo próprio (Personalizados).
+    svc.from('simulado_simulados').select('id, titulo, regras, status, data_fim, embed_token').eq('id', id).is('owner_estudante_id', null).maybeSingle(),
     svc.from('simulado_sessoes_prova')
       .select('id, status, nota, iniciado_em, finalizado_em, posicao_ranking, tentativa_num')
       .eq('estudante_id', estId).eq('simulado_id', id).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada'),
