@@ -1,8 +1,8 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Check, X, Eye, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, ClipboardList } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, X, Eye, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, ClipboardList, Bold, Italic, Underline, List, Baseline, Highlighter } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -124,27 +124,27 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
     )
   })
 
-  // Seções de ferramentas: Anotações + Comentário (SEM revelar o gabarito) — ambos podem ficar abertos.
-  const secoesFerr = (
-    <div className="space-y-2">
-      <div className="overflow-hidden rounded-xl border">
-        <button type="button" onClick={() => setAnotAberta((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
+  // Seções de ferramentas: Anotações (editor rico) + Comentário (SEM revelar o gabarito).
+  // preencher=true (barra do desktop): a área de Anotações cresce até o fim.
+  const renderFerramentas = (preencher: boolean) => (
+    <div className={cn('flex flex-col gap-2', preencher && 'min-h-0 flex-1')}>
+      <div className={cn('flex flex-col overflow-hidden rounded-xl border', preencher && anotAberta && 'min-h-0 flex-1')}>
+        <button type="button" onClick={() => setAnotAberta((v) => !v)} className="flex w-full shrink-0 items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
           <StickyNote className="h-4 w-4 text-primary" /> Anotações
           <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !anotAberta && '-rotate-90')} />
         </button>
         {anotAberta && (
-          <textarea value={anotacoes[q.id] ?? ''} onChange={(e) => setAnotacoes((a) => ({ ...a, [q.id]: e.target.value }))}
-            placeholder="Escreva suas anotações sobre esta questão…"
-            className="min-h-[7rem] w-full resize-y border-t bg-transparent p-3 text-sm outline-none placeholder:text-muted-foreground/70 focus-visible:ring-1 focus-visible:ring-primary" />
+          <EditorAnotacao key={q.id} valor={anotacoes[q.id] ?? ''} fill={preencher}
+            onChange={(html) => setAnotacoes((a) => ({ ...a, [q.id]: html }))} />
         )}
       </div>
-      <div className="overflow-hidden rounded-xl border">
+      <div className="shrink-0 overflow-hidden rounded-xl border">
         <button type="button" onClick={() => setComentAberto((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
           <Lightbulb className="h-4 w-4 text-primary" /> Comentário do professor
           <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !comentAberto && '-rotate-90')} />
         </button>
         {comentAberto && (
-          <div className="border-t p-3 text-sm">
+          <div className="max-h-64 overflow-y-auto border-t p-3 text-sm">
             {q.comentario ? <MarkdownContent className="leading-relaxed text-foreground">{q.comentario}</MarkdownContent> : <span className="text-muted-foreground">Sem comentário para esta questão.</span>}
           </div>
         )}
@@ -188,12 +188,12 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
       </div>
       {/* Painel expandido — OVERLAY por cima do conteúdo E do próprio trilho (a "fita" some) */}
       {sidebarAberta && (
-        <div className="absolute right-0 top-0 z-30 flex h-full w-80 flex-col overflow-y-auto border-l bg-card shadow-2xl duration-200 animate-in slide-in-from-right-4">
-          <div className="flex items-center justify-between border-b p-3">
+        <div className="absolute right-0 top-0 z-30 flex h-full w-80 flex-col overflow-hidden border-l bg-card shadow-2xl duration-200 animate-in slide-in-from-right-4">
+          <div className="flex shrink-0 items-center justify-between border-b p-3">
             <span className="text-xs font-semibold text-muted-foreground">Ferramentas</span>
             <button type="button" onClick={() => setSidebarAberta(false)} title="Recolher barra" className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><PanelRightClose className="h-4 w-4" /></button>
           </div>
-          <div className="space-y-3 p-3">{secoesFerr}</div>
+          <div className="flex min-h-0 flex-1 flex-col p-3">{renderFerramentas(true)}</div>
         </div>
       )}
     </aside>
@@ -206,7 +206,7 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
         <span className="text-xs font-semibold text-foreground">Ferramentas</span>
         <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', !ferrAberta && '-rotate-90')} />
       </button>
-      {ferrAberta && <div className="border-t p-3">{secoesFerr}</div>}
+      {ferrAberta && <div className="border-t p-3">{renderFerramentas(false)}</div>}
     </div>
   )
 
@@ -374,6 +374,60 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
         {/* Barra lateral de ferramentas docada (desktop) */}
         {sidebar}
       </div>
+    </div>
+  )
+}
+
+const CORES_TEXTO = ['#ef4444', '#f59e0b', '#10b981', '#2563eb', '#7c3aed', '#111827']
+const CORES_MARCA = ['#fde047', '#86efac', '#f9a8d4', '#93c5fd', '#d8b4fe']
+
+/** Editor de anotações "estilo Word" (contenteditable + execCommand): negrito, itálico, sublinhado,
+ *  marcadores, cor do texto e marca-texto. Remonta por questão (key) e salva o HTML em onChange. */
+function EditorAnotacao({ valor, onChange, fill }: { valor: string; onChange: (html: string) => void; fill?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [paleta, setPaleta] = useState<'texto' | 'marca' | null>(null)
+  useEffect(() => { if (ref.current) ref.current.innerHTML = valor || '' }, []) // conteúdo inicial (remonta por questão via key) // eslint-disable-line react-hooks/exhaustive-deps
+  const exec = (c: string, v?: string) => {
+    ref.current?.focus()
+    try { document.execCommand('styleWithCSS', false, 'true') } catch { /* ok */ }
+    document.execCommand(c, false, v)
+    onChange(ref.current?.innerHTML ?? '')
+    setPaleta(null)
+  }
+  return (
+    <div className={cn('flex flex-col overflow-hidden border-t', fill && 'min-h-0 flex-1')}>
+      <div className="flex flex-wrap items-center gap-0.5 border-b bg-muted/30 px-1 py-1">
+        <BtnFmt title="Negrito" onClick={() => exec('bold')}><Bold className="h-3.5 w-3.5" /></BtnFmt>
+        <BtnFmt title="Itálico" onClick={() => exec('italic')}><Italic className="h-3.5 w-3.5" /></BtnFmt>
+        <BtnFmt title="Sublinhado" onClick={() => exec('underline')}><Underline className="h-3.5 w-3.5" /></BtnFmt>
+        <BtnFmt title="Marcadores" onClick={() => exec('insertUnorderedList')}><List className="h-3.5 w-3.5" /></BtnFmt>
+        <span className="mx-0.5 h-4 w-px bg-border" />
+        <div className="relative">
+          <BtnFmt title="Cor do texto" onClick={() => setPaleta((p) => (p === 'texto' ? null : 'texto'))}><Baseline className="h-3.5 w-3.5" /></BtnFmt>
+          {paleta === 'texto' && <Paleta cores={CORES_TEXTO} onPick={(c) => exec('foreColor', c)} />}
+        </div>
+        <div className="relative">
+          <BtnFmt title="Marca-texto" onClick={() => setPaleta((p) => (p === 'marca' ? null : 'marca'))}><Highlighter className="h-3.5 w-3.5" /></BtnFmt>
+          {paleta === 'marca' && <Paleta cores={CORES_MARCA} onLimpar={() => exec('hiliteColor', 'transparent')} onPick={(c) => exec('hiliteColor', c)} />}
+        </div>
+      </div>
+      <div ref={ref} contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
+        onInput={() => onChange(ref.current?.innerHTML ?? '')}
+        data-placeholder="Escreva suas anotações sobre esta questão…"
+        className={cn('w-full overflow-y-auto p-3 text-sm leading-relaxed outline-none [&_ul]:list-disc [&_ul]:pl-5', fill ? 'min-h-0 flex-1' : 'min-h-[7rem] max-h-72')} />
+    </div>
+  )
+}
+
+function BtnFmt({ children, onClick, title }: { children: ReactNode; onClick: () => void; title: string }) {
+  return <button type="button" title={title} onMouseDown={(e) => e.preventDefault()} onClick={onClick} className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">{children}</button>
+}
+
+function Paleta({ cores, onPick, onLimpar }: { cores: string[]; onPick: (c: string) => void; onLimpar?: () => void }) {
+  return (
+    <div className="absolute left-0 top-full z-20 mt-1 flex items-center gap-1 rounded-lg border bg-card p-1.5 shadow-lg">
+      {cores.map((c) => <button key={c} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(c)} title={c} className="h-5 w-5 rounded ring-1 ring-black/10 transition-transform hover:scale-110" style={{ background: c }} />)}
+      {onLimpar && <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onLimpar} title="Sem marcação" className="flex h-5 w-5 items-center justify-center rounded border text-muted-foreground hover:bg-muted"><X className="h-3 w-3" /></button>}
     </div>
   )
 }

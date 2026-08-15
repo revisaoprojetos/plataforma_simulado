@@ -246,6 +246,13 @@
   }
 }
 
+/* Placeholder do editor de anotações (contenteditable) quando vazio. */
+[contenteditable][data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
 /* ── Animações (sintaxe Tailwind v4: keyframes no topo + CSS direto) ───────── */
 @keyframes page-enter {
   from { opacity: 0; transform: translateY(8px); }
