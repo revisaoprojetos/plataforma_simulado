@@ -297,23 +297,39 @@ export function MeuSimuladoView({
                       </div>
 
                       {/* Downloads INLINE — abaixo do texto da tentativa (no lugar do menu ⋮).
-                          Cobre as modalidades do caderno (oficial) e o fallback (pessoal/sem caderno). */}
+                          Título + grupos "sem gabarito" / "com gabarito"; cobre modalidades (oficial)
+                          e o fallback (pessoal/sem caderno). */}
                       {cadernosInline && (
-                        <div className="flex flex-wrap items-center gap-1.5 border-t border-dashed border-border/70 px-2.5 pb-2.5 pt-2">
-                          {/* Como você fez — sem gabarito (sempre disponível) */}
-                          {modalidades.some((m) => m.semGab)
-                            ? modalidades.filter((m) => m.semGab).map((m) => (
-                                <ChipCaderno key={`s-${m.id}`} nome={m.nome} loading={baixando === `${t.id}:${m.id}:s`} onClick={() => baixarCaderno(t.id, m.id, m.nome)} />
-                              ))
-                            : <ChipCaderno nome="Prova que você fez" href={`${gabaritoUrl(t.id)}?sem=1`} />}
-                          {/* Com correção — só com o gabarito liberado */}
-                          {gabaritoLiberado && (
-                            modalidades.some((m) => m.comGab)
-                              ? modalidades.filter((m) => m.comGab).map((m) => (
-                                  <ChipCaderno key={`g-${m.id}`} nome={m.nome} gab loading={baixando === `${t.id}:${m.id}:g`} onClick={() => baixarCaderno(t.id, m.id, m.nome, true)} />
-                                ))
-                              : <ChipCaderno nome="Com correção" gab href={gabaritoUrl(t.id)} />
-                          )}
+                        <div className="border-t border-dashed border-border/70 px-2.5 pb-2.5 pt-2">
+                          <p className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            <Download className="h-3 w-3" /> Download dos cadernos
+                          </p>
+                          <div className="space-y-2">
+                            {/* Sem gabarito (sempre disponível) */}
+                            <div>
+                              <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">Sem gabarito</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {modalidades.some((m) => m.semGab)
+                                  ? modalidades.filter((m) => m.semGab).map((m) => (
+                                      <ChipCaderno key={`s-${m.id}`} nome={m.nome} loading={baixando === `${t.id}:${m.id}:s`} onClick={() => baixarCaderno(t.id, m.id, m.nome)} />
+                                    ))
+                                  : <ChipCaderno nome="Prova que você fez" href={`${gabaritoUrl(t.id)}?sem=1`} />}
+                              </div>
+                            </div>
+                            {/* Com gabarito — só com o gabarito liberado */}
+                            {gabaritoLiberado && (
+                              <div>
+                                <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-primary/80">Com gabarito</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {modalidades.some((m) => m.comGab)
+                                    ? modalidades.filter((m) => m.comGab).map((m) => (
+                                        <ChipCaderno key={`g-${m.id}`} nome={m.nome} gab loading={baixando === `${t.id}:${m.id}:g`} onClick={() => baixarCaderno(t.id, m.id, m.nome, true)} />
+                                      ))
+                                    : <ChipCaderno nome="Com correção" gab href={gabaritoUrl(t.id)} />}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
