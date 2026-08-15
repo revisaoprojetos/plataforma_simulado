@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Check, X, Eye, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, X, Eye, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -112,25 +112,26 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   return (
     // Tela cheia imersiva (como o simulado real): cobre o portal, sem barra lateral nem gutters brancos.
     <div className="fixed inset-0 z-50 flex flex-col bg-muted dark:bg-background">
-      {/* Header full-width: sair, título, progresso, timer */}
-      <header className="flex items-center gap-3 border-b bg-card px-3 py-2.5 sm:px-4">
+      {/* Header full-width: sair, título/modo, questão X de Y, timer */}
+      <header className="flex items-center gap-3 border-b bg-card px-3 py-2.5 sm:px-5">
         <button type="button" onClick={() => router.push(`/aluno/simulados/personalizados/${sessao.simuladoId}`)}
-          className="shrink-0 rounded-lg border p-1.5 text-muted-foreground transition-colors hover:text-foreground" aria-label="Sair"><ArrowLeft className="h-4 w-4" /></button>
+          className="shrink-0 rounded-lg border p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Sair"><ArrowLeft className="h-4 w-4" /></button>
+        <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:flex"><Icon className="h-5 w-5" /></span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Icon className="h-3.5 w-3.5" /> <span className="truncate font-medium text-foreground">{sessao.titulo}</span>
-          </div>
-          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.round(((idx + 1) / total) * 100)}%` }} />
-          </div>
+          <div className="truncate text-sm font-semibold leading-tight">{sessao.titulo}</div>
+          <div className="text-xs text-muted-foreground">Questão {idx + 1} de {total}</div>
         </div>
         {restante != null && (
-          <span className={cn('shrink-0 rounded-lg border px-2 py-1 text-sm font-semibold tabular-nums',
-            restante <= 60 ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'text-foreground')}>
-            {formatarSeg(Math.max(0, restante))}
+          <span className={cn('flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold tabular-nums',
+            restante <= 60 ? 'bg-destructive/10 text-destructive' : 'bg-muted text-foreground')}>
+            <Timer className={cn('h-4 w-4', restante <= 60 && 'animate-pulse')} /> {formatarSeg(Math.max(0, restante))}
           </span>
         )}
       </header>
+      {/* Progresso — barra fina full-width sob o header */}
+      <div className="h-1 w-full bg-muted">
+        <div className="h-full bg-primary transition-all duration-300 ease-out" style={{ width: `${Math.round(((idx + 1) / total) * 100)}%` }} />
+      </div>
 
       {/* Área com rolagem própria; navegador vira coluna à direita no desktop (como o real). */}
       <div className="flex-1 overflow-y-auto">
@@ -139,81 +140,84 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
             {/* Navegador (mobile/tablet) */}
             <div className="flex flex-wrap gap-1.5 lg:hidden">{navBtns}</div>
 
-      {/* Questão */}
-      <div className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
-        <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-muted font-semibold text-foreground">{idx + 1}</span>
-          <span>de {total}</span>
-          {secaoPorQ.get(q.id) && <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">{secaoPorQ.get(q.id)}</span>}
-          {q.disciplina && <span className="rounded-full bg-muted px-2 py-0.5">{q.disciplina}</span>}
+      {/* Questão — card com fita colorida, badge do número e pills */}
+      <div className="relative overflow-hidden rounded-2xl border bg-card shadow-sm">
+        <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-primary via-primary to-primary/30" />
+        <div className="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-4 pb-2.5 pt-4 sm:px-5">
+          <span className="flex h-6 items-center rounded-lg bg-primary px-2 text-xs font-bold tabular-nums text-primary-foreground">{idx + 1} / {total}</span>
+          {secaoPorQ.get(q.id) && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">{secaoPorQ.get(q.id)}</span>}
+          {q.disciplina && <span className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary/90">{q.disciplina}</span>}
         </div>
-
-        {q.imagemUrl && <img src={q.imagemUrl} alt="" className="mb-3 max-h-64 w-auto rounded-lg border" />}
-        <MarkdownContent className="leading-relaxed">{q.enunciado || '(sem enunciado)'}</MarkdownContent>
-
-        <div className="mt-4 space-y-2">
-          {q.alternativas.map((alt, i) => {
-            const sel = escolhida === alt.id
-            const mostrarCerta = revelado && alt.correta
-            const mostrarErrada = revelado && sel && !alt.correta
-            return (
-              <button key={alt.id} type="button" onClick={() => marcar(q.id, alt.id)}
-                disabled={revelado && modo === 'estudo'}
-                className={cn('flex w-full items-start gap-3 rounded-xl border p-3 text-left text-sm transition',
-                  mostrarCerta ? 'border-emerald-500 bg-emerald-500/10'
-                    : mostrarErrada ? 'border-destructive bg-destructive/10'
-                      : sel ? 'border-primary bg-primary/5'
-                        : 'hover:border-foreground/20 hover:bg-muted/40',
-                  revelado && modo === 'estudo' && 'cursor-default')}>
-                <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-xs font-bold',
-                  mostrarCerta ? 'border-emerald-500 bg-emerald-500 text-white'
-                    : mostrarErrada ? 'border-destructive bg-destructive text-white'
-                      : sel ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40 text-muted-foreground')}>
-                  {mostrarCerta ? <Check className="h-3.5 w-3.5" /> : mostrarErrada ? <X className="h-3.5 w-3.5" /> : LETRA[i]}
-                </span>
-                <MarkdownContent inline className="min-w-0 flex-1 leading-relaxed">{alt.texto}</MarkdownContent>
-              </button>
-            )
-          })}
+        <div className="p-4 sm:p-6">
+          {q.imagemUrl && <img src={q.imagemUrl} alt="" className="mb-4 max-h-72 w-auto rounded-lg border" />}
+          <MarkdownContent className="text-[15px] leading-relaxed text-foreground sm:text-base">{q.enunciado || '(sem enunciado)'}</MarkdownContent>
         </div>
-
-        {/* Feedback (Estudo/Revisão revelados) */}
-        {revelado && escolhida && (
-          <div className={cn('mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium',
-            acertou ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-destructive/10 text-destructive')}>
-            {acertou ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />} {acertou ? 'Você acertou!' : 'Resposta incorreta.'}
-          </div>
-        )}
-        {revelado && q.comentario && (
-          <div className="mt-3 rounded-lg border bg-muted/40 p-3 text-sm">
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Comentário do professor</p>
-            <MarkdownContent className="leading-relaxed text-foreground">{q.comentario}</MarkdownContent>
-          </div>
-        )}
       </div>
+
+      {/* Alternativas — cards individuais com bolinha da letra */}
+      <div className="space-y-2.5">
+        {q.alternativas.map((alt, i) => {
+          const sel = escolhida === alt.id
+          const mostrarCerta = revelado && alt.correta
+          const mostrarErrada = revelado && sel && !alt.correta
+          const travado = revelado && modo === 'estudo'
+          return (
+            <button key={alt.id} type="button" onClick={() => marcar(q.id, alt.id)} disabled={travado}
+              className={cn('group flex w-full items-center gap-3 rounded-xl border bg-card p-3.5 text-left text-sm shadow-sm transition-all sm:p-4',
+                mostrarCerta ? 'border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/40'
+                  : mostrarErrada ? 'border-destructive bg-destructive/5 ring-1 ring-destructive/40'
+                    : sel ? 'border-primary bg-primary/5 ring-1 ring-primary/40'
+                      : 'hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md',
+                travado && 'cursor-default hover:translate-y-0 hover:shadow-sm')}>
+              <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-bold transition-colors',
+                mostrarCerta ? 'border-emerald-500 bg-emerald-500 text-white'
+                  : mostrarErrada ? 'border-destructive bg-destructive text-white'
+                    : sel ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-muted-foreground/30 text-muted-foreground group-hover:border-primary/50 group-hover:text-primary')}>
+                {mostrarCerta ? <Check className="h-4 w-4" /> : mostrarErrada ? <X className="h-4 w-4" /> : LETRA[i]}
+              </span>
+              <MarkdownContent inline className="min-w-0 flex-1 leading-relaxed">{alt.texto}</MarkdownContent>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Feedback (Estudo/Revisão revelados) */}
+      {revelado && escolhida && (
+        <div className={cn('flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold',
+          acertou ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border-destructive/30 bg-destructive/10 text-destructive')}>
+          {acertou ? <Check className="h-5 w-5" /> : <X className="h-5 w-5" />} {acertou ? 'Você acertou!' : 'Resposta incorreta.'}
+        </div>
+      )}
+      {revelado && q.comentario && (
+        <div className="rounded-xl border bg-card p-4 text-sm shadow-sm">
+          <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary"><Lightbulb className="h-3.5 w-3.5" /> Comentário do professor</p>
+          <MarkdownContent className="leading-relaxed text-foreground">{q.comentario}</MarkdownContent>
+        </div>
+      )}
 
       {/* Navegação / ações */}
       <div className="flex items-center justify-between gap-2 pb-2">
         <button type="button" onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
-          className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-40">
+          className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted disabled:opacity-40">
           <ArrowLeft className="h-4 w-4" /> Anterior
         </button>
 
         <div className="flex items-center gap-2">
           {modo === 'revisao' && !revelados.has(q.id) && (
             <button type="button" onClick={() => setRevelados((s) => new Set(s).add(q.id))}
-              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted">
+              className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted">
               <Eye className="h-4 w-4" /> Ver gabarito
             </button>
           )}
           {idx < total - 1 ? (
             <button type="button" onClick={() => setIdx((i) => Math.min(total - 1, i + 1))}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
+              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md">
               Próxima <ArrowRight className="h-4 w-4" />
             </button>
           ) : (
             <button type="button" onClick={finalizar} disabled={enviando}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60">
+              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md disabled:opacity-60">
               {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />} Finalizar
             </button>
           )}
@@ -223,7 +227,7 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
       {/* Atalho para finalizar antes do fim (respondeu tudo) */}
       {idx < total - 1 && respondidas === total && (
         <button type="button" onClick={finalizar} disabled={enviando}
-          className="mx-auto -mt-1 inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10 disabled:opacity-60">
+          className="mx-auto -mt-1 inline-flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/5 px-4 py-2.5 text-sm font-semibold text-primary shadow-sm hover:bg-primary/10 disabled:opacity-60">
           {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />} Finalizar agora ({respondidas}/{total})
         </button>
       )}
@@ -231,9 +235,20 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
 
           {/* Navegador (desktop) — coluna fixa à direita, como o simulado real */}
           <aside className="hidden lg:block">
-            <div className="sticky top-4 rounded-2xl border bg-card p-3 shadow-sm">
-              <p className="mb-2 text-xs font-semibold text-muted-foreground">Questões</p>
+            <div className="sticky top-4 space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-muted-foreground">Questões</p>
+                <span className="text-xs font-medium tabular-nums text-muted-foreground">{respondidas}/{total}</span>
+              </div>
               <div className="grid grid-cols-5 gap-1.5">{navBtns}</div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-emerald-500/20 ring-1 ring-emerald-500/40" /> respondida</span>
+                <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-primary" /> atual</span>
+              </div>
+              <button type="button" onClick={finalizar} disabled={enviando}
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60">
+                {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />} Finalizar
+              </button>
             </div>
           </aside>
         </div>
