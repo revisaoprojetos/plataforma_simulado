@@ -385,8 +385,8 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   )
 }
 
-const CORES_TEXTO = ['#111827', '#ef4444', '#f97316', '#f59e0b', '#22c55e', '#10b981', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#6b7280']
-const CORES_MARCA = ['#fef08a', '#fde68a', '#fed7aa', '#fecaca', '#bbf7d0', '#a7f3d0', '#99f6e4', '#a5f3fc', '#bfdbfe', '#c7d2fe', '#ddd6fe', '#f5d0fe', '#fbcfe8', '#e5e7eb']
+const CORES_TEXTO = ['#111827', '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#ec4899']
+const CORES_MARCA = ['#fde047', '#facc15', '#fdba74', '#fb923c', '#f87171', '#f472b6', '#e879f9', '#c084fc', '#a78bfa', '#818cf8', '#60a5fa', '#38bdf8', '#22d3ee', '#4ade80', '#a3e635']
 
 /** Editor de anotações "estilo Word" (contenteditable + execCommand): negrito, itálico, sublinhado,
  *  marcadores, cor do texto e marca-texto. Remonta por questão (key) e salva o HTML em onChange. */
@@ -432,10 +432,10 @@ function BtnFmt({ children, onClick, title, ativo }: { children: ReactNode; onCl
       ativo ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>{children}</button>
 }
 
-/** Paleta de cores em grade, ancorada à DIREITA (cresce para a esquerda, sem vazar o painel). */
+/** Paleta de cores em grade (2 linhas de 8), CENTRALIZADA na opção. */
 function Paleta({ cores, onPick, onLimpar }: { cores: string[]; onPick: (c: string) => void; onLimpar?: () => void }) {
   return (
-    <div className="absolute right-0 top-full z-20 mt-1 grid w-max grid-cols-7 gap-1 rounded-lg border bg-card p-1.5 shadow-lg">
+    <div className="absolute left-1/2 top-full z-20 mt-1 grid w-max -translate-x-1/2 grid-cols-8 gap-1 rounded-lg border bg-card p-1.5 shadow-lg">
       {cores.map((c) => <button key={c} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(c)} title={c} className="h-5 w-5 rounded ring-1 ring-black/10 transition-transform hover:scale-110" style={{ background: c }} />)}
       {onLimpar && <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onLimpar} title="Sem marcação" className="flex h-5 w-5 items-center justify-center rounded border text-muted-foreground hover:bg-muted"><X className="h-3 w-3" /></button>}
     </div>
