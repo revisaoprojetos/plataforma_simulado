@@ -186,9 +186,9 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
         <button type="button" onClick={() => { setSidebarAberta(true); setAnotAberta(true) }} title="Anotações" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><StickyNote className="h-5 w-5" /></button>
         <button type="button" onClick={() => { setSidebarAberta(true); setComentAberto(true) }} title="Comentário do professor" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Lightbulb className="h-5 w-5" /></button>
       </div>
-      {/* Painel expandido — OVERLAY à esquerda do trilho, por cima do conteúdo */}
+      {/* Painel expandido — OVERLAY por cima do conteúdo E do próprio trilho (a "fita" some) */}
       {sidebarAberta && (
-        <div className="absolute right-full top-0 z-30 flex h-full w-80 flex-col overflow-y-auto border-l bg-card shadow-2xl duration-200 animate-in slide-in-from-right-4">
+        <div className="absolute right-0 top-0 z-30 flex h-full w-80 flex-col overflow-y-auto border-l bg-card shadow-2xl duration-200 animate-in slide-in-from-right-4">
           <div className="flex items-center justify-between border-b p-3">
             <span className="text-xs font-semibold text-muted-foreground">Ferramentas</span>
             <button type="button" onClick={() => setSidebarAberta(false)} title="Recolher barra" className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><PanelRightClose className="h-4 w-4" /></button>
