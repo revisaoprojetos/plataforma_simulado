@@ -50,7 +50,14 @@ export async function criarMeuSimulado(nome: string): Promise<{ id?: string; err
   return { id: (data as any).id as string }
 }
 
-export type MeuSimuladoResumo = { id: string; titulo: string; status: string; questoes: number; criadoEm: string | null }
+export type MeuSimuladoResumo = {
+  id: string; titulo: string; status: string; questoes: number; criadoEm: string | null
+  /** Estatísticas das sessões DESTE aluno (para o card mostrar nota/tentativas, como nos oficiais). */
+  tentativas: number            // sessões finalizadas
+  melhorNota: number | null     // maior nota entre as finalizadas
+  emAndamento: boolean          // tem sessão não finalizada
+  ultimaSessaoId: string | null // sessão para "Ver resultado" (a de maior nota; desempate: mais recente)
+}
 
 export async function listarMeusSimulados(): Promise<MeuSimuladoResumo[]> {
   const { svc, estudanteId, tenantId } = await ctx()
@@ -60,11 +67,50 @@ export async function listarMeusSimulados(): Promise<MeuSimuladoResumo[]> {
     .order('created_at', { ascending: false }))
   const ids = sims.map((s) => s.id)
   const cont = new Map<string, number>()
+  const sessByS = new Map<string, any[]>()
   if (ids.length) {
-    const pqs = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_prova_questoes').select('simulado_id').in('simulado_id', chunk))
+    // Contagem de questões + sessões do aluno (para nota/tentativas), em paralelo.
+    const [pqs, sess] = await Promise.all([
+      fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_prova_questoes').select('simulado_id').in('simulado_id', chunk)),
+      fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_sessoes_prova')
+        .select('id, simulado_id, status, nota, finalizado_em')
+        .in('simulado_id', chunk).eq('estudante_id', estudanteId).eq('is_teste', false).eq('deletado', false)),
+    ])
     for (const p of pqs) cont.set(p.simulado_id, (cont.get(p.simulado_id) ?? 0) + 1)
+    for (const s of sess) { const arr = sessByS.get(s.simulado_id) ?? []; arr.push(s); sessByS.set(s.simulado_id, arr) }
   }
-  return sims.map((s) => ({ id: s.id, titulo: s.titulo, status: s.status, questoes: cont.get(s.id) ?? 0, criadoEm: s.created_at ?? null }))
+  return sims.map((s) => {
+    const ss = sessByS.get(s.id) ?? []
+    const fin = ss.filter((x) => x.status === 'finalizada')
+    const emAndamento = ss.some((x) => x.status !== 'finalizada')
+    const notas = fin.map((x) => (x.nota != null ? Number(x.nota) : null)).filter((n): n is number => n != null)
+    const melhorNota = notas.length ? Math.max(...notas) : null
+    // Melhor tentativa (nota; desempate: mais recente) → sessão que a tela de resultado abre.
+    const melhorSess = fin.slice().sort((a, b) => (Number(b.nota ?? -1) - Number(a.nota ?? -1)) || (new Date(b.finalizado_em ?? 0).getTime() - new Date(a.finalizado_em ?? 0).getTime()))[0]
+    return {
+      id: s.id, titulo: s.titulo, status: s.status, questoes: cont.get(s.id) ?? 0, criadoEm: s.created_at ?? null,
+      tentativas: fin.length, melhorNota, emAndamento, ultimaSessaoId: melhorSess?.id ?? null,
+    }
+  })
+}
+
+/**
+ * Sessão FINALIZADA para ver o RESULTADO do simulado pessoal: a de maior nota (desempate: mais
+ * recente). Se `st` for de uma sessão válida (deste aluno + simulado + finalizada), usa ela.
+ * Valida posse (owner_estudante_id) antes de devolver — a rota de resultado é escopada por aqui.
+ */
+export async function sessaoResultadoPessoal(simuladoId: string, st?: string): Promise<{ sessaoId?: string; error?: string }> {
+  const { svc, estudanteId, tenantId } = await ctx()
+  const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)
+  if (!sim) return { error: 'Simulado não encontrado.' }
+  const { data: fin } = await svc.from('simulado_sessoes_prova')
+    .select('id, nota, finalizado_em')
+    .eq('simulado_id', simuladoId).eq('estudante_id', estudanteId).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada')
+  const sessoes = (fin ?? []) as any[]
+  if (!sessoes.length) return { error: 'Nenhuma tentativa concluída.' }
+  if (st && sessoes.some((s) => s.id === st)) return { sessaoId: st }
+  const melhor = sessoes.slice().sort((a, b) => (Number(b.nota ?? -1) - Number(a.nota ?? -1)) || (new Date(b.finalizado_em ?? 0).getTime() - new Date(a.finalizado_em ?? 0).getTime()))[0]
+  return { sessaoId: melhor.id }
 }
 
 export async function renomearMeuSimulado(simuladoId: string, nome: string): Promise<{ ok?: boolean; error?: string }> {

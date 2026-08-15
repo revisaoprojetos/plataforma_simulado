@@ -2,10 +2,111 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Wand2, Plus, Trash2, Loader2, FileQuestion, ChevronRight, Play } from 'lucide-react'
+import { Wand2, Plus, Trash2, Loader2, FileQuestion, Play, BarChart3, RotateCcw, Pencil, Repeat } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { listarMeusSimulados, excluirMeuSimulado, type MeuSimuladoResumo } from '@/app/aluno/(portal)/simulados/builder-actions'
+
+// Nota (0–100) → tom + formatação (mesma régua dos cards oficiais).
+const notaTone = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
+const fmtNota = (n: number | null) => (n == null ? '—' : Number(n).toFixed(1).replace('.', ','))
+
+/**
+ * Card de um simulado personalizado. Design "pôster" enxuto: fita roxa da marca (igual à área do
+ * simulado), ícone, título + nº de questões, banda de ESTADO (nota/tentativas quando concluído) e
+ * ações conforme o estado — com acesso ao RESULTADO, como nos simulados oficiais.
+ */
+function CardPersonalizado({ s, onExcluir }: { s: MeuSimuladoResumo; onExcluir: () => void }) {
+  const router = useRouter()
+  const concluido = s.tentativas > 0
+  const vazio = s.questoes === 0
+  const irEditor = () => router.push(`/aluno/simulados/personalizados/${s.id}`)
+  const irFazer = () => router.push(`/aluno/simulados/personalizados/${s.id}/fazer`)
+  const irResultado = () => router.push(`/aluno/simulados/personalizados/${s.id}/resultado`)
+
+  return (
+    <div className="group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+      {/* Fita roxa da marca (mesma da área do simulado). */}
+      <div className="h-1.5 shrink-0 bg-gradient-to-r from-primary via-primary to-primary/30" />
+      <div className="flex flex-1 flex-col p-4">
+        {/* Topo: ícone + título (abre o editor) + excluir. */}
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Wand2 className="h-5 w-5" />
+          </div>
+          <button type="button" onClick={irEditor} className="min-w-0 flex-1 text-left">
+            <h3 className="line-clamp-2 text-sm font-semibold leading-snug transition-colors group-hover:text-primary">{s.titulo}</h3>
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+              <FileQuestion className="h-3.5 w-3.5" /> {s.questoes} {s.questoes === 1 ? 'questão' : 'questões'}
+            </p>
+          </button>
+          <button type="button" onClick={onExcluir} title="Excluir"
+            className="shrink-0 rounded-md p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Banda de estado: concluído (nota + tentativas) · em andamento · sem questões · pronto. */}
+        <div className="mt-3">
+          {concluido ? (
+            <div className="flex items-center justify-between gap-2 rounded-xl border bg-muted/40 px-3 py-2">
+              <div className="flex items-baseline gap-1.5">
+                <span className={cn('text-xl font-bold tabular-nums', s.melhorNota != null && notaTone(s.melhorNota))}>{fmtNota(s.melhorNota)}</span>
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">melhor nota</span>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <Repeat className="h-3 w-3" /> {s.tentativas} {s.tentativas === 1 ? 'tentativa' : 'tentativas'}
+              </span>
+            </div>
+          ) : s.emAndamento ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/15 px-2.5 py-1 text-xs font-medium text-sky-600 dark:text-sky-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-sky-500" /> Em andamento
+            </span>
+          ) : vazio ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+              Sem questões — edite para adicionar
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">Pronto para fazer</span>
+          )}
+        </div>
+
+        {/* Ações — variam pelo estado; "Ver resultado" dá o acesso às notas (como nos oficiais). */}
+        <div className="mt-auto flex items-center gap-2 pt-4">
+          {concluido ? (
+            <>
+              <button type="button" onClick={irResultado}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90">
+                <BarChart3 className="h-4 w-4" /> Ver resultado
+              </button>
+              <button type="button" onClick={irFazer} title="Refazer"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted">
+                <RotateCcw className="h-4 w-4" /> <span className="hidden sm:inline">Refazer</span>
+              </button>
+            </>
+          ) : !vazio ? (
+            <>
+              <button type="button" onClick={irFazer}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90">
+                <Play className="h-4 w-4" /> {s.emAndamento ? 'Continuar' : 'Fazer'}
+              </button>
+              <button type="button" onClick={irEditor} title="Editar"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted">
+                <Pencil className="h-4 w-4" /> <span className="hidden sm:inline">Editar</span>
+              </button>
+            </>
+          ) : (
+            <button type="button" onClick={irEditor}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90">
+              <Pencil className="h-4 w-4" /> Editar simulado
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 /** Aba "Personalizados": lista os simulados criados pelo próprio aluno + criar/abrir/excluir. */
 export function PersonalizadosLista() {
@@ -58,32 +159,7 @@ export function PersonalizadosLista() {
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {itens.map((s) => (
-            <div key={s.id} className="group relative flex flex-col rounded-2xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
-              <button type="button" onClick={() => router.push(`/aluno/simulados/personalizados/${s.id}`)} className="absolute inset-0 z-0" aria-label={`Abrir ${s.titulo}`} />
-              <div className="relative z-10 flex items-start justify-between gap-2">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Wand2 className="h-4 w-4" /></div>
-                <button type="button" onClick={() => excluir(s)} title="Excluir"
-                  className="pointer-events-auto relative z-10 rounded-md p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100">
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-              <h3 className="relative z-0 mt-3 line-clamp-2 text-sm font-semibold">{s.titulo}</h3>
-              <div className="relative z-0 mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1"><FileQuestion className="h-3.5 w-3.5" /> {s.questoes} {s.questoes === 1 ? 'questão' : 'questões'}</span>
-                {s.status === 'rascunho' && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 font-medium text-amber-600 dark:text-amber-400">Rascunho</span>}
-              </div>
-              <div className="relative z-10 mt-3 flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">Abrir <ChevronRight className="h-3.5 w-3.5" /></span>
-                {s.questoes > 0 && (
-                  <button type="button" onClick={() => router.push(`/aluno/simulados/personalizados/${s.id}/fazer`)}
-                    className="pointer-events-auto inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90">
-                    <Play className="h-3.5 w-3.5" /> Fazer
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+          {itens.map((s) => <CardPersonalizado key={s.id} s={s} onExcluir={() => excluir(s)} />)}
         </div>
       )}
     </section>
