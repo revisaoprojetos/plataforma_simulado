@@ -20,6 +20,9 @@ const pctBar = (p: number) => (p >= 70 ? 'bg-emerald-500' : p >= 50 ? 'bg-amber-
 const fmtDur = (ms: number) => { const m = Math.floor(ms / 60000), s = Math.round((ms % 60000) / 1000); return m > 0 ? `${m}min ${String(s).padStart(2, '0')}s` : `${s}s` }
 const fmtData = (d?: string | null) => (d ? new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—')
 const nota = (n: number | null) => (n == null ? '—' : Number(n).toFixed(1).replace('.', ','))
+// Ordena os chips de download deixando "Diagnóstico" por último (à direita); mantém o resto na ordem.
+const ehDiagnostico = (nome: string) => /diagn[oó]stico/i.test(nome)
+const porDiagFim = (a: { nome: string }, b: { nome: string }) => (ehDiagnostico(a.nome) ? 1 : 0) - (ehDiagnostico(b.nome) ? 1 : 0)
 
 export function MeuSimuladoView({
   tentativas, questoes, comparativo, desempenho, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false, ocultarComparativo = false, cadernosInline = false,
@@ -310,7 +313,7 @@ export function MeuSimuladoView({
                               <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">Sem gabarito</p>
                               <div className="flex flex-wrap gap-1.5">
                                 {modalidades.some((m) => m.semGab)
-                                  ? modalidades.filter((m) => m.semGab).map((m) => (
+                                  ? modalidades.filter((m) => m.semGab).slice().sort(porDiagFim).map((m) => (
                                       <ChipCaderno key={`s-${m.id}`} nome={m.nome} loading={baixando === `${t.id}:${m.id}:s`} onClick={() => baixarCaderno(t.id, m.id, m.nome)} />
                                     ))
                                   : <ChipCaderno nome="Prova que você fez" href={`${gabaritoUrl(t.id)}?sem=1`} />}
@@ -322,7 +325,7 @@ export function MeuSimuladoView({
                                 <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-primary/80">Com gabarito</p>
                                 <div className="flex flex-wrap gap-1.5">
                                   {modalidades.some((m) => m.comGab)
-                                    ? modalidades.filter((m) => m.comGab).map((m) => (
+                                    ? modalidades.filter((m) => m.comGab).slice().sort(porDiagFim).map((m) => (
                                         <ChipCaderno key={`g-${m.id}`} nome={m.nome} gab loading={baixando === `${t.id}:${m.id}:g`} onClick={() => baixarCaderno(t.id, m.id, m.nome, true)} />
                                       ))
                                     : <ChipCaderno nome="Com correção" gab href={gabaritoUrl(t.id)} />}
