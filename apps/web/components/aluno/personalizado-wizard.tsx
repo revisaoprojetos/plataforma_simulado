@@ -51,19 +51,23 @@ export function PersonalizadoWizard() {
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Criar simulado</h1>
       </div>
 
-      {/* Indicador de etapas */}
+      {/* Indicador de etapas — no mobile só a etapa ATUAL mostra o rótulo (as outras ficam só com
+          o número) p/ não vazar na lateral; em telas maiores todos os rótulos aparecem. */}
       <nav className="flex items-center gap-2 text-sm">
         {PASSOS.map((p, i) => {
           const idx = PASSOS.findIndex((x) => x.id === etapa)
           const estado = i < idx ? 'feito' : i === idx ? 'atual' : 'futuro'
           return (
             <div key={p.id} className="flex items-center gap-2">
-              <span className={cn('flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold',
+              <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
                 estado === 'atual' ? 'bg-primary text-primary-foreground' : estado === 'feito' ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground')}>
                 {estado === 'feito' ? <Check className="h-3.5 w-3.5" /> : i + 1}
               </span>
-              <span className={cn(estado === 'futuro' ? 'text-muted-foreground' : 'font-medium text-foreground')}>{p.nome}</span>
-              {i < PASSOS.length - 1 && <span className="mx-1 h-px w-5 bg-border sm:w-8" />}
+              <span className={cn('whitespace-nowrap',
+                estado === 'atual' ? 'font-medium text-foreground' : 'hidden sm:inline',
+                estado === 'feito' && 'sm:font-medium sm:text-foreground',
+                estado === 'futuro' && 'sm:text-muted-foreground')}>{p.nome}</span>
+              {i < PASSOS.length - 1 && <span className="mx-1 h-px w-4 shrink-0 bg-border sm:w-8" />}
             </div>
           )
         })}
