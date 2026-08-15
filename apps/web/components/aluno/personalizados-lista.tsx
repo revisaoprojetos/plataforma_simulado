@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Wand2, Plus, Loader2, FileQuestion, Play, Pencil, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { iconePersonalizado } from '@/lib/personalizado-visual'
 import { listarMeusSimulados, type MeuSimuladoResumo } from '@/app/aluno/(portal)/simulados/builder-actions'
 
 // Nota (0–100) → tom (mesma régua dos cards oficiais).
 const notaTone = (n: number) => (n >= 70 ? 'text-emerald-400' : n >= 50 ? 'text-amber-400' : 'text-rose-400')
 const fmtNota = (n: number | null) => (n == null ? '—' : Number(n).toFixed(1).replace('.', ','))
-const COR = '#6d28d9' // roxo da marca (default dos pôsteres, igual ao card oficial sem capa)
 
 /**
  * Card "pôster" de um simulado personalizado — MESMO modelo dos cards do "Simulado Revisão"
@@ -20,6 +20,8 @@ const COR = '#6d28d9' // roxo da marca (default dos pôsteres, igual ao card ofi
  */
 function CardPersonalizado({ s }: { s: MeuSimuladoResumo }) {
   const concluido = s.tentativas > 0
+  const cor = s.cor
+  const Icone = iconePersonalizado(s.icone) // ícone marca-d'água escolhido pelo aluno
   // Destino do clique (parte interna), como nos oficiais (card → área de detalhe).
   const hrefPrincipal = concluido
     ? `/aluno/simulados/personalizados/${s.id}/resultado`
@@ -28,10 +30,10 @@ function CardPersonalizado({ s }: { s: MeuSimuladoResumo }) {
 
   return (
     <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
-      {/* Fundo: degradê da marca + ícone marca-d'água (sem capa, igual ao oficial). */}
-      <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${COR} 0%, #0f172a 135%)` }} />
-      <Wand2 className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${COR}, transparent)` }} />
+      {/* Fundo: degradê + ícone marca-d'água (cor e ícone escolhidos pelo aluno). */}
+      <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />
+      <Icone className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
 
       {/* Card inteiro clicável → parte interna. */}

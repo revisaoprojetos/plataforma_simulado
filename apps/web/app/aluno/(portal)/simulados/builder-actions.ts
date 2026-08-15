@@ -23,6 +23,16 @@ async function meuSimulado(svc: SupabaseClient, tenantId: string, estudanteId: s
   return data ?? null
 }
 
+// Aparência (capa) do simulado pessoal — vive em `regras.visual` (jsonb, sem migração). Defaults =
+// os históricos do card (roxo da marca + varinha). Ver lib/personalizado-visual (validação no render).
+function saneVisual(cor?: string | null, icone?: string | null): { cor: string; icone: string } {
+  return {
+    cor: typeof cor === 'string' && /^#[0-9a-fA-F]{6}$/.test(cor) ? cor : '#6d28d9',
+    icone: typeof icone === 'string' && icone.trim() ? icone.trim().slice(0, 30) : 'varinha',
+  }
+}
+const visualDe = (regras: any) => saneVisual(regras?.visual?.cor, regras?.visual?.icone)
+
 /** IDs das questões que o aluno pode ESCOLHER = questões dos simulados a que ele tem acesso. */
 async function questaoIdsAcessiveis(svc: SupabaseClient, estudanteId: string): Promise<string[]> {
   const [{ data: mats }, { data: acs }] = await Promise.all([
@@ -57,12 +67,14 @@ export type MeuSimuladoResumo = {
   melhorNota: number | null     // maior nota entre as finalizadas
   emAndamento: boolean          // tem sessão não finalizada
   ultimaSessaoId: string | null // sessão para "Ver resultado" (a de maior nota; desempate: mais recente)
+  cor: string                   // cor da capa (regras.visual.cor)
+  icone: string                 // ícone da capa (regras.visual.icone)
 }
 
 export async function listarMeusSimulados(): Promise<MeuSimuladoResumo[]> {
   const { svc, estudanteId, tenantId } = await ctx()
   const sims = await fetchAll<any>(() => svc.from('simulado_simulados')
-    .select('id, titulo, status, created_at')
+    .select('id, titulo, status, created_at, regras')
     .eq('tenant_id', tenantId).eq('owner_estudante_id', estudanteId).eq('deletado', false)
     .order('created_at', { ascending: false }))
   const ids = sims.map((s) => s.id)
@@ -87,9 +99,11 @@ export async function listarMeusSimulados(): Promise<MeuSimuladoResumo[]> {
     const melhorNota = notas.length ? Math.max(...notas) : null
     // Melhor tentativa (nota; desempate: mais recente) → sessão que a tela de resultado abre.
     const melhorSess = fin.slice().sort((a, b) => (Number(b.nota ?? -1) - Number(a.nota ?? -1)) || (new Date(b.finalizado_em ?? 0).getTime() - new Date(a.finalizado_em ?? 0).getTime()))[0]
+    const vis = visualDe(s.regras)
     return {
       id: s.id, titulo: s.titulo, status: s.status, questoes: cont.get(s.id) ?? 0, criadoEm: s.created_at ?? null,
       tentativas: fin.length, melhorNota, emAndamento, ultimaSessaoId: melhorSess?.id ?? null,
+      cor: vis.cor, icone: vis.icone,
     }
   })
 }
@@ -128,7 +142,7 @@ function sanearSecoes(raw: unknown, doSim: Set<string>): Secao[] {
     .map((s) => ({ ...s, questaoIds: s.questaoIds.filter((id: string) => doSim.has(id) && !seen.has(id) && seen.add(id)) }))
 }
 
-export async function questoesDoMeuSimulado(simuladoId: string): Promise<{ titulo?: string; itens?: QuestaoEscolhida[]; secoes?: Secao[]; error?: string }> {
+export async function questoesDoMeuSimulado(simuladoId: string): Promise<{ titulo?: string; itens?: QuestaoEscolhida[]; secoes?: Secao[]; visual?: { cor: string; icone: string }; error?: string }> {
   const { svc, estudanteId, tenantId } = await ctx()
   const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)
   if (!sim) return { error: 'Simulado não encontrado.' }
@@ -142,7 +156,20 @@ export async function questoesDoMeuSimulado(simuladoId: string): Promise<{ titul
   }
   const limpar = (s: string) => (s ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180)
   const secoes = sanearSecoes((sim as any).regras?.secoes, new Set(qids))
-  return { titulo: (sim as any).titulo, itens: pqs.map((p) => ({ questaoId: p.questao_id, ordem: p.ordem, enunciado: limpar(qmap.get(p.questao_id)?.enunciado) })), secoes }
+  return { titulo: (sim as any).titulo, itens: pqs.map((p) => ({ questaoId: p.questao_id, ordem: p.ordem, enunciado: limpar(qmap.get(p.questao_id)?.enunciado) })), secoes, visual: visualDe((sim as any).regras) }
+}
+
+/** Salva a APARÊNCIA (cor + ícone) da capa do simulado pessoal em `regras.visual`. */
+export async function salvarVisualMeuSimulado(simuladoId: string, cor: string, icone: string): Promise<{ ok?: boolean; error?: string }> {
+  const { svc, estudanteId, tenantId } = await ctx()
+  const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)
+  if (!sim) return { error: 'Simulado não encontrado.' }
+  const regras = { ...((sim as any).regras ?? {}), visual: saneVisual(cor, icone) }
+  const { error } = await svc.from('simulado_simulados').update({ regras })
+    .eq('id', simuladoId).eq('tenant_id', tenantId).eq('owner_estudante_id', estudanteId)
+  if (error) return { error: error.message }
+  revalidatePath('/aluno/simulados'); revalidatePath(`/aluno/simulados/personalizados/${simuladoId}`)
+  return { ok: true }
 }
 
 /**
@@ -285,16 +312,17 @@ export async function adicionarQuestao(simuladoId: string, questaoId: string): P
 
 const MODOS_PESSOAIS = ['estudo', 'prova', 'revisao'] as const
 
-/** Cria o simulado JÁ com a configuração (nome/tipo/tempo) e as questões escolhidas, em lote. */
-export async function criarMeuSimuladoCompleto(input: { nome: string; modo?: string; tempo?: number | null; questaoIds: string[] }): Promise<{ id?: string; adicionadas?: number; error?: string }> {
+/** Cria o simulado JÁ com a configuração (nome/tipo/tempo/aparência) e as questões escolhidas, em lote. */
+export async function criarMeuSimuladoCompleto(input: { nome: string; modo?: string; tempo?: number | null; cor?: string; icone?: string; questaoIds: string[] }): Promise<{ id?: string; adicionadas?: number; error?: string }> {
   const { svc, estudanteId, tenantId } = await ctx()
   const titulo = (input.nome || '').trim() || 'Meu simulado'
   const modo = (MODOS_PESSOAIS as readonly string[]).includes(input.modo || '') ? input.modo : 'estudo'
   const tempo = input.tempo && input.tempo > 0 ? Math.min(Math.round(input.tempo), 600) : null
+  const visual = saneVisual(input.cor, input.icone)
   const { data, error } = await svc.from('simulado_simulados').insert({
     tenant_id: tenantId, owner_estudante_id: estudanteId, titulo,
     modo_aplicacao: 'aberto', status: 'rascunho', tempo_limite_min: tempo,
-    regras: { modo_pessoal: modo }, created_at: new Date().toISOString(),
+    regras: { modo_pessoal: modo, visual }, created_at: new Date().toISOString(),
   }).select('id').single()
   if (error || !data) return { error: error?.message ?? 'Não foi possível criar.' }
   const simuladoId = (data as any).id as string

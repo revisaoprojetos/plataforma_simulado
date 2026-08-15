@@ -8,6 +8,8 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { SeletorQuestoes } from '@/components/aluno/seletor-questoes'
 import { SeletorTempo, formatarTempo } from '@/components/aluno/seletor-tempo'
+import { VisualPersonalizadoPicker } from '@/components/aluno/visual-personalizado-picker'
+import { COR_PADRAO, ICONE_PADRAO } from '@/lib/personalizado-visual'
 import { criarMeuSimuladoCompleto, type QuestaoDisponivel } from '@/app/aluno/(portal)/simulados/builder-actions'
 
 type Modo = 'estudo' | 'prova' | 'revisao'
@@ -28,6 +30,7 @@ export function PersonalizadoWizard() {
   const [nome, setNome] = useState('Meu simulado')
   const [modo, setModo] = useState<Modo>('estudo')
   const [tempoMin, setTempoMin] = useState(300) // base 5h
+  const [visual, setVisual] = useState({ cor: COR_PADRAO, icone: ICONE_PADRAO })
   const [escolhidas, setEscolhidas] = useState<QuestaoDisponivel[]>([])
   const [simuladoId, setSimuladoId] = useState<string | null>(null)
 
@@ -36,7 +39,7 @@ export function PersonalizadoWizard() {
   // Cria o simulado JÁ com a config e as questões (import em lote) — o "Importando…" é mostrado
   // pelo próprio SeletorQuestoes enquanto esta promessa resolve.
   const concluirSelecao = async (qs: QuestaoDisponivel[]) => {
-    const r = await criarMeuSimuladoCompleto({ nome, modo, tempo: tempoMin || null, questaoIds: qs.map((q) => q.id) })
+    const r = await criarMeuSimuladoCompleto({ nome, modo, tempo: tempoMin || null, cor: visual.cor, icone: visual.icone, questaoIds: qs.map((q) => q.id) })
     if (r.error || !r.id) { toast.error(r.error ?? 'Não foi possível criar.'); return }
     setEscolhidas(qs); setSimuladoId(r.id); setEtapa('previa')
   }
@@ -99,6 +102,7 @@ export function PersonalizadoWizard() {
             <SeletorTempo minutos={tempoMin} onChange={setTempoMin} />
             <p className="text-xs text-muted-foreground">Toque para ajustar as horas e minutos.</p>
           </div>
+          <VisualPersonalizadoPicker cor={visual.cor} icone={visual.icone} onChange={setVisual} />
           <div className="flex justify-end">
             <button type="button" onClick={irSelecao} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">Escolher questões</button>
           </div>
