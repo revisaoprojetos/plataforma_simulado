@@ -97,10 +97,23 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   const escolhida = respostas[q.id] ?? null
   const acertou = revelado && q.alternativas.find((a) => a.id === escolhida)?.correta === true
 
+  // Navegador de questões (reusado no topo em mobile e na coluna à direita no desktop).
+  const navBtns = sessao.questoes.map((qq, i) => {
+    const feito = respostas[qq.id] != null
+    return (
+      <button key={qq.id} type="button" onClick={() => setIdx(i)}
+        className={cn('h-8 w-8 rounded-md border text-xs font-semibold tabular-nums transition-colors',
+          i === idx ? 'border-primary bg-primary text-primary-foreground'
+            : feito ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+              : 'text-muted-foreground hover:border-foreground/30')}>{i + 1}</button>
+    )
+  })
+
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4">
-      {/* Barra fixa: sair, progresso, timer */}
-      <div className="sticky top-0 z-10 -mx-4 flex items-center gap-3 border-b bg-background/95 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:-mx-6 md:px-6">
+    // Tela cheia imersiva (como o simulado real): cobre o portal, sem barra lateral nem gutters brancos.
+    <div className="fixed inset-0 z-50 flex flex-col bg-muted dark:bg-background">
+      {/* Header full-width: sair, título, progresso, timer */}
+      <header className="flex items-center gap-3 border-b bg-card px-3 py-2.5 sm:px-4">
         <button type="button" onClick={() => router.push(`/aluno/simulados/personalizados/${sessao.simuladoId}`)}
           className="shrink-0 rounded-lg border p-1.5 text-muted-foreground transition-colors hover:text-foreground" aria-label="Sair"><ArrowLeft className="h-4 w-4" /></button>
         <div className="min-w-0 flex-1">
@@ -117,21 +130,14 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
             {formatarSeg(Math.max(0, restante))}
           </span>
         )}
-      </div>
+      </header>
 
-      {/* Navegador de questões */}
-      <div className="flex flex-wrap gap-1.5">
-        {sessao.questoes.map((qq, i) => {
-          const feito = respostas[qq.id] != null
-          return (
-            <button key={qq.id} type="button" onClick={() => setIdx(i)}
-              className={cn('h-7 w-7 rounded-md border text-xs font-semibold tabular-nums transition-colors',
-                i === idx ? 'border-primary bg-primary text-primary-foreground'
-                  : feito ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                    : 'text-muted-foreground hover:border-foreground/30')}>{i + 1}</button>
-          )
-        })}
-      </div>
+      {/* Área com rolagem própria; navegador vira coluna à direita no desktop (como o real). */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto grid w-full max-w-5xl gap-4 px-3 py-4 sm:px-4 sm:py-5 lg:grid-cols-[1fr_13rem] lg:gap-8">
+          <div className="flex min-w-0 flex-col gap-4">
+            {/* Navegador (mobile/tablet) */}
+            <div className="flex flex-wrap gap-1.5 lg:hidden">{navBtns}</div>
 
       {/* Questão */}
       <div className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
@@ -221,6 +227,17 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
           {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />} Finalizar agora ({respondidas}/{total})
         </button>
       )}
+          </div>
+
+          {/* Navegador (desktop) — coluna fixa à direita, como o simulado real */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-4 rounded-2xl border bg-card p-3 shadow-sm">
+              <p className="mb-2 text-xs font-semibold text-muted-foreground">Questões</p>
+              <div className="grid grid-cols-5 gap-1.5">{navBtns}</div>
+            </div>
+          </aside>
+        </div>
+      </div>
     </div>
   )
 }
@@ -245,7 +262,8 @@ function TelaResultado({ sessao, respostas, resultado, onRefazer }: {
   const router = useRouter()
   const pct = resultado.total > 0 ? Math.round((resultado.acertos / resultado.total) * 100) : 0
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-muted dark:bg-background">
+      <div className="mx-auto flex max-w-2xl flex-col gap-4 px-3 py-5 sm:px-4">
       <div className="rounded-2xl border bg-card p-6 text-center shadow-sm">
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary"><Trophy className="h-7 w-7" /></div>
         <h1 className="text-lg font-bold tracking-tight">Simulado concluído</h1>
@@ -278,6 +296,7 @@ function TelaResultado({ sessao, respostas, resultado, onRefazer }: {
             )
           })
         })()}
+      </div>
       </div>
     </div>
   )

@@ -52,7 +52,9 @@ export function PersonalizadoStart({ resumo }: { resumo: ResumoPessoal }) {
   ]
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4">
+    // Tela cheia imersiva (como o simulado real) — sem barra lateral do portal nem gutters brancos.
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-muted dark:bg-background">
+      <div className="mx-auto flex max-w-2xl flex-col gap-4 px-3 py-5 sm:px-4">
       <button type="button" onClick={() => router.push(`/aluno/simulados/personalizados/${resumo.simuladoId}`)}
         className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Voltar ao editor
@@ -134,6 +136,7 @@ export function PersonalizadoStart({ resumo }: { resumo: ResumoPessoal }) {
         </button>
       </div>
       {continuar && <p className="-mt-1 text-center text-xs text-muted-foreground">Você tem uma tentativa em andamento — vamos retomar de onde parou.</p>}
+      </div>
     </div>
   )
 }
