@@ -257,6 +257,30 @@ export async function adicionarQuestoes(simuladoId: string, questaoIds: string[]
   return { adicionadas: rows.length }
 }
 
+/**
+ * Salva a nova ORDEM das questões do simulado (drag/setas no editor). Só reordena questões que já
+ * estão no simulado (ignora ids alheios). Atualiza `ordem` linha a linha, em lotes paralelos.
+ */
+export async function reordenarQuestoes(simuladoId: string, ordemIds: string[]): Promise<{ ok?: boolean; error?: string }> {
+  const { svc, estudanteId, tenantId } = await ctx()
+  const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)
+  if (!sim) return { error: 'Simulado não encontrado.' }
+  const { data: atuais } = await svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', simuladoId).eq('tenant_id', tenantId)
+  const doSim = new Set((atuais ?? []).map((r: any) => r.questao_id))
+  const ord = [...new Set(ordemIds)].filter((id) => doSim.has(id))
+  if (!ord.length) return { ok: true }
+  // Lotes de 20 updates paralelos (evita N requisições simultâneas em simulados grandes).
+  for (let i = 0; i < ord.length; i += 20) {
+    const lote = ord.slice(i, i + 20)
+    const res = await Promise.all(lote.map((qid, j) =>
+      svc.from('simulado_prova_questoes').update({ ordem: i + j }).eq('simulado_id', simuladoId).eq('tenant_id', tenantId).eq('questao_id', qid)))
+    const err = res.find((r) => r.error)?.error
+    if (err) return { error: err.message }
+  }
+  revalidatePath(`/aluno/simulados/personalizados/${simuladoId}`)
+  return { ok: true }
+}
+
 export async function removerQuestao(simuladoId: string, questaoId: string): Promise<{ ok?: boolean; error?: string }> {
   const { svc, estudanteId, tenantId } = await ctx()
   const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)

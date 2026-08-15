@@ -4,10 +4,11 @@ import { useMemo, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Plus, Trash2, Loader2, Play, X } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Loader2, Play, X, GripVertical, ChevronUp, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { SeletorQuestoes } from '@/components/aluno/seletor-questoes'
-import { adicionarQuestoes, removerQuestao, renomearMeuSimulado, type QuestaoEscolhida } from '@/app/aluno/(portal)/simulados/builder-actions'
+import { adicionarQuestoes, removerQuestao, renomearMeuSimulado, reordenarQuestoes, type QuestaoEscolhida } from '@/app/aluno/(portal)/simulados/builder-actions'
 
 /** Editor de um simulado personalizado do aluno: nome + questões escolhidas + seletor de questões. */
 export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensIniciais }: {
@@ -18,6 +19,9 @@ export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensInicia
   const [itens, setItens] = useState<QuestaoEscolhida[]>(itensIniciais)
   const [modal, setModal] = useState(false)
   const [salvandoNome, startSalvar] = useTransition()
+  const [salvandoOrdem, startOrdem] = useTransition()
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [overIdx, setOverIdx] = useState<number | null>(null)
   const escolhidas = useMemo(() => new Set(itens.map((i) => i.questaoId)), [itens])
 
   const salvarNome = () => {
@@ -28,6 +32,18 @@ export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensInicia
     setItens((prev) => prev.filter((i) => i.questaoId !== qid))
     const r = await removerQuestao(simuladoId, qid)
     if (r.error) toast.error(r.error)
+  }
+
+  // ── Reordenação (drag no desktop, setas ↑/↓ no mobile) ──────────────────────
+  const persistirOrdem = (lista: QuestaoEscolhida[]) =>
+    startOrdem(async () => { const r = await reordenarQuestoes(simuladoId, lista.map((i) => i.questaoId)); if (r.error) toast.error(r.error) })
+  const mover = (from: number, to: number) => {
+    if (from === to || to < 0 || to >= itens.length) return
+    const arr = [...itens]
+    const [it] = arr.splice(from, 1)
+    arr.splice(to, 0, it)
+    setItens(arr)
+    persistirOrdem(arr)
   }
 
   return (
@@ -48,7 +64,10 @@ export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensInicia
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold">Questões ({itens.length})</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            Questões ({itens.length})
+            {salvandoOrdem && <span className="inline-flex items-center gap-1 text-xs font-normal text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> salvando ordem</span>}
+          </h2>
           <button type="button" onClick={() => setModal(true)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
             <Plus className="h-4 w-4" /> Adicionar questões
@@ -59,16 +78,37 @@ export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensInicia
             Nenhuma questão ainda. Clique em <span className="font-medium text-foreground">Adicionar questões</span> para montar seu simulado.
           </div>
         ) : (
-          <ol className="space-y-2">
-            {itens.map((q, i) => (
-              <li key={q.questaoId} className="flex items-start gap-3 rounded-xl border bg-card p-3 text-sm shadow-sm">
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">{i + 1}</span>
-                <p className="min-w-0 flex-1 line-clamp-2 text-foreground">{q.enunciado || '(sem enunciado)'}</p>
-                <button type="button" onClick={() => remover(q.questaoId)} title="Remover"
-                  className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
-              </li>
-            ))}
-          </ol>
+          <>
+            <p className="text-xs text-muted-foreground">Arraste pela alça ou use as setas para reordenar.</p>
+            <ol className="space-y-2">
+              {itens.map((q, i) => (
+                <li key={q.questaoId}
+                  draggable
+                  onDragStart={() => setDragIdx(i)}
+                  onDragOver={(e) => { if (dragIdx !== null) { e.preventDefault(); setOverIdx(i) } }}
+                  onDrop={(e) => { if (dragIdx !== null) { e.preventDefault(); mover(dragIdx, i); setDragIdx(null); setOverIdx(null) } }}
+                  onDragEnd={() => { setDragIdx(null); setOverIdx(null) }}
+                  className={cn('flex items-start gap-2 rounded-xl border bg-card p-3 text-sm shadow-sm transition-colors sm:gap-3',
+                    dragIdx === i && 'opacity-50',
+                    overIdx === i && dragIdx !== i && 'border-primary ring-1 ring-primary')}>
+                  {/* Controles de ordem: alça (arrastar) + setas (mobile) */}
+                  <span className="mt-0.5 flex shrink-0 items-center gap-0.5">
+                    <span className="hidden cursor-grab text-muted-foreground/50 active:cursor-grabbing sm:inline" title="Arraste para reordenar"><GripVertical className="h-4 w-4" /></span>
+                    <span className="flex flex-col">
+                      <button type="button" onClick={() => mover(i, i - 1)} disabled={i === 0} title="Subir"
+                        className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button>
+                      <button type="button" onClick={() => mover(i, i + 1)} disabled={i === itens.length - 1} title="Descer"
+                        className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button>
+                    </span>
+                  </span>
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">{i + 1}</span>
+                  <p className="min-w-0 flex-1 line-clamp-2 text-foreground">{q.enunciado || '(sem enunciado)'}</p>
+                  <button type="button" onClick={() => remover(q.questaoId)} title="Remover"
+                    className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                </li>
+              ))}
+            </ol>
+          </>
         )}
       </section>
 
