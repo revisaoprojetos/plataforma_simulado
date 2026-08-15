@@ -45,13 +45,13 @@ export function VisualPersonalizadoPicker({ cor, icone, onChange, titulo = 'Apar
 
           <div>
             <span className="mb-1.5 block text-xs font-medium text-muted-foreground">Ícone</span>
-            <div className="grid grid-cols-8 gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {ICONES_LISTA.map((k) => {
                 const I = PERSONALIZADO_ICONES[k]
                 const on = icone === k
                 return (
                   <button key={k} type="button" onClick={() => onChange({ cor, icone: k })} aria-label={k}
-                    className={cn('flex aspect-square items-center justify-center rounded-lg border transition',
+                    className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition',
                       on ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:border-foreground/20 hover:text-foreground')}>
                     <I className="h-4 w-4" />
                   </button>
