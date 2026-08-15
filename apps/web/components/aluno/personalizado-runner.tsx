@@ -37,7 +37,7 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   const toggleMarcar = (id: string) => setMarcadas((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   // Barra lateral de ferramentas (desktop, docada à direita) + seções internas (anotações e comentário,
   // independentes, ambos podem ficar abertos). No mobile vira um card colapsável (ferrAberta).
-  const [sidebarAberta, setSidebarAberta] = useState(true)
+  const [sidebarAberta, setSidebarAberta] = useState(false)
   const [ferrAberta, setFerrAberta] = useState(true)
   const [anotAberta, setAnotAberta] = useState(false)
   const [comentAberto, setComentAberto] = useState(false)

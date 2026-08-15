@@ -61,12 +61,17 @@ export async function abrirSessaoPessoal(simuladoId: string): Promise<{ sessao?:
   catch { qrows = await fetchAllByIn<any>(qids, (c) => svc.from('simulado_questoes').select('id, enunciado, tipo, comentario_professor, disciplina_id').in('id', c)) }
   const qmap = new Map(qrows.map((q) => [q.id, q]))
 
-  const altRows = await fetchAllByIn<any>(qids, (c) => svc.from('simulado_alternativas').select('id, questao_id, texto, ordem, correta').in('questao_id', c))
+  // Tolerante à coluna `comentario` da alternativa (comentário do gabarito por alternativa).
+  let altRows: any[]
+  try { altRows = await fetchAllByIn<any>(qids, (c) => svc.from('simulado_alternativas').select('id, questao_id, texto, ordem, correta, comentario').in('questao_id', c)) }
+  catch { altRows = await fetchAllByIn<any>(qids, (c) => svc.from('simulado_alternativas').select('id, questao_id, texto, ordem, correta').in('questao_id', c)) }
   const altsByQ = new Map<string, AltRunner[]>()
+  const comentCorretaByQ = new Map<string, string>() // comentário da alternativa CORRETA (por questão)
   for (const a of altRows) {
     const arr = altsByQ.get(a.questao_id) ?? []
     arr.push({ id: a.id, texto: a.texto ?? '', ordem: a.ordem ?? 0, correta: a.correta === true })
     altsByQ.set(a.questao_id, arr)
+    if (a.correta === true && a.comentario && String(a.comentario).trim()) comentCorretaByQ.set(a.questao_id, String(a.comentario))
   }
 
   const discIds = [...new Set(qrows.map((q) => q.disciplina_id).filter(Boolean))] as string[]
@@ -95,7 +100,9 @@ export async function abrirSessaoPessoal(simuladoId: string): Promise<{ sessao?:
       id: p.questao_id, ordem: p.ordem, enunciado: (q.enunciado as string) ?? '', tipo: (q.tipo as string) ?? 'objetiva',
       imagemUrl: (q.imagem_url as string | null) ?? null,
       disciplina: q.disciplina_id ? (discM.get(q.disciplina_id) ?? null) : null,
-      comentario: (q.comentario_professor as string | null) ?? null,
+      // Comentário do professor = comentário da alternativa CORRETA (padrão do sistema), com
+      // fallback para comentario_professor da questão.
+      comentario: comentCorretaByQ.get(p.questao_id) ?? (q.comentario_professor as string | null) ?? null,
       origemSimulado: o?.titulo ?? null, origemNumero: o?.numero ?? null,
       alternativas: (altsByQ.get(p.questao_id) ?? []).sort((a, b) => a.ordem - b.ordem),
     }
