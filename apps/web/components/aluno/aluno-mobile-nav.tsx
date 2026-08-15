@@ -32,12 +32,16 @@ function frameLogo(estilo?: string): string {
 // do fundo da barra (`furo`), preservando o TAMANHO cheio do ícone (sem inset de traço).
 type SolidProps = { className?: string; cor: string; furo: string }
 
+// Sólidos preenchem só até a borda do path; os de contorno (inativos) têm o traço que adiciona
+// ~1px de halo. Ampliamos levemente cada sólido (sobre o centro) p/ ficarem do MESMO tamanho.
 function HomeSolido({ className, cor, furo }: SolidProps) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden focusable="false">
-      <path d="M2.42 11.08a1 1 0 0 1 .38-.78L12 2.9l9.2 7.4a1 1 0 0 1 .38.78V19a2 2 0 0 1-2 2H4.42a2 2 0 0 1-2-2Z" fill={cor} />
-      {/* porta */}
-      <path d="M9.5 21v-4.75a2.5 2.5 0 0 1 5 0V21Z" fill={furo} />
+      <g transform="translate(12 12) scale(1.1) translate(-12 -12)">
+        <path d="M2.42 11.08a1 1 0 0 1 .38-.78L12 2.9l9.2 7.4a1 1 0 0 1 .38.78V19a2 2 0 0 1-2 2H4.42a2 2 0 0 1-2-2Z" fill={cor} />
+        {/* porta */}
+        <path d="M9.5 21v-4.75a2.5 2.5 0 0 1 5 0V21Z" fill={furo} />
+      </g>
     </svg>
   )
 }
@@ -45,25 +49,30 @@ function HomeSolido({ className, cor, furo }: SolidProps) {
 function SinoSolido({ className, cor, furo }: SolidProps) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden focusable="false">
-      <path d="M12 2.6a1.1 1.1 0 0 0-1.1 1.1v.62A6 6 0 0 0 6 10.2c0 3.35-1.02 4.7-1.77 5.55A1.1 1.1 0 0 0 5.06 17.6h13.88a1.1 1.1 0 0 0 .83-1.85c-.75-.85-1.77-2.2-1.77-5.55a6 6 0 0 0-4.9-5.88V3.7A1.1 1.1 0 0 0 12 2.6Z" fill={cor} />
-      {/* badalo (parte de baixo) */}
-      <path d="M9.6 19.1h4.8a2.4 2.4 0 0 1-4.8 0Z" fill={cor} />
+      <g transform="translate(12 12) scale(1.1) translate(-12 -12)">
+        <path d="M12 2.6a1.1 1.1 0 0 0-1.1 1.1v.62A6 6 0 0 0 6 10.2c0 3.35-1.02 4.7-1.77 5.55A1.1 1.1 0 0 0 5.06 17.6h13.88a1.1 1.1 0 0 0 .83-1.85c-.75-.85-1.77-2.2-1.77-5.55a6 6 0 0 0-4.9-5.88V3.7A1.1 1.1 0 0 0 12 2.6Z" fill={cor} />
+        {/* badalo (parte de baixo) */}
+        <path d="M9.6 19.1h4.8a2.4 2.4 0 0 1-4.8 0Z" fill={cor} />
+      </g>
     </svg>
   )
 }
 
 function ClipboardSolido({ className, cor, furo }: SolidProps) {
+  // A prancheta tem muito vazio interno; ampliada ~14% (sobre o centro) p/ igualar o peso visual da casa/sino.
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden focusable="false">
-      {/* prancheta */}
-      <path d="M7 4h1.29A1.75 1.75 0 0 1 10 2.75h4A1.75 1.75 0 0 1 15.71 4H17a2.5 2.5 0 0 1 2.5 2.5V19A2.5 2.5 0 0 1 17 21.5H7A2.5 2.5 0 0 1 4.5 19V6.5A2.5 2.5 0 0 1 7 4Z" fill={cor} />
-      {/* clipe */}
-      <path d="M9.75 3.5h4.5a.9.9 0 0 1 .9.9v1.05a.9.9 0 0 1-.9.9h-4.5a.9.9 0 0 1-.9-.9V4.4a.9.9 0 0 1 .9-.9Z" fill={furo} />
-      {/* linhas da lista */}
-      <circle cx="9" cy="11.6" r="1.05" fill={furo} />
-      <rect x="11.1" y="10.7" width="5.2" height="1.8" rx=".9" fill={furo} />
-      <circle cx="9" cy="15.9" r="1.05" fill={furo} />
-      <rect x="11.1" y="15" width="5.2" height="1.8" rx=".9" fill={furo} />
+      <g transform="translate(12 12) scale(1.14) translate(-12 -12)">
+        {/* prancheta */}
+        <path d="M7 4h1.29A1.75 1.75 0 0 1 10 2.75h4A1.75 1.75 0 0 1 15.71 4H17a2.5 2.5 0 0 1 2.5 2.5V19A2.5 2.5 0 0 1 17 21.5H7A2.5 2.5 0 0 1 4.5 19V6.5A2.5 2.5 0 0 1 7 4Z" fill={cor} />
+        {/* clipe */}
+        <path d="M9.75 3.5h4.5a.9.9 0 0 1 .9.9v1.05a.9.9 0 0 1-.9.9h-4.5a.9.9 0 0 1-.9-.9V4.4a.9.9 0 0 1 .9-.9Z" fill={furo} />
+        {/* linhas da lista */}
+        <circle cx="9" cy="11.6" r="1.05" fill={furo} />
+        <rect x="11.1" y="10.7" width="5.2" height="1.8" rx=".9" fill={furo} />
+        <circle cx="9" cy="15.9" r="1.05" fill={furo} />
+        <rect x="11.1" y="15" width="5.2" height="1.8" rx=".9" fill={furo} />
+      </g>
     </svg>
   )
 }
