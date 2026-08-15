@@ -133,6 +133,7 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
         estId={estId}
         simuladoId={id}
         simuladoTitulo={sim.titulo}
+        cadernosInline
       />
     </div>
   )

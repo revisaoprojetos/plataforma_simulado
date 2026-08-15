@@ -296,18 +296,23 @@ export function MeuSimuladoView({
                         )}
                       </div>
 
-                      {/* Downloads INLINE — abaixo do texto da tentativa (no lugar do menu ⋮). */}
+                      {/* Downloads INLINE — abaixo do texto da tentativa (no lugar do menu ⋮).
+                          Cobre as modalidades do caderno (oficial) e o fallback (pessoal/sem caderno). */}
                       {cadernosInline && (
                         <div className="flex flex-wrap items-center gap-1.5 border-t border-dashed border-border/70 px-2.5 pb-2.5 pt-2">
-                          <a href={`${gabaritoUrl(t.id)}?sem=1`} target="_blank" rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground">
-                            <ScrollText className="h-3.5 w-3.5" /> Prova que você fez
-                          </a>
+                          {/* Como você fez — sem gabarito (sempre disponível) */}
+                          {modalidades.some((m) => m.semGab)
+                            ? modalidades.filter((m) => m.semGab).map((m) => (
+                                <ChipCaderno key={`s-${m.id}`} nome={m.nome} loading={baixando === `${t.id}:${m.id}:s`} onClick={() => baixarCaderno(t.id, m.id, m.nome)} />
+                              ))
+                            : <ChipCaderno nome="Prova que você fez" href={`${gabaritoUrl(t.id)}?sem=1`} />}
+                          {/* Com correção — só com o gabarito liberado */}
                           {gabaritoLiberado && (
-                            <a href={gabaritoUrl(t.id)} target="_blank" rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/[0.06] px-2 py-1 text-[11px] font-semibold text-primary shadow-sm transition-colors hover:bg-primary/10">
-                              <FileText className="h-3.5 w-3.5" /> Com correção
-                            </a>
+                            modalidades.some((m) => m.comGab)
+                              ? modalidades.filter((m) => m.comGab).map((m) => (
+                                  <ChipCaderno key={`g-${m.id}`} nome={m.nome} gab loading={baixando === `${t.id}:${m.id}:g`} onClick={() => baixarCaderno(t.id, m.id, m.nome, true)} />
+                                ))
+                              : <ChipCaderno nome="Com correção" gab href={gabaritoUrl(t.id)} />
                           )}
                         </div>
                       )}
@@ -403,6 +408,16 @@ function BtnCaderno({ nome, onClick, gab, loading }: { nome: string; onClick: ()
         : <Download className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-y-0.5 group-hover:text-foreground" />}
     </button>
   )
+}
+
+/** Chip de download INLINE (na lista de tentativas). Vira <a> (link direto) ou <button> (gera PDF). */
+function ChipCaderno({ nome, href, onClick, gab, loading }: { nome: string; href?: string; onClick?: () => void; gab?: boolean; loading?: boolean }) {
+  const cls = cn('inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] shadow-sm transition-colors disabled:opacity-70',
+    gab ? 'border-primary/25 bg-primary/[0.06] font-semibold text-primary hover:bg-primary/10' : 'bg-background font-medium text-muted-foreground hover:bg-muted hover:text-foreground')
+  const inner = <>{loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : gab ? <FileText className="h-3.5 w-3.5" /> : <ScrollText className="h-3.5 w-3.5" />}{loading ? 'Gerando…' : nome}</>
+  return href
+    ? <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>{inner}</a>
+    : <button type="button" onClick={onClick} disabled={loading} className={cls}>{inner}</button>
 }
 
 function CheckBox({ on, disabled }: { on: boolean; disabled?: boolean }) {
