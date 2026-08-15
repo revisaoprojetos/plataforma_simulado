@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Check, X, Eye, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, X, Eye, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, LayoutGrid } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -35,7 +35,9 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   // Questões marcadas "para revisar" (só client-side, ajudam a navegar; ficam âmbar no navegador).
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set())
   const toggleMarcar = (id: string) => setMarcadas((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
-  // Ferramentas (painel à direita): recolher/expandir + anotações e comentário (independentes, ambos podem ficar abertos).
+  // Barra lateral de ferramentas (desktop, docada à direita) + seções internas (anotações e comentário,
+  // independentes, ambos podem ficar abertos). No mobile vira um card colapsável (ferrAberta).
+  const [sidebarAberta, setSidebarAberta] = useState(true)
   const [ferrAberta, setFerrAberta] = useState(true)
   const [anotAberta, setAnotAberta] = useState(false)
   const [comentAberto, setComentAberto] = useState(false)
@@ -122,41 +124,87 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
     )
   })
 
-  // Painel recolhível de Ferramentas: Anotações + Comentário do professor (SEM revelar o gabarito).
-  const ferramentas = (
-    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+  // Seções de ferramentas: Anotações + Comentário (SEM revelar o gabarito) — ambos podem ficar abertos.
+  const secoesFerr = (
+    <div className="space-y-2">
+      <div className="overflow-hidden rounded-xl border">
+        <button type="button" onClick={() => setAnotAberta((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
+          <StickyNote className="h-4 w-4 text-primary" /> Anotações
+          <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !anotAberta && '-rotate-90')} />
+        </button>
+        {anotAberta && (
+          <textarea value={anotacoes[q.id] ?? ''} onChange={(e) => setAnotacoes((a) => ({ ...a, [q.id]: e.target.value }))}
+            placeholder="Escreva suas anotações sobre esta questão…"
+            className="min-h-[7rem] w-full resize-y border-t bg-transparent p-3 text-sm outline-none placeholder:text-muted-foreground/70 focus-visible:ring-1 focus-visible:ring-primary" />
+        )}
+      </div>
+      <div className="overflow-hidden rounded-xl border">
+        <button type="button" onClick={() => setComentAberto((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
+          <Lightbulb className="h-4 w-4 text-primary" /> Comentário do professor
+          <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !comentAberto && '-rotate-90')} />
+        </button>
+        {comentAberto && (
+          <div className="border-t p-3 text-sm">
+            {q.comentario ? <MarkdownContent className="leading-relaxed text-foreground">{q.comentario}</MarkdownContent> : <span className="text-muted-foreground">Sem comentário para esta questão.</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
+  // Card do navegador de questões (fita + grid + legenda) — usado na barra lateral.
+  const navegadorCard = (
+    <div className="overflow-hidden rounded-xl border">
+      <div className="h-1.5 bg-gradient-to-r from-primary via-primary to-primary/30" />
+      <div className="space-y-3 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold text-foreground">Navegador de questões</p>
+          <span className="text-xs font-medium tabular-nums text-muted-foreground">{respondidas}/{total}</span>
+        </div>
+        <div className="grid grid-cols-5 gap-1.5">{navBtns}</div>
+        <div className="border-t" />
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-primary" /> atual</span>
+          <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-primary/20 ring-1 ring-primary/40" /> respondida</span>
+          <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-amber-500/15 ring-1 ring-amber-500/50" /> para revisar</span>
+          <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded border" /> em branco</span>
+        </div>
+      </div>
+    </div>
+  )
+
+  // BARRA LATERAL (desktop): docada à direita, altura cheia; recolhe para um trilho de ícones.
+  const sidebar = (
+    <aside className={cn('hidden h-full shrink-0 flex-col overflow-y-auto border-l bg-card transition-[width] duration-200 lg:flex', sidebarAberta ? 'w-80' : 'w-14')}>
+      {sidebarAberta ? (
+        <div className="space-y-3 p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground">Ferramentas</span>
+            <button type="button" onClick={() => setSidebarAberta(false)} title="Recolher barra" className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><PanelRightClose className="h-4 w-4" /></button>
+          </div>
+          {navegadorCard}
+          {secoesFerr}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-1 py-3">
+          <button type="button" onClick={() => setSidebarAberta(true)} title="Expandir barra" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><PanelRightOpen className="h-5 w-5" /></button>
+          <div className="my-1 h-px w-6 bg-border" />
+          <button type="button" onClick={() => setSidebarAberta(true)} title="Navegador de questões" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><LayoutGrid className="h-5 w-5" /></button>
+          <button type="button" onClick={() => { setSidebarAberta(true); setAnotAberta(true) }} title="Anotações" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><StickyNote className="h-5 w-5" /></button>
+          <button type="button" onClick={() => { setSidebarAberta(true); setComentAberto(true) }} title="Comentário do professor" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Lightbulb className="h-5 w-5" /></button>
+        </div>
+      )}
+    </aside>
+  )
+
+  // Ferramentas (mobile) — card colapsável abaixo da questão (a barra lateral é só desktop).
+  const ferramentasMobile = (
+    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm lg:hidden">
       <button type="button" onClick={() => setFerrAberta((v) => !v)} className="flex w-full items-center justify-between gap-2 px-4 py-2.5 transition-colors hover:bg-muted/40">
         <span className="text-xs font-semibold text-foreground">Ferramentas</span>
         <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', !ferrAberta && '-rotate-90')} />
       </button>
-      {ferrAberta && (
-        <div className="space-y-2 border-t p-3">
-          {/* Anotações */}
-          <div className="overflow-hidden rounded-xl border">
-            <button type="button" onClick={() => setAnotAberta((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
-              <StickyNote className="h-4 w-4 text-primary" /> Anotações
-              <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !anotAberta && '-rotate-90')} />
-            </button>
-            {anotAberta && (
-              <textarea value={anotacoes[q.id] ?? ''} onChange={(e) => setAnotacoes((a) => ({ ...a, [q.id]: e.target.value }))}
-                placeholder="Escreva suas anotações sobre esta questão…"
-                className="min-h-[6rem] w-full resize-y border-t bg-transparent p-3 text-sm outline-none placeholder:text-muted-foreground/70 focus-visible:ring-1 focus-visible:ring-primary" />
-            )}
-          </div>
-          {/* Comentário do professor — mostra o texto SEM revelar a alternativa correta */}
-          <div className="overflow-hidden rounded-xl border">
-            <button type="button" onClick={() => setComentAberto((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
-              <Lightbulb className="h-4 w-4 text-primary" /> Comentário do professor
-              <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !comentAberto && '-rotate-90')} />
-            </button>
-            {comentAberto && (
-              <div className="border-t p-3 text-sm">
-                {q.comentario ? <MarkdownContent className="leading-relaxed text-foreground">{q.comentario}</MarkdownContent> : <span className="text-muted-foreground">Sem comentário para esta questão.</span>}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {ferrAberta && <div className="border-t p-3">{secoesFerr}</div>}
     </div>
   )
 
@@ -195,10 +243,10 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
         <div className="h-full bg-primary transition-all duration-300 ease-out" style={{ width: `${Math.round(((idx + 1) / total) * 100)}%` }} />
       </div>
 
-      {/* Área com rolagem própria; navegador vira coluna à direita no desktop (como o real). */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto grid w-full max-w-5xl gap-4 px-3 py-4 sm:px-4 sm:py-5 lg:grid-cols-[1fr_13rem] lg:gap-8">
-          <div className="flex min-w-0 flex-col gap-4">
+      {/* Conteúdo (rolagem própria) + BARRA LATERAL docada à direita no desktop */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 py-4 sm:px-4 sm:py-5">
             {/* Navegador (mobile/tablet) */}
             <div className="lg:hidden">
               <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Navegador de questões</p>
@@ -261,8 +309,8 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
         </div>
       )}
 
-      {/* Ferramentas (mobile) — no desktop ficam na coluna da direita */}
-      <div className="lg:hidden">{ferramentas}</div>
+      {/* Ferramentas (mobile) — no desktop viram a barra lateral */}
+      {ferramentasMobile}
 
       {/* Navegação / ações */}
       <div className="flex items-center justify-between gap-2 pb-2">
@@ -307,33 +355,9 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
       )}
           </div>
 
-          {/* Coluna direita (desktop): navegador + ferramentas, como o simulado real */}
-          <aside className="hidden lg:block">
-            <div className="sticky top-4 space-y-3">
-              <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                {/* fita colorida no topo (como o card da questão) */}
-                <div className="h-1.5 bg-gradient-to-r from-primary via-primary to-primary/30" />
-                <div className="space-y-3 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold text-foreground">Navegador de questões</p>
-                    <span className="text-xs font-medium tabular-nums text-muted-foreground">{respondidas}/{total}</span>
-                  </div>
-                  <div className="grid grid-cols-5 gap-1.5">{navBtns}</div>
-                  {/* divisória */}
-                  <div className="border-t" />
-                  {/* legenda — cores respectivas */}
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
-                    <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-primary" /> atual</span>
-                    <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-primary/20 ring-1 ring-primary/40" /> respondida</span>
-                    <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-amber-500/15 ring-1 ring-amber-500/50" /> para revisar</span>
-                    <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded border" /> em branco</span>
-                  </div>
-                </div>
-              </div>
-              {ferramentas}
-            </div>
-          </aside>
         </div>
+        {/* Barra lateral docada (desktop) */}
+        {sidebar}
       </div>
     </div>
   )
