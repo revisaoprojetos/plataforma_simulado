@@ -57,9 +57,9 @@ export function MeuSimuladoView({
   async function apagarTentativa(sessaoId: string, n: number) {
     if (apagando) return
     const ok = await confirmar({
-      titulo: 'Apagar tentativa',
-      mensagem: `Apagar a tentativa #${n}?\n\nEla deixa de contar (sai do histórico, resultados e ranking) e o aluno poderá refazer — se for a única, o simulado volta a aparecer como "não feito" para ele. Vai para a Lixeira (pode ser restaurada).`,
-      confirmar: 'Apagar tentativa',
+      titulo: 'Apagar realização',
+      mensagem: `Apagar a realização #${n}?\n\nEla deixa de contar (sai do histórico, resultados e ranking) e o aluno poderá refazer — se for a única, o simulado volta a aparecer como "não feito" para ele. Vai para a Lixeira (pode ser restaurada).`,
+      confirmar: 'Apagar realização',
       destrutivo: true,
     })
     if (!ok) return
@@ -67,7 +67,7 @@ export function MeuSimuladoView({
     const r = await excluirSessaoAction(sessaoId, simuladoId, estId)
     setApagando(null)
     if (r?.error) toast.error(r.error)
-    else { toast.success('Tentativa apagada (aluno pode refazer)'); router.refresh() }
+    else { toast.success('Realização apagada (aluno pode refazer)'); router.refresh() }
   }
 
   // Multi-seleção de tentativas DESTE simulado. Se veio ?tentativa=<id> (ex.: clique no
@@ -132,7 +132,7 @@ export function MeuSimuladoView({
     const chave = `${sessaoId}:${mod}:${gab ? 'g' : 's'}`
     if (baixando) return
     const limpar = (s?: string) => (s ?? '').trim().replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_')
-    const arquivo = [simuladoTitulo, nome, `tentativa-${modalTent?.n ?? ''}`].map(limpar).filter(Boolean).join('_') || 'caderno'
+    const arquivo = [simuladoTitulo, nome, `realizacao-${modalTent?.n ?? ''}`].map(limpar).filter(Boolean).join('_') || 'caderno'
     // Entrega V2: item gerado → rota do caderno de teste (folha/diagnóstico/questões).
     const qs = new URLSearchParams({ caderno: md.cadernoTeste.cadernoId, grupo: md.cadernoTeste.itemId, sessao: sessaoId, nome: arquivo })
     if (gab) qs.set('gabarito', '1')
@@ -180,17 +180,17 @@ export function MeuSimuladoView({
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary"><BarChart3 className="h-4 w-4" /></span>
                 <div>
                   <h2 className="text-sm font-semibold leading-tight">Métrica de desempenho</h2>
-                  <p className="text-[11px] text-muted-foreground">Comparação das tentativas selecionadas</p>
+                  <p className="text-[11px] text-muted-foreground">Comparação das realizações selecionadas</p>
                 </div>
               </div>
 
               {pontos.length === 0 ? (
-                <p className="p-8 text-center text-sm text-muted-foreground">Nenhuma tentativa selecionada. Marque na lista ao lado.</p>
+                <p className="p-8 text-center text-sm text-muted-foreground">Nenhuma realização selecionada. Marque na lista ao lado.</p>
               ) : (
                 <div className="space-y-5 p-4">
                   {foco && notaLiberada && (
                     <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-xl border bg-muted/20 px-3.5 py-2.5 text-sm">
-                      <span className="inline-flex items-center gap-1.5 font-semibold"><Crown className="h-4 w-4 text-amber-500" /> Melhor tentativa <span className="font-normal text-muted-foreground">#{foco.n}</span></span>
+                      <span className="inline-flex items-center gap-1.5 font-semibold"><Crown className="h-4 w-4 text-amber-500" /> Melhor realização <span className="font-normal text-muted-foreground">#{foco.n}</span></span>
                       <span className="text-muted-foreground"><Target className="mr-1 inline h-3.5 w-3.5" />Acerto <b className="text-foreground">{foco.pct}%</b> <span className="text-xs">({foco.acertos}/{foco.total})</span></span>
                       <span className="text-muted-foreground"><Clock className="mr-1 inline h-3.5 w-3.5" />Tempo <b className="text-foreground">{foco.tempoMs ? fmtDur(foco.tempoMs) : '—'}</b></span>
                       <span className="text-muted-foreground">Posição <b className="text-foreground">{foco.posicao ? `${foco.posicao}º` : '—'}</b></span>
@@ -199,20 +199,20 @@ export function MeuSimuladoView({
                   )}
                   <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
                     <Kpi icon={ListChecks} label="Simulados" value={nSimulados} chip="bg-indigo-500/15 text-indigo-600 dark:text-indigo-400" />
-                    <Kpi icon={TrendingUp} label="Tentativas" value={pontos.length} chip="bg-sky-500/15 text-sky-600 dark:text-sky-400" />
+                    <Kpi icon={TrendingUp} label="Realizações" value={pontos.length} chip="bg-sky-500/15 text-sky-600 dark:text-sky-400" />
                     <Kpi icon={Award} label="Nota média" value={nota(notaMedia)} chip="bg-violet-500/15 text-violet-600 dark:text-violet-400" />
                     <Kpi icon={Crown} label="Melhor nota" value={nota(melhorNota)} chip="bg-amber-500/15 text-amber-600 dark:text-amber-400" />
                   </div>
 
                   <div>
-                    <div className="mb-2 flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" /><h3 className="text-sm font-semibold">Progresso por tentativa</h3><span className="text-xs text-muted-foreground">({pontos.length})</span></div>
+                    <div className="mb-2 flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" /><h3 className="text-sm font-semibold">Progresso por realização</h3><span className="text-xs text-muted-foreground">({pontos.length})</span></div>
                     <div className="overflow-x-auto rounded-xl border bg-muted/20 p-3">
                       <div className="flex min-w-full items-end gap-2" style={{ height: 160 }}>
                         {pontos.map((p, i) => {
                           const prev = i > 0 ? pontos[i - 1].nota : null
                           const subiu = p.nota != null && prev != null ? p.nota - prev : null
                           return (
-                            <div key={`${p.simId}-${p.n}-${i}`} className="flex min-w-[42px] flex-1 flex-col items-center justify-end gap-1" title={`${p.simulado} · Tentativa ${p.n}`}>
+                            <div key={`${p.simId}-${p.n}-${i}`} className="flex min-w-[42px] flex-1 flex-col items-center justify-end gap-1" title={`${p.simulado} · Realização ${p.n}`}>
                               <span className={cn('text-xs font-bold tabular-nums', p.nota != null && notaTone(p.nota))}>{nota(p.nota)}</span>
                               <div className="flex w-full max-w-[46px] flex-col justify-end overflow-hidden rounded-t-md bg-muted" style={{ height: `${Math.max(4, ((p.nota ?? 0) / 100) * 120)}px` }}>
                                 <div className={cn('w-full', p.nota != null ? pctBar(p.nota ?? 0) : 'bg-muted')} style={{ height: '100%' }} />
@@ -258,10 +258,10 @@ export function MeuSimuladoView({
               <div className="border-b bg-muted/25 px-4 py-3">
                 <div className="flex items-center gap-2">
                   <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary"><ListChecks className="h-4 w-4" /></span>
-                  <h3 className="text-sm font-semibold">Tentativas</h3>
+                  <h3 className="text-sm font-semibold">Realizações</h3>
                   <span className="ml-auto rounded-full bg-background px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground shadow-sm">{selTents.size}/{tentativas.length}</span>
                 </div>
-                <p className="mt-1 text-[11px] text-muted-foreground">Marque tentativas para comparar no gráfico.</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Marque realizações para comparar no gráfico.</p>
                 {tentativas.length > 1 && (
                   <div className="mt-2.5 flex gap-2">
                     <button type="button" onClick={selTodasTent} className={cn('flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors', todasTentMarcadas ? 'border-primary bg-primary/10 text-primary' : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground')}>Selecionar todas</button>
@@ -281,7 +281,7 @@ export function MeuSimuladoView({
                           <CheckBox on={on} />
                           <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold tabular-nums transition-colors', on ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-background text-muted-foreground')}>#{t.n}</span>
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs font-semibold leading-tight">Tentativa {t.n}</p>
+                            <p className="text-xs font-semibold leading-tight">Realização {t.n}</p>
                             <p className="text-[11px] text-muted-foreground">{fmtData(t.finalizado)}</p>
                           </div>
                           {notaLiberada
@@ -295,7 +295,7 @@ export function MeuSimuladoView({
                           </button>
                         )}
                         {adminMode && (
-                          <button type="button" onClick={() => apagarTentativa(t.id, t.n ?? 0)} disabled={apagando === t.id} title="Apagar tentativa"
+                          <button type="button" onClick={() => apagarTentativa(t.id, t.n ?? 0)} disabled={apagando === t.id} title="Apagar realização"
                             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50">
                             {apagando === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                           </button>
@@ -369,7 +369,7 @@ export function MeuSimuladoView({
             Material para download
           </DialogTitle>
           <DialogDescription>
-            {modalTent && `Tentativa ${modalTent.n} · ${fmtData(modalTent.finalizado)}${modalTent.nota != null && notaLiberada ? ` · nota ${nota(modalTent.nota)}` : ''}`}
+            {modalTent && `Realização ${modalTent.n} · ${fmtData(modalTent.finalizado)}${modalTent.nota != null && notaLiberada ? ` · nota ${nota(modalTent.nota)}` : ''}`}
           </DialogDescription>
         </DialogHeader>
         {modalTent && (
@@ -465,7 +465,7 @@ function QuestoesAgregadas({ questoes, totalTentativas, revelou }: { questoes: Q
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-muted-foreground">Contagem entre as {totalTentativas} tentativa(s){revelou ? '' : ' — a alternativa correta aparece quando o gabarito for liberado'}.</p>
+      <p className="text-xs text-muted-foreground">Contagem entre {totalTentativas} {totalTentativas === 1 ? 'realização' : 'realizações'}{revelou ? '' : ' — a alternativa correta aparece quando o gabarito for liberado'}.</p>
 
       {revelou && (
         <div className="flex flex-wrap gap-1.5">

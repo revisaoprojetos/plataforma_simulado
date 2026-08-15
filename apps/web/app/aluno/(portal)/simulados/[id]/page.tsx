@@ -96,7 +96,7 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Resultado</p>
             <h1 className="truncate text-2xl font-bold tracking-tight sm:text-3xl">{sim.titulo}</h1>
-            {finalizadas.length > 1 && <p className="mt-1 text-sm text-muted-foreground">{finalizadas.length} tentativas realizadas</p>}
+            {finalizadas.length > 1 && <p className="mt-1 text-sm text-muted-foreground">{finalizadas.length} realizações</p>}
           </div>
           <div className="flex shrink-0 flex-col items-end gap-3">
             {notaLiberada ? (
