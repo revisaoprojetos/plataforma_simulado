@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Check, X, Eye, EyeOff, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, FileText, Scissors, Bold, Italic, Underline, List, Baseline, Highlighter } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, X, Eye, EyeOff, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, FileText, Scissors, Bold, Italic, Underline, List, Baseline, Highlighter, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -39,6 +39,25 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   const [eliminadas, setEliminadas] = useState<Set<string>>(new Set())
   const eliminar = (id: string) => setEliminadas((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const [mostrarTempo, setMostrarTempo] = useState(true) // ocultar/mostrar o temporizador
+
+  // Baixar TODAS as anotações feitas (todas as questões) como .txt.
+  const baixarAnotacoes = () => {
+    const strip = (html: string) => { const d = document.createElement('div'); d.innerHTML = html || ''; return (d.textContent || '').replace(/ /g, ' ').trim() }
+    const blocos: string[] = []
+    sessao.questoes.forEach((qq, i) => {
+      const txt = strip(anotacoes[qq.id] ?? '')
+      if (!txt) return
+      const orig = qq.origemSimulado ? ` — ${qq.origemNumero ? `Q${qq.origemNumero} ` : ''}${qq.origemSimulado}` : ''
+      blocos.push(`Questão ${i + 1}${orig}\n${txt}`)
+    })
+    if (!blocos.length) { toast.info('Você ainda não fez anotações.'); return }
+    const conteudo = `Anotações — ${sessao.titulo}\n${'='.repeat(40)}\n\n` + blocos.join(`\n\n${'─'.repeat(30)}\n\n`) + '\n'
+    const blob = new Blob([conteudo], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `anotacoes-${(sessao.titulo || 'simulado').replace(/[^\w-]+/g, '_').slice(0, 40)}.txt`
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+  }
   // Barra lateral de ferramentas (desktop, docada à direita) + seções internas (anotações e comentário,
   // independentes, ambos podem ficar abertos). No mobile vira um card colapsável (ferrAberta).
   const [sidebarAberta, setSidebarAberta] = useState(false)
@@ -141,7 +160,7 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
         </button>
         <div className={cn('grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]', anotAberta ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
           <div className={cn('overflow-hidden transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]', anotAberta ? 'opacity-100' : 'opacity-0')}>
-            <EditorAnotacao key={q.id} valor={anotacoes[q.id] ?? ''} fill={preencher}
+            <EditorAnotacao key={q.id} valor={anotacoes[q.id] ?? ''} fill={preencher} onBaixar={baixarAnotacoes}
               onChange={(html) => setAnotacoes((a) => ({ ...a, [q.id]: html }))} />
           </div>
         </div>
@@ -415,7 +434,7 @@ const CORES_MARCA = ['#fde047', '#facc15', '#fdba74', '#fb923c', '#f87171', '#f4
 
 /** Editor de anotações "estilo Word" (contenteditable + execCommand): negrito, itálico, sublinhado,
  *  marcadores, cor do texto e marca-texto. Remonta por questão (key) e salva o HTML em onChange. */
-function EditorAnotacao({ valor, onChange, fill }: { valor: string; onChange: (html: string) => void; fill?: boolean }) {
+function EditorAnotacao({ valor, onChange, fill, onBaixar }: { valor: string; onChange: (html: string) => void; fill?: boolean; onBaixar?: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const [paleta, setPaleta] = useState<'texto' | 'marca' | null>(null)
   const [fmt, setFmt] = useState({ bold: false, italic: false, underline: false, ul: false })
@@ -449,6 +468,12 @@ function EditorAnotacao({ valor, onChange, fill }: { valor: string; onChange: (h
           <BtnFmt title="Marca-texto" ativo={paleta === 'marca'} onClick={() => setPaleta((p) => (p === 'marca' ? null : 'marca'))}><Highlighter className="h-3.5 w-3.5" /></BtnFmt>
           {paleta === 'marca' && <Paleta cores={CORES_MARCA} onLimpar={() => exec('hiliteColor', 'transparent')} onPick={(c) => exec('hiliteColor', c)} />}
         </div>
+        {onBaixar && (
+          <>
+            <span className="mx-0.5 h-4 w-px bg-border" />
+            <BtnFmt title="Salvar anotações em texto (.txt)" onClick={onBaixar}><Download className="h-3.5 w-3.5" /></BtnFmt>
+          </>
+        )}
       </div>
       <div ref={ref} contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
         onInput={() => { onChange(ref.current?.innerHTML ?? ''); sync() }} onKeyUp={sync} onMouseUp={sync}
