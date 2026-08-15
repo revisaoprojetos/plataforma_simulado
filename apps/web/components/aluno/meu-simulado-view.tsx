@@ -22,7 +22,7 @@ const fmtData = (d?: string | null) => (d ? new Date(d).toLocaleDateString('pt-B
 const nota = (n: number | null) => (n == null ? '—' : Number(n).toFixed(1).replace('.', ','))
 
 export function MeuSimuladoView({
-  tentativas, questoes, comparativo, desempenho, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false,
+  tentativas, questoes, comparativo, desempenho, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false, ocultarComparativo = false,
 }: {
   tentativas: TentativaResumo[]
   questoes: QuestaoAgregada[]
@@ -38,6 +38,8 @@ export function MeuSimuladoView({
   simuladoTitulo: string
   /** Admin: habilita apagar cada tentativa (o aluno NUNCA vê isso). */
   adminMode?: boolean
+  /** Esconde a tab "Comparativo" (ex.: simulado PESSOAL do aluno — não há turma). */
+  ocultarComparativo?: boolean
 }) {
   const router = useRouter()
   const ordenadas = useMemo(() => [...tentativas].sort((a, b) => (a.n ?? 0) - (b.n ?? 0)), [tentativas])
@@ -153,7 +155,7 @@ export function MeuSimuladoView({
       <TabsList>
         <TabsTrigger value="geral"><LayoutDashboard className="h-4 w-4" /> Visão geral</TabsTrigger>
         <TabsTrigger value="questoes"><ClipboardCheck className="h-4 w-4" /> Questões</TabsTrigger>
-        <TabsTrigger value="turma"><Users className="h-4 w-4" /> Comparativo</TabsTrigger>
+        {!ocultarComparativo && <TabsTrigger value="turma"><Users className="h-4 w-4" /> Comparativo</TabsTrigger>}
       </TabsList>
 
       <TabsContent value="geral" className="pt-1">
@@ -305,10 +307,12 @@ export function MeuSimuladoView({
         <QuestoesAgregadas questoes={questoes} totalTentativas={tentativas.length} revelou={gabaritoLiberado} />
       </TabsContent>
 
-      {/* COMPARATIVO */}
-      <TabsContent value="turma" className="pt-1">
-        {notaLiberada ? <ComparativoTurma c={comparativo} /> : <Bloqueado titulo="Comparativo indisponível" msg="O comparativo com a turma aparece quando o resultado for liberado." />}
-      </TabsContent>
+      {/* COMPARATIVO — oculto p/ simulado pessoal (sem turma). */}
+      {!ocultarComparativo && (
+        <TabsContent value="turma" className="pt-1">
+          {notaLiberada ? <ComparativoTurma c={comparativo} /> : <Bloqueado titulo="Comparativo indisponível" msg="O comparativo com a turma aparece quando o resultado for liberado." />}
+        </TabsContent>
+      )}
     </Tabs>
 
     {/* MODAL — download de cadernos (sem gabarito × com gabarito) */}

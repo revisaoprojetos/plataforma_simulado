@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Wand2, Plus, Trash2, Loader2, FileQuestion, Play, BarChart3, Pencil, CheckCircle2 } from 'lucide-react'
+import { Wand2, Plus, Trash2, Loader2, FileQuestion, Play, Pencil, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
@@ -16,19 +16,16 @@ const COR = '#6d28d9' // roxo da marca (default dos pôsteres, igual ao card ofi
 
 /**
  * Card "pôster" de um simulado personalizado — MESMO modelo dos cards do "Simulado Revisão"
- * (CardConcluido): aspect-[4/5], degradê da marca, ícone marca-d'água, badge de nota no canto,
- * chip de estado + título embaixo. Clicar no card faz a ação principal (concluído → resultado);
- * uma pill secundária (Refazer/Editar) fica no rodapé, e excluir aparece no hover.
+ * (CardConcluido): pôster limpo (aspect-[4/5], degradê da marca, ícone marca-d'água, badge de nota,
+ * chip de estado + título) SEM botões na capa. Clicar no card abre a PARTE INTERNA: concluído →
+ * página de resultado (hero + Visão geral/Questões + Refazer/Editar); senão → editor (com Fazer).
  */
 function CardPersonalizado({ s, onExcluir }: { s: MeuSimuladoResumo; onExcluir: () => void }) {
   const concluido = s.tentativas > 0
-  const vazio = s.questoes === 0
-  // Destino do clique no card (área principal), como nos oficiais (card → resultado).
+  // Destino do clique (parte interna), como nos oficiais (card → área de detalhe).
   const hrefPrincipal = concluido
     ? `/aluno/simulados/personalizados/${s.id}/resultado`
-    : vazio
-      ? `/aluno/simulados/personalizados/${s.id}`
-      : `/aluno/simulados/personalizados/${s.id}/fazer`
+    : `/aluno/simulados/personalizados/${s.id}`
   const estadoLabel = concluido ? 'Concluído' : s.emAndamento ? 'Em andamento' : 'Rascunho'
 
   return (
@@ -39,7 +36,7 @@ function CardPersonalizado({ s, onExcluir }: { s: MeuSimuladoResumo; onExcluir: 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${COR}, transparent)` }} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
 
-      {/* Área principal clicável (cobre o card). */}
+      {/* Card inteiro clicável → parte interna. */}
       <Link href={hrefPrincipal} className="absolute inset-0 z-10" aria-label={s.titulo} />
 
       {/* Nota (concluído) OU nº de questões — canto superior direito. */}
@@ -59,38 +56,19 @@ function CardPersonalizado({ s, onExcluir }: { s: MeuSimuladoResumo; onExcluir: 
         <Wand2 className="h-3 w-3" /> Personalizado
       </span>
 
-      {/* Excluir — hover, canto inferior direito (não colide com as pills à esquerda). */}
+      {/* Excluir — hover, canto inferior direito. */}
       <button type="button" onClick={onExcluir} title="Excluir"
         className="absolute bottom-3 right-3 z-30 rounded-full bg-black/45 p-2 text-white/80 opacity-0 backdrop-blur transition-all hover:bg-destructive hover:text-white group-hover:opacity-100">
         <Trash2 className="h-4 w-4" />
       </button>
 
-      {/* Rodapé: chip de estado + título + pill(s) de ação secundária. */}
-      <div className="absolute inset-x-0 bottom-0 z-20 p-4">
+      {/* Rodapé: chip de estado + título (SEM botões na capa). */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
         <span className="mb-1 inline-flex items-center gap-1 rounded-md bg-black/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/85 backdrop-blur">
           {concluido ? <CheckCircle2 className="h-3 w-3" /> : s.emAndamento ? <Play className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
           {estadoLabel}
         </span>
         <h3 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{s.titulo}</h3>
-
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {concluido ? (
-            // Refazer NÃO fica na frente: a parte interna (tela de resultado) já tem "Refazer simulado".
-            <>
-              <span className="pointer-events-none inline-flex items-center gap-1 rounded-lg bg-white/90 px-2 py-1 text-[11px] font-semibold text-slate-900"><BarChart3 className="h-3.5 w-3.5" /> Ver resultado</span>
-              <Link href={`/aluno/simulados/personalizados/${s.id}`} onClick={(e) => e.stopPropagation()}
-                className="pointer-events-auto relative z-30 inline-flex items-center gap-1 rounded-lg border border-white/30 bg-white/10 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:bg-white/20"><Pencil className="h-3.5 w-3.5" /> Editar</Link>
-            </>
-          ) : !vazio ? (
-            <>
-              <span className="pointer-events-none inline-flex items-center gap-1 rounded-lg bg-white/90 px-2 py-1 text-[11px] font-semibold text-slate-900"><Play className="h-3.5 w-3.5" /> {s.emAndamento ? 'Continuar' : 'Fazer'}</span>
-              <Link href={`/aluno/simulados/personalizados/${s.id}`} onClick={(e) => e.stopPropagation()}
-                className="pointer-events-auto relative z-30 inline-flex items-center gap-1 rounded-lg border border-white/30 bg-white/10 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:bg-white/20"><Pencil className="h-3.5 w-3.5" /> Editar</Link>
-            </>
-          ) : (
-            <span className="pointer-events-none inline-flex items-center gap-1 rounded-lg bg-white/90 px-2 py-1 text-[11px] font-semibold text-slate-900"><Pencil className="h-3.5 w-3.5" /> Editar</span>
-          )}
-        </div>
       </div>
     </div>
   )
