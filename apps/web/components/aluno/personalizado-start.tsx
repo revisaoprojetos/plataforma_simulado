@@ -14,8 +14,9 @@ const MODO: Record<ModoPessoal, { nome: string; desc: string; Icon: typeof Gradu
   prova: { nome: 'Prova', desc: 'Cronometrada, resultado no fim', Icon: Timer },
   revisao: { nome: 'Revisão', desc: 'Ver gabarito no seu ritmo', Icon: Eye },
 }
-// Paleta de barras por matéria (cores fixas, semânticas de "trilha") — ciclam.
-const CORES = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#ef4444', '#84cc16']
+// Paleta de barras por matéria — a 1ª usa o ROXO DA MARCA (var(--brand-primary), vinculado à
+// personalização do tenant); as demais são acentos distintos p/ diferenciar as matérias. Ciclam.
+const CORES = ['var(--brand-primary)', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#ef4444', '#84cc16']
 
 /** Tela de INÍCIO (HUD animada) do simulado pessoal: mostra nome, nº de questões, quebra por
  *  matéria, estilo, ordenação e download do caderno. Ao Iniciar, abre a sessão e entra no runner. */
@@ -52,8 +53,8 @@ export function PersonalizadoStart({ resumo }: { resumo: ResumoPessoal }) {
   ]
 
   return (
-    // Tela cheia imersiva (como o simulado real) — sem barra lateral do portal nem gutters brancos.
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-muted dark:bg-background">
+    // Tela cheia imersiva; --primary := --brand-primary (roxo forte do sistema, vinculado à personalização).
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-muted dark:bg-background" style={{ ['--primary' as any]: 'var(--brand-primary)' }}>
       <div className="mx-auto flex max-w-2xl flex-col gap-4 px-3 py-5 sm:px-4">
       <button type="button" onClick={() => router.push(`/aluno/simulados/personalizados/${resumo.simuladoId}`)}
         className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">

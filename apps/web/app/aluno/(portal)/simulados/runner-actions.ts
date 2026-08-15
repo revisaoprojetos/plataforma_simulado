@@ -28,6 +28,7 @@ export type SessaoPessoal = {
   sessaoId: string; simuladoId: string; titulo: string; modo: ModoPessoal
   tempoLimiteMin: number | null; iniciadoEm: string; status: string
   questoes: QuestaoRunner[]; respostas: Record<string, string>; secoes: SecaoRunner[]
+  estudanteNome: string
 }
 
 /**
@@ -103,10 +104,14 @@ export async function abrirSessaoPessoal(simuladoId: string): Promise<{ sessao?:
     sessaoId = (nova as any).id as string; iniciadoEm = now; status = 'em_andamento'
   }
 
-  // 4. Respostas já gravadas nesta sessão.
-  const { data: resp } = await svc.from('simulado_respostas_objetivas').select('questao_id, alternativa_id').eq('sessao_id', sessaoId)
+  // 4. Respostas já gravadas nesta sessão + nome do estudante (header "Criado: …").
+  const [{ data: resp }, { data: est }] = await Promise.all([
+    svc.from('simulado_respostas_objetivas').select('questao_id, alternativa_id').eq('sessao_id', sessaoId),
+    svc.from('simulado_estudantes').select('nome').eq('id', estudanteId).maybeSingle(),
+  ])
   const respostas: Record<string, string> = {}
   for (const r of resp ?? []) if ((r as any).alternativa_id) respostas[(r as any).questao_id] = (r as any).alternativa_id
+  const estudanteNome = ((est as any)?.nome as string) || 'Você'
 
   // 5. Prática pessoal: o /api/sessoes/resposta não deve BLOQUEAR por tempo (o timer do modo Prova
   //    é só UX, sem antifraude). Garante a flag `permitir_continuar_apos_tempo`.
@@ -122,7 +127,7 @@ export async function abrirSessaoPessoal(simuladoId: string): Promise<{ sessao?:
     .map((s: any) => ({ id: String(s?.id ?? ''), nome: String(s?.nome ?? '').slice(0, 80), questaoIds: (Array.isArray(s?.questaoIds) ? s.questaoIds : []).filter((id: string) => presentes.has(id) && !seen.has(id) && seen.add(id)) }))
     .filter((s: SecaoRunner) => s.id)
 
-  return { sessao: { sessaoId, simuladoId, titulo: (sim as any).titulo as string, modo, tempoLimiteMin: (sim as any).tempo_limite_min ?? null, iniciadoEm, status, questoes, respostas, secoes } }
+  return { sessao: { sessaoId, simuladoId, titulo: (sim as any).titulo as string, modo, tempoLimiteMin: (sim as any).tempo_limite_min ?? null, iniciadoEm, status, questoes, respostas, secoes, estudanteNome } }
 }
 
 export type ResumoPessoal = {

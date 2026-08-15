@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Check, X, Eye, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, X, Eye, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -32,6 +32,14 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   )
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState<Resultado | null>(null)
+  // Questões marcadas "para revisar" (só client-side, ajudam a navegar; ficam âmbar no navegador).
+  const [marcadas, setMarcadas] = useState<Set<string>>(new Set())
+  const toggleMarcar = (id: string) => setMarcadas((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  // Ferramentas (painel à direita): recolher/expandir + anotações e comentário (independentes, ambos podem ficar abertos).
+  const [ferrAberta, setFerrAberta] = useState(true)
+  const [anotAberta, setAnotAberta] = useState(false)
+  const [comentAberto, setComentAberto] = useState(false)
+  const [anotacoes, setAnotacoes] = useState<Record<string, string>>({})
 
   const q = sessao.questoes[idx]
   const respondidas = useMemo(() => Object.keys(respostas).length, [respostas])
@@ -100,33 +108,87 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   // Navegador de questões (reusado no topo em mobile e na coluna à direita no desktop).
   const navBtns = sessao.questoes.map((qq, i) => {
     const feito = respostas[qq.id] != null
+    const marcada = marcadas.has(qq.id)
     return (
       <button key={qq.id} type="button" onClick={() => setIdx(i)}
-        className={cn('h-8 w-8 rounded-md border text-xs font-semibold tabular-nums transition-colors',
+        className={cn('relative h-8 w-8 rounded-md border text-xs font-semibold tabular-nums transition-colors',
           i === idx ? 'border-primary bg-primary text-primary-foreground'
-            : feito ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-              : 'text-muted-foreground hover:border-foreground/30')}>{i + 1}</button>
+            : marcada ? 'border-amber-500/50 bg-amber-500/15 text-amber-600 dark:text-amber-400'
+              : feito ? 'border-primary/30 bg-primary/15 text-primary'
+                : 'text-muted-foreground hover:border-foreground/30')}>
+        {i + 1}
+        {marcada && i === idx && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-card" />}
+      </button>
     )
   })
 
+  // Painel recolhível de Ferramentas: Anotações + Comentário do professor (SEM revelar o gabarito).
+  const ferramentas = (
+    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <button type="button" onClick={() => setFerrAberta((v) => !v)} className="flex w-full items-center justify-between gap-2 px-4 py-2.5 transition-colors hover:bg-muted/40">
+        <span className="text-xs font-semibold text-foreground">Ferramentas</span>
+        <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', !ferrAberta && '-rotate-90')} />
+      </button>
+      {ferrAberta && (
+        <div className="space-y-2 border-t p-3">
+          {/* Anotações */}
+          <div className="overflow-hidden rounded-xl border">
+            <button type="button" onClick={() => setAnotAberta((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
+              <StickyNote className="h-4 w-4 text-primary" /> Anotações
+              <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !anotAberta && '-rotate-90')} />
+            </button>
+            {anotAberta && (
+              <textarea value={anotacoes[q.id] ?? ''} onChange={(e) => setAnotacoes((a) => ({ ...a, [q.id]: e.target.value }))}
+                placeholder="Escreva suas anotações sobre esta questão…"
+                className="min-h-[6rem] w-full resize-y border-t bg-transparent p-3 text-sm outline-none placeholder:text-muted-foreground/70 focus-visible:ring-1 focus-visible:ring-primary" />
+            )}
+          </div>
+          {/* Comentário do professor — mostra o texto SEM revelar a alternativa correta */}
+          <div className="overflow-hidden rounded-xl border">
+            <button type="button" onClick={() => setComentAberto((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
+              <Lightbulb className="h-4 w-4 text-primary" /> Comentário do professor
+              <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !comentAberto && '-rotate-90')} />
+            </button>
+            {comentAberto && (
+              <div className="border-t p-3 text-sm">
+                {q.comentario ? <MarkdownContent className="leading-relaxed text-foreground">{q.comentario}</MarkdownContent> : <span className="text-muted-foreground">Sem comentário para esta questão.</span>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
   return (
     // Tela cheia imersiva (como o simulado real): cobre o portal, sem barra lateral nem gutters brancos.
-    <div className="fixed inset-0 z-50 flex flex-col bg-muted dark:bg-background">
-      {/* Header full-width: sair, título/modo, questão X de Y, timer */}
-      <header className="flex items-center gap-3 border-b bg-card px-3 py-2.5 sm:px-5">
-        <button type="button" onClick={() => router.push(`/aluno/simulados/personalizados/${sessao.simuladoId}`)}
-          className="shrink-0 rounded-lg border p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Sair"><ArrowLeft className="h-4 w-4" /></button>
-        <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:flex"><Icon className="h-5 w-5" /></span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold leading-tight">{sessao.titulo}</div>
-          <div className="text-xs text-muted-foreground">Questão {idx + 1} de {total}</div>
+    // --primary := --brand-primary (roxo NOVO/mais forte do sistema, vinculado à personalização):
+    // assim todos os bg-primary/text-primary do simulado usam a cor da marca atualizada.
+    <div className="fixed inset-0 z-50 flex flex-col bg-muted dark:bg-background" style={{ ['--primary' as any]: 'var(--brand-primary)' }}>
+      {/* Header: [esquerda: sair/modo] · [centro: título + criado] · [direita: timer + finalizar] */}
+      <header className="flex items-center gap-2 border-b bg-card px-3 py-2.5 sm:px-5">
+        <div className="flex flex-1 items-center gap-2">
+          <button type="button" onClick={() => router.push(`/aluno/simulados/personalizados/${sessao.simuladoId}`)}
+            className="shrink-0 rounded-lg border p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Sair"><ArrowLeft className="h-4 w-4" /></button>
+          <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:flex"><Icon className="h-5 w-5" /></span>
         </div>
-        {restante != null && (
-          <span className={cn('flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold tabular-nums',
-            restante <= 60 ? 'bg-destructive/10 text-destructive' : 'bg-muted text-foreground')}>
-            <Timer className={cn('h-4 w-4', restante <= 60 && 'animate-pulse')} /> {formatarSeg(Math.max(0, restante))}
-          </span>
-        )}
+        <div className="flex min-w-0 flex-col items-center px-1 text-center">
+          <span className="max-w-[42vw] truncate text-sm font-semibold leading-tight sm:max-w-[26rem]">{sessao.titulo}</span>
+          <span className="max-w-[42vw] truncate text-xs text-muted-foreground">Criado: {sessao.estudanteNome}</span>
+        </div>
+        <div className="flex flex-1 items-center justify-end gap-2">
+          {restante != null && (
+            <span className={cn('flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold tabular-nums',
+              restante <= 60 ? 'bg-destructive/10 text-destructive' : 'bg-muted text-foreground')}>
+              <Timer className={cn('h-4 w-4', restante <= 60 && 'animate-pulse')} /> {formatarSeg(Math.max(0, restante))}
+            </span>
+          )}
+          {/* Finalizar sempre visível, à direita do timer */}
+          <button type="button" onClick={finalizar} disabled={enviando}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90 hover:shadow-md disabled:opacity-60">
+            {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />} <span className="hidden sm:inline">Finalizar</span>
+          </button>
+        </div>
       </header>
       {/* Progresso — barra fina full-width sob o header */}
       <div className="h-1 w-full bg-muted">
@@ -138,7 +200,10 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
         <div className="mx-auto grid w-full max-w-5xl gap-4 px-3 py-4 sm:px-4 sm:py-5 lg:grid-cols-[1fr_13rem] lg:gap-8">
           <div className="flex min-w-0 flex-col gap-4">
             {/* Navegador (mobile/tablet) */}
-            <div className="flex flex-wrap gap-1.5 lg:hidden">{navBtns}</div>
+            <div className="lg:hidden">
+              <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Navegador de questões</p>
+              <div className="flex flex-wrap gap-1.5">{navBtns}</div>
+            </div>
 
       {/* Questão — card com fita colorida, badge do número e pills */}
       <div className="relative overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -196,6 +261,9 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
         </div>
       )}
 
+      {/* Ferramentas (mobile) — no desktop ficam na coluna da direita */}
+      <div className="lg:hidden">{ferramentas}</div>
+
       {/* Navegação / ações */}
       <div className="flex items-center justify-between gap-2 pb-2">
         <button type="button" onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
@@ -210,6 +278,12 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
               <Eye className="h-4 w-4" /> Ver gabarito
             </button>
           )}
+          {/* Revisar — à esquerda do Próxima/Finalizar */}
+          <button type="button" onClick={() => toggleMarcar(q.id)} title={marcadas.has(q.id) ? 'Desmarcar revisão' : 'Marcar para revisar'}
+            className={cn('inline-flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-sm font-medium shadow-sm transition-colors',
+              marcadas.has(q.id) ? 'border-amber-500/50 bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-card hover:bg-muted')}>
+            <Bookmark className={cn('h-4 w-4', marcadas.has(q.id) && 'fill-current')} /> Revisar
+          </button>
           {idx < total - 1 ? (
             <button type="button" onClick={() => setIdx((i) => Math.min(total - 1, i + 1))}
               className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md">
@@ -233,22 +307,30 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
       )}
           </div>
 
-          {/* Navegador (desktop) — coluna fixa à direita, como o simulado real */}
+          {/* Coluna direita (desktop): navegador + ferramentas, como o simulado real */}
           <aside className="hidden lg:block">
-            <div className="sticky top-4 space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-muted-foreground">Questões</p>
-                <span className="text-xs font-medium tabular-nums text-muted-foreground">{respondidas}/{total}</span>
+            <div className="sticky top-4 space-y-3">
+              <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                {/* fita colorida no topo (como o card da questão) */}
+                <div className="h-1.5 bg-gradient-to-r from-primary via-primary to-primary/30" />
+                <div className="space-y-3 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-foreground">Navegador de questões</p>
+                    <span className="text-xs font-medium tabular-nums text-muted-foreground">{respondidas}/{total}</span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1.5">{navBtns}</div>
+                  {/* divisória */}
+                  <div className="border-t" />
+                  {/* legenda — cores respectivas */}
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
+                    <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-primary" /> atual</span>
+                    <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-primary/20 ring-1 ring-primary/40" /> respondida</span>
+                    <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-amber-500/15 ring-1 ring-amber-500/50" /> para revisar</span>
+                    <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded border" /> em branco</span>
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-5 gap-1.5">{navBtns}</div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-emerald-500/20 ring-1 ring-emerald-500/40" /> respondida</span>
-                <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-primary" /> atual</span>
-              </div>
-              <button type="button" onClick={finalizar} disabled={enviando}
-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60">
-                {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />} Finalizar
-              </button>
+              {ferramentas}
             </div>
           </aside>
         </div>
@@ -277,7 +359,7 @@ function TelaResultado({ sessao, respostas, resultado, onRefazer }: {
   const router = useRouter()
   const pct = resultado.total > 0 ? Math.round((resultado.acertos / resultado.total) * 100) : 0
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-muted dark:bg-background">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-muted dark:bg-background" style={{ ['--primary' as any]: 'var(--brand-primary)' }}>
       <div className="mx-auto flex max-w-2xl flex-col gap-4 px-3 py-5 sm:px-4">
       <div className="rounded-2xl border bg-card p-6 text-center shadow-sm">
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary"><Trophy className="h-7 w-7" /></div>
