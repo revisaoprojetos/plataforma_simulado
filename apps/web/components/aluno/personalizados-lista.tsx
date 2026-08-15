@@ -3,11 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Wand2, Plus, Trash2, Loader2, FileQuestion, Play, Pencil, CheckCircle2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { Wand2, Plus, Loader2, FileQuestion, Play, Pencil, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { confirmar } from '@/components/ui/confirm-dialog'
-import { listarMeusSimulados, excluirMeuSimulado, type MeuSimuladoResumo } from '@/app/aluno/(portal)/simulados/builder-actions'
+import { listarMeusSimulados, type MeuSimuladoResumo } from '@/app/aluno/(portal)/simulados/builder-actions'
 
 // Nota (0–100) → tom (mesma régua dos cards oficiais).
 const notaTone = (n: number) => (n >= 70 ? 'text-emerald-400' : n >= 50 ? 'text-amber-400' : 'text-rose-400')
@@ -20,7 +18,7 @@ const COR = '#6d28d9' // roxo da marca (default dos pôsteres, igual ao card ofi
  * chip de estado + título) SEM botões na capa. Clicar no card abre a PARTE INTERNA: concluído →
  * página de resultado (hero + Visão geral/Questões + Refazer/Editar); senão → editor (com Fazer).
  */
-function CardPersonalizado({ s, onExcluir }: { s: MeuSimuladoResumo; onExcluir: () => void }) {
+function CardPersonalizado({ s }: { s: MeuSimuladoResumo }) {
   const concluido = s.tentativas > 0
   // Destino do clique (parte interna), como nos oficiais (card → área de detalhe).
   const hrefPrincipal = concluido
@@ -56,13 +54,7 @@ function CardPersonalizado({ s, onExcluir }: { s: MeuSimuladoResumo; onExcluir: 
         <Wand2 className="h-3 w-3" /> Personalizado
       </span>
 
-      {/* Excluir — hover, canto inferior direito. */}
-      <button type="button" onClick={onExcluir} title="Excluir"
-        className="absolute bottom-3 right-3 z-30 rounded-full bg-black/45 p-2 text-white/80 opacity-0 backdrop-blur transition-all hover:bg-destructive hover:text-white group-hover:opacity-100">
-        <Trash2 className="h-4 w-4" />
-      </button>
-
-      {/* Rodapé: chip de estado + título (SEM botões na capa). */}
+      {/* Rodapé: chip de estado + título (SEM botões na capa — excluir foi p/ a parte interna). */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
         <span className="mb-1 inline-flex items-center gap-1 rounded-md bg-black/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/85 backdrop-blur">
           {concluido ? <CheckCircle2 className="h-3 w-3" /> : s.emAndamento ? <Play className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
@@ -84,15 +76,6 @@ export function PersonalizadosLista() {
 
   // Abre o criador em etapas (configuração → questões → prévia).
   const criar = () => router.push('/aluno/simulados/personalizados/novo')
-
-  const excluir = async (s: MeuSimuladoResumo) => {
-    const ok = await confirmar({ titulo: 'Excluir simulado', mensagem: `Excluir "${s.titulo}"? Isso não pode ser desfeito.`, confirmar: 'Excluir', destrutivo: true })
-    if (!ok) return
-    const r = await excluirMeuSimulado(s.id)
-    if (r.error) { toast.error(r.error); return }
-    toast.success('Simulado excluído.')
-    setItens((prev) => (prev ?? []).filter((x) => x.id !== s.id))
-  }
 
   return (
     <section className="space-y-3">
@@ -126,7 +109,7 @@ export function PersonalizadosLista() {
       ) : (
         // Mesma grade dos cards oficiais (pôsteres).
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {itens.map((s) => <CardPersonalizado key={s.id} s={s} onExcluir={() => excluir(s)} />)}
+          {itens.map((s) => <CardPersonalizado key={s.id} s={s} />)}
         </div>
       )}
     </section>

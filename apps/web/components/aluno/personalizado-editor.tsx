@@ -8,6 +8,7 @@ import { ArrowLeft, Plus, Trash2, Loader2, Play, X, GripVertical, ChevronUp, Che
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { SeletorQuestoes } from '@/components/aluno/seletor-questoes'
+import { ExcluirPersonalizadoButton } from '@/components/aluno/excluir-personalizado-button'
 import { adicionarQuestoes, removerQuestao, renomearMeuSimulado, salvarLayout, type QuestaoEscolhida, type Secao } from '@/app/aluno/(portal)/simulados/builder-actions'
 
 const uid = () => (globalThis.crypto?.randomUUID?.() ?? `s_${Math.random().toString(36).slice(2)}_${Date.now()}`)
@@ -111,6 +112,7 @@ export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensInicia
             className="w-full rounded-lg border bg-transparent px-3 py-2 text-lg font-bold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Nome do simulado" />
           {salvandoNome && <Loader2 className="absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />}
         </div>
+        <ExcluirPersonalizadoButton simuladoId={simuladoId} titulo={titulo} iconOnly />
         <button type="button" onClick={() => router.push(`/aluno/simulados/personalizados/${simuladoId}/fazer`)}
           disabled={totalQ === 0} title={totalQ === 0 ? 'Adicione questões para fazer' : 'Fazer o simulado'}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60">

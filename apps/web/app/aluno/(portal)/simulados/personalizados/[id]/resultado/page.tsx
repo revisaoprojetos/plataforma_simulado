@@ -6,6 +6,7 @@ import { ChevronLeft, RotateCcw, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { montarResultadoAluno, type SessaoInput } from '@/lib/simulado/resultado-aluno'
 import { MeuSimuladoView } from '@/components/aluno/meu-simulado-view'
+import { ExcluirPersonalizadoButton } from '@/components/aluno/excluir-personalizado-button'
 import type { Comparativo } from '@/lib/simulado/comparativo'
 
 export const dynamic = 'force-dynamic'
@@ -70,6 +71,7 @@ export default async function ResultadoPersonalizadoPage({ params }: { params: P
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">melhor nota</div>
             </div>
             <div className="flex items-center gap-2">
+              <ExcluirPersonalizadoButton simuladoId={id} titulo={sim.titulo} />
               <Link href={`/aluno/simulados/personalizados/${id}`} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted">
                 <Pencil className="h-4 w-4" /> Editar
               </Link>
