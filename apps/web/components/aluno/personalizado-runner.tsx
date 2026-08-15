@@ -217,10 +217,12 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   // BARRA LATERAL (desktop): trilho fixo (w-14) docado à direita; ao expandir, o painel abre como
   // OVERLAY POR CIMA do conteúdo (não empurra o simulado).
   const sidebar = (
-    <aside className="relative hidden h-full w-14 shrink-0 border-l bg-card lg:block">
-      {/* Trilho de ícones — some ao abrir; ao recolher, só reaparece DEPOIS que o painel termina de
-          deslizar (delay), evitando o trilho aparecer atrás do painel durante a animação. */}
-      <div className={cn('flex flex-col items-center gap-1 py-3 transition-opacity duration-200',
+    // Trilho SEM borda/fundo próprios (só os ícones flutuam) — assim, ao recolher, não sobra uma
+    // "divisória"/faixa atrás do painel. A borda + sombra ficam só no painel deslizante.
+    <aside className="relative hidden h-full w-14 shrink-0 lg:block">
+      {/* Trilho de ícones = card flutuante compacto no topo (não uma faixa de altura cheia). Some ao
+          abrir; ao recolher, só reaparece DEPOIS que o painel termina de deslizar (delay). */}
+      <div className={cn('absolute right-2 top-3 z-20 flex flex-col items-center gap-1 rounded-xl border bg-card p-1 shadow-sm transition-opacity duration-200',
         sidebarAberta ? 'pointer-events-none opacity-0' : 'opacity-100 delay-[380ms]')}>
         <button type="button" onClick={() => setSidebarAberta((v) => !v)} title={sidebarAberta ? 'Recolher barra' : 'Expandir barra'} className={cn('rounded-md p-2 transition-colors hover:bg-muted', sidebarAberta ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}>
           {sidebarAberta ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
