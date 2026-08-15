@@ -70,9 +70,23 @@ function CardConcluido({ s }: { s: MeuSimuladoItem }) {
  */
 export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoItem[]; grupos: Grupo[] }) {
   const temCatalogo = grupos.length > 0
-  // Aba inicial via URL (?aba=personalizados) — usado pelo "Voltar" da tela de fazer personalizado.
-  const abaInicial = useSearchParams().get('aba') === 'personalizados' ? 'personalizados' : 'revisao'
-  const [aba, setAba] = useState<'revisao' | 'personalizados'>(abaInicial)
+  const searchParams = useSearchParams()
+  // Aba refletida na URL (?aba=personalizados). Manter na URL é o que faz o VOLTAR do navegador
+  // (botão lateral do mouse) retornar à aba certa em vez de cair sempre na "Simulado Revisão".
+  const abaUrl = searchParams.get('aba') === 'personalizados' ? 'personalizados' : 'revisao'
+  const [aba, setAba] = useState<'revisao' | 'personalizados'>(abaUrl)
+  // Sincroniza a aba quando a URL muda (ex.: voltar do navegador para ?aba=personalizados).
+  useEffect(() => { setAba(abaUrl) }, [abaUrl])
+  // Troca a aba E grava na URL via History API (instantâneo, SEM round-trip/re-fetch do Next) — o
+  // voltar do navegador retorna à aba certa. router.replace faria um fetch RSC (~1s) e criava corrida.
+  const trocarAba = (id: 'revisao' | 'personalizados') => {
+    setAba(id)
+    const params = new URLSearchParams(searchParams.toString())
+    if (id === 'personalizados') params.set('aba', 'personalizados')
+    else params.delete('aba')
+    const qs = params.toString()
+    window.history.replaceState(null, '', qs ? `/aluno/simulados?${qs}` : '/aluno/simulados')
+  }
   const [vista, setVista] = useState<'quadro' | 'catalogo'>('catalogo')
   useEffect(() => { const v = localStorage.getItem('aluno-meus-simulados-vista'); if (v === 'catalogo' || v === 'quadro') setVista(v) }, [])
   useEffect(() => { localStorage.setItem('aluno-meus-simulados-vista', vista) }, [vista])
@@ -103,7 +117,7 @@ export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoIte
       <div className="border-b border-border">
         <nav className="-mb-px flex gap-5" role="tablist" aria-label="Meus simulados">
           {([['revisao', 'Simulado Revisão'], ['personalizados', 'Personalizados']] as const).map(([id, label]) => (
-            <button key={id} type="button" role="tab" aria-selected={aba === id} onClick={() => setAba(id)}
+            <button key={id} type="button" role="tab" aria-selected={aba === id} onClick={() => trocarAba(id)}
               className={cn('-mb-px border-b-2 px-1 pb-2.5 text-sm font-medium transition-colors',
                 aba === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground')}>
               {label}
