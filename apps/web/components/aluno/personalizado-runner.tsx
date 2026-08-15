@@ -1,13 +1,13 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Check, X, Eye, EyeOff, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, FileText, Scissors, Bold, Italic, Underline, List, Baseline, Highlighter, Download, Maximize2, Target, BarChart3, BookOpen, ListChecks } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
-import type { SessaoPessoal, ModoPessoal, QuestaoRunner } from '@/app/aluno/(portal)/simulados/runner-actions'
+import type { SessaoPessoal, ModoPessoal } from '@/app/aluno/(portal)/simulados/runner-actions'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 const MODO_INFO: Record<ModoPessoal, { nome: string; Icon: typeof GraduationCap }> = {
@@ -568,7 +568,7 @@ function TelaResultado({ sessao, respostas, resultado, onRefazer }: {
   })()
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-muted dark:bg-background" style={{ ['--primary' as any]: 'var(--brand-primary)' }}>
-      <div className="mx-auto flex max-w-2xl flex-col gap-4 px-3 py-5 sm:px-4">
+      <div className="mx-auto flex max-w-3xl flex-col gap-4 px-3 py-5 sm:px-4">
       {/* Hero + KPIs (mesmo estilo do resultado do simulado real) */}
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         <div className="flex flex-col items-center gap-1 border-b bg-gradient-to-b from-primary/5 to-transparent p-6 text-center">
@@ -606,71 +606,110 @@ function TelaResultado({ sessao, respostas, resultado, onRefazer }: {
         </div>
       )}
 
-      <div className="space-y-2">
-        <h2 className="text-sm font-semibold">Gabarito</h2>
-        {(() => {
-          const sec = secaoMap(sessao.secoes); let anterior = ''
-          return sessao.questoes.map((q, i) => {
-            const nome = sec.get(q.id) ?? ''
-            const divisor = nome && nome !== anterior
-            anterior = nome
-            return (
-              <Fragment key={q.id}>
-                {divisor && <p className="px-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{nome}</p>}
-                <RevisaoItem q={q} numero={i + 1} escolhida={respostas[q.id] ?? null} />
-              </Fragment>
-            )
-          })
-        })()}
-      </div>
+      <RevisaoQuestoes sessao={sessao} respostas={respostas} />
       </div>
     </div>
   )
 }
 
-function RevisaoItem({ q, numero, escolhida }: { q: QuestaoRunner; numero: number; escolhida: string | null }) {
-  const [aberto, setAberto] = useState(false)
-  const idxCerta = q.alternativas.findIndex((a) => a.correta)
-  const idxSua = q.alternativas.findIndex((a) => a.id === escolhida)
-  const acertou = idxSua >= 0 && idxSua === idxCerta
-  const emBranco = idxSua < 0
+/** Revisão completa (como no simulado real): navegador de questões + filtros + cada questão INTEIRA
+ *  (enunciado, TODAS as alternativas com certo/errado/sua resposta e comentário). */
+function RevisaoQuestoes({ sessao, respostas }: { sessao: SessaoPessoal; respostas: Record<string, string> }) {
+  const [filtro, setFiltro] = useState<'todas' | 'erradas' | 'branco'>('todas')
+  const sec = secaoMap(sessao.secoes)
+  const refs = useRef<Record<string, HTMLDivElement | null>>({})
+  const infos = sessao.questoes.map((q, i) => {
+    const correta = q.alternativas.find((a) => a.correta) ?? null
+    const escolhida = respostas[q.id] ?? null
+    const emBranco = !escolhida
+    const acertou = !!escolhida && correta?.id === escolhida
+    return { q, numero: i + 1, escolhida, emBranco, acertou }
+  })
+  const comErro = infos.filter((x) => !x.emBranco && !x.acertou).length
+  const comBranco = infos.filter((x) => x.emBranco).length
+  const lista = infos.filter((x) => (filtro === 'erradas' ? !x.emBranco && !x.acertou : filtro === 'branco' ? x.emBranco : true))
+  const irPara = (id: string) => refs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
   return (
-    <div className="rounded-xl border bg-card shadow-sm">
-      <button type="button" onClick={() => setAberto((v) => !v)} className="flex w-full items-center gap-3 p-3 text-left">
-        <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white',
-          emBranco ? 'bg-muted-foreground/60' : acertou ? 'bg-emerald-500' : 'bg-destructive')}>{numero}</span>
-        <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{limparTexto(q.enunciado)}</span>
-        <span className="shrink-0 text-xs font-medium">
-          {emBranco ? <span className="text-muted-foreground">em branco</span>
-            : <>Sua: <b className={acertou ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}>{LETRA[idxSua]}</b> · Certa: <b className="text-emerald-600 dark:text-emerald-400">{LETRA[idxCerta]}</b></>}
-        </span>
-      </button>
-      {aberto && (
-        <div className="border-t p-3 text-sm">
-          <MarkdownContent className="leading-relaxed">{q.enunciado}</MarkdownContent>
-          <div className="mt-3 space-y-1.5">
-            {q.alternativas.map((alt, i) => (
-              <div key={alt.id} className={cn('flex items-start gap-2 rounded-lg border p-2',
-                alt.correta ? 'border-emerald-500 bg-emerald-500/10' : alt.id === escolhida ? 'border-destructive bg-destructive/10' : 'border-transparent')}>
-                <span className="text-xs font-bold text-muted-foreground">{LETRA[i]}</span>
-                <MarkdownContent inline className="min-w-0 flex-1">{alt.texto}</MarkdownContent>
-              </div>
-            ))}
-          </div>
-          {q.comentario && (
-            <div className="mt-3 rounded-lg border bg-muted/40 p-3">
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Comentário</p>
-              <MarkdownContent className="leading-relaxed">{q.comentario}</MarkdownContent>
-            </div>
-          )}
+    <div className="space-y-4">
+      <h2 className="text-sm font-semibold">Revisão das questões</h2>
+
+      {/* Navegador de questões (cores por acerto/erro/branco) */}
+      <div className="rounded-2xl border bg-card p-4 shadow-sm">
+        <p className="mb-2 text-xs font-semibold text-muted-foreground">Navegador de questões</p>
+        <div className="flex flex-wrap gap-1.5">
+          {infos.map((x) => (
+            <button key={x.q.id} type="button" onClick={() => irPara(x.q.id)}
+              className={cn('h-8 w-8 rounded-md border text-xs font-bold tabular-nums transition-transform hover:scale-105',
+                x.emBranco ? 'border-border bg-muted text-muted-foreground' : x.acertou ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-destructive bg-destructive text-white')}>{x.numero}</button>
+          ))}
         </div>
-      )}
+        <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-emerald-500" /> acertou</span>
+          <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-destructive" /> errou</span>
+          <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-muted ring-1 ring-border" /> em branco</span>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-1.5">
+        {([['todas', `Todas (${infos.length})`], ['erradas', `Com erro (${comErro})`], ['branco', `Em branco (${comBranco})`]] as const).map(([v, label]) => (
+          <button key={v} type="button" onClick={() => setFiltro(v)}
+            className={cn('rounded-full border px-3 py-1 text-sm font-medium transition-colors', filtro === v ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground')}>{label}</button>
+        ))}
+      </div>
+
+      {/* Questões por inteiro */}
+      <div className="space-y-3">
+        {lista.map((x) => {
+          const q = x.q
+          return (
+            <div key={q.id} ref={(el) => { refs.current[q.id] = el }} className="scroll-mt-4 rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+              <div className="flex items-start gap-3">
+                <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold tabular-nums text-white',
+                  x.emBranco ? 'bg-muted-foreground/60' : x.acertou ? 'bg-emerald-500' : 'bg-destructive')}>{x.numero}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                    {sec.get(q.id) && <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">{sec.get(q.id)}</span>}
+                    {q.disciplina && <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">{q.disciplina}</span>}
+                    {q.origemSimulado && <span className="inline-flex max-w-[13rem] items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-muted-foreground" title={q.origemSimulado}><FileText className="h-3 w-3 shrink-0" />{q.origemNumero != null && <b className="text-foreground">Q{q.origemNumero}</b>}<span className="truncate">{q.origemSimulado}</span></span>}
+                    <span className={cn('rounded-full px-2 py-0.5 font-semibold', x.emBranco ? 'bg-muted text-muted-foreground' : x.acertou ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-destructive/10 text-destructive')}>{x.emBranco ? 'Em branco' : x.acertou ? 'Acertou' : 'Errou'}</span>
+                  </div>
+                  {q.imagemUrl && <img src={q.imagemUrl} alt="" className="mb-3 max-h-64 w-auto rounded-lg border" />}
+                  <MarkdownContent className="text-[15px] leading-relaxed text-foreground">{q.enunciado || '(sem enunciado)'}</MarkdownContent>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                {q.alternativas.map((a, ai) => {
+                  const sua = x.escolhida === a.id
+                  return (
+                    <div key={a.id} className={cn('flex items-start gap-3 rounded-xl border p-3 text-sm',
+                      a.correta ? 'border-emerald-500 bg-emerald-500/10' : sua ? 'border-destructive bg-destructive/10' : 'border-border')}>
+                      <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                        a.correta ? 'bg-emerald-500 text-white' : sua ? 'bg-destructive text-white' : 'border border-muted-foreground/30 text-muted-foreground')}>{LETRA[ai]}</span>
+                      <MarkdownContent inline className={cn('min-w-0 flex-1 leading-relaxed', (a.correta || sua) && 'font-medium')}>{a.texto}</MarkdownContent>
+                      {a.correta && <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />}
+                      {sua && !a.correta && <X className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />}
+                      {sua && <span className="shrink-0 self-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">sua resposta</span>}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {q.comentario && (
+                <div className="mt-3 flex gap-2 rounded-xl border bg-muted/30 p-3 text-sm">
+                  <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <div><p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Comentário do professor</p><MarkdownContent className="mt-0.5 leading-relaxed text-foreground">{q.comentario}</MarkdownContent></div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {lista.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Nenhuma questão nesse filtro.</p>}
+      </div>
     </div>
   )
-}
-
-function limparTexto(s: string): string {
-  return (s ?? '').replace(/<[^>]+>/g, ' ').replace(/[*_`#>[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120)
 }
 
 // Cores por aproveitamento (mesma escala do resultado oficial): verde ≥70, âmbar ≥50, senão vermelho.
