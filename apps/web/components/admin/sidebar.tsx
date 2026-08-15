@@ -71,6 +71,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { NotificationBell } from '@/components/admin/notification-bell'
 import { AjudaButton } from '@/components/admin/ajuda-center'
 import { logoutAction } from '@/app/login/actions'
+import { confirmarDescartarAlteracoes } from '@/components/admin/use-unsaved-guard'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { LOGIN_DEFAULT, type LoginConfig } from '@/lib/login-config'
 
@@ -417,7 +418,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
             className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[color:var(--sidebar-accent)]">
             <Building2 className="h-4 w-4" />
           </button>
-          <button type="button" onClick={() => { setSaindo(true); setTimeout(() => { void logoutAction() }, 1100) }} title="Sair" aria-label="Sair"
+          <button type="button" onClick={async () => { if (!(await confirmarDescartarAlteracoes())) return; setSaindo(true); setTimeout(() => { void logoutAction() }, 1100) }} title="Sair" aria-label="Sair"
             className={cn(btnFooter, 'flex items-center justify-center gap-1.5 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:px-0')}>
             <LogOut className="h-3.5 w-3.5" /> <span className="group-data-[collapsible=icon]:hidden">Sair</span>
           </button>

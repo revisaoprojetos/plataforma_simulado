@@ -76,13 +76,14 @@ type Modo =
  * pontinhos voando para a barra. Roda no carregamento e também SOB DEMANDA (evento `gam:recelebrar`)
  * quando o aluno ganha XP na própria tela (check-in do dia, baú da trilha), com um ponto de origem.
  */
-export function CelebracaoXp() {
+export function CelebracaoXp({ assistenteAtivo = false }: { assistenteAtivo?: boolean }) {
   const [modo, setModo] = useState<Modo>(null)
   const alvoRef = useRef<HTMLElement | null>(null)
   const spanRefs = useRef<(HTMLSpanElement | null)[]>([])
   const labelRef = useRef<HTMLSpanElement | null>(null)
   const jaRodou = useRef(false)
   const pendingLevelupRef = useRef<Modo | null>(null) // level-up que abre DEPOIS da barra encher
+  const celebrandoTourRef = useRef(false) // celebração disparada pelo tour de novidades
 
   // Núcleo reutilizável: decide level-up x partículas a partir do estado atual do servidor.
   const celebrar = useCallback(async (origin: Ponto | null, esperarPopup: boolean): Promise<boolean> => {
@@ -155,6 +156,10 @@ export function CelebracaoXp() {
   // Carregamento inicial (com espera do pop-up de entrada) + 1 retry para o award assíncrono.
   useEffect(() => {
     if (jaRodou.current) return
+    // No 1º acesso com o tour de novidades ativo, quem dispara a celebração (level-up) é o TOUR,
+    // na hora certa — aqui NÃO auto-roda para o level-up não aparecer antes da capivara.
+    const tourVaiRodar = !!assistenteAtivo && typeof localStorage !== 'undefined' && !localStorage.getItem('mascote-tour-gam:v1')
+    if (tourVaiRodar) return
     jaRodou.current = true
     let cancelado = false
     const timers: any[] = []
@@ -164,6 +169,17 @@ export function CelebracaoXp() {
       timers.push(setTimeout(() => { if (!cancelado) celebrar(null, true) }, 1800))
     }, 700))
     return () => { cancelado = true; timers.forEach(clearTimeout) }
+  }, [celebrar, assistenteAtivo])
+
+  // Tour de novidades: dispara a celebração (level-up) na hora certa e avisa quando termina.
+  useEffect(() => {
+    const onTour = async () => {
+      celebrandoTourRef.current = true
+      const ok = await celebrar(null, false)
+      if (!ok) { celebrandoTourRef.current = false; window.dispatchEvent(new CustomEvent('tour:celebrar-fim')) }
+    }
+    window.addEventListener('tour:celebrar', onTour)
+    return () => window.removeEventListener('tour:celebrar', onTour)
   }, [celebrar])
 
   // Sob demanda: check-in do dia / baú da trilha recolhido (com origem dos pontinhos).
@@ -230,6 +246,13 @@ export function CelebracaoXp() {
     const m = modo
     // Ao fechar o level-up: volta para a Início com XP voando p/ a barra + desbloqueio do cargo.
     const aoFechar = () => {
+      // Tour de novidades: fecha o level-up e avisa o tour p/ seguir (sem os pontinhos de follow-up).
+      if (celebrandoTourRef.current) {
+        celebrandoTourRef.current = false
+        setModo(null)
+        window.dispatchEvent(new CustomEvent('tour:celebrar-fim'))
+        return
+      }
       // In-portal: a barra JÁ cruzou o nível durante os pontinhos; agora (depois do level-up) só
       // acontece a transformação do cargo — nunca imediatamente ao pular de nível.
       if (m.jaEncheu) {
@@ -260,7 +283,7 @@ export function CelebracaoXp() {
       } catch { /* ignore */ }
       setModo(null)
     }
-    return <LevelUpModal from={m.from} to={m.to} curva={m.curva} gains={m.gains} unlocked={[]} xpGanho={m.xpGanho} totalXp={m.totalXp} streak={m.streak} badgesLabel={m.badges} logo={m.logo} onClose={aoFechar} />
+    return <LevelUpModal from={m.from} to={m.to} curva={m.curva} gains={m.gains} unlocked={[]} xpGanho={m.xpGanho} totalXp={m.totalXp} streak={m.streak} badgesLabel={m.badges} logo={m.logo} onClose={aoFechar} mascote={assistenteAtivo} />
   }
 
   return createPortal(

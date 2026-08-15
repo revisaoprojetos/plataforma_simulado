@@ -1,10 +1,14 @@
+import { redirect } from 'next/navigation'
 import { Route } from 'lucide-react'
 import { carregarTrilhasAluno } from '@/lib/aluno/trilhas'
 import { TrilhaGigante } from '@/components/aluno/trilha-simulados'
 import { GamificacaoRail } from '@/components/aluno/gamificacao-rail'
+import { MascoteTour } from '@/components/mascote/mascote-tour'
 
 export default async function TrilhaAlunoPage() {
   const { trilhas, gamAtivo, gam } = await carregarTrilhasAluno()
+  // Trilha é recurso de gamificação — some por completo quando a gamificação está desativada.
+  if (!gamAtivo) redirect('/aluno')
   const totalSims = trilhas.reduce((a, t) => a + t.total, 0)
   const totalDone = trilhas.reduce((a, t) => a + t.done, 0)
 
@@ -25,7 +29,7 @@ export default async function TrilhaAlunoPage() {
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* Coluna principal: a trilha gigante */}
-        <div className="min-w-0">
+        <div data-tour="trilha-pagina" className="min-w-0">
           {trilhas.length > 0 ? (
             <div className="overflow-x-auto pb-10">
               <TrilhaGigante trilhas={trilhas} gamAtivo={gamAtivo} />
@@ -40,6 +44,10 @@ export default async function TrilhaAlunoPage() {
         {/* Coluna direita: meta, sequência, missões, liga, conquistas (igual à Início) */}
         {gam && <GamificacaoRail resumo={gam.resumo} missoes={gam.missoes} semana={gam.semana} conquistas={gam.conquistas} config={gam.config} />}
       </div>
+
+      {/* Continuação do tour da mascote (2º capítulo): retoma aqui quando veio da Início.
+          Sem gate por gamAtivo — o tour se auto-gate pela fase salva (só roda se veio da Início). */}
+      <MascoteTour ativo />
     </div>
   )
 }

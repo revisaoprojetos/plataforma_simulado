@@ -316,6 +316,12 @@
   0%, 100% { box-shadow: 0 12px 28px -8px rgba(0,0,0,.35), 0 0 0 0 color-mix(in oklab, var(--brand-primary, var(--primary)) 50%, transparent); }
   50% { box-shadow: 0 12px 28px -8px rgba(0,0,0,.35), 0 0 22px 6px color-mix(in oklab, var(--brand-primary, var(--primary)) 34%, transparent); }
 }
+/* Ligas — pulso (anel sonar) no emblema da liga atual no banner: escala para fora e some. */
+@keyframes liga-pulse-ring { 0% { transform: scale(.9); opacity: .6; } 100% { transform: scale(1.7); opacity: 0; } }
+.animate-liga-pulse { animation: liga-pulse-ring 1.8s cubic-bezier(0, 0, .2, 1) infinite; }
+/* Ligas — BRILHO (faixa de luz varrendo) no nó da liga atual na trilha. */
+@keyframes liga-shine { 0% { transform: translateX(-160%); } 55%, 100% { transform: translateX(360%); } }
+.animate-liga-shine { animation: liga-shine 2.8s ease-in-out infinite; }
 /* Gamificação — chama dos dias ativos da sequência: bruxuleia (escala + leve giro). */
 @keyframes streak-flame {
   0%, 100% { transform: scale(1) rotate(0deg); }
@@ -327,6 +333,35 @@
 @keyframes conquista-wiggle {
   0%, 100% { transform: scale(1.1) rotate(-6deg); }
   50% { transform: scale(1.18) rotate(6deg); }
+}
+/* Mascote (capivara): flutua suave, entra e o balão de fala aparece. */
+@keyframes mascote-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+@keyframes mascote-in { from { opacity: 0; transform: translateY(18px) scale(.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes mascote-balao { from { opacity: 0; transform: translateY(6px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes mascote-tchau { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-11deg); } 60% { transform: rotate(9deg); } }
+/* Tour guiado da mascote: card entra/sai suave. */
+@keyframes tour-in { from { opacity: 0; transform: translateY(26px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes tour-out { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(26px) scale(.97); } }
+/* Dashboard de novidades (mini-visualizações animadas). */
+@keyframes dash-shimmer { 0% { transform: translateX(-140%); } 100% { transform: translateX(260%); } }
+@keyframes dash-pop { 0% { opacity: 0; transform: scale(.3); } 60% { transform: scale(1.14); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes dash-rise { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+@keyframes dash-draw { to { stroke-dashoffset: 0; } }
+@keyframes dash-grow { 0% { transform: scaleY(0); } 100% { transform: scaleY(1); } }
+/* Baú caindo + abrindo (pulsa) e partículas de XP saindo. */
+@keyframes bau-drop { 0% { transform: translateY(-130px) scale(.6); opacity: 0; } 55% { transform: translateY(7px) scale(1.06); opacity: 1; } 70% { transform: translateY(0) scale(1); } 82% { transform: scale(1.24) rotate(-4deg); } 92% { transform: scale(1.24) rotate(4deg); } 100% { transform: scale(1); } }
+@keyframes xp-sair { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.3); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1); } }
+/* Pulse do botão "Continuar" quando a mascote pede pra clicar. */
+@keyframes lu-btnpulse {
+  0% { box-shadow: 0 10px 30px -8px color-mix(in oklab, var(--brand-primary, var(--primary)) 55%, transparent), 0 0 0 0 color-mix(in oklab, var(--brand-primary, var(--primary)) 50%, transparent); }
+  70% { box-shadow: 0 10px 30px -8px color-mix(in oklab, var(--brand-primary, var(--primary)) 55%, transparent), 0 0 0 12px color-mix(in oklab, var(--brand-primary, var(--primary)) 0%, transparent); }
+  100% { box-shadow: 0 10px 30px -8px color-mix(in oklab, var(--brand-primary, var(--primary)) 55%, transparent), 0 0 0 0 color-mix(in oklab, var(--brand-primary, var(--primary)) 0%, transparent); }
+}
+/* Ícones da trilha (tour): cards subindo de baixo p/ cima, um atrás do outro; o "atual" pulsa. */
+@keyframes ic-rise { 0% { opacity: 0; transform: translateY(26px); } 100% { opacity: 1; transform: translateY(0); } }
+@keyframes ic-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in oklab, var(--brand-primary, var(--primary)) 45%, transparent); }
+  50% { transform: scale(1.08); box-shadow: 0 0 0 7px color-mix(in oklab, var(--brand-primary, var(--primary)) 0%, transparent); }
 }
 /* Baú da trilha liberado p/ resgate: pulsa com um glow dourado (só box-shadow, não mexe no layout). */
 @keyframes bau-pulse {

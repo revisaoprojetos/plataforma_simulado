@@ -32,46 +32,67 @@ export async function GET(request: NextRequest) {
     .maybeSingle()
   if (!sessao) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
 
-  // Engajamento: registra a visualização do relatório (só quando já finalizado).
+  const admin = createAdminClient()
+
+  // Leituras independentes do resultado em PARALELO (caminho quente: 1000+ alunos na tela de
+  // resultado). Antes eram ~8 round-trips em série; todas dependem só de sessao/st.
+  const [
+    { data: participantes },
+    { data: simulado },
+    classificacao,
+    { data: recs },
+    { data: sq },
+    { data: respostas },
+    { data: disc },
+    alunoInfo,
+  ] = await Promise.all([
+    supabase.from('simulado_sessoes_prova').select('estudante_id').eq('simulado_id', sessao.simulado_id).eq('is_teste', false).eq('status', 'finalizada').eq('deletado', false),
+    supabase.from('simulado_simulados').select('titulo, status, data_fim, regras').eq('id', sessao.simulado_id).single(),
+    (async (): Promise<string | null> => {
+      if (!sessao.estudante_id) return null
+      const { data } = await supabase.from('simulado_estudantes').select('classificacao').eq('id', sessao.estudante_id).maybeSingle()
+      return (data as any)?.classificacao ?? null
+    })(),
+    supabase.from('simulado_recorrecoes').select('tipo, executado_em').eq('simulado_id', sessao.simulado_id).order('executado_em', { ascending: false }),
+    supabase.from('simulado_prova_questoes').select('ordem, anulada, questoes:simulado_questoes(id, tipo, enunciado, comentario_professor, disciplina_id, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem))').eq('simulado_id', sessao.simulado_id).order('ordem'),
+    supabase.from('simulado_respostas_objetivas').select('questao_id, alternativa_id, correta').eq('sessao_id', st),
+    supabase.from('simulado_respostas_discursivas').select('questao_id, texto, status, nota, feedback').eq('sessao_id', st),
+    // Nome + e-mail do estudante (cabeçalho) — 2 passos encadeados, mas concorrentes com o resto.
+    (async (): Promise<{ nome: string; email: string }> => {
+      let nome = 'Estudante', email = ''
+      try {
+        const { data: est } = await admin.from('simulado_estudantes').select('nome, user_id').eq('id', sessao.estudante_id).maybeSingle()
+        if (est?.nome) nome = est.nome as string
+        if (est?.user_id) {
+          const { data: u } = await admin.from('simulado_users').select('email').eq('id', est.user_id).maybeSingle()
+          if (u?.email) email = u.email as string
+        }
+        if (!email) {
+          try { const { data: est2 } = await admin.from('simulado_estudantes').select('email').eq('id', sessao.estudante_id).maybeSingle(); if ((est2 as any)?.email) email = (est2 as any).email } catch { /* estudantes pode não ter email */ }
+        }
+      } catch { /* sem estudante */ }
+      return { nome, email }
+    })(),
+  ])
+
+  // Engajamento: registra a visualização do relatório — best-effort, NÃO bloqueia a resposta.
   if (sessao.status === 'finalizada' && sessao.tenant_id) {
-    const admin = createAdminClient()
-    await registrarRelatorioEvento(admin, {
-      tenantId: sessao.tenant_id, simuladoId: sessao.simulado_id, estudanteId: sessao.estudante_id, sessaoId: sessao.id, tipo: 'visualizou',
-    })
-    void dispararWebhook(sessao.tenant_id, 'estudante.visualizou_relatorio', await dadosProgressao(admin, sessao as any))
+    void (async () => {
+      try {
+        await registrarRelatorioEvento(admin, { tenantId: sessao.tenant_id, simuladoId: sessao.simulado_id, estudanteId: sessao.estudante_id, sessaoId: sessao.id, tipo: 'visualizou' })
+        void dispararWebhook(sessao.tenant_id, 'estudante.visualizou_relatorio', await dadosProgressao(admin, sessao as any))
+      } catch { /* best-effort */ }
+    })()
   }
 
-  // Total de participantes (alunos distintos finalizados, exceto testes) — contexto do ranking.
-  const { data: participantes } = await supabase
-    .from('simulado_sessoes_prova')
-    .select('estudante_id')
-    .eq('simulado_id', sessao.simulado_id)
-    .eq('is_teste', false)
-    .eq('status', 'finalizada')
-    .eq('deletado', false)
   const totalParticipantes = new Set((participantes ?? []).map((p: any) => p.estudante_id)).size
+  const alunoNome = alunoInfo.nome
+  const alunoEmail = alunoInfo.email
 
-  const { data: simulado } = await supabase
-    .from('simulado_simulados')
-    .select('titulo, status, data_fim, regras')
-    .eq('id', sessao.simulado_id)
-    .single()
-
-  // Classificação do aluno (para o público do caderno: todos | só passaporte).
-  let classificacao: string | null = null
-  if (sessao.estudante_id) {
-    const { data: est } = await supabase.from('simulado_estudantes').select('classificacao').eq('id', sessao.estudante_id).maybeSingle()
-    classificacao = (est as any)?.classificacao ?? null
-  }
   const liberacoes = resolverLiberacoes(simulado?.regras as any, simulado ?? {}, { classificacao })
   const gabaritoLiberado = liberacoes.gabaritoLiberado
 
   // Avisos de mudança de gabarito (anulação/troca) neste simulado → faixa no topo da revisão.
-  const { data: recs } = await supabase
-    .from('simulado_recorrecoes')
-    .select('tipo, executado_em')
-    .eq('simulado_id', sessao.simulado_id)
-    .order('executado_em', { ascending: false })
   const recorrecoes = (recs ?? []) as any[]
   const avisoGabarito = recorrecoes.length
     ? {
@@ -82,37 +103,25 @@ export async function GET(request: NextRequest) {
       }
     : null
 
-  const { data: sq } = await supabase
-    .from('simulado_prova_questoes')
-    .select('ordem, anulada, questoes:simulado_questoes(id, tipo, enunciado, comentario_professor, disciplina_id, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem))')
-    .eq('simulado_id', sessao.simulado_id)
-    .order('ordem')
-
-  const { data: respostas } = await supabase
-    .from('simulado_respostas_objetivas')
-    .select('questao_id, alternativa_id, correta')
-    .eq('sessao_id', st)
-
-  // Respostas discursivas desta sessão (com correção, se houver).
-  const { data: disc } = await supabase
-    .from('simulado_respostas_discursivas')
-    .select('questao_id, texto, status, nota, feedback')
-    .eq('sessao_id', st)
   const discMap = new Map((disc ?? []).map((d: any) => [d.questao_id, d]))
 
-  // Para revelar o gabarito, buscamos as alternativas corretas separadamente.
-  let corretasMap = new Map<string, string>() // questao_id -> alternativa_id correta
-  if (gabaritoLiberado) {
-    const questaoIds = (sq ?? []).map((r: any) => r.questoes?.id).filter(Boolean)
-    if (questaoIds.length) {
-      const { data: corretas } = await supabase
-        .from('simulado_alternativas')
-        .select('id, questao_id')
-        .in('questao_id', questaoIds)
-        .eq('correta', true)
-      corretasMap = new Map((corretas ?? []).map((a) => [a.questao_id as string, a.id as string]))
-    }
-  }
+  // Gabarito (alternativas corretas) + modalidades do caderno — pós-batch, independentes entre si.
+  const bancoBaseIdV2 = (simulado?.regras as any)?.banco_base_id as string | undefined
+  const [corretasMap, modalidades] = await Promise.all([
+    (async (): Promise<Map<string, string>> => {
+      if (!gabaritoLiberado) return new Map<string, string>()
+      const questaoIds = (sq ?? []).map((r: any) => r.questoes?.id).filter(Boolean)
+      if (!questaoIds.length) return new Map<string, string>()
+      const { data: corretas } = await supabase.from('simulado_alternativas').select('id, questao_id').in('questao_id', questaoIds).eq('correta', true)
+      return new Map((corretas ?? []).map((a) => [a.questao_id as string, a.id as string]))
+    })(),
+    (async (): Promise<ModalidadeAluno[]> => {
+      if (!bancoBaseIdV2) return []
+      const entrega = await carregarEntregaBanco(admin, sessao.tenant_id, bancoBaseIdV2)
+      return temEntregaV2(entrega) ? modalidadesDoAlunoV2(entrega) : []
+    })(),
+  ])
+  const cadernoId: string | null = null
 
   const respMap = new Map((respostas ?? []).map((r) => [r.questao_id as string, r]))
   // Questões anuladas continuam no total e valem ponto para TODOS (não contam como erro/branco).
@@ -187,35 +196,6 @@ export async function GET(request: NextRequest) {
     const seg = Math.max(0, Math.floor((new Date(sessao.finalizado_em as string).getTime() - new Date(sessao.iniciado_em as string).getTime()) / 1000))
     const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), s = seg % 60
     tempo = h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-  }
-
-  const admin = createAdminClient()
-
-  // Dados do estudante vinculado (nome + e-mail) para o cabeçalho do encerramento.
-  let alunoNome = 'Estudante'
-  let alunoEmail = ''
-  try {
-    const { data: est } = await admin.from('simulado_estudantes').select('nome, user_id').eq('id', sessao.estudante_id).maybeSingle()
-    if (est?.nome) alunoNome = est.nome as string
-    if (est?.user_id) {
-      const { data: u } = await admin.from('simulado_users').select('email').eq('id', est.user_id).maybeSingle()
-      if (u?.email) alunoEmail = u.email as string
-    }
-    if (!alunoEmail) {
-      try {
-        const { data: est2 } = await admin.from('simulado_estudantes').select('email').eq('id', sessao.estudante_id).maybeSingle()
-        if ((est2 as any)?.email) alunoEmail = (est2 as any).email
-      } catch { /* estudantes pode não ter coluna email */ }
-    }
-  } catch { /* sem estudante */ }
-
-  // Caderno do aluno (entrega V2, fonte única): modalidades vêm do caderno_entrega do banco do simulado.
-  const cadernoId: string | null = null
-  let modalidades: ModalidadeAluno[] = []
-  const bancoBaseIdV2 = (simulado?.regras as any)?.banco_base_id as string | undefined
-  if (bancoBaseIdV2) {
-    const entrega = await carregarEntregaBanco(admin, sessao.tenant_id, bancoBaseIdV2)
-    if (temEntregaV2(entrega)) modalidades = modalidadesDoAlunoV2(entrega)
   }
 
   return NextResponse.json({

@@ -16,41 +16,33 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
   const tenantId = await getCurrentTenantId()
   const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
 
-  // Simulados (tolerante a pasta_id: se a migration ainda não rodou, seleciona sem a coluna).
-  let simulados: any[] = []
-  {
-    const base = 'id, titulo, status, data_inicio, data_fim, modo_aplicacao, tempo_limite_min, embed_token, created_at, regras'
-    // fetchAll: tenant com >1000 simulados truncava o board. Tolerante à coluna pasta_id ausente.
-    // owner_estudante_id IS NULL: só simulados OFICIAIS (os do construtor pessoal do aluno ficam de fora).
-    const buscar = (cols: string) => fetchAll<any>(() => supabase.from('simulado_simulados').select(cols).eq('deletado', false).eq('tenant_id', tid).is('owner_estudante_id', null).order('created_at', { ascending: false }).order('id', { ascending: true }))
-    try {
-      simulados = await buscar(`${base}, pasta_id`)
-    } catch (e: any) {
-      if (/pasta_id|column/i.test(e?.message ?? '')) simulados = await buscar(base)
-      else throw e
-    }
-    simulados = simulados.map((s: any) => ({ ...s, pasta_id: s.pasta_id ?? null }))
-  }
-
-  // Pastas da Aplicação de Simulado (is_folder + folder_area='simulado'). Tolerante: se as colunas
-  // não existirem, não há pastas (a página segue com os simulados normalmente).
-  let folders: any[] = []
-  {
-    const selP = (cols: string) => supabase.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid).order('nome')
-    let r: { data: any[] | null; error: { message: string } | null } = await selP('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area')
-    if (r.error) r = await selP('id, nome, cor, icone, capa_url, is_folder, folder_area')
-    if (!r.error) folders = (r.data ?? []).filter((p: any) => p.is_folder && p.folder_area === 'simulado')
-  }
-
-  // Bancos (Banco de Simulado): usados para agrupar o CATÁLOGO. Cada simulado vem de um banco
-  // (regras.banco_base_id); o banco pode estar dentro de uma PASTA/grupo (is_folder) — essa pasta é a fileira.
-  let bancos: any[] = []
-  {
-    const selB = (cols: string) => supabase.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid)
-    let r: { data: any[] | null; error: { message: string } | null } = await selB('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area, pai_id')
-    if (r.error) r = await selB('id, nome, cor, icone, is_folder, pai_id')
-    bancos = (r.data ?? []).filter((p: any) => p.folder_area !== 'simulado' && p.folder_area !== 'caderno')
-  }
+  // Simulados + pastas (Aplicação) + bancos em PARALELO — 3 leituras independentes (só dependem do tenant).
+  const [simulados, folders, bancos] = await Promise.all([
+    // Simulados (tolerante à coluna pasta_id ausente). owner_estudante_id IS NULL: só OFICIAIS
+    // (os do construtor pessoal do aluno ficam de fora). fetchAll: tenant com >1000 não trunca.
+    (async (): Promise<any[]> => {
+      const base = 'id, titulo, status, data_inicio, data_fim, modo_aplicacao, tempo_limite_min, embed_token, created_at, regras'
+      const buscar = (cols: string) => fetchAll<any>(() => supabase.from('simulado_simulados').select(cols).eq('deletado', false).eq('tenant_id', tid).is('owner_estudante_id', null).order('created_at', { ascending: false }).order('id', { ascending: true }))
+      let sims: any[]
+      try { sims = await buscar(`${base}, pasta_id`) }
+      catch (e: any) { if (/pasta_id|column/i.test(e?.message ?? '')) sims = await buscar(base); else throw e }
+      return sims.map((s: any) => ({ ...s, pasta_id: s.pasta_id ?? null }))
+    })(),
+    // Pastas da Aplicação de Simulado (is_folder + folder_area='simulado'), tolerante a colunas ausentes.
+    (async (): Promise<any[]> => {
+      const selP = (cols: string) => supabase.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid).order('nome')
+      let r: { data: any[] | null; error: { message: string } | null } = await selP('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area')
+      if (r.error) r = await selP('id, nome, cor, icone, capa_url, is_folder, folder_area')
+      return r.error ? [] : (r.data ?? []).filter((p: any) => p.is_folder && p.folder_area === 'simulado')
+    })(),
+    // Bancos (Banco de Simulado) p/ agrupar o CATÁLOGO — a pasta-pai (is_folder) é a fileira.
+    (async (): Promise<any[]> => {
+      const selB = (cols: string) => supabase.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid)
+      let r: { data: any[] | null; error: { message: string } | null } = await selB('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area, pai_id')
+      if (r.error) r = await selB('id, nome, cor, icone, is_folder, pai_id')
+      return (r.data ?? []).filter((p: any) => p.folder_area !== 'simulado' && p.folder_area !== 'caderno')
+    })(),
+  ])
   const bancoById = new Map<string, any>(bancos.map((b) => [b.id, b]))
   // Pasta (is_folder) que contém o banco do simulado — é a fileira do catálogo (null = avulso).
   const grupoDoBanco = (bancoId: string | null | undefined): any | null => {
@@ -60,8 +52,10 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
     return pai?.is_folder ? pai : null
   }
 
-  const tipos = await tiposDeSimulados(supabase, simulados.map((s) => s.id))
-  const visual = await resolverVisualSimulados(supabase, simulados.map((s) => ({ id: s.id, regras: s.regras })))
+  const [tipos, visual] = await Promise.all([
+    tiposDeSimulados(supabase, simulados.map((s) => s.id)),
+    resolverVisualSimulados(supabase, simulados.map((s) => ({ id: s.id, regras: s.regras }))),
+  ])
   const comTipo = simulados.map((s) => ({ ...s, tipo: tipos.get(s.id) ?? null, vis: visual.get(s.id) ?? null }))
     .filter((s) => !OCULTAR_DISCURSIVA || s.tipo !== 'discursiva')
 

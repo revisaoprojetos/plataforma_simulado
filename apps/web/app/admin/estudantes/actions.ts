@@ -16,7 +16,7 @@ const TENANT_VAZIO = '00000000-0000-0000-0000-000000000000'
 
 export type EstudanteBase = {
   id: string; nome: string; email: string | null; cpf: string | null; telefone: string | null
-  classificacao: string | null; created_at: string | null
+  classificacao: string | null; created_at: string | null; avatar: string | null; avatarCor: string | null
 }
 
 /**
@@ -32,7 +32,7 @@ export async function carregarLoteEstudantes(offset: number, limit: number, comC
   // Só o 1º lote precisa do total; os demais (loop de fundo) já o conhecem e pedem `comContagem=false`.
   const { data, count } = await svc
     .from('simulado_estudantes')
-    .select('id, nome, email, cpf, telefone, classificacao, created_at', comContagem ? { count: 'exact' } : undefined)
+    .select('id, nome, email, cpf, telefone, classificacao, created_at, avatar, perfil_avatar_cor', comContagem ? { count: 'exact' } : undefined)
     .eq('deletado', false)
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
@@ -41,6 +41,7 @@ export async function carregarLoteEstudantes(offset: number, limit: number, comC
   const rows = (data ?? []).map((e: any) => ({
     id: e.id, nome: e.nome, email: e.email ?? null, cpf: e.cpf ?? null, telefone: e.telefone ?? null,
     classificacao: e.classificacao ?? null, created_at: e.created_at ?? null,
+    avatar: e.avatar ?? null, avatarCor: e.perfil_avatar_cor ?? null,
   }))
   return { rows, total: count ?? rows.length }
 }
@@ -57,7 +58,7 @@ export async function buscarEstudantes(termo: string): Promise<EstudanteBase[]> 
   const like = t.replace(/[%,()*]/g, ' ')
   const { data } = await svc
     .from('simulado_estudantes')
-    .select('id, nome, email, cpf, telefone, classificacao, created_at')
+    .select('id, nome, email, cpf, telefone, classificacao, created_at, avatar, perfil_avatar_cor')
     .eq('deletado', false)
     .eq('tenant_id', tenantId)
     .or(`nome.ilike.%${like}%,email.ilike.%${like}%,cpf.ilike.%${like}%,telefone.ilike.%${like}%`)
@@ -66,6 +67,7 @@ export async function buscarEstudantes(termo: string): Promise<EstudanteBase[]> 
   return (data ?? []).map((e: any) => ({
     id: e.id, nome: e.nome, email: e.email ?? null, cpf: e.cpf ?? null, telefone: e.telefone ?? null,
     classificacao: e.classificacao ?? null, created_at: e.created_at ?? null,
+    avatar: e.avatar ?? null, avatarCor: e.perfil_avatar_cor ?? null,
   }))
 }
 

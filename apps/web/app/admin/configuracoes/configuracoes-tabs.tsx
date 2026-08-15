@@ -1,16 +1,19 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Fingerprint, Palette, LoaderCircle, Settings2, PanelTop, MonitorPlay, LayoutGrid } from 'lucide-react'
+import { Fingerprint, Palette, LoaderCircle, Settings2, PanelTop, MonitorPlay, LayoutGrid, Sparkles, Contact, Smartphone } from 'lucide-react'
 import { ConfiguracoesForm } from './configuracoes-form'
 import { CarregamentoForm } from './carregamento-form'
 import { ImersaoForm } from './imersao-form'
 import { AvancadoForm } from './avancado-form'
 import { TemaSistemaForm } from './tema-sistema-form'
 import { SelecaoForm } from './selecao-form'
+import { AssistenteForm } from './assistente-form'
+import { PersonalizacaoForm } from './personalizacao-form'
+import { NavegacaoMobileForm } from './navegacao-mobile-form'
 import type { EstiloLoader } from '@/components/admin/loaders'
 
-export function ConfiguracoesTabs({ tema, salvarTema }: { tema: any; salvarTema: (t: Record<string, unknown>) => Promise<{ ok?: boolean } | void> }) {
+export function ConfiguracoesTabs({ tema, salvarTema, capasSistema }: { tema: any; salvarTema: (t: Record<string, unknown>) => Promise<{ ok?: boolean } | void>; capasSistema?: string[] }) {
   const estiloInicial = ((tema?.loading_estilo as EstiloLoader) ?? 'skeleton') as EstiloLoader
   const animacaoInicial = (tema?.animacao_entrada as boolean | undefined) !== false
   return (
@@ -20,6 +23,9 @@ export function ConfiguracoesTabs({ tema, salvarTema }: { tema: any; salvarTema:
         <TabsTrigger value="selecao"><LayoutGrid /> Seleção</TabsTrigger>
         <TabsTrigger value="tema"><Palette /> Cores &amp; Tema</TabsTrigger>
         <TabsTrigger value="carregamento"><LoaderCircle /> Carregamento</TabsTrigger>
+        <TabsTrigger value="mobile"><Smartphone /> Mobile</TabsTrigger>
+        <TabsTrigger value="assistente"><Sparkles /> Assistente</TabsTrigger>
+        <TabsTrigger value="personalizacao"><Contact /> Personalização</TabsTrigger>
         <TabsTrigger value="avancado"><Settings2 /> Avançado</TabsTrigger>
       </TabsList>
 
@@ -49,6 +55,18 @@ export function ConfiguracoesTabs({ tema, salvarTema }: { tema: any; salvarTema:
             <ImersaoForm tema={tema} salvarTema={salvarTema} />
           </TabsContent>
         </Tabs>
+      </TabsContent>
+
+      <TabsContent value="mobile">
+        <NavegacaoMobileForm tema={tema} salvarTema={salvarTema} />
+      </TabsContent>
+
+      <TabsContent value="assistente">
+        <AssistenteForm tema={tema} salvarTema={salvarTema} />
+      </TabsContent>
+
+      <TabsContent value="personalizacao">
+        <PersonalizacaoForm tema={tema} salvarTema={salvarTema} capasSistema={capasSistema} />
       </TabsContent>
 
       <TabsContent value="avancado">

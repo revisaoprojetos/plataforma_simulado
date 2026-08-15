@@ -90,7 +90,7 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
         </p>
       </div>
 
-      <div className="relative rounded-2xl border bg-gradient-to-br from-card to-muted/30 p-5 shadow-sm">
+      <div data-tour="nivel" className="relative rounded-2xl border bg-gradient-to-br from-card to-muted/30 p-5 shadow-sm">
         <div className="flex flex-col items-center gap-2">
           <span className="flex h-14 w-14 items-center justify-center rounded-full border-4 text-xl font-bold tabular-nums transition-transform"
             style={{ borderColor: 'var(--brand-primary, var(--primary))', color: 'var(--brand-primary, var(--primary))', animation: cargoFx ? 'nc-pulse 1.1s ease-out' : undefined }}>

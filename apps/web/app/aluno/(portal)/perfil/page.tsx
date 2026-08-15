@@ -5,10 +5,13 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { montarRelatorioEstudante } from '@/app/admin/relatorios/estudantes/_dados'
 import { RelatorioEstudanteView } from '@/app/admin/relatorios/estudantes/relatorio-estudante-view'
 import { KpiCard } from '@/components/admin/relatorios/viz'
-import { Mail, Phone, IdCard, BarChart3, ArrowRight, Flame, Zap, Trophy, ClipboardList, Target, Clock, Award, Medal } from 'lucide-react'
+import { Mail, Phone, BarChart3, ArrowRight, Flame, Zap, Trophy, ClipboardList, Target, Clock, Award, Medal } from 'lucide-react'
 import { getGamConfig } from '@/lib/gamificacao'
 import { resumoGamificacao, conquistasDoAluno, posicaoNaLiga } from '@/lib/gamificacao/leitura'
 import { ConquistasGrid } from '@/components/aluno/conquistas-grid'
+import { MascoteTour } from '@/components/mascote/mascote-tour'
+import { PerfilEditar } from '@/components/aluno/perfil-editar'
+import { lerPersonalizacaoEstudante, lerOpcoesPersonalizacao, ehCorFundo } from '@/lib/aluno/personalizacao'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Meu perfil' }
@@ -16,11 +19,6 @@ export const metadata = { title: 'Meu perfil' }
 const fmt = (n: number) => n.toLocaleString('pt-BR')
 function iniciais(nome: string) {
   return nome.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || 'A'
-}
-function mascararCpf(cpf?: string | null) {
-  const d = (cpf ?? '').replace(/\D/g, '')
-  if (d.length !== 11) return cpf ?? null
-  return `${d.slice(0, 3)}.${d.slice(3, 6)}.***-**`
 }
 
 /**
@@ -34,18 +32,28 @@ export default async function PerfilAlunoPage() {
 
   const svc = createAdminClient()
   const gamConfig = await getGamConfig(svc, sessao.tenantId)
-  const [{ data: est }, dados, gamResumo, gamConquistas] = await Promise.all([
-    svc.from('simulado_estudantes').select('nome, email, cpf, telefone').eq('id', sessao.estudanteId).maybeSingle(),
+  const [{ data: est }, dados, gamResumo, gamConquistas, pers, { data: temaRow }] = await Promise.all([
+    svc.from('simulado_estudantes').select('nome, email, telefone').eq('id', sessao.estudanteId).maybeSingle(),
     montarRelatorioEstudante(svc, sessao.estudanteId, sessao.tenantId),
     gamConfig?.ativo ? resumoGamificacao(svc, sessao.tenantId, sessao.estudanteId, gamConfig) : Promise.resolve(null),
     gamConfig?.ativo ? conquistasDoAluno(svc, sessao.tenantId, sessao.estudanteId, gamConfig) : Promise.resolve([]),
+    lerPersonalizacaoEstudante(svc, sessao.estudanteId),
+    svc.from('simulado_tenants').select('tema').eq('id', sessao.tenantId).maybeSingle(),
   ])
+  const opcoes = lerOpcoesPersonalizacao(temaRow?.tema)
+  // Personalização visual: cor de destaque (texto/barra/anel), texto legível sobre fundo, sombra.
+  const temFundo = !!pers.perfilCapa
+  const corDestaque = pers.perfilTexto || null
+  const corTexto = corDestaque || (temFundo ? '#ffffff' : undefined)
+  const corMarca = corDestaque || 'var(--brand-primary, var(--primary))'
+  // O "Nv" fica sobre fundo claro; se o texto for branco ele sumiria → força preto só nesse caso.
+  const corNivel = corDestaque?.toLowerCase() === '#ffffff' ? '#0f172a' : corMarca
+  const sombraTexto = temFundo ? '0 1px 4px rgba(0,0,0,.55)' : undefined
 
   const nome = est?.nome ?? sessao.nome
   const email = est?.email ?? sessao.email
   const contatos = [
     email && { icon: Mail, label: email },
-    est?.cpf && { icon: IdCard, label: mascararCpf(est.cpf) },
     est?.telefone && { icon: Phone, label: est.telefone },
   ].filter(Boolean) as { icon: any; label: string }[]
 
@@ -63,14 +71,33 @@ export default async function PerfilAlunoPage() {
   return (
     <div className="animate-page space-y-6">
       {/* ── Cabeçalho: avatar + nível, dados, barra de XP e chips ── */}
-      <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/[0.10] via-card to-card px-6 pb-5 pt-7 shadow-sm sm:px-7">
+      <div data-tour="perfil-nivel" className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/[0.10] via-card to-card px-6 pb-5 pt-7 shadow-sm sm:px-7">
+        {pers.perfilCapa && ehCorFundo(pers.perfilCapa) && (
+          <>
+            <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: pers.perfilCapa }} />
+            <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 via-black/15 to-black/40" />
+          </>
+        )}
+        {pers.perfilCapa && !ehCorFundo(pers.perfilCapa) && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img aria-hidden src={pers.perfilCapa} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-100 dark:opacity-90" />
+            {/* véu escuro suave (não lava a imagem) — o texto vira branco com sombra p/ legibilidade */}
+            <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/55" />
+          </>
+        )}
         <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 h-64 w-64 rounded-full bg-primary/25 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--brand-accent) 75%, transparent), transparent)' }} />
 
         {/* "Meu perfil" no canto superior esquerdo */}
-        <div className="absolute left-5 top-4 flex items-center gap-2 sm:left-6">
+        <div className="absolute left-5 top-4 z-[2] flex items-center gap-2 sm:left-6">
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--brand-accent)' }} />
-          <span className="text-[11px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand-accent)' }}>Meu perfil</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--brand-accent)', textShadow: sombraTexto }}>Meu perfil</span>
+        </div>
+
+        {/* Editar perfil — canto superior direito */}
+        <div className="absolute right-4 top-3.5 z-[2] sm:right-5">
+          <PerfilEditar nome={nome} avatar={pers.avatar} perfilCapa={pers.perfilCapa} perfilTexto={pers.perfilTexto} avatarCor={pers.avatarCor} avatares={opcoes.avatares} fundos={opcoes.fundos} cores={opcoes.cores} />
         </div>
 
         <div className="relative flex flex-col items-center text-center">
@@ -79,18 +106,23 @@ export default async function PerfilAlunoPage() {
             {prog ? (
               <svg viewBox="0 0 144 144" className="absolute inset-0 h-full w-full -rotate-90">
                 <circle cx="72" cy="72" r={raio} fill="none" stroke="color-mix(in oklab, var(--muted-foreground) 22%, transparent)" strokeWidth="6" />
-                <circle cx="72" cy="72" r={raio} fill="none" stroke="var(--brand-primary, var(--primary))" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${dash} ${circ}`} className="transition-all duration-700" />
+                <circle cx="72" cy="72" r={raio} fill="none" stroke={corMarca} strokeWidth="6" strokeLinecap="round" strokeDasharray={`${dash} ${circ}`} className="transition-all duration-700" />
               </svg>
             ) : null}
-            <span className="absolute inset-[20px] flex items-center justify-center rounded-full bg-white text-4xl font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais(nome)}</span>
+            <span className="absolute inset-[20px] flex items-center justify-center overflow-hidden rounded-full text-4xl font-bold text-primary shadow-sm ring-1 ring-black/10" style={{ background: pers.avatarCor ?? '#ffffff' }}>
+              {pers.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={pers.avatar} alt="" className="h-full w-full object-contain object-[center_82%]" />
+              ) : iniciais(nome)}
+            </span>
             {prog && (
-              <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full border border-primary/40 bg-background px-2.5 py-0.5 text-[11px] font-bold text-primary shadow-sm">Nv {prog.nivel}</span>
+              <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full border border-primary/40 bg-background px-2.5 py-0.5 text-[11px] font-bold shadow-sm" style={{ color: corNivel }}>Nv {prog.nivel}</span>
             )}
           </div>
 
-          <h1 className="mt-2 truncate text-2xl font-bold tracking-tight sm:text-[2rem]">{nome}</h1>
+          <h1 className="mt-2 truncate text-2xl font-bold tracking-tight sm:text-[2rem]" style={{ color: corTexto, textShadow: sombraTexto }}>{nome}</h1>
 
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground" style={{ color: corTexto, textShadow: sombraTexto }}>
             {contatos.map((c, i) => (
               <span key={i} className="inline-flex items-center gap-1.5"><c.icon className="h-4 w-4" /> {c.label}</span>
             ))}
@@ -99,10 +131,10 @@ export default async function PerfilAlunoPage() {
           {/* Barra de XP do nível */}
           {prog && (
             <div className="mt-3 w-full max-w-md">
-              <div className="h-2 overflow-hidden rounded-full ring-1 ring-black/10 dark:ring-white/10" style={{ background: 'color-mix(in oklab, var(--brand-primary, var(--primary)) 16%, transparent)' }}>
-                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${prog.pct}%`, background: 'var(--brand-primary, var(--primary))' }} />
+              <div className="h-2 overflow-hidden rounded-full ring-1 ring-black/10 dark:ring-white/10" style={{ background: temFundo ? 'rgba(255,255,255,.28)' : `color-mix(in oklab, ${corMarca} 16%, transparent)` }}>
+                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${prog.pct}%`, background: corMarca }} />
               </div>
-              <div className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">{fmt(prog.xpNoNivel)} / {fmt(prog.xpDoNivel)} XP</div>
+              <div className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground" style={{ color: corTexto, textShadow: sombraTexto }}>{fmt(prog.xpNoNivel)} / {fmt(prog.xpDoNivel)} XP</div>
             </div>
           )}
 
@@ -119,8 +151,8 @@ export default async function PerfilAlunoPage() {
 
       {dados && dados.simulados > 0 ? (
         <>
-          {/* ── KPIs ── */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {/* ── KPIs ── (6 colunas com o card de XP; 5 quando a gamificação está desativada, p/ completar a linha) */}
+          <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${gamResumo ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
             <KpiCard label="Simulados feitos" valor={dados.simulados} icon={<ClipboardList className="h-4 w-4" />} tom="primary" />
             <KpiCard label="Nota média" valor={nota(dados.notaMedia)} icon={<Trophy className="h-4 w-4" />} tom="amber" />
             <KpiCard label="Acerto médio" valor={dados.acertoMedio != null ? `${dados.acertoMedio}%` : '—'} icon={<Target className="h-4 w-4" />} tom="emerald" />
@@ -132,11 +164,11 @@ export default async function PerfilAlunoPage() {
           </div>
 
           {/* ── Conquistas ── */}
-          {gamConquistas.length > 0 && <ConquistasGrid conquistas={gamConquistas} />}
+          {gamConquistas.length > 0 && <div data-tour="perfil-conquistas"><ConquistasGrid conquistas={gamConquistas} /></div>}
 
           {/* ── Ranking e divisões ── */}
           {gamResumo && ligas.length > 0 && (
-            <div className="rounded-2xl border bg-card p-4 shadow-sm">
+            <div data-tour="perfil-ranking" className="rounded-2xl border bg-card p-4 shadow-sm">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="flex items-center gap-2 text-sm font-semibold"><Medal className="h-4 w-4 text-primary" /> Ranking e divisões</h3>
                 {pos && <span className="text-[11px] text-muted-foreground">você está em <span className="font-semibold text-foreground">{pos}º</span> na {gamResumo.liga.nome}</span>}
@@ -185,6 +217,9 @@ export default async function PerfilAlunoPage() {
           </Link>
         </div>
       )}
+
+      {/* Continuação do tour (capítulo Perfil → sinaliza a Ajuda e encerra). */}
+      {gamConfig?.ativo && <MascoteTour ativo />}
     </div>
   )
 }

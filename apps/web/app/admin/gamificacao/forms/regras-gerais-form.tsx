@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { salvarRegrasGerais } from '../actions'
 import { NumberField, TextField, SaveBar } from './_campos'
 import { useUnsavedGuard } from '@/components/admin/use-unsaved-guard'
+import { confirmar } from '@/components/ui/confirm-dialog'
 
 // Card de regra "inovador": faixa colorida + ícone + toggle opcional, com o corpo desabilitável.
 function RuleCard({ icon: Icon, tom, titulo, descricao, ativo, onToggle, disabled, children }: {
@@ -46,10 +47,29 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
   const [salvando, start] = useTransition()
   const { dirty, markSaved } = useUnsavedGuard({ ativo, timezone, streak, chest, fimSemana, metaDia, trilhaEstilo, trilhaVisiveis })
 
+  // Ativar/desativar a gamificação exige confirmação (impacto amplo no portal do aluno).
+  async function pedirToggleAtivo(v: boolean) {
+    const ok = await confirmar({
+      titulo: v ? 'Ativar a gamificação?' : 'Desativar a gamificação?',
+      mensagem: v
+        ? 'XP, níveis, ligas, sequência (streak), missões e conquistas passarão a aparecer para TODOS os alunos desta plataforma, e o sistema voltará a creditar XP. Salve para aplicar.'
+        : 'Todas as áreas de gamificação (Trilha, Ligas, XP, níveis, sequência, missões e conquistas) serão OCULTADAS dos alunos e o sistema deixa de creditar XP. O histórico é preservado. Salve para aplicar.',
+      confirmar: v ? 'Sim, ativar' : 'Sim, desativar',
+      destrutivo: !v,
+    })
+    if (ok) setAtivo(v)
+  }
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    // Só envia trilha_estilo/trilha_visiveis quando o usuário mexeu na trilha — assim um simples
+    // ativar/desativar (ou editar streak/meta) salva limpo sem disparar o aviso de migração da trilha.
+    const trilhaMudou = trilhaEstilo !== config.trilha_estilo || trilhaVisiveis !== config.trilha_visiveis
     start(async () => {
-      const r: any = await salvarRegrasGerais({ ativo, timezone, streak, chest, fim_semana: fimSemana, meta_dia: metaDia, trilha_estilo: trilhaEstilo, trilha_visiveis: trilhaVisiveis })
+      const r: any = await salvarRegrasGerais({
+        ativo, timezone, streak, chest, fim_semana: fimSemana, meta_dia: metaDia,
+        ...(trilhaMudou ? { trilha_estilo: trilhaEstilo, trilha_visiveis: trilhaVisiveis } : {}),
+      })
       if (r?.error) toast.error(r.error); else { toast.success(r?.aviso ?? 'Regras gerais salvas.'); markSaved() }
     })
   }
@@ -73,7 +93,7 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
             <p className="mt-0.5 text-xs text-muted-foreground">Liga XP, níveis, ligas, streak, missões e conquistas para os alunos desta plataforma.</p>
           </div>
         </div>
-        <Switch checked={ativo} onCheckedChange={setAtivo} disabled={dis} />
+        <Switch checked={ativo} onCheckedChange={pedirToggleAtivo} disabled={dis} />
       </div>
 
       {/* Grade de regras */}

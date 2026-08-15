@@ -80,11 +80,6 @@ export function SimuladosFeitosCards({ rows, estudanteId, estudanteNome, visuais
                     {/* link cobre o card (abaixo do kebab) */}
                     <Link href={`/admin/estudantes/${estudanteId}/simulado/${g.simuladoId}`} className="absolute inset-0 z-10" aria-label={g.titulo} />
 
-                    {/* chip do ícone */}
-                    <span className="pointer-events-none absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm ring-1 ring-white/20" style={{ background: c }}>
-                      <Icon className="h-4 w-4" />
-                    </span>
-
                     {/* AÇÕES (última tentativa) — acima do link */}
                     <div className="absolute right-2 top-2 z-30 rounded-lg bg-black/40 backdrop-blur [&_button:hover]:!bg-white/20 [&_button]:!text-white/90">
                       <SessaoAcoesMenu cadId={u.cadId} mods={u.mods} estudanteId={estudanteId} sessaoId={u.id} simuladoId={u.simuladoId} temResultado={u.temResultado} estudanteNome={estudanteNome} simuladoTitulo={u.titulo} />

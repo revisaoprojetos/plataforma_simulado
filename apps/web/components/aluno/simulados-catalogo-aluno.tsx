@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, FolderOpen, Play } from 'lucide-react'
+import { ArrowLeft, FolderOpen, Play, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { CardSimulado } from '@/components/aluno/card-simulado'
@@ -13,6 +13,8 @@ export type ProgressoGrupo = Record<string, { done: number; total: number }>
 // Largura de cada card na fileira (deixa espiar um pedaço do próximo).
 // Fileira "recentes": ~4 cards + um pedaço do próximo nas telas largas (o resto rola pro lado).
 const FILEIRA_BASIS = 'shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-3rem)/4.3)] xl:basis-[calc((100%-4rem)/4.3)]'
+// Modo "largura total" (gamificação desativada → sem coluna lateral): ~5 cards por linha.
+const FILEIRA_BASIS_FULL = 'shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-4rem)/5.3)] xl:basis-[calc((100%-4rem)/5.3)]'
 
 // Seções semânticas do aluno (por estado). Usadas na visão de dentro da pasta.
 const SECOES = [
@@ -27,7 +29,7 @@ function bucketDe(i: ItemSimuladoCat): 'agendados' | 'disponiveis' | 'refazer' {
   return i.modo_aplicacao === 'janela_fixa' ? 'agendados' : 'disponiveis'
 }
 
-function SecoesGrid({ itens }: { itens: ItemSimuladoCat[] }) {
+function SecoesGrid({ itens, cols5 }: { itens: ItemSimuladoCat[]; cols5?: boolean }) {
   const buckets: Record<string, ItemSimuladoCat[]> = { agendados: [], disponiveis: [], refazer: [] }
   for (const i of itens) buckets[bucketDe(i)].push(i)
   if (itens.length === 0) return <p className="rounded-2xl border border-dashed py-10 text-center text-sm text-muted-foreground">Nenhum simulado nesta pasta ainda.</p>
@@ -43,7 +45,7 @@ function SecoesGrid({ itens }: { itens: ItemSimuladoCat[] }) {
               <h2 className="font-semibold">{sec.titulo}</h2>
               <span className="text-sm text-muted-foreground">({arr.length})</span>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            <div className={cn('grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4', cols5 && 'xl:grid-cols-5')}>
               {arr.map((s) => <CardSimulado key={s.id} s={s} />)}
             </div>
           </section>
@@ -64,7 +66,7 @@ function CardPasta({ g, count, prog }: { g: GrupoCatalogo; count: number; prog?:
   const capa = g.capaCard ?? g.capa ?? null
   return (
     <Link href={`/aluno?pasta=${g.id}`}
-      className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
+      className="group relative block aspect-[4/5] w-full overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
       {capa
         ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
@@ -72,12 +74,10 @@ function CardPasta({ g, count, prog }: { g: GrupoCatalogo; count: number; prog?:
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
 
-      <span className="pointer-events-none absolute right-3 top-3 z-20 rounded-lg bg-black/45 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur">{count} simulado{count !== 1 ? 's' : ''}</span>
+      <span className="pointer-events-none absolute right-3 top-3 z-20 rounded-lg bg-black/45 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur sm:py-1 sm:text-[11px]">{count} simulado{count !== 1 ? 's' : ''}</span>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
-        <span className="mb-1 inline-flex items-center gap-1 rounded-md bg-black/45 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/85 backdrop-blur"><FolderOpen className="h-3 w-3" /> Pasta</span>
-        <h3 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-sm">{g.nome}</h3>
-        <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-white">Ver conteúdo <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" /></span>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-3 sm:p-4">
+        <h3 className="line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm sm:text-base">{g.nome}</h3>
 
         {/* PROGRESSO — aparece/expande no hover */}
         <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-300 group-hover:mt-2.5 group-hover:grid-rows-[1fr] group-hover:opacity-100">
@@ -101,12 +101,16 @@ function CardPasta({ g, count, prog }: { g: GrupoCatalogo; count: number; prog?:
  * com progresso no hover). Ao abrir uma pasta (?pasta=id), mostra os simulados de dentro.
  * Os sem pasta (avulsos) aparecem em grade. A área "Simulados" foi absorvida por aqui.
  */
-export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pastaAtiva }: {
+export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pastaAtiva, full, recentesConcluidos }: {
   itens: ItemSimuladoCat[]
   grupos: GrupoCatalogo[]
   progresso?: ProgressoGrupo
   recentes?: ItemSimuladoCat[]
   pastaAtiva?: string | null
+  /** Largura total (gamificação desativada, sem coluna lateral) → grades de 5 por linha. */
+  full?: boolean
+  /** Aluno já fez todos os simulados recentes disponíveis (sem pendentes, mas com histórico). */
+  recentesConcluidos?: boolean
 }) {
   // VISÃO DA PASTA — só os simulados de dentro dela.
   if (pastaAtiva) {
@@ -131,24 +135,47 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
   const avulsos = itens.filter((s) => !s.grupoId)
   const contar = (gid: string) => itens.filter((s) => s.grupoId === gid).length
   const recent = recentes ?? []
+  const basis = full ? FILEIRA_BASIS_FULL : FILEIRA_BASIS
   // 1º recente que tem caderno de questões → recebe o balão de dica do botão de download.
   const dicaId = recent.find((s) => s.enunciadoUrl)?.id
 
   return (
     <div className="space-y-6">
-      {recent.length > 0 && (
+      {recent.length > 0 ? (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold"><Play className="h-4 w-4 text-primary" /> Simulados recentes</h2>
           <FileiraHorizontal>
-            {recent.map((s) => <div key={s.id} className={FILEIRA_BASIS}><CardSimulado s={s} dica={s.id === dicaId} /></div>)}
+            {recent.map((s) => <div key={s.id} className={basis}><CardSimulado s={s} dica={s.id === dicaId} /></div>)}
           </FileiraHorizontal>
         </section>
-      )}
+      ) : recentesConcluidos ? (
+        <section className="space-y-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold"><Play className="h-4 w-4 text-primary" /> Simulados recentes</h2>
+          <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.06] px-5 py-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-5 w-5" /></span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Você está em dia!</p>
+              <p className="text-xs text-muted-foreground">Você já fez todos os simulados recentes disponíveis. Assim que um novo for liberado, ele aparece aqui.</p>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {grupos.length > 0 && (
         <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold"><FolderOpen className="h-4 w-4 text-primary" /> Cursos e pacotes</h2>
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-sm font-semibold"><FolderOpen className="h-4 w-4 text-primary" /> Cursos e pacotes</h2>
+            <Link href="/aluno/simulados" className="text-xs font-semibold text-primary transition-opacity hover:opacity-80 md:hidden">Ver todos →</Link>
+          </div>
+          {/* Mobile: carrossel horizontal com snap (cards pôster ~152px). Desktop: grade. */}
+          <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden">
+            {grupos.map((g) => (
+              <div key={g.id} className="w-[152px] shrink-0 snap-start">
+                <CardPasta g={g} count={contar(g.id)} prog={progresso?.[g.id]} />
+              </div>
+            ))}
+          </div>
+          <div className={cn('hidden gap-4 md:grid md:grid-cols-3 lg:grid-cols-4', full && 'xl:grid-cols-5')}>
             {grupos.map((g) => <CardPasta key={g.id} g={g} count={contar(g.id)} prog={progresso?.[g.id]} />)}
           </div>
         </section>
@@ -157,7 +184,7 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
       {avulsos.length > 0 && (
         <section className="space-y-3">
           {grupos.length > 0 && <h2 className="text-sm font-semibold text-muted-foreground">Outros simulados</h2>}
-          <SecoesGrid itens={avulsos} />
+          <SecoesGrid itens={avulsos} cols5={full} />
         </section>
       )}
     </div>

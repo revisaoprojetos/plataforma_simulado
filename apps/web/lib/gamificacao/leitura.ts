@@ -131,6 +131,29 @@ export async function posicaoNaLiga(svc: any, tenantId: string, liga: string, xp
   return (count ?? 0) + 1
 }
 
+/** Leaderboard GERAL (todas as ligas) por XP total. */
+export async function leaderboardGeral(svc: any, tenantId: string, eu: string, limite = 20): Promise<RankingItem[]> {
+  const { data } = await svc
+    .from('simulado_gamificacao_estudante')
+    .select('estudante_id, xp_total')
+    .eq('tenant_id', tenantId)
+    .order('xp_total', { ascending: false })
+    .limit(limite)
+  const rows = (data ?? []) as any[]
+  const nomes = await nomesDe(svc, rows.map((r) => r.estudante_id))
+  return rows.map((r, i) => ({ estudanteId: r.estudante_id, nome: nomes.get(r.estudante_id) ?? 'Aluno', xp: r.xp_total, posicao: i + 1, eu: r.estudante_id === eu }))
+}
+
+/** Posição GERAL do aluno (por XP total, todas as ligas). */
+export async function posicaoGeral(svc: any, tenantId: string, xpTotal: number): Promise<number> {
+  const { count } = await svc
+    .from('simulado_gamificacao_estudante')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .gt('xp_total', xpTotal)
+  return (count ?? 0) + 1
+}
+
 /** Leaderboard por XP num PERÍODO (semana/mês) via RPC — janela derivada de now(), sem reset. */
 export async function rankingPeriodo(svc: any, tenantId: string, desdeISO: string, eu: string, limite = 20): Promise<RankingItem[]> {
   const { data } = await svc.rpc('rpc_xp_ranking_periodo', { p_tenant: tenantId, p_desde: desdeISO })
@@ -199,6 +222,33 @@ export async function atividadeSemana(svc: any, tenantId: string, estudanteId: s
     out.push({ dia, label: DOW[dow], ativo: ativos.has(dia), hoje: dia === hoje })
   }
   return out
+}
+
+// ─────────── XP POR DIA (barras da semana) ───────────
+export interface DiaXp { dia: string; label: string; xp: number; hoje: boolean }
+
+/** XP ganho em cada um dos últimos 7 dias (tz do tenant) — barras "Sua semana (XP/dia)". */
+export async function xpPorDiaSemana(svc: any, tenantId: string, estudanteId: string, tz: string): Promise<DiaXp[]> {
+  const desde = new Date(Date.now() - 7 * 86_400_000).toISOString()
+  const porDia = new Map<string, number>()
+  try {
+    const { data } = await svc.from('simulado_xp_eventos').select('xp, criado_em').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).gte('criado_em', desde).limit(2000)
+    for (const r of (data ?? []) as any[]) { const d = diaLocal(tz, new Date(r.criado_em)); porDia.set(d, (porDia.get(d) ?? 0) + (Number(r.xp) || 0)) }
+  } catch { /* tolerante */ }
+  const hoje = diaLocal(tz)
+  const out: DiaXp[] = []
+  for (let i = 6; i >= 0; i--) {
+    const dia = diaLocal(tz, new Date(Date.now() - i * 86_400_000))
+    const dow = new Date(dia + 'T00:00:00Z').getUTCDay()
+    out.push({ dia, label: DOW[dow], xp: porDia.get(dia) ?? 0, hoje: dia === hoje })
+  }
+  return out
+}
+
+/** IDs dos alunos numa liga (tier) — usado no pódio e no filtro "minha liga". */
+export async function membrosDaLiga(svc: any, tenantId: string, liga: string): Promise<Set<string>> {
+  const { data } = await svc.from('simulado_gamificacao_estudante').select('estudante_id').eq('tenant_id', tenantId).eq('liga', liga)
+  return new Set(((data ?? []) as any[]).map((r) => r.estudante_id as string))
 }
 
 export { inicioDaSemanaISO, inicioDoMesISO }

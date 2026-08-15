@@ -10,12 +10,13 @@ import { ImportarMembrosDialog } from '@/components/admin/importar-membros-dialo
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
+import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import {
   ChevronLeft, Pencil, Users, UserPlus, UserMinus, Search, Upload, Loader2, X, Download,
   Eye, FolderTree, Activity, Settings, Trash2, FolderInput, ArrowUpDown, ExternalLink, MoreHorizontal,
 } from 'lucide-react'
 
-type Est = { id: string; nome: string; email: string | null; classificacao: string | null; ultimo: string | null; simulados: number }
+type Est = { id: string; nome: string; email: string | null; classificacao: string | null; ultimo: string | null; simulados: number; avatar?: string | null; avatarCor?: string | null }
 type Sub = { id: string; nome: string; cor: string | null; membros: number }
 type Atividade = { id: string; quando: string; operacao: string; texto: string; detalhe: string | null; cor: string; ator: string; email: string | null }
 type Origem = 'guru' | 'curseduca' | null
@@ -77,7 +78,6 @@ export function GrupoDetalheClient({ grupo, membros: membrosBase, subgrupos, pas
   const [pagina, setPagina] = useState(1)
 
   const cor = grupo.cor ?? '#6d28d9'
-  const iniciais = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join('')
 
   // Distribuição por plano.
   const dist = useMemo(() => {
@@ -247,7 +247,7 @@ export function GrupoDetalheClient({ grupo, membros: membrosBase, subgrupos, pas
                   ) : visiveis.map((e) => (
                     <div key={e.id} style={{ gridTemplateColumns: '1fr 120px 150px 72px' }} className="group grid items-center gap-2 border-b border-border/60 px-4 py-2.5 transition-colors hover:bg-muted/40">
                       <div className="flex min-w-0 items-center gap-2.5">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{iniciais(e.nome)}</span>
+                        <AvatarEstudante nome={e.nome} avatar={e.avatar} cor={e.avatarCor} className="h-8 w-8 bg-primary/10 text-xs text-primary" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <Link href={`/admin/estudantes/${e.id}`} className="truncate text-[13.5px] font-medium hover:text-primary">{e.nome}</Link>
@@ -559,7 +559,6 @@ function AdicionarDialog({ grupoId, onClose }: { grupoId: string; onClose: () =>
       if (r.ok) { toast.success(`${e.nome} adicionado`); setItens((p) => p.filter((x) => x.id !== e.id)); router.refresh() } else toast.error(r.error ?? 'Erro')
     })
   }
-  const iniciais = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join('')
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -582,7 +581,7 @@ function AdicionarDialog({ grupoId, onClose }: { grupoId: string; onClose: () =>
             <p className="py-8 text-center text-sm text-muted-foreground">{busca.trim() ? 'Nenhum estudante encontrado.' : 'Comece a digitar para buscar.'}</p>
           ) : itens.map((e) => (
             <div key={e.id} className="flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors hover:border-primary/40">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">{iniciais(e.nome)}</span>
+              <AvatarEstudante nome={e.nome} avatar={e.avatar} cor={e.avatarCor} className="h-8 w-8 bg-muted text-xs text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5"><p className="truncate text-sm font-medium">{e.nome}</p><ClassificacaoBadge classificacao={e.classificacao} /></div>
                 {e.email && <p className="truncate text-xs text-muted-foreground">{e.email}</p>}

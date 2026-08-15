@@ -8,7 +8,7 @@ export function LigaPainel({ ligas, ligaAtual, xpTotal, proximaNome, faltam }: {
   const ord = [...ligas].sort((a, b) => a.xp_min - b.xp_min)
   const atual = ord.find((l) => l.id === ligaAtual) ?? ord[0]
   return (
-    <div className="rounded-2xl border bg-card p-4 shadow-sm">
+    <div data-tour="liga" className="rounded-2xl border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2">
         <EscudoLiga cor={atual?.cor ?? 'var(--muted-foreground)'} nome={atual?.nome} ativo fundo={false} className="h-6 w-6" />
         <h3 className="text-sm font-semibold">Liga {atual?.nome}</h3>

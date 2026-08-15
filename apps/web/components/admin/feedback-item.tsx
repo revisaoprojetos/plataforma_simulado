@@ -12,8 +12,13 @@ import { responderFeedback } from '@/app/admin/feedbacks/actions'
 
 const TIPO_LABEL: Record<string, string> = {
   erro_gabarito: 'Gabarito incorreto',
+  alternativa_incorreta: 'Alternativa incorreta',
   enunciado_confuso: 'Enunciado confuso',
-  desatualizada: 'Desatualizada',
+  erro_portugues: 'Erro de português / digitação',
+  imagem_problema: 'Problema na imagem',
+  desatualizada: 'Questão desatualizada',
+  duplicada: 'Questão duplicada',
+  comentario_incorreto: 'Comentário incorreto',
   outro: 'Outro',
 }
 const STATUS_LABEL: Record<string, string> = { pendente: 'Pendente', analisado: 'Analisado', resolvido: 'Resolvido' }

@@ -45,7 +45,7 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
     }
     const vincRecs: any[] = vincIds.length
       ? await fetchAllByIn<any>(vincIds, (ids) => svc
-          .from('simulado_estudantes').select('id, nome, email, telefone, cpf, classificacao').in('id', ids), { chunk: 300 })
+          .from('simulado_estudantes').select('id, nome, email, telefone, cpf, classificacao, avatar, perfil_avatar_cor').in('id', ids), { chunk: 300 })
       : []
     vinculados = vincRecs.sort((a: any, b: any) => (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR'))
   }

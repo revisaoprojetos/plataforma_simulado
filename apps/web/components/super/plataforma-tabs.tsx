@@ -23,7 +23,7 @@ type GeralProps = {
  *  - Acessos (RBAC) → equipe da plataforma (membros + cargos), gerida pelo super-admin
  *    direto do console (escopo por tenant-alvo via `tenantId`).
  */
-export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTema, banners, destinosBanner, embedConfig, salvarEmbed, rbacErro }: {
+export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTema, banners, destinosBanner, embedConfig, salvarEmbed, rbacErro, capasSistema }: {
   geral: GeralProps
   membros: AdminMembro[]
   cargos: CargoOpcao[]
@@ -34,6 +34,7 @@ export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTem
   embedConfig: EmbedConfigInput
   salvarEmbed: (dados: EmbedConfigInput) => Promise<{ ok: boolean; error?: string }>
   rbacErro?: string | null
+  capasSistema?: string[]
 }) {
   return (
     <Tabs defaultValue="geral" className="space-y-4">
@@ -51,7 +52,7 @@ export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTem
       </TabsContent>
 
       <TabsContent value="aparencia">
-        <ConfiguracoesTabs tema={temaCompleto} salvarTema={salvarTema} />
+        <ConfiguracoesTabs tema={temaCompleto} salvarTema={salvarTema} capasSistema={capasSistema} />
       </TabsContent>
 
       <TabsContent value="login">

@@ -3,9 +3,10 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { QuestaoCard } from '@/components/aluno/questao-card'
 import { etiquetasPorQuestao } from '@/lib/aluno/etiquetas-questao'
+import { provasPorQuestao } from '@/lib/aluno/provas-questao'
 import { Card, CardContent } from '@/components/ui/card'
-import { Sparkles, Target, Lightbulb } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Sparkles, Lightbulb } from 'lucide-react'
+import { DiagnosticoCard } from '@/components/aluno/diagnostico-card'
 
 export default async function RecomendadoPage() {
   const sessao = await getSessaoAluno()
@@ -84,7 +85,10 @@ export default async function RecomendadoPage() {
     const altMap = new Map<string, any[]>()
     for (const a of alts ?? []) { const arr = altMap.get(a.questao_id) ?? []; arr.push(a); altMap.set(a.questao_id, arr) }
     const favSet = new Set((favs ?? []).map((f: any) => f.questao_id))
-    const etiquetasMap = await etiquetasPorQuestao(svc, sessao!.tenantId, ids)
+    const [etiquetasMap, provasMap] = await Promise.all([
+      etiquetasPorQuestao(svc, sessao!.tenantId, ids),
+      provasPorQuestao(svc, sessao!.tenantId, ids),
+    ])
 
     recomendadas = escolhidas.map((q: any) => ({
       id: q.id,
@@ -96,6 +100,7 @@ export default async function RecomendadoPage() {
       comentario_professor: q.comentario_professor ?? null,
       favorito: favSet.has(q.id),
       etiquetas: etiquetasMap.get(q.id) ?? [],
+      provas: provasMap.get(q.id) ?? [],
       alternativas: (altMap.get(q.id) ?? []).map((a) => ({ id: a.id, texto: a.texto, ordem: a.ordem ?? 0, correta: !!a.correta })),
     }))
   }
@@ -120,23 +125,8 @@ export default async function RecomendadoPage() {
         </Card>
       ) : (
         <>
-          {/* Diagnóstico */}
-          <Card>
-            <CardContent className="space-y-3 p-5">
-              <h2 className="flex items-center gap-2 text-sm font-semibold"><Target className="h-4 w-4 text-primary" /> Seu diagnóstico por matéria</h2>
-              {diagnostico.map((d) => (
-                <div key={d.id} className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-medium">{d.nome}</span>
-                    <span className="text-muted-foreground">{d.pct}% ({d.acertos}/{d.total})</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div className={cn('h-full rounded-full', d.pct >= 70 ? 'bg-green-500' : d.pct >= 50 ? 'bg-amber-500' : 'bg-red-500')} style={{ width: `${d.pct}%` }} />
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          {/* Diagnóstico (recolhido; abre com animação das barras/linhas) */}
+          <DiagnosticoCard diagnostico={diagnostico} />
 
           {/* Recomendadas */}
           <div>

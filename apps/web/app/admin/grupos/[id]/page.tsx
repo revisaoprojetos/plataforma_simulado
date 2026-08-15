@@ -71,7 +71,7 @@ export default async function GrupoDetalhePage({ params }: { params: Promise<{ i
 
   // ── Tudo que depende só de (id, tid, grupo) num único round-trip paralelo: membros, origem,
   // pastas, subgrupos e atividade. Cada bloco pesado tem SQL-direto → fallback PostgREST. ──
-  type Membro = { id: string; nome: string; email: string | null; classificacao: string | null; ultimo: string | null; simulados: number }
+  type Membro = { id: string; nome: string; email: string | null; classificacao: string | null; ultimo: string | null; simulados: number; avatar?: string | null; avatarCor?: string | null }
   type Atividade = { id: string; quando: string; operacao: string; texto: string; detalhe: string | null; cor: string; ator: string; email: string | null }
 
   const [membros, provMap, pastasRaw, subSqlRes, atividades] = await Promise.all([
@@ -143,6 +143,15 @@ export default async function GrupoDetalhePage({ params }: { params: Promise<{ i
       subgrupos.push({ id: s.id, nome: s.nome, cor: s.cor ?? null, membros: count ?? 0 })
     }))
     subgrupos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }
+
+  // Personalização dos membros (avatar + cor atrás) — 1 lote, tolerante a colunas ausentes.
+  if (membros.length) {
+    try {
+      const perfis = await fetchAllByIn<any>(membros.map((m) => m.id), (chunk) => svc.from('simulado_estudantes').select('id, avatar, perfil_avatar_cor').in('id', chunk), { chunk: 300 })
+      const mapaP = new Map(perfis.map((p) => [p.id, p]))
+      for (const m of membros) { const p = mapaP.get(m.id); m.avatar = p?.avatar ?? null; m.avatarCor = p?.perfil_avatar_cor ?? null }
+    } catch { /* colunas de personalização podem não existir */ }
   }
 
   return (

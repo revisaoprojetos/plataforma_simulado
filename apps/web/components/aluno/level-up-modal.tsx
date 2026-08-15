@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom'
 import { Zap, Medal, ArrowRight, Flame, Trophy, Sparkles } from 'lucide-react'
 import { tituloParaNivel } from '@/lib/gamificacao/niveis'
 import type { NivelCurva } from '@/lib/gamificacao/config'
+import { cn } from '@/lib/utils'
+import { Mascote } from '@/components/mascote/mascote'
 
 export type GanhoXp = { icon: React.ReactNode; label: string; xp: number; cor?: string }
 export type ConquistaUp = { icon: React.ReactNode; title: string; desc: string }
@@ -27,9 +29,11 @@ type St = { level: number; fill: number; playing: boolean; done: boolean; pop: b
 
 /** Modal de subida de nível (v2): halo/órbita, anel de XP enchendo (com ponta branca) e desacelerando
  * no fim, impacto forte ao completar cada nível, e a área de informações compacta ao terminar. */
-export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalXp, streak, badgesLabel, logo, onClose }: {
+export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalXp, streak, badgesLabel, logo, onClose, mascote = false }: {
   from: number; to: number; curva: NivelCurva; gains: GanhoXp[]; unlocked: ConquistaUp[]
   xpGanho: number; totalXp: number; streak: number; badgesLabel: string; logo?: string | null; onClose: () => void
+  /** Mostra a mascote (capivara) sobre a tela: comemora e, ao terminar, sinaliza o cargo/Continuar. */
+  mascote?: boolean
 }) {
   const [st, setSt] = useState<St>({ level: from, fill: 0, playing: true, done: false, pop: false, promoted: null, xpShown: 0, xpTarget: 0, burst: 0 })
   const [saindo, setSaindo] = useState(false)
@@ -214,13 +218,31 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
             </div>
 
             <button type="button" onClick={fechar} className="mt-0.5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-110"
-              style={{ background: `linear-gradient(135deg, ${A}, ${mix(78, 'black')})`, boxShadow: `0 10px 30px -8px ${mix(55, 'transparent')}`, animation: 'lu-rise .6s ease 1.95s both' }}>
+              style={{ background: `linear-gradient(135deg, ${A}, ${mix(78, 'black')})`, boxShadow: `0 10px 30px -8px ${mix(55, 'transparent')}`, animation: mascote ? 'lu-rise .6s ease 1.95s both, lu-btnpulse 1.8s ease-out 2.7s infinite' : 'lu-rise .6s ease 1.95s both' }}>
               <Sparkles className="h-4 w-4" /> Continuar estudando <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         )}
         {st.playing && <div className="text-[12px] uppercase tracking-[0.14em]" style={{ color: MUT }}>Ganhando XP…</div>}
       </div>
+
+      {/* Mascote sobre a tela: balão EM CIMA da capivara, conjunto mais para o meio. */}
+      {mascote && (
+        <div className="pointer-events-none absolute bottom-8 right-[13%] z-[4] flex flex-col items-center">
+          <div key={done ? 'fim' : 'sub'} className="relative mb-3 max-w-[240px] rounded-2xl border bg-card px-4 py-3 text-left text-foreground shadow-2xl motion-safe:animate-[mascote-balao_.4s_ease-out_both]">
+            {done ? (
+              <p className="text-sm leading-snug">
+                <span className="font-bold text-primary">Uhul! 🎉</span> Você desbloqueou o cargo{st.promoted ? <> <span className="font-bold">{st.promoted}</span></> : ''}! Toca em <span className="font-bold text-primary">Continuar</span> que eu sigo com você. 👉
+              </p>
+            ) : (
+              <p className="text-sm leading-snug"><span className="font-bold text-primary">Boa!</span> Você tá subindo de nível… ⚡</p>
+            )}
+            {/* bico embaixo do balão apontando p/ a capivara (logo abaixo) */}
+            <span className="absolute -bottom-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b border-r bg-card" />
+          </div>
+          <Mascote reacao={done ? 'joinha' : 'feliz'} tamanho={120} entra flutua espelhar />
+        </div>
+      )}
     </div>,
     document.body,
   )

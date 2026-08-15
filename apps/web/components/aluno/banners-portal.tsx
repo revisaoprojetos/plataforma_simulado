@@ -136,8 +136,9 @@ export function BannersPortal({ banners, simulados = [], stats }: { banners: Ban
   return (
     <>
       {slides.length > 0 && (
-        // FULL-BLEED: cancela o padding do <main> (p-6) → ocupa até as laterais e cola no topo.
-        <div className="-mx-6 -mt-6 mb-5">
+        // FULL-BLEED: cancela o padding do <main> (mobile p-4 / desktop p-6) → ocupa até as
+        // laterais e cola no topo. Casar com o padding evita sobra/clipe no mobile.
+        <div className="-mx-4 -mt-4 mb-5 md:-mx-6 md:-mt-6">
           <Carrossel slides={slides} stats={stats} />
         </div>
       )}
@@ -168,7 +169,7 @@ function Carrossel({ slides, stats }: { slides: Slide[]; stats?: BannerStats | n
   }, [n, i])
 
   return (
-    <div className="group relative aspect-[1920/500] w-full overflow-hidden">
+    <div className="group relative aspect-[2/1] w-full overflow-hidden sm:aspect-[1920/620] md:aspect-[1920/500]">
       {slides.map((s, idx) => (
         <div key={s.id} className={cn('absolute inset-0 transition-opacity duration-700 ease-out', idx === i ? 'z-10 opacity-100' : 'pointer-events-none z-0 opacity-0')}>
           {s.kind === 'sim' ? <SimSlide s={s} stats={stats} /> : <ImgSlide b={s} />}
@@ -260,22 +261,23 @@ export function SimSlide({ s, stats }: { s: HeroSimSlide; stats?: BannerStats | 
         : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${s.cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
       {fadeAtivo && <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, rgba(10,7,20,${a(0.94)}) 2%, rgba(10,7,20,${a(0.7)}) 42%, rgba(10,7,20,${a(0.14)}) 78%, rgba(10,7,20,${a(0.5)}) 100%)` }} />}
 
-      {/* Conteúdo — recuado à esquerda p/ não ficar atrás da seta "anterior". */}
-      <div className="relative flex h-full max-w-2xl flex-col justify-center py-5 pl-14 pr-6 sm:py-7 sm:pl-16 md:pl-20">
+      {/* Conteúdo — recuado à esquerda p/ não ficar atrás da seta "anterior". No mobile, mais
+          compacto (menos recuo, título menor, descrição/ação secundária ocultas) p/ caber. */}
+      <div className="relative flex h-full max-w-2xl flex-col justify-center py-4 pl-12 pr-4 sm:py-7 sm:pl-16 sm:pr-6 md:pl-20">
         {s.destaqueAtivo !== false && (
-          <div className="mb-1.5 flex items-center gap-2">
+          <div className="mb-1 flex items-center gap-2 sm:mb-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 10px 1px rgba(52,211,153,.7)' }} />
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] sm:text-[11px]" style={{ color: 'var(--brand-accent)' }}>{s.destaqueTexto || 'Em destaque para você'}</span>
           </div>
         )}
-        <h2 className="line-clamp-2 text-xl font-extrabold leading-[1.05] tracking-tight text-white drop-shadow-sm sm:text-3xl md:text-4xl">{s.titulo}</h2>
-        {s.descricao && <p className="mt-1.5 line-clamp-2 max-w-lg text-xs text-white/75 sm:text-sm">{s.descricao}</p>}
+        <h2 className="line-clamp-2 text-lg font-extrabold leading-[1.08] tracking-tight text-white drop-shadow-sm sm:text-3xl md:text-4xl">{s.titulo}</h2>
+        {s.descricao && <p className="mt-1.5 hidden max-w-lg text-xs text-white/75 sm:line-clamp-2 sm:text-sm">{s.descricao}</p>}
 
         {s.chips && s.chips.length > 0 && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:mt-2.5 sm:gap-2">
             {s.chips.map((c, k) => (
               <span key={k} className={cn(
-                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur',
+                'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold backdrop-blur sm:px-3 sm:py-1 sm:text-xs',
                 c.tone === 'ok' ? 'border-emerald-400/35 bg-emerald-400/15 text-emerald-200' : 'border-white/18 bg-white/10 text-white/90',
               )}>
                 {c.icon === 'book' && <BookOpen className="h-3.5 w-3.5" />}
@@ -286,15 +288,15 @@ export function SimSlide({ s, stats }: { s: HeroSimSlide; stats?: BannerStats | 
           </div>
         )}
 
-        <div className="mt-4 flex flex-wrap items-center gap-2.5">
+        <div className="mt-3 flex flex-wrap items-center gap-2.5 sm:mt-4">
           {s.link && (
-            <Alvo href={s.link} className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold shadow-lg ring-1 ring-white/15 transition-transform hover:scale-[1.03]"
+            <Alvo href={s.link} className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold shadow-lg ring-1 ring-white/15 transition-transform hover:scale-[1.03] sm:px-5 sm:py-2.5"
               style={{ background: `linear-gradient(135deg, ${s.cor}, color-mix(in oklab, ${s.cor} 62%, #f5e6b8))`, color: '#1b1036' }}>
               <Play className="h-4 w-4 fill-current" /> {s.acao}
             </Alvo>
           )}
           {s.detalhesLink && (
-            <Alvo href={s.detalhesLink} className="inline-flex items-center gap-1.5 rounded-xl border border-white/16 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20">
+            <Alvo href={s.detalhesLink} className="hidden items-center gap-1.5 rounded-xl border border-white/16 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20 sm:inline-flex">
               Ver detalhes <ArrowRight className="h-4 w-4" />
             </Alvo>
           )}

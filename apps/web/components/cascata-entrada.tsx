@@ -1,7 +1,11 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
+
+// useLayoutEffect no CLIENTE (revela ANTES do paint → zero frame branco nas navegações);
+// useEffect no server (evita o warning de "useLayoutEffect não faz nada no servidor").
+const useIsoEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
 // Passo por card (sensação "normal") e JANELA máxima de escalonamento. TODOS os cards entram na
 // sequência (mais simulados/cadernos/banco → mais cards animando, sem teto). O passo em ms se
@@ -75,11 +79,11 @@ function coletarCards(root: HTMLElement): HTMLElement[] {
  */
 export function CascataEntrada({ children, ativa = true }: { children: React.ReactNode; ativa?: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
+  const primeiraVezRef = useRef(true)
   const pathname = usePathname()
-  // useEffect (não useLayoutEffect): roda DEPOIS do commit/hidratação — mutar o DOM durante a
-  // hidratação concorrente do React 19 dá erro "didn't match". Depende do pathname → re-dispara em
-  // TODA navegação. Páginas async: MutationObserver aplica assim que os cards aparecem.
-  useEffect(() => {
+  // Layout effect (cliente): na NAVEGAÇÃO roda antes do paint → revela sem frame branco. Na 1ª carga
+  // (hidratação) a mutação é adiada p/ o idle (evita "didn't match" durante a hidratação concorrente).
+  useIsoEffect(() => {
     const root = ref.current
     if (!root) return
     // Desligada no console (tema.animacao_entrada = false): não anima, não esconde — só mostra.
@@ -100,6 +104,14 @@ export function CascataEntrada({ children, ativa = true }: { children: React.Rea
     // branco). Feito aqui em JS porque a regra CSS com `:has` é derrubada pelo pipeline. Síncrono
     // (fora do requestIdleCallback) p/ o loader aparecer no 1º frame, sem atraso.
     if (carregando()) revelar()
+    // Numa NAVEGAÇÃO client-side o loader (loading.tsx via Suspense) é comitado DEPOIS deste efeito —
+    // e numa 1ª VISITA o chunk da rota carrega mais tarde ainda, então o loader entra atrasado no DOM.
+    // Um observer DEDICADO, anexado JÁ (síncrono), revela no exato instante em que `[data-app-loading]`
+    // aparecer, não importa quando — sem isto a tela fica BRANCA até o conteúdo real chegar.
+    // (revelar() só adiciona classe → seguro; não roda a cascata no esqueleto.)
+    const obsLoader = new MutationObserver(() => { if (carregando()) revelar() })
+    obsLoader.observe(root, { childList: true, subtree: true })
+    requestAnimationFrame(() => { if (carregando()) revelar() })
 
     const aplicar = (): boolean => {
       if (carregando()) return false // espera o conteúdo REAL substituir o loader
@@ -126,6 +138,9 @@ export function CascataEntrada({ children, ativa = true }: { children: React.Rea
     const tentar = () => {
       if (cancelado) return
       if (aplicar()) { revelar(); return }
+      // Loader de rota na tela agora (comitado após o efeito): revela JÁ (não fica branco esperando
+      // o conteúdo real) — a cascata roda depois, quando o conteúdo REAL substituir o loader.
+      if (carregando()) revelar()
       // Ou o loader de rota está na tela (o CSS já o exibe via :has), ou o conteúdo async/streaming
       // ainda vai chegar. Observa até o loader SAIR e o conteúdo real aparecer → então a cascata roda
       // (data-cascata é aplicado na MESMA callback do observer, antes do paint → sem "flash").
@@ -138,18 +153,30 @@ export function CascataEntrada({ children, ativa = true }: { children: React.Rea
       seguranca = window.setTimeout(() => { obs?.disconnect(); aplicar(); revelar() }, 6000)
     }
 
-    // Espera o main thread ficar OCIOSO (hidratação concorrente do React CONCLUÍDA) antes de mutar
-    // o DOM — mutar durante a hidratação é o que gerava o erro "didn't match".
-    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback
-    const cic = (window as unknown as { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback
-    const idle = ric ? ric(tentar, { timeout: 500 }) : window.setTimeout(tentar, 180)
+    // 1ª VEZ (carga + hidratação): agenda no IDLE — espera a hidratação concorrente do React 19
+    // concluir antes de mutar o DOM (evita "didn't match"). NAVEGAÇÕES seguintes: rAF (rápido) — não
+    // há hidratação e, sem loading.tsx, o conteúdo já chega PRONTO, então a cascata revela em ~1 frame
+    // (sem tela branca perceptível, em vez de esperar até 500ms do requestIdleCallback).
+    let cancelarAgenda: () => void
+    if (primeiraVezRef.current) {
+      const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback
+      const cic = (window as unknown as { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback
+      const idle = ric ? ric(tentar, { timeout: 500 }) : window.setTimeout(tentar, 180)
+      cancelarAgenda = () => { if (ric && cic) cic(idle); else clearTimeout(idle) }
+    } else {
+      // Navegação: o conteúdo já está presente (sem loading.tsx) → aplica + revela AGORA, dentro do
+      // layout effect (antes do paint) → a nova página já aparece com a cascata, sem NENHUM frame branco.
+      tentar()
+      cancelarAgenda = () => {}
+    }
+    primeiraVezRef.current = false
 
     return () => {
       cancelado = true
       obs?.disconnect()
+      obsLoader.disconnect()
       clearTimeout(seguranca)
-      if (ric && cic) cic(idle)
-      else clearTimeout(idle)
+      cancelarAgenda()
     }
   }, [pathname, ativa])
   // Sem `cascata-root` quando desligada → o CSS não esconde (opacity:0) nem anima nada.

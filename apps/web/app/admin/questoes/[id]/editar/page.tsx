@@ -1,6 +1,8 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { QuestaoForm } from '@/components/admin/questao-form'
+import { EtiquetaPicker } from '@/components/admin/etiqueta-picker'
+import { etiquetasDaQuestao } from '@/app/admin/etiquetas/actions'
 import { updateQuestaoAction } from '../../actions'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -49,6 +51,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
   const bancasSugestoes = (bancas ?? []).map((b) => b.nome)
   const disciplinasSugestoes = (disciplinas ?? []).map((d) => d.nome)
   const bancoIds = (vinculos ?? []).map((v: { pasta_id: string }) => v.pasta_id)
+  const et = await etiquetasDaQuestao(id)
 
   const initialData = {
     tipo: questao.tipo as 'objetiva' | 'discursiva',
@@ -82,6 +85,8 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
         <h1 className="text-2xl font-bold tracking-tight">Editar Questão</h1>
         <p className="text-sm text-muted-foreground font-mono">{id}</p>
       </div>
+
+      <EtiquetaPicker questaoId={id} todas={et.todas ?? []} ativasIniciais={et.ativas ?? []} />
 
       <QuestaoForm
         initialData={initialData}

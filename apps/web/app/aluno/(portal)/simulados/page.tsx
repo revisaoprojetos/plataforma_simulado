@@ -35,9 +35,7 @@ export default async function MeusSimuladosPage() {
     for (const s of (sessAll ?? []) as any[]) { const arr = sessoesPorSim.get(s.simulado_id) ?? []; arr.push(s); sessoesPorSim.set(s.simulado_id, arr) }
   }
 
-  const visual = await resolverVisualSimulados(svc, simulados.map((s: any) => ({ id: s.id, regras: s.regras })))
-
-  // Classifica cada simulado.
+  // Classifica cada simulado (o `vis` visual e os grupos vêm DEPOIS, em paralelo — não bloqueiam aqui).
   const itens = simulados.map((s) => {
     const sess = sessoesPorSim.get(s.id) ?? []
     const finalizadas = sess.filter((x) => x.status === 'finalizada')
@@ -46,7 +44,7 @@ export default async function MeusSimuladosPage() {
     const melhor = notas.length ? Math.max(...notas) : null
     const concluido = finalizadas.length > 0
     const { notaLiberada } = resolverLiberacoes(s.regras, s)
-    return { ...s, concluido, emAndamento, tentativas: finalizadas.length, melhor, notaLiberada, vis: visual.get(s.id) ?? null }
+    return { ...s, concluido, emAndamento, tentativas: finalizadas.length, melhor, notaLiberada }
   })
 
   const concluidos = itens
@@ -69,11 +67,14 @@ export default async function MeusSimuladosPage() {
     )
   }
 
-  // Grupo (pasta is_folder do banco) de cada concluído → fileiras do catálogo.
-  const { grupoPorSim, grupos } = await resolverGruposCatalogo(svc, concluidos.map((s: any) => ({ id: s.id, regras: s.regras })))
+  // Visual (capa/cor) + grupo (pasta) de cada concluído — leituras independentes, em PARALELO.
+  const [visual, { grupoPorSim, grupos }] = await Promise.all([
+    resolverVisualSimulados(svc, concluidos.map((s: any) => ({ id: s.id, regras: s.regras }))),
+    resolverGruposCatalogo(svc, concluidos.map((s: any) => ({ id: s.id, regras: s.regras }))),
+  ])
   const concluidosCat = concluidos.map((s: any) => ({
     id: s.id, titulo: s.titulo, modo_aplicacao: s.modo_aplicacao, tentativas: s.tentativas,
-    melhor: s.melhor, notaLiberada: s.notaLiberada, vis: s.vis, grupoId: grupoPorSim.get(s.id) ?? null,
+    melhor: s.melhor, notaLiberada: s.notaLiberada, vis: visual.get(s.id) ?? null, grupoId: grupoPorSim.get(s.id) ?? null,
   }))
 
   return <MeusSimuladosCatalogo itens={concluidosCat} grupos={grupos} />

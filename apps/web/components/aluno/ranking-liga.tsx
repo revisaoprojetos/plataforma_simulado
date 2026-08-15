@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Trophy, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useSWRGet } from '@/hooks/use-swr-get'
 
-interface RankingItem { estudanteId: string; nome: string; xp: number; posicao: number; eu: boolean }
+interface RankingItem { estudanteId: string; nome: string; xp: number; posicao: number; eu: boolean; avatar?: string | null; avatarCor?: string | null }
 type Escopo = 'total' | 'semana' | 'mes'
 
 const ABAS: { id: Escopo; label: string }[] = [
@@ -23,19 +24,9 @@ function medalha(p: number) {
 /** Leaderboard com alternância entre liga (XP total) e período (semana/mês). Busca sob demanda. */
 export function RankingLiga({ inicial = 'total' }: { inicial?: Escopo }) {
   const [escopo, setEscopo] = useState<Escopo>(inicial)
-  const [itens, setItens] = useState<RankingItem[]>([])
-  const [carregando, setCarregando] = useState(true)
-
-  useEffect(() => {
-    let ativo = true
-    setCarregando(true)
-    fetch(`/api/aluno/gamificacao/ranking?escopo=${escopo}`)
-      .then((r) => r.json())
-      .then((j) => { if (ativo) setItens(j.itens ?? []) })
-      .catch(() => { if (ativo) setItens([]) })
-      .finally(() => { if (ativo) setCarregando(false) })
-    return () => { ativo = false }
-  }, [escopo])
+  // SWR: mostra o ranking do cache NA HORA (ao remontar ou trocar p/ uma aba já vista) e revalida atrás.
+  const { data, carregando } = useSWRGet<{ itens?: RankingItem[] }>(`/api/aluno/gamificacao/ranking?escopo=${escopo}`)
+  const itens = data?.itens ?? []
 
   return (
     <div className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -64,7 +55,12 @@ export function RankingLiga({ inicial = 'total' }: { inicial?: Escopo }) {
                 {gap && <li className="flex justify-center py-0.5 text-muted-foreground/60" aria-hidden>⋯</li>}
                 <li className={cn('flex items-center gap-3 rounded-lg px-2.5 py-2', it.eu && 'bg-primary/10 ring-1 ring-primary/30')}>
                   <span className={cn('w-6 shrink-0 text-center text-sm font-bold tabular-nums', medalha(it.posicao))}>{it.posicao}</span>
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold uppercase">{it.nome.slice(0, 1)}</span>
+                  <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold uppercase', !it.avatarCor && 'bg-muted')} style={it.avatarCor ? { background: it.avatarCor } : undefined}>
+                    {it.avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={it.avatar} alt="" className="h-full w-full object-contain object-[center_82%]" />
+                    ) : it.nome.slice(0, 1)}
+                  </span>
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">{it.nome}{it.eu && <span className="ml-1 text-xs text-primary">(você)</span>}</span>
                   <span className="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">{it.xp.toLocaleString('pt-BR')} XP</span>
                 </li>

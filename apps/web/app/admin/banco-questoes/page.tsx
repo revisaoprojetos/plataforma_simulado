@@ -44,10 +44,14 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
   const idsNivel = bancosNivel.map((b) => b.id)
   const contarPorBanco = async (tabela: string) => {
     const m = new Map<string, number>()
-    await Promise.all(idsNivel.map(async (id) => {
-      const { count } = await svc.from(tabela).select('*', { count: 'exact', head: true }).eq('tenant_id', tid).eq('pasta_id', id)
-      m.set(id, count ?? 0)
-    }))
+    // Concorrência LIMITADA (12): muitos bancos no nível não estouram o pool do PgBouncer.
+    const CONC = 12
+    for (let i = 0; i < idsNivel.length; i += CONC) {
+      await Promise.all(idsNivel.slice(i, i + CONC).map(async (id) => {
+        const { count } = await svc.from(tabela).select('*', { count: 'exact', head: true }).eq('tenant_id', tid).eq('pasta_id', id)
+        m.set(id, count ?? 0)
+      }))
+    }
     return m
   }
   const [contagem, contEstudantes] = await Promise.all([

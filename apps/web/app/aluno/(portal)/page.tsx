@@ -32,13 +32,15 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const svc = await createServiceClient()
   const estId = sessao!.estudanteId
 
-  const [{ data: mats }, { data: acs }, { data: sessAll }, { data: banRows }, { data: tenantRow }] = await Promise.all([
+  const [{ data: mats }, { data: acs }, { data: sessAll }, { data: banRows }, { data: tenantRow }, gratuitoIds] = await Promise.all([
     svc.from('simulado_matriculas').select('simulado_id, liberado').eq('estudante_id', estId),
     svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', estId),
     svc.from('simulado_sessoes_prova').select('simulado_id, status, nota, finalizado_em').eq('estudante_id', estId).eq('is_teste', false).eq('deletado', false),
     // Mesma ordenação do console (ordem asc, empate por criado_em DESC) para o carrossel bater com a lista de Avisos.
     svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor').eq('tenant_id', sessao!.tenantId).eq('ativo', true).order('ordem', { ascending: true }).order('criado_em', { ascending: false }),
     svc.from('simulado_tenants').select('tema').eq('id', sessao!.tenantId).maybeSingle(),
+    // Simulados de "acesso gratuito" (aparecem p/ todos) — só dependem do tenant, entram no mesmo lote.
+    idsSimuladosGratuitos(svc, sessao!.tenantId),
   ])
   // Painel de desempenho (KPIs) nos banners de simulado: só quando o tenant liga (default OFF).
   const mostrarDesempenhoBanner = (tenantRow?.tema as any)?.banners_desempenho === true
@@ -81,8 +83,6 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   // Banners de imagem (banner/destaque + pop-up), SEM os de simulado (esses viram slides via `simulados`).
   const bannersSemSim = todosBanners.filter((b) => !ehSimBanner(b))
 
-  // Simulados de "acesso gratuito" (classificação própria) aparecem para TODOS, sem matrícula.
-  const gratuitoIds = await idsSimuladosGratuitos(svc, sessao!.tenantId)
   const ids = [...new Set([
     ...(mats ?? []).filter((m: any) => m.liberado !== false).map((m: any) => m.simulado_id),
     ...(acs ?? []).map((a: any) => a.simulado_id),
@@ -172,9 +172,13 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     if (tokens.length) {
       const { data: rows0 } = await svc.from('simulado_simulados').select('id, titulo, embed_token, regras, status, modo_aplicacao, data_inicio, data_fim, created_at').in('embed_token', tokens).eq('deletado', false)
       const rows = (rows0 ?? []) as any[]
-      const visB = await resolverVisualSimulados(svc, rows.map((s) => ({ id: s.id, regras: s.regras })))
+      // Visual + contagem/tipos de questões dependem só de `rows` e são independentes entre si → paralelo.
+      const [visB, pqRes] = await Promise.all([
+        resolverVisualSimulados(svc, rows.map((s) => ({ id: s.id, regras: s.regras }))),
+        rows.length ? svc.from('simulado_prova_questoes').select('simulado_id, questoes:simulado_questoes(tipo)').in('simulado_id', rows.map((r) => r.id)) : Promise.resolve({ data: [] as any[] }),
+      ])
+      const pq = pqRes.data
       const itemById = new Map(montarItensSimulado(rows, new Map(), expiraPorSim, visB).map((i) => [i.id, i]))
-      const { data: pq } = rows.length ? await svc.from('simulado_prova_questoes').select('simulado_id, questoes:simulado_questoes(tipo)').in('simulado_id', rows.map((r) => r.id)) : { data: [] as any[] }
       for (const r of (pq ?? []) as any[]) { cntPorSim.set(r.simulado_id, (cntPorSim.get(r.simulado_id) ?? 0) + 1); const a = tiposPorSim.get(r.simulado_id) ?? []; a.push((r.questoes as any)?.tipo); tiposPorSim.set(r.simulado_id, a) }
       for (const s of rows) simByToken.set(s.embed_token, { ...s, vis: visB.get(s.id) ?? null, item: itemById.get(s.id) })
     }
@@ -183,9 +187,12 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     const pastaIds = [...new Set(simBanners.map((b) => pastaDe(b.link as string)).filter(Boolean))] as string[]
     const pastaRow = new Map<string, any>(); const pastaCount = new Map<string, number>()
     if (pastaIds.length) {
-      const pr = await svc.from('simulado_pastas').select('id, nome, cor, capa_url').in('id', pastaIds)
+      // Pasta-alvo (id) + bancos-filhos (pai_id): 2 leituras independentes em simulado_pastas → paralelo.
+      const [pr, bancos] = await Promise.all([
+        svc.from('simulado_pastas').select('id, nome, cor, capa_url').in('id', pastaIds),
+        svc.from('simulado_pastas').select('id, pai_id').in('pai_id', pastaIds).then((r: any) => r.data ?? [], () => []),
+      ])
       for (const p of (pr.data ?? []) as any[]) pastaRow.set(p.id, p)
-      const bancos = await svc.from('simulado_pastas').select('id, pai_id').in('pai_id', pastaIds).then((r: any) => r.data ?? [], () => [])
       const bancoToFolder = new Map<string, string>()
       for (const f of pastaIds) bancoToFolder.set(f, f)
       for (const bc of bancos as any[]) if (bc.pai_id) bancoToFolder.set(bc.id, bc.pai_id)
@@ -283,27 +290,23 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
 
   // Trilhas de simulados (estilo Duolingo): por grupo, nós concluído → atual → bloqueado.
   const baseXp = gamConfig?.ativo ? (gamConfig.xp_regras.simulado.base || 0) : 0
-  // Contagem de questões (válidas) por simulado das trilhas — para exibir "· N questões".
+  // Contagem de questões por simulado (trilha: "· N questões") + baús de trilha já resgatados:
+  // leituras independentes (prova_questoes × xp_eventos) → em PARALELO (antes eram 2 em série).
+  const idsTrilha = [...new Set(itensCat.map((i) => i.id))]
+  const [cntRows, bausRows] = await Promise.all([
+    idsTrilha.length ? fetchAllByIn<any>(idsTrilha, (chunk) => svc.from('simulado_prova_questoes').select('simulado_id, anulada').in('simulado_id', chunk).order('simulado_id')) : Promise.resolve([] as any[]),
+    gamConfig?.ativo
+      ? svc.from('simulado_xp_eventos').select('ref_id').eq('tenant_id', sessao!.tenantId).eq('estudante_id', estId).eq('origem', 'chest').like('ref_id', 'trilha:%').then((r: any) => r.data ?? [], () => [])
+      : Promise.resolve([] as any[]),
+  ])
   const cntQ = new Map<string, number>()
-  {
-    const idsTrilha = [...new Set(itensCat.map((i) => i.id))]
-    if (idsTrilha.length) {
-      const rows = await fetchAllByIn<any>(idsTrilha, (chunk) => svc.from('simulado_prova_questoes').select('simulado_id, anulada').in('simulado_id', chunk).order('simulado_id'))
-      for (const r of rows) if (!r.anulada) cntQ.set(r.simulado_id, (cntQ.get(r.simulado_id) ?? 0) + 1)
-    }
-  }
+  for (const r of cntRows as any[]) if (!r.anulada) cntQ.set(r.simulado_id, (cntQ.get(r.simulado_id) ?? 0) + 1)
+  const bausResgatados = new Set<string>((bausRows as any[]).map((r: any) => String(r.ref_id).slice('trilha:'.length)))
+
   const lanc = (i: any) => new Date(i.regras?.publicado_em ?? i.created_at ?? 0).getTime()
   // Ordem da trilha: prioriza a DATA no título ("DD/MM/AAAA – …"); senão, publicado_em/created_at.
   const dataTitulo = (tit?: string) => { const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(tit || ''); return m ? Date.UTC(+m[3], +m[2] - 1, +m[1]) : null }
   const ordKey = (i: any) => dataTitulo(i.titulo) ?? lanc(i)
-  // Baús de trilha já resgatados (evento de chest no ledger) — estado autoritativo do servidor.
-  let bausResgatados = new Set<string>()
-  if (gamConfig?.ativo) {
-    try {
-      const { data } = await svc.from('simulado_xp_eventos').select('ref_id').eq('tenant_id', sessao!.tenantId).eq('estudante_id', estId).eq('origem', 'chest').like('ref_id', 'trilha:%')
-      bausResgatados = new Set((data ?? []).map((r: any) => String(r.ref_id).slice('trilha:'.length)))
-    } catch { /* tolerante */ }
-  }
 
   const trilhas: Trilha[] = grupos.map((g) => {
     const its = itensCat.filter((i) => i.grupoId === g.id).sort((a, b) => ordKey(a) - ordKey(b) || (a.titulo || '').localeCompare(b.titulo || ''))

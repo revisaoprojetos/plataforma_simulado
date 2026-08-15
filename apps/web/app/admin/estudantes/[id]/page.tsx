@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +15,9 @@ import { HistoricoSimples } from '@/components/admin/historico-simples'
 import { BancosVinculadosPopup } from '@/components/admin/bancos-vinculados-popup'
 import { GruposVinculadosPopup } from '@/components/admin/grupos-vinculados-popup'
 import { SimuladosPendentesCard } from '@/components/admin/simulados-pendentes-card'
+import { GamificacaoEstudante } from '@/components/admin/gamificacao-estudante'
+import { getGamConfig } from '@/lib/gamificacao'
+import { resumoGamificacao, conquistasDoAluno } from '@/lib/gamificacao/leitura'
 import { EditarEstudanteButton } from '@/components/admin/editar-estudante-button'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
@@ -59,7 +63,7 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
   // (perfil, sessões, vínculos de banco/grupo, matrículas e acessos avulsos). ──
   const [estRes, sessoesRes, peRes, gmRes, matsRes, acesRes] = await Promise.all([
     svc.from('simulado_estudantes')
-      .select('id, nome, email, cpf, telefone, data_nascimento, classificacao, matricula_externa, created_at')
+      .select('id, nome, email, cpf, telefone, data_nascimento, classificacao, matricula_externa, created_at, avatar, perfil_avatar_cor')
       .eq('id', id).eq('tenant_id', TID).maybeSingle(),
     svc.from('simulado_sessoes_prova')
       .select('id, status, nota, posicao_ranking, iniciado_em, finalizado_em, tentativa_num, is_teste, simulado_id, simulados:simulado_simulados(titulo)')
@@ -205,11 +209,17 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
       .sort((a, b) => Number(b.iniciado) - Number(a.iniciado))
   }
 
-  // Visual do banco (capa/cor/ícone) por simulado — usado no card de "simulado feito".
+  // Visual do banco (capa/cor/ícone) por simulado — MESMO resolver do aluno (prioriza
+  // regras.banco_base_id; fallback pela pasta mais comum das questões). Corrige a capa que não
+  // aparecia quando o "banco que mais cobre por questões" não tinha capa.
   const visualPorSim: Record<string, { cor: string | null; icone: string | null; capa: string | null; bancoId: string | null }> = {}
-  for (const [sim, pid] of pastaPorSim) {
-    const v = visualPorPasta.get(pid)
-    visualPorSim[sim] = { cor: v?.cor ?? null, icone: v?.icone ?? null, capa: v?.capa ?? null, bancoId: pid }
+  if (simIds.length) {
+    const { data: simsVis } = await svc.from('simulado_simulados').select('id, regras').in('id', simIds)
+    const mapaVis = await resolverVisualSimulados(svc as any, (simsVis ?? []).map((s: any) => ({ id: s.id, regras: s.regras })))
+    for (const sim of simIds) {
+      const v = mapaVis.get(sim)
+      visualPorSim[sim] = { cor: v?.cor ?? null, icone: v?.icone ?? null, capa: v?.capa ?? null, bancoId: pastaPorSim.get(sim) ?? null }
+    }
   }
 
   // ── Breakdown por disciplina + tempo, por sessão (detalhe expansível) ──
@@ -249,6 +259,12 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
     }
   })
 
+  // Gamificação do aluno (o admin confere sem entrar na conta) — só quando ativa no tenant.
+  const gamConfig = await getGamConfig(svc, TID)
+  const [gamResumo, gamConquistas] = gamConfig?.ativo
+    ? await Promise.all([resumoGamificacao(svc, TID, id, gamConfig), conquistasDoAluno(svc, TID, id, gamConfig)])
+    : [null, [] as any[]]
+
   const iniciais = (est.nome ?? '?').split(' ').filter(Boolean).slice(0, 2).map((n: string) => n[0]?.toUpperCase()).join('')
   const notaTone = (n: number) => n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
 
@@ -284,8 +300,11 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
             </Link>
             <div className="relative shrink-0">
               <div aria-hidden className="absolute -inset-1 rounded-[1.4rem] bg-gradient-to-br from-primary to-primary/30 opacity-70 blur-[6px]" />
-              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-2xl font-bold text-primary-foreground ring-2 ring-background sm:h-20 sm:w-20">
-                {iniciais || <User className="h-8 w-8" />}
+              <div className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-primary text-2xl font-bold text-primary-foreground ring-2 ring-background sm:h-20 sm:w-20" style={est.perfil_avatar_cor ? { background: est.perfil_avatar_cor } : undefined}>
+                {est.avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={est.avatar} alt="" className="h-full w-full object-contain object-[center_82%]" />
+                ) : (iniciais || <User className="h-8 w-8" />)}
               </div>
             </div>
             <div className="min-w-0">
@@ -312,6 +331,9 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
 
       {/* SIMULADOS PENDENTES: cartão clicável → abre pop-up com a lista (não polui o perfil) */}
       <SimuladosPendentesCard pendentes={pendentes} />
+
+      {/* GAMIFICAÇÃO: nível, cargo, liga e conquistas do aluno (só quando ativa) */}
+      {gamResumo && <GamificacaoEstudante resumo={gamResumo} conquistas={gamConquistas} />}
 
       {/* Conteúdo: esquerda (Informações + Simulados feitos) | direita (Bancos + Histórico) */}
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">

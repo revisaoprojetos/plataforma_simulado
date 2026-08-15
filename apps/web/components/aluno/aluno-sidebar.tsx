@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LoginLoading } from '@/components/aluno/login-loading'
@@ -8,7 +8,7 @@ import { type LoginConfig } from '@/lib/login-config'
 import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy, Flame, Zap, Route } from 'lucide-react'
 import {
   Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupContent,
-  SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter,
+  SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, useSidebar,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
@@ -52,16 +52,23 @@ export interface ProgressoAluno { streak: number; xpTotal: number; nivel: number
 
 export function AlunoSidebar({
   logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none',
-  usuarioNome = 'Aluno', usuarioEmail, counts, loginConfig, progresso,
+  usuarioNome = 'Aluno', usuarioEmail, avatar, avatarCor, counts, loginConfig, progresso, gamAtivo = false,
 }: {
   logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string
-  usuarioNome?: string; usuarioEmail?: string | null; counts?: Record<string, number>; loginConfig: LoginConfig; progresso?: ProgressoAluno | null
+  usuarioNome?: string; usuarioEmail?: string | null; avatar?: string | null; avatarCor?: string | null; counts?: Record<string, number>; loginConfig: LoginConfig; progresso?: ProgressoAluno | null; gamAtivo?: boolean
 }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { setOpenMobile } = useSidebar()
   const [saindo, setSaindo] = useState(false)
+  // Ao navegar (ex.: tocar num item pelo "Mais" no mobile), fecha o menu lateral (Sheet).
+  useEffect(() => { setOpenMobile(false) }, [pathname, setOpenMobile])
   const ativo = (n: (typeof NAV)[number]) => (n.exact ? pathname === n.href : pathname.startsWith(n.href))
-  const nav = NAV.filter((n) => !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(n.href)))
+  // Trilha e Ligas (gamificação) só aparecem quando ativa; + oculta os extras configurados.
+  const nav = NAV.filter((n) =>
+    (gamAtivo || (n.href !== '/aluno/trilha' && n.href !== '/aluno/ligas')) &&
+    !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(n.href)),
+  )
 
   async function sair() {
     // Mostra a tela de carregamento (branded) na SAÍDA — dá tempo do login (imagem + animações)
@@ -105,7 +112,7 @@ export function AlunoSidebar({
               {nav.map((n) => {
                 const c = counts?.[n.href]
                 return (
-                  <SidebarMenuItem key={n.href}>
+                  <SidebarMenuItem key={n.href} data-tour={n.href === '/aluno/trilha' ? 'nav-trilha' : n.href === '/aluno/ligas' ? 'nav-liga' : undefined}>
                     <SidebarMenuButton className={NAV_STATES} render={<Link href={n.href} />} isActive={ativo(n)} tooltip={n.label}>
                       <n.icon className="h-4 w-4" />
                       <span>{n.label}</span>
@@ -137,8 +144,13 @@ export function AlunoSidebar({
         )}
         <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
           {/* Card do perfil (avatar + nome + email) — todo clicável, no estilo dos botões Ajuda/Sair. */}
-          <Link href="/aluno/perfil" title="Meu perfil" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1.5 pr-2.5 transition-colors hover:bg-white/10 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:p-0">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-primary shadow-sm ring-1 ring-black/10">{iniciais(usuarioNome)}</span>
+          <Link data-tour="perfil" href="/aluno/perfil" title="Meu perfil" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1.5 pr-2.5 transition-colors hover:bg-white/10 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:p-0">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-primary shadow-sm ring-1 ring-black/10" style={{ background: avatarCor ?? '#ffffff' }}>
+              {avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatar} alt="" className="h-full w-full object-contain object-[center_82%]" />
+              ) : iniciais(usuarioNome)}
+            </span>
             {/* nome/email: colapsam largura + opacidade (não somem de golpe) */}
             <div className="min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:opacity-0">
               <p className="truncate text-sm font-medium leading-tight">{usuarioNome}</p>
@@ -155,7 +167,7 @@ export function AlunoSidebar({
           {/* Ajuda/Sair (rótulo): some por completo na colapsada (sem gap fantasma) */}
           <div className="flex min-w-0 flex-1 items-center gap-2 group-data-[collapsible=icon]:hidden">
             <AjudaDrawer renderTrigger={(abrir) => (
-              <button type="button" onClick={abrir} className={btnFooter}>Ajuda</button>
+              <button type="button" data-tour="ajuda" onClick={abrir} className={btnFooter}>Ajuda</button>
             )} />
             <button type="button" onClick={sair} className={btnFooter}>Sair</button>
           </div>

@@ -276,7 +276,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
   const capaFundo = capaFundoTrilha(t)
 
   return (
-    <section className="space-y-4">
+    <section data-tour="trilha" className="space-y-4">
       <div>
         <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight"><Route className="h-5 w-5 text-primary" /> Trilhas de simulados</h2>
         <p className="text-sm text-muted-foreground">Todos os simulados ficam disponíveis — faça na ordem que quiser.</p>
@@ -314,7 +314,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
               acompanha o rolamento. Cobre toda a altura da trilha; fade lateral + topo/base. */}
           {capaFundo && (
             <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-2xl" style={{ WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)' }}>
-              <img src={capaFundo} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-[center_30%] opacity-100 dark:opacity-[0.75]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)' }} />
+              <img src={capaFundo} alt="" loading="lazy" decoding="async" className="h-full w-full scale-105 object-cover object-[center_30%] opacity-100 blur-[5px] dark:opacity-[0.75]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)' }} />
             </div>
           )}
           {caminho ? (
@@ -472,7 +472,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       {/* Fundo por grupo — capa do banco (quase às bordas), quadrada com fade em todas as bordas */}
       {segmentos.map((s) => s.capa && (
         <div key={s.id} className="pointer-events-none absolute left-1/2 z-0 -translate-x-1/2 overflow-hidden" style={{ top: s.yTop, height: Math.max(0, s.yBot - s.yTop), width: coverW, WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)' }}>
-          <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-[center_30%] opacity-100 dark:opacity-[0.75]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)' }} />
+          <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full scale-105 object-cover object-[center_30%] opacity-100 blur-[5px] dark:opacity-[0.75]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)' }} />
         </div>
       ))}
       {/* Conectores pontilhados — spline Catmull-Rom contínua (C1): curva fluida que passa por

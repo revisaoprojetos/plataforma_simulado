@@ -9,10 +9,12 @@ import { ExcluirEstudanteButton } from '@/components/admin/excluir-estudante-but
 import { ExportButton } from '@/components/admin/export-button'
 import type { ColunaExport } from '@/lib/exportar'
 import { carregarLoteEstudantes, buscarEstudantes, type EstudanteBase } from '@/app/admin/estudantes/actions'
+import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 
 export type EstudanteRow = {
   id: string; nome: string; email: string | null; cpf: string | null; telefone: string | null
   classificacao: string | null; created_at: string | null; feitos: number; media: number | null
+  avatar: string | null; avatarCor: string | null
 }
 type Agregados = Record<string, { feitos: number; media: number | null }>
 
@@ -23,9 +25,6 @@ type Sort = { key: SortKey; dir: 'asc' | 'desc' } | null
 const POR_PAGINA = 25
 const LOTE = 1000 // teto do PostgREST — carrega o restante em segundo plano
 
-function iniciais(nome: string) {
-  return (nome || '?').split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]?.toUpperCase()).join('')
-}
 function fmtData(iso: string | null) {
   if (!iso) return '—'
   const d = new Date(iso)
@@ -224,7 +223,7 @@ export function EstudantesLista({ inicial, agregados, total, kpis, adminEmails =
                 <tr key={e.id} className="group border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40">
                   <td className="px-4 py-2.5">
                     <Link href={`/admin/estudantes/${e.id}`} className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{iniciais(e.nome)}</span>
+                      <AvatarEstudante nome={e.nome} avatar={e.avatar} cor={e.avatarCor} className="h-9 w-9 bg-primary/10 text-xs text-primary" />
                       <span className="min-w-0">
                         <span className="block truncate font-semibold text-foreground group-hover:text-primary">{e.nome || '—'}</span>
                         <span className="block truncate text-xs text-muted-foreground">{e.email ?? 'sem e-mail'}</span>

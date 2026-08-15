@@ -5,6 +5,7 @@ import './globals.css'
 import { Providers } from '@/components/providers'
 import { Toaster } from 'sonner'
 import { ConfirmHost } from '@/components/ui/confirm-dialog'
+import { ServiceWorkerRegister } from '@/components/service-worker-register'
 import { getTenantTheme } from '@/lib/tenant-theme'
 
 const inter = Inter({
@@ -90,6 +91,8 @@ export default async function RootLayout({
           <Toaster position="bottom-right" richColors />
           <ConfirmHost />
         </Providers>
+        {/* Service Worker (prod): cache de assets estáticos + fallback offline. */}
+        <ServiceWorkerRegister />
       </body>
     </html>
   )

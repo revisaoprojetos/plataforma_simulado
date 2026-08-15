@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useSidebar } from '@/components/ui/sidebar'
+import { cn } from '@/lib/utils'
 
 /**
  * Botão flutuante de recolher/expandir, À FRENTE da sidebar, na altura da divisória
@@ -12,7 +13,7 @@ import { useSidebar } from '@/components/ui/sidebar'
  * ele aparece inteiro. O `left` segue a largura real da sidebar (via CSS vars) e desliza
  * junto com o colapso. `mode` diz como fica a largura recolhida (ícone x escondida).
  */
-export function SidebarEdgeToggle({ mode = 'icon' }: { mode?: 'icon' | 'offcanvas' }) {
+export function SidebarEdgeToggle({ mode = 'icon', hideOnMobile = false }: { mode?: 'icon' | 'offcanvas'; hideOnMobile?: boolean }) {
   const { toggleSidebar, state, isMobile } = useSidebar()
   const collapsed = state === 'collapsed'
   const left = isMobile
@@ -28,7 +29,10 @@ export function SidebarEdgeToggle({ mode = 'icon' }: { mode?: 'icon' | 'offcanva
       title={collapsed ? 'Expandir menu' : 'Recolher menu'}
       aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
       style={{ left, top: '3.5rem' }}
-      className="fixed z-50 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-md transition-[left,transform,background-color,border-color] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:scale-110 hover:border-primary/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+      className={cn(
+        'fixed z-50 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-md transition-[left,transform,background-color,border-color] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:scale-110 hover:border-primary/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+        hideOnMobile && 'max-md:hidden',
+      )}
     >
       {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
     </button>

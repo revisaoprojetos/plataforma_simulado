@@ -17,17 +17,19 @@ export default async function AlunoFavoritosPage() {
 
   const ids = (favs ?? []).map((f: any) => f.questao_id)
 
-  const [{ data: questoes }, { data: alts }] = await Promise.all([
+  // questões + alternativas + etiquetas dependem só de `ids` (favoritos) → em PARALELO.
+  const [{ data: questoes }, { data: alts }, etiquetasMap] = await Promise.all([
     ids.length ? svc.from('simulado_questoes').select('id, tipo, enunciado, disciplina_id, ano, comentario_professor').in('id', ids).eq('status', 'publicada') : Promise.resolve({ data: [] as any[] }),
     ids.length ? svc.from('simulado_alternativas').select('id, questao_id, texto, ordem, correta').in('questao_id', ids) : Promise.resolve({ data: [] as any[] }),
+    etiquetasPorQuestao(svc, sessao!.tenantId, ids),
   ])
 
+  // Nomes das disciplinas dependem dos disciplina_id das questões → só depois.
   const discIds = (questoes ?? []).map((x: any) => x.disciplina_id).filter(Boolean)
   const { data: discNomes } = discIds.length
     ? await svc.from('simulado_disciplinas').select('id, nome').in('id', discIds)
     : { data: [] as any[] }
   const discMap = new Map((discNomes ?? []).map((d: any) => [d.id, d.nome]))
-  const etiquetasMap = await etiquetasPorQuestao(svc, sessao!.tenantId, ids)
 
   const altMap = new Map<string, any[]>()
   for (const a of alts ?? []) {

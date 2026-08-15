@@ -15,7 +15,7 @@ import { AdicionarEstudantesDialog } from '@/components/admin/adicionar-estudant
 import { AdicionarGrupoBancoDialog } from '@/components/admin/adicionar-grupo-banco-dialog'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 
-interface Aluno { id: string; nome: string; email?: string | null; telefone?: string | null; cpf?: string | null; classificacao?: string | null; ultimo_acesso?: string | null }
+interface Aluno { id: string; nome: string; email?: string | null; telefone?: string | null; cpf?: string | null; classificacao?: string | null; ultimo_acesso?: string | null; avatar?: string | null; perfil_avatar_cor?: string | null }
 
 function iniciais(n: string) {
   return n.split(' ').filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join('')
@@ -188,7 +188,12 @@ export function BancoEstudantesClient({ bancoId, vinculados, cor = '#6d28d9' }: 
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2.5">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold" style={{ backgroundColor: `${cor}1a`, color: cor }}>{iniciais(a.nome)}</span>
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold" style={{ backgroundColor: a.perfil_avatar_cor ?? `${cor}1a`, color: cor }}>
+                            {a.avatar ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={a.avatar} alt="" className="h-full w-full object-contain object-[center_82%]" />
+                            ) : iniciais(a.nome)}
+                          </span>
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
                               <span className="truncate font-medium">{a.nome}</span>
