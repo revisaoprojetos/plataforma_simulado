@@ -71,8 +71,9 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input value={termo} onChange={(e) => setTermo(e.target.value)} placeholder="Buscar no enunciado…" className="w-full rounded-lg border bg-transparent py-2 pl-8 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary" />
         </div>
-        {/* Filtros em pills — quebram em 2+ linhas quando não cabem. */}
-        <div className="flex flex-wrap items-center gap-1.5">
+        {/* Filtros em pills: no mobile ficam numa ÚNICA linha rolável (swipe) p/ não roubar altura
+            da lista; em telas maiores quebram em 2+ linhas. */}
+        <div className="-mx-3 flex items-center gap-1.5 overflow-x-auto px-3 pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
           {!!op?.disciplinas.length && (
             <Pill valor={f.disciplina} onChange={(v) => setF((s) => ({ ...s, disciplina: v, assunto: '' }))} rotulo="Disciplina">
               {op.disciplinas.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
@@ -109,7 +110,7 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
             </Pill>
           )}
           {algumFiltro && (
-            <button type="button" onClick={() => { setTermo(''); setF(F0) }} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+            <button type="button" onClick={() => { setTermo(''); setF(F0) }} className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
               <X className="h-3 w-3" /> Limpar
             </button>
           )}
@@ -148,7 +149,7 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
                           {q.dificuldade && <span className="capitalize text-muted-foreground">{difLabel(q.dificuldade)}</span>}
                           {jaTem && <span className="text-emerald-600 dark:text-emerald-400">já no simulado</span>}
                         </span>
-                        <span className="line-clamp-2 block text-foreground">{q.enunciado || '(sem enunciado)'}</span>
+                        <span className="line-clamp-2 text-foreground">{q.enunciado || '(sem enunciado)'}</span>
                       </span>
                     </button>
                   </li>
@@ -179,7 +180,7 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
 /** Filtro "pill": select nativo estilizado como chip; realça quando ativo. */
 function Pill({ valor, onChange, rotulo, children }: { valor: string; onChange: (v: string) => void; rotulo: string; children: React.ReactNode }) {
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       <select value={valor} onChange={(e) => onChange(e.target.value)}
         className={cn('h-8 max-w-[9.5rem] cursor-pointer appearance-none truncate rounded-full border py-0 pl-3 pr-7 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary',
           valor ? 'border-primary/40 bg-primary/10 text-foreground' : 'border-border bg-card text-muted-foreground hover:bg-muted')}>

@@ -45,7 +45,7 @@ export function PersonalizadoWizard() {
     // Na etapa de seleção o wizard preenche exatamente a área visível (dvh, adapta a aparelhos):
     // o card termina ~16px acima da barra inferior, SEM rolamento. O -mb-6 anula o pb-24 do <main>
     // (que sobraria abaixo do card e causaria scroll); nas outras etapas é fluxo normal.
-    <div className={cn('flex flex-col gap-5', etapa === 'selecao' && 'h-[calc(100dvh-5.5rem)] -mb-6')}>
+    <div className={cn('flex flex-col gap-3 sm:gap-5', etapa === 'selecao' && 'h-[calc(100dvh-5.5rem)] -mb-6')}>
       <div className="flex items-center gap-3">
         <Link href="/aluno/simulados" className="shrink-0 rounded-lg border p-2 text-muted-foreground transition-colors hover:text-foreground" aria-label="Voltar"><ArrowLeft className="h-4 w-4" /></Link>
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Criar simulado</h1>
