@@ -3,10 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Check, X, Eye, EyeOff, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, FileText, Scissors, Bold, Italic, Underline, List, Baseline, Highlighter, Download, Maximize2, Target, BarChart3, BookOpen, ListChecks } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, X, Eye, EyeOff, Loader2, Flag, GraduationCap, Timer, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, FileText, Scissors, Bold, Italic, Underline, List, Baseline, Highlighter, Download, Maximize2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
+import { RevisaoFinal } from '@/components/aluno/revisao-final'
+import { efetivarHud } from '@/lib/caderno-designer/types'
+import { hudCssVars } from '@/lib/caderno-designer/hud'
+import { useTheme } from 'next-themes'
 import type { SessaoPessoal, ModoPessoal } from '@/app/aluno/(portal)/simulados/runner-actions'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -22,6 +26,8 @@ type Resultado = { nota: number; acertos: number; total: number }
  *  (cronometrada, resultado no fim) e Revisão (ver gabarito sob demanda). */
 export function PersonalizadoRunner({ sessao, onSair }: { sessao: SessaoPessoal; onSair?: () => void }) {
   const router = useRouter()
+  const { resolvedTheme, setTheme } = useTheme()
+  const dark = resolvedTheme === 'dark'
   const { modo } = sessao
   const total = sessao.questoes.length
 
@@ -127,7 +133,20 @@ export function PersonalizadoRunner({ sessao, onSair }: { sessao: SessaoPessoal;
     return () => clearInterval(t)
   }, [modo, sessao.tempoLimiteMin, sessao.iniciadoEm, finalizar])
 
-  if (resultado) return <TelaResultado sessao={sessao} respostas={respostas} resultado={resultado} onRefazer={() => router.refresh()} />
+  // Resultado: REUSA a tela oficial do simulado real (RevisaoFinal), que busca /api/sessoes/resultado
+  // pela sessão. Envolto em overlay full-screen + HUD padrão (fita/topbar coloridos).
+  if (resultado) return (
+    <div className="fixed inset-0 z-50 overflow-y-auto" style={hudCssVars(efetivarHud(undefined, undefined, 'encerrada'), dark) as any}>
+      <RevisaoFinal
+        sessionToken={sessao.sessaoId}
+        voltarUrl="/aluno/simulados?aba=personalizados"
+        simuladosUrl="/aluno/simulados?aba=personalizados"
+        inicioUrl={`/aluno/simulados/personalizados/${sessao.simuladoId}/fazer`}
+        dark={dark}
+        onToggleDark={() => setTheme(dark ? 'light' : 'dark')}
+      />
+    </div>
+  )
   if (!q) return null
 
   const { Icon } = MODO_INFO[modo]
@@ -546,183 +565,4 @@ function formatarSeg(s: number): string {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60
   const mm = String(m).padStart(2, '0'), sss = String(ss).padStart(2, '0')
   return h > 0 ? `${h}:${mm}:${sss}` : `${mm}:${sss}`
-}
-
-/** Tela de resultado + revisão do gabarito questão a questão. */
-function TelaResultado({ sessao, respostas, resultado, onRefazer }: {
-  sessao: SessaoPessoal; respostas: Record<string, string>; resultado: Resultado; onRefazer: () => void
-}) {
-  const router = useRouter()
-  const pct = resultado.total > 0 ? Math.round((resultado.acertos / resultado.total) * 100) : 0
-  // Acerto por disciplina (client-side): usa o gabarito carregado + as respostas.
-  const porDisc = (() => {
-    const m = new Map<string, { ac: number; tt: number }>()
-    for (const q of sessao.questoes) {
-      const nome = q.disciplina ?? 'Sem disciplina'
-      const v = m.get(nome) ?? { ac: 0, tt: 0 }; v.tt++
-      const correta = q.alternativas.find((a) => a.correta)
-      if (correta && respostas[q.id] === correta.id) v.ac++
-      m.set(nome, v)
-    }
-    return [...m.entries()].map(([nome, v]) => ({ nome, ac: v.ac, tt: v.tt, pct: v.tt ? Math.round((v.ac / v.tt) * 100) : 0 })).sort((a, b) => b.pct - a.pct)
-  })()
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-muted dark:bg-background" style={{ ['--primary' as any]: 'var(--brand-primary)' }}>
-      <div className="mx-auto flex max-w-3xl flex-col gap-4 px-3 py-5 sm:px-4">
-      {/* Hero + KPIs (mesmo estilo do resultado do simulado real) */}
-      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <div className="flex flex-col items-center gap-1 border-b bg-gradient-to-b from-primary/5 to-transparent p-6 text-center">
-          <div className="mb-1 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary"><Trophy className="h-7 w-7" /></div>
-          <h1 className="text-lg font-bold tracking-tight">Simulado concluído</h1>
-          <p className="text-sm text-muted-foreground">{sessao.titulo}</p>
-        </div>
-        <div className="grid grid-cols-3 gap-2 p-4 sm:gap-3">
-          <KpiRes icon={Target} chip="bg-primary/10 text-primary" value={`${resultado.acertos}/${resultado.total}`} label="Acertos" />
-          <KpiRes icon={BarChart3} chip={cn(pct >= 70 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : pct >= 50 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400')} value={`${pct}%`} label="Aproveitamento" valueClass={pctTone(pct)} />
-          <KpiRes icon={ListChecks} chip="bg-sky-500/15 text-sky-600 dark:text-sky-400" value={resultado.total} label="Questões" />
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-2 border-t p-4">
-          <button type="button" onClick={onRefazer} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted"><RotateCcw className="h-4 w-4" /> Refazer</button>
-          <button type="button" onClick={() => router.push(`/aluno/simulados/personalizados/${sessao.simuladoId}`)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted"><Pencil className="h-4 w-4" /> Editar</button>
-          <button type="button" onClick={() => router.push('/aluno/simulados?aba=personalizados')} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">Voltar aos simulados</button>
-        </div>
-      </div>
-
-      {/* Acerto por disciplina (barras) */}
-      {porDisc.length > 0 && (
-        <div className="rounded-2xl border bg-card p-4 shadow-sm">
-          <div className="mb-3 flex items-center gap-2"><BookOpen className="h-4 w-4 text-primary" /><h2 className="text-sm font-semibold">Acerto por disciplina</h2></div>
-          <div className="space-y-3">
-            {porDisc.map((d) => (
-              <div key={d.nome}>
-                <div className="mb-1 flex items-baseline justify-between gap-2">
-                  <span className="text-sm font-medium">{d.nome}</span>
-                  <span className="text-xs tabular-nums text-muted-foreground">{d.ac}/{d.tt} · <b className={pctTone(d.pct)}>{d.pct}%</b></span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-muted"><div className={cn('h-full rounded-full', pctBar(d.pct))} style={{ width: `${d.pct}%` }} /></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <RevisaoQuestoes sessao={sessao} respostas={respostas} />
-      </div>
-    </div>
-  )
-}
-
-/** Revisão completa (como no simulado real): navegador de questões + filtros + cada questão INTEIRA
- *  (enunciado, TODAS as alternativas com certo/errado/sua resposta e comentário). */
-function RevisaoQuestoes({ sessao, respostas }: { sessao: SessaoPessoal; respostas: Record<string, string> }) {
-  const [filtro, setFiltro] = useState<'todas' | 'erradas' | 'branco'>('todas')
-  const sec = secaoMap(sessao.secoes)
-  const refs = useRef<Record<string, HTMLDivElement | null>>({})
-  const infos = sessao.questoes.map((q, i) => {
-    const correta = q.alternativas.find((a) => a.correta) ?? null
-    const escolhida = respostas[q.id] ?? null
-    const emBranco = !escolhida
-    const acertou = !!escolhida && correta?.id === escolhida
-    return { q, numero: i + 1, escolhida, emBranco, acertou }
-  })
-  const comErro = infos.filter((x) => !x.emBranco && !x.acertou).length
-  const comBranco = infos.filter((x) => x.emBranco).length
-  const lista = infos.filter((x) => (filtro === 'erradas' ? !x.emBranco && !x.acertou : filtro === 'branco' ? x.emBranco : true))
-  const irPara = (id: string) => refs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-
-  return (
-    <div className="space-y-4">
-      <h2 className="text-sm font-semibold">Revisão das questões</h2>
-
-      {/* Navegador de questões (cores por acerto/erro/branco) */}
-      <div className="rounded-2xl border bg-card p-4 shadow-sm">
-        <p className="mb-2 text-xs font-semibold text-muted-foreground">Navegador de questões</p>
-        <div className="flex flex-wrap gap-1.5">
-          {infos.map((x) => (
-            <button key={x.q.id} type="button" onClick={() => irPara(x.q.id)}
-              className={cn('h-8 w-8 rounded-md border text-xs font-bold tabular-nums transition-transform hover:scale-105',
-                x.emBranco ? 'border-border bg-muted text-muted-foreground' : x.acertou ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-destructive bg-destructive text-white')}>{x.numero}</button>
-          ))}
-        </div>
-        <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-          <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-emerald-500" /> acertou</span>
-          <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-destructive" /> errou</span>
-          <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-muted ring-1 ring-border" /> em branco</span>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-1.5">
-        {([['todas', `Todas (${infos.length})`], ['erradas', `Com erro (${comErro})`], ['branco', `Em branco (${comBranco})`]] as const).map(([v, label]) => (
-          <button key={v} type="button" onClick={() => setFiltro(v)}
-            className={cn('rounded-full border px-3 py-1 text-sm font-medium transition-colors', filtro === v ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground')}>{label}</button>
-        ))}
-      </div>
-
-      {/* Questões por inteiro */}
-      <div className="space-y-3">
-        {lista.map((x) => {
-          const q = x.q
-          return (
-            <div key={q.id} ref={(el) => { refs.current[q.id] = el }} className="scroll-mt-4 rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
-              <div className="flex items-start gap-3">
-                <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold tabular-nums text-white',
-                  x.emBranco ? 'bg-muted-foreground/60' : x.acertou ? 'bg-emerald-500' : 'bg-destructive')}>{x.numero}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-                    {sec.get(q.id) && <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">{sec.get(q.id)}</span>}
-                    {q.disciplina && <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">{q.disciplina}</span>}
-                    {q.origemSimulado && <span className="inline-flex max-w-[13rem] items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-muted-foreground" title={q.origemSimulado}><FileText className="h-3 w-3 shrink-0" />{q.origemNumero != null && <b className="text-foreground">Q{q.origemNumero}</b>}<span className="truncate">{q.origemSimulado}</span></span>}
-                    <span className={cn('rounded-full px-2 py-0.5 font-semibold', x.emBranco ? 'bg-muted text-muted-foreground' : x.acertou ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-destructive/10 text-destructive')}>{x.emBranco ? 'Em branco' : x.acertou ? 'Acertou' : 'Errou'}</span>
-                  </div>
-                  {q.imagemUrl && <img src={q.imagemUrl} alt="" className="mb-3 max-h-64 w-auto rounded-lg border" />}
-                  <MarkdownContent className="text-[15px] leading-relaxed text-foreground">{q.enunciado || '(sem enunciado)'}</MarkdownContent>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-2">
-                {q.alternativas.map((a, ai) => {
-                  const sua = x.escolhida === a.id
-                  return (
-                    <div key={a.id} className={cn('flex items-start gap-3 rounded-xl border p-3 text-sm',
-                      a.correta ? 'border-emerald-500 bg-emerald-500/10' : sua ? 'border-destructive bg-destructive/10' : 'border-border')}>
-                      <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                        a.correta ? 'bg-emerald-500 text-white' : sua ? 'bg-destructive text-white' : 'border border-muted-foreground/30 text-muted-foreground')}>{LETRA[ai]}</span>
-                      <MarkdownContent inline className={cn('min-w-0 flex-1 leading-relaxed', (a.correta || sua) && 'font-medium')}>{a.texto}</MarkdownContent>
-                      {a.correta && <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />}
-                      {sua && !a.correta && <X className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />}
-                      {sua && <span className="shrink-0 self-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">sua resposta</span>}
-                    </div>
-                  )
-                })}
-              </div>
-
-              {q.comentario && (
-                <div className="mt-3 flex gap-2 rounded-xl border bg-muted/30 p-3 text-sm">
-                  <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <div><p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Comentário do professor</p><MarkdownContent className="mt-0.5 leading-relaxed text-foreground">{q.comentario}</MarkdownContent></div>
-                </div>
-              )}
-            </div>
-          )
-        })}
-        {lista.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Nenhuma questão nesse filtro.</p>}
-      </div>
-    </div>
-  )
-}
-
-// Cores por aproveitamento (mesma escala do resultado oficial): verde ≥70, âmbar ≥50, senão vermelho.
-const pctBar = (p: number) => (p >= 70 ? 'bg-emerald-500' : p >= 50 ? 'bg-amber-500' : 'bg-rose-500')
-const pctTone = (p: number) => (p >= 70 ? 'text-emerald-600 dark:text-emerald-400' : p >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
-
-/** Tile de KPI do resultado (ícone + valor + rótulo), no estilo do resultado oficial. */
-function KpiRes({ icon: Icon, chip, value, label, valueClass }: { icon: any; chip: string; value: ReactNode; label: string; valueClass?: string }) {
-  return (
-    <div className="rounded-xl border bg-card p-3 text-center">
-      <span className={cn('mx-auto flex h-8 w-8 items-center justify-center rounded-lg', chip)}><Icon className="h-4 w-4" /></span>
-      <div className={cn('mt-1.5 text-lg font-bold leading-none tabular-nums', valueClass)}>{value}</div>
-      <div className="mt-0.5 text-[11px] text-muted-foreground">{label}</div>
-    </div>
-  )
 }

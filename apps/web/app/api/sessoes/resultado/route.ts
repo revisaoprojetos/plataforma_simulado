@@ -14,6 +14,18 @@ import { tipoDoSimulado } from '@/lib/simulado/tipo'
 // Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
 export const dynamic = 'force-dynamic'
 
+const LETRAS_ALT = ['A', 'B', 'C', 'D', 'E', 'F']
+/** Comentário do gabarito a partir das ALTERNATIVAS (usado nos simulados pessoais, cujos comentários
+ *  vêm por alternativa): pega o da correta; senão junta os das alternativas comentadas (A) … B) …). */
+function comentarioDasAlternativas(alts: any[], corretaId: string | null): string | null {
+  const lista = (alts ?? []).slice().sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
+  const correta = lista.find((a) => a.id === corretaId)
+  if (correta?.comentario && String(correta.comentario).trim()) return String(correta.comentario)
+  const comentadas = lista.filter((a) => a.comentario && String(a.comentario).trim())
+  if (comentadas.length) return comentadas.map((a) => `**${LETRAS_ALT[a.ordem] ?? '•'})** ${String(a.comentario).trim()}`).join('\n\n')
+  return null
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const st = searchParams.get('st')
@@ -47,14 +59,14 @@ export async function GET(request: NextRequest) {
     alunoInfo,
   ] = await Promise.all([
     supabase.from('simulado_sessoes_prova').select('estudante_id').eq('simulado_id', sessao.simulado_id).eq('is_teste', false).eq('status', 'finalizada').eq('deletado', false),
-    supabase.from('simulado_simulados').select('titulo, status, data_fim, regras').eq('id', sessao.simulado_id).single(),
+    supabase.from('simulado_simulados').select('titulo, status, data_fim, regras, owner_estudante_id').eq('id', sessao.simulado_id).single(),
     (async (): Promise<string | null> => {
       if (!sessao.estudante_id) return null
       const { data } = await supabase.from('simulado_estudantes').select('classificacao').eq('id', sessao.estudante_id).maybeSingle()
       return (data as any)?.classificacao ?? null
     })(),
     supabase.from('simulado_recorrecoes').select('tipo, executado_em').eq('simulado_id', sessao.simulado_id).order('executado_em', { ascending: false }),
-    supabase.from('simulado_prova_questoes').select('ordem, anulada, questoes:simulado_questoes(id, tipo, enunciado, comentario_professor, disciplina_id, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem))').eq('simulado_id', sessao.simulado_id).order('ordem'),
+    supabase.from('simulado_prova_questoes').select('ordem, anulada, questoes:simulado_questoes(id, tipo, enunciado, comentario_professor, disciplina_id, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, comentario))').eq('simulado_id', sessao.simulado_id).order('ordem'),
     supabase.from('simulado_respostas_objetivas').select('questao_id, alternativa_id, correta').eq('sessao_id', st),
     supabase.from('simulado_respostas_discursivas').select('questao_id, texto, status, nota, feedback').eq('sessao_id', st),
     // Nome + e-mail do estudante (cabeçalho) — 2 passos encadeados, mas concorrentes com o resto.
@@ -90,7 +102,9 @@ export async function GET(request: NextRequest) {
   const alunoEmail = alunoInfo.email
 
   const liberacoes = resolverLiberacoes(simulado?.regras as any, simulado ?? {}, { classificacao })
-  const gabaritoLiberado = liberacoes.gabaritoLiberado
+  // Simulado PESSOAL do aluno (owner_estudante_id): gabarito/nota SEMPRE liberados (é o estudo dele).
+  const pessoal = !!(simulado as any)?.owner_estudante_id
+  const gabaritoLiberado = pessoal || liberacoes.gabaritoLiberado
 
   // Avisos de mudança de gabarito (anulação/troca) neste simulado → faixa no topo da revisão.
   const recorrecoes = (recs ?? []) as any[]
@@ -170,8 +184,9 @@ export async function GET(request: NextRequest) {
       resposta_aluno: resp?.alternativa_id ?? null,
       // Anulada = ponto garantido (independe do gabarito estar liberado).
       acertou: anulada ? true : (gabaritoLiberado ? resp?.correta ?? false : null),
-      // Justificativa (comentário do professor) — só revelada com o gabarito.
-      justificativa: gabaritoLiberado ? (q?.comentario_professor ?? null) : null,
+      // Justificativa (comentário do professor) — só revelada com o gabarito. No simulado pessoal,
+      // cai para o comentário das ALTERNATIVAS (formato do import) quando não há comentario_professor.
+      justificativa: gabaritoLiberado ? (q?.comentario_professor ?? (pessoal ? comentarioDasAlternativas(q?.alternativas, correta_id) : null)) : null,
       // Para discursiva: a resposta escrita + estado da correção.
       discursiva: q?.tipo === 'discursiva' && d
         ? { texto: d.texto ?? '', status: d.status, nota: d.nota, feedback: d.feedback }
@@ -217,7 +232,7 @@ export async function GET(request: NextRequest) {
     total_participantes: totalParticipantes ?? 0,
     stats_por_disciplina: statsPorDisciplina,
     gabarito_liberado: gabaritoLiberado,
-    nota_liberada: liberacoes.notaLiberada,
+    nota_liberada: pessoal || liberacoes.notaLiberada,
     caderno_liberado: liberacoes.cadernoParaAluno,
     aviso_gabarito: avisoGabarito,
     questoes,
