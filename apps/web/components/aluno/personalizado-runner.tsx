@@ -1,8 +1,9 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Check, X, Eye, EyeOff, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, FileText, Scissors, Bold, Italic, Underline, List, Baseline, Highlighter, Download } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, X, Eye, EyeOff, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, FileText, Scissors, Bold, Italic, Underline, List, Baseline, Highlighter, Download, Maximize2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -65,6 +66,10 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   const [anotAberta, setAnotAberta] = useState(false)
   const [comentAberto, setComentAberto] = useState(false)
   const [anotacoes, setAnotacoes] = useState<Record<string, string>>({})
+  // Expandir um bloco em modal grande. expandKey remonta o editor inline ao fechar (sincroniza o conteúdo).
+  const [expandido, setExpandido] = useState<'anot' | 'coment' | null>(null)
+  const [expandKey, setExpandKey] = useState(0)
+  const fecharExpandido = () => { setExpandido(null); setExpandKey((k) => k + 1) }
 
   const q = sessao.questoes[idx]
   const respondidas = useMemo(() => Object.keys(respostas).length, [respostas])
@@ -154,23 +159,29 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
     <div className="flex flex-col gap-2">
       {/* Anotações */}
       <div className="flex flex-col overflow-hidden rounded-xl border">
-        <button type="button" onClick={() => setAnotAberta((v) => !v)} className="flex w-full shrink-0 items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
-          <StickyNote className="h-4 w-4 text-primary" /> Anotações
-          <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !anotAberta && '-rotate-90')} />
-        </button>
+        <div className="flex shrink-0 items-center pr-1.5">
+          <button type="button" onClick={() => setAnotAberta((v) => !v)} className="flex flex-1 items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
+            <StickyNote className="h-4 w-4 text-primary" /> Anotações
+          </button>
+          <button type="button" onClick={() => setExpandido('anot')} title="Expandir" aria-label="Expandir anotações" className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Maximize2 className="h-3.5 w-3.5" /></button>
+          <button type="button" onClick={() => setAnotAberta((v) => !v)} title={anotAberta ? 'Recolher' : 'Abrir'} className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ChevronDown className={cn('h-4 w-4 transition-transform', !anotAberta && '-rotate-90')} /></button>
+        </div>
         <div className={cn('grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]', anotAberta ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
           <div className={cn('overflow-hidden transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]', anotAberta ? 'opacity-100' : 'opacity-0')}>
-            <EditorAnotacao key={q.id} valor={anotacoes[q.id] ?? ''} fill={preencher} onBaixar={baixarAnotacoes}
+            <EditorAnotacao key={`${q.id}-${expandKey}`} valor={anotacoes[q.id] ?? ''} fill={preencher} onBaixar={baixarAnotacoes}
               onChange={(html) => setAnotacoes((a) => ({ ...a, [q.id]: html }))} />
           </div>
         </div>
       </div>
       {/* Comentário do professor */}
       <div className="shrink-0 overflow-hidden rounded-xl border">
-        <button type="button" onClick={() => setComentAberto((v) => !v)} className="flex w-full shrink-0 items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
-          <Lightbulb className="h-4 w-4 text-primary" /> Comentário do professor
-          <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !comentAberto && '-rotate-90')} />
-        </button>
+        <div className="flex shrink-0 items-center pr-1.5">
+          <button type="button" onClick={() => setComentAberto((v) => !v)} className="flex flex-1 items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
+            <Lightbulb className="h-4 w-4 text-primary" /> Comentário do professor
+          </button>
+          <button type="button" onClick={() => setExpandido('coment')} title="Expandir" aria-label="Expandir comentário" className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Maximize2 className="h-3.5 w-3.5" /></button>
+          <button type="button" onClick={() => setComentAberto((v) => !v)} title={comentAberto ? 'Recolher' : 'Abrir'} className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ChevronDown className={cn('h-4 w-4 transition-transform', !comentAberto && '-rotate-90')} /></button>
+        </div>
         <div className={cn('grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]', comentAberto ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
           <div className={cn('overflow-hidden transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]', comentAberto ? 'opacity-100' : 'opacity-0')}>
             <div className="max-h-64 overflow-y-auto border-t p-3 text-sm">
@@ -207,8 +218,10 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   // OVERLAY POR CIMA do conteúdo (não empurra o simulado).
   const sidebar = (
     <aside className="relative hidden h-full w-14 shrink-0 border-l bg-card lg:block">
-      {/* Trilho de ícones (sempre no fluxo) */}
-      <div className="flex flex-col items-center gap-1 py-3">
+      {/* Trilho de ícones — some ao abrir; ao recolher, só reaparece DEPOIS que o painel termina de
+          deslizar (delay), evitando o trilho aparecer atrás do painel durante a animação. */}
+      <div className={cn('flex flex-col items-center gap-1 py-3 transition-opacity duration-200',
+        sidebarAberta ? 'pointer-events-none opacity-0' : 'opacity-100 delay-[380ms]')}>
         <button type="button" onClick={() => setSidebarAberta((v) => !v)} title={sidebarAberta ? 'Recolher barra' : 'Expandir barra'} className={cn('rounded-md p-2 transition-colors hover:bg-muted', sidebarAberta ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}>
           {sidebarAberta ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
         </button>
@@ -216,16 +229,15 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
         <button type="button" onClick={() => { setSidebarAberta(true); setAnotAberta(true) }} title="Anotações" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><StickyNote className="h-5 w-5" /></button>
         <button type="button" onClick={() => { setSidebarAberta(true); setComentAberto(true) }} title="Comentário do professor" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Lightbulb className="h-5 w-5" /></button>
       </div>
-      {/* Painel expandido — OVERLAY por cima do conteúdo E do próprio trilho (a "fita" some) */}
-      {sidebarAberta && (
-        <div className="absolute right-0 top-0 z-30 flex h-full w-80 flex-col overflow-hidden border-l bg-card shadow-2xl duration-200 animate-in slide-in-from-right-4">
-          <div className="flex shrink-0 items-center justify-between border-b p-3">
-            <span className="text-xs font-semibold text-muted-foreground">Ferramentas</span>
-            <button type="button" onClick={() => setSidebarAberta(false)} title="Recolher barra" className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><PanelRightClose className="h-4 w-4" /></button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-3">{renderFerramentas(true)}</div>
+      {/* Painel — OVERLAY por cima do conteúdo E do trilho; sempre montado, DESLIZA ao expandir/recolher */}
+      <div className={cn('absolute right-0 top-0 z-30 flex h-full w-80 flex-col overflow-hidden border-l bg-card shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+        sidebarAberta ? 'translate-x-0' : 'pointer-events-none translate-x-full')}>
+        <div className="flex shrink-0 items-center justify-between border-b p-3">
+          <span className="text-xs font-semibold text-muted-foreground">Ferramentas</span>
+          <button type="button" onClick={() => setSidebarAberta(false)} title="Recolher barra" className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><PanelRightClose className="h-4 w-4" /></button>
         </div>
-      )}
+        <div className="flex-1 overflow-y-auto p-3">{renderFerramentas(true)}</div>
+      </div>
     </aside>
   )
 
@@ -425,6 +437,28 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
         {/* Barra lateral de ferramentas docada (desktop) */}
         {sidebar}
       </div>
+
+      {/* Modal — expandir um bloco (Anotações / Comentário) em tela grande */}
+      {expandido && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm duration-200 animate-in fade-in" onClick={fecharExpandido}>
+          <div className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl duration-200 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()} style={{ ['--primary' as any]: 'var(--brand-primary)' }}>
+            <div className="flex shrink-0 items-center justify-between border-b p-3">
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                {expandido === 'anot' ? <><StickyNote className="h-4 w-4 text-primary" /> Anotações</> : <><Lightbulb className="h-4 w-4 text-primary" /> Comentário do professor</>}
+              </span>
+              <button type="button" onClick={fecharExpandido} title="Fechar" aria-label="Fechar" className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+            {expandido === 'anot' ? (
+              <EditorAnotacao key={`exp-${q.id}`} valor={anotacoes[q.id] ?? ''} fill onBaixar={baixarAnotacoes} onChange={(html) => setAnotacoes((a) => ({ ...a, [q.id]: html }))} />
+            ) : (
+              <div className="min-h-0 flex-1 overflow-y-auto p-5 text-sm">
+                {q.comentario ? <MarkdownContent className="leading-relaxed text-foreground">{q.comentario}</MarkdownContent> : <span className="text-muted-foreground">Sem comentário para esta questão.</span>}
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }
