@@ -252,10 +252,12 @@ export function MeuSimuladoView({
             )}
           </div>
 
-          {/* DIREITA: histórico do simulado selecionado */}
-          <div className="lg:col-span-1">
-            <div className="overflow-hidden rounded-2xl border bg-card shadow-sm lg:sticky lg:top-4">
-              <div className="border-b bg-muted/25 px-4 py-3">
+          {/* DIREITA: histórico — card com a MESMA altura do card de métrica (à esquerda); a lista de
+              realizações ROLA internamente quando passa da altura. No desktop o card fica ABSOLUTO na
+              coluna (que o grid estica até a altura da esquerda), então não empurra a página. */}
+          <div className="relative lg:col-span-1">
+            <div className="flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm lg:absolute lg:inset-0">
+              <div className="shrink-0 border-b bg-muted/25 px-4 py-3">
                 <div className="flex items-center gap-2">
                   <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary"><ListChecks className="h-4 w-4" /></span>
                   <h3 className="text-sm font-semibold">Realizações</h3>
@@ -270,8 +272,9 @@ export function MeuSimuladoView({
                 )}
               </div>
 
-              {/* Tentativas — cards com multi-seleção; downloads INLINE (pessoal) ou no ⋮ (oficial). */}
-              <div className="max-h-[560px] space-y-2 overflow-y-auto p-2.5">
+              {/* Realizações — cards com multi-seleção; downloads INLINE (pessoal) ou no ⋮ (oficial).
+                  flex-1 + overflow: rola quando passa da altura do card (que segue a métrica no desktop). */}
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2.5 max-h-[560px] lg:max-h-none">
                 {ordenadas.map((t) => {
                   const on = selTents.has(t.id)
                   return (
