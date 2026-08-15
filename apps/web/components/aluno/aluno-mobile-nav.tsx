@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { Home, ClipboardList, Bell, Menu, GraduationCap, Sparkles, BookOpen, ClipboardCheck, ChevronRight, type LucideIcon } from 'lucide-react'
+import { Home, ClipboardList, Bell, Menu, GraduationCap, Sparkles, BookOpen, ClipboardCheck, ChevronRight } from 'lucide-react'
 import { useSidebar } from '@/components/ui/sidebar'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useSWRGet } from '@/hooks/use-swr-get'
@@ -24,6 +24,48 @@ function frameLogo(estilo?: string): string {
   if (estilo === 'quadrado') return 'rounded-none'
   if (estilo === 'borda') return 'rounded-lg border'
   return 'rounded-lg'
+}
+
+// ── Ícones SÓLIDOS do estado ativo (estilo Instagram) ─────────────────────────────
+// Os do Lucide são de traço; preenchê-los vira borrão. Aqui a silhueta é preenchida com
+// a cor accent (`cor`) e os detalhes internos (porta, badalo, linhas) são vazados na cor
+// do fundo da barra (`furo`), preservando o TAMANHO cheio do ícone (sem inset de traço).
+type SolidProps = { className?: string; cor: string; furo: string }
+
+function HomeSolido({ className, cor, furo }: SolidProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden focusable="false">
+      <path d="M2.42 11.08a1 1 0 0 1 .38-.78L12 2.9l9.2 7.4a1 1 0 0 1 .38.78V19a2 2 0 0 1-2 2H4.42a2 2 0 0 1-2-2Z" fill={cor} />
+      {/* porta */}
+      <path d="M9.5 21v-4.75a2.5 2.5 0 0 1 5 0V21Z" fill={furo} />
+    </svg>
+  )
+}
+
+function SinoSolido({ className, cor, furo }: SolidProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden focusable="false">
+      <path d="M12 2.6a1.1 1.1 0 0 0-1.1 1.1v.62A6 6 0 0 0 6 10.2c0 3.35-1.02 4.7-1.77 5.55A1.1 1.1 0 0 0 5.06 17.6h13.88a1.1 1.1 0 0 0 .83-1.85c-.75-.85-1.77-2.2-1.77-5.55a6 6 0 0 0-4.9-5.88V3.7A1.1 1.1 0 0 0 12 2.6Z" fill={cor} />
+      {/* badalo (parte de baixo) */}
+      <path d="M9.6 19.1h4.8a2.4 2.4 0 0 1-4.8 0Z" fill={cor} />
+    </svg>
+  )
+}
+
+function ClipboardSolido({ className, cor, furo }: SolidProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden focusable="false">
+      {/* prancheta */}
+      <path d="M7 4h1.29A1.75 1.75 0 0 1 10 2.75h4A1.75 1.75 0 0 1 15.71 4H17a2.5 2.5 0 0 1 2.5 2.5V19A2.5 2.5 0 0 1 17 21.5H7A2.5 2.5 0 0 1 4.5 19V6.5A2.5 2.5 0 0 1 7 4Z" fill={cor} />
+      {/* clipe */}
+      <path d="M9.75 3.5h4.5a.9.9 0 0 1 .9.9v1.05a.9.9 0 0 1-.9.9h-4.5a.9.9 0 0 1-.9-.9V4.4a.9.9 0 0 1 .9-.9Z" fill={furo} />
+      {/* linhas da lista */}
+      <circle cx="9" cy="11.6" r="1.05" fill={furo} />
+      <rect x="11.1" y="10.7" width="5.2" height="1.8" rx=".9" fill={furo} />
+      <circle cx="9" cy="15.9" r="1.05" fill={furo} />
+      <rect x="11.1" y="15" width="5.2" height="1.8" rx=".9" fill={furo} />
+    </svg>
+  )
 }
 
 interface Props {
@@ -104,35 +146,29 @@ export function AlunoMobileNav({ navMode, logo, nome = 'Área do Aluno', subtitu
   }
 
   // ─────────────────────────── OPÇÃO A — barra inferior (tabs) ───────────────────────────
-  // Estilo do ícone da tab bar. Ícones do Lucide são de TRAÇO — para o ativo ficar preenchido MAS
-  // com os detalhes à mostra (estilo Instagram), pinta-se o corpo com a cor accent e o traço com a
-  // cor do fundo da barra: as linhas internas (porta, listas, badalo) aparecem "recortadas".
-  const estiloIcone = (ativo: boolean): React.CSSProperties =>
-    ativo
-      ? { fill: 'var(--brand-accent, var(--primary))', stroke: 'var(--sidebar)' }
-      : { fill: 'none' }
-  const Cell = ({ icon: Icon, ativo, dot, label, ...rest }: { icon: LucideIcon; ativo: boolean; dot?: boolean; label: string } & React.ComponentProps<'button'>) => (
-    <button aria-label={label} className="relative flex flex-1 items-center justify-center py-3.5 outline-none active:scale-95" {...rest}>
-      <Icon
-        className={cn('h-[26px] w-[26px] transition-transform', ativo ? 'scale-110' : 'text-sidebar-foreground/45')}
-        strokeWidth={2}
-        style={estiloIcone(ativo)}
-      />
-      {dot && <span className="absolute right-[calc(50%-16px)] top-2.5 h-2 w-2 rounded-full ring-2 ring-[color:var(--sidebar)]" style={{ background: 'var(--brand-accent, var(--primary))' }} />}
-    </button>
-  )
-
+  // Ativo = ícone SÓLIDO (silhueta accent + detalhes vazados no fundo), mesmo tamanho do inativo.
+  // Inativo = contorno do Lucide em cinza. Sem scale (todos ficam do mesmo tamanho).
+  const ACCENT = 'var(--brand-accent, var(--primary))'
+  const SZ = 'h-[26px] w-[26px]'
   return (
     <>
       <nav aria-label="Navegação" className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] text-sidebar-foreground shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.5)] md:hidden">
         <Link href="/aluno" className="flex flex-1 items-center justify-center py-3.5 active:scale-95" aria-label="Início">
-          <Home className={cn('h-[26px] w-[26px] transition-transform', inicioAtivo ? 'scale-110' : 'text-sidebar-foreground/45')} strokeWidth={2} style={estiloIcone(inicioAtivo)} />
+          {inicioAtivo
+            ? <HomeSolido className={SZ} cor={ACCENT} furo="var(--sidebar)" />
+            : <Home className={cn(SZ, 'text-sidebar-foreground/45')} strokeWidth={2} style={{ fill: 'none' }} />}
         </Link>
-        <Cell icon={ClipboardList} ativo={emSimulados} label="Simulados" onClick={() => setPopup((v) => !v)} />
+        <button aria-label="Simulados" onClick={() => setPopup((v) => !v)} className="relative flex flex-1 items-center justify-center py-3.5 outline-none active:scale-95">
+          {emSimulados
+            ? <ClipboardSolido className={SZ} cor={ACCENT} furo="var(--sidebar)" />
+            : <ClipboardList className={cn(SZ, 'text-sidebar-foreground/45')} strokeWidth={2} style={{ fill: 'none' }} />}
+        </button>
         <Link href="/aluno/notificacoes" className="flex flex-1 items-center justify-center py-3.5 active:scale-95" aria-label="Notificações">
           <span className="relative flex items-center justify-center">
-            <Bell className={cn('h-[26px] w-[26px] transition-transform', notifAtivo ? 'scale-110' : 'text-sidebar-foreground/45')} strokeWidth={2} style={estiloIcone(notifAtivo)} />
-            {naoLidas > 0 && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full ring-2 ring-[color:var(--sidebar)]" style={{ background: 'var(--brand-accent, var(--primary))' }} />}
+            {notifAtivo
+              ? <SinoSolido className={SZ} cor={ACCENT} furo="var(--sidebar)" />
+              : <Bell className={cn(SZ, 'text-sidebar-foreground/45')} strokeWidth={2} style={{ fill: 'none' }} />}
+            {naoLidas > 0 && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full ring-2 ring-[color:var(--sidebar)]" style={{ background: ACCENT }} />}
           </span>
         </Link>
         <Link href="/aluno/perfil" className="flex flex-1 items-center justify-center py-3.5 active:scale-95" aria-label="Perfil">{avatarEl(perfilAtivo, 'h-[26px] w-[26px]')}</Link>
