@@ -88,8 +88,20 @@ export async function excluirMeuSimulado(simuladoId: string): Promise<{ ok?: boo
 }
 
 export type QuestaoEscolhida = { questaoId: string; ordem: number; enunciado: string }
+/** Seção (fileira) do simulado do aluno: agrupa questões. Persistida em `regras.secoes` (jsonb). */
+export type Secao = { id: string; nome: string; questaoIds: string[] }
 
-export async function questoesDoMeuSimulado(simuladoId: string): Promise<{ titulo?: string; itens?: QuestaoEscolhida[]; error?: string }> {
+/** Sanea/normaliza as seções vindas do jsonb contra as questões que realmente estão no simulado. */
+function sanearSecoes(raw: unknown, doSim: Set<string>): Secao[] {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  return raw
+    .map((s: any) => ({ id: String(s?.id ?? ''), nome: String(s?.nome ?? '').slice(0, 80), questaoIds: Array.isArray(s?.questaoIds) ? s.questaoIds : [] }))
+    .filter((s) => s.id)
+    .map((s) => ({ ...s, questaoIds: s.questaoIds.filter((id: string) => doSim.has(id) && !seen.has(id) && seen.add(id)) }))
+}
+
+export async function questoesDoMeuSimulado(simuladoId: string): Promise<{ titulo?: string; itens?: QuestaoEscolhida[]; secoes?: Secao[]; error?: string }> {
   const { svc, estudanteId, tenantId } = await ctx()
   const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)
   if (!sim) return { error: 'Simulado não encontrado.' }
@@ -102,7 +114,39 @@ export async function questoesDoMeuSimulado(simuladoId: string): Promise<{ titul
     for (const q of qs) qmap.set(q.id, q)
   }
   const limpar = (s: string) => (s ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180)
-  return { titulo: (sim as any).titulo, itens: pqs.map((p) => ({ questaoId: p.questao_id, ordem: p.ordem, enunciado: limpar(qmap.get(p.questao_id)?.enunciado) })) }
+  const secoes = sanearSecoes((sim as any).regras?.secoes, new Set(qids))
+  return { titulo: (sim as any).titulo, itens: pqs.map((p) => ({ questaoId: p.questao_id, ordem: p.ordem, enunciado: limpar(qmap.get(p.questao_id)?.enunciado) })), secoes }
+}
+
+/**
+ * Salva o LAYOUT do simulado: a ordem global das questões (`ordemIds`) + as seções (`regras.secoes`).
+ * Fonte única: o cliente manda o layout completo; o servidor persiste as seções e sincroniza a
+ * `ordem` de prova_questoes com a lista achatada (o runner continua lendo `ordem`).
+ */
+export async function salvarLayout(simuladoId: string, ordemIds: string[], secoes: Secao[]): Promise<{ ok?: boolean; error?: string }> {
+  const { svc, estudanteId, tenantId } = await ctx()
+  const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)
+  if (!sim) return { error: 'Simulado não encontrado.' }
+  const { data: atuais } = await svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', simuladoId).eq('tenant_id', tenantId)
+  const doSim = new Set((atuais ?? []).map((r: any) => r.questao_id))
+
+  const cleanSec = sanearSecoes(secoes, doSim)
+  const regras = { ...((sim as any).regras ?? {}), secoes: cleanSec }
+  const { error: e1 } = await svc.from('simulado_simulados').update({ regras }).eq('id', simuladoId).eq('tenant_id', tenantId).eq('owner_estudante_id', estudanteId)
+  if (e1) return { error: e1.message }
+
+  // Ordem global = ordemIds (saneado) + qualquer questão faltante ao fim (segurança).
+  const ord = [...new Set(ordemIds)].filter((id) => doSim.has(id))
+  for (const id of doSim) if (!ord.includes(id)) ord.push(id)
+  for (let i = 0; i < ord.length; i += 20) {
+    const lote = ord.slice(i, i + 20)
+    const res = await Promise.all(lote.map((qid, j) =>
+      svc.from('simulado_prova_questoes').update({ ordem: i + j }).eq('simulado_id', simuladoId).eq('tenant_id', tenantId).eq('questao_id', qid)))
+    const err = res.find((r) => r.error)?.error
+    if (err) return { error: err.message }
+  }
+  revalidatePath(`/aluno/simulados/personalizados/${simuladoId}`)
+  return { ok: true }
 }
 
 export type QuestaoDisponivel = {
@@ -255,30 +299,6 @@ export async function adicionarQuestoes(simuladoId: string, questaoIds: string[]
   if (error) return { error: error.message }
   revalidatePath(`/aluno/simulados/personalizados/${simuladoId}`)
   return { adicionadas: rows.length }
-}
-
-/**
- * Salva a nova ORDEM das questões do simulado (drag/setas no editor). Só reordena questões que já
- * estão no simulado (ignora ids alheios). Atualiza `ordem` linha a linha, em lotes paralelos.
- */
-export async function reordenarQuestoes(simuladoId: string, ordemIds: string[]): Promise<{ ok?: boolean; error?: string }> {
-  const { svc, estudanteId, tenantId } = await ctx()
-  const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)
-  if (!sim) return { error: 'Simulado não encontrado.' }
-  const { data: atuais } = await svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', simuladoId).eq('tenant_id', tenantId)
-  const doSim = new Set((atuais ?? []).map((r: any) => r.questao_id))
-  const ord = [...new Set(ordemIds)].filter((id) => doSim.has(id))
-  if (!ord.length) return { ok: true }
-  // Lotes de 20 updates paralelos (evita N requisições simultâneas em simulados grandes).
-  for (let i = 0; i < ord.length; i += 20) {
-    const lote = ord.slice(i, i + 20)
-    const res = await Promise.all(lote.map((qid, j) =>
-      svc.from('simulado_prova_questoes').update({ ordem: i + j }).eq('simulado_id', simuladoId).eq('tenant_id', tenantId).eq('questao_id', qid)))
-    const err = res.find((r) => r.error)?.error
-    if (err) return { error: err.message }
-  }
-  revalidatePath(`/aluno/simulados/personalizados/${simuladoId}`)
-  return { ok: true }
 }
 
 export async function removerQuestao(simuladoId: string, questaoId: string): Promise<{ ok?: boolean; error?: string }> {

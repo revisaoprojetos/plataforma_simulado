@@ -23,10 +23,11 @@ export type QuestaoRunner = {
   imagemUrl: string | null; disciplina: string | null; comentario: string | null
   alternativas: AltRunner[]
 }
+export type SecaoRunner = { id: string; nome: string; questaoIds: string[] }
 export type SessaoPessoal = {
   sessaoId: string; simuladoId: string; titulo: string; modo: ModoPessoal
   tempoLimiteMin: number | null; iniciadoEm: string; status: string
-  questoes: QuestaoRunner[]; respostas: Record<string, string>
+  questoes: QuestaoRunner[]; respostas: Record<string, string>; secoes: SecaoRunner[]
 }
 
 /**
@@ -114,5 +115,12 @@ export async function abrirSessaoPessoal(simuladoId: string): Promise<{ sessao?:
       .eq('id', simuladoId).eq('tenant_id', tenantId).eq('owner_estudante_id', estudanteId)
   }
 
-  return { sessao: { sessaoId, simuladoId, titulo: (sim as any).titulo as string, modo, tempoLimiteMin: (sim as any).tempo_limite_min ?? null, iniciadoEm, status, questoes, respostas } }
+  // Seções (fileiras) p/ divisórias no runner — saneadas contra as questões presentes.
+  const presentes = new Set(questoes.map((x) => x.id))
+  const seen = new Set<string>()
+  const secoes: SecaoRunner[] = (Array.isArray(regras.secoes) ? regras.secoes : [])
+    .map((s: any) => ({ id: String(s?.id ?? ''), nome: String(s?.nome ?? '').slice(0, 80), questaoIds: (Array.isArray(s?.questaoIds) ? s.questaoIds : []).filter((id: string) => presentes.has(id) && !seen.has(id) && seen.add(id)) }))
+    .filter((s: SecaoRunner) => s.id)
+
+  return { sessao: { sessaoId, simuladoId, titulo: (sim as any).titulo as string, modo, tempoLimiteMin: (sim as any).tempo_limite_min ?? null, iniciadoEm, status, questoes, respostas, secoes } }
 }

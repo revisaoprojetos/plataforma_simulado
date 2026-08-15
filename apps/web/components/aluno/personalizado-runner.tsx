@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Check, X, Eye, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
@@ -35,6 +35,7 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
 
   const q = sessao.questoes[idx]
   const respondidas = useMemo(() => Object.keys(respostas).length, [respostas])
+  const secaoPorQ = useMemo(() => secaoMap(sessao.secoes), [sessao.secoes])
 
   // ── Auto-save (reusa /api/sessoes/resposta, idempotente) ──────────────────
   const salvar = useCallback(async (questaoId: string, alternativaId: string) => {
@@ -137,6 +138,7 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
         <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-muted font-semibold text-foreground">{idx + 1}</span>
           <span>de {total}</span>
+          {secaoPorQ.get(q.id) && <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">{secaoPorQ.get(q.id)}</span>}
           {q.disciplina && <span className="rounded-full bg-muted px-2 py-0.5">{q.disciplina}</span>}
         </div>
 
@@ -223,6 +225,13 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   )
 }
 
+/** Mapa questão→nome da seção (para chips/divisórias). */
+function secaoMap(secoes: SessaoPessoal['secoes']): Map<string, string> {
+  const m = new Map<string, string>()
+  for (const s of secoes ?? []) for (const id of s.questaoIds) m.set(id, s.nome)
+  return m
+}
+
 function formatarSeg(s: number): string {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60
   const mm = String(m).padStart(2, '0'), sss = String(ss).padStart(2, '0')
@@ -255,7 +264,20 @@ function TelaResultado({ sessao, respostas, resultado, onRefazer }: {
 
       <div className="space-y-2">
         <h2 className="text-sm font-semibold">Gabarito</h2>
-        {sessao.questoes.map((q, i) => <RevisaoItem key={q.id} q={q} numero={i + 1} escolhida={respostas[q.id] ?? null} />)}
+        {(() => {
+          const sec = secaoMap(sessao.secoes); let anterior = ''
+          return sessao.questoes.map((q, i) => {
+            const nome = sec.get(q.id) ?? ''
+            const divisor = nome && nome !== anterior
+            anterior = nome
+            return (
+              <Fragment key={q.id}>
+                {divisor && <p className="px-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{nome}</p>}
+                <RevisaoItem q={q} numero={i + 1} escolhida={respostas[q.id] ?? null} />
+              </Fragment>
+            )
+          })
+        })()}
       </div>
     </div>
   )

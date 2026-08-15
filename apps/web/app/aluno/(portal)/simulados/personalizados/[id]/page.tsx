@@ -10,5 +10,5 @@ export default async function EditorPersonalizadoPage({ params }: { params: Prom
   const { id } = await params
   const r = await questoesDoMeuSimulado(id)
   if (r.error || r.titulo == null) redirect('/aluno/simulados')
-  return <PersonalizadoEditor simuladoId={id} titulo={r.titulo} itensIniciais={r.itens ?? []} />
+  return <PersonalizadoEditor simuladoId={id} titulo={r.titulo} itensIniciais={r.itens ?? []} secoesIniciais={r.secoes ?? []} />
 }
