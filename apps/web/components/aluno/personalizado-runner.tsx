@@ -135,8 +135,8 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
           <StickyNote className="h-4 w-4 text-primary" /> Anotações
           <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !anotAberta && '-rotate-90')} />
         </button>
-        <div className={cn('grid transition-[grid-template-rows] duration-300 ease-out', anotAberta ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]', preencher && anotAberta && 'min-h-0 flex-1')}>
-          <div className={cn('overflow-hidden', preencher && anotAberta && 'flex min-h-0 flex-1 flex-col')}>
+        <div className={cn('grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]', anotAberta ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]', preencher && anotAberta && 'min-h-0 flex-1')}>
+          <div className={cn('overflow-hidden transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]', anotAberta ? 'opacity-100' : 'opacity-0', preencher && anotAberta && 'flex min-h-0 flex-1 flex-col')}>
             <EditorAnotacao key={q.id} valor={anotacoes[q.id] ?? ''} fill={preencher}
               onChange={(html) => setAnotacoes((a) => ({ ...a, [q.id]: html }))} />
           </div>
@@ -148,8 +148,8 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
           <Lightbulb className="h-4 w-4 text-primary" /> Comentário do professor
           <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !comentAberto && '-rotate-90')} />
         </button>
-        <div className={cn('grid transition-[grid-template-rows] duration-300 ease-out', comentAberto ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
-          <div className="overflow-hidden">
+        <div className={cn('grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]', comentAberto ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+          <div className={cn('overflow-hidden transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]', comentAberto ? 'opacity-100' : 'opacity-0')}>
             <div className="max-h-64 overflow-y-auto border-t p-3 text-sm">
               {q.comentario ? <MarkdownContent className="leading-relaxed text-foreground">{q.comentario}</MarkdownContent> : <span className="text-muted-foreground">Sem comentário para esta questão.</span>}
             </div>
