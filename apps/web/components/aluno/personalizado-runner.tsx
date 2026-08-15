@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Check, X, Eye, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, ClipboardList, Bold, Italic, Underline, List, Baseline, Highlighter } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, X, Eye, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, FileText, Scissors, Bold, Italic, Underline, List, Baseline, Highlighter } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -35,6 +35,9 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   // Questões marcadas "para revisar" (só client-side, ajudam a navegar; ficam âmbar no navegador).
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set())
   const toggleMarcar = (id: string) => setMarcadas((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  // Tesoura: alternativas "eliminadas" (riscadas) por questão — só ajuda visual, client-side.
+  const [eliminadas, setEliminadas] = useState<Set<string>>(new Set())
+  const eliminar = (id: string) => setEliminadas((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   // Barra lateral de ferramentas (desktop, docada à direita) + seções internas (anotações e comentário,
   // independentes, ambos podem ficar abertos). No mobile vira um card colapsável (ferrAberta).
   const [sidebarAberta, setSidebarAberta] = useState(false)
@@ -125,18 +128,18 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   })
 
   // Seções de ferramentas: Anotações (editor rico) + Comentário (SEM revelar o gabarito).
-  // preencher=true (barra do desktop): a área de Anotações cresce até o fim.
-  // Abrir/fechar desliza via grid-template-rows 0fr↔1fr (anima nos dois sentidos, mantém o preenchimento).
+  // Abrir/fechar desliza via grid-template-rows 0fr↔1fr + fade (anima nos dois sentidos; sem flex-1,
+  // que fazia o bloco abrir de uma vez). No desktop o editor é alto (min-h-[58vh]) para preencher.
   const renderFerramentas = (preencher: boolean) => (
-    <div className={cn('flex flex-col gap-2', preencher && 'min-h-0 flex-1')}>
+    <div className="flex flex-col gap-2">
       {/* Anotações */}
-      <div className={cn('flex flex-col overflow-hidden rounded-xl border', preencher && anotAberta && 'min-h-0 flex-1')}>
+      <div className="flex flex-col overflow-hidden rounded-xl border">
         <button type="button" onClick={() => setAnotAberta((v) => !v)} className="flex w-full shrink-0 items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/40">
           <StickyNote className="h-4 w-4 text-primary" /> Anotações
           <ChevronDown className={cn('ml-auto h-4 w-4 text-muted-foreground transition-transform', !anotAberta && '-rotate-90')} />
         </button>
-        <div className={cn('grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]', anotAberta ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]', preencher && anotAberta && 'min-h-0 flex-1')}>
-          <div className={cn('overflow-hidden transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]', anotAberta ? 'opacity-100' : 'opacity-0', preencher && anotAberta && 'flex min-h-0 flex-1 flex-col')}>
+        <div className={cn('grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]', anotAberta ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+          <div className={cn('overflow-hidden transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]', anotAberta ? 'opacity-100' : 'opacity-0')}>
             <EditorAnotacao key={q.id} valor={anotacoes[q.id] ?? ''} fill={preencher}
               onChange={(html) => setAnotacoes((a) => ({ ...a, [q.id]: html }))} />
           </div>
@@ -200,7 +203,7 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
             <span className="text-xs font-semibold text-muted-foreground">Ferramentas</span>
             <button type="button" onClick={() => setSidebarAberta(false)} title="Recolher barra" className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><PanelRightClose className="h-4 w-4" /></button>
           </div>
-          <div className="flex min-h-0 flex-1 flex-col p-3">{renderFerramentas(true)}</div>
+          <div className="flex-1 overflow-y-auto p-3">{renderFerramentas(true)}</div>
         </div>
       )}
     </aside>
@@ -271,10 +274,11 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
           {secaoPorQ.get(q.id) && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">{secaoPorQ.get(q.id)}</span>}
           {q.disciplina && <span className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary/90">{q.disciplina}</span>}
           {q.origemSimulado && (
-            <span className="inline-flex max-w-[15rem] items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground" title={q.origemSimulado}>
-              <ClipboardList className="h-3 w-3 shrink-0" />
+            <span className="inline-flex max-w-[15rem] items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground" title={q.origemSimulado}>
+              <FileText className="h-3 w-3 shrink-0" />
+              {q.origemNumero != null && <span className="font-medium text-foreground">Q{q.origemNumero}</span>}
+              {q.origemNumero != null && <span>-</span>}
               <span className="truncate">{q.origemSimulado}</span>
-              {q.origemNumero != null && <span className="shrink-0">· Q{q.origemNumero}</span>}
             </span>
           )}
         </div>
@@ -284,30 +288,42 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
         </div>
       </div>
 
-      {/* Alternativas — cards individuais com bolinha da letra */}
+      {/* Alternativas — cards com bolinha da letra + tesoura (eliminar) à esquerda */}
       <div className="space-y-2.5">
         {q.alternativas.map((alt, i) => {
           const sel = escolhida === alt.id
           const mostrarCerta = revelado && alt.correta
           const mostrarErrada = revelado && sel && !alt.correta
           const travado = revelado && modo === 'estudo'
+          const cortada = eliminadas.has(alt.id) && !revelado
           return (
-            <button key={alt.id} type="button" onClick={() => marcar(q.id, alt.id)} disabled={travado}
-              className={cn('group flex w-full items-center gap-3 rounded-xl border bg-card p-3.5 text-left text-sm shadow-sm transition-all sm:p-4',
-                mostrarCerta ? 'border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/40'
-                  : mostrarErrada ? 'border-destructive bg-destructive/5 ring-1 ring-destructive/40'
-                    : sel ? 'border-primary bg-primary/5 ring-1 ring-primary/40'
-                      : 'hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md',
-                travado && 'cursor-default hover:translate-y-0 hover:shadow-sm')}>
-              <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-bold transition-colors',
-                mostrarCerta ? 'border-emerald-500 bg-emerald-500 text-white'
-                  : mostrarErrada ? 'border-destructive bg-destructive text-white'
-                    : sel ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-muted-foreground/30 text-muted-foreground group-hover:border-primary/50 group-hover:text-primary')}>
-                {mostrarCerta ? <Check className="h-4 w-4" /> : mostrarErrada ? <X className="h-4 w-4" /> : LETRA[i]}
-              </span>
-              <MarkdownContent inline className="min-w-0 flex-1 leading-relaxed">{alt.texto}</MarkdownContent>
-            </button>
+            <div key={alt.id} className="flex items-stretch gap-2">
+              {/* Tesoura — elimina/restaura a alternativa (só antes de revelar) */}
+              {!revelado && (
+                <button type="button" onClick={() => eliminar(alt.id)} title={cortada ? 'Restaurar alternativa' : 'Eliminar (tesoura)'} aria-label={cortada ? 'Restaurar alternativa' : 'Eliminar alternativa'}
+                  className={cn('flex w-9 shrink-0 items-center justify-center rounded-xl border transition-colors sm:w-10',
+                    cortada ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground')}>
+                  <Scissors className={cn('h-4 w-4 transition-transform', cortada && '-rotate-12')} />
+                </button>
+              )}
+              <button type="button" onClick={() => marcar(q.id, alt.id)} disabled={travado || cortada}
+                className={cn('group flex flex-1 items-center gap-3 rounded-xl border bg-card p-3.5 text-left text-sm shadow-sm transition-all sm:p-4',
+                  mostrarCerta ? 'border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/40'
+                    : mostrarErrada ? 'border-destructive bg-destructive/5 ring-1 ring-destructive/40'
+                      : sel ? 'border-primary bg-primary/5 ring-1 ring-primary/40'
+                        : !cortada ? 'hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md' : '',
+                  cortada && 'opacity-45',
+                  travado && 'cursor-default hover:translate-y-0 hover:shadow-sm')}>
+                <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-bold transition-colors',
+                  mostrarCerta ? 'border-emerald-500 bg-emerald-500 text-white'
+                    : mostrarErrada ? 'border-destructive bg-destructive text-white'
+                      : sel ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-muted-foreground/30 text-muted-foreground group-hover:border-primary/50 group-hover:text-primary')}>
+                  {mostrarCerta ? <Check className="h-4 w-4" /> : mostrarErrada ? <X className="h-4 w-4" /> : LETRA[i]}
+                </span>
+                <MarkdownContent inline className={cn('min-w-0 flex-1 leading-relaxed', cortada && 'line-through')}>{alt.texto}</MarkdownContent>
+              </button>
+            </div>
           )
         })}
       </div>
@@ -329,26 +345,29 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
       {/* Ferramentas (mobile) — no desktop viram a barra lateral */}
       {ferramentasMobile}
 
-      {/* Navegação / ações */}
-      <div className="flex items-center justify-between gap-2 pb-2">
-        <button type="button" onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
-          className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted disabled:opacity-40">
-          <ArrowLeft className="h-4 w-4" /> Anterior
+      {/* Navegação / ações — Anterior (esq) · Revisar (centro) · Ver gabarito + Próxima/Finalizar (dir) */}
+      <div className="flex items-center gap-2 pb-2">
+        <div className="flex flex-1 justify-start">
+          <button type="button" onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
+            className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted disabled:opacity-40">
+            <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Anterior</span>
+          </button>
+        </div>
+
+        {/* Revisar — centralizado entre Anterior e Próxima */}
+        <button type="button" onClick={() => toggleMarcar(q.id)} title={marcadas.has(q.id) ? 'Desmarcar revisão' : 'Marcar para revisar'}
+          className={cn('inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-4 py-2.5 text-sm font-medium shadow-sm transition-colors',
+            marcadas.has(q.id) ? 'border-amber-500/50 bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-card hover:bg-muted')}>
+          <Bookmark className={cn('h-4 w-4', marcadas.has(q.id) && 'fill-current')} /> Revisar
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-1 items-center justify-end gap-2">
           {modo === 'revisao' && !revelados.has(q.id) && (
             <button type="button" onClick={() => setRevelados((s) => new Set(s).add(q.id))}
               className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted">
-              <Eye className="h-4 w-4" /> Ver gabarito
+              <Eye className="h-4 w-4" /> <span className="hidden sm:inline">Ver gabarito</span>
             </button>
           )}
-          {/* Revisar — à esquerda do Próxima/Finalizar */}
-          <button type="button" onClick={() => toggleMarcar(q.id)} title={marcadas.has(q.id) ? 'Desmarcar revisão' : 'Marcar para revisar'}
-            className={cn('inline-flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-sm font-medium shadow-sm transition-colors',
-              marcadas.has(q.id) ? 'border-amber-500/50 bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-card hover:bg-muted')}>
-            <Bookmark className={cn('h-4 w-4', marcadas.has(q.id) && 'fill-current')} /> Revisar
-          </button>
           {idx < total - 1 ? (
             <button type="button" onClick={() => setIdx((i) => Math.min(total - 1, i + 1))}
               className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md">
@@ -385,7 +404,7 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
   )
 }
 
-const CORES_TEXTO = ['#111827', '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#ec4899']
+const CORES_TEXTO = ['#111827', '#ffffff', '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899']
 const CORES_MARCA = ['#fde047', '#facc15', '#fdba74', '#fb923c', '#f87171', '#f472b6', '#e879f9', '#c084fc', '#a78bfa', '#818cf8', '#60a5fa', '#38bdf8', '#22d3ee', '#4ade80', '#a3e635']
 
 /** Editor de anotações "estilo Word" (contenteditable + execCommand): negrito, itálico, sublinhado,
@@ -393,21 +412,28 @@ const CORES_MARCA = ['#fde047', '#facc15', '#fdba74', '#fb923c', '#f87171', '#f4
 function EditorAnotacao({ valor, onChange, fill }: { valor: string; onChange: (html: string) => void; fill?: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
   const [paleta, setPaleta] = useState<'texto' | 'marca' | null>(null)
-  useEffect(() => { if (ref.current) ref.current.innerHTML = valor || '' }, []) // conteúdo inicial (remonta por questão via key) // eslint-disable-line react-hooks/exhaustive-deps
+  const [fmt, setFmt] = useState({ bold: false, italic: false, underline: false, ul: false })
+  const sync = () => { try { setFmt({ bold: document.queryCommandState('bold'), italic: document.queryCommandState('italic'), underline: document.queryCommandState('underline'), ul: document.queryCommandState('insertUnorderedList') }) } catch { /* ok */ } }
+  useEffect(() => {
+    if (ref.current) ref.current.innerHTML = valor || '' // conteúdo inicial (remonta por questão via key)
+    const onSel = () => { if (document.activeElement === ref.current) sync() }
+    document.addEventListener('selectionchange', onSel)
+    return () => document.removeEventListener('selectionchange', onSel)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const exec = (c: string, v?: string) => {
     ref.current?.focus()
     try { document.execCommand('styleWithCSS', false, 'true') } catch { /* ok */ }
     document.execCommand(c, false, v)
     onChange(ref.current?.innerHTML ?? '')
-    setPaleta(null)
+    setPaleta(null); sync()
   }
   return (
-    <div className={cn('flex flex-col overflow-hidden border-t', fill && 'min-h-0 flex-1')}>
+    <div className="flex flex-col overflow-hidden border-t">
       <div className="flex flex-wrap items-center gap-0.5 border-b bg-muted/30 px-1 py-1">
-        <BtnFmt title="Negrito" onClick={() => exec('bold')}><Bold className="h-3.5 w-3.5" /></BtnFmt>
-        <BtnFmt title="Itálico" onClick={() => exec('italic')}><Italic className="h-3.5 w-3.5" /></BtnFmt>
-        <BtnFmt title="Sublinhado" onClick={() => exec('underline')}><Underline className="h-3.5 w-3.5" /></BtnFmt>
-        <BtnFmt title="Marcadores" onClick={() => exec('insertUnorderedList')}><List className="h-3.5 w-3.5" /></BtnFmt>
+        <BtnFmt title="Negrito" ativo={fmt.bold} onClick={() => exec('bold')}><Bold className="h-3.5 w-3.5" /></BtnFmt>
+        <BtnFmt title="Itálico" ativo={fmt.italic} onClick={() => exec('italic')}><Italic className="h-3.5 w-3.5" /></BtnFmt>
+        <BtnFmt title="Sublinhado" ativo={fmt.underline} onClick={() => exec('underline')}><Underline className="h-3.5 w-3.5" /></BtnFmt>
+        <BtnFmt title="Marcadores" ativo={fmt.ul} onClick={() => exec('insertUnorderedList')}><List className="h-3.5 w-3.5" /></BtnFmt>
         <span className="mx-0.5 h-4 w-px bg-border" />
         <div className="relative">
           <BtnFmt title="Cor do texto" ativo={paleta === 'texto'} onClick={() => setPaleta((p) => (p === 'texto' ? null : 'texto'))}><Baseline className="h-3.5 w-3.5" /></BtnFmt>
@@ -419,9 +445,9 @@ function EditorAnotacao({ valor, onChange, fill }: { valor: string; onChange: (h
         </div>
       </div>
       <div ref={ref} contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
-        onInput={() => onChange(ref.current?.innerHTML ?? '')}
+        onInput={() => { onChange(ref.current?.innerHTML ?? ''); sync() }} onKeyUp={sync} onMouseUp={sync}
         data-placeholder="Escreva suas anotações sobre esta questão…"
-        className={cn('w-full overflow-y-auto p-3 text-sm leading-relaxed outline-none [&_ul]:list-disc [&_ul]:pl-5', fill ? 'min-h-0 flex-1' : 'min-h-[7rem] max-h-72')} />
+        className={cn('w-full overflow-y-auto p-3 text-sm leading-relaxed outline-none [&_ul]:list-disc [&_ul]:pl-5', fill ? 'min-h-[58vh]' : 'min-h-[7rem] max-h-72')} />
     </div>
   )
 }
