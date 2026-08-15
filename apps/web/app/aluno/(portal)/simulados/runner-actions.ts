@@ -21,6 +21,7 @@ export type AltRunner = { id: string; texto: string; ordem: number; correta: boo
 export type QuestaoRunner = {
   id: string; ordem: number; enunciado: string; tipo: string
   imagemUrl: string | null; disciplina: string | null; comentario: string | null
+  origemSimulado: string | null; origemNumero: number | null
   alternativas: AltRunner[]
 }
 export type SecaoRunner = { id: string; nome: string; questaoIds: string[] }
@@ -72,13 +73,30 @@ export async function abrirSessaoPessoal(simuladoId: string): Promise<{ sessao?:
   const discM = new Map<string, string>()
   if (discIds.length) { const ds = await fetchAllByIn<any>(discIds, (c) => svc.from('simulado_disciplinas').select('id, nome').in('id', c)); for (const d of ds) discM.set(d.id, d.nome) }
 
+  // Origem: de qual simulado OFICIAL cada questão veio + o número dela lá (1º oficial que a contém).
+  const origRows = await fetchAllByIn<any>(qids, (c) => svc.from('simulado_prova_questoes').select('questao_id, simulado_id, ordem').in('questao_id', c).neq('simulado_id', simuladoId).order('ordem', { ascending: true }))
+  const origSimIds = [...new Set(origRows.map((r) => r.simulado_id).filter(Boolean))] as string[]
+  const oficialTitulo = new Map<string, string>()
+  if (origSimIds.length) {
+    const os = await fetchAllByIn<any>(origSimIds, (c) => svc.from('simulado_simulados').select('id, titulo').in('id', c).eq('tenant_id', tenantId).is('owner_estudante_id', null).eq('deletado', false))
+    for (const o of os) oficialTitulo.set(o.id, o.titulo)
+  }
+  const origemDe = new Map<string, { titulo: string; numero: number }>()
+  for (const r of origRows) {
+    if (origemDe.has(r.questao_id)) continue
+    const t = oficialTitulo.get(r.simulado_id)
+    if (t) origemDe.set(r.questao_id, { titulo: t, numero: (Number(r.ordem) || 0) + 1 })
+  }
+
   const questoes: QuestaoRunner[] = pqs.map((p) => {
     const q = qmap.get(p.questao_id) ?? {}
+    const o = origemDe.get(p.questao_id)
     return {
       id: p.questao_id, ordem: p.ordem, enunciado: (q.enunciado as string) ?? '', tipo: (q.tipo as string) ?? 'objetiva',
       imagemUrl: (q.imagem_url as string | null) ?? null,
       disciplina: q.disciplina_id ? (discM.get(q.disciplina_id) ?? null) : null,
       comentario: (q.comentario_professor as string | null) ?? null,
+      origemSimulado: o?.titulo ?? null, origemNumero: o?.numero ?? null,
       alternativas: (altsByQ.get(p.questao_id) ?? []).sort((a, b) => a.ordem - b.ordem),
     }
   })

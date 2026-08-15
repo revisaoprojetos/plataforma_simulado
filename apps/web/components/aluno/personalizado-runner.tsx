@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Check, X, Eye, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, LayoutGrid } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, X, Eye, Loader2, Flag, GraduationCap, Timer, Trophy, RotateCcw, Pencil, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, ClipboardList } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -182,14 +182,12 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
             <span className="text-xs font-semibold text-muted-foreground">Ferramentas</span>
             <button type="button" onClick={() => setSidebarAberta(false)} title="Recolher barra" className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><PanelRightClose className="h-4 w-4" /></button>
           </div>
-          {navegadorCard}
           {secoesFerr}
         </div>
       ) : (
         <div className="flex flex-col items-center gap-1 py-3">
           <button type="button" onClick={() => setSidebarAberta(true)} title="Expandir barra" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><PanelRightOpen className="h-5 w-5" /></button>
           <div className="my-1 h-px w-6 bg-border" />
-          <button type="button" onClick={() => setSidebarAberta(true)} title="Navegador de questões" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><LayoutGrid className="h-5 w-5" /></button>
           <button type="button" onClick={() => { setSidebarAberta(true); setAnotAberta(true) }} title="Anotações" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><StickyNote className="h-5 w-5" /></button>
           <button type="button" onClick={() => { setSidebarAberta(true); setComentAberto(true) }} title="Comentário do professor" className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Lightbulb className="h-5 w-5" /></button>
         </div>
@@ -243,10 +241,11 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
         <div className="h-full bg-primary transition-all duration-300 ease-out" style={{ width: `${Math.round(((idx + 1) / total) * 100)}%` }} />
       </div>
 
-      {/* Conteúdo (rolagem própria) + BARRA LATERAL docada à direita no desktop */}
+      {/* Conteúdo (rolagem própria) + BARRA LATERAL de ferramentas docada à direita no desktop */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 py-4 sm:px-4 sm:py-5">
+          <div className="mx-auto grid w-full max-w-5xl gap-4 px-3 py-4 sm:px-4 sm:py-5 lg:grid-cols-[1fr_13rem] lg:gap-8">
+            <div className="flex min-w-0 flex-col gap-4">
             {/* Navegador (mobile/tablet) */}
             <div className="lg:hidden">
               <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Navegador de questões</p>
@@ -260,6 +259,13 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
           <span className="flex h-6 items-center rounded-lg bg-primary px-2 text-xs font-bold tabular-nums text-primary-foreground">{idx + 1} / {total}</span>
           {secaoPorQ.get(q.id) && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">{secaoPorQ.get(q.id)}</span>}
           {q.disciplina && <span className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary/90">{q.disciplina}</span>}
+          {q.origemSimulado && (
+            <span className="inline-flex max-w-[15rem] items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground" title={q.origemSimulado}>
+              <ClipboardList className="h-3 w-3 shrink-0" />
+              <span className="truncate">{q.origemSimulado}</span>
+              {q.origemNumero != null && <span className="shrink-0">· Q{q.origemNumero}</span>}
+            </span>
+          )}
         </div>
         <div className="p-4 sm:p-6">
           {q.imagemUrl && <img src={q.imagemUrl} alt="" className="mb-4 max-h-72 w-auto rounded-lg border" />}
@@ -355,8 +361,13 @@ export function PersonalizadoRunner({ sessao }: { sessao: SessaoPessoal }) {
       )}
           </div>
 
+          {/* Navegador de questões — coluna direita do conteúdo (no lugar original) */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-4">{navegadorCard}</div>
+          </aside>
         </div>
-        {/* Barra lateral docada (desktop) */}
+        </div>
+        {/* Barra lateral de ferramentas docada (desktop) */}
         {sidebar}
       </div>
     </div>
