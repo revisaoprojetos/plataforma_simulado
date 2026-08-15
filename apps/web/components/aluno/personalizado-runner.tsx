@@ -134,13 +134,27 @@ export function PersonalizadoRunner({ sessao, onSair }: { sessao: SessaoPessoal;
   }, [modo, sessao.tempoLimiteMin, sessao.iniciadoEm, finalizar])
 
   // Resultado: REUSA a tela oficial do simulado real (RevisaoFinal), que busca /api/sessoes/resultado
-  // pela sessão. Envolto em overlay full-screen + HUD padrão (fita/topbar coloridos).
+  // pela sessão. Overlay OPACO full-screen — o RevisaoFinal tem raiz com gradiente translúcido
+  // (`to-muted/30`), que numa página alta deixava a área "Meus simulados" vazar por trás; o `bg-background`
+  // (opaco, via cssVar do HUD) veda isso. Fita/acentos no ROXO da marca (--brand-primary), IGUAL à área
+  // do simulado (o runner usa `from-primary via-primary to-primary/30`).
   if (resultado) return (
-    <div className="fixed inset-0 z-50 overflow-y-auto" style={hudCssVars(efetivarHud(undefined, undefined, 'encerrada'), dark) as any}>
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto bg-background"
+      style={{
+        ...hudCssVars(efetivarHud(undefined, undefined, 'encerrada'), dark),
+        ['--primary' as any]: 'var(--brand-primary)',
+        ['--prova-fita1' as any]: 'var(--brand-primary)',
+        ['--prova-fita2' as any]: 'var(--brand-primary)',
+        ['--prova-fita3' as any]: 'color-mix(in oklab, var(--brand-primary) 30%, transparent)',
+      } as any}
+    >
       <RevisaoFinal
         sessionToken={sessao.sessaoId}
+        // Voltar ao menu (tela de erro) → lista de personalizados; Início da plataforma → home do aluno;
+        // Refazer simulado → a HUD de início deste personalizado.
         voltarUrl="/aluno/simulados?aba=personalizados"
-        simuladosUrl="/aluno/simulados?aba=personalizados"
+        simuladosUrl="/aluno"
         inicioUrl={`/aluno/simulados/personalizados/${sessao.simuladoId}/fazer`}
         dark={dark}
         onToggleDark={() => setTheme(dark ? 'light' : 'dark')}
