@@ -118,11 +118,11 @@ export function AlunoSidebar({
                       <span>{n.label}</span>
                       {/* Meus Simulados: "oficiais finalizados | personalizados criados" quando há pessoais. */}
                       {n.href === '/aluno/simulados' && simuladosPersonalizados > 0 ? (
-                        <span className="nav-badge ml-auto text-xs font-medium tabular-nums text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">
+                        <span className="nav-badge ml-auto pr-1.5 text-xs font-medium tabular-nums text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">
                           {c ?? 0} <span className="opacity-40">|</span> {simuladosPersonalizados}
                         </span>
                       ) : c != null && c > 0 ? (
-                        <span className="nav-badge ml-auto text-xs font-medium tabular-nums text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">{c}</span>
+                        <span className="nav-badge ml-auto pr-1.5 text-xs font-medium tabular-nums text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">{c}</span>
                       ) : null}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
