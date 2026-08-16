@@ -75,11 +75,14 @@ export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoIte
   // (botão lateral do mouse) retornar à aba certa em vez de cair sempre na "Simulado Revisão".
   const abaUrl = searchParams.get('aba') === 'personalizados' ? 'personalizados' : 'revisao'
   const [aba, setAba] = useState<'revisao' | 'personalizados'>(abaUrl)
+  // Direção da animação de deslizar ao trocar de aba (Personalizados fica à DIREITA).
+  const [dir, setDir] = useState<'dir' | 'esq'>('dir')
   // Sincroniza a aba quando a URL muda (ex.: voltar do navegador para ?aba=personalizados).
-  useEffect(() => { setAba(abaUrl) }, [abaUrl])
+  useEffect(() => { setAba(abaUrl); setDir(abaUrl === 'personalizados' ? 'dir' : 'esq') }, [abaUrl])
   // Troca a aba E grava na URL via History API (instantâneo, SEM round-trip/re-fetch do Next) — o
   // voltar do navegador retorna à aba certa. router.replace faria um fetch RSC (~1s) e criava corrida.
   const trocarAba = (id: 'revisao' | 'personalizados') => {
+    setDir(id === 'personalizados' ? 'dir' : 'esq')
     setAba(id)
     const params = new URLSearchParams(searchParams.toString())
     if (id === 'personalizados') params.set('aba', 'personalizados')
@@ -126,6 +129,8 @@ export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoIte
         </nav>
       </div>
 
+      {/* Conteúdo da aba com animação de DESLIZAR (key=aba remonta → re-anima; direção pela posição). */}
+      <div key={aba} className={cn('duration-300 fill-mode-both animate-in fade-in', dir === 'dir' ? 'slide-in-from-right-6' : 'slide-in-from-left-6')}>
       {aba === 'revisao' ? (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Concluídos ({itens.length})</h2>
@@ -150,6 +155,7 @@ export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoIte
       ) : (
         <PersonalizadosLista />
       )}
+      </div>
     </div>
   )
 }

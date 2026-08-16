@@ -52,10 +52,10 @@ export interface ProgressoAluno { streak: number; xpTotal: number; nivel: number
 
 export function AlunoSidebar({
   logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none',
-  usuarioNome = 'Aluno', usuarioEmail, avatar, avatarCor, counts, loginConfig, progresso, gamAtivo = false,
+  usuarioNome = 'Aluno', usuarioEmail, avatar, avatarCor, counts, simuladosPersonalizados = 0, loginConfig, progresso, gamAtivo = false,
 }: {
   logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string
-  usuarioNome?: string; usuarioEmail?: string | null; avatar?: string | null; avatarCor?: string | null; counts?: Record<string, number>; loginConfig: LoginConfig; progresso?: ProgressoAluno | null; gamAtivo?: boolean
+  usuarioNome?: string; usuarioEmail?: string | null; avatar?: string | null; avatarCor?: string | null; counts?: Record<string, number>; simuladosPersonalizados?: number; loginConfig: LoginConfig; progresso?: ProgressoAluno | null; gamAtivo?: boolean
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -116,9 +116,14 @@ export function AlunoSidebar({
                     <SidebarMenuButton className={NAV_STATES} render={<Link href={n.href} />} isActive={ativo(n)} tooltip={n.label}>
                       <n.icon className="h-4 w-4" />
                       <span>{n.label}</span>
-                      {c != null && c > 0 && (
+                      {/* Meus Simulados: "oficiais finalizados | personalizados criados" quando há pessoais. */}
+                      {n.href === '/aluno/simulados' && simuladosPersonalizados > 0 ? (
+                        <span className="nav-badge ml-auto text-xs font-medium tabular-nums text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">
+                          {c ?? 0} <span className="opacity-40">|</span> {simuladosPersonalizados}
+                        </span>
+                      ) : c != null && c > 0 ? (
                         <span className="nav-badge ml-auto text-xs font-medium tabular-nums text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">{c}</span>
-                      )}
+                      ) : null}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )
@@ -144,7 +149,7 @@ export function AlunoSidebar({
         )}
         <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
           {/* Card do perfil (avatar + nome + email) — todo clicável, no estilo dos botões Ajuda/Sair. */}
-          <Link data-tour="perfil" href="/aluno/perfil" title="Meu perfil" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1.5 pr-2.5 transition-colors hover:bg-white/10 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:p-0">
+          <Link data-tour="perfil" href="/aluno/perfil" title="Meu perfil" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1.5 pr-2.5 transition-colors hover:bg-white/10 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-primary shadow-sm ring-1 ring-black/10" style={{ background: avatarCor ?? '#ffffff' }}>
               {avatar ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -157,8 +162,9 @@ export function AlunoSidebar({
               {usuarioEmail && <p className="truncate text-[11px] leading-tight text-sidebar-foreground/55">{usuarioEmail}</p>}
             </div>
           </Link>
-          {/* sem overflow-hidden: o badge do sino (-top/-right) precisa aparecer inteiro; o recolher usa w-0 + opacity-0. */}
-          <div className="shrink-0 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0"><NotificacaoBellAluno /></div>
+          {/* sem overflow-hidden: o badge do sino (-top/-right) precisa aparecer inteiro. Ao recolher,
+              some por completo (não só w-0) p/ NÃO desalinhar o avatar — há um sino próprio na versão fechada. */}
+          <div className="shrink-0 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:hidden"><NotificacaoBellAluno /></div>
         </div>
 
         <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2">

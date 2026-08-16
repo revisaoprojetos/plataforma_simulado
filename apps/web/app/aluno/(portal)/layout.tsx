@@ -26,21 +26,26 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   // tema + contagens da sidebar + progresso de gamificação + personalização. Antes eram 4
   // round-trips em série; agora 1 cliente reutilizado e um único Promise.all.
   const svc = await createServiceClient()
-  const [themeData, counts, gamData, persData] = await Promise.all([
+  const [themeData, contadores, gamData, persData] = await Promise.all([
     getTenantTheme(),
-    // Contagens da sidebar ("Meus Simulados" = simulados distintos finalizados; "Favoritos").
-    (async (): Promise<Record<string, number>> => {
+    // Contagens da sidebar: "Meus Simulados" = oficiais distintos finalizados (badge da esquerda) +
+    // personalizados criados (badge da direita, "X | Y"); "Favoritos".
+    (async (): Promise<{ counts: Record<string, number>; personalizados: number }> => {
       try {
-        const [{ data: fin }, { count: favs }] = await Promise.all([
+        const [{ data: fin }, { count: favs }, { data: pers }] = await Promise.all([
           svc.from('simulado_sessoes_prova').select('simulado_id').eq('estudante_id', sessao.estudanteId).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false),
           svc.from('simulado_favoritos').select('id', { count: 'exact', head: true }).eq('estudante_id', sessao.estudanteId),
+          svc.from('simulado_simulados').select('id').eq('owner_estudante_id', sessao.estudanteId).eq('tenant_id', sessao.tenantId).eq('deletado', false),
         ])
+        const personalIds = new Set((pers ?? []).map((r: any) => r.id))
+        const finIds = new Set((fin ?? []).map((r: any) => r.simulado_id))
+        // Plataforma = simulados OFICIAIS distintos finalizados (exclui os pessoais do aluno).
+        const plataforma = [...finIds].filter((id) => !personalIds.has(id)).length
         const c: Record<string, number> = {}
-        const meus = new Set((fin ?? []).map((r: any) => r.simulado_id)).size
-        if (meus > 0) c['/aluno/simulados'] = meus
+        if (plataforma > 0) c['/aluno/simulados'] = plataforma
         if ((favs ?? 0) > 0) c['/aluno/favoritos'] = favs ?? 0
-        return c
-      } catch { return {} }
+        return { counts: c, personalizados: personalIds.size }
+      } catch { return { counts: {}, personalizados: 0 } }
     })(),
     // Progresso de gamificação + gate de Trilha/Ligas — só quando ativa.
     (async (): Promise<{ progresso: ProgressoAluno | null; gamAtivo: boolean }> => {
@@ -59,6 +64,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   ])
 
   const { css, tema, tenantNome } = themeData
+  const { counts, personalizados: simuladosPersonalizados } = contadores
   const t = (tema ?? {}) as any
   // Layout de navegação MOBILE, escolhido no console (Aparência → Mobile): 'tabs' | 'menu'.
   const navMode: 'tabs' | 'menu' = t.mobile_nav === 'menu' ? 'menu' : 'tabs'
@@ -83,7 +89,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       <MonitorManutencao inicial={{ inicio: manut.inicio, avisos: manut.avisos }} />
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
-          <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} logoEstilo={t.logo_estilo ?? 'arredondado'} logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'} usuarioNome={sessao.nome} usuarioEmail={sessao.email} avatar={avatarUsuario} avatarCor={avatarCorUsuario} counts={counts} loginConfig={resolverLoginConfig(t.login)} progresso={progresso} gamAtivo={gamAtivo} />
+          <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} logoEstilo={t.logo_estilo ?? 'arredondado'} logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'} usuarioNome={sessao.nome} usuarioEmail={sessao.email} avatar={avatarUsuario} avatarCor={avatarCorUsuario} counts={counts} simuladosPersonalizados={simuladosPersonalizados} loginConfig={resolverLoginConfig(t.login)} progresso={progresso} gamAtivo={gamAtivo} />
           <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
             {/* Toggle de recolher a sidebar: só no desktop (no mobile vale o chrome abaixo). */}
             <SidebarEdgeToggle hideOnMobile />
