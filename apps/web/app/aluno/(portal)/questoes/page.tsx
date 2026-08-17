@@ -55,23 +55,32 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
 
   let questoes: any[] = []
   let count = 0
-  if (params.minhas) {
-    // Filtro "minhas" (resolvidas/não-resolvidas/acertei/errei): antes usava .in()/.not-in() de uma
-    // lista GRANDE de ids na URL → estourava (400) e/ou truncava. Agora: busca só os IDS que casam os
-    // filtros (leve) + as respostas do aluno, intersecta/complementa em memória e busca só a PÁGINA.
-    const [idsFiltrados, ra] = await Promise.all([
+  if (params.minhas || params.favoritas) {
+    // Filtros "minhas" (resolvidas/…) e/ou "favoritas": em vez de .in()/.not-in() de uma lista GRANDE
+    // de ids na URL (estourava 400), busca os IDS que casam a taxonomia (leve) + as respostas e os
+    // favoritos do aluno, e intersecta em memória — paginando só a PÁGINA.
+    const [idsFiltrados, ra, favRows] = await Promise.all([
       fetchAll<{ id: string }>(() => aplicarFiltros(svc.from('simulado_questoes').select('id')).order('created_at', { ascending: false })),
-      fetchAll<{ questao_id: string; correta: boolean }>(() => svc.from('simulado_respostas_avulsas').select('questao_id, correta').eq('estudante_id', estId).order('questao_id', { ascending: true })),
+      params.minhas
+        ? fetchAll<{ questao_id: string; correta: boolean }>(() => svc.from('simulado_respostas_avulsas').select('questao_id, correta').eq('estudante_id', estId).order('questao_id', { ascending: true }))
+        : Promise.resolve([] as { questao_id: string; correta: boolean }[]),
+      params.favoritas
+        ? fetchAll<{ questao_id: string }>(() => svc.from('simulado_favoritos').select('questao_id').eq('estudante_id', estId).order('questao_id', { ascending: true }))
+        : Promise.resolve([] as { questao_id: string }[]),
     ])
     const resolvidas = new Set(ra.map((r) => r.questao_id).filter(Boolean))
     const acertei = new Set(ra.filter((r) => r.correta).map((r) => r.questao_id).filter(Boolean))
     const errei = new Set(ra.filter((r) => !r.correta).map((r) => r.questao_id).filter(Boolean))
-    const alvo = idsFiltrados.map((x) => x.id).filter((id) =>
-      params.minhas === 'resolvidas' ? resolvidas.has(id)
-        : params.minhas === 'nao_resolvidas' ? !resolvidas.has(id)
-          : params.minhas === 'acertei' ? acertei.has(id)
-            : params.minhas === 'errei' ? errei.has(id)
-              : true)
+    const favSetF = new Set(favRows.map((r) => r.questao_id).filter(Boolean))
+    const alvo = idsFiltrados.map((x) => x.id).filter((id) => {
+      const okMinhas = !params.minhas ? true
+        : params.minhas === 'resolvidas' ? resolvidas.has(id)
+          : params.minhas === 'nao_resolvidas' ? !resolvidas.has(id)
+            : params.minhas === 'acertei' ? acertei.has(id)
+              : params.minhas === 'errei' ? errei.has(id)
+                : true
+      return okMinhas && (!params.favoritas || favSetF.has(id))
+    })
     count = alvo.length
     const pageIds = alvo.slice(offset, offset + POR_PAGINA)
     if (pageIds.length) {

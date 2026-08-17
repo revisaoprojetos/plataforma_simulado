@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, X, SlidersHorizontal, Eraser } from 'lucide-react'
+import { Search, X, SlidersHorizontal, Eraser, Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type Opt = { id: string; nome: string }
@@ -10,7 +10,7 @@ export type AssuntoOpt = { id: string; nome: string; disciplina_id: string | nul
 
 export type FiltrosParams = {
   tipo?: string; minhas?: string; disciplina?: string; assunto?: string
-  banca?: string; ano?: string; dificuldade?: string; busca?: string; comentadas?: string
+  banca?: string; ano?: string; dificuldade?: string; busca?: string; comentadas?: string; favoritas?: string
 }
 
 const DIFICULDADES = [{ v: 'facil', r: 'Fácil' }, { v: 'medio', r: 'Médio' }, { v: 'dificil', r: 'Difícil' }]
@@ -54,6 +54,7 @@ export function QuestoesFiltrosAluno({
   if (f.ano) chips.push({ k: 'ano', label: `Ano: ${f.ano}` })
   if (f.dificuldade) chips.push({ k: 'dificuldade', label: DIFICULDADES.find((d) => d.v === f.dificuldade)?.r ?? f.dificuldade })
   if (f.comentadas) chips.push({ k: 'comentadas', label: 'Com gabarito comentado' })
+  if (f.favoritas) chips.push({ k: 'favoritas', label: 'Favoritas' })
   if (f.busca) chips.push({ k: 'busca', label: `"${f.busca}"` })
 
   const selCls = 'h-9 w-full rounded-lg border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'
@@ -110,6 +111,11 @@ export function QuestoesFiltrosAluno({
           <input type="checkbox" checked={f.comentadas === '1'} onChange={(e) => { set('comentadas', e.target.checked ? '1' : ''); aplicar({ comentadas: e.target.checked ? '1' : undefined }) }}
             className="h-4 w-4 rounded border accent-primary" />
           Gabarito comentado
+        </label>
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <input type="checkbox" checked={f.favoritas === '1'} onChange={(e) => { set('favoritas', e.target.checked ? '1' : ''); aplicar({ favoritas: e.target.checked ? '1' : undefined }) }}
+            className="h-4 w-4 rounded border accent-primary" />
+          <Star className="h-4 w-4 text-amber-500" /> Favoritas
         </label>
       </div>
 

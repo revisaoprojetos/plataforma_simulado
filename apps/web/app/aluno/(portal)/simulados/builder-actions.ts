@@ -210,6 +210,7 @@ export type QuestaoDisponivel = {
   bancaId: string | null; banca: string | null
   ano: number | null; tipo: string | null; dificuldade: string | null
   simuladoId: string | null; simulado: string | null
+  favorito: boolean
 }
 export type OpcoesFiltro = {
   disciplinas: { id: string; nome: string }[]
@@ -260,12 +261,14 @@ export async function questoesAcessiveis(): Promise<{ questoes: QuestaoDisponive
     return m
   }
   const simsUsados = [...new Set(qids.map((id) => qToSim.get(id)).filter(Boolean))] as string[]
-  const [discM, assuntoM, bancaM, simM] = await Promise.all([
+  const [discM, assuntoM, bancaM, simM, favRows] = await Promise.all([
     mapear('simulado_disciplinas', 'nome', idsDe('disciplina_id')),
     mapear('simulado_assuntos', 'nome', idsDe('assunto_id')),
     mapear('simulado_bancas', 'nome', idsDe('banca_id')),
     mapear('simulado_simulados', 'titulo', simsUsados),
+    svc.from('simulado_favoritos').select('questao_id').eq('estudante_id', estudanteId).then((r) => r.data ?? [], () => []),
   ])
+  const favSet = new Set((favRows as any[]).map((r) => r.questao_id).filter(Boolean))
   const limpar = (s: string) => (s ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220)
 
   const questoes: QuestaoDisponivel[] = rows.map((m) => {
@@ -277,6 +280,7 @@ export async function questoesAcessiveis(): Promise<{ questoes: QuestaoDisponive
       bancaId: m.banca_id ?? null, banca: m.banca_id ? (bancaM.get(m.banca_id) ?? null) : null,
       ano: m.ano ?? null, tipo: m.tipo ?? null, dificuldade: m.nivel_dificuldade ?? null,
       simuladoId: simId, simulado: simId ? (simM.get(simId) ?? null) : null,
+      favorito: favSet.has(m.id),
     }
   }).sort((a, b) => a.enunciado.localeCompare(b.enunciado, 'pt-BR'))
 

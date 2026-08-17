@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Loader2, Check, ChevronDown, X, ClipboardList } from 'lucide-react'
+import { Search, Loader2, Check, ChevronDown, X, ClipboardList, Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { questoesAcessiveis, type QuestaoDisponivel, type OpcoesFiltro } from '@/app/aluno/(portal)/simulados/builder-actions'
 
@@ -28,6 +28,7 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
   const [dados, setDados] = useState<{ questoes: QuestaoDisponivel[]; filtros: OpcoesFiltro; truncado: boolean } | null>(null)
   const [termo, setTermo] = useState('')
   const [f, setF] = useState<Filtros>(F0)
+  const [soFavoritas, setSoFavoritas] = useState(false)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [importando, setImportando] = useState(false)
 
@@ -43,6 +44,7 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
     if (!dados) return []
     const t = termo.trim().toLowerCase()
     return dados.questoes.filter((q) =>
+      (!soFavoritas || q.favorito) &&
       (!f.disciplina || q.disciplinaId === f.disciplina) &&
       (!f.assunto || q.assuntoId === f.assunto) &&
       (!f.banca || q.bancaId === f.banca) &&
@@ -51,10 +53,10 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
       (!f.tipo || q.tipo === f.tipo) &&
       (!f.dificuldade || q.dificuldade === f.dificuldade) &&
       (!t || q.enunciado.toLowerCase().includes(t)))
-  }, [dados, termo, f])
+  }, [dados, termo, f, soFavoritas])
   const mostradas = filtradas.slice(0, MAX_MOSTRAR)
   const porId = useMemo(() => new Map((dados?.questoes ?? []).map((q) => [q.id, q])), [dados])
-  const algumFiltro = termo.trim() !== '' || Object.values(f).some(Boolean)
+  const algumFiltro = termo.trim() !== '' || Object.values(f).some(Boolean) || soFavoritas
 
   const toggle = (id: string) => { if (ja.has(id)) return; setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
   const concluir = async () => {
@@ -74,6 +76,12 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
         {/* Filtros em pills: no mobile ficam numa ÚNICA linha rolável (swipe) p/ não roubar altura
             da lista; em telas maiores quebram em 2+ linhas. */}
         <div className="-mx-3 flex items-center gap-1.5 overflow-x-auto px-3 pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
+          {/* Só favoritas — questões marcadas como favoritas no banco. */}
+          <button type="button" onClick={() => setSoFavoritas((v) => !v)} aria-pressed={soFavoritas}
+            className={cn('inline-flex h-8 shrink-0 items-center gap-1 rounded-full border px-3 text-xs font-medium transition-colors',
+              soFavoritas ? 'border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'border-border bg-card text-muted-foreground hover:bg-muted')}>
+            <Star className={cn('h-3.5 w-3.5', soFavoritas && 'fill-amber-400 text-amber-500')} /> Favoritas
+          </button>
           {!!op?.disciplinas.length && (
             <Pill valor={f.disciplina} onChange={(v) => setF((s) => ({ ...s, disciplina: v, assunto: '' }))} rotulo="Disciplina">
               {op.disciplinas.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
@@ -110,7 +118,7 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
             </Pill>
           )}
           {algumFiltro && (
-            <button type="button" onClick={() => { setTermo(''); setF(F0) }} className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+            <button type="button" onClick={() => { setTermo(''); setF(F0); setSoFavoritas(false) }} className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
               <X className="h-3 w-3" /> Limpar
             </button>
           )}
@@ -142,6 +150,7 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
                       <span className="min-w-0 flex-1">
                         {/* Infos no topo: tag do simulado + disciplina/banca/ano/dificuldade. */}
                         <span className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                          {q.favorito && <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-500" />}
                           {q.simulado && <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary"><ClipboardList className="h-3 w-3 shrink-0" /> <span className="truncate">{q.simulado}</span></span>}
                           {q.disciplina && <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">{q.disciplina}</span>}
                           {q.banca && <span className="text-muted-foreground">{q.banca}</span>}
