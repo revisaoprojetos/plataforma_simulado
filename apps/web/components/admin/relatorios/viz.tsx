@@ -7,7 +7,7 @@
 // e SVG com `currentColor` — robusto no claro e no escuro, e no estilo do Ranking.
 
 import { useId, useMemo, useState } from 'react'
-import { Inbox } from 'lucide-react'
+import { Inbox, BarChart3, LineChart } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { usePdfDownloads } from '@/components/pdf-downloads-provider'
@@ -427,26 +427,27 @@ export function BotaoExportar({ onClick }: { onClick: () => void }) {
   )
 }
 
-// Períodos do filtro por tempo do gráfico de evolução (o mais recente à direita).
+// Períodos do filtro por tempo do gráfico de evolução (caixa de seleção).
 const PERIODOS_EVOL = [
-  { id: 'tudo', label: 'Tudo', dias: Infinity },
-  { id: '12m', label: '12 meses', dias: 365 },
-  { id: '3m', label: '3 meses', dias: 90 },
+  { id: '7d', label: '7 dias', dias: 7 },
+  { id: '14d', label: '14 dias', dias: 14 },
   { id: '30d', label: '30 dias', dias: 30 },
+  { id: '3m', label: '3 meses', dias: 90 },
+  { id: '12m', label: '12 meses', dias: 365 },
 ] as const
 
 /**
- * Evolução da NOTA em BARRAS verticais (uma por simulado, cronológico) + filtro por TEMPO.
- * Cada barra colorida pela faixa da nota; rola na horizontal quando há muitos simulados.
+ * Evolução da NOTA — alterna entre BARRAS × LINHA, com filtro por TEMPO (caixa de seleção:
+ * 7/14/30 dias, 3/12 meses). Barras coloridas pela faixa da nota; rola na horizontal se houver muitos.
  */
 export function EvolucaoNotaChart({ pontos, altura = 190 }: {
   pontos: { rotulo: string; nota: number; data?: string | null }[]
   altura?: number
 }) {
-  const [periodo, setPeriodo] = useState<string>('tudo')
-  const dias = PERIODOS_EVOL.find((p) => p.id === periodo)?.dias ?? Infinity
+  const [modo, setModo] = useState<'barras' | 'linha'>('barras')
+  const [periodo, setPeriodo] = useState<string>('12m')
+  const dias = PERIODOS_EVOL.find((p) => p.id === periodo)?.dias ?? 365
   const dados = useMemo(() => {
-    if (dias === Infinity) return pontos
     const limite = Date.now() - dias * 86400000
     return pontos.filter((p) => { const t = p.data ? new Date(p.data).getTime() : NaN; return Number.isNaN(t) || t >= limite })
   }, [pontos, dias])
@@ -455,19 +456,27 @@ export function EvolucaoNotaChart({ pontos, altura = 190 }: {
 
   return (
     <div>
-      {/* Filtro por tempo */}
-      <div className="mb-3 flex flex-wrap gap-1.5">
-        {PERIODOS_EVOL.map((p) => (
-          <button key={p.id} type="button" onClick={() => setPeriodo(p.id)}
-            className={cn('rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
-              periodo === p.id ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground')}>
-            {p.label}
-          </button>
-        ))}
+      {/* Modo (barras/linha) + filtro por tempo (caixa de seleção) */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-1 rounded-lg bg-muted p-1">
+          {([['barras', 'Barras', BarChart3], ['linha', 'Linha', LineChart]] as const).map(([m, label, Icon]) => (
+            <button key={m} type="button" onClick={() => setModo(m)} aria-pressed={modo === m}
+              className={cn('inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                modo === m ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+              <Icon className="h-3.5 w-3.5" /> {label}
+            </button>
+          ))}
+        </div>
+        <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} aria-label="Filtrar por período"
+          className="h-9 rounded-lg border bg-background px-2.5 text-xs font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          {PERIODOS_EVOL.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+        </select>
       </div>
 
       {dados.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">Nenhum simulado neste período.</p>
+      ) : modo === 'linha' ? (
+        <AreaSpark pontos={dados.map((p) => ({ rotulo: p.rotulo, valor: p.nota }))} tom="primary" altura={altura} min={0} max={100} formato={(n) => n.toFixed(1).replace('.', ',')} />
       ) : (
         <div className="overflow-x-auto pb-1 [scrollbar-width:thin]">
           <div className="flex min-w-full items-end gap-1.5" style={{ height: altura }}>
