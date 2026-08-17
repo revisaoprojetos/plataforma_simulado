@@ -255,7 +255,7 @@ export function MeuSimuladoView({
           {/* DIREITA: histórico — card com a MESMA altura do card de métrica (à esquerda); a lista de
               realizações ROLA internamente quando passa da altura. No desktop o card fica ABSOLUTO na
               coluna (que o grid estica até a altura da esquerda), então não empurra a página. */}
-          <div className="relative lg:col-span-1">
+          <div data-tour="realizacoes" className="relative lg:col-span-1">
             <div className="flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm lg:absolute lg:inset-0">
               <div className="shrink-0 border-b bg-muted/25 px-4 py-3">
                 <div className="flex items-center gap-2">

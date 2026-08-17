@@ -57,12 +57,12 @@ export const GUIAS_ALUNO: GuiaAluno[] = [
     ],
   },
   {
-    id: 'banco', titulo: 'Banco de questões e favoritos', resumo: 'Treine questões avulsas e organize seu estudo.', icon: BookOpen, link: { href: '/aluno/questoes', label: 'Abrir Banco de Questões' },
+    id: 'banco', titulo: 'Banco de questões e favoritas', resumo: 'Treine questões avulsas e organize seu estudo.', icon: BookOpen, link: { href: '/aluno/questoes', label: 'Abrir Banco de Questões' },
     passos: [
-      { t: 'Banco de Questões', d: 'Resolva questões avulsas quantas vezes quiser.' },
+      { t: 'Banco de Questões', d: 'Resolva questões avulsas quantas vezes quiser — sem limite de tentativas.' },
       { t: 'Filtre do seu jeito', d: 'Toque em "Filtros" e escolha disciplina, banca, dificuldade, ano — e até só as suas favoritas.' },
-      { t: 'Favorite as melhores', d: 'Toque na estrela ⭐ de uma questão para salvá-la nos Favoritos e revê-la depois.' },
-      { t: 'Cadernos', d: 'Em "Cadernos" você organiza questões para revisar de forma agrupada.' },
+      { t: 'Favorite as melhores', d: 'Toque na estrela ⭐ de uma questão para salvá-la. Depois é só marcar "Favoritas" nos filtros para revê-las.' },
+      { t: 'Responda e confira', d: 'Marque a alternativa e toque em "Resolver" para ver o gabarito e o comentário na hora.' },
     ],
   },
   {

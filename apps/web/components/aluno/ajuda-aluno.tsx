@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
-import { ChevronRight, Lightbulb, ArrowUpRight, Play } from 'lucide-react'
+import { ChevronRight, Lightbulb, ArrowUpRight, Play, Sparkles } from 'lucide-react'
 import { GUIAS_ALUNO } from '@/lib/ajuda/guias-aluno'
 import { TOURS_ALUNO } from '@/lib/ajuda/tours-aluno'
 import { iniciarTourGuia } from '@/components/aluno/guia-tour-runner'
@@ -17,7 +17,17 @@ export function AjudaAluno({ gamAtivo = false }: { gamAtivo?: boolean }) {
   return (
     <div className="flex flex-col gap-6 lg:h-full lg:min-h-0 lg:flex-row">
       {/* Índice (barra lateral) — igual ao admin */}
-      <nav className="lg:h-full lg:max-h-[calc(100vh-12rem)] lg:min-h-0 lg:w-[260px] lg:shrink-0 lg:overflow-y-auto lg:pr-1">
+      <nav className="space-y-3 lg:h-full lg:max-h-[calc(100vh-12rem)] lg:min-h-0 lg:w-[260px] lg:shrink-0 lg:overflow-y-auto lg:pr-1">
+        {/* CTA: tour COMPLETO guiado pela Capi. */}
+        <button type="button" onClick={() => iniciarTourGuia('completo')}
+          className="group flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/[0.12] via-card to-card p-3 text-left shadow-sm transition hover:border-primary/50 hover:shadow-md">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm"><Sparkles className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold leading-tight">Conheça o portal</span>
+            <span className="block text-[11px] leading-snug text-muted-foreground">Tour guiado ao vivo com a Capi</span>
+          </span>
+          <Play className="h-4 w-4 shrink-0 fill-current text-primary" />
+        </button>
         <div className="space-y-1 rounded-2xl border bg-card p-3">
           <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Guias</p>
           {guias.map((g) => (

@@ -21,6 +21,27 @@ export type PassoTour = {
  * `gamOnly` só entram com a gamificação ativa — então o mesmo tour serve para ON e OFF.
  */
 export const TOURS_ALUNO: Record<string, PassoTour[]> = {
+  // Tour COMPLETO ("Conheça o portal") — passeia pelas áreas principais de ponta a ponta.
+  // Os passos gamOnly só entram com a gamificação ativa; senão o tour segue direto.
+  completo: [
+    { pose: 'feliz', titulo: 'Oi, eu sou a Capi! 👋', texto: 'Vem que eu te dou um tour rapidinho pelo portal — em 1 minutinho você conhece tudo!', rota: '/aluno' },
+    { pose: 'satisfeita', titulo: 'Seu nível', texto: 'Aqui você acompanha seu nível — ele sobe conforme você ganha XP estudando.', alvo: 'nivel', gamOnly: true },
+    { pose: 'cafe', titulo: 'Meta do dia', texto: 'Todo dia tem uma meta rapidinha pra você cumprir. 🎯', alvo: 'meta', gamOnly: true },
+    { pose: 'atencao', titulo: 'Sequência 🔥', texto: 'Estude todo dia para manter a sua sequência acesa.', alvo: 'sequencia', gamOnly: true },
+    { pose: 'concluido', titulo: 'Missões', texto: 'Complete missões e ganhe XP extra.', alvo: 'missoes', gamOnly: true },
+    { pose: 'ideia', titulo: 'Meus Simulados', texto: 'Nesta lateral fica tudo. Comece pelos seus simulados.', alvo: 'nav-simulados' },
+    { pose: 'estudante', titulo: 'Escolha e faça', texto: 'Cada card é um simulado — toque nele e depois em "Fazer".', rota: '/aluno/simulados', alvo: 'simulados-lista', topo: true },
+    { pose: 'ideia', titulo: 'Crie o seu', texto: 'Na aba "Personalizados" você monta um simulado só seu.', alvo: 'aba-personalizados' },
+    { pose: 'procurando', titulo: 'Banco de Questões', texto: 'Aqui você treina questão por questão, quantas vezes quiser.', alvo: 'nav-questoes' },
+    { pose: 'ideia', titulo: 'Filtre do seu jeito', texto: 'Toque em "Filtros" para escolher disciplina, banca, ano — e até só as suas favoritas.', rota: '/aluno/questoes', alvo: 'banco-filtros' },
+    { pose: 'coracao', titulo: 'Favorite as melhores', texto: 'Toque na estrela ⭐ de uma questão para salvá-la. Depois é só filtrar por "Favoritas" para revê-las.', alvo: 'favoritar' },
+    { pose: 'ideia', titulo: 'A Trilha', texto: 'A Trilha organiza seus simulados em ordem — é só ir avançando.', alvo: 'trilha', rota: '/aluno/trilha', topo: true, gamOnly: true },
+    { pose: 'balanca', titulo: 'Ligas', texto: 'Acumule XP para subir de liga e brilhar no ranking. 🏆', alvo: 'liga', rota: '/aluno/ligas', topo: true, gamOnly: true },
+    { pose: 'coracao', titulo: 'Seu perfil', texto: 'No perfil ficam sua evolução da nota e o acerto por disciplina — sua evolução num olhar.', alvo: 'perfil-desempenho', rota: '/aluno/perfil' },
+    { pose: 'joinha', titulo: 'Precisou de ajuda?', texto: 'É só tocar aqui na Ajuda — e me chamar de novo quando quiser! 💜', alvo: 'ajuda' },
+    { pose: 'feliz', titulo: 'Tudo pronto! 🎉', texto: 'Agora é com você. Bons estudos — e conte comigo sempre que precisar!' },
+  ],
+
   iniciar: [
     { pose: 'feliz', titulo: 'Bora fazer um simulado!', texto: 'Oi! Eu sou a Capi, sua guia por aqui. Vem que eu te mostro o caminho. 🎯', rota: '/aluno' },
     { pose: 'ideia', titulo: 'Meus Simulados', texto: 'Aqui na lateral ficam os seus simulados. É por aqui que tudo começa.', alvo: 'nav-simulados' },
@@ -58,17 +79,17 @@ export const TOURS_ALUNO: Record<string, PassoTour[]> = {
   resultado: [
     { pose: 'estudante', titulo: 'Ver resultado e desempenho', texto: 'Depois de concluir, seus simulados ficam guardadinhos aqui. 📊', rota: '/aluno/simulados', alvo: 'nav-simulados' },
     { pose: 'ideia', titulo: 'Abra e explore', texto: 'Toque num simulado concluído para ver nota, acerto por matéria e a revisão das questões.', alvo: 'simulados-lista', topo: true },
-    { pose: 'coracao', titulo: 'Seu perfil', texto: 'No seu perfil tem a evolução da nota (barras ou linha) e o acerto por disciplina — sua evolução num olhar.', alvo: 'perfil', rota: '/aluno/perfil', topo: true },
-    { pose: 'satisfeita', titulo: 'Nível & XP', texto: 'Com a gamificação, seu nível e XP também aparecem no perfil.', alvo: 'perfil-nivel', gamOnly: true },
+    { pose: 'coracao', titulo: 'Seu perfil', texto: 'No seu perfil tem a evolução da nota (barras ou linha) e o acerto por disciplina — sua evolução num olhar.', alvo: 'perfil-desempenho', rota: '/aluno/perfil' },
+    { pose: 'satisfeita', titulo: 'Nível & XP', texto: 'Com a gamificação, seu nível e XP também aparecem no topo do perfil.', alvo: 'perfil-nivel', gamOnly: true },
     { pose: 'balanca', titulo: 'Suba nas Ligas', texto: 'E cada simulado te leva mais longe nas Ligas!', alvo: 'nav-liga', gamOnly: true },
   ],
 
   banco: [
     { pose: 'procurando', titulo: 'Banco de Questões', texto: 'Aqui você treina questão por questão, quantas vezes quiser. 🔎', alvo: 'nav-questoes' },
     { pose: 'ideia', titulo: 'Filtre do seu jeito', texto: 'Toque em "Filtros" para escolher disciplina, banca, ano — e até só as suas favoritas.', rota: '/aluno/questoes', alvo: 'banco-filtros' },
-    { pose: 'coracao', titulo: 'Favorite as melhores', texto: 'Toque na estrela ⭐ de uma questão para salvá-la. Ela vira favorita na hora.', alvo: 'banco-lista', topo: true },
-    { pose: 'satisfeita', titulo: 'Suas favoritas', texto: 'Todas as questões favoritas ficam reunidas em "Favoritos".', alvo: 'nav-favoritos' },
-    { pose: 'estudante', titulo: 'Cadernos', texto: 'E em "Cadernos" você organiza questões para revisar de forma agrupada.', alvo: 'nav-cadernos' },
+    { pose: 'coracao', titulo: 'Favorite as melhores', texto: 'Toque na estrela ⭐ da questão para salvá-la. Depois é só marcar "Favoritas" nos filtros para revê-las.', alvo: 'favoritar' },
+    { pose: 'estudante', titulo: 'Responda e confira', texto: 'Marque a alternativa e toque em "Resolver" para ver o gabarito e o comentário na hora.', alvo: 'banco-lista', topo: true },
+    { pose: 'joinha', titulo: 'Treine à vontade 💜', texto: 'Sem limite de tentativas por aqui — pratique quanto quiser e volte sempre!' },
   ],
 
   gamificacao: [
@@ -77,9 +98,9 @@ export const TOURS_ALUNO: Record<string, PassoTour[]> = {
     { pose: 'cafe', titulo: 'Meta do dia', texto: 'A meta diária te dá um objetivo pra hoje. Cumpra e ganhe XP!', alvo: 'meta', gamOnly: true },
     { pose: 'atencao', titulo: 'Mantenha a sequência 🔥', texto: 'Estude todo dia para não perder a sua sequência (streak).', alvo: 'sequencia', gamOnly: true },
     { pose: 'concluido', titulo: 'Missões', texto: 'Complete missões para ganhar XP extra e acelerar seu nível.', alvo: 'missoes', gamOnly: true },
-    { pose: 'ideia', titulo: 'A Trilha', texto: 'A Trilha organiza seus simulados em ordem — vá avançando pelos nós.', alvo: 'trilha-pagina', rota: '/aluno/trilha', topo: true, gamOnly: true },
-    { pose: 'balanca', titulo: 'Suba de liga', texto: 'Acumule XP para subir na escada de ligas.', alvo: 'liga-escada', rota: '/aluno/ligas', topo: true, gamOnly: true },
-    { pose: 'estudante', titulo: 'Ranking', texto: 'E acompanhe sua posição no ranking da sua liga.', alvo: 'liga-ranking', gamOnly: true },
+    { pose: 'ideia', titulo: 'A Trilha', texto: 'A Trilha organiza seus simulados em ordem — vá avançando pelos nós.', alvo: 'trilha', rota: '/aluno/trilha', topo: true, gamOnly: true },
+    { pose: 'balanca', titulo: 'Suba de liga', texto: 'Acumule XP para subir na escada de ligas.', alvo: 'liga', rota: '/aluno/ligas', topo: true, gamOnly: true },
+    { pose: 'estudante', titulo: 'Ranking', texto: 'E acompanhe sua posição no ranking da sua liga.', alvo: 'ranking', gamOnly: true },
     { pose: 'joinha', titulo: 'É isso! 💜', texto: 'Estude, ganhe XP e suba no ranking. Cada dia conta — bora?', gamOnly: true },
   ],
 

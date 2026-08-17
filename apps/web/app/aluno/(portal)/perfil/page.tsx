@@ -205,7 +205,7 @@ export default async function PerfilAlunoPage() {
           )}
 
           {/* ── Gráficos + histórico (mesmo motor do admin, sem os KPIs já exibidos acima) ── */}
-          <RelatorioEstudanteView d={dados} semCabecalho semKpis historicoLink semTurma semTendencia layoutPerfil />
+          <div data-tour="perfil-desempenho"><RelatorioEstudanteView d={dados} semCabecalho semKpis historicoLink semTurma semTendencia layoutPerfil /></div>
         </>
       ) : (
         <div className="rounded-2xl border bg-muted/30 p-10 text-center">

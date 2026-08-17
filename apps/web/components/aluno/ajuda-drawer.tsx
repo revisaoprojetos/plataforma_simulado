@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { HelpCircle, X, ChevronDown, Lightbulb, ArrowUpRight, Maximize2, Play } from 'lucide-react'
+import { HelpCircle, X, ChevronDown, Lightbulb, ArrowUpRight, Maximize2, Play, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GUIAS_ALUNO } from '@/lib/ajuda/guias-aluno'
 import { TOURS_ALUNO } from '@/lib/ajuda/tours-aluno'
@@ -53,6 +53,17 @@ export function AjudaDrawer({ renderTrigger, gamAtivo = false }: { renderTrigger
             </header>
 
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+              {/* CTA: tour COMPLETO guiado pela Capi (percorre o portal inteiro). */}
+              <button type="button" onClick={() => { setAberto(false); setTimeout(() => iniciarTourGuia('completo'), 90) }}
+                className="group flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/[0.12] via-card to-card p-3 text-left shadow-sm transition hover:border-primary/50 hover:shadow-md">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm"><Sparkles className="h-5 w-5" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold leading-tight">Conheça o portal com a Capi</span>
+                  <span className="block text-[11px] leading-snug text-muted-foreground">Um tour guiado ao vivo pelas áreas principais — leva 1 minutinho.</span>
+                </span>
+                <span className="flex h-8 shrink-0 items-center gap-1 rounded-lg bg-primary px-2.5 text-xs font-semibold text-primary-foreground transition group-hover:opacity-90"><Play className="h-3.5 w-3.5 fill-current" /> Começar</span>
+              </button>
+              <p className="px-1 pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Ou escolha um guia</p>
               {guias.map((g) => {
                 const on = guia === g.id
                 return (

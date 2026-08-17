@@ -113,7 +113,7 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
               </div>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div data-tour="favoritar" className="flex shrink-0 items-center gap-1">
             <button
               onClick={toggleFavorito}
               disabled={favPending}
