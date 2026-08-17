@@ -10,5 +10,8 @@ export default async function EditorPersonalizadoPage({ params }: { params: Prom
   const { id } = await params
   const r = await questoesDoMeuSimulado(id)
   if (r.error || r.titulo == null) redirect('/aluno/simulados')
-  return <PersonalizadoEditor simuladoId={id} titulo={r.titulo} itensIniciais={r.itens ?? []} secoesIniciais={r.secoes ?? []} visualInicial={r.visual ?? { cor: '#6d28d9', icone: 'varinha' }} tempoInicial={r.tempo ?? null} />
+  // "Voltar" volta para a ÁREA INTERNA do simulado: se concluído, o detalhe (resultado); senão
+  // (rascunho, cujo detalhe É este editor), para Meus simulados.
+  const voltarUrl = r.concluido ? `/aluno/simulados/personalizados/${id}/resultado` : '/aluno/simulados'
+  return <PersonalizadoEditor simuladoId={id} titulo={r.titulo} itensIniciais={r.itens ?? []} secoesIniciais={r.secoes ?? []} visualInicial={r.visual ?? { cor: '#6d28d9', icone: 'varinha' }} tempoInicial={r.tempo ?? null} voltarUrl={voltarUrl} />
 }

@@ -105,18 +105,20 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="space-y-2 border-b p-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input value={termo} onChange={(e) => setTermo(e.target.value)} placeholder="Buscar no enunciado…" className="w-full rounded-lg border bg-transparent py-2 pl-8 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary" />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input value={termo} onChange={(e) => setTermo(e.target.value)} placeholder="Buscar no enunciado…" className="w-full rounded-lg border bg-transparent py-2 pl-8 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary" />
+          </div>
+          {/* Aleatório — botão PRÓPRIO ao lado da busca; abre o sub-pop-up de geração. */}
+          <button type="button" onClick={abrirAleatorio} title="Selecionar questões aleatoriamente"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-gradient-to-br from-primary to-primary/85 px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm ring-1 ring-primary/20 transition hover:opacity-90 active:scale-[.98]">
+            <Shuffle className="h-4 w-4" /> Aleatório
+          </button>
         </div>
         {/* Filtros em pills: no mobile ficam numa ÚNICA linha rolável (swipe) p/ não roubar altura
             da lista; em telas maiores quebram em 2+ linhas. */}
         <div className="-mx-3 flex items-center gap-1.5 overflow-x-auto px-3 pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
-          {/* Aleatório — abre um sub-pop-up p/ gerar uma seleção por qtd/disciplinas/dificuldades. */}
-          <button type="button" onClick={abrirAleatorio}
-            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/15">
-            <Shuffle className="h-3.5 w-3.5" /> Aleatório
-          </button>
           {/* Só favoritas — questões marcadas como favoritas no banco. */}
           <button type="button" onClick={() => setSoFavoritas((v) => !v)} aria-pressed={soFavoritas}
             className={cn('inline-flex h-8 shrink-0 items-center gap-1 rounded-full border px-3 text-xs font-medium transition-colors',

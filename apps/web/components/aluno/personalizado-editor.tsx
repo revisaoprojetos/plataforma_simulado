@@ -17,9 +17,9 @@ const uid = () => (globalThis.crypto?.randomUUID?.() ?? `s_${Math.random().toStr
 const ORFA = '__sem_secao__' // chave do grupo "Sem seção"
 
 /** Editor de um simulado personalizado: nome + seções (fileiras) + questões (reordenar/mover/remover). */
-export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensIniciais, secoesIniciais, visualInicial, tempoInicial }: {
+export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensIniciais, secoesIniciais, visualInicial, tempoInicial, voltarUrl = '/aluno/simulados' }: {
   simuladoId: string; titulo: string; itensIniciais: QuestaoEscolhida[]; secoesIniciais: Secao[]
-  visualInicial: { cor: string; icone: string }; tempoInicial: number | null
+  visualInicial: { cor: string; icone: string }; tempoInicial: number | null; voltarUrl?: string
 }) {
   const router = useRouter()
   const [titulo, setTitulo] = useState(tituloIni)
@@ -125,7 +125,7 @@ export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensInicia
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 sm:gap-3">
-        <Link href="/aluno/simulados" className="shrink-0 rounded-lg border p-2 text-muted-foreground transition-colors hover:text-foreground" aria-label="Voltar para Meus simulados"><ArrowLeft className="h-4 w-4" /></Link>
+        <Link href={voltarUrl} className="shrink-0 rounded-lg border p-2 text-muted-foreground transition-colors hover:text-foreground" aria-label="Voltar"><ArrowLeft className="h-4 w-4" /></Link>
         <div className="relative min-w-0 flex-1">
           <input value={titulo} onChange={(e) => setTitulo(e.target.value)} onBlur={salvarNome} maxLength={120}
             className="w-full rounded-lg border bg-transparent px-3 py-2 text-lg font-bold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Nome do simulado" />

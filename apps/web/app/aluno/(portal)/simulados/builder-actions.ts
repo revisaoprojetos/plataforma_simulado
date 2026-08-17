@@ -142,10 +142,14 @@ function sanearSecoes(raw: unknown, doSim: Set<string>): Secao[] {
     .map((s) => ({ ...s, questaoIds: s.questaoIds.filter((id: string) => doSim.has(id) && !seen.has(id) && seen.add(id)) }))
 }
 
-export async function questoesDoMeuSimulado(simuladoId: string): Promise<{ titulo?: string; itens?: QuestaoEscolhida[]; secoes?: Secao[]; visual?: { cor: string; icone: string }; tempo?: number | null; error?: string }> {
+export async function questoesDoMeuSimulado(simuladoId: string): Promise<{ titulo?: string; itens?: QuestaoEscolhida[]; secoes?: Secao[]; visual?: { cor: string; icone: string }; tempo?: number | null; concluido?: boolean; error?: string }> {
   const { svc, estudanteId, tenantId } = await ctx()
   const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)
   if (!sim) return { error: 'Simulado não encontrado.' }
+  // Concluído = tem ao menos uma realização finalizada (define a "área interna": detalhe vs editor).
+  const { data: finSess } = await svc.from('simulado_sessoes_prova').select('id')
+    .eq('simulado_id', simuladoId).eq('estudante_id', estudanteId).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada').limit(1)
+  const concluido = (finSess?.length ?? 0) > 0
   const pqs = await fetchAll<any>(() => svc.from('simulado_prova_questoes').select('questao_id, ordem')
     .eq('simulado_id', simuladoId).eq('tenant_id', tenantId).order('ordem', { ascending: true }))
   const qids = pqs.map((p) => p.questao_id)
@@ -156,7 +160,7 @@ export async function questoesDoMeuSimulado(simuladoId: string): Promise<{ titul
   }
   const limpar = (s: string) => (s ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180)
   const secoes = sanearSecoes((sim as any).regras?.secoes, new Set(qids))
-  return { titulo: (sim as any).titulo, itens: pqs.map((p) => ({ questaoId: p.questao_id, ordem: p.ordem, enunciado: limpar(qmap.get(p.questao_id)?.enunciado) })), secoes, visual: visualDe((sim as any).regras), tempo: (sim as any).tempo_limite_min ?? null }
+  return { titulo: (sim as any).titulo, itens: pqs.map((p) => ({ questaoId: p.questao_id, ordem: p.ordem, enunciado: limpar(qmap.get(p.questao_id)?.enunciado) })), secoes, visual: visualDe((sim as any).regras), tempo: (sim as any).tempo_limite_min ?? null, concluido }
 }
 
 /** Salva a DURAÇÃO (tempo limite em minutos; 0/null = sem limite) do simulado pessoal. */
