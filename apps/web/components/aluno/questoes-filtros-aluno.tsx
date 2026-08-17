@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, X, SlidersHorizontal, Eraser, Star, ChevronDown, ListChecks, FileText, Check } from 'lucide-react'
+import { Search, X, SlidersHorizontal, Eraser, Star, ChevronDown, ChevronRight, ListChecks, FileText, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useBancoNav } from '@/components/aluno/banco-questoes-client'
 
@@ -75,33 +75,41 @@ export function QuestoesFiltrosAluno({
 
   return (
     <>
-      {/* Barra compacta: abrir filtros + chips ativos + contagem. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border bg-gradient-to-r from-primary/[0.07] via-card to-card p-2.5 pl-3 shadow-sm">
-        <button type="button" onClick={() => setAberto(true)}
-          className="group flex shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-95 hover:shadow-md">
-          <SlidersHorizontal className="h-4 w-4 transition-transform duration-300 group-hover:rotate-90" /> Filtros
-          {ativos > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-foreground/25 px-1 text-[11px] font-bold tabular-nums leading-none">{ativos}</span>}
-        </button>
+      {/* Barra-LAUNCHER: o CARD INTEIRO abre os filtros (chips/Limpar usam stopPropagation). */}
+      <div role="button" tabIndex={0} onClick={() => setAberto(true)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAberto(true) } }}
+        className="group flex cursor-pointer items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm transition-all hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform group-hover:scale-[1.03]">
+          <SlidersHorizontal className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" />
+        </span>
 
-        {ativos === 0 ? (
-          <span className="hidden text-sm text-muted-foreground sm:inline">Disciplina, assunto, banca, ano, dificuldade e mais…</span>
-        ) : (
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            {chips.map((c) => (
-              <button key={c.k} type="button" onClick={() => tirar(c.k)}
-                className="group inline-flex items-center gap-1 rounded-full border bg-card px-2.5 py-1 text-xs font-medium shadow-sm transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive">
-                {c.label} <X className="h-3 w-3 opacity-60 group-hover:opacity-100" />
-              </button>
-            ))}
-            <button type="button" onClick={limpar} className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition hover:text-foreground">
-              <Eraser className="h-3.5 w-3.5" /> Limpar
-            </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">Filtros</span>
+            {ativos > 0 && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold tabular-nums text-primary">{ativos} ativo{ativos > 1 ? 's' : ''}</span>}
           </div>
-        )}
+          {ativos === 0 ? (
+            <p className="truncate text-xs text-muted-foreground">Disciplina, assunto, banca, ano, dificuldade e mais — toque para filtrar</p>
+          ) : (
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              {chips.map((c) => (
+                <button key={c.k} type="button" onClick={(e) => { e.stopPropagation(); tirar(c.k) }}
+                  className="group/chip inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-[11px] font-medium shadow-sm transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive">
+                  {c.label} <X className="h-3 w-3 opacity-60 group-hover/chip:opacity-100" />
+                </button>
+              ))}
+              <button type="button" onClick={(e) => { e.stopPropagation(); limpar() }}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition hover:text-foreground">
+                <Eraser className="h-3 w-3" /> Limpar
+              </button>
+            </div>
+          )}
+        </div>
 
-        <span className="ml-auto shrink-0 rounded-full bg-muted/70 px-3 py-1 text-xs font-medium text-muted-foreground">
+        <span className="ml-auto hidden shrink-0 rounded-full bg-muted/70 px-3 py-1 text-xs font-medium text-muted-foreground sm:inline-block">
           <span className="font-bold text-foreground tabular-nums">{total.toLocaleString('pt-BR')}</span> questões
         </span>
+        <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
       </div>
 
       {/* POP-UP com todos os filtros. */}
