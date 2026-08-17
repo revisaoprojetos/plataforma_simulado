@@ -86,7 +86,7 @@ export function PersonalizadosLista() {
           <Wand2 className="h-4 w-4 text-primary" /> Seus simulados
           {itens && <span className="text-xs font-normal text-muted-foreground">({itens.length})</span>}
         </h2>
-        <button type="button" onClick={criar}
+        <button type="button" data-tour="criar-simulado" onClick={criar}
           className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
           <Plus className="h-4 w-4" /> Criar simulado
         </button>

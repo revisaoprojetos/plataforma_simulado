@@ -14,9 +14,11 @@ const KEYFRAMES = `@keyframes ajudaSlideIn { from { transform: translateX(100%) 
 /** Botão "?" que abre a AJUDA como BARRA LATERAL (drawer deslizante), sobre a tela.
  *  `renderTrigger` permite um gatilho customizado (ex.: botão "Ajuda" no rodapé da
  *  sidebar). Sem ele, usa o botão "?" padrão. */
-export function AjudaDrawer({ renderTrigger }: { renderTrigger?: (abrir: () => void) => React.ReactNode }) {
+export function AjudaDrawer({ renderTrigger, gamAtivo = false }: { renderTrigger?: (abrir: () => void) => React.ReactNode; gamAtivo?: boolean }) {
   const [aberto, setAberto] = useState(false)
-  const [guia, setGuia] = useState<string>(GUIAS_ALUNO[0].id)
+  // Esconde os guias só-gamificação (Trilha/Ligas/XP) quando ela está desativada.
+  const guias = GUIAS_ALUNO.filter((g) => !g.gamOnly || gamAtivo)
+  const [guia, setGuia] = useState<string>(guias[0].id)
 
   useEffect(() => {
     if (!aberto) return
@@ -51,7 +53,7 @@ export function AjudaDrawer({ renderTrigger }: { renderTrigger?: (abrir: () => v
             </header>
 
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
-              {GUIAS_ALUNO.map((g) => {
+              {guias.map((g) => {
                 const on = guia === g.id
                 return (
                   <div key={g.id} className="overflow-hidden rounded-xl border bg-card">

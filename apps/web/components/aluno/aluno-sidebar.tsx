@@ -172,7 +172,7 @@ export function AlunoSidebar({
           <span className="flex h-9 w-9 items-center justify-center"><ThemeToggle /></span>
           {/* Ajuda/Sair (rótulo): some por completo na colapsada (sem gap fantasma) */}
           <div className="flex min-w-0 flex-1 items-center gap-2 group-data-[collapsible=icon]:hidden">
-            <AjudaDrawer renderTrigger={(abrir) => (
+            <AjudaDrawer gamAtivo={gamAtivo} renderTrigger={(abrir) => (
               <button type="button" data-tour="ajuda" onClick={abrir} className={btnFooter}>Ajuda</button>
             )} />
             <button type="button" onClick={sair} className={btnFooter}>Sair</button>
