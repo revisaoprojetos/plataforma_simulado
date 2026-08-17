@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Loader2, Check, ChevronDown, X, ClipboardList, Star } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Search, Loader2, Check, ChevronDown, X, ClipboardList, Star, Shuffle, CheckCheck } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { questoesAcessiveis, type QuestaoDisponivel, type OpcoesFiltro } from '@/app/aluno/(portal)/simulados/builder-actions'
 
@@ -31,6 +33,11 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
   const [soFavoritas, setSoFavoritas] = useState(false)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [importando, setImportando] = useState(false)
+  // Sub-pop-up "Aleatório": qtd + disciplinas + dificuldades → gera uma seleção.
+  const [aleatorio, setAleatorio] = useState(false)
+  const [alqQtd, setAlqQtd] = useState(10)
+  const [alqDisc, setAlqDisc] = useState<Set<string>>(new Set())
+  const [alqDif, setAlqDif] = useState<Set<string>>(new Set())
 
   useEffect(() => { questoesAcessiveis().then(setDados).catch(() => setDados({ questoes: [], filtros: { disciplinas: [], assuntos: [], bancas: [], anos: [], tipos: [], dificuldades: [], simulados: [] }, truncado: false })) }, [])
 
@@ -59,6 +66,35 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
   const algumFiltro = termo.trim() !== '' || Object.values(f).some(Boolean) || soFavoritas
 
   const toggle = (id: string) => { if (ja.has(id)) return; setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
+
+  // ── Selecionar TODAS as questões do filtro atual (não só as 100 exibidas) ──
+  const selecionaveis = useMemo(() => filtradas.filter((q) => !ja.has(q.id)), [filtradas, ja])
+  const todasMarcadas = selecionaveis.length > 0 && selecionaveis.every((q) => sel.has(q.id))
+  const marcarTodasFiltro = () => {
+    setSel((s) => {
+      const n = new Set(s)
+      if (todasMarcadas) for (const q of selecionaveis) n.delete(q.id)
+      else for (const q of selecionaveis) n.add(q.id)
+      return n
+    })
+  }
+
+  // ── Seleção ALEATÓRIA por referências (qtd / disciplinas / dificuldades) ──
+  const poolAleatorio = useMemo(() => (dados?.questoes ?? []).filter((q) =>
+    !ja.has(q.id) &&
+    (alqDisc.size === 0 || (q.disciplinaId != null && alqDisc.has(q.disciplinaId))) &&
+    (alqDif.size === 0 || (q.dificuldade != null && alqDif.has(q.dificuldade)))), [dados, ja, alqDisc, alqDif])
+  const abrirAleatorio = () => { setAlqDisc(new Set()); setAlqDif(new Set()); setAlqQtd(10); setAleatorio(true) }
+  const gerarAleatorio = () => {
+    const arr = [...poolAleatorio]
+    for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]] }
+    const escolhidas = arr.slice(0, Math.max(1, Math.min(alqQtd, arr.length)))
+    setSel((s) => { const n = new Set(s); for (const q of escolhidas) n.add(q.id); return n })
+    setAleatorio(false)
+    if (!escolhidas.length) toast.error('Nenhuma questão para essas referências.')
+    else toast.success(`${escolhidas.length} ${escolhidas.length === 1 ? 'questão selecionada' : 'questões selecionadas'}${escolhidas.length < alqQtd ? ' (só havia essas)' : ''}.`)
+  }
+
   const concluir = async () => {
     setImportando(true)
     const escolhidas = [...sel].map((id) => porId.get(id)).filter(Boolean) as QuestaoDisponivel[]
@@ -76,6 +112,11 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
         {/* Filtros em pills: no mobile ficam numa ÚNICA linha rolável (swipe) p/ não roubar altura
             da lista; em telas maiores quebram em 2+ linhas. */}
         <div className="-mx-3 flex items-center gap-1.5 overflow-x-auto px-3 pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
+          {/* Aleatório — abre um sub-pop-up p/ gerar uma seleção por qtd/disciplinas/dificuldades. */}
+          <button type="button" onClick={abrirAleatorio}
+            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/15">
+            <Shuffle className="h-3.5 w-3.5" /> Aleatório
+          </button>
           {/* Só favoritas — questões marcadas como favoritas no banco. */}
           <button type="button" onClick={() => setSoFavoritas((v) => !v)} aria-pressed={soFavoritas}
             className={cn('inline-flex h-8 shrink-0 items-center gap-1 rounded-full border px-3 text-xs font-medium transition-colors',
@@ -134,6 +175,14 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
           </div>
         ) : (
           <>
+            {/* Selecionar TODAS as questões do filtro atual (inclui as não exibidas além das 100). */}
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">{filtradas.length} {filtradas.length === 1 ? 'questão' : 'questões'}{algumFiltro ? ' no filtro' : ''}</span>
+              <button type="button" onClick={marcarTodasFiltro}
+                className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted">
+                <CheckCheck className="h-3.5 w-3.5" /> {todasMarcadas ? 'Limpar seleção' : `Selecionar todas${selecionaveis.length ? ` (${selecionaveis.length})` : ''}`}
+              </button>
+            </div>
             <ul className="space-y-2">
               {mostradas.map((q) => {
                 const marcada = sel.has(q.id)
@@ -182,6 +231,82 @@ export function SeletorQuestoes({ jaEscolhidas, onConcluir, onCancelar, textoCon
           </button>
         </div>
       </div>
+
+      {/* Sub-pop-up "Aleatório": gera uma seleção por referências (qtd/disciplinas/dificuldades). */}
+      {aleatorio && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm duration-200 animate-in fade-in sm:items-center sm:p-4" onClick={() => setAleatorio(false)}>
+          <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border bg-card shadow-xl duration-200 animate-in slide-in-from-bottom-4 sm:rounded-2xl sm:zoom-in-95 sm:slide-in-from-bottom-0" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2.5 border-b p-4">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Shuffle className="h-4 w-4" /></span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold leading-tight">Seleção aleatória</h3>
+                <p className="text-[11px] text-muted-foreground">Escolha as referências e gere a seleção.</p>
+              </div>
+              <button type="button" onClick={() => setAleatorio(false)} className="rounded-md p-1 text-muted-foreground hover:text-foreground" aria-label="Fechar"><X className="h-4 w-4" /></button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+              {/* Quantidade */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantidade</label>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <input type="number" min={1} max={poolAleatorio.length || 1} value={alqQtd}
+                    onChange={(e) => setAlqQtd(Math.max(1, Math.min(500, Math.floor(Number(e.target.value) || 1))))}
+                    className="w-24 rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary" />
+                  <span className="text-xs text-muted-foreground">{poolAleatorio.length} disponíve{poolAleatorio.length === 1 ? 'l' : 'is'} nas referências</span>
+                </div>
+              </div>
+
+              {/* Disciplinas (multi; vazio = todas) */}
+              {!!op?.disciplinas.length && (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Disciplinas</label>
+                    <span className="text-[11px] text-muted-foreground">{alqDisc.size === 0 ? 'todas' : `${alqDisc.size} selecionada${alqDisc.size === 1 ? '' : 's'}`}</span>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {op.disciplinas.map((d) => {
+                      const on = alqDisc.has(d.id)
+                      return (
+                        <button key={d.id} type="button" onClick={() => setAlqDisc((s) => { const n = new Set(s); on ? n.delete(d.id) : n.add(d.id); return n })}
+                          className={cn('rounded-full border px-2.5 py-1 text-xs font-medium transition-colors', on ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card text-muted-foreground hover:bg-muted')}>{d.nome}</button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Dificuldades (multi; vazio = todas) */}
+              {!!op?.dificuldades.length && (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dificuldade</label>
+                    <span className="text-[11px] text-muted-foreground">{alqDif.size === 0 ? 'todas' : `${alqDif.size} selecionada${alqDif.size === 1 ? '' : 's'}`}</span>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {op.dificuldades.map((d) => {
+                      const on = alqDif.has(d)
+                      return (
+                        <button key={d} type="button" onClick={() => setAlqDif((s) => { const n = new Set(s); on ? n.delete(d) : n.add(d); return n })}
+                          className={cn('rounded-full border px-2.5 py-1 text-xs font-medium transition-colors', on ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card text-muted-foreground hover:bg-muted')}>{difLabel(d)}</button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t p-3">
+              <button type="button" onClick={() => setAleatorio(false)} className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted">Cancelar</button>
+              <button type="button" onClick={gerarAleatorio} disabled={poolAleatorio.length === 0}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60">
+                <Shuffle className="h-4 w-4" /> Gerar
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }

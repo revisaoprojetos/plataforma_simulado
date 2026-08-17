@@ -8,21 +8,24 @@ import { ArrowLeft, Plus, Trash2, Loader2, Play, X, GripVertical, ChevronUp, Che
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { SeletorQuestoes } from '@/components/aluno/seletor-questoes'
+import { SeletorTempo } from '@/components/aluno/seletor-tempo'
 import { ExcluirPersonalizadoButton } from '@/components/aluno/excluir-personalizado-button'
 import { VisualPersonalizadoPicker } from '@/components/aluno/visual-personalizado-picker'
-import { adicionarQuestoes, removerQuestao, renomearMeuSimulado, salvarLayout, salvarVisualMeuSimulado, type QuestaoEscolhida, type Secao } from '@/app/aluno/(portal)/simulados/builder-actions'
+import { adicionarQuestoes, removerQuestao, renomearMeuSimulado, salvarLayout, salvarTempoMeuSimulado, salvarVisualMeuSimulado, type QuestaoEscolhida, type Secao } from '@/app/aluno/(portal)/simulados/builder-actions'
 
 const uid = () => (globalThis.crypto?.randomUUID?.() ?? `s_${Math.random().toString(36).slice(2)}_${Date.now()}`)
 const ORFA = '__sem_secao__' // chave do grupo "Sem seção"
 
 /** Editor de um simulado personalizado: nome + seções (fileiras) + questões (reordenar/mover/remover). */
-export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensIniciais, secoesIniciais, visualInicial }: {
+export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensIniciais, secoesIniciais, visualInicial, tempoInicial }: {
   simuladoId: string; titulo: string; itensIniciais: QuestaoEscolhida[]; secoesIniciais: Secao[]
-  visualInicial: { cor: string; icone: string }
+  visualInicial: { cor: string; icone: string }; tempoInicial: number | null
 }) {
   const router = useRouter()
   const [titulo, setTitulo] = useState(tituloIni)
   const [visual, setVisual] = useState(visualInicial)
+  const [tempo, setTempo] = useState(tempoInicial ?? 0) // minutos; 0 = sem limite
+  const [salvandoTempo, startTempo] = useTransition()
   const [salvandoVisual, startVisual] = useTransition()
   const [modal, setModal] = useState(false)
   const [salvandoNome, startSalvar] = useTransition()
@@ -50,6 +53,12 @@ export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensInicia
   const mudarVisual = (v: { cor: string; icone: string }) => {
     setVisual(v)
     startVisual(async () => { const r = await salvarVisualMeuSimulado(simuladoId, v.cor, v.icone); if (r.error) toast.error(r.error) })
+  }
+
+  // Duração (tempo limite) — salva ao trocar. 0 = sem limite.
+  const mudarTempo = (m: number) => {
+    setTempo(m)
+    startTempo(async () => { const r = await salvarTempoMeuSimulado(simuladoId, m || null); if (r.error) toast.error(r.error) })
   }
 
   // Persiste o layout inteiro (ordem achatada + seções). Fonte única no cliente.
@@ -128,6 +137,16 @@ export function PersonalizadoEditor({ simuladoId, titulo: tituloIni, itensInicia
           className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60">
           <Play className="h-4 w-4" /> <span className="hidden sm:inline">Fazer</span>
         </button>
+      </div>
+
+      {/* Duração (tempo limite) — salva ao trocar. */}
+      <div className="rounded-2xl border bg-card p-4">
+        <div className="mb-2.5 flex items-center gap-2">
+          <span className="text-sm font-semibold">Duração</span>
+          {salvandoTempo && <span className="inline-flex items-center gap-1 text-xs font-normal text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> salvando</span>}
+        </div>
+        <SeletorTempo minutos={tempo} onChange={mudarTempo} />
+        <p className="mt-2 text-xs text-muted-foreground">Tempo limite para fazer o simulado. “Sem limite” desativa o cronômetro.</p>
       </div>
 
       {/* Aparência da capa (cor + ícone) — salva ao trocar. */}

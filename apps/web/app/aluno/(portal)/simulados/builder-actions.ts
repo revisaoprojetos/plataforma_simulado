@@ -18,7 +18,7 @@ async function ctx() {
 
 /** Garante que o simulado é do aluno logado (senão null). */
 async function meuSimulado(svc: SupabaseClient, tenantId: string, estudanteId: string, simuladoId: string) {
-  const { data } = await svc.from('simulado_simulados').select('id, titulo, status, regras')
+  const { data } = await svc.from('simulado_simulados').select('id, titulo, status, regras, tempo_limite_min')
     .eq('id', simuladoId).eq('tenant_id', tenantId).eq('owner_estudante_id', estudanteId).eq('deletado', false).maybeSingle()
   return data ?? null
 }
@@ -142,7 +142,7 @@ function sanearSecoes(raw: unknown, doSim: Set<string>): Secao[] {
     .map((s) => ({ ...s, questaoIds: s.questaoIds.filter((id: string) => doSim.has(id) && !seen.has(id) && seen.add(id)) }))
 }
 
-export async function questoesDoMeuSimulado(simuladoId: string): Promise<{ titulo?: string; itens?: QuestaoEscolhida[]; secoes?: Secao[]; visual?: { cor: string; icone: string }; error?: string }> {
+export async function questoesDoMeuSimulado(simuladoId: string): Promise<{ titulo?: string; itens?: QuestaoEscolhida[]; secoes?: Secao[]; visual?: { cor: string; icone: string }; tempo?: number | null; error?: string }> {
   const { svc, estudanteId, tenantId } = await ctx()
   const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)
   if (!sim) return { error: 'Simulado não encontrado.' }
@@ -156,7 +156,20 @@ export async function questoesDoMeuSimulado(simuladoId: string): Promise<{ titul
   }
   const limpar = (s: string) => (s ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180)
   const secoes = sanearSecoes((sim as any).regras?.secoes, new Set(qids))
-  return { titulo: (sim as any).titulo, itens: pqs.map((p) => ({ questaoId: p.questao_id, ordem: p.ordem, enunciado: limpar(qmap.get(p.questao_id)?.enunciado) })), secoes, visual: visualDe((sim as any).regras) }
+  return { titulo: (sim as any).titulo, itens: pqs.map((p) => ({ questaoId: p.questao_id, ordem: p.ordem, enunciado: limpar(qmap.get(p.questao_id)?.enunciado) })), secoes, visual: visualDe((sim as any).regras), tempo: (sim as any).tempo_limite_min ?? null }
+}
+
+/** Salva a DURAÇÃO (tempo limite em minutos; 0/null = sem limite) do simulado pessoal. */
+export async function salvarTempoMeuSimulado(simuladoId: string, tempo: number | null): Promise<{ ok?: boolean; error?: string }> {
+  const { svc, estudanteId, tenantId } = await ctx()
+  const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)
+  if (!sim) return { error: 'Simulado não encontrado.' }
+  const t = tempo && tempo > 0 ? Math.min(Math.round(tempo), 600) : null
+  const { error } = await svc.from('simulado_simulados').update({ tempo_limite_min: t })
+    .eq('id', simuladoId).eq('tenant_id', tenantId).eq('owner_estudante_id', estudanteId)
+  if (error) return { error: error.message }
+  revalidatePath(`/aluno/simulados/personalizados/${simuladoId}`)
+  return { ok: true }
 }
 
 /** Salva a APARÊNCIA (cor + ícone) da capa do simulado pessoal em `regras.visual`. */
