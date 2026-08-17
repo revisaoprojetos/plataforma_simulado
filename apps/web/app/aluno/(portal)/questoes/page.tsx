@@ -3,6 +3,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { QuestaoCard } from '@/components/aluno/questao-card'
 import { QuestoesFiltrosAluno, type FiltrosParams } from '@/components/aluno/questoes-filtros-aluno'
+import { BancoNavProvider, CardsComOverlay } from '@/components/aluno/banco-questoes-client'
 import { PaginationControls } from '@/components/admin/pagination-controls'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { etiquetasPorQuestao } from '@/lib/aluno/etiquetas-questao'
@@ -138,41 +139,45 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
   }))
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Banco de questões</h1>
-        <p className="text-muted-foreground">Pratique com filtros — responda quantas vezes quiser.</p>
+    <BancoNavProvider>
+      <div className="space-y-5">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Banco de questões</h1>
+          <p className="text-muted-foreground">Pratique com filtros — responda quantas vezes quiser.</p>
+        </div>
+
+        {praticaTotal > 0 && (
+          <div className="grid grid-cols-3 gap-3">
+            <Kpi icon={<Target className="h-5 w-5" />} tom="bg-primary/10 text-primary" rotulo="Resolvidas" valor={praticaTotal.toLocaleString('pt-BR')} />
+            <Kpi icon={<CheckCircle2 className="h-5 w-5" />} tom="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" rotulo="Acertos" valor={praticaAcertos.toLocaleString('pt-BR')} />
+            <Kpi icon={<Percent className="h-5 w-5" />} tom="bg-amber-500/15 text-amber-600 dark:text-amber-400" rotulo="Aproveitamento" valor={`${pct}%`} />
+          </div>
+        )}
+
+        <QuestoesFiltrosAluno
+          disciplinas={(disciplinas ?? []) as any}
+          assuntos={(assuntos ?? []) as any}
+          bancas={(bancas ?? []) as any}
+          anos={anos}
+          total={count ?? 0}
+          params={params}
+        />
+
+        {/* Cards com overlay de carregamento durante a navegação por filtro. */}
+        <CardsComOverlay>
+          {lista.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
+              Nenhuma questão encontrada com esses filtros.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {lista.map((qq, i) => <QuestaoCard key={qq.id} questao={qq} numero={offset + i + 1} />)}
+            </div>
+          )}
+          <PaginationControls page={page} totalPages={totalPages} />
+        </CardsComOverlay>
       </div>
-
-      {praticaTotal > 0 && (
-        <div className="grid grid-cols-3 gap-3">
-          <Kpi icon={<Target className="h-5 w-5" />} tom="bg-primary/10 text-primary" rotulo="Resolvidas" valor={praticaTotal.toLocaleString('pt-BR')} />
-          <Kpi icon={<CheckCircle2 className="h-5 w-5" />} tom="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" rotulo="Acertos" valor={praticaAcertos.toLocaleString('pt-BR')} />
-          <Kpi icon={<Percent className="h-5 w-5" />} tom="bg-amber-500/15 text-amber-600 dark:text-amber-400" rotulo="Aproveitamento" valor={`${pct}%`} />
-        </div>
-      )}
-
-      <QuestoesFiltrosAluno
-        disciplinas={(disciplinas ?? []) as any}
-        assuntos={(assuntos ?? []) as any}
-        bancas={(bancas ?? []) as any}
-        anos={anos}
-        total={count ?? 0}
-        params={params}
-      />
-
-      {lista.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          Nenhuma questão encontrada com esses filtros.
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {lista.map((qq, i) => <QuestaoCard key={qq.id} questao={qq} numero={offset + i + 1} />)}
-        </div>
-      )}
-
-      <PaginationControls page={page} totalPages={totalPages} />
-    </div>
+    </BancoNavProvider>
   )
 }
 
