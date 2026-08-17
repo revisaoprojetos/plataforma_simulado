@@ -76,26 +76,32 @@ export function QuestoesFiltrosAluno({
   return (
     <>
       {/* Barra compacta: abrir filtros + chips ativos + contagem. */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setAberto(true)}
-            className="group inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-95 hover:shadow-md">
-            <SlidersHorizontal className="h-4 w-4 transition-transform group-hover:rotate-90" /> Filtros
-            {ativos > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-foreground/25 px-1 text-[11px] font-bold tabular-nums leading-none">{ativos}</span>}
-          </button>
-          {chips.map((c) => (
-            <button key={c.k} type="button" onClick={() => tirar(c.k)}
-              className="group inline-flex items-center gap-1 rounded-full border bg-muted/50 px-2.5 py-1 text-xs font-medium transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive">
-              {c.label} <X className="h-3 w-3 opacity-60 group-hover:opacity-100" />
-            </button>
-          ))}
-          {ativos > 0 && (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border bg-gradient-to-r from-primary/[0.07] via-card to-card p-2.5 pl-3 shadow-sm">
+        <button type="button" onClick={() => setAberto(true)}
+          className="group flex shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-95 hover:shadow-md">
+          <SlidersHorizontal className="h-4 w-4 transition-transform duration-300 group-hover:rotate-90" /> Filtros
+          {ativos > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-foreground/25 px-1 text-[11px] font-bold tabular-nums leading-none">{ativos}</span>}
+        </button>
+
+        {ativos === 0 ? (
+          <span className="hidden text-sm text-muted-foreground sm:inline">Disciplina, assunto, banca, ano, dificuldade e mais…</span>
+        ) : (
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            {chips.map((c) => (
+              <button key={c.k} type="button" onClick={() => tirar(c.k)}
+                className="group inline-flex items-center gap-1 rounded-full border bg-card px-2.5 py-1 text-xs font-medium shadow-sm transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive">
+                {c.label} <X className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+              </button>
+            ))}
             <button type="button" onClick={limpar} className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition hover:text-foreground">
-              <Eraser className="h-3.5 w-3.5" /> Limpar tudo
+              <Eraser className="h-3.5 w-3.5" /> Limpar
             </button>
-          )}
-        </div>
-        <p className="shrink-0 text-sm text-muted-foreground"><span className="font-semibold text-foreground tabular-nums">{total.toLocaleString('pt-BR')}</span> questões</p>
+          </div>
+        )}
+
+        <span className="ml-auto shrink-0 rounded-full bg-muted/70 px-3 py-1 text-xs font-medium text-muted-foreground">
+          <span className="font-bold text-foreground tabular-nums">{total.toLocaleString('pt-BR')}</span> questões
+        </span>
       </div>
 
       {/* POP-UP com todos os filtros. */}
