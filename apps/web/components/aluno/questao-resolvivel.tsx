@@ -88,10 +88,10 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
               {questao.codigo
                 ? <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono font-semibold text-primary">{questao.codigo}</span>
                 : numero != null && <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono font-semibold text-primary">#{numero}</span>}
-              {questao.disciplina && <span className="rounded-full bg-muted px-2 py-0.5 font-medium">{questao.disciplina}</span>}
-              {questao.assunto && <span className="rounded-full bg-muted px-2 py-0.5">{questao.assunto}</span>}
-              {questao.banca && <span className="rounded-full bg-muted px-2 py-0.5">{questao.banca}</span>}
-              {questao.ano && <span className="rounded-full bg-muted px-2 py-0.5">{questao.ano}</span>}
+              {questao.disciplina && <span className="rounded-full border bg-muted/40 px-2 py-0.5 font-medium">{questao.disciplina}</span>}
+              {questao.assunto && <span className="rounded-full border bg-muted/40 px-2 py-0.5">{questao.assunto}</span>}
+              {questao.banca && <span className="rounded-full border bg-muted/40 px-2 py-0.5">{questao.banca}</span>}
+              {questao.ano && <span className="rounded-full border bg-muted/40 px-2 py-0.5">{questao.ano}</span>}
               {questao.etiquetas?.map((e) => (
                 <span key={e.nome} className="rounded-full px-2 py-0.5 font-medium" style={{ background: `${e.cor ?? '#64748b'}22`, color: e.cor ?? '#64748b' }}>{e.nome}</span>
               ))}

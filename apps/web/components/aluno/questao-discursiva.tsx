@@ -65,7 +65,7 @@ export function QuestaoDiscursiva({ questao, numero }: { questao: QuestaoDiscurs
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {numero != null && <span className="font-mono">#{numero}</span>}
             <span className="rounded bg-primary/10 px-2 py-0.5 font-medium text-primary">Discursiva</span>
-            {questao.disciplina && <span className="rounded bg-muted px-2 py-0.5">{questao.disciplina}</span>}
+            {questao.disciplina && <span className="rounded-full border bg-muted/40 px-2 py-0.5 font-medium">{questao.disciplina}</span>}
           </div>
           <button onClick={toggleFav} aria-label="Favoritar" className="shrink-0 text-muted-foreground hover:text-amber-500">
             <Star className={cn('h-5 w-5', favorito && 'fill-amber-400 text-amber-400')} />
