@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { HelpCircle, X, ChevronDown, Lightbulb, ArrowUpRight, Maximize2 } from 'lucide-react'
+import { HelpCircle, X, ChevronDown, Lightbulb, ArrowUpRight, Maximize2, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GUIAS_ALUNO } from '@/lib/ajuda/guias-aluno'
+import { TOURS_ALUNO } from '@/lib/ajuda/tours-aluno'
+import { iniciarTourGuia } from '@/components/aluno/guia-tour-runner'
 
 const KEYFRAMES = `@keyframes ajudaSlideIn { from { transform: translateX(100%) } to { transform: translateX(0) } }`
 
@@ -65,6 +67,18 @@ export function AjudaDrawer({ renderTrigger }: { renderTrigger?: (abrir: () => v
 
                     {on && (
                       <div className="space-y-3 border-t p-3">
+                        {/* Tour guiado da Capi na tela real. */}
+                        {TOURS_ALUNO[g.id] && (
+                          <button type="button" onClick={() => { setAberto(false); setTimeout(() => iniciarTourGuia(g.id), 90) }}
+                            className="flex w-full items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/[0.06] p-2.5 text-left transition hover:bg-primary/10">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"><Play className="h-4 w-4 fill-current" /></span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-semibold text-primary">Iniciar passo a passo</span>
+                              <span className="block text-[11px] text-muted-foreground">A Capi te guia ao vivo na tela</span>
+                            </span>
+                            <ArrowUpRight className="h-4 w-4 shrink-0 text-primary" />
+                          </button>
+                        )}
                         {g.link && (
                           <Link href={g.link.href} onClick={() => setAberto(false)}
                             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition hover:opacity-90">

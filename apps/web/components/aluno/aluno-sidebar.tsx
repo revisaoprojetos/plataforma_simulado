@@ -24,14 +24,14 @@ const NAV_STATES =
   '[&:hover_.nav-badge]:text-[color:var(--sidebar-text-active)] [&[data-active]_.nav-badge]:text-[color:var(--sidebar-text-active)]'
 
 const NAV = [
-  { href: '/aluno', label: 'Início', icon: Home, exact: true },
-  { href: '/aluno/simulados', label: 'Meus Simulados', icon: ClipboardList },
-  { href: '/aluno/trilha', label: 'Trilha', icon: Route },
-  { href: '/aluno/recomendado', label: 'Recomendado', icon: Sparkles },
-  { href: '/aluno/ligas', label: 'Ligas', icon: Trophy },
-  { href: '/aluno/questoes', label: 'Banco de Questões', icon: BookOpen },
-  { href: '/aluno/favoritos', label: 'Favoritos', icon: Star },
-  { href: '/aluno/cadernos', label: 'Cadernos', icon: NotebookPen },
+  { href: '/aluno', label: 'Início', icon: Home, exact: true, tour: 'nav-inicio' },
+  { href: '/aluno/simulados', label: 'Meus Simulados', icon: ClipboardList, tour: 'nav-simulados' },
+  { href: '/aluno/trilha', label: 'Trilha', icon: Route, tour: 'nav-trilha' },
+  { href: '/aluno/recomendado', label: 'Recomendado', icon: Sparkles, tour: 'nav-recomendado' },
+  { href: '/aluno/ligas', label: 'Ligas', icon: Trophy, tour: 'nav-liga' },
+  { href: '/aluno/questoes', label: 'Banco de Questões', icon: BookOpen, tour: 'nav-questoes' },
+  { href: '/aluno/favoritos', label: 'Favoritos', icon: Star, tour: 'nav-favoritos' },
+  { href: '/aluno/cadernos', label: 'Cadernos', icon: NotebookPen, tour: 'nav-cadernos' },
 ]
 
 function filtroLogo(f?: string): string | undefined {
@@ -112,7 +112,7 @@ export function AlunoSidebar({
               {nav.map((n) => {
                 const c = counts?.[n.href]
                 return (
-                  <SidebarMenuItem key={n.href} data-tour={n.href === '/aluno/trilha' ? 'nav-trilha' : n.href === '/aluno/ligas' ? 'nav-liga' : undefined}>
+                  <SidebarMenuItem key={n.href} data-tour={n.tour}>
                     <SidebarMenuButton className={NAV_STATES} render={<Link href={n.href} />} isActive={ativo(n)} tooltip={n.label}>
                       <n.icon className="h-4 w-4" />
                       <span>{n.label}</span>

@@ -22,7 +22,7 @@ export function BancoNavProvider({ children }: { children: ReactNode }) {
 export function CardsComOverlay({ children }: { children: ReactNode }) {
   const { pending } = useBancoNav()
   return (
-    <div className="relative min-h-[240px]">
+    <div data-tour="banco-lista" className="relative min-h-[240px]">
       {pending && (
         <div className="absolute inset-0 z-20 flex items-start justify-center rounded-2xl bg-background/55 pt-16 backdrop-blur-[1.5px] duration-200 animate-in fade-in">
           <span className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium text-muted-foreground shadow-sm">

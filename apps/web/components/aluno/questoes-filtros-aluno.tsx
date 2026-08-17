@@ -76,7 +76,7 @@ export function QuestoesFiltrosAluno({
   return (
     <>
       {/* Barra-LAUNCHER: o CARD INTEIRO abre os filtros (chips/Limpar usam stopPropagation). */}
-      <div role="button" tabIndex={0} onClick={() => setAberto(true)}
+      <div data-tour="banco-filtros" role="button" tabIndex={0} onClick={() => setAberto(true)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAberto(true) } }}
         className="group flex cursor-pointer items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm transition-all hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform group-hover:scale-[1.03]">

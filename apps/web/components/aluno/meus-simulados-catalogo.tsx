@@ -99,7 +99,7 @@ export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoIte
   const avulsos = catalogo ? itens.filter((s) => !s.grupoId) : itens
 
   return (
-    <div className="space-y-5">
+    <div data-tour="simulados-lista" className="space-y-5">
       {/* Título + (à direita) alternador de visão — só faz sentido na aba da plataforma. */}
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Meus simulados</h1>
@@ -120,7 +120,7 @@ export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoIte
       <div className="border-b border-border">
         <nav className="-mb-px flex gap-5" role="tablist" aria-label="Meus simulados">
           {([['revisao', 'Simulado Revisão'], ['personalizados', 'Personalizados']] as const).map(([id, label]) => (
-            <button key={id} type="button" role="tab" aria-selected={aba === id} onClick={() => trocarAba(id)}
+            <button key={id} type="button" role="tab" data-tour={id === 'personalizados' ? 'aba-personalizados' : undefined} aria-selected={aba === id} onClick={() => trocarAba(id)}
               className={cn('-mb-px border-b-2 px-1 pb-2.5 text-sm font-medium transition-colors',
                 aba === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground')}>
               {label}

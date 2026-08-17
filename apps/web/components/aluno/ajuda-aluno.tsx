@@ -5,8 +5,10 @@ import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import {
   PlayCircle, ListChecks, Download, BarChart3, BookOpen, Flag,
-  ChevronRight, ImageIcon, Lightbulb, ArrowUpRight,
+  ChevronRight, ImageIcon, Lightbulb, ArrowUpRight, Play,
 } from 'lucide-react'
+import { TOURS_ALUNO } from '@/lib/ajuda/tours-aluno'
+import { iniciarTourGuia } from '@/components/aluno/guia-tour-runner'
 
 type Passo = { t: string; d: string; dica?: string }
 type Guia = { id: string; titulo: string; resumo: string; icon: React.ComponentType<{ className?: string }>; link?: { href: string; label: string }; passos: Passo[] }
@@ -92,11 +94,19 @@ export function AjudaAluno() {
               <div>
                 <h2 className="text-xl font-bold tracking-tight">{sel.titulo}</h2>
                 <p className="mt-0.5 text-sm text-muted-foreground">{sel.resumo}</p>
-                {sel.link && (
-                  <Link href={sel.link.href} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:opacity-90">
-                    {sel.link.label} <ArrowUpRight className="h-4 w-4" />
-                  </Link>
-                )}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {TOURS_ALUNO[sel.id] && (
+                    <button type="button" onClick={() => iniciarTourGuia(sel.id)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90">
+                      <Play className="h-4 w-4 fill-current" /> Iniciar passo a passo
+                    </button>
+                  )}
+                  {sel.link && (
+                    <Link href={sel.link.href} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition hover:bg-muted">
+                      {sel.link.label} <ArrowUpRight className="h-4 w-4" />
+                    </Link>
+                  )}
+                </div>
               </div>
             </header>
 

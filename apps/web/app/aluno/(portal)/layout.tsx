@@ -8,6 +8,7 @@ import { SidebarProvider } from '@/components/ui/sidebar'
 import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
 import { AlunoSidebar } from '@/components/aluno/aluno-sidebar'
 import { AlunoMobileNav } from '@/components/aluno/aluno-mobile-nav'
+import { GuiaTourRunner } from '@/components/aluno/guia-tour-runner'
 import { cn } from '@/lib/utils'
 import { resolverLoginConfig } from '@/lib/login-config'
 import { NavProgress } from '@/components/admin/nav-progress'
@@ -87,6 +88,8 @@ export default async function AlunoPortalLayout({ children }: { children: React.
     <>
       {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
       <MonitorManutencao inicial={{ inicio: manut.inicio, avisos: manut.avisos }} />
+      {/* Tour guiado da Capi (acionado pelo "Iniciar passo a passo" na Ajuda) — global p/ sobreviver à navegação. */}
+      <GuiaTourRunner gamAtivo={gamAtivo} />
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
           <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} logoEstilo={t.logo_estilo ?? 'arredondado'} logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'} usuarioNome={sessao.nome} usuarioEmail={sessao.email} avatar={avatarUsuario} avatarCor={avatarCorUsuario} counts={counts} simuladosPersonalizados={simuladosPersonalizados} loginConfig={resolverLoginConfig(t.login)} progresso={progresso} gamAtivo={gamAtivo} />
