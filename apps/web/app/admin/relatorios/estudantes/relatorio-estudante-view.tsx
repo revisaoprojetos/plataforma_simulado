@@ -16,7 +16,7 @@ export type DadosRelatorioEstudante = {
   historico: { simulado: string; quando: string; nota: number | null; acerto: number; tempo: string; simuladoId?: string; sessaoId?: string }[]
 }
 
-export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, historicoHrefBase, semTurma, semTendencia, semKpis }: { d: DadosRelatorioEstudante; print?: boolean; semCabecalho?: boolean; historicoLink?: boolean; historicoHrefBase?: string; semTurma?: boolean; semTendencia?: boolean; semKpis?: boolean }) {
+export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, historicoHrefBase, semTurma, semTendencia, semKpis, layoutPerfil }: { d: DadosRelatorioEstudante; print?: boolean; semCabecalho?: boolean; historicoLink?: boolean; historicoHrefBase?: string; semTurma?: boolean; semTendencia?: boolean; semKpis?: boolean; layoutPerfil?: boolean }) {
   const nota = (n: number | null) => (n == null ? '—' : n.toFixed(1).replace('.', ','))
   const sobe = d.evolucao.length >= 2 && d.evolucao[d.evolucao.length - 1].nota >= d.evolucao[0].nota
   const temTend = d.evolucao.length >= 2
@@ -34,6 +34,83 @@ export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, 
     ]
     baixarCsv(`${d.nome}_relatorio`, linhas)
   }
+
+  // Painéis (reusados em 2 arranjos: admin × perfil do aluno).
+  const painelEvolucao = (
+    <Painel titulo="Evolução da nota" sub="Nota em cada simulado, na ordem cronológica" tom="primary" icon={<TrendingUp className="h-4 w-4" />}>
+      <AreaSpark pontos={d.evolucao.map((x) => ({ rotulo: x.rotulo, valor: x.nota }))} tom="primary" min={0} max={100} formato={(n) => n.toFixed(1).replace('.', ',')} />
+    </Painel>
+  )
+  const painelAcertoTempo = (
+    <Painel titulo="Acerto ao longo do tempo" sub="% de acerto em cada simulado (cronológico)" tom="emerald" icon={<Target className="h-4 w-4" />}>
+      <AreaSpark pontos={[...d.historico].reverse().map((h) => ({ rotulo: h.quando, valor: h.acerto }))} tom="emerald" min={0} max={100} formato={(n) => `${Math.round(n)}%`} />
+    </Painel>
+  )
+  const painelDisciplina = (
+    <Painel titulo="Acerto por disciplina" sub={semTurma ? 'Seu percentual de acerto por matéria' : 'Comparação do estudante com a média da turma'} tom="emerald" icon={<BookOpen className="h-4 w-4" />}>
+      {/* Rolamento quando há muitas disciplinas. */}
+      <div className="max-h-[520px] overflow-y-auto pr-1 [scrollbar-width:thin]">
+        {semTurma ? (
+          <div className="flex flex-col gap-3.5">
+            {d.porDisciplina.length === 0 && <p className="text-sm text-muted-foreground">Sem dados de acerto por disciplina ainda.</p>}
+            {d.porDisciplina.map((x) => (
+              <div key={x.nome}>
+                <div className="mb-1 flex items-baseline justify-between gap-2">
+                  <span className="truncate text-xs font-medium uppercase tracking-wide text-foreground/80">{x.nome}</span>
+                  <span className="shrink-0 text-sm font-bold tabular-nums text-primary">{x.aluno}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${x.aluno}%` }} /></div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <BarrasDupla itens={d.porDisciplina.map((x) => ({ rotulo: x.nome, a: x.aluno, b: x.turma }))} aTom="primary" bTom="slate" aNome="Aluno" bNome="Turma" />
+        )}
+      </div>
+    </Painel>
+  )
+  const painelHistorico = (
+    <Painel titulo="Histórico de simulados" sub={d.historico.length ? `${d.historico.length} realização(ões)` : undefined} tom="violet" icon={<ClipboardList className="h-4 w-4" />}>
+      <ListaBusca itens={d.historico} placeholder="Buscar simulado pelo título…" vazio="Sem simulados finalizados ainda." print={print}
+        filtro={(h, t) => h.simulado.toLowerCase().includes(t)}>
+        {(h, i) => {
+          // Link para o resultado do simulado com aquela tentativa marcada (?tentativa=<sessaoId>).
+          // Admin: `historicoHrefBase` = /admin/estudantes/<id>/simulado; Aluno: /aluno/simulados.
+          const tent = h.sessaoId ? `?tentativa=${h.sessaoId}` : ''
+          const href = h.simuladoId
+            ? historicoHrefBase
+              ? `${historicoHrefBase}/${h.simuladoId}${tent}`
+              : historicoLink
+                ? `/aluno/simulados/${h.simuladoId}${tent}`
+                : null
+            : null
+          const conteudo = (
+            <>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-semibold">{h.simulado}</div>
+                <div className="text-xs text-muted-foreground">{h.quando} · {h.tempo}</div>
+              </div>
+              <div className="hidden w-40 shrink-0 sm:block">
+                <div className="mb-1 flex justify-between text-[11px] text-muted-foreground"><span>acerto</span><span className="font-medium tabular-nums">{h.acerto}%</span></div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${h.acerto}%` }} /></div>
+              </div>
+              {/* Nota com LARGURA FIXA → não empurra a coluna de acerto. */}
+              <div className="w-[68px] shrink-0 border-l pl-4 text-right">
+                <div className="text-xl font-bold tabular-nums text-primary">{nota(h.nota)}</div>
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">nota</div>
+              </div>
+              {href && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />}
+            </>
+          )
+          return href ? (
+            <Link key={i} href={href} className="group flex items-center gap-4 rounded-xl border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-muted/40">{conteudo}</Link>
+          ) : (
+            <div key={i} className="flex items-center gap-4 rounded-xl border bg-card p-3">{conteudo}</div>
+          )
+        }}
+      </ListaBusca>
+    </Painel>
+  )
 
   return (
     <div className="space-y-5">
@@ -57,80 +134,29 @@ export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, 
       </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-        {/* Coluna esquerda: evolução da NOTA + evolução do ACERTO (novo). */}
+      {layoutPerfil ? (
+        // Perfil: "Evolução da nota" ocupa a linha inteira; abaixo, "Acerto por disciplina" +
+        // "Histórico de simulados" lado a lado com a MESMA largura (sem "Acerto ao longo do tempo").
         <div className="space-y-4">
-          <Painel titulo="Evolução da nota" sub="Nota em cada simulado, na ordem cronológica" tom="primary" icon={<TrendingUp className="h-4 w-4" />}>
-            <AreaSpark pontos={d.evolucao.map((x) => ({ rotulo: x.rotulo, valor: x.nota }))} tom="primary" min={0} max={100} formato={(n) => n.toFixed(1).replace('.', ',')} />
-          </Painel>
-          <Painel titulo="Acerto ao longo do tempo" sub="% de acerto em cada simulado (cronológico)" tom="emerald" icon={<Target className="h-4 w-4" />}>
-            <AreaSpark pontos={[...d.historico].reverse().map((h) => ({ rotulo: h.quando, valor: h.acerto }))} tom="emerald" min={0} max={100} formato={(n) => `${Math.round(n)}%`} />
-          </Painel>
-        </div>
-
-        <Painel titulo="Acerto por disciplina" sub={semTurma ? 'Seu percentual de acerto por matéria' : 'Comparação do estudante com a média da turma'} tom="emerald" icon={<BookOpen className="h-4 w-4" />}>
-          {/* Rolamento quando há muitas disciplinas. */}
-          <div className="max-h-[520px] overflow-y-auto pr-1 [scrollbar-width:thin]">
-            {semTurma ? (
-              <div className="flex flex-col gap-3.5">
-                {d.porDisciplina.length === 0 && <p className="text-sm text-muted-foreground">Sem dados de acerto por disciplina ainda.</p>}
-                {d.porDisciplina.map((x) => (
-                  <div key={x.nome}>
-                    <div className="mb-1 flex items-baseline justify-between gap-2">
-                      <span className="truncate text-xs font-medium uppercase tracking-wide text-foreground/80">{x.nome}</span>
-                      <span className="shrink-0 text-sm font-bold tabular-nums text-primary">{x.aluno}%</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${x.aluno}%` }} /></div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <BarrasDupla itens={d.porDisciplina.map((x) => ({ rotulo: x.nome, a: x.aluno, b: x.turma }))} aTom="primary" bTom="slate" aNome="Aluno" bNome="Turma" />
-            )}
+          {painelEvolucao}
+          <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+            {painelDisciplina}
+            {painelHistorico}
           </div>
-        </Painel>
-      </div>
-
-      <Painel titulo="Histórico de simulados" sub={d.historico.length ? `${d.historico.length} realização(ões)` : undefined} tom="violet" icon={<ClipboardList className="h-4 w-4" />}>
-        <ListaBusca itens={d.historico} placeholder="Buscar simulado pelo título…" vazio="Sem simulados finalizados ainda." print={print}
-          filtro={(h, t) => h.simulado.toLowerCase().includes(t)}>
-          {(h, i) => {
-            // Link para o resultado do simulado com aquela tentativa marcada (?tentativa=<sessaoId>).
-            // Admin: `historicoHrefBase` = /admin/estudantes/<id>/simulado; Aluno: /aluno/simulados.
-            const tent = h.sessaoId ? `?tentativa=${h.sessaoId}` : ''
-            const href = h.simuladoId
-              ? historicoHrefBase
-                ? `${historicoHrefBase}/${h.simuladoId}${tent}`
-                : historicoLink
-                  ? `/aluno/simulados/${h.simuladoId}${tent}`
-                  : null
-              : null
-            const conteudo = (
-              <>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold">{h.simulado}</div>
-                  <div className="text-xs text-muted-foreground">{h.quando} · {h.tempo}</div>
-                </div>
-                <div className="hidden w-40 shrink-0 sm:block">
-                  <div className="mb-1 flex justify-between text-[11px] text-muted-foreground"><span>acerto</span><span className="font-medium tabular-nums">{h.acerto}%</span></div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${h.acerto}%` }} /></div>
-                </div>
-                {/* Nota com LARGURA FIXA → não empurra a coluna de acerto. */}
-                <div className="w-[68px] shrink-0 border-l pl-4 text-right">
-                  <div className="text-xl font-bold tabular-nums text-primary">{nota(h.nota)}</div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">nota</div>
-                </div>
-                {href && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />}
-              </>
-            )
-            return href ? (
-              <Link key={i} href={href} className="group flex items-center gap-4 rounded-xl border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-muted/40">{conteudo}</Link>
-            ) : (
-              <div key={i} className="flex items-center gap-4 rounded-xl border bg-card p-3">{conteudo}</div>
-            )
-          }}
-        </ListaBusca>
-      </Painel>
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+            {/* Coluna esquerda: evolução da NOTA + evolução do ACERTO. */}
+            <div className="space-y-4">
+              {painelEvolucao}
+              {painelAcertoTempo}
+            </div>
+            {painelDisciplina}
+          </div>
+          {painelHistorico}
+        </>
+      )}
     </div>
   )
 }
