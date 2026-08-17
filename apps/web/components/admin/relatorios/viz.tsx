@@ -6,7 +6,7 @@
 // classes Tailwind (bg-primary, bg-emerald-500…) que resolvem o oklch certo,
 // e SVG com `currentColor` — robusto no claro e no escuro, e no estilo do Ranking.
 
-import { useId, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { Inbox } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -424,5 +424,64 @@ export function BotaoExportar({ onClick }: { onClick: () => void }) {
       <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h2m4 0h2m-8 4h2m4 0h2" /></svg>
       Exportar (CSV/Excel)
     </button>
+  )
+}
+
+// Períodos do filtro por tempo do gráfico de evolução (o mais recente à direita).
+const PERIODOS_EVOL = [
+  { id: 'tudo', label: 'Tudo', dias: Infinity },
+  { id: '12m', label: '12 meses', dias: 365 },
+  { id: '3m', label: '3 meses', dias: 90 },
+  { id: '30d', label: '30 dias', dias: 30 },
+] as const
+
+/**
+ * Evolução da NOTA em BARRAS verticais (uma por simulado, cronológico) + filtro por TEMPO.
+ * Cada barra colorida pela faixa da nota; rola na horizontal quando há muitos simulados.
+ */
+export function EvolucaoNotaChart({ pontos, altura = 190 }: {
+  pontos: { rotulo: string; nota: number; data?: string | null }[]
+  altura?: number
+}) {
+  const [periodo, setPeriodo] = useState<string>('tudo')
+  const dias = PERIODOS_EVOL.find((p) => p.id === periodo)?.dias ?? Infinity
+  const dados = useMemo(() => {
+    if (dias === Infinity) return pontos
+    const limite = Date.now() - dias * 86400000
+    return pontos.filter((p) => { const t = p.data ? new Date(p.data).getTime() : NaN; return Number.isNaN(t) || t >= limite })
+  }, [pontos, dias])
+  const tom = (n: number) => (n >= 70 ? 'bg-emerald-500' : n >= 50 ? 'bg-amber-500' : 'bg-rose-500')
+  const alturaBarra = altura - 42 // reserva p/ o rótulo da nota (topo) + a data (base)
+
+  return (
+    <div>
+      {/* Filtro por tempo */}
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {PERIODOS_EVOL.map((p) => (
+          <button key={p.id} type="button" onClick={() => setPeriodo(p.id)}
+            className={cn('rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+              periodo === p.id ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground')}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {dados.length === 0 ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">Nenhum simulado neste período.</p>
+      ) : (
+        <div className="overflow-x-auto pb-1 [scrollbar-width:thin]">
+          <div className="flex min-w-full items-end gap-1.5" style={{ height: altura }}>
+            {dados.map((p, i) => (
+              <div key={i} className="flex min-w-[26px] flex-1 flex-col items-center justify-end gap-1" title={`${p.rotulo} · ${p.nota.toFixed(1).replace('.', ',')}`}>
+                <span className="text-[10px] font-bold tabular-nums">{p.nota.toFixed(1).replace('.', ',')}</span>
+                <div className={cn('w-full max-w-[40px] rounded-t-md transition-[height] duration-500', tom(p.nota))}
+                  style={{ height: Math.max(4, (Math.min(100, p.nota) / 100) * alturaBarra) }} />
+                <span className="w-full truncate text-center text-[9px] leading-tight text-muted-foreground">{p.rotulo}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

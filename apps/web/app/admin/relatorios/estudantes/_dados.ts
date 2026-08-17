@@ -51,7 +51,7 @@ function montarEstudante(nome: string, sessoes: EstSessaoRow[], disciplinas: Est
   const tempoMedioMin = temposMin.length ? Math.round(temposMin.reduce((a, b) => a + b, 0) / temposMin.length) : null
 
   const pct = (ac: number, tt: number) => (tt ? Math.round((ac / tt) * 100) : 0)
-  const evolucao = finalizadas.filter((s) => s.nota != null).map((s) => ({ rotulo: fmtData(s.iniciado_em as any), nota: Number(s.nota) }))
+  const evolucao = finalizadas.filter((s) => s.nota != null).map((s) => ({ rotulo: fmtData(s.iniciado_em as any), nota: Number(s.nota), data: (s.iniciado_em as any) ?? null }))
   const porDisciplina = disciplinas.map((d) => ({ nome: d.disc, aluno: pct(d.aluno_ac, d.aluno_tt), turma: pct(d.turma_ac, d.turma_tt) })).sort((a, b) => b.aluno - a.aluno).slice(0, 15)
   const historico = finalizadas.map((s) => {
     const tMin = s.iniciado_em && s.finalizado_em ? (new Date(s.finalizado_em as any).getTime() - new Date(s.iniciado_em as any).getTime()) / 60000 : null
@@ -142,7 +142,7 @@ async function _estudanteViaPostgrest(svc: SupabaseClient, estId: string, tenant
   const tempoMedioMin = temposMin.length ? Math.round(temposMin.reduce((a, b) => a + b, 0) / temposMin.length) : null
 
   const pct = (v?: { ac: number; tt: number }) => (v && v.tt ? Math.round((v.ac / v.tt) * 100) : 0)
-  const evolucao = finalizadas.filter((s) => s.nota != null).map((s) => ({ rotulo: fmtData(s.iniciado_em), nota: Number(s.nota) }))
+  const evolucao = finalizadas.filter((s) => s.nota != null).map((s) => ({ rotulo: fmtData(s.iniciado_em), nota: Number(s.nota), data: s.iniciado_em ?? null }))
   const porDisciplina = [...acDiscAluno.entries()].map(([nome, v]) => ({ nome, aluno: pct(v), turma: pct(acDiscTurma.get(nome)) })).sort((a, b) => b.aluno - a.aluno).slice(0, 15)
   const historico = finalizadas.map((s) => {
     const ac = acPorSess.get(s.id) ?? 0, tt = ttPorSess.get(s.id) ?? 0

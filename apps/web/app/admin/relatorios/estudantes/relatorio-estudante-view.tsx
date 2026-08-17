@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { KpiCard, Painel, Hero, AreaSpark, BarrasDupla, ListaBusca, BotaoExportar, baixarCsv } from '@/components/admin/relatorios/viz'
+import { KpiCard, Painel, Hero, AreaSpark, EvolucaoNotaChart, BarrasDupla, ListaBusca, BotaoExportar, baixarCsv } from '@/components/admin/relatorios/viz'
 import { ClipboardList, Trophy, Target, Clock, TrendingUp, TrendingDown, Minus, GraduationCap, BookOpen, ChevronRight, Award } from 'lucide-react'
 
 export type DadosRelatorioEstudante = {
@@ -11,7 +11,7 @@ export type DadosRelatorioEstudante = {
   melhorNota: number | null
   acertoMedio: number | null
   tempoMedioMin: number | null
-  evolucao: { rotulo: string; nota: number }[]
+  evolucao: { rotulo: string; nota: number; data?: string | null }[]
   porDisciplina: { nome: string; aluno: number; turma: number }[]
   historico: { simulado: string; quando: string; nota: number | null; acerto: number; tempo: string; simuladoId?: string; sessaoId?: string }[]
 }
@@ -37,8 +37,8 @@ export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, 
 
   // Painéis (reusados em 2 arranjos: admin × perfil do aluno).
   const painelEvolucao = (
-    <Painel titulo="Evolução da nota" sub="Nota em cada simulado, na ordem cronológica" tom="primary" icon={<TrendingUp className="h-4 w-4" />}>
-      <AreaSpark pontos={d.evolucao.map((x) => ({ rotulo: x.rotulo, valor: x.nota }))} tom="primary" min={0} max={100} formato={(n) => n.toFixed(1).replace('.', ',')} />
+    <Painel titulo="Evolução da nota" sub="Nota em cada simulado (barras) — filtre por período" tom="primary" icon={<TrendingUp className="h-4 w-4" />}>
+      <EvolucaoNotaChart pontos={d.evolucao} />
     </Painel>
   )
   const painelAcertoTempo = (
