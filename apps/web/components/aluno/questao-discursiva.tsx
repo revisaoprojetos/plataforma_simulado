@@ -63,9 +63,9 @@ export function QuestaoDiscursiva({ questao, numero }: { questao: QuestaoDiscurs
       <CardContent className="space-y-4 p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {numero != null && <span className="font-mono">#{numero}</span>}
+            {numero != null && <span className="rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 font-mono font-semibold text-primary">#{numero}</span>}
             <span className="rounded bg-primary/10 px-2 py-0.5 font-medium text-primary">Discursiva</span>
-            {questao.disciplina && <span className="rounded-full border bg-muted/40 px-2 py-0.5 font-medium">{questao.disciplina}</span>}
+            {questao.disciplina && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-600/80 dark:text-emerald-400/80">{questao.disciplina}</span>}
           </div>
           <button onClick={toggleFav} aria-label="Favoritar" className="shrink-0 text-muted-foreground hover:text-amber-500">
             <Star className={cn('h-5 w-5', favorito && 'fill-amber-400 text-amber-400')} />

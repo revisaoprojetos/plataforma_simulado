@@ -85,13 +85,16 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {/* Número/código da questão: com BORDA (roxo da marca). */}
               {questao.codigo
-                ? <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono font-semibold text-primary">{questao.codigo}</span>
-                : numero != null && <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono font-semibold text-primary">#{numero}</span>}
-              {questao.disciplina && <span className="rounded-full border bg-muted/40 px-2 py-0.5 font-medium">{questao.disciplina}</span>}
-              {questao.assunto && <span className="rounded-full border bg-muted/40 px-2 py-0.5">{questao.assunto}</span>}
-              {questao.banca && <span className="rounded-full border bg-muted/40 px-2 py-0.5">{questao.banca}</span>}
-              {questao.ano && <span className="rounded-full border bg-muted/40 px-2 py-0.5">{questao.ano}</span>}
+                ? <span className="rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 font-mono font-semibold text-primary">{questao.codigo}</span>
+                : numero != null && <span className="rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 font-mono font-semibold text-primary">#{numero}</span>}
+              {/* Cada tipo de tag com sua cor (apagada, sem borda): disciplina (verde), assunto (azul),
+                  banca (âmbar), ano (violeta). */}
+              {questao.disciplina && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-600/80 dark:text-emerald-400/80">{questao.disciplina}</span>}
+              {questao.assunto && <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-sky-600/80 dark:text-sky-400/80">{questao.assunto}</span>}
+              {questao.banca && <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-amber-600/80 dark:text-amber-400/80">{questao.banca}</span>}
+              {questao.ano && <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-violet-600/80 dark:text-violet-400/80">{questao.ano}</span>}
               {questao.etiquetas?.map((e) => (
                 <span key={e.nome} className="rounded-full px-2 py-0.5 font-medium" style={{ background: `${e.cor ?? '#64748b'}22`, color: e.cor ?? '#64748b' }}>{e.nome}</span>
               ))}
