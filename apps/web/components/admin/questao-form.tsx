@@ -224,19 +224,22 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
             </div>
           </div>
 
-          {/* Discursiva — informativos ao aluno (pontuação total + nº de linhas). Não afetam a correção. */}
+          {/* Discursiva — informativos ao aluno (nota + nº de linhas), inline. Não afetam a correção. */}
           {tipo === 'discursiva' && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Pontuação total</Label>
-                <Input type="number" step="0.5" min="0" placeholder="Ex.: 10" {...register('pontuacao_total')} />
-                <p className="text-xs text-muted-foreground">Quanto a questão vale (mostrado ao aluno).</p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-muted/30 px-3 py-2.5 text-sm">
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium">Nota:</span>
+                <Input type="number" step="0.5" min="0" placeholder="10" className="h-8 w-16 text-center" {...register('pontuacao_total')} />
+                <span className="text-muted-foreground">pontos</span>
               </div>
-              <div className="space-y-2">
-                <Label>Número de linhas</Label>
-                <Input type="number" step="1" min="0" placeholder="Ex.: 30" {...register('linhas')} />
-                <p className="text-xs text-muted-foreground">Máximo esperado na resposta (mostrado ao aluno).</p>
+              <span className="text-muted-foreground/40">|</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium">Linhas:</span>
+                <span className="text-muted-foreground">máximo</span>
+                <Input type="number" step="1" min="0" placeholder="15" className="h-8 w-16 text-center" {...register('linhas')} />
+                <span className="text-muted-foreground">linhas</span>
               </div>
+              <span className="ml-auto text-xs text-muted-foreground">só informativo — mostrado ao aluno</span>
             </div>
           )}
 
