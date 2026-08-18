@@ -51,7 +51,8 @@ export default async function PerfilAlunoPage() {
   const sombraTexto = temFundo ? '0 1px 4px rgba(0,0,0,.55)' : undefined
 
   const nome = est?.nome ?? sessao.nome
-  const email = est?.email ?? sessao.email
+  // Mostra o e-mail que a pessoa usou para entrar (pode ser um secundário), não o principal do banco.
+  const email = sessao.email ?? est?.email
   const contatos = [
     email && { icon: Mail, label: email },
     est?.telefone && { icon: Phone, label: est.telefone },
