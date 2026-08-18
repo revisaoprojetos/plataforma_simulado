@@ -79,7 +79,7 @@ async function resolverEstudante(svc: any, tenantId: string, provider: Provider,
   try {
     const { data } = await svc.from('simulado_integracao_pessoas').select('estudante_id')
       .eq('tenant_id', tenantId).eq('provider', provider).eq('external_id', p.externalId).maybeSingle()
-    if (data?.estudante_id) { await backfill(svc, tenantId, data.estudante_id, cpf, p.telefone, email); return data.estudante_id }
+    if (data?.estudante_id) { await backfill(svc, tenantId, data.estudante_id, cpf, p.telefone, email, provider); return data.estudante_id }
   } catch { /* segue */ }
 
   // 2) matricula_externa == externalId  3) email  4) cpf
@@ -105,7 +105,7 @@ async function resolverEstudante(svc: any, tenantId: string, provider: Provider,
       if (!id) return null
     } else id = data.id
   } else {
-    await backfill(svc, tenantId, id, cpf, p.telefone, email)
+    await backfill(svc, tenantId, id, cpf, p.telefone, email, provider)
   }
   // registra o external id no mapa cross-provider (idempotente)
   if (id) {
@@ -114,38 +114,47 @@ async function resolverEstudante(svc: any, tenantId: string, provider: Provider,
   return id
 }
 
-async function backfill(svc: any, tenantId: string, estudanteId: string, cpf: string | null, telefone?: string | null, email?: string | null) {
+async function backfill(svc: any, tenantId: string, estudanteId: string, cpf: string | null, telefone?: string | null, email?: string | null, provider?: Provider) {
   const patch: Record<string, unknown> = {}
   const { data } = await svc.from('simulado_estudantes').select('cpf, telefone').eq('id', estudanteId).maybeSingle()
   if (cpf && !data?.cpf) patch.cpf = cpf
   if (telefone && !data?.telefone) patch.telefone = telefone
   if (Object.keys(patch).length) { try { await svc.from('simulado_estudantes').update(patch).eq('id', estudanteId).eq('tenant_id', tenantId) } catch (e) { logIntegracao(e) } }
-  if (email) await registrarEmailDaCompra(svc, tenantId, estudanteId, email)
+  if (email) await promoverEmailDaCompra(svc, tenantId, estudanteId, email, provider)
 }
 
 /**
  * Quando a compra casa um aluno EXISTENTE (por CPF/matrícula/provider-id) mas vem com um e-mail
- * diferente do cadastro, registra esse e-mail como SECUNDÁRIO — assim a pessoa loga com qualquer
- * e-mail já usado numa compra (o login aceita principal OU secundário). Se o aluno ainda não tem
- * e-mail, adota o da compra como principal. Não faz nada se outro cadastro já usa o e-mail (evita
- * ambiguidade no login). Tolerante à coluna ausente.
+ * DIFERENTE do cadastro, o e-mail da compra passa a ser o PRINCIPAL e o anterior vira SECUNDÁRIO
+ * (mesma regra da Curseduca: o último e-mail processado vira o principal). Todos os e-mails
+ * continuam válidos no login (principal OU secundário). Se o aluno ainda não tinha e-mail, adota
+ * o da compra como principal. Não mexe se OUTRO cadastro já usa o e-mail (evita ambiguidade no
+ * login). MOSTRA a troca via audit log (antes/depois, visível em Auditoria). Tolerante à coluna ausente.
  */
-async function registrarEmailDaCompra(svc: any, tenantId: string, estudanteId: string, email: string) {
+async function promoverEmailDaCompra(svc: any, tenantId: string, estudanteId: string, email: string, provider?: Provider) {
   try {
     const { data } = await svc.from('simulado_estudantes').select('email, emails_secundarios').eq('id', estudanteId).maybeSingle()
     if (!data) return
     const principal = (data.email ?? '').trim().toLowerCase()
-    if (!principal) { await svc.from('simulado_estudantes').update({ email }).eq('id', estudanteId).eq('tenant_id', tenantId); return }
-    if (email === principal) return
-    const secs = (data.emails_secundarios ?? []).map((x: string) => String(x).toLowerCase())
-    if (secs.includes(email)) return
-    // não adiciona se OUTRO cadastro já usa esse e-mail (principal ou secundário)
+    if (email === principal) return // já é o principal
+    // não promove se OUTRO cadastro já usa esse e-mail (principal ou secundário)
     const { data: outros } = await svc.from('simulado_estudantes').select('id')
       .eq('tenant_id', tenantId).eq('deletado', false)
       .or(`email.ilike.${email},emails_secundarios.cs.{${email}}`)
     if ((outros ?? []).some((r: any) => r.id !== estudanteId)) return
-    await svc.from('simulado_estudantes').update({ emails_secundarios: [...(data.emails_secundarios ?? []), email] }).eq('id', estudanteId).eq('tenant_id', tenantId)
-  } catch (e) { logIntegracao(e) }
+
+    const secsAtuais: string[] = (data.emails_secundarios ?? []).map((x: string) => String(x).toLowerCase())
+    // e-mail da compra → PRINCIPAL; principal anterior entra nos secundários; remove o novo dos secundários.
+    const novosSecs = [...new Set([...(principal ? [principal] : []), ...secsAtuais.filter((s) => s !== email)])]
+    await svc.from('simulado_estudantes').update({ email, emails_secundarios: novosSecs }).eq('id', estudanteId).eq('tenant_id', tenantId)
+
+    // "mostrativo": registra a atualização na Auditoria (diff antes/depois).
+    await registrarAudit({
+      operacao: 'UPDATE', entidade: 'simulado_estudantes', entidadeId: estudanteId, tenantId,
+      antes: { email: data.email ?? null, emails_secundarios: data.emails_secundarios ?? [] },
+      depois: { email, emails_secundarios: novosSecs, motivo: `email_promovido_${provider ?? 'integracao'}` },
+    }).catch(() => {})
+  } catch (e) { logIntegracao(e, 'promoverEmailDaCompra') }
 }
 
 /** Grava/atualiza a assinatura (por provider+external_id) com o status atual. */
