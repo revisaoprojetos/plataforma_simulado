@@ -10,12 +10,13 @@ import { assumirCorrecao, salvarCorrecao } from '@/app/admin/correcao/actions'
 interface Comp { id: string; nome: string; pontos: number; nota: number | null; comentario: string }
 
 export function CorrecaoForm({
-  respostaId, jaCorrigida, competencias, feedbackInicial,
+  respostaId, jaCorrigida, competencias, feedbackInicial, voltarUrl = '/admin/correcao',
 }: {
   respostaId: string
   jaCorrigida: boolean
   competencias: Comp[]
   feedbackInicial: string
+  voltarUrl?: string
 }) {
   const router = useRouter()
   const [comps, setComps] = useState<Comp[]>(competencias)
@@ -47,8 +48,8 @@ export function CorrecaoForm({
         feedback,
       )
       if (r.ok) {
-        toast.success('Correção salva')
-        router.push('/admin/correcao')
+        toast.success(jaCorrigida ? 'Correção atualizada' : 'Correção devolvida ao aluno')
+        router.push(voltarUrl)
         router.refresh()
       } else {
         toast.error(r.error ?? 'Erro ao salvar')
@@ -109,7 +110,7 @@ export function CorrecaoForm({
 
       <Button onClick={salvar} disabled={pending}>
         {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-        {jaCorrigida ? 'Atualizar correção' : 'Finalizar correção'}
+        {jaCorrigida ? 'Atualizar correção' : 'Devolver ao aluno'}
       </Button>
     </div>
   )

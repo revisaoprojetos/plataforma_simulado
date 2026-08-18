@@ -21,6 +21,7 @@ import {
   RefreshCw,
   Loader2,
   AlertTriangle,
+  Images,
 } from 'lucide-react'
 import { FitaTopo } from '@/components/prova/fita-topo'
 import { ThemeToggle } from '@/components/prova/theme-toggle'
@@ -48,7 +49,7 @@ interface QuestaoRev {
   acertou_antes?: boolean | null
   /** justificativa/comentário da questão (exibida quando o gabarito é liberado) */
   justificativa?: string | null
-  discursiva?: { texto: string; status: string; nota: number | null; feedback: string | null } | null
+  discursiva?: { texto: string; status: string; nota: number | null; feedback: string | null; paginas?: number } | null
   alternativas: AltRev[]
 }
 interface StatDisciplina {
@@ -593,9 +594,18 @@ export function RevisaoFinal({
                           Resposta enviada — aguardando correção por um avaliador.
                         </div>
                       )}
-                      <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
-                        {q.discursiva?.texto || '(resposta em branco)'}
-                      </div>
+                      {(q.discursiva?.paginas ?? 0) > 0 ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1.5 rounded-md border bg-muted/30 p-2.5 text-xs text-muted-foreground">
+                            <Images className="h-4 w-4 shrink-0" /> {q.discursiva!.paginas} {q.discursiva!.paginas === 1 ? 'foto enviada' : 'fotos enviadas'} da sua resposta manuscrita.
+                          </div>
+                          {q.discursiva?.texto && <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">{q.discursiva.texto}</div>}
+                        </div>
+                      ) : (
+                        <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
+                          {q.discursiva?.texto || '(resposta em branco)'}
+                        </div>
+                      )}
                       {q.discursiva?.feedback && (
                         <div className="rounded-md border bg-primary/5 p-3 text-sm">
                           <p className="mb-1 text-xs font-semibold text-muted-foreground">Feedback do corretor</p>

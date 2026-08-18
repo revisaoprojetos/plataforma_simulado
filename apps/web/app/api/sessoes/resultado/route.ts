@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     supabase.from('simulado_recorrecoes').select('tipo, executado_em').eq('simulado_id', sessao.simulado_id).order('executado_em', { ascending: false }),
     supabase.from('simulado_prova_questoes').select('ordem, anulada, questoes:simulado_questoes(id, tipo, enunciado, comentario_professor, disciplina_id, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, comentario))').eq('simulado_id', sessao.simulado_id).order('ordem'),
     supabase.from('simulado_respostas_objetivas').select('questao_id, alternativa_id, correta').eq('sessao_id', st),
-    supabase.from('simulado_respostas_discursivas').select('questao_id, texto, status, nota, feedback').eq('sessao_id', st),
+    supabase.from('simulado_respostas_discursivas').select('id, questao_id, texto, status, nota, feedback').eq('sessao_id', st),
     // Nome + e-mail do estudante (cabeçalho) — 2 passos encadeados, mas concorrentes com o resto.
     (async (): Promise<{ nome: string; email: string }> => {
       let nome = 'Estudante', email = ''
@@ -118,6 +118,18 @@ export async function GET(request: NextRequest) {
     : null
 
   const discMap = new Map((disc ?? []).map((d: any) => [d.questao_id, d]))
+
+  // Nº de páginas (fotos) enviadas por questão discursiva — tolerante (a junção pode não estar migrada).
+  const discPaginasMap = new Map<string, number>()
+  const discIds = (disc ?? []).map((d: any) => d.id).filter(Boolean)
+  if (discIds.length) {
+    try {
+      const { data: js } = await admin.from('simulado_resposta_arquivos').select('resposta_id').in('resposta_id', discIds)
+      const porResp = new Map<string, number>()
+      for (const j of (js ?? []) as any[]) porResp.set(j.resposta_id, (porResp.get(j.resposta_id) ?? 0) + 1)
+      for (const d of (disc ?? []) as any[]) discPaginasMap.set(d.questao_id, porResp.get(d.id) ?? 0)
+    } catch { /* tabela ainda não migrada */ }
+  }
 
   // Gabarito (alternativas corretas) + modalidades do caderno — pós-batch, independentes entre si.
   const bancoBaseIdV2 = (simulado?.regras as any)?.banco_base_id as string | undefined
@@ -187,9 +199,9 @@ export async function GET(request: NextRequest) {
       // Justificativa (comentário do professor) — só revelada com o gabarito. No simulado pessoal,
       // cai para o comentário das ALTERNATIVAS (formato do import) quando não há comentario_professor.
       justificativa: gabaritoLiberado ? (q?.comentario_professor ?? (pessoal ? comentarioDasAlternativas(q?.alternativas, correta_id) : null)) : null,
-      // Para discursiva: a resposta escrita + estado da correção.
+      // Para discursiva: a resposta escrita + estado da correção + nº de páginas (fotos) enviadas.
       discursiva: q?.tipo === 'discursiva' && d
-        ? { texto: d.texto ?? '', status: d.status, nota: d.nota, feedback: d.feedback }
+        ? { texto: d.texto ?? '', status: d.status, nota: d.nota, feedback: d.feedback, paginas: discPaginasMap.get(q.id) ?? 0 }
         : null,
       alternativas: (q?.alternativas ?? [])
         .slice()
@@ -203,7 +215,7 @@ export async function GET(request: NextRequest) {
   })
 
   // Marcadas / em branco + tempo (para a tela de encerramento).
-  const marcadas = questoes.filter((q: any) => q.tipo === 'discursiva' ? !!q.discursiva?.texto : !!q.resposta_aluno).length
+  const marcadas = questoes.filter((q: any) => q.tipo === 'discursiva' ? (!!q.discursiva?.texto || (q.discursiva?.paginas ?? 0) > 0) : !!q.resposta_aluno).length
   // Anuladas não são "em branco" (ponto garantido) — saem da contagem de não respondidas.
   const emBranco = Math.max(0, total - marcadas - anuladaSet.size)
   let tempo: string | null = null

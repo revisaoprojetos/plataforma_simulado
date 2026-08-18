@@ -5,6 +5,7 @@
 
 export const RBAC_CATALOGO: { resource: string; action: string }[] = [
   { resource: 'questoes', action: 'view' }, { resource: 'questoes', action: 'create' }, { resource: 'questoes', action: 'update' },
+  { resource: 'correcao', action: 'view' }, { resource: 'correcao', action: 'corrigir' },
   { resource: 'simulados', action: 'view' }, { resource: 'simulados', action: 'create' }, { resource: 'simulados', action: 'update' }, { resource: 'simulados', action: 'delete' },
   { resource: 'estudantes', action: 'view' }, { resource: 'estudantes', action: 'create' }, { resource: 'estudantes', action: 'update' }, { resource: 'estudantes', action: 'delete' },
   { resource: 'grupos', action: 'view' },
@@ -22,6 +23,7 @@ export const RBAC_CATALOGO: { resource: string; action: string }[] = [
 // Rótulos amigáveis (a matriz usa quando disponíveis; senão cai no valor cru).
 export const RBAC_RECURSO_LABEL: Record<string, string> = {
   questoes: 'Questões',
+  correcao: 'Correção de discursivas',
   simulados: 'Simulados',
   estudantes: 'Estudantes',
   grupos: 'Grupos',
@@ -44,4 +46,5 @@ export const RBAC_ACAO_LABEL: Record<string, string> = {
   delete: 'Excluir',
   manage: 'Gerenciar (tudo)',
   export: 'Exportar',
+  corrigir: 'Corrigir',
 }

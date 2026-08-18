@@ -3,10 +3,11 @@
  *
  * OCULTAR_DISCURSIVA: esconde da interface tudo que é da parte discursiva
  * (menu de correção, opção de tipo discursivo, modelos de caderno discursivo/redação,
- * simulados/questões discursivas nas listagens). Ainda em construção — ligar de volta
- * (false) quando a discursiva estiver pronta.
+ * simulados/questões discursivas nas listagens). Controlado por env (curto prazo — um
+ * toggle por deploy): defina NEXT_PUBLIC_DISCURSIVA_ATIVA=true para LIGAR a discursiva.
+ * Sem o env, fica escondida. (Próximo passo do plano: resolver por-tenant.)
  */
-export const OCULTAR_DISCURSIVA = true
+export const OCULTAR_DISCURSIVA = process.env.NEXT_PUBLIC_DISCURSIVA_ATIVA !== 'true'
 
 /**
  * OCULTAR_ALUNO_EXTRAS: esconde da área do aluno os módulos Banco de Questões,

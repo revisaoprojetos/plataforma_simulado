@@ -20,13 +20,13 @@ const CURRENT_POLICY_VERSION = '1.0'
 // Gate de ROTA por permissão (defesa em profundidade, além de esconder do menu): cada área do
 // /admin exige a permissão de "ver". Cargos de acesso total (isAdmin) ignoram. O prefixo mais
 // específico primeiro. Áreas sem entrada (ex.: /admin dashboard, /admin/ajuda) são livres.
-const AREA_PERM: { prefix: string; perm: string }[] = [
+const AREA_PERM: { prefix: string; perm: string; ou?: string }[] = [
   { prefix: '/admin/simulados', perm: 'simulados:view' },
   { prefix: '/admin/questoes', perm: 'questoes:view' },
   { prefix: '/admin/etiquetas', perm: 'questoes:view' },
   { prefix: '/admin/banco-questoes', perm: 'questoes:view' },
   { prefix: '/admin/cadernos', perm: 'questoes:view' },
-  { prefix: '/admin/correcao', perm: 'questoes:view' },
+  { prefix: '/admin/correcao', perm: 'correcao:view', ou: 'questoes:view' },
   { prefix: '/admin/comentarios', perm: 'questoes:view' },
   { prefix: '/admin/feedbacks', perm: 'questoes:view' },
   { prefix: '/admin/lixeira', perm: 'questoes:view' },
@@ -108,7 +108,7 @@ export default async function AdminLayout({
   if (!access.isAdmin) {
     const pathname = (await headers()).get('x-pathname') ?? ''
     const area = AREA_PERM.find((a) => pathname === a.prefix || pathname.startsWith(a.prefix + '/'))
-    if (area && !accessCan(access, area.perm)) {
+    if (area && !accessCan(access, area.perm) && !(area.ou && accessCan(access, area.ou))) {
       redirect('/admin?erro=sem-acesso')
     }
   }

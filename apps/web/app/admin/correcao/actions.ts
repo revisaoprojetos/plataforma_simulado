@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
+import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { rankearSimulado } from '@/lib/ranking'
 
@@ -10,10 +10,10 @@ const LOCK_MIN = 30
 
 /** Assume a correção (lock). Falha se já há outro corretor com lock ativo. */
 export async function assumirCorrecao(respostaId: string): Promise<{ ok: boolean; error?: string }> {
-  if (!(await checkPermission('questoes:update'))) {
+  const access = await getCurrentAccess()
+  if (!(access.isAdmin || accessCan(access, 'correcao:corrigir') || accessCan(access, 'questoes:update'))) {
     return { ok: false, error: 'Sem permissão para corrigir.' }
   }
-  const access = await getCurrentAccess()
   if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
 
@@ -46,10 +46,10 @@ export async function salvarCorrecao(
   competencias: { competencia_id: string; nota: number; comentario?: string }[],
   feedback: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!(await checkPermission('questoes:update'))) {
+  const access = await getCurrentAccess()
+  if (!(access.isAdmin || accessCan(access, 'correcao:corrigir') || accessCan(access, 'questoes:update'))) {
     return { ok: false, error: 'Sem permissão para corrigir.' }
   }
-  const access = await getCurrentAccess()
   if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
 

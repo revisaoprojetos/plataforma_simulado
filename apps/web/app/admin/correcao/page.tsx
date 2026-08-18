@@ -1,16 +1,22 @@
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { buttonVariants } from '@/components/ui/button'
 import { SecaoHeader } from '@/components/admin/secao-header'
-import { Inbox, PenLine } from 'lucide-react'
+import { Inbox, PenLine, ClipboardCheck, ArrowRight } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
 
+export const dynamic = 'force-dynamic'
+
+const ZERO = '00000000-0000-0000-0000-000000000000'
+
+/** Correção discursiva — grid de CARDS por simulado. Clicar abre os alunos que fizeram. */
 export default async function CorrecaoPage() {
   const access = await getCurrentAccess()
-  const pode = access.isAdmin || access.permissions.includes('correcao:corrigir') || access.permissions.includes('questoes:update')
+  const pode = access.isAdmin
+    || access.permissions.includes('correcao:view') || access.permissions.includes('correcao:corrigir')
+    || access.permissions.includes('questoes:view') || access.permissions.includes('questoes:update')
   if (!pode) {
     return (
       <div className="space-y-4">
@@ -21,61 +27,77 @@ export default async function CorrecaoPage() {
   }
 
   const svc = createAdminClient()
-  const { data } = await svc
-    .from('simulado_respostas_discursivas')
-    .select('id, questao_id, estudante_id, status, lock_expira_em, criado_em')
-    .eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
-    .in('status', ['pendente', 'em_correcao'])
-    .order('criado_em', { ascending: true })
-    .limit(100)
+  const tenantId = access.tenantId ?? ZERO
 
-  const rows = data ?? []
-  const qIds = [...new Set(rows.map((r: any) => r.questao_id))]
-  const eIds = [...new Set(rows.map((r: any) => r.estudante_id))]
-  const [{ data: questoes }, { data: estudantes }] = await Promise.all([
-    qIds.length ? svc.from('simulado_questoes').select('id, enunciado').in('id', qIds) : Promise.resolve({ data: [] as any[] }),
-    eIds.length ? svc.from('simulado_estudantes').select('id, nome').in('id', eIds) : Promise.resolve({ data: [] as any[] }),
-  ])
-  const qMap = new Map((questoes ?? []).map((q: any) => [q.id, q.enunciado]))
-  const eMap = new Map((estudantes ?? []).map((e: any) => [e.id, e.nome]))
+  // 1) Questões discursivas do tenant → 2) simulados OFICIAIS que as usam.
+  const qd = await fetchAll<any>(() => svc.from('simulado_questoes').select('id').eq('tenant_id', tenantId).eq('tipo', 'discursiva').order('id'))
+  const qdIds = qd.map((q) => q.id)
+  let sims: any[] = []
+  if (qdIds.length) {
+    const pq = await fetchAllByIn<any>(qdIds, (c) => svc.from('simulado_prova_questoes').select('simulado_id').in('questao_id', c))
+    const simIds = [...new Set(pq.map((p) => p.simulado_id).filter(Boolean))] as string[]
+    if (simIds.length) {
+      const rows = await fetchAllByIn<any>(simIds, (c) => svc.from('simulado_simulados').select('id, titulo, status, owner_estudante_id, deletado').in('id', c))
+      sims = rows.filter((s) => !s.owner_estudante_id && !s.deletado)
+    }
+  }
 
-  const fila = rows.map((r: any) => ({
-    id: r.id,
-    status: r.status,
-    travada: r.status === 'em_correcao' && r.lock_expira_em && new Date(r.lock_expira_em) > new Date(),
-    enunciado: qMap.get(r.questao_id) ?? '—',
-    estudante: eMap.get(r.estudante_id) ?? 'Aluno',
-    criado_em: r.criado_em,
-  }))
+  // 3) Contagem de respostas discursivas por simulado (via sessão) → pendentes/corrigidas.
+  const cont = new Map<string, { pend: number; corr: number }>()
+  if (sims.length) {
+    const resp = await fetchAll<any>(() => svc.from('simulado_respostas_discursivas').select('id, sessao_id, status').eq('tenant_id', tenantId).order('id'))
+    const sessIds = [...new Set(resp.map((r) => r.sessao_id).filter(Boolean))] as string[]
+    const sess = sessIds.length ? await fetchAllByIn<any>(sessIds, (c) => svc.from('simulado_sessoes_prova').select('id, simulado_id, is_teste, deletado').in('id', c)) : []
+    const sessToSim = new Map(sess.filter((s) => !s.is_teste && !s.deletado).map((s) => [s.id, s.simulado_id]))
+    for (const r of resp) {
+      const sim = sessToSim.get(r.sessao_id)
+      if (!sim) continue
+      const c = cont.get(sim) ?? { pend: 0, corr: 0 }
+      if (r.status === 'corrigida') c.corr++
+      else c.pend++
+      cont.set(sim, c)
+    }
+  }
+
+  const cards = sims
+    .map((s) => ({ id: s.id, titulo: s.titulo as string, status: s.status as string, pend: cont.get(s.id)?.pend ?? 0, corr: cont.get(s.id)?.corr ?? 0 }))
+    .sort((a, b) => b.pend - a.pend || a.titulo.localeCompare(b.titulo, 'pt-BR'))
+  const totalPend = cards.reduce((n, c) => n + c.pend, 0)
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Correção de discursivas</h1>
-        <p className="text-muted-foreground">{fila.length} resposta(s) na fila.</p>
+        <p className="text-muted-foreground">{cards.length} simulado(s) discursivo(s) · {totalPend} resposta(s) pendente(s).</p>
       </div>
 
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
-        <SecaoHeader icon={PenLine} titulo="Fila de correção" subtitulo={`${fila.length} resposta(s) na fila`} />
-        <CardContent className="space-y-3 px-4 py-4">
-          {fila.length === 0 ? (
+        <SecaoHeader icon={ClipboardCheck} titulo="Simulados discursivos" subtitulo="Escolha um simulado para corrigir" />
+        <CardContent className="px-4 py-4">
+          {cards.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
               <Inbox className="h-8 w-8" />
-              <p className="text-sm">Nenhuma resposta para corrigir.</p>
+              <p className="text-sm">Nenhum simulado discursivo por aqui ainda.</p>
             </div>
           ) : (
-            fila.map((f) => (
-              <div key={f.id} className="flex items-center gap-3 rounded-lg border p-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{f.estudante}</p>
-                  <p className="truncate text-xs text-muted-foreground">{f.enunciado}</p>
-                </div>
-                {f.travada && <Badge variant="secondary">em correção</Badge>}
-                <Link href={`/admin/correcao/${f.id}`} className={buttonVariants({ size: 'sm' })}>
-                  <PenLine className="mr-1 h-3.5 w-3.5" /> Corrigir
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {cards.map((c) => (
+                <Link key={c.id} href={`/admin/correcao/simulado/${c.id}`}
+                  className="group flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><PenLine className="h-4 w-4" /></span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                  <h3 className="line-clamp-2 text-sm font-semibold leading-snug">{c.titulo}</h3>
+                  <div className="mt-auto flex flex-wrap items-center gap-1.5">
+                    {c.pend > 0
+                      ? <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">{c.pend} pendente{c.pend === 1 ? '' : 's'}</span>
+                      : <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Em dia</span>}
+                    {c.corr > 0 && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{c.corr} corrigida{c.corr === 1 ? '' : 's'}</span>}
+                  </div>
                 </Link>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>

@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       return sqr.data
     })(),
     supabase.from('simulado_respostas_objetivas').select('questao_id, alternativa_id').eq('sessao_id', sessao.id),
-    supabase.from('simulado_respostas_discursivas').select('questao_id, texto').eq('sessao_id', sessao.id),
+    supabase.from('simulado_respostas_discursivas').select('id, questao_id, texto').eq('sessao_id', sessao.id),
     resolverHudConfig(sessao.simulado_id, sessao.tenant_id),
     (async (): Promise<{ nome: string; logoUrl: string | null; logoGrandeUrl: string | null; logoBg: string; logoEstilo: string } | null> => {
       try {
@@ -92,6 +92,19 @@ export async function GET(request: NextRequest) {
   const respDisc: Record<string, string> = {}
   for (const d of disc ?? []) respDisc[d.questao_id as string] = (d.texto as string) ?? ''
 
+  // Nº de páginas (fotos) enviadas por questão discursiva — para o runner marcar "respondida".
+  // Tolerante: se a tabela de junção ainda não foi migrada, ignora (fica vazio).
+  const respDiscPaginas: Record<string, number> = {}
+  const respIds = (disc ?? []).map((d: any) => d.id).filter(Boolean)
+  if (respIds.length) {
+    try {
+      const { data: js } = await admin.from('simulado_resposta_arquivos').select('resposta_id').in('resposta_id', respIds)
+      const porResp = new Map<string, number>()
+      for (const j of (js ?? []) as any[]) porResp.set(j.resposta_id, (porResp.get(j.resposta_id) ?? 0) + 1)
+      for (const d of (disc ?? []) as any[]) { const n = porResp.get(d.id) ?? 0; if (n > 0) respDiscPaginas[d.questao_id] = n }
+    } catch { /* tabela ainda não migrada */ }
+  }
+
   // Cores do HUD do caderno vinculado ao simulado — recolore a prova com o tema do caderno.
   const hudCores: HudCores = hud.base
   const hudPorPagina = hud.porPagina
@@ -105,6 +118,7 @@ export async function GET(request: NextRequest) {
     status: sessao.status,
     respostas: respMap,
     respostas_discursivas: respDisc,
+    paginas_discursivas: respDiscPaginas,
     hudCores,
     hudPorPagina,
     branding,

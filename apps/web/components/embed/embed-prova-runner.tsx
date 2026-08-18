@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { ProvaIntro, ProvaLoading } from '@/components/prova/prova-intro'
+import { QuestaoDiscursivaEnvio } from '@/components/aluno/questao-discursiva-envio'
 
 interface Alternativa {
   id: string
@@ -44,6 +45,7 @@ interface SessaoData {
   status: string
   respostas: Record<string, string>
   respostas_discursivas?: Record<string, string>
+  paginas_discursivas?: Record<string, number>
 }
 
 type ProvaStatus = 'loading' | 'em_andamento' | 'finalizada' | 'erro'
@@ -97,6 +99,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
   const [questaoIndex, setQuestaoIndex] = useState(0)
   const [respostas, setRespostas] = useState<Record<string, string>>({})
   const [respDiscursivas, setRespDiscursivas] = useState<Record<string, string>>({})
+  const [discPaginas, setDiscPaginas] = useState<Record<string, number>>({})
   const discTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [salvando, setSalvando] = useState<string | null>(null)
   const [showRevisao, setShowRevisao] = useState(false)
@@ -113,6 +116,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
         setSessao(data)
         setRespostas(data.respostas ?? {})
         setRespDiscursivas(data.respostas_discursivas ?? {})
+        setDiscPaginas(data.paginas_discursivas ?? {})
         setStatus('em_andamento')
       } catch {
         setStatus('erro')
@@ -279,7 +283,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
   const totalQuestoes = sessao.questoes.length
   const respondidaDe = (q: Questao) =>
     // Anulada não é respondível — conta como "concluída" para o progresso chegar a 100%.
-    q.anulada ? true : (q.tipo === 'discursiva' ? !!respDiscursivas[q.id]?.trim() : !!respostas[q.id])
+    q.anulada ? true : (q.tipo === 'discursiva' ? (!!respDiscursivas[q.id]?.trim() || (discPaginas[q.id] ?? 0) > 0) : !!respostas[q.id])
   const totalRespondidas = sessao.questoes.filter(respondidaDe).length
   const progresso = (totalRespondidas / totalQuestoes) * 100
   const timerWarning = segundosRestantes !== null && segundosRestantes < 300
@@ -366,16 +370,26 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
         </Card>
 
         {questaoAtual.tipo === 'discursiva' ? (
-          <div className="space-y-1">
-            <textarea
-              value={respDiscursivas[questaoAtual.id] ?? ''}
-              onChange={(e) => handleDiscursiva(questaoAtual.id, e.target.value)}
-              placeholder="Escreva sua resposta…"
-              rows={10}
-              maxLength={20000}
-              className="w-full resize-y rounded-lg border bg-card p-3.5 text-sm leading-relaxed outline-none focus:ring-1 focus:ring-ring"
+          <div className="space-y-3">
+            <QuestaoDiscursivaEnvio
+              sessaoId={sessao.id}
+              questaoId={questaoAtual.id}
+              bloqueada={!!questaoAtual.anulada}
+              onCount={(n) => setDiscPaginas((p) => ({ ...p, [questaoAtual.id]: n }))}
             />
-            <p className="text-xs text-muted-foreground">Resposta salva automaticamente. Será corrigida por um avaliador.</p>
+            {!questaoAtual.anulada && (
+              <details>
+                <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">Observações (opcional) — digite se quiser complementar</summary>
+                <textarea
+                  value={respDiscursivas[questaoAtual.id] ?? ''}
+                  onChange={(e) => handleDiscursiva(questaoAtual.id, e.target.value)}
+                  placeholder="Observações à sua resposta (opcional)…"
+                  rows={5}
+                  maxLength={20000}
+                  className="mt-2 w-full resize-y rounded-lg border bg-card p-3.5 text-sm leading-relaxed outline-none focus:ring-1 focus:ring-ring"
+                />
+              </details>
+            )}
           </div>
         ) : (
           <div className="space-y-2">

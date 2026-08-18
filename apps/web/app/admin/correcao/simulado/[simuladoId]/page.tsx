@@ -1,0 +1,115 @@
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { createAdminClient } from '@/lib/supabase/server'
+import { getCurrentAccess } from '@/lib/auth/permissions'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { Card, CardContent } from '@/components/ui/card'
+import { buttonVariants } from '@/components/ui/button'
+import { SecaoHeader } from '@/components/admin/secao-header'
+import { ArrowLeft, PenLine, Users, Images, CheckCircle2 } from 'lucide-react'
+import { SemPermissao } from '@/components/ui/alert-box'
+import { cn } from '@/lib/utils'
+
+export const dynamic = 'force-dynamic'
+const ZERO = '00000000-0000-0000-0000-000000000000'
+const corte = (s: string) => (s ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90)
+
+/** Alunos que fizeram um simulado discursivo → uma linha por resposta a corrigir. */
+export default async function CorrecaoSimuladoPage({ params }: { params: Promise<{ simuladoId: string }> }) {
+  const { simuladoId } = await params
+  const access = await getCurrentAccess()
+  const pode = access.isAdmin
+    || access.permissions.includes('correcao:view') || access.permissions.includes('correcao:corrigir')
+    || access.permissions.includes('questoes:view') || access.permissions.includes('questoes:update')
+  if (!pode) return <div className="space-y-4"><SemPermissao>Sem permissão para corrigir.</SemPermissao></div>
+
+  const svc = createAdminClient()
+  const tenantId = access.tenantId ?? ZERO
+
+  const { data: sim } = await svc.from('simulado_simulados')
+    .select('id, titulo').eq('id', simuladoId).eq('tenant_id', tenantId).maybeSingle()
+  if (!sim) notFound()
+
+  // Sessões válidas do simulado → respostas discursivas dessas sessões.
+  const sess = await fetchAll<any>(() => svc.from('simulado_sessoes_prova')
+    .select('id, estudante_id, is_teste, deletado, finalizado_em').eq('simulado_id', simuladoId).eq('tenant_id', tenantId).order('id'))
+  const sessValidas = sess.filter((s) => !s.is_teste && !s.deletado)
+  const sessIds = sessValidas.map((s) => s.id)
+  const sessMap = new Map(sessValidas.map((s) => [s.id, s]))
+
+  const resp = sessIds.length
+    ? await fetchAllByIn<any>(sessIds, (c) => svc.from('simulado_respostas_discursivas')
+        .select('id, sessao_id, questao_id, status, nota').in('sessao_id', c))
+    : []
+
+  // Nomes de alunos + enunciados + contagem de páginas (tolerante).
+  const eIds = [...new Set(sessValidas.map((s) => s.estudante_id).filter(Boolean))] as string[]
+  const qIds = [...new Set(resp.map((r) => r.questao_id).filter(Boolean))] as string[]
+  const respIds = resp.map((r) => r.id)
+  const [ests, questoes, paginas] = await Promise.all([
+    eIds.length ? fetchAllByIn<any>(eIds, (c) => svc.from('simulado_estudantes').select('id, nome').in('id', c)) : Promise.resolve([] as any[]),
+    qIds.length ? fetchAllByIn<any>(qIds, (c) => svc.from('simulado_questoes').select('id, enunciado').in('id', c)) : Promise.resolve([] as any[]),
+    (async () => { try { return respIds.length ? await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_resposta_arquivos').select('resposta_id').in('resposta_id', c)) : [] } catch { return [] as any[] } })(),
+  ])
+  const eMap = new Map(ests.map((e: any) => [e.id, e.nome]))
+  const qMap = new Map(questoes.map((q: any) => [q.id, corte(q.enunciado)]))
+  const pagCount = new Map<string, number>()
+  for (const p of paginas as any[]) pagCount.set(p.resposta_id, (pagCount.get(p.resposta_id) ?? 0) + 1)
+
+  const linhas = resp.map((r: any) => {
+    const s = sessMap.get(r.sessao_id)
+    return {
+      id: r.id,
+      aluno: eMap.get(s?.estudante_id) ?? 'Aluno',
+      enunciado: qMap.get(r.questao_id) ?? '—',
+      status: r.status as string,
+      nota: r.nota,
+      paginas: pagCount.get(r.id) ?? 0,
+    }
+  }).sort((a, b) =>
+    (a.status === 'corrigida' ? 1 : 0) - (b.status === 'corrigida' ? 1 : 0)
+    || a.aluno.localeCompare(b.aluno, 'pt-BR'))
+
+  const pend = linhas.filter((l) => l.status !== 'corrigida').length
+
+  return (
+    <div className="space-y-6">
+      <Link href="/admin/correcao" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" /> Simulados discursivos
+      </Link>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">{sim.titulo}</h1>
+        <p className="text-muted-foreground">{linhas.length} resposta(s) · {pend} pendente(s).</p>
+      </div>
+
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader icon={Users} titulo="Respostas dos alunos" subtitulo={`${linhas.length} resposta(s)`} />
+        <CardContent className="space-y-2.5 px-4 py-4">
+          {linhas.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Ninguém enviou resposta discursiva ainda.</p>
+          ) : linhas.map((l) => {
+            const corrigida = l.status === 'corrigida'
+            return (
+              <div key={l.id} className="flex items-center gap-3 rounded-lg border p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{l.aluno}</p>
+                  <p className="truncate text-xs text-muted-foreground">{l.enunciado}</p>
+                </div>
+                {l.paginas > 0 && (
+                  <span className="hidden shrink-0 items-center gap-1 text-xs text-muted-foreground sm:inline-flex"><Images className="h-3.5 w-3.5" /> {l.paginas}</span>
+                )}
+                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                  corrigida ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : l.status === 'em_correcao' ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400')}>
+                  {corrigida ? <><CheckCircle2 className="mr-0.5 inline h-3 w-3" />nota {Number(l.nota ?? 0).toFixed(1)}</> : l.status === 'em_correcao' ? 'em correção' : 'pendente'}
+                </span>
+                <Link href={`/admin/correcao/${l.id}`} className={buttonVariants({ size: 'sm', variant: corrigida ? 'outline' : 'default' })}>
+                  <PenLine className="mr-1 h-3.5 w-3.5" /> {corrigida ? 'Rever' : 'Corrigir'}
+                </Link>
+              </div>
+            )
+          })}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
