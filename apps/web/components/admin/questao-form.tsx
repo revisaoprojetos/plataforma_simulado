@@ -224,6 +224,22 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
             </div>
           </div>
 
+          {/* Discursiva — informativos ao aluno (pontuação total + nº de linhas). Não afetam a correção. */}
+          {tipo === 'discursiva' && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Pontuação total</Label>
+                <Input type="number" step="0.5" min="0" placeholder="Ex.: 10" {...register('pontuacao_total')} />
+                <p className="text-xs text-muted-foreground">Quanto a questão vale (mostrado ao aluno).</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Número de linhas</Label>
+                <Input type="number" step="1" min="0" placeholder="Ex.: 30" {...register('linhas')} />
+                <p className="text-xs text-muted-foreground">Máximo esperado na resposta (mostrado ao aluno).</p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="enunciado">Enunciado *</Label>
             <MarkdownTextarea
@@ -442,26 +458,6 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                 Adicionar alternativa
               </Button>
             )}
-          </CardContent>
-        </Card>
-      )}
-
-      {tipo === 'discursiva' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Detalhes da resposta (informativo ao aluno)</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Pontuação total</Label>
-              <Input type="number" step="0.5" min="0" placeholder="Ex.: 10" {...register('pontuacao_total')} />
-              <p className="text-xs text-muted-foreground">Quanto a questão vale no total.</p>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Número de linhas</Label>
-              <Input type="number" step="1" min="0" placeholder="Ex.: 30" {...register('linhas')} />
-              <p className="text-xs text-muted-foreground">Máximo de linhas esperado na resposta.</p>
-            </div>
           </CardContent>
         </Card>
       )}
