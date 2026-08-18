@@ -78,11 +78,23 @@ export async function GET(request: NextRequest) {
     enunciado: row.questoes?.enunciado ?? '',
     disciplina: row.questoes?.disciplinas?.nome ?? null,
     imagem_url: row.questoes?.imagem_url ?? null,
+    pontuacao_total: null as number | null, // discursiva: preenchido abaixo (tolerante)
+    linhas: null as number | null,
     alternativas: (row.questoes?.alternativas ?? [])
       .slice()
       .sort((a: any, b: any) => a.ordem - b.ordem)
       .map((a: any) => ({ id: a.id, texto: a.texto, ordem: a.ordem })),
   }))
+
+  // Campos informativos da discursiva (pontuação total + nº de linhas) — tolerante (podem não estar migrados).
+  try {
+    const qids = questoes.map((q) => q.id).filter(Boolean)
+    if (qids.length) {
+      const { data: extras } = await admin.from('simulado_questoes').select('id, pontuacao_total, linhas').in('id', qids)
+      const ex = new Map((extras ?? []).map((r: any) => [r.id, r]))
+      for (const q of questoes) { const e = ex.get(q.id); if (e) { q.pontuacao_total = e.pontuacao_total ?? null; q.linhas = e.linhas ?? null } }
+    }
+  } catch { /* colunas não migradas */ }
 
   const respMap: Record<string, string> = {}
   for (const r of respostas ?? []) {

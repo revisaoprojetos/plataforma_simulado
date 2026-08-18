@@ -31,6 +31,9 @@ interface QuestaoData {
   status: string
   /** URL da imagem da questão (opcional) — exibida entre o enunciado e as alternativas. */
   imagem_url?: string | null
+  /** Discursiva (informativo ao aluno): quanto vale no total + nº máx. de linhas da resposta. */
+  pontuacao_total?: number | null
+  linhas?: number | null
   alternativas?: AlternativaData[]
   competencias?: { nome: string; pontos: number; ordem: number }[]
   /** Bancos (pastas) de destino — a questão é vinculada a estes ao salvar. */
@@ -219,10 +222,19 @@ async function buildQuestaoFields(supabase: SupabaseClient, tenantId: string, da
     gabarito_tipo: data.gabarito_tipo || 'oficial',
     comentario_professor: data.comentario_professor || null,
     status: data.status,
+    // Discursiva (informativo ao aluno) — não afeta a correção. 0/vazio = não definido.
+    pontuacao_total: data.pontuacao_total || null,
+    linhas: data.linhas || null,
     // Normalmente já vem como URL (o form hospeda ao selecionar). Defensivo: se chegar base64
     // (ex.: import), sobe pro storage e grava a URL — hospedarBase64 no-op quando já é URL.
     imagem_url: await hospedarBase64(data.imagem_url, createAdminClient(), { tenantId }),
   }
+}
+
+// Remove colunas que podem não estar migradas (fallback tolerante em insert/update).
+function semColunasNovas<T extends Record<string, any>>(fields: T) {
+  const { imagem_url: _i, pontuacao_total: _p, linhas: _l, ...resto } = fields
+  return resto
 }
 
 /**
@@ -264,10 +276,9 @@ export async function createQuestaoAction(data: QuestaoData) {
     .select()
     .single()
 
-  // Tolerante: se a coluna imagem_url ainda não foi migrada no banco, reinsere sem ela.
-  if (error && /imagem_url|column/i.test(error.message) && 'imagem_url' in fields) {
-    const { imagem_url: _img, ...semImg } = fields
-    ;({ data: questao, error } = await supabase.from('simulado_questoes').insert(semImg).select().single())
+  // Tolerante: se alguma coluna nova (imagem_url/pontuacao_total/linhas) ainda não foi migrada, reinsere sem elas.
+  if (error && /imagem_url|pontuacao_total|linhas|column/i.test(error.message)) {
+    ;({ data: questao, error } = await supabase.from('simulado_questoes').insert(semColunasNovas(fields)).select().single())
   }
 
   if (error) {
@@ -327,10 +338,9 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
     .update(fields)
     .eq('id', id)
 
-  // Tolerante: coluna imagem_url ainda não migrada → atualiza sem ela.
-  if (error && /imagem_url|column/i.test(error.message) && 'imagem_url' in fields) {
-    const { imagem_url: _img, ...semImg } = fields
-    ;({ error } = await supabase.from('simulado_questoes').update(semImg).eq('id', id))
+  // Tolerante: colunas novas (imagem_url/pontuacao_total/linhas) ainda não migradas → atualiza sem elas.
+  if (error && /imagem_url|pontuacao_total|linhas|column/i.test(error.message)) {
+    ;({ error } = await supabase.from('simulado_questoes').update(semColunasNovas(fields)).eq('id', id))
   }
 
   if (error) {

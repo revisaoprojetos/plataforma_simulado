@@ -34,6 +34,8 @@ interface Questao {
   anulada?: boolean
   enunciado: string
   imagem_url?: string | null
+  pontuacao_total?: number | null
+  linhas?: number | null
   alternativas: Alternativa[]
 }
 
@@ -371,6 +373,16 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
 
         {questaoAtual.tipo === 'discursiva' ? (
           <div className="space-y-3">
+            {(questaoAtual.pontuacao_total != null || questaoAtual.linhas != null) && (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                {questaoAtual.pontuacao_total != null && (
+                  <span className="rounded-full bg-primary/10 px-2.5 py-1 font-semibold text-primary">Vale {Number(questaoAtual.pontuacao_total).toLocaleString('pt-BR')} {Number(questaoAtual.pontuacao_total) === 1 ? 'ponto' : 'pontos'}</span>
+                )}
+                {questaoAtual.linhas != null && (
+                  <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-muted-foreground">Máximo {questaoAtual.linhas} linhas</span>
+                )}
+              </div>
+            )}
             <QuestaoDiscursivaEnvio
               sessaoId={sessao.id}
               questaoId={questaoAtual.id}

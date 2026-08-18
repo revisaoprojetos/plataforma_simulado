@@ -62,6 +62,9 @@ const questaoSchema = z
     comentario_professor: z.string().optional(),
     status: z.enum(['rascunho', 'publicada', 'arquivada']),
     imagem_url: z.string().optional(),
+    // Discursiva — informativos ao aluno (não afetam a correção).
+    pontuacao_total: z.coerce.number().min(0).optional(),
+    linhas: z.coerce.number().int().min(0).optional(),
     alternativas: z.array(alternativaSchema).optional(),
     competencias: z.array(competenciaSchema).optional(),
     bancoIds: z.array(z.string()).optional(),
@@ -439,6 +442,26 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                 Adicionar alternativa
               </Button>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tipo === 'discursiva' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Detalhes da resposta (informativo ao aluno)</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Pontuação total</Label>
+              <Input type="number" step="0.5" min="0" placeholder="Ex.: 10" {...register('pontuacao_total')} />
+              <p className="text-xs text-muted-foreground">Quanto a questão vale no total.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Número de linhas</Label>
+              <Input type="number" step="1" min="0" placeholder="Ex.: 30" {...register('linhas')} />
+              <p className="text-xs text-muted-foreground">Máximo de linhas esperado na resposta.</p>
+            </div>
           </CardContent>
         </Card>
       )}
