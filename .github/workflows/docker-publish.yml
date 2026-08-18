@@ -96,6 +96,23 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Redeploy automático no Portainer (SÓ na main, se o webhook estiver configurado)
+        # Auto-deploy sem colar SHA na mão: o Portainer re-pulla a tag `latest` e reinicia o serviço.
+        # Pré-requisitos (feitos 1x): (1) serviço web apontando para `:latest`; (2) webhook do serviço
+        # criado no Portainer; (3) a URL do webhook salva no secret PORTAINER_WEBHOOK do repositório.
+        # Sem o secret, este passo é um no-op (deploy segue manual). Branches NUNCA disparam (só a main).
+        if: github.ref == 'refs/heads/main'
+        env:
+          HOOK: ${{ secrets.PORTAINER_WEBHOOK }}
+        run: |
+          if [ -n "$HOOK" ]; then
+            echo "Disparando redeploy no Portainer (re-pull da :latest + restart do serviço)…"
+            curl -fsSL -X POST "$HOOK"
+            echo "OK — Portainer vai puxar a imagem nova e reiniciar o serviço."
+          else
+            echo "PORTAINER_WEBHOOK ausente — pulando auto-deploy (deploy manual pelo Portainer)."
+          fi
+
   deploy:
     needs: build-and-push
     # Deploy automático (docker service update → `latest`) SÓ na main. Uma branch nunca dispara
