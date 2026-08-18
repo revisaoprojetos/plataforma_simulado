@@ -78,8 +78,11 @@ export async function POST(request: NextRequest) {
     if (!a || a !== b) return NextResponse.json({ message: 'Telefone não confere com o cadastro.' }, { status: 403 })
   }
 
-  await criarSessaoAluno({ estudanteId: estudante.id, tenantId, nome: estudante.nome ?? 'Aluno', email: (estudante.email as string | null) ?? email })
+  // Exibe o e-mail que a pessoa REALMENTE usou para entrar (pode ser um secundário) — o acesso
+  // é o mesmo perfil de qualquer forma. Assim o portal mostra o e-mail digitado, não o principal.
+  const emailLogin = email || (estudante.email as string | null) || undefined
+  await criarSessaoAluno({ estudanteId: estudante.id, tenantId, nome: estudante.nome ?? 'Aluno', email: emailLogin })
   // Auditoria: acesso do aluno à plataforma (portal). ator_id fica no entidade_id p/ evitar FK.
-  await registrarAudit({ operacao: 'LOGIN', entidade: 'aluno_portal', entidadeId: estudante.id, atorTipo: 'estudante', tenantId, depois: { nome: estudante.nome ?? 'Aluno', email: (estudante.email as string | null) ?? email } })
+  await registrarAudit({ operacao: 'LOGIN', entidade: 'aluno_portal', entidadeId: estudante.id, atorTipo: 'estudante', tenantId, depois: { nome: estudante.nome ?? 'Aluno', email: emailLogin, email_conta: (estudante.email as string | null) ?? null } })
   return NextResponse.json({ ok: true })
 }
