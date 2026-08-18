@@ -56,12 +56,19 @@ export async function buscarEstudantes(termo: string): Promise<EstudanteBase[]> 
   const svc = await createServiceClient()
   const tenantId = (await getCurrentTenantId()) ?? TENANT_VAZIO
   const like = t.replace(/[%,()*]/g, ' ')
+  const ors = [`nome.ilike.%${like}%`, `email.ilike.%${like}%`, `cpf.ilike.%${like}%`, `telefone.ilike.%${like}%`]
+  // E-mail SECUNDÁRIO (coluna text[]): casa o endereço exato quando o termo parece um e-mail
+  // (operador `cs`/contém — o mesmo usado no login). Assim buscar pelo secundário também acha o aluno.
+  if (t.includes('@')) {
+    const alvo = t.toLowerCase().replace(/[{}(),*%]/g, '')
+    if (alvo) ors.push(`emails_secundarios.cs.{${alvo}}`)
+  }
   const { data } = await svc
     .from('simulado_estudantes')
     .select('id, nome, email, cpf, telefone, classificacao, created_at, avatar, perfil_avatar_cor')
     .eq('deletado', false)
     .eq('tenant_id', tenantId)
-    .or(`nome.ilike.%${like}%,email.ilike.%${like}%,cpf.ilike.%${like}%,telefone.ilike.%${like}%`)
+    .or(ors.join(','))
     .order('nome', { ascending: true })
     .limit(200)
   return (data ?? []).map((e: any) => ({
