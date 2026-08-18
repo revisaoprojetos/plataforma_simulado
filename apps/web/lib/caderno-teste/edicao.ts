@@ -27,18 +27,22 @@ export function camposDoBloco(item: ItemCaderno, parte: string, nomeFallback?: s
   if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] == null) return []; return [{ id: 'intro', label: 'Parágrafo', valor: c.intro[i], multiline: true }] }
   if (parte.startsWith('fechamento:')) { const i = Number(parte.slice('fechamento:'.length)); if (c.fechamento?.[i] == null) return []; return [{ id: 'fechamento', label: 'Parágrafo', valor: c.fechamento[i], multiline: true }] }
   if (parte.startsWith('gabIntro:')) { const i = Number(parte.slice('gabIntro:'.length)); if (c.gabaritoIntro[i] == null) return []; return [{ id: 'texto', label: 'Parágrafo', valor: c.gabaritoIntro[i], multiline: true }] }
+  if (parte.startsWith('card:')) { const i = Number(parte.slice('card:'.length)); if (c.cards?.[i] == null) return []; return [{ id: 'texto', label: 'Título da seção', valor: c.cards[i].texto }] }
+  if (parte.startsWith('fita:')) { const i = Number(parte.slice('fita:'.length)); if (c.fitas?.[i] == null) return []; return [{ id: 'texto', label: 'Texto (uma linha por observação)', valor: c.fitas[i].texto, multiline: true }] }
   if (parte === 'gab_obs') return [{ id: 'obs', label: 'Observações (uma por linha)', valor: c.gabaritoObs.join('\n'), multiline: true }]
   if (parte === 'disc_intro') return [{ id: 'disciplinasIntro', label: 'Introdução das disciplinas', valor: c.disciplinasIntro, multiline: true }]
-  if (parte.startsWith('pilar:')) {
-    const i = Number(parte.slice('pilar:'.length)); const pl = c.pilares[i]; if (!pl) return []
+  if (parte.startsWith('pilar:') || parte.startsWith('pilarG:')) {
+    const pl = parte.startsWith('pilarG:') ? (() => { const [, gi, pj] = parte.split(':'); return c.pilaresGrupos?.[Number(gi)]?.[Number(pj)] })() : c.pilares[Number(parte.slice('pilar:'.length))]
+    if (!pl) return []
     return [
       { id: 'nome', label: 'Nome do pilar', valor: pl.nome },
       { id: 'totalTxt', label: 'Legenda (x de N questões)', valor: pl.totalTxt, multiline: true },
       ...pl.bandas.map((b, j) => ({ id: `banda:${j}`, label: `Texto ${b.faixa}`, valor: b.texto, multiline: true })),
     ]
   }
-  if (parte.startsWith('sug:')) {
-    const i = Number(parte.slice('sug:'.length)); const s = c.sugestoes[i]; if (!s) return []
+  if (parte.startsWith('sug:') || parte.startsWith('sugInd:')) {
+    const s = parte.startsWith('sugInd:') ? c.sugsIndividuais?.[Number(parte.slice('sugInd:'.length))] : c.sugestoes[Number(parte.slice('sug:'.length))]
+    if (!s) return []
     return [
       { id: 'titulo', label: 'Título', valor: s.titulo },
       { id: 'prioridade', label: 'Prioridade', valor: s.prioridade },
@@ -78,15 +82,18 @@ export function camposDoBloco(item: ItemCaderno, parte: string, nomeFallback?: s
 const OCULTAVEIS: Record<string, string> = {
   diag_nota_num: 'nota', diag_nota_faixa: 'nota',
   diag_nome_rot: 'nome', diag_nome_val: 'nome',
-  sec_pilares: 'pilares', sec_disciplinas: 'disciplinas', sec_sugestoes: 'sugestoes',
-  sec_gabarito: 'gabarito', diag_gab_obs: 'gabarito',
+  // Faixa de seção e conteúdo são INDEPENDENTES: cada sec_* oculta só a própria faixa; o conteúdo
+  // tem sua própria chave (ex.: 'pilares'). Assim apagar a faixa não some com o conteúdo (e vice-versa).
+  sec_pilares: 'sec_pilares', sec_disciplinas: 'sec_disciplinas', sec_sugestoes: 'sec_sugestoes', sec_gabarito: 'sec_gabarito',
+  pilares: 'pilares',
+  diag_gab_obs: 'gabarito',
   sec_lingua: 'lingua', lingua_intro: 'lingua', lingua_card: 'lingua',
 }
 export function chaveOcultavel(parte: string): string | null { return OCULTAVEIS[parte] ?? null }
 
 /** Partes do diagnóstico que podem ser REMOVIDAS: itens de lista OU blocos estruturais (ocultar). */
 export function podeRemoverParte(parte: string): boolean {
-  return parte.startsWith('intro:') || parte.startsWith('fechamento:') || parte.startsWith('pilar:') || parte.startsWith('sug:') || parte.startsWith('disc:') || parte.startsWith('gabIntro:') || parte === 'gab_obs' || chaveOcultavel(parte) !== null
+  return parte.startsWith('intro:') || parte.startsWith('fechamento:') || parte.startsWith('pilar:') || parte.startsWith('sug:') || parte.startsWith('sugInd:') || parte.startsWith('pilaresG:') || parte.startsWith('disc:') || parte.startsWith('discInd:') || parte.startsWith('card:') || parte.startsWith('fita:') || parte.startsWith('gabIntro:') || parte === 'gab_obs' || parte === 'dados_card' || parte === 'diag_cab' || parte === 'diag_cab_titulo' || parte === 'diag_cab_sub' || chaveOcultavel(parte) !== null
 }
 
 /** Remove (retorna novo conteúdo): itens de lista somem; blocos estruturais entram em partesOcultas. */
@@ -100,6 +107,12 @@ export function removerParteDiag(conteudo: DiagConteudo | undefined, parte: stri
   else if (parte === 'disc_intro') { c.disciplinasIntro = '' }
   else if (parte === 'lingua_intro') { if (c.linguaPortuguesa) c.linguaPortuguesa.secIntro = '' }
   else if (parte.startsWith('gabIntro:')) { const i = Number(parte.slice('gabIntro:'.length)); if (c.gabaritoIntro[i] != null) c.gabaritoIntro.splice(i, 1) }
+  else if (parte.startsWith('card:')) { const i = Number(parte.slice('card:'.length)); if (c.cards?.[i] != null) c.cards.splice(i, 1) }
+  else if (parte.startsWith('fita:')) { const i = Number(parte.slice('fita:'.length)); if (c.fitas?.[i] != null) c.fitas.splice(i, 1) }
+  else if (parte.startsWith('discInd:')) { const i = Number(parte.slice('discInd:'.length)); if (c.discsIndividuais?.[i] != null) c.discsIndividuais.splice(i, 1) }
+  else if (parte.startsWith('sugInd:')) { const i = Number(parte.slice('sugInd:'.length)); if (c.sugsIndividuais?.[i] != null) c.sugsIndividuais.splice(i, 1) }
+  else if (parte.startsWith('pilaresG:')) { const i = Number(parte.slice('pilaresG:'.length)); if (c.pilaresGrupos?.[i] != null) c.pilaresGrupos.splice(i, 1) }
+  else if (parte === 'dados_card') { c.dadosCard = false }
   else if (parte === 'gab_obs') { c.gabaritoObs = [] }
   else { const oc = chaveOcultavel(parte); if (oc) c.partesOcultas = [...new Set([...(c.partesOcultas ?? []), oc])] }
   return c
@@ -118,17 +131,20 @@ export function aplicarCampoBloco(conteudo: DiagConteudo | undefined, parte: str
   else if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] != null) c.intro[i] = valor }
   else if (parte.startsWith('fechamento:')) { const i = Number(parte.slice('fechamento:'.length)); if (c.fechamento?.[i] != null) c.fechamento[i] = valor }
   else if (parte.startsWith('gabIntro:')) { const i = Number(parte.slice('gabIntro:'.length)); if (c.gabaritoIntro[i] != null) c.gabaritoIntro[i] = valor }
+  else if (parte.startsWith('card:')) { const i = Number(parte.slice('card:'.length)); if (c.cards?.[i] != null) c.cards[i].texto = valor }
+  else if (parte.startsWith('fita:')) { const i = Number(parte.slice('fita:'.length)); if (c.fitas?.[i] != null) c.fitas[i].texto = valor }
   else if (parte === 'gab_obs') { if (campoId === 'obs') c.gabaritoObs = valor.split('\n').filter((l) => l.trim().length > 0) }
   else if (parte === 'disc_intro') { c.disciplinasIntro = valor }
-  else if (parte.startsWith('pilar:')) {
-    const i = Number(parte.slice('pilar:'.length)); if (c.pilares[i]) {
-      const pl = c.pilares[i]
+  else if (parte.startsWith('pilar:') || parte.startsWith('pilarG:')) {
+    const pl = parte.startsWith('pilarG:') ? (() => { const [, gi, pj] = parte.split(':'); return c.pilaresGrupos?.[Number(gi)]?.[Number(pj)] })() : c.pilares[Number(parte.slice('pilar:'.length))]
+    if (pl) {
       if (campoId === 'nome') pl.nome = valor
       else if (campoId === 'totalTxt') pl.totalTxt = valor
       else if (campoId.startsWith('banda:')) { const j = Number(campoId.slice('banda:'.length)); if (pl.bandas[j]) pl.bandas[j].texto = valor }
     }
-  } else if (parte.startsWith('sug:')) {
-    const i = Number(parte.slice('sug:'.length)); const s = c.sugestoes[i]; if (s) {
+  } else if (parte.startsWith('sug:') || parte.startsWith('sugInd:')) {
+    const s = parte.startsWith('sugInd:') ? c.sugsIndividuais?.[Number(parte.slice('sugInd:'.length))] : c.sugestoes[Number(parte.slice('sug:'.length))]
+    if (s) {
       if (campoId === 'titulo') s.titulo = valor
       else if (campoId === 'prioridade') s.prioridade = valor
       else if (campoId === 'intro') s.intro = valor

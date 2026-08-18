@@ -3,7 +3,7 @@
 // própria (como as "modalidades" do editor antigo). Config isolado em
 // simulado_cadernos_teste.config.builderV3.
 
-import { DIAG_PADRAO, DIAG_AGU_2023, DIAG_PGE_RS, DIAG_BASE_4, type DiagConteudo } from './diagnostico'
+import { DIAG_PADRAO, DIAG_AGU_2023, DIAG_PGE_RS, DIAG_BASE_4, DIAG_VAZIO, type DiagConteudo } from './diagnostico'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
 import { FOLHA_RESPOSTAS_DOC, CADERNO_PERGUNTAS_DOC } from '@/lib/caderno-designer/preset-cadernos-doc'
 
@@ -108,6 +108,8 @@ export type BuilderAjustes = {
   alinhamentoParte: Record<string, string>
   /** Cor do TEXTO por PARTE (parte → hex) — para blocos com fundo colorido (nota, cabeçalho…). */
   coresTextoParte: Record<string, string>
+  /** Cor de FUNDO por PARTE (parte → hex) — para cards com fundo editável (disciplina/sugestão individual). */
+  coresFundoParte: Record<string, string>
   /** Estilo (negrito/itálico/sublinhado) por PARTE — aplica ao bloco inteiro. */
   estiloParte: Record<string, { b?: boolean; i?: boolean; u?: boolean }>
   /** Fonte por PARTE (parte → id de FONTES_CADERNO). Herdada pelos textos do bloco. */
@@ -193,6 +195,7 @@ export const AJUSTES_BASE: BuilderAjustes = {
   coresParte: {},
   alinhamentoParte: {},
   coresTextoParte: {},
+  coresFundoParte: {},
   estiloParte: {},
   fonteParte: {},
   tamanhoParte: {},
@@ -288,6 +291,19 @@ export function novoItem(modalidade: Modalidade, modeloId: string): ItemCaderno 
   if (modalidade === 'diagnostico') item.conteudo = clonar(modelo.conteudo ?? DIAG_PADRAO)
   if (modelo.doc) item.docEdit = clonar(modelo.doc) // variante pronta (ex.: folha AGU só com um gabarito)
   return item
+}
+
+/** Item "em branco total": um grupo com conteúdo VAZIO (nada renderiza) — canvas de criação do zero.
+ *  Usa o motor do diagnóstico (único com blocos livres), mas nasce sem nenhum bloco: cabeçalho/dados
+ *  desligados e todas as seções ocultas. O usuário monta pelo painel de Estrutura ("Adicionar bloco"). */
+export function novoItemVazio(): ItemCaderno {
+  return {
+    id: novoId(),
+    modalidade: 'diagnostico',
+    modelo: 'padrao',
+    ajustes: { ...AJUSTES_BASE, titulo: '', mostrarCabecalho: false, mostrarDadosAluno: false, corPrimaria: '#2d254f', corSecundaria: '#f6b420' },
+    conteudo: clonar(DIAG_VAZIO),
+  }
 }
 
 /** Builder padrão: um único grupo (Caderno de Questões / Clássico). */

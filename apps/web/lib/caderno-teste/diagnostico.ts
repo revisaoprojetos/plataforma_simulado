@@ -62,6 +62,20 @@ export type DiagConteudo = {
   discOcultas?: string[]
   /** Blocos estruturais ocultados (nota/nome/pilares/disciplinas/sugestoes/gabarito). */
   partesOcultas?: string[]
+  /** Card "Dados do estudante" (nome/e-mail/tempo/nota) — mesmo estilo da Folha de Respostas. */
+  dadosCard?: boolean
+  /** Overrides de cor do card "Dados do estudante" (chave = atributo do bloco identificacao → hex). */
+  dadosCardCores?: Record<string, string>
+  /** Cards de pilar INDIVIDUAIS/separados: cada "Desempenho por pilar" adicionado vira um grupo próprio. */
+  pilaresGrupos?: DiagPilar[][]
+  /** Cards de sugestão INDIVIDUAIS (só o card, sem faixa de seção). */
+  sugsIndividuais?: DiagSugestao[]
+  /** Faixas de seção avulsas (barra colorida com título, ex.: "GABARITO OFICIAL DESATUALIZADO"). */
+  cards?: { texto: string }[]
+  /** Cards com fita (fundo claro + faixa colorida à esquerda OU no topo + linhas de texto). */
+  fitas?: { texto: string; pos?: 'left' | 'top' }[]
+  /** Cards de disciplina INDIVIDUAIS (só o card com a fita, sem faixa/introdução): chave + posição da fita. */
+  discsIndividuais?: { chave: string; pos?: 'top' | 'left' }[]
   /** Ordem dos blocos na prévia (chaves das entradas). Ausentes ficam na ordem natural, ao final. */
   ordem?: string[]
   /** Cor dos marcadores no início da linha: `>` (normal) e `>>` (forte). */
@@ -97,6 +111,25 @@ export const DIAG_PADRAO: DiagConteudo = {
   gabaritoTitulo: 'GABARITO OFICIAL DESATUALIZADO',
   gabaritoIntro: ['Observações sobre questões que sofreram atualização legislativa ou jurisprudencial.'],
   gabaritoObs: [],
+}
+
+/** Diagnóstico VAZIO — canvas "em branco total" para criação do zero: nenhum bloco renderiza até
+ *  o usuário adicioná-los (painel Estrutura). As chaves estruturais ficam em `partesOcultas`;
+ *  cabeçalho/dados do aluno são desligados nos ajustes do item (ver novoItemVazio). */
+export const DIAG_VAZIO: DiagConteudo = {
+  tituloCabecalho: 'Diagnóstico de Desempenho',
+  subtitulo: '',
+  notaTotal: '{total_questoes}',
+  notaTexto: '{acertos} acertos de {total_questoes} questões — {percentual} de aproveitamento',
+  intro: [],
+  pilares: [],
+  disciplinasIntro: '',
+  disciplinas: [],
+  sugestoes: [],
+  gabaritoTitulo: 'GABARITO OFICIAL DESATUALIZADO',
+  gabaritoIntro: [],
+  gabaritoObs: [],
+  partesOcultas: ['nome', 'nota', 'pilares', 'sec_pilares', 'disciplinas', 'sec_disciplinas', 'sugestoes', 'sec_sugestoes', 'gabarito', 'sec_gabarito', 'lingua'],
 }
 
 /** Preset pronto: Diagnóstico de Desempenho — AGU 2023 (base montada a partir do documento enviado). */
