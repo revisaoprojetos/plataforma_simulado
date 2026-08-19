@@ -210,11 +210,11 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
             {tipo === 'discursiva' && (
               <div key="categoria" className="space-y-2 sm:shrink-0">
                 <Label>Categoria</Label>
-                <Select defaultValue={initialData?.categoria_discursiva ?? 'questao'} onValueChange={(v) => setValue('categoria_discursiva', v as string)}>
+                <Select defaultValue={initialData?.categoria_discursiva ?? 'Questão discursiva'} onValueChange={(v) => setValue('categoria_discursiva', v as string)}>
                   <SelectTrigger className="w-64 *:data-[slot=select-value]:line-clamp-none *:data-[slot=select-value]:whitespace-nowrap"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="questao">Questão discursiva</SelectItem>
-                    <SelectItem value="peca">Peça jurídica</SelectItem>
+                    <SelectItem value="Questão discursiva">Questão discursiva</SelectItem>
+                    <SelectItem value="Peça jurídica">Peça jurídica</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

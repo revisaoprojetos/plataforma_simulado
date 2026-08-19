@@ -363,8 +363,8 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
               </div>
             )}
             {questaoAtual.tipo === 'discursiva' && questaoAtual.categoria_discursiva && (
-              <p className={cn('mb-1.5 text-sm font-semibold', questaoAtual.categoria_discursiva === 'peca' ? 'text-amber-700 dark:text-amber-400' : 'text-primary')}>
-                {questaoAtual.categoria_discursiva === 'peca' ? 'Peça jurídica' : 'Questão discursiva'}
+              <p className={cn('mb-1.5 text-sm font-semibold', /pe[çc]a/i.test(questaoAtual.categoria_discursiva) ? 'text-amber-700 dark:text-amber-400' : 'text-primary')}>
+                {questaoAtual.categoria_discursiva}
               </p>
             )}
             <p className="leading-relaxed text-sm">{questaoAtual.enunciado}</p>
