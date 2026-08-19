@@ -49,7 +49,7 @@ interface QuestaoRev {
   acertou_antes?: boolean | null
   /** justificativa/comentário da questão (exibida quando o gabarito é liberado) */
   justificativa?: string | null
-  discursiva?: { texto: string; status: string; nota: number | null; feedback: string | null; paginas?: number } | null
+  discursiva?: { texto: string; status: string; nota: number | null; feedback: string | null; paginas?: number; imagens?: string[] } | null
   alternativas: AltRev[]
 }
 interface StatDisciplina {
@@ -594,12 +594,22 @@ export function RevisaoFinal({
                           Resposta enviada — aguardando correção por um avaliador.
                         </div>
                       )}
-                      {(q.discursiva?.paginas ?? 0) > 0 ? (
+                      {(q.discursiva?.imagens?.length ?? 0) > 0 ? (
                         <div className="space-y-2">
-                          <div className="flex items-center gap-1.5 rounded-md border bg-muted/30 p-2.5 text-xs text-muted-foreground">
-                            <Images className="h-4 w-4 shrink-0" /> {q.discursiva!.paginas} {q.discursiva!.paginas === 1 ? 'foto enviada' : 'fotos enviadas'} da sua resposta manuscrita.
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            {q.discursiva!.imagens!.map((url, i) => (
+                              <a key={i} href={url} target="_blank" rel="noreferrer" className="relative block overflow-hidden rounded-lg border bg-muted/30">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={url} alt={`Página ${i + 1}`} className="h-44 w-full object-cover" />
+                                <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white">Página {i + 1}</span>
+                              </a>
+                            ))}
                           </div>
                           {q.discursiva?.texto && <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">{q.discursiva.texto}</div>}
+                        </div>
+                      ) : (q.discursiva?.paginas ?? 0) > 0 ? (
+                        <div className="flex items-center gap-1.5 rounded-md border bg-muted/30 p-2.5 text-xs text-muted-foreground">
+                          <Images className="h-4 w-4 shrink-0" /> {q.discursiva!.paginas} {q.discursiva!.paginas === 1 ? 'foto enviada' : 'fotos enviadas'} da sua resposta manuscrita.
                         </div>
                       ) : (
                         <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">

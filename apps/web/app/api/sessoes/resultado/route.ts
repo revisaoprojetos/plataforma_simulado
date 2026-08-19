@@ -7,6 +7,7 @@ import { dadosProgressao } from '@/lib/webhooks/payload'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
+import { getStorage } from '@/lib/storage'
 
 // GET /api/sessoes/resultado?st={sessao_id}
 // Dados da central de revisão: resumo + questões com resposta do aluno.
@@ -119,15 +120,28 @@ export async function GET(request: NextRequest) {
 
   const discMap = new Map((disc ?? []).map((d: any) => [d.questao_id, d]))
 
-  // Nº de páginas (fotos) enviadas por questão discursiva — tolerante (a junção pode não estar migrada).
+  // Fotos enviadas por questão discursiva: contagem + URLs assinadas (bucket privado) — tolerante.
   const discPaginasMap = new Map<string, number>()
+  const discImagensMap = new Map<string, string[]>()
   const discIds = (disc ?? []).map((d: any) => d.id).filter(Boolean)
   if (discIds.length) {
     try {
-      const { data: js } = await admin.from('simulado_resposta_arquivos').select('resposta_id').in('resposta_id', discIds)
-      const porResp = new Map<string, number>()
-      for (const j of (js ?? []) as any[]) porResp.set(j.resposta_id, (porResp.get(j.resposta_id) ?? 0) + 1)
-      for (const d of (disc ?? []) as any[]) discPaginasMap.set(d.questao_id, porResp.get(d.id) ?? 0)
+      const { data: js } = await admin.from('simulado_resposta_arquivos').select('resposta_id, arquivo_id, ordem').in('resposta_id', discIds).order('ordem', { ascending: true })
+      const respToQuestao = new Map((disc ?? []).map((d: any) => [d.id, d.questao_id]))
+      const arqIds = [...new Set(((js ?? []) as any[]).map((j) => j.arquivo_id).filter(Boolean))] as string[]
+      const { data: arqs } = arqIds.length ? await admin.from('simulado_arquivos').select('id, bucket, path').in('id', arqIds) : { data: [] as any[] }
+      const arqMap = new Map(((arqs ?? []) as any[]).map((a) => [a.id, a]))
+      const storage = getStorage()
+      for (const j of (js ?? []) as any[]) {
+        const qid = respToQuestao.get(j.resposta_id)
+        if (!qid) continue
+        discPaginasMap.set(qid, (discPaginasMap.get(qid) ?? 0) + 1)
+        const a = arqMap.get(j.arquivo_id)
+        if (!a) continue
+        let url = ''
+        try { url = await storage.getSignedUrl((a as any).bucket, (a as any).path, 3600) } catch { /* sumiu do storage */ }
+        if (url) { const arr = discImagensMap.get(qid) ?? []; arr.push(url); discImagensMap.set(qid, arr) }
+      }
     } catch { /* tabela ainda não migrada */ }
   }
 
@@ -199,9 +213,9 @@ export async function GET(request: NextRequest) {
       // Justificativa (comentário do professor) — só revelada com o gabarito. No simulado pessoal,
       // cai para o comentário das ALTERNATIVAS (formato do import) quando não há comentario_professor.
       justificativa: gabaritoLiberado ? (q?.comentario_professor ?? (pessoal ? comentarioDasAlternativas(q?.alternativas, correta_id) : null)) : null,
-      // Para discursiva: a resposta escrita + estado da correção + nº de páginas (fotos) enviadas.
+      // Para discursiva: a resposta escrita + estado da correção + fotos enviadas (URLs assinadas).
       discursiva: q?.tipo === 'discursiva' && d
-        ? { texto: d.texto ?? '', status: d.status, nota: d.nota, feedback: d.feedback, paginas: discPaginasMap.get(q.id) ?? 0 }
+        ? { texto: d.texto ?? '', status: d.status, nota: d.nota, feedback: d.feedback, paginas: discPaginasMap.get(q.id) ?? 0, imagens: discImagensMap.get(q.id) ?? [] }
         : null,
       alternativas: (q?.alternativas ?? [])
         .slice()
