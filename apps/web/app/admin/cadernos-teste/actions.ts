@@ -168,6 +168,17 @@ export async function carregarMontagem(bancoId: string): Promise<{ entrega: Entr
     entrega = ((p.data as any)?.caderno_entrega ?? {}) as EntregaSlots
     discursivo = (p.data as any)?.tipo === 'discursiva'
   } catch { /* coluna pode não existir ainda */ }
+  // Fallback robusto: o banco tem QUESTÃO discursiva? (o `tipo` do banco pode não estar setado).
+  if (!discursivo) {
+    try {
+      const qp = await fetchAll<any>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).order('questao_id'))
+      const qids = [...new Set(qp.map((r) => r.questao_id).filter(Boolean))] as string[]
+      if (qids.length) {
+        const disc = await fetchAllByIn<any>(qids, (c) => svc.from('simulado_questoes').select('id').in('id', c).eq('tipo', 'discursiva').eq('tenant_id', access.tenantId))
+        discursivo = disc.length > 0
+      }
+    } catch { /* ignora */ }
+  }
   return { entrega: entrega ?? {}, grupos, pdfs, discursivo }
 }
 
