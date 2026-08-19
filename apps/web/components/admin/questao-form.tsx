@@ -196,7 +196,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                 defaultValue={initialData?.tipo ?? 'objetiva'}
                 onValueChange={(v) => setValue('tipo', v as 'objetiva' | 'discursiva')}
               >
-                <SelectTrigger>
+                <SelectTrigger className="min-w-44">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -211,7 +211,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
               <div key="categoria" className="space-y-2">
                 <Label>Categoria</Label>
                 <Select defaultValue={initialData?.categoria_discursiva ?? 'questao'} onValueChange={(v) => setValue('categoria_discursiva', v as string)}>
-                  <SelectTrigger className="min-w-[12rem]"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="min-w-44"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="questao">Questão discursiva</SelectItem>
                     <SelectItem value="peca">Peça jurídica</SelectItem>
@@ -226,7 +226,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                 defaultValue={initialData?.status ?? 'rascunho'}
                 onValueChange={(v) => setValue('status', v as QuestaoFormData['status'])}
               >
-                <SelectTrigger>
+                <SelectTrigger className="min-w-44">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
