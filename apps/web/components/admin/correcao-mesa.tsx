@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { MarkdownContent } from '@/components/markdown-content'
 import { cn } from '@/lib/utils'
 import {
-  MousePointer2, Highlighter, Circle, Hash, Trash2, Save, Loader2, Lock, BookOpen, ListChecks, Shapes,
+  MousePointer2, Highlighter, Circle, Hash, Type, Trash2, Save, Loader2, Lock, BookOpen, ListChecks, Shapes,
   Flag, Check, RotateCcw, AlertTriangle, MessageSquare, Lightbulb,
 } from 'lucide-react'
 import { CorrecaoFolha, ICONES, type Ferramenta, type Marca } from '@/components/admin/correcao-folha'
@@ -25,6 +25,7 @@ const FERRAMENTAS: { id: Ferramenta; nome: string; Icon: React.ComponentType<{ c
   { id: 'ponto', nome: 'Ponto', Icon: Circle },
   { id: 'icone', nome: 'Ícone', Icon: Shapes },
   { id: 'bolinha', nome: 'Bolinha', Icon: Hash },
+  { id: 'texto', nome: 'Texto', Icon: Type },
 ]
 type Filtro = 'todos' | 'pendentes' | 'revisar' | 'aprovados' | 'com_marca'
 const FILTROS: { id: Filtro; nome: string }[] = [
@@ -72,6 +73,18 @@ export function CorrecaoMesa({
     assumirCorrecao(respostaId).then((r) => { if (!r.ok) setBloqueado(r.error ?? 'Indisponível') })
   }, [respostaId, jaCorrigida])
 
+  // Atalhos: Esc desmarca; Delete/Backspace remove a marca selecionada (fora de campos de texto).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
+      if (e.key === 'Escape') setSelecionadaId(null)
+      else if ((e.key === 'Delete' || e.key === 'Backspace') && selecionadaId) { e.preventDefault(); remover(selecionadaId) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selecionadaId, anotacoes]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const corDoQuesito = (compId: string | null) => {
     if (!compId) return COR_GERAL
     const i = comps.findIndex((c) => c.id === compId)
@@ -94,9 +107,10 @@ export function CorrecaoMesa({
     const tempId = gerarTemp()
     const payload = { ...m, competencia_id: quesitoAtivo, cor: corDoQuesito(quesitoAtivo) }
     setAnotacoes((a) => [...a, { ...payload, id: tempId }])
+    if (m.tipo === 'texto') setSelecionadaId(tempId) // abre a edição inline do texto
     const r = await salvarAnotacao(respostaId, payload)
-    if (r.ok && r.id) setAnotacoes((a) => a.map((x) => (x.id === tempId ? { ...x, id: r.id! } : x)))
-    else { setAnotacoes((a) => a.filter((x) => x.id !== tempId)); toast.error(r.error ?? 'Erro ao salvar marca') }
+    if (r.ok && r.id) { setAnotacoes((a) => a.map((x) => (x.id === tempId ? { ...x, id: r.id! } : x))); setSelecionadaId((s) => (s === tempId ? r.id! : s)) }
+    else { setAnotacoes((a) => a.filter((x) => x.id !== tempId)); setSelecionadaId((s) => (s === tempId ? null : s)); toast.error(r.error ?? 'Erro ao salvar marca') }
   }
   async function remover(id: string) {
     const bak = anotacoes
@@ -112,6 +126,12 @@ export function CorrecaoMesa({
   function atualizarMarca(id: string, patch: Partial<Marca>) {
     setAnotacoes((a) => a.map((x) => (x.id === id ? { ...x, ...patch } : x)))
     if (!id.startsWith('tmp-')) atualizarAnotacao(id, patch)
+  }
+  function patchMarcaLocal(id: string, patch: Partial<Marca>) { setAnotacoes((a) => a.map((x) => (x.id === id ? { ...x, ...patch } : x))) }
+  // Clicar numa marca ativa o quesito dela (o inspetor à direita segue a marca).
+  function selecionarMarca(id: string | null) {
+    setSelecionadaId(id)
+    if (id) { const m = anotacoes.find((a) => a.id === id); if (m?.competencia_id) setQuesitoAtivo(m.competencia_id) }
   }
 
   // ── Ritual por quesito ──
@@ -252,7 +272,7 @@ export function CorrecaoMesa({
         <CorrecaoFolha
           paginas={paginas} marcas={anotacoes} paginaIndex={paginaIndex} onPagina={setPaginaIndex}
           ferramenta={ferramenta} corAtiva={corAtiva} iconeAtivo={iconeAtivo}
-          selecionadaId={selecionadaId} onSelecionar={setSelecionadaId}
+          selecionadaId={selecionadaId} onSelecionar={selecionarMarca}
           onCriar={criar} onAtualizar={atualizarMarca} focoId={focoId} focoKey={focoKey}
         />
 
@@ -273,6 +293,13 @@ export function CorrecaoMesa({
             <button type="button" onClick={() => remover(selecionada.id)} className="ml-auto inline-flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/5">
               <Trash2 className="h-3.5 w-3.5" /> Excluir marca
             </button>
+            {selecionada.tipo === 'texto' && (
+              <input value={selecionada.conteudo ?? ''} autoFocus
+                onChange={(e) => patchMarcaLocal(selecionada.id, { conteudo: e.target.value })}
+                onBlur={(e) => atualizarMarca(selecionada.id, { conteudo: e.target.value })}
+                placeholder="Texto da nota na folha…"
+                className="order-last w-full rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+            )}
           </div>
         )}
       </div>

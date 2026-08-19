@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from 'react'
 import { CheckCircle2, XCircle, AlertTriangle, Star, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type Ferramenta = 'selecionar' | 'destaque' | 'ponto' | 'icone' | 'bolinha'
+export type Ferramenta = 'selecionar' | 'destaque' | 'ponto' | 'icone' | 'bolinha' | 'texto'
 
 export interface Marca {
   id: string
@@ -44,6 +44,15 @@ function MarcaView({ m, selecionada, clicavel, movivel, onIniciarMover, onInicia
         {selecionada && movivel && (
           <div onPointerDown={(e) => onIniciarResize(e, m)} className="absolute -bottom-1.5 -right-1.5 h-3.5 w-3.5 cursor-se-resize rounded-sm border-2 border-white bg-foreground" style={{ mixBlendMode: 'normal' }} />
         )}
+      </div>
+    )
+  }
+  if (m.tipo === 'texto') {
+    return (
+      <div id={`marca-${m.id}`} onClick={onClick} onPointerDown={onDown}
+        className={cn('absolute max-w-[45%] -translate-y-1/2 truncate rounded-md border bg-white px-1.5 py-0.5 text-[11px] font-medium shadow-sm', cursor, selecionada && 'ring-2 ring-foreground')}
+        style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%`, color: cor, borderColor: cor }}>
+        {m.conteudo?.trim() || 'nota…'}
       </div>
     )
   }
@@ -109,12 +118,15 @@ export function CorrecaoFolha({
     e.stopPropagation()
     if (ferramenta !== 'selecionar') return
     onSelecionar(m.id)
+    // A captura de ponteiro redireciona o clique seguinte p/ o wrap; ignora-o (senão desmarcaria).
+    ignorarClique.current = true
     const { x, y } = pos(e)
     setDrag({ id: m.id, modo: 'mover', dx: x - m.x, dy: y - m.y, base: m })
     wrapRef.current?.setPointerCapture?.(e.pointerId)
   }
   function iniciarResize(e: React.PointerEvent, m: Marca) {
     e.stopPropagation()
+    ignorarClique.current = true
     setDrag({ id: m.id, modo: 'resize', dx: 0, dy: 0, base: m })
     wrapRef.current?.setPointerCapture?.(e.pointerId)
   }
@@ -127,6 +139,7 @@ export function CorrecaoFolha({
     const base = { arquivo_id: arquivoAtual, cor: corAtiva, x, y }
     if (ferramenta === 'ponto') onCriar({ ...base, tipo: 'ponto' })
     else if (ferramenta === 'icone') onCriar({ ...base, tipo: 'icone', icone: iconeAtivo })
+    else if (ferramenta === 'texto') onCriar({ ...base, tipo: 'texto', conteudo: '' })
     else if (ferramenta === 'bolinha') {
       const prox = marcas.filter((m) => m.tipo === 'bolinha').reduce((mx, m) => Math.max(mx, m.numero ?? 0), 0) + 1
       onCriar({ ...base, tipo: 'bolinha', numero: prox })
