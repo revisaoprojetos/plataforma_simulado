@@ -135,14 +135,14 @@ export async function criarCadernoTesteNoBanco(bancoId: string, nome?: string): 
 // ===== Montagem / entrega do Caderno (teste) por banco (slots) =====
 export type MontagemGrupo = { cadernoId: string; cadernoNome: string; itemId: string; modalidade: string; modelo: string; label: string }
 export type EntregaRef = { cadernoId?: string; itemId?: string; pdfUrl?: string; pdfNome?: string } | null
-export type EntregaSlots = { diagnostico?: EntregaRef; folha?: EntregaRef; enunciado?: EntregaRef; gabarito?: EntregaRef }
+export type EntregaSlots = { diagnostico?: EntregaRef; folha?: EntregaRef; enunciado?: EntregaRef; gabarito?: EntregaRef; espelho?: EntregaRef }
 
 export type MontagemPdf = { url: string; nome: string; origem: string }
 
 /** Carrega a montagem salva do banco + grupos + PDFs já enviados nos cadernos do banco. */
-export async function carregarMontagem(bancoId: string): Promise<{ entrega: EntregaSlots; grupos: MontagemGrupo[]; pdfs: MontagemPdf[] }> {
+export async function carregarMontagem(bancoId: string): Promise<{ entrega: EntregaSlots; grupos: MontagemGrupo[]; pdfs: MontagemPdf[]; discursivo: boolean }> {
   const access = await getCurrentAccess()
-  if (!access.tenantId || !bancoId) return { entrega: {}, grupos: [], pdfs: [] }
+  if (!access.tenantId || !bancoId) return { entrega: {}, grupos: [], pdfs: [], discursivo: false }
   const svc = createAdminClient()
   const r = await svc.from(TABELA).select('id, nome, config').eq('tenant_id', access.tenantId).eq('deletado', false)
   const grupos: MontagemGrupo[] = []
@@ -162,11 +162,13 @@ export async function carregarMontagem(bancoId: string): Promise<{ entrega: Entr
     const me = materialEnunciadoDoConfig(cfg); if (me.pdfUrl && !vistoUrl.has(me.pdfUrl)) { vistoUrl.add(me.pdfUrl); pdfs.push({ url: me.pdfUrl, nome: me.pdfNome || 'Enunciado', origem: `${c.nome ?? 'Caderno'} · Enunciado` }) }
   }
   let entrega: EntregaSlots = {}
+  let discursivo = false
   try {
-    const p = await svc.from('simulado_pastas').select('caderno_entrega').eq('id', bancoId).eq('tenant_id', access.tenantId).maybeSingle()
+    const p = await svc.from('simulado_pastas').select('caderno_entrega, tipo').eq('id', bancoId).eq('tenant_id', access.tenantId).maybeSingle()
     entrega = ((p.data as any)?.caderno_entrega ?? {}) as EntregaSlots
+    discursivo = (p.data as any)?.tipo === 'discursiva'
   } catch { /* coluna pode não existir ainda */ }
-  return { entrega: entrega ?? {}, grupos, pdfs }
+  return { entrega: entrega ?? {}, grupos, pdfs, discursivo }
 }
 
 /** Salva a montagem (slots) do banco em simulado_pastas.caderno_entrega. */

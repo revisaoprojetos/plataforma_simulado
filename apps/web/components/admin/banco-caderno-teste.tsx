@@ -20,12 +20,12 @@ export async function BancoCadernoTeste({ bancoId, cor = '#6d28d9' }: { bancoId:
           </div>
         </div>
         <div className="p-4">
-          {montagem.grupos.length === 0 ? (
+          {montagem.grupos.length === 0 && !montagem.discursivo ? (
             <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
               Nenhuma peça criada ainda. Crie um caderno no construtor abaixo para poder selecionar aqui.
             </div>
           ) : (
-            <BancoCadernoMontagem bancoId={bancoId} cor={cor} entregaInicial={montagem.entrega} grupos={montagem.grupos} pdfs={montagem.pdfs} />
+            <BancoCadernoMontagem bancoId={bancoId} cor={cor} entregaInicial={montagem.entrega} grupos={montagem.grupos} pdfs={montagem.pdfs} discursivo={montagem.discursivo} />
           )}
         </div>
       </div>

@@ -2,21 +2,25 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { BarChart3, ClipboardList, FileText, BookOpenCheck, ExternalLink, Loader2, ImageUp, Trash2 } from 'lucide-react'
+import { BarChart3, ClipboardList, FileText, BookOpenCheck, ExternalLink, Loader2, ImageUp, Trash2, Stamp } from 'lucide-react'
 import { PdfPreview } from '@/components/admin/pdf-preview'
 import { salvarMontagem, type EntregaSlots, type EntregaRef, type MontagemGrupo, type MontagemPdf } from '@/app/admin/cadernos-teste/actions'
 
-type SlotKey = 'diagnostico' | 'folha' | 'enunciado' | 'gabarito'
-const SLOTS: { chave: SlotKey; titulo: string; icon: typeof FileText; modalidade: string; pdf: boolean }[] = [
+type SlotKey = 'diagnostico' | 'folha' | 'enunciado' | 'gabarito' | 'espelho'
+type SlotDef = { chave: SlotKey; titulo: string; icon: typeof FileText; modalidade: string; pdf: boolean }
+const SLOTS_BASE: SlotDef[] = [
   { chave: 'diagnostico', titulo: 'Diagnóstico', icon: BarChart3, modalidade: 'diagnostico', pdf: false },
   { chave: 'folha', titulo: 'Folha de Resposta', icon: ClipboardList, modalidade: 'folha_respostas', pdf: false },
   { chave: 'enunciado', titulo: 'Caderno de Enunciado', icon: FileText, modalidade: 'caderno_questoes', pdf: true },
   { chave: 'gabarito', titulo: 'Gabarito Comentado', icon: BookOpenCheck, modalidade: 'caderno_questoes', pdf: true },
 ]
+// Só bancos DISCURSIVOS: o espelho (gabarito/rubrica) usado na correção — normalmente importado em PDF.
+const SLOT_ESPELHO: SlotDef = { chave: 'espelho', titulo: 'Espelho', icon: Stamp, modalidade: 'espelho', pdf: true }
 
-export function BancoCadernoMontagem({ bancoId, cor, entregaInicial, grupos, pdfs = [] }: {
-  bancoId: string; cor: string; entregaInicial: EntregaSlots; grupos: MontagemGrupo[]; pdfs?: MontagemPdf[]
+export function BancoCadernoMontagem({ bancoId, cor, entregaInicial, grupos, pdfs = [], discursivo = false }: {
+  bancoId: string; cor: string; entregaInicial: EntregaSlots; grupos: MontagemGrupo[]; pdfs?: MontagemPdf[]; discursivo?: boolean
 }) {
+  const SLOTS: SlotDef[] = discursivo ? [...SLOTS_BASE, SLOT_ESPELHO] : SLOTS_BASE
   const [entrega, setEntrega] = useState<EntregaSlots>(entregaInicial ?? {})
   const [salvando, setSalvando] = useState(false)
 
@@ -48,7 +52,7 @@ export function BancoCadernoMontagem({ bancoId, cor, entregaInicial, grupos, pdf
 }
 
 function SlotCard({ slot, cor, bancoId, grupos, pdfs, valor, onGrupo, onPdf }: {
-  slot: { chave: SlotKey; titulo: string; icon: typeof FileText; modalidade: string; pdf: boolean }
+  slot: SlotDef
   cor: string; bancoId: string; grupos: MontagemGrupo[]; pdfs: MontagemPdf[]; valor: EntregaRef
   onGrupo: (g: MontagemGrupo | null) => void; onPdf: (pdf: EntregaRef) => void
 }) {
@@ -90,7 +94,7 @@ function SlotCard({ slot, cor, bancoId, grupos, pdfs, valor, onGrupo, onPdf }: {
     try {
       const fd = new FormData()
       fd.append('file', file); fd.append('alvo', 'entrega'); fd.append('bancoId', bancoId)
-      fd.append('slot', slot.chave === 'enunciado' ? 'enunciado' : 'gabarito')
+      fd.append('slot', slot.chave)
       const resp = await fetch('/api/admin/material-pdf', { method: 'POST', body: fd })
       const r = await resp.json().catch(() => ({ ok: false }))
       if (!resp.ok || !r.ok) { toast.error(r.error ?? 'Falha ao enviar o PDF.'); return }
