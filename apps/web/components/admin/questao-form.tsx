@@ -65,6 +65,7 @@ const questaoSchema = z
     // Discursiva — informativos ao aluno (não afetam a correção).
     pontuacao_total: z.coerce.number().min(0).optional(),
     linhas: z.coerce.number().int().min(0).optional(),
+    categoria_discursiva: z.string().optional(),
     alternativas: z.array(alternativaSchema).optional(),
     competencias: z.array(competenciaSchema).optional(),
     bancoIds: z.array(z.string()).optional(),
@@ -120,6 +121,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
         { texto: '', correta: true, ordem: 4 },
       ],
       competencias: [{ nome: '', pontos: 1, ordem: 0 }],
+      categoria_discursiva: 'questao',
       ...initialData,
     },
   })
@@ -221,6 +223,20 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
               </Select>
             </div>
           </div>
+
+          {/* Discursiva — categoria (dissertativa × peça jurídica), subtítulo mostrado ao aluno. */}
+          {tipo === 'discursiva' && (
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select defaultValue={initialData?.categoria_discursiva ?? 'questao'} onValueChange={(v) => setValue('categoria_discursiva', v as string)}>
+                <SelectTrigger className="sm:max-w-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="questao">Questão discursiva</SelectItem>
+                  <SelectItem value="peca">Peça jurídica</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Discursiva — informativos ao aluno (nota + nº de linhas), inline. Não afetam a correção. */}
           {tipo === 'discursiva' && (

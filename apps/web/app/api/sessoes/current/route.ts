@@ -80,6 +80,7 @@ export async function GET(request: NextRequest) {
     imagem_url: row.questoes?.imagem_url ?? null,
     pontuacao_total: null as number | null, // discursiva: preenchido abaixo (tolerante)
     linhas: null as number | null,
+    categoria_discursiva: null as string | null,
     alternativas: (row.questoes?.alternativas ?? [])
       .slice()
       .sort((a: any, b: any) => a.ordem - b.ordem)
@@ -90,9 +91,9 @@ export async function GET(request: NextRequest) {
   try {
     const qids = questoes.map((q) => q.id).filter(Boolean)
     if (qids.length) {
-      const { data: extras } = await admin.from('simulado_questoes').select('id, pontuacao_total, linhas').in('id', qids)
+      const { data: extras } = await admin.from('simulado_questoes').select('id, pontuacao_total, linhas, categoria_discursiva').in('id', qids)
       const ex = new Map((extras ?? []).map((r: any) => [r.id, r]))
-      for (const q of questoes) { const e = ex.get(q.id); if (e) { q.pontuacao_total = e.pontuacao_total ?? null; q.linhas = e.linhas ?? null } }
+      for (const q of questoes) { const e = ex.get(q.id); if (e) { q.pontuacao_total = e.pontuacao_total ?? null; q.linhas = e.linhas ?? null; q.categoria_discursiva = e.categoria_discursiva ?? null } }
     }
   } catch { /* colunas não migradas */ }
 

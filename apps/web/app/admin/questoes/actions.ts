@@ -34,6 +34,8 @@ interface QuestaoData {
   /** Discursiva (informativo ao aluno): quanto vale no total + nº máx. de linhas da resposta. */
   pontuacao_total?: number | null
   linhas?: number | null
+  /** Discursiva: categoria/subtítulo ('questao' = dissertativa | 'peca' = peça jurídica). */
+  categoria_discursiva?: string | null
   alternativas?: AlternativaData[]
   competencias?: { nome: string; pontos: number; ordem: number }[]
   /** Bancos (pastas) de destino — a questão é vinculada a estes ao salvar. */
@@ -225,6 +227,7 @@ async function buildQuestaoFields(supabase: SupabaseClient, tenantId: string, da
     // Discursiva (informativo ao aluno) — não afeta a correção. 0/vazio = não definido.
     pontuacao_total: data.pontuacao_total || null,
     linhas: data.linhas || null,
+    categoria_discursiva: data.categoria_discursiva || null,
     // Normalmente já vem como URL (o form hospeda ao selecionar). Defensivo: se chegar base64
     // (ex.: import), sobe pro storage e grava a URL — hospedarBase64 no-op quando já é URL.
     imagem_url: await hospedarBase64(data.imagem_url, createAdminClient(), { tenantId }),
@@ -233,7 +236,7 @@ async function buildQuestaoFields(supabase: SupabaseClient, tenantId: string, da
 
 // Remove colunas que podem não estar migradas (fallback tolerante em insert/update).
 function semColunasNovas<T extends Record<string, any>>(fields: T) {
-  const { imagem_url: _i, pontuacao_total: _p, linhas: _l, ...resto } = fields
+  const { imagem_url: _i, pontuacao_total: _p, linhas: _l, categoria_discursiva: _c, ...resto } = fields
   return resto
 }
 
@@ -276,8 +279,8 @@ export async function createQuestaoAction(data: QuestaoData) {
     .select()
     .single()
 
-  // Tolerante: se alguma coluna nova (imagem_url/pontuacao_total/linhas) ainda não foi migrada, reinsere sem elas.
-  if (error && /imagem_url|pontuacao_total|linhas|column/i.test(error.message)) {
+  // Tolerante: se alguma coluna nova (imagem_url/pontuacao_total/linhas/categoria_discursiva) ainda não foi migrada, reinsere sem elas.
+  if (error && /imagem_url|pontuacao_total|linhas|categoria_discursiva|column/i.test(error.message)) {
     ;({ data: questao, error } = await supabase.from('simulado_questoes').insert(semColunasNovas(fields)).select().single())
   }
 
@@ -338,8 +341,8 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
     .update(fields)
     .eq('id', id)
 
-  // Tolerante: colunas novas (imagem_url/pontuacao_total/linhas) ainda não migradas → atualiza sem elas.
-  if (error && /imagem_url|pontuacao_total|linhas|column/i.test(error.message)) {
+  // Tolerante: colunas novas (imagem_url/pontuacao_total/linhas/categoria_discursiva) ainda não migradas → atualiza sem elas.
+  if (error && /imagem_url|pontuacao_total|linhas|categoria_discursiva|column/i.test(error.message)) {
     ;({ error } = await supabase.from('simulado_questoes').update(semColunasNovas(fields)).eq('id', id))
   }
 

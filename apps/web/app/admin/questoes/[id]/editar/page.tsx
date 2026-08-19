@@ -66,6 +66,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
     imagem_url: (questao.imagem_url as string | null) ?? undefined,
     pontuacao_total: (questao.pontuacao_total as number | null) ?? undefined,
     linhas: (questao.linhas as number | null) ?? undefined,
+    categoria_discursiva: (questao.categoria_discursiva as string | null) ?? undefined,
     alternativas: alternativas?.map((a) => ({
       texto: a.texto,
       correta: a.correta,

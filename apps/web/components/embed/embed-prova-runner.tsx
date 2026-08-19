@@ -36,6 +36,7 @@ interface Questao {
   imagem_url?: string | null
   pontuacao_total?: number | null
   linhas?: number | null
+  categoria_discursiva?: string | null
   alternativas: Alternativa[]
 }
 
@@ -360,6 +361,11 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 Questão anulada — ponto garantido a todos. As alternativas ficam bloqueadas.
               </div>
+            )}
+            {questaoAtual.tipo === 'discursiva' && questaoAtual.categoria_discursiva && (
+              <p className={cn('mb-1.5 text-sm font-semibold', questaoAtual.categoria_discursiva === 'peca' ? 'text-amber-700 dark:text-amber-400' : 'text-primary')}>
+                {questaoAtual.categoria_discursiva === 'peca' ? 'Peça jurídica' : 'Questão discursiva'}
+              </p>
             )}
             <p className="leading-relaxed text-sm">{questaoAtual.enunciado}</p>
             {questaoAtual.imagem_url && (
