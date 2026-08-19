@@ -208,10 +208,10 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
 
             {/* Discursiva — categoria à direita do Tipo (mesma linha), mais larga p/ caber o texto. */}
             {tipo === 'discursiva' && (
-              <div key="categoria" className="space-y-2">
+              <div key="categoria" className="space-y-2 sm:shrink-0">
                 <Label>Categoria</Label>
                 <Select defaultValue={initialData?.categoria_discursiva ?? 'questao'} onValueChange={(v) => setValue('categoria_discursiva', v as string)}>
-                  <SelectTrigger className="min-w-44"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="min-w-56"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="questao">Questão discursiva</SelectItem>
                     <SelectItem value="peca">Peça jurídica</SelectItem>
