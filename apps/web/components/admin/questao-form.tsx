@@ -190,7 +190,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
         </CardHeader>
         <CardContent className="space-y-4">
           <div className={`grid gap-4 sm:grid-cols-2 ${tipo === 'discursiva' ? 'lg:grid-cols-3' : ''}`}>
-            <div className="space-y-2">
+            <div key="tipo" className="space-y-2">
               <Label>Tipo</Label>
               <Select
                 defaultValue={initialData?.tipo ?? 'objetiva'}
@@ -208,7 +208,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
 
             {/* Discursiva — categoria à direita do Tipo (mesma linha). Subtítulo mostrado ao aluno. */}
             {tipo === 'discursiva' && (
-              <div className="space-y-2">
+              <div key="categoria" className="space-y-2">
                 <Label>Categoria</Label>
                 <Select defaultValue={initialData?.categoria_discursiva ?? 'questao'} onValueChange={(v) => setValue('categoria_discursiva', v as string)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -220,7 +220,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
               </div>
             )}
 
-            <div className="space-y-2">
+            <div key="status" className="space-y-2">
               <Label>Status</Label>
               <Select
                 defaultValue={initialData?.status ?? 'rascunho'}
