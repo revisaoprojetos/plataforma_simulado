@@ -214,7 +214,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                   <SelectTrigger className="w-64 *:data-[slot=select-value]:line-clamp-none *:data-[slot=select-value]:whitespace-nowrap"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Questão discursiva">Questão discursiva</SelectItem>
-                    <SelectItem value="Peça jurídica">Peça jurídica</SelectItem>
+                    <SelectItem value="Peça judicial">Peça judicial</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
