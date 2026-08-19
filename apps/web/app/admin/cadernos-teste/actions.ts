@@ -135,7 +135,7 @@ export async function criarCadernoTesteNoBanco(bancoId: string, nome?: string): 
 // ===== Montagem / entrega do Caderno (teste) por banco (slots) =====
 export type MontagemGrupo = { cadernoId: string; cadernoNome: string; itemId: string; modalidade: string; modelo: string; label: string }
 export type EntregaRef = { cadernoId?: string; itemId?: string; pdfUrl?: string; pdfNome?: string } | null
-export type EntregaSlots = { diagnostico?: EntregaRef; folha?: EntregaRef; enunciado?: EntregaRef; gabarito?: EntregaRef; espelho?: EntregaRef }
+export type EntregaSlots = { diagnostico?: EntregaRef; folha?: EntregaRef; enunciado?: EntregaRef; gabarito?: EntregaRef }
 
 export type MontagemPdf = { url: string; nome: string; origem: string }
 

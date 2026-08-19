@@ -29,9 +29,8 @@ export async function POST(req: NextRequest) {
   const file = form.get('file')
   const cadernoId = String(form.get('cadernoId') ?? '')
   const bancoId = String(form.get('bancoId') ?? '')
-  // slot: 'material' = Gabarito Comentado (padrão) | 'enunciado' = Enunciado (2º PDF) | 'espelho' = Espelho (só entrega, banco discursivo).
-  const slotRaw = String(form.get('slot') ?? 'material')
-  const slot = slotRaw === 'enunciado' ? 'enunciado' : 'material'
+  // slot: 'material' = Gabarito Comentado (padrão) | 'enunciado' = Enunciado de Questões (2º PDF).
+  const slot = String(form.get('slot') ?? 'material') === 'enunciado' ? 'enunciado' : 'material'
   const configKey = slot === 'enunciado' ? 'material_enunciado' : 'material'
   // Tabela alvo: designer (real) ou a isolada de teste. Whitelist — nunca aceita nome arbitrário.
   const tabela = String(form.get('tabela') ?? '') === 'simulado_cadernos_teste' ? 'simulado_cadernos_teste' : 'simulado_cadernos_designer'
@@ -51,7 +50,7 @@ export async function POST(req: NextRequest) {
 
   // ----- Montagem do banco (slot enunciado/gabarito como PDF) -----
   if (alvo === 'entrega') {
-    const chave = slotRaw === 'enunciado' ? 'enunciado' : slotRaw === 'espelho' ? 'espelho' : 'gabarito'
+    const chave = slot === 'enunciado' ? 'enunciado' : 'gabarito'
     const hash = createHash('sha1').update(buf).digest('hex').slice(0, 10)
     const path = `materiais/${access.tenantId}/entrega-${bancoId}-${chave}-${hash}.pdf`
     try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }

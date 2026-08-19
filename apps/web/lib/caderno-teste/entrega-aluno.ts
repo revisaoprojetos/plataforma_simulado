@@ -15,7 +15,7 @@ export interface ModalidadeAluno {
 // Entrega V2: espelha os tipos de app/admin/cadernos-teste/actions.ts (definidos aqui p/ NÃO importar de
 // um arquivo 'use server' — evita acoplar a lib ao bundle de server actions). `simulado_pastas.caderno_entrega`.
 export type EntregaRef = { cadernoId?: string; itemId?: string; pdfUrl?: string; pdfNome?: string } | null
-export type EntregaSlots = { diagnostico?: EntregaRef; folha?: EntregaRef; enunciado?: EntregaRef; gabarito?: EntregaRef; espelho?: EntregaRef }
+export type EntregaSlots = { diagnostico?: EntregaRef; folha?: EntregaRef; enunciado?: EntregaRef; gabarito?: EntregaRef }
 
 /** Adiciona ?download=<nome>.pdf p/ o arquivo baixar com nome amigável (mesmo padrão do v1). */
 function comDownload(url: string, nome: string): string {
