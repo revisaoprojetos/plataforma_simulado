@@ -100,6 +100,86 @@ export async function salvarCorrecao(
   return { ok: true }
 }
 
+// ─── Anotações sobre a folha (mesa de correção — Fase 2/Fatia 1) ──────────────
+// Marcas do professor na imagem do aluno (destaque/ponto/ícone/bolinha/texto),
+// coords 0–1, ligadas opcionalmente a um quesito (competência) e a uma página.
+
+export interface AnotacaoInput {
+  arquivo_id?: string | null
+  competencia_id?: string | null
+  tipo: string
+  x: number; y: number
+  largura?: number | null; altura?: number | null
+  cor?: string | null
+  icone?: string | null
+  numero?: number | null
+  conteudo?: string | null
+}
+export interface AnotacaoRow extends AnotacaoInput { id: string; origem: string }
+
+async function podeCorrigir() {
+  const access = await getCurrentAccess()
+  const ok = access.isAdmin || accessCan(access, 'correcao:corrigir') || accessCan(access, 'questoes:update')
+  return { access, ok }
+}
+
+/** Marcas da resposta (todas as páginas). Tolerante à tabela ausente (migração pendente). */
+export async function listarAnotacoes(respostaId: string): Promise<AnotacaoRow[]> {
+  const { access, ok } = await podeCorrigir()
+  if (!ok || !access.tenantId) return []
+  const svc = createAdminClient()
+  try {
+    const { data } = await svc
+      .from('simulado_anotacoes_discursivas')
+      .select('id, arquivo_id, competencia_id, tipo, x, y, largura, altura, cor, icone, numero, conteudo, origem')
+      .eq('resposta_id', respostaId).eq('tenant_id', access.tenantId)
+      .order('criado_em', { ascending: true })
+    return (data ?? []) as unknown as AnotacaoRow[]
+  } catch { return [] }
+}
+
+export async function salvarAnotacao(respostaId: string, a: AnotacaoInput): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const { access, ok } = await podeCorrigir()
+  if (!ok) return { ok: false, error: 'Sem permissão para corrigir.' }
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const { data: r } = await svc.from('simulado_respostas_discursivas').select('id, questao_id').eq('id', respostaId).eq('tenant_id', access.tenantId).maybeSingle()
+  if (!r) return { ok: false, error: 'Resposta não encontrada.' }
+  const { data, error } = await svc.from('simulado_anotacoes_discursivas').insert({
+    tenant_id: access.tenantId, resposta_id: respostaId, questao_id: (r as any).questao_id,
+    arquivo_id: a.arquivo_id ?? null, competencia_id: a.competencia_id ?? null,
+    tipo: a.tipo, x: a.x, y: a.y, largura: a.largura ?? null, altura: a.altura ?? null,
+    cor: a.cor ?? null, icone: a.icone ?? null, numero: a.numero ?? null, conteudo: a.conteudo ?? null,
+    origem: 'professor', criado_por: access.userId,
+  }).select('id').single()
+  if (error) return { ok: false, error: /anotacoes_discursivas|does not exist|relation/i.test(error.message) ? 'Rode a migração 20260819000001_anotacoes_discursivas.sql.' : error.message }
+  return { ok: true, id: (data as { id: string }).id }
+}
+
+export async function atualizarAnotacao(id: string, patch: Partial<AnotacaoInput>): Promise<{ ok: boolean; error?: string }> {
+  const { access, ok } = await podeCorrigir()
+  if (!ok) return { ok: false, error: 'Sem permissão.' }
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const upd: Record<string, unknown> = { atualizado_em: new Date().toISOString() }
+  for (const k of ['competencia_id', 'tipo', 'x', 'y', 'largura', 'altura', 'cor', 'icone', 'numero', 'conteudo'] as const) {
+    if (k in patch) upd[k] = (patch as Record<string, unknown>)[k]
+  }
+  const { error } = await svc.from('simulado_anotacoes_discursivas').update(upd).eq('id', id).eq('tenant_id', access.tenantId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+export async function removerAnotacao(id: string): Promise<{ ok: boolean; error?: string }> {
+  const { access, ok } = await podeCorrigir()
+  if (!ok) return { ok: false, error: 'Sem permissão.' }
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_anotacoes_discursivas').delete().eq('id', id).eq('tenant_id', access.tenantId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
 /**
  * Nota combinada da sessão: cada questão vale igual (0..1); objetiva = 1 se
  * correta; discursiva = nota/pontos_máximos (parcial). nota = média × 10.

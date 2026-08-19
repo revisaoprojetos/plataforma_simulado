@@ -3,9 +3,9 @@ import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { getStorage } from '@/lib/storage'
-import { CorrecaoForm } from '@/components/admin/correcao-form'
-import { MarkdownContent } from '@/components/markdown-content'
-import { ArrowLeft, Images, BookOpen } from 'lucide-react'
+import { CorrecaoMesa } from '@/components/admin/correcao-mesa'
+import { type Marca } from '@/components/admin/correcao-folha'
+import { ArrowLeft } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 const ZERO = '00000000-0000-0000-0000-000000000000'
@@ -30,8 +30,8 @@ export default async function CorrigirPage({ params }: { params: Promise<{ id: s
     svc.from('simulado_sessoes_prova').select('simulado_id').eq('id', r.sessao_id).maybeSingle(),
   ])
 
-  // Páginas (fotos) enviadas pelo aluno → URLs assinadas (bucket privado).
-  const paginas: { url: string }[] = []
+  // Páginas (fotos) enviadas pelo aluno → URLs assinadas (bucket privado). arquivoId liga a anotação à página.
+  const paginas: { arquivoId: string; url: string }[] = []
   try {
     const { data: js } = await svc.from('simulado_resposta_arquivos').select('arquivo_id, ordem').eq('resposta_id', id).order('ordem')
     const arqIds = (js ?? []).map((j: any) => j.arquivo_id)
@@ -42,10 +42,25 @@ export default async function CorrigirPage({ params }: { params: Promise<{ id: s
       for (const j of (js ?? []) as any[]) {
         const a = arqMap.get(j.arquivo_id)
         if (!a) continue
-        try { paginas.push({ url: await storage.getSignedUrl(a.bucket, a.path, 3600) }) } catch { /* sumiu */ }
+        try { paginas.push({ arquivoId: a.id as string, url: await storage.getSignedUrl(a.bucket, a.path, 3600) }) } catch { /* sumiu */ }
       }
     }
   } catch { /* junção não migrada */ }
+
+  // Anotações da mesa (tolerante à tabela ausente — migração pendente).
+  let anotacoesIniciais: Marca[] = []
+  try {
+    const { data: an } = await svc
+      .from('simulado_anotacoes_discursivas')
+      .select('id, arquivo_id, competencia_id, tipo, x, y, largura, altura, cor, icone, numero, conteudo')
+      .eq('resposta_id', id).eq('tenant_id', tenantId).order('criado_em', { ascending: true })
+    anotacoesIniciais = (an ?? []).map((a: any) => ({
+      id: a.id, arquivo_id: a.arquivo_id, competencia_id: a.competencia_id, tipo: a.tipo,
+      x: Number(a.x), y: Number(a.y),
+      largura: a.largura != null ? Number(a.largura) : null, altura: a.altura != null ? Number(a.altura) : null,
+      cor: a.cor, icone: a.icone, numero: a.numero != null ? Number(a.numero) : null, conteudo: a.conteudo,
+    }))
+  } catch { /* tabela não migrada */ }
 
   const notaMap = new Map((notas ?? []).map((n: any) => [n.competencia_id, n]))
   const competencias = (comps ?? []).map((c: any) => ({
@@ -57,74 +72,28 @@ export default async function CorrigirPage({ params }: { params: Promise<{ id: s
   const voltarUrl = simuladoId ? `/admin/correcao/simulado/${simuladoId}` : '/admin/correcao'
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="mx-auto max-w-[110rem] space-y-4">
       <Link href={voltarUrl} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Voltar
       </Link>
 
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Corrigir resposta</h1>
-        <p className="text-muted-foreground">Aluno: {estudante?.nome ?? '—'}</p>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Corrigir resposta</h1>
+          <p className="text-muted-foreground">Aluno: {estudante?.nome ?? '—'}</p>
+        </div>
+        {r.texto && <p className="max-w-md text-xs text-muted-foreground">Obs. do aluno: <span className="italic">“{r.texto.slice(0, 140)}”</span></p>}
       </div>
 
-      {/* Prova do aluno (imagens) × Espelho (enunciado + gabarito + competências) lado a lado. */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Images className="h-4 w-4" /> Resposta do aluno</p>
-          {paginas.length > 0 ? (
-            <div className="grid grid-cols-2 gap-2">
-              {paginas.map((p, i) => (
-                <a key={i} href={p.url} target="_blank" rel="noopener noreferrer" className="group relative block overflow-hidden rounded-lg border bg-background">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.url} alt={`Página ${i + 1}`} className="h-56 w-full object-contain" />
-                  <span className="absolute left-1.5 top-1.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[11px] font-semibold text-white">Página {i + 1}</span>
-                </a>
-              ))}
-            </div>
-          ) : (
-            <p className="rounded-md border bg-background p-3 text-sm text-muted-foreground">Nenhuma foto enviada.</p>
-          )}
-          {r.texto && (
-            <div>
-              <p className="mb-1 text-xs font-semibold text-muted-foreground">Observações do aluno</p>
-              <p className="whitespace-pre-wrap rounded-md border bg-background p-3 text-sm">{r.texto}</p>
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-3 rounded-lg border bg-card p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><BookOpen className="h-4 w-4" /> Espelho de correção</p>
-          <div>
-            <p className="mb-1 text-xs font-semibold text-muted-foreground">Enunciado</p>
-            <MarkdownContent className="text-sm leading-relaxed">{questao?.enunciado ?? '—'}</MarkdownContent>
-          </div>
-          {questao?.comentario_professor && (
-            <div>
-              <p className="mb-1 text-xs font-semibold text-muted-foreground">Gabarito / comentário</p>
-              <MarkdownContent className="text-sm leading-relaxed">{questao.comentario_professor}</MarkdownContent>
-            </div>
-          )}
-          {competencias.length > 0 && (
-            <div>
-              <p className="mb-1 text-xs font-semibold text-muted-foreground">Competências</p>
-              <ul className="space-y-1 text-sm">
-                {competencias.map((c) => (
-                  <li key={c.id} className="flex justify-between gap-2 rounded-md border px-2.5 py-1.5">
-                    <span>{c.nome}</span><span className="shrink-0 text-muted-foreground">{c.pontos.toFixed(1)} pts</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <CorrecaoForm
+      <CorrecaoMesa
         respostaId={r.id}
         jaCorrigida={r.status === 'corrigida'}
         competencias={competencias}
         feedbackInicial={r.feedback ?? ''}
         voltarUrl={voltarUrl}
+        paginas={paginas}
+        anotacoesIniciais={anotacoesIniciais}
+        espelho={{ enunciado: questao?.enunciado ?? '', comentarioProfessor: questao?.comentario_professor ?? null }}
       />
     </div>
   )
