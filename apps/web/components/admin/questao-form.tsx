@@ -220,7 +220,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
               </div>
             )}
 
-            <div key="status" className="space-y-2">
+            <div key="status" className="space-y-2 sm:ml-auto">
               <Label>Status</Label>
               <Select
                 defaultValue={initialData?.status ?? 'rascunho'}
