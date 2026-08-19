@@ -22,13 +22,19 @@ export default async function CorrigirPage({ params }: { params: Promise<{ id: s
     .eq('id', id).eq('tenant_id', tenantId).maybeSingle()
   if (!r) notFound()
 
-  const [{ data: questao }, { data: estudante }, { data: comps }, { data: notas }, { data: sessao }] = await Promise.all([
+  const [{ data: questao }, { data: estudante }, { data: comps }, { data: sessao }] = await Promise.all([
     svc.from('simulado_questoes').select('enunciado, comentario_professor').eq('id', r.questao_id).maybeSingle(),
     svc.from('simulado_estudantes').select('nome').eq('id', r.estudante_id).maybeSingle(),
     svc.from('simulado_competencias').select('id, nome, pontos, ordem').eq('questao_id', r.questao_id).order('ordem'),
-    svc.from('simulado_correcao_competencias').select('competencia_id, nota, comentario').eq('resposta_id', id),
     svc.from('simulado_sessoes_prova').select('simulado_id').eq('id', r.sessao_id).maybeSingle(),
   ])
+  // Notas por competência com o estado do ritual (tolerante à migração 2 ausente).
+  const notas = await (async () => {
+    const full = await svc.from('simulado_correcao_competencias').select('competencia_id, nota, comentario, audit_state, mensagem_aluno').eq('resposta_id', id)
+    if (!full.error) return full.data ?? []
+    const basic = await svc.from('simulado_correcao_competencias').select('competencia_id, nota, comentario').eq('resposta_id', id)
+    return basic.data ?? []
+  })()
 
   // Páginas (fotos) enviadas pelo aluno → URLs assinadas (bucket privado). arquivoId liga a anotação à página.
   const paginas: { arquivoId: string; url: string }[] = []
@@ -63,11 +69,16 @@ export default async function CorrigirPage({ params }: { params: Promise<{ id: s
   } catch { /* tabela não migrada */ }
 
   const notaMap = new Map((notas ?? []).map((n: any) => [n.competencia_id, n]))
-  const competencias = (comps ?? []).map((c: any) => ({
-    id: c.id, nome: c.nome, pontos: Number(c.pontos),
-    nota: notaMap.get(c.id)?.nota != null ? Number(notaMap.get(c.id).nota) : null,
-    comentario: notaMap.get(c.id)?.comentario ?? '',
-  }))
+  const competencias = (comps ?? []).map((c: any) => {
+    const n = notaMap.get(c.id)
+    return {
+      id: c.id, nome: c.nome, pontos: Number(c.pontos),
+      nota: n?.nota != null ? Number(n.nota) : null,
+      comentario: n?.comentario ?? '',
+      audit_state: (n?.audit_state ?? 'pending') as string,
+      mensagem: n?.mensagem_aluno ?? '',
+    }
+  })
   const simuladoId = (sessao as any)?.simulado_id as string | undefined
   const voltarUrl = simuladoId ? `/admin/correcao/simulado/${simuladoId}` : '/admin/correcao'
 

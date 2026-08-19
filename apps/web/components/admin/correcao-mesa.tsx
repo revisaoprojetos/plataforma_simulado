@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -8,11 +8,12 @@ import { MarkdownContent } from '@/components/markdown-content'
 import { cn } from '@/lib/utils'
 import {
   MousePointer2, Highlighter, Circle, Hash, Trash2, Save, Loader2, Lock, BookOpen, ListChecks, Shapes,
+  Flag, Check, RotateCcw, AlertTriangle, MessageSquare, Lightbulb,
 } from 'lucide-react'
 import { CorrecaoFolha, ICONES, type Ferramenta, type Marca } from '@/components/admin/correcao-folha'
-import { assumirCorrecao, salvarCorrecao, salvarAnotacao, removerAnotacao, atualizarAnotacao } from '@/app/admin/correcao/actions'
+import { assumirCorrecao, salvarCorrecao, salvarQuesito, salvarAnotacao, removerAnotacao, atualizarAnotacao } from '@/app/admin/correcao/actions'
 
-interface Comp { id: string; nome: string; pontos: number; nota: number | null; comentario: string }
+interface Comp { id: string; nome: string; pontos: number; nota: number | null; comentario: string; audit_state: string; mensagem: string }
 
 const PALETA = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#65a30d']
 const COR_GERAL = '#64748b'
@@ -25,14 +26,18 @@ const FERRAMENTAS: { id: Ferramenta; nome: string; Icon: React.ComponentType<{ c
   { id: 'icone', nome: 'Ícone', Icon: Shapes },
   { id: 'bolinha', nome: 'Bolinha', Icon: Hash },
 ]
+type Filtro = 'todos' | 'pendentes' | 'revisar' | 'aprovados' | 'com_marca'
+const FILTROS: { id: Filtro; nome: string }[] = [
+  { id: 'todos', nome: 'Todos' }, { id: 'pendentes', nome: 'Pendentes' },
+  { id: 'revisar', nome: 'Revisar' }, { id: 'aprovados', nome: 'Aprovados' }, { id: 'com_marca', nome: 'Com marca' },
+]
+const dotEstado = (s: string) => (s === 'approved' ? 'bg-emerald-500' : s === 'review' ? 'bg-amber-500' : 'bg-muted-foreground/30')
+const SEV_CLS: Record<string, string> = {
+  alto: 'border-destructive/30 bg-destructive/5 text-destructive',
+  medio: 'border-amber-300/50 bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300',
+  baixo: 'border-sky-300/50 bg-sky-50 text-sky-800 dark:bg-sky-900/20 dark:text-sky-300',
+}
 
-/**
- * Mesa de correção (Fase 2 / Fatia 1): 3 colunas —
- *  ① índice dos quesitos (competências) com contagem de marcas e estado (navega/zooma a folha),
- *  ② folha do aluno com camada de anotações (destaque/ponto/ícone/bolinha, coords 0–1),
- *  ③ inspetor: espelho + avaliação por competência + feedback + "Devolver".
- * As marcas são coloridas pelo quesito ativo (reforça o "ligamento dos pontos").
- */
 export function CorrecaoMesa({
   respostaId, jaCorrigida, competencias, feedbackInicial, voltarUrl,
   paginas, anotacoesIniciais, espelho,
@@ -47,16 +52,16 @@ export function CorrecaoMesa({
   espelho: { enunciado: string; comentarioProfessor: string | null }
 }) {
   const router = useRouter()
-  // Avaliação (estado elevado p/ o índice ficar vivo).
   const [comps, setComps] = useState<Comp[]>(competencias)
+  const compsRef = useRef(comps); useEffect(() => { compsRef.current = comps }, [comps])
   const [feedback, setFeedback] = useState(feedbackInicial)
   const [bloqueado, setBloqueado] = useState<string | null>(null)
   const [pending, start] = useTransition()
-  // Mesa.
   const [anotacoes, setAnotacoes] = useState<Marca[]>(anotacoesIniciais)
   const [ferramenta, setFerramenta] = useState<Ferramenta>('selecionar')
   const [iconeAtivo, setIconeAtivo] = useState<string>('check')
   const [quesitoAtivo, setQuesitoAtivo] = useState<string | null>(competencias[0]?.id ?? null)
+  const [filtro, setFiltro] = useState<Filtro>('todos')
   const [paginaIndex, setPaginaIndex] = useState(0)
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null)
   const [focoId, setFocoId] = useState<string | null>(null)
@@ -75,6 +80,7 @@ export function CorrecaoMesa({
   const corAtiva = corDoQuesito(quesitoAtivo)
   const contarMarcas = (compId: string | null) => anotacoes.filter((a) => (a.competencia_id ?? null) === compId).length
   const selecionada = anotacoes.find((a) => a.id === selecionadaId) ?? null
+  const ativo = comps.find((c) => c.id === quesitoAtivo) ?? null
 
   function focar(id: string | null) { if (!id) return; setFocoId(id); setFocoKey((k) => k + 1) }
   function irParaQuesito(compId: string | null) {
@@ -83,6 +89,7 @@ export function CorrecaoMesa({
     if (primeira) { setSelecionadaId(primeira.id); focar(primeira.id) }
   }
 
+  // ── Anotações ──
   async function criar(m: Omit<Marca, 'id'>) {
     const tempId = gerarTemp()
     const payload = { ...m, competencia_id: quesitoAtivo, cor: corDoQuesito(quesitoAtivo) }
@@ -102,12 +109,51 @@ export function CorrecaoMesa({
     setAnotacoes((a) => a.map((x) => (x.id === id ? { ...x, competencia_id: compId, cor } : x)))
     if (!id.startsWith('tmp-')) atualizarAnotacao(id, { competencia_id: compId, cor })
   }
+  function atualizarMarca(id: string, patch: Partial<Marca>) {
+    setAnotacoes((a) => a.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+    if (!id.startsWith('tmp-')) atualizarAnotacao(id, patch)
+  }
 
-  function setNota(id: string, nota: number) { setComps((cs) => cs.map((c) => (c.id === id ? { ...c, nota } : c))) }
-  function setComentario(id: string, comentario: string) { setComps((cs) => cs.map((c) => (c.id === id ? { ...c, comentario } : c))) }
+  // ── Ritual por quesito ──
+  function patchComp(id: string, patch: Partial<Comp>) { setComps((cs) => cs.map((c) => (c.id === id ? { ...c, ...patch } : c))) }
+  async function persistQuesito(id: string, override?: Partial<Comp>) {
+    const c = { ...(compsRef.current.find((x) => x.id === id) ?? {} as Comp), ...override }
+    const r = await salvarQuesito(respostaId, id, { nota: Number(c.nota) || 0, comentario: c.comentario ?? null, audit_state: c.audit_state, mensagem_aluno: c.mensagem ?? null })
+    if (!r.ok) toast.error(r.error ?? 'Erro ao salvar quesito')
+  }
+  function editarNota(id: string, nota: number) {
+    const c = comps.find((x) => x.id === id)
+    // Editar um quesito aprovado rebaixa p/ pendente (AURÉA §14.5).
+    patchComp(id, { nota, ...(c?.audit_state === 'approved' ? { audit_state: 'pending' } : {}) })
+  }
+  function mudarEstado(id: string, audit_state: string, avancar?: boolean) {
+    patchComp(id, { audit_state })
+    persistQuesito(id, { audit_state })
+    if (avancar) { const i = comps.findIndex((c) => c.id === id); const prox = comps[i + 1]; if (prox) irParaQuesito(prox.id) }
+  }
+
+  function setFeedbackLocal(v: string) { setFeedback(v) }
 
   const total = comps.reduce((acc, c) => acc + (Number(c.nota) || 0), 0)
   const maxTotal = comps.reduce((acc, c) => acc + c.pontos, 0)
+
+  // ── Alertas mecânicos (sem IA) ──
+  const alertas: { sev: string; msg: string }[] = []
+  for (const c of comps) {
+    const nMarks = contarMarcas(c.id)
+    if (c.audit_state === 'approved' && c.nota == null) alertas.push({ sev: 'alto', msg: `“${c.nome}” aprovado sem nota definida.` })
+    if (c.nota != null && c.nota > c.pontos) alertas.push({ sev: 'alto', msg: `“${c.nome}”: nota acima do máximo (${c.pontos}).` })
+    if (c.nota != null && c.nota < c.pontos && nMarks === 0) alertas.push({ sev: 'medio', msg: `“${c.nome}” perdeu pontos sem nenhuma marca na folha.` })
+    if (c.audit_state === 'approved' && !c.mensagem.trim()) alertas.push({ sev: 'baixo', msg: `“${c.nome}” aprovado sem devolutiva ao aluno.` })
+  }
+
+  const quesitosVis = comps.filter((c) => {
+    if (filtro === 'pendentes') return c.audit_state === 'pending' || !c.audit_state
+    if (filtro === 'revisar') return c.audit_state === 'review'
+    if (filtro === 'aprovados') return c.audit_state === 'approved'
+    if (filtro === 'com_marca') return contarMarcas(c.id) > 0
+    return true
+  })
 
   function salvar() {
     start(async () => {
@@ -117,25 +163,32 @@ export function CorrecaoMesa({
     })
   }
 
-  const btnTool = (ativa: boolean) => cn('flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors', ativa ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')
+  const btnTool = (a: boolean) => cn('flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors', a ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[15rem_minmax(0,1fr)_20rem]">
+    <div className="grid gap-4 lg:grid-cols-[15rem_minmax(0,1fr)_21rem]">
       {/* ① ÍNDICE / TRILHO */}
       <aside className="space-y-2">
         <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><ListChecks className="h-4 w-4" /> Quesitos</p>
+        <div className="flex flex-wrap gap-1">
+          {FILTROS.map((f) => (
+            <button key={f.id} type="button" onClick={() => setFiltro(f.id)}
+              className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors', filtro === f.id ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}>
+              {f.nome}
+            </button>
+          ))}
+        </div>
         <div className="space-y-1.5">
-          {comps.map((c) => {
+          {quesitosVis.map((c) => {
             const n = contarMarcas(c.id)
-            const preenchido = c.nota != null
-            const ativo = quesitoAtivo === c.id
+            const at = quesitoAtivo === c.id
             return (
               <button key={c.id} type="button" onClick={() => irParaQuesito(c.id)}
-                className={cn('w-full rounded-lg border p-2.5 text-left transition-colors', ativo ? 'border-primary bg-primary/5' : 'hover:bg-muted/50')}>
+                className={cn('w-full rounded-lg border p-2.5 text-left transition-colors', at ? 'border-primary bg-primary/5' : 'hover:bg-muted/50')}>
                 <div className="flex items-center gap-2">
                   <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: corDoQuesito(c.id) }} />
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">{c.nome}</span>
-                  <span className={cn('h-2 w-2 shrink-0 rounded-full', preenchido ? 'bg-emerald-500' : 'bg-muted-foreground/30')} title={preenchido ? 'Avaliado' : 'Pendente'} />
+                  <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', dotEstado(c.audit_state))} title={c.audit_state === 'approved' ? 'Aprovado' : c.audit_state === 'review' ? 'Revisar' : 'Pendente'} />
                 </div>
                 <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
                   <span>{(c.nota ?? 0).toFixed(1)} / {c.pontos.toFixed(1)} pts</span>
@@ -144,7 +197,7 @@ export function CorrecaoMesa({
               </button>
             )
           })}
-          {/* Geral (marcas sem quesito) */}
+          {quesitosVis.length === 0 && <p className="rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground">Nenhum quesito neste filtro.</p>}
           <button type="button" onClick={() => irParaQuesito(null)}
             className={cn('w-full rounded-lg border p-2.5 text-left transition-colors', quesitoAtivo === null ? 'border-primary bg-primary/5' : 'hover:bg-muted/50')}>
             <div className="flex items-center gap-2">
@@ -155,6 +208,16 @@ export function CorrecaoMesa({
             <p className="mt-1 text-[11px] text-muted-foreground">Marcas sem quesito</p>
           </button>
         </div>
+
+        {/* Alertas mecânicos */}
+        {alertas.length > 0 && (
+          <div className="space-y-1.5 pt-1">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><AlertTriangle className="h-4 w-4" /> Alertas ({alertas.length})</p>
+            {alertas.map((a, i) => (
+              <p key={i} className={cn('rounded-md border px-2 py-1.5 text-[11px] leading-snug', SEV_CLS[a.sev])}>{a.msg}</p>
+            ))}
+          </div>
+        )}
       </aside>
 
       {/* ② FOLHA + FERRAMENTAS */}
@@ -187,21 +250,12 @@ export function CorrecaoMesa({
         </div>
 
         <CorrecaoFolha
-          paginas={paginas}
-          marcas={anotacoes}
-          paginaIndex={paginaIndex}
-          onPagina={setPaginaIndex}
-          ferramenta={ferramenta}
-          corAtiva={corAtiva}
-          iconeAtivo={iconeAtivo}
-          selecionadaId={selecionadaId}
-          onSelecionar={setSelecionadaId}
-          onCriar={criar}
-          focoId={focoId}
-          focoKey={focoKey}
+          paginas={paginas} marcas={anotacoes} paginaIndex={paginaIndex} onPagina={setPaginaIndex}
+          ferramenta={ferramenta} corAtiva={corAtiva} iconeAtivo={iconeAtivo}
+          selecionadaId={selecionadaId} onSelecionar={setSelecionadaId}
+          onCriar={criar} onAtualizar={atualizarMarca} focoId={focoId} focoKey={focoKey}
         />
 
-        {/* Marca selecionada */}
         {selecionada && (
           <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2.5 text-sm">
             <span className="inline-flex items-center gap-1.5 font-medium">
@@ -223,7 +277,7 @@ export function CorrecaoMesa({
         )}
       </div>
 
-      {/* ③ INSPETOR: espelho + avaliação */}
+      {/* ③ INSPETOR: espelho + quesito ativo (ritual) + fecho */}
       <aside className="space-y-3">
         <details className="rounded-lg border bg-muted/20 p-3" open>
           <summary className="cursor-pointer text-xs font-semibold text-muted-foreground"><BookOpen className="mr-1 inline h-4 w-4" /> Espelho de correção</summary>
@@ -246,40 +300,91 @@ export function CorrecaoMesa({
             <Lock className="h-4 w-4" /> {bloqueado}
           </div>
         ) : (
-          <div className="space-y-3 rounded-lg border bg-card p-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Avaliação</h2>
-              <span className="text-xs text-muted-foreground">Total <strong className="text-foreground">{total.toFixed(1)}</strong> / {maxTotal.toFixed(1)}</span>
-            </div>
-            {comps.length === 0 && <p className="text-sm text-muted-foreground">Esta questão não tem competências — use o feedback abaixo (nota 0).</p>}
-            {comps.map((c) => (
-              <div key={c.id} className="space-y-1.5 rounded-md border p-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium">
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: corDoQuesito(c.id) }} />
-                    <span className="truncate">{c.nome}</span>
+          <>
+            {/* Quesito ativo — ritual */}
+            {ativo ? (
+              <div className="space-y-2.5 rounded-lg border bg-card p-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full" style={{ background: corDoQuesito(ativo.id) }} />
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{ativo.nome}</span>
+                  <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                    ativo.audit_state === 'approved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                      : ativo.audit_state === 'review' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                      : 'bg-muted text-muted-foreground')}>
+                    {ativo.audit_state === 'approved' ? 'Aprovado' : ativo.audit_state === 'review' ? 'Revisar' : 'Pendente'}
                   </span>
-                  <div className="flex shrink-0 items-center gap-1 text-sm">
-                    <input type="number" step="0.5" min="0" max={c.pontos} value={c.nota ?? ''}
-                      onChange={(e) => setNota(c.id, Math.min(c.pontos, Math.max(0, Number(e.target.value))))}
-                      className="w-16 rounded-md border bg-[var(--input-bg,transparent)] px-2 py-1 text-right outline-none focus:ring-1 focus:ring-ring" />
-                    <span className="text-muted-foreground">/ {c.pontos}</span>
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground">Nota do quesito</span>
+                  <div className="flex items-center gap-1 text-sm">
+                    <input type="number" step="0.5" min="0" max={ativo.pontos} value={ativo.nota ?? ''}
+                      onChange={(e) => editarNota(ativo.id, Math.min(ativo.pontos, Math.max(0, Number(e.target.value))))}
+                      onBlur={() => persistQuesito(ativo.id)}
+                      className="w-20 rounded-md border bg-[var(--input-bg,transparent)] px-2 py-1 text-right outline-none focus:ring-1 focus:ring-ring" />
+                    <span className="text-muted-foreground">/ {ativo.pontos}</span>
                   </div>
                 </div>
-                <input value={c.comentario} onChange={(e) => setComentario(c.id, e.target.value)} placeholder="Comentário do critério (opcional)"
+
+                <input value={ativo.comentario} onChange={(e) => patchComp(ativo.id, { comentario: e.target.value })} onBlur={() => persistQuesito(ativo.id)}
+                  placeholder="Fundamentação do critério (privada)"
                   className="w-full rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring" />
+
+                {/* Rodapé do ritual */}
+                <div className="flex items-center gap-1.5">
+                  {ativo.audit_state === 'approved' ? (
+                    <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => mudarEstado(ativo.id, 'pending')}>
+                      <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Reabrir
+                    </Button>
+                  ) : (
+                    <>
+                      <Button type="button" variant="outline" size="sm" onClick={() => mudarEstado(ativo.id, 'review')}
+                        style={ativo.audit_state === 'review' ? { borderColor: '#f59e0b', color: '#b45309' } : undefined}>
+                        <Flag className="mr-1.5 h-3.5 w-3.5" /> Revisar
+                      </Button>
+                      <Button type="button" size="sm" className="flex-1" onClick={() => mudarEstado(ativo.id, 'approved', true)}>
+                        <Check className="mr-1.5 h-3.5 w-3.5" /> Aprovar e próximo
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+                {/* Mensagem ao aluno — travada até aprovar (AURÉA) */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-1.5 text-xs font-medium">
+                    <MessageSquare className="h-3.5 w-3.5" /> Devolutiva do quesito ao aluno
+                    {ativo.audit_state !== 'approved' && <Lock className="h-3 w-3 text-muted-foreground" />}
+                  </label>
+                  <textarea value={ativo.mensagem} disabled={ativo.audit_state !== 'approved'}
+                    onChange={(e) => patchComp(ativo.id, { mensagem: e.target.value })} onBlur={() => persistQuesito(ativo.id)}
+                    rows={3} placeholder={ativo.audit_state === 'approved' ? 'Mensagem ao aluno sobre este quesito…' : 'Aprove o quesito para liberar a devolutiva.'}
+                    className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted/40 disabled:text-muted-foreground" />
+                </div>
               </div>
-            ))}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Feedback geral</label>
-              <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={3} placeholder="Observações gerais para o aluno…"
-                className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+            ) : (
+              <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
+                <Lightbulb className="mx-auto mb-1 h-4 w-4" /> Selecione um quesito no índice para avaliá-lo.
+              </div>
+            )}
+
+            {/* Fecho */}
+            <div className="space-y-2.5 rounded-lg border bg-card p-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold">Nota final</h2>
+                <span className="text-xs text-muted-foreground">Total <strong className="text-foreground">{total.toFixed(1)}</strong> / {maxTotal.toFixed(1)}</span>
+              </div>
+              {comps.length === 0 && <p className="text-xs text-muted-foreground">Sem competências — use o feedback abaixo (nota 0).</p>}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Feedback geral</label>
+                <textarea value={feedback} onChange={(e) => setFeedbackLocal(e.target.value)} rows={3} placeholder="Observações gerais para o aluno…"
+                  className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+              </div>
+              <Button onClick={salvar} disabled={pending} className="w-full">
+                {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                {jaCorrigida ? 'Atualizar correção' : 'Devolver ao aluno'}
+              </Button>
             </div>
-            <Button onClick={salvar} disabled={pending} className="w-full">
-              {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              {jaCorrigida ? 'Atualizar correção' : 'Devolver ao aluno'}
-            </Button>
-          </div>
+          </>
         )}
       </aside>
     </div>

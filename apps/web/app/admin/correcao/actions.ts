@@ -66,12 +66,17 @@ export async function salvarCorrecao(
     return { ok: false, error: 'O lock desta resposta é de outro corretor.' }
   }
 
-  // Regrava as notas por competência.
-  await svc.from('simulado_correcao_competencias').delete().eq('resposta_id', respostaId)
+  // Grava as notas por competência: UPSERT (preserva audit_state/mensagem do ritual).
+  // Se o índice único ainda não existe (migração 2 pendente), cai no apaga+insere antigo.
   if (competencias.length) {
-    await svc.from('simulado_correcao_competencias').insert(
-      competencias.map((c) => ({ resposta_id: respostaId, competencia_id: c.competencia_id, nota: c.nota ?? 0, comentario: c.comentario?.trim() || null })),
-    )
+    const rows = competencias.map((c) => ({ resposta_id: respostaId, competencia_id: c.competencia_id, nota: c.nota ?? 0, comentario: c.comentario?.trim() || null }))
+    const { error: upErr } = await svc.from('simulado_correcao_competencias').upsert(rows, { onConflict: 'resposta_id,competencia_id' })
+    if (upErr) {
+      await svc.from('simulado_correcao_competencias').delete().eq('resposta_id', respostaId)
+      await svc.from('simulado_correcao_competencias').insert(rows)
+    }
+  } else {
+    await svc.from('simulado_correcao_competencias').delete().eq('resposta_id', respostaId)
   }
   const notaTotal = competencias.reduce((acc, c) => acc + (Number(c.nota) || 0), 0)
 
@@ -179,6 +184,46 @@ export async function removerAnotacao(id: string): Promise<{ ok: boolean; error?
   if (error) return { ok: false, error: error.message }
   return { ok: true }
 }
+
+// ─── Ritual por quesito (mesa — Fase 2/Fatia 2) ───────────────────────────────
+// Salva UM quesito (nota/comentário/estado/mensagem) sem apagar os demais (UPSERT).
+// Requer o índice único da migração 20260819000002; degrada se as colunas novas faltam.
+const HINT_RITUAL = 'Rode a migração 20260819000002_correcao_ritual.sql.'
+const semUnico = (m: string) => /no unique|exclusion constraint|on conflict|matching the on conflict/i.test(m)
+const colFaltando = (m: string) => /audit_state|mensagem_aluno|atualizado_em|column .* does not exist/i.test(m)
+
+export async function salvarQuesito(
+  respostaId: string,
+  competenciaId: string,
+  patch: { nota?: number; comentario?: string | null; audit_state?: string; mensagem_aluno?: string | null },
+): Promise<{ ok: boolean; error?: string }> {
+  const { access, ok } = await podeCorrigir()
+  if (!ok) return { ok: false, error: 'Sem permissão para corrigir.' }
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const { data: r } = await svc.from('simulado_respostas_discursivas').select('id').eq('id', respostaId).eq('tenant_id', access.tenantId).maybeSingle()
+  if (!r) return { ok: false, error: 'Resposta não encontrada.' }
+
+  const full: Record<string, unknown> = { resposta_id: respostaId, competencia_id: competenciaId, atualizado_em: new Date().toISOString() }
+  if ('nota' in patch) full.nota = patch.nota ?? 0
+  if ('comentario' in patch) full.comentario = patch.comentario?.toString().trim() || null
+  if ('audit_state' in patch) full.audit_state = patch.audit_state
+  if ('mensagem_aluno' in patch) full.mensagem_aluno = patch.mensagem_aluno?.toString().trim() || null
+
+  let { error } = await svc.from('simulado_correcao_competencias').upsert(full, { onConflict: 'resposta_id,competencia_id' })
+  if (error && colFaltando(error.message)) {
+    // Colunas novas ausentes → grava só nota/comentário.
+    const basic: Record<string, unknown> = { resposta_id: respostaId, competencia_id: competenciaId }
+    if ('nota' in patch) basic.nota = patch.nota ?? 0
+    if ('comentario' in patch) basic.comentario = patch.comentario?.toString().trim() || null
+    ;({ error } = await svc.from('simulado_correcao_competencias').upsert(basic, { onConflict: 'resposta_id,competencia_id' }))
+  }
+  if (error) return { ok: false, error: semUnico(error.message) ? HINT_RITUAL : error.message }
+  return { ok: true }
+}
+
+/**
+ * Nota combinada da sessão: cada questão vale igual (0..1); objetiva = 1 se
 
 /**
  * Nota combinada da sessão: cada questão vale igual (0..1); objetiva = 1 se
