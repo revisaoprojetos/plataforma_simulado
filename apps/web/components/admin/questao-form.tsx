@@ -189,7 +189,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
           <CardTitle>Informações da Questão</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className={`grid gap-4 sm:grid-cols-2 ${tipo === 'discursiva' ? 'lg:grid-cols-3' : ''}`}>
             <div className="space-y-2">
               <Label>Tipo</Label>
               <Select
@@ -205,6 +205,20 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Discursiva — categoria à direita do Tipo (mesma linha). Subtítulo mostrado ao aluno. */}
+            {tipo === 'discursiva' && (
+              <div className="space-y-2">
+                <Label>Categoria</Label>
+                <Select defaultValue={initialData?.categoria_discursiva ?? 'questao'} onValueChange={(v) => setValue('categoria_discursiva', v as string)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="questao">Questão discursiva</SelectItem>
+                    <SelectItem value="peca">Peça jurídica</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Status</Label>
@@ -223,20 +237,6 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
               </Select>
             </div>
           </div>
-
-          {/* Discursiva — categoria (dissertativa × peça jurídica), subtítulo mostrado ao aluno. */}
-          {tipo === 'discursiva' && (
-            <div className="space-y-2">
-              <Label>Categoria</Label>
-              <Select defaultValue={initialData?.categoria_discursiva ?? 'questao'} onValueChange={(v) => setValue('categoria_discursiva', v as string)}>
-                <SelectTrigger className="sm:max-w-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="questao">Questão discursiva</SelectItem>
-                  <SelectItem value="peca">Peça jurídica</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           {/* Discursiva — informativos ao aluno (nota + nº de linhas), inline. Não afetam a correção. */}
           {tipo === 'discursiva' && (
