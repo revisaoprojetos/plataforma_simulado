@@ -189,7 +189,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
           <CardTitle>Informações da Questão</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className={`grid gap-4 sm:grid-cols-2 ${tipo === 'discursiva' ? 'lg:grid-cols-3' : ''}`}>
+          <div className={`grid gap-4 sm:grid-cols-2 ${tipo === 'discursiva' ? 'lg:grid-cols-4' : ''}`}>
             <div key="tipo" className="space-y-2">
               <Label>Tipo</Label>
               <Select
@@ -208,7 +208,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
 
             {/* Discursiva — categoria à direita do Tipo (mesma linha). Subtítulo mostrado ao aluno. */}
             {tipo === 'discursiva' && (
-              <div key="categoria" className="space-y-2">
+              <div key="categoria" className="space-y-2 lg:col-span-2">
                 <Label>Categoria</Label>
                 <Select defaultValue={initialData?.categoria_discursiva ?? 'questao'} onValueChange={(v) => setValue('categoria_discursiva', v as string)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
