@@ -189,14 +189,14 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
           <CardTitle>Informações da Questão</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className={`grid gap-4 sm:grid-cols-2 ${tipo === 'discursiva' ? 'lg:grid-cols-4' : ''}`}>
-            <div key="tipo" className="space-y-2">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div key="tipo" className="space-y-2 sm:flex-1">
               <Label>Tipo</Label>
               <Select
                 defaultValue={initialData?.tipo ?? 'objetiva'}
                 onValueChange={(v) => setValue('tipo', v as 'objetiva' | 'discursiva')}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -206,12 +206,12 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
               </Select>
             </div>
 
-            {/* Discursiva — categoria à direita do Tipo (mesma linha). Subtítulo mostrado ao aluno. */}
+            {/* Discursiva — categoria à direita do Tipo (mesma linha), mais larga p/ caber o texto. */}
             {tipo === 'discursiva' && (
-              <div key="categoria" className="space-y-2 lg:col-span-2">
+              <div key="categoria" className="space-y-2 sm:flex-[2]">
                 <Label>Categoria</Label>
                 <Select defaultValue={initialData?.categoria_discursiva ?? 'questao'} onValueChange={(v) => setValue('categoria_discursiva', v as string)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="questao">Questão discursiva</SelectItem>
                     <SelectItem value="peca">Peça jurídica</SelectItem>
@@ -220,13 +220,13 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
               </div>
             )}
 
-            <div key="status" className="space-y-2">
+            <div key="status" className="space-y-2 sm:flex-1">
               <Label>Status</Label>
               <Select
                 defaultValue={initialData?.status ?? 'rascunho'}
                 onValueChange={(v) => setValue('status', v as QuestaoFormData['status'])}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
