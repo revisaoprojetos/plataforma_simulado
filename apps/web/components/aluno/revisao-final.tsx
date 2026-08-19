@@ -589,9 +589,13 @@ export function RevisaoFinal({
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
                           <span className="font-medium text-green-700 dark:text-green-400">Corrigida — nota {Number(q.discursiva.nota ?? 0).toFixed(1)}</span>
                         </div>
-                      ) : (
+                      ) : ((q.discursiva?.imagens?.length ?? 0) > 0 || (q.discursiva?.paginas ?? 0) > 0 || !!q.discursiva?.texto?.trim()) ? (
                         <div className="rounded-md bg-amber-50 p-2.5 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
                           Resposta enviada — aguardando correção por um avaliador.
+                        </div>
+                      ) : (
+                        <div className="rounded-md bg-muted/40 p-2.5 text-xs text-muted-foreground">
+                          Questão não respondida.
                         </div>
                       )}
                       {(q.discursiva?.imagens?.length ?? 0) > 0 ? (
@@ -611,11 +615,11 @@ export function RevisaoFinal({
                         <div className="flex items-center gap-1.5 rounded-md border bg-muted/30 p-2.5 text-xs text-muted-foreground">
                           <Images className="h-4 w-4 shrink-0" /> {q.discursiva!.paginas} {q.discursiva!.paginas === 1 ? 'foto enviada' : 'fotos enviadas'} da sua resposta manuscrita.
                         </div>
-                      ) : (
+                      ) : q.discursiva?.texto ? (
                         <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
-                          {q.discursiva?.texto || '(resposta em branco)'}
+                          {q.discursiva.texto}
                         </div>
-                      )}
+                      ) : null}
                       {q.discursiva?.feedback && (
                         <div className="rounded-md border bg-primary/5 p-3 text-sm">
                           <p className="mb-1 text-xs font-semibold text-muted-foreground">Feedback do corretor</p>

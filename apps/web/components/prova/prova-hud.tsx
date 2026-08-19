@@ -31,7 +31,7 @@ function frameLogo(estilo?: string): string {
 }
 
 export type ProvaHudAlternativa = { id: string; texto: string }
-export type ProvaHudQuestao = { id: string; tipo?: string; enunciado: string; disciplina?: string | null; imagem_url?: string | null; alternativas: ProvaHudAlternativa[] }
+export type ProvaHudQuestao = { id: string; tipo?: string; enunciado: string; disciplina?: string | null; imagem_url?: string | null; pontuacao_total?: number | null; linhas?: number | null; categoria_discursiva?: string | null; alternativas: ProvaHudAlternativa[] }
 
 export interface ProvaHudProps {
   titulo: string
@@ -46,6 +46,8 @@ export interface ProvaHudProps {
   respostaId?: string
   respondidas: boolean[]
   onResponder: (altId: string) => void
+  /** Slot da resposta DISCURSIVA (envio de foto) — renderizado no lugar das alternativas quando a questão é discursiva. */
+  slotDiscursiva?: React.ReactNode
   /** tesoura: eliminar/reativar alternativas da questão atual (ids). Opcional. */
   eliminadas?: string[]
   onToggleEliminar?: (altId: string) => void
@@ -150,6 +152,9 @@ export function ProvaHud(p: ProvaHudProps) {
                 )}
               </div>
               <CardContent className="pt-10">
+                {q.tipo === 'discursiva' && q.categoria_discursiva && (
+                  <p className={cn('mb-1.5 text-sm font-semibold', /pe[çc]a/i.test(q.categoria_discursiva) ? 'text-amber-700 dark:text-amber-400' : 'text-primary')}>{q.categoria_discursiva}</p>
+                )}
                 <div data-campo="texto"><MarkdownContent className="leading-relaxed">{q.enunciado}</MarkdownContent></div>
                 {q.imagem_url && (
                   <div className="mt-4 overflow-hidden rounded-lg border bg-muted/30 p-2">
@@ -160,6 +165,21 @@ export function ProvaHud(p: ProvaHudProps) {
               </CardContent>
             </Card>
 
+            {q.tipo === 'discursiva' ? (
+              <div className="space-y-3">
+                {(q.pontuacao_total != null || q.linhas != null) && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    {q.pontuacao_total != null && (
+                      <span className="rounded-full bg-primary/10 px-2.5 py-1 font-semibold text-primary">Vale {Number(q.pontuacao_total).toLocaleString('pt-BR')} {Number(q.pontuacao_total) === 1 ? 'ponto' : 'pontos'}</span>
+                    )}
+                    {q.linhas != null && (
+                      <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-muted-foreground">Máximo {q.linhas} linhas</span>
+                    )}
+                  </div>
+                )}
+                {p.slotDiscursiva}
+              </div>
+            ) : (
             <div className="space-y-2">
               {q.alternativas.map((alt, i) => {
                 const eliminada = !!p.eliminadas?.includes(alt.id)
@@ -194,6 +214,7 @@ export function ProvaHud(p: ProvaHudProps) {
                 )
               })}
             </div>
+            )}
 
             <div className="flex items-center justify-end gap-2 pt-2">
               <Button data-campo="card" variant="outline" onClick={p.onPrev} disabled={p.questaoIndex === 0} style={{ background: CARD }}><ChevronLeft className="mr-1 h-4 w-4" />Voltar</Button>

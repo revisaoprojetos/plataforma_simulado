@@ -15,6 +15,7 @@ import { ProvaHud } from '@/components/prova/prova-hud'
 import { ProvaIntro, ProvaLoading, type EstiloProvaLoading } from '@/components/prova/prova-intro'
 import { toast } from 'sonner'
 import { RevisaoFinal } from '@/components/aluno/revisao-final'
+import { QuestaoDiscursivaEnvio } from '@/components/aluno/questao-discursiva-envio'
 
 // --- Types ---
 interface Alternativa {
@@ -25,9 +26,14 @@ interface Alternativa {
 
 interface Questao {
   id: string
+  tipo?: string
   enunciado: string
   disciplina?: string | null
   imagem_url?: string | null
+  anulada?: boolean
+  pontuacao_total?: number | null
+  linhas?: number | null
+  categoria_discursiva?: string | null
   alternativas: Alternativa[]
 }
 
@@ -38,6 +44,7 @@ interface SessaoData {
   iniciado_em: string
   status: string
   respostas: Record<string, string> // questao_id -> alternativa_id
+  paginas_discursivas?: Record<string, number> // questao_id -> nº de fotos enviadas (discursiva)
   hudCores?: Partial<HudCores> // cores do HUD do caderno vinculado (base)
   hudPorPagina?: HudPorPagina // cores próprias por página
   simuladoTitulo?: string
@@ -98,6 +105,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
   const [sessao, setSessao] = useState<SessaoData | null>(null)
   const [questaoIndex, setQuestaoIndex] = useState(0)
   const [respostas, setRespostas] = useState<Record<string, string>>({})
+  const [discPaginas, setDiscPaginas] = useState<Record<string, number>>({}) // questao_id -> nº de fotos (discursiva)
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set()) // questões marcadas p/ revisar depois
   const [mostrarTempo, setMostrarTempo] = useState(true)
   const [salvando, setSalvando] = useState<string | null>(null)
@@ -173,6 +181,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
         const data: SessaoData = await res.json()
         if (!data?.id) throw new Error('Sessão inválida')
         setSessao(data)
+        setDiscPaginas(data.paginas_discursivas ?? {})
         // Mescla respostas do servidor com o backup local (que pode ter respostas
         // não salvas por queda de rede) e re-sincroniza as que faltam no servidor.
         const resp: Record<string, string> = { ...(data.respostas ?? {}) }
@@ -428,7 +437,10 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
 
   const questaoAtual = sessao.questoes[questaoIndex]
   const totalQuestoes = sessao.questoes.length
-  const totalRespondidas = Object.keys(respostas).length
+  // "Respondida": objetiva = tem alternativa marcada; discursiva = tem ao menos 1 foto enviada.
+  const respondida = (q: Questao) => (q.tipo === 'discursiva' ? (discPaginas[q.id] ?? 0) > 0 : !!respostas[q.id])
+  const respondidasArr = sessao.questoes.map(respondida)
+  const totalRespondidas = respondidasArr.filter(Boolean).length
   const progresso = (totalRespondidas / totalQuestoes) * 100
 
   const timerWarning = segundosRestantes !== null && segundosRestantes < 300
@@ -449,7 +461,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
       progresso={progresso}
       questaoAtual={questaoAtual}
       respostaId={respostas[questaoAtual.id]}
-      respondidas={sessao.questoes.map((q) => !!respostas[q.id])}
+      respondidas={respondidasArr}
       marcadas={sessao.questoes.map((q) => marcadas.has(q.id))}
       marcadaAtual={marcadas.has(questaoAtual.id)}
       numMarcadas={marcadas.size}
@@ -457,6 +469,15 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
       mostrarTempo={mostrarTempo}
       onToggleTempo={() => setMostrarTempo((v) => !v)}
       onResponder={(altId) => handleResponder(questaoAtual.id, altId)}
+      slotDiscursiva={questaoAtual.tipo === 'discursiva' ? (
+        <QuestaoDiscursivaEnvio
+          key={questaoAtual.id}
+          sessaoId={sessao.id}
+          questaoId={questaoAtual.id}
+          bloqueada={!!questaoAtual.anulada}
+          onCount={(n) => setDiscPaginas((prev) => ({ ...prev, [questaoAtual.id]: n }))}
+        />
+      ) : undefined}
       eliminadas={eliminadas[questaoAtual.id] ?? []}
       onToggleEliminar={(altId) => toggleEliminar(questaoAtual.id, altId)}
       onGoto={(i) => setQuestaoIndex(i)}
@@ -528,7 +549,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
 
             <div className="flex flex-wrap gap-2">
               {sessao.questoes.map((q, i) => {
-                const respondida = !!respostas[q.id]
+                const jaRespondida = respondidasArr[i]
                 const marcada = marcadas.has(q.id)
                 return (
                   <button
@@ -540,10 +561,10 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
                     title={`Questão ${i + 1}${marcada ? ' (marcada)' : ''}`}
                     className={cn(
                       'relative flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold',
-                      respondida ? 'text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                      jaRespondida ? 'text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80',
                     )}
                     style={{
-                      ...(respondida ? { background: 'var(--prova-marcada, var(--primary))' } : {}),
+                      ...(jaRespondida ? { background: 'var(--prova-marcada, var(--primary))' } : {}),
                       ...(marcada ? { boxShadow: '0 0 0 2px var(--prova-revisar, #f59e0b)' } : {}),
                     }}
                   >
