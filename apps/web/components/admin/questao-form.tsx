@@ -78,11 +78,9 @@ const questaoSchema = z
       if (!alts.some((a) => a.correta && a.texto.trim())) {
         ctx.addIssue({ code: 'custom', path: ['alternativas'], message: 'Marque a alternativa correta.' })
       }
-    } else if (data.tipo === 'discursiva') {
-      if ((data.competencias ?? []).filter((c) => c.nome.trim()).length < 1) {
-        ctx.addIssue({ code: 'custom', path: ['competencias'], message: 'Adicione ao menos 1 competência.' })
-      }
     }
+    // Discursiva: competências são OPCIONAIS. Sem elas, o backend cria uma "Nota"
+    // com a pontuação total da questão (a correção continua sendo por competência).
   })
 
 export type QuestaoFormData = z.infer<typeof questaoSchema>
@@ -468,11 +466,12 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
       {tipo === 'discursiva' && (
         <Card>
           <CardHeader>
-            <CardTitle>Competências (critérios de correção)</CardTitle>
+            <CardTitle>Competências (critérios de correção) — opcional</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Defina os critérios e a pontuação máxima de cada um. O corretor dará nota por competência.
+              Opcional: detalhe os critérios e a pontuação máxima de cada um (o corretor dá nota por competência).
+              Se deixar em branco, a questão usa uma única nota igual à <strong>pontuação total</strong> acima.
             </p>
             {compFields.map((field, index) => (
               <div key={field.id} className="flex items-start gap-3">

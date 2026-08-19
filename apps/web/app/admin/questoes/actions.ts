@@ -300,14 +300,14 @@ export async function createQuestaoAction(data: QuestaoData) {
     }
   }
 
-  if (data.tipo === 'discursiva' && data.competencias?.length) {
-    const comps = data.competencias.filter((c) => c.nome?.trim())
-    if (comps.length) {
-      // simulado_competencias tem RLS sem policy de INSERT p/ authenticated → service role.
-      await createAdminClient().from('simulado_competencias').insert(
-        comps.map((c, i) => ({ tenant_id: tenantId, questao_id: questao.id, nome: c.nome.trim(), pontos: c.pontos ?? 1, ordem: c.ordem ?? i })),
-      )
-    }
+  if (data.tipo === 'discursiva') {
+    // Competências são opcionais: sem nenhuma, cria uma "Nota" com a pontuação total (default 10).
+    const nomeadas = (data.competencias ?? []).filter((c) => c.nome?.trim())
+    const comps = nomeadas.length ? nomeadas : [{ nome: 'Nota', pontos: data.pontuacao_total || 10, ordem: 0 }]
+    // simulado_competencias tem RLS sem policy de INSERT p/ authenticated → service role.
+    await createAdminClient().from('simulado_competencias').insert(
+      comps.map((c, i) => ({ tenant_id: tenantId, questao_id: questao.id, nome: c.nome.trim(), pontos: c.pontos ?? 1, ordem: c.ordem ?? i })),
+    )
   }
 
   // Armazena a questão diretamente nos bancos de destino escolhidos.
@@ -355,15 +355,15 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
     await sincronizarAlternativas(createAdminClient(), tenantId, id, data.alternativas)
   }
 
-  if (data.tipo === 'discursiva' && data.competencias) {
+  if (data.tipo === 'discursiva') {
     const admin = createAdminClient()
     await admin.from('simulado_competencias').delete().eq('questao_id', id).eq('tenant_id', tenantId)
-    const comps = data.competencias.filter((c) => c.nome?.trim())
-    if (comps.length) {
-      await admin.from('simulado_competencias').insert(
-        comps.map((c, i) => ({ tenant_id: tenantId, questao_id: id, nome: c.nome.trim(), pontos: c.pontos ?? 1, ordem: c.ordem ?? i })),
-      )
-    }
+    // Sem competências nomeadas → cria a "Nota" com a pontuação total (default 10).
+    const nomeadas = (data.competencias ?? []).filter((c) => c.nome?.trim())
+    const comps = nomeadas.length ? nomeadas : [{ nome: 'Nota', pontos: data.pontuacao_total || 10, ordem: 0 }]
+    await admin.from('simulado_competencias').insert(
+      comps.map((c, i) => ({ tenant_id: tenantId, questao_id: id, nome: c.nome.trim(), pontos: c.pontos ?? 1, ordem: c.ordem ?? i })),
+    )
   }
 
   // Sincroniza os bancos de destino (substitui os vínculos pelos selecionados).
