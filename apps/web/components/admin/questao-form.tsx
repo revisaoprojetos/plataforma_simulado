@@ -196,7 +196,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                 defaultValue={initialData?.tipo ?? 'objetiva'}
                 onValueChange={(v) => setValue('tipo', v as 'objetiva' | 'discursiva')}
               >
-                <SelectTrigger className="min-w-44">
+                <SelectTrigger className="min-w-44 capitalize">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -226,7 +226,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                 defaultValue={initialData?.status ?? 'rascunho'}
                 onValueChange={(v) => setValue('status', v as QuestaoFormData['status'])}
               >
-                <SelectTrigger className="min-w-44">
+                <SelectTrigger className="min-w-44 capitalize">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -370,7 +370,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
               defaultValue={initialData?.gabarito_tipo ?? 'oficial'}
               onValueChange={(v) => setValue('gabarito_tipo', v as QuestaoFormData['gabarito_tipo'])}
             >
-              <SelectTrigger>
+              <SelectTrigger className="capitalize">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
