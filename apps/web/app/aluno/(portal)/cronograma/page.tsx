@@ -5,6 +5,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { cronogramasDoAluno } from '@/lib/cronograma/acesso'
 import { Card } from '@/components/ui/card'
 import { CronogramaClient } from './cronograma-client'
+import { MinhasEmissoes } from './minhas-emissoes'
+import { listarMinhasEmissoes } from './emissoes-actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +27,7 @@ export default async function CronogramaAlunoPage() {
     .maybeSingle()
 
   const catalogo = (cfg as any)?.ativo ? await cronogramasDoAluno(svc, sessao.tenantId, sessao.estudanteId) : []
+  const emissoes = await listarMinhasEmissoes()
 
   return (
     <div className="animate-page space-y-6">
@@ -38,6 +41,8 @@ export default async function CronogramaAlunoPage() {
           semanas de revisão e recesso que você quiser.
         </p>
       </div>
+
+      <MinhasEmissoes itens={emissoes.itens ?? []} />
 
       {!catalogo.length ? (
         <Card className="px-4 py-12 text-center">

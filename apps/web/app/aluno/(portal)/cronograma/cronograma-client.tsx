@@ -1,18 +1,19 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { CalendarDays, Download, ExternalLink, Loader2, Sparkles } from 'lucide-react'
+import Link from 'next/link'
+import { Loader2, Save, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { fmtBr, fmtIntervalo, hojeISO, proximaSegunda } from '@/lib/cronograma/datas'
+import { GradeCronograma, ResumoGrade } from '@/components/cronograma/grade-cronograma'
+import { fmtBr, hojeISO, proximaSegunda } from '@/lib/cronograma/datas'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
-import { CHAVE_PALETA_LOCAL, PALETAS, acharPaleta } from '@/lib/cronograma/paletas'
-import { ORDEM_TIPO, ROTULO_TELA, type Grade, type ModoRecesso, type PeriodicidadeRevisao, type TipoMeta } from '@/lib/cronograma/tipos'
+import { CHAVE_PALETA_LOCAL, PALETAS } from '@/lib/cronograma/paletas'
+import type { Grade, ModoRecesso, PeriodicidadeRevisao } from '@/lib/cronograma/tipos'
 import type { CronogramaDoAluno } from '@/lib/cronograma/acesso'
 import { gerarCronograma } from './actions'
 
@@ -48,16 +49,12 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
     const salva = localStorage.getItem(CHAVE_PALETA_LOCAL)
     if (salva) setPaletaSlug(salva)
   }, [])
-  const paleta = acharPaleta(paletaSlug)
 
   const [grade, setGrade] = useState<Grade | null>(null)
+  const [emissaoId, setEmissaoId] = useState<string | null>(null)
   const [desatualizada, setDesatualizada] = useState(false)
   const [gerando, iniciar] = useTransition()
 
-  // ── Filtros do resultado. AO VIVO, sobre a grade já calculada: mexer neles não
-  // dispara nova geração nem apaga a tabela (correção deliberada ao gerador legado).
-  const [filtroSemana, setFiltroSemana] = useState<string>('todas')
-  const [filtroTipo, setFiltroTipo] = useState<string>('todos')
 
   // Trocar um parâmetro não apaga o resultado — marca como desatualizado.
   function aoMudar<T>(set: (v: T) => void) {
@@ -90,23 +87,13 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
         return
       }
       setGrade(r.grade)
+      setEmissaoId(r.emissaoId)
       setDesatualizada(false)
-      setFiltroSemana('todas')
-      setFiltroTipo('todos')
       localStorage.setItem(CHAVE_PALETA_LOCAL, paletaSlug)
       if (r.grade.avisos.length) toast.info(r.grade.avisos[0])
     })
   }
 
-  const semanasVisiveis = useMemo(() => {
-    if (!grade) return []
-    let xs = grade.semanas
-    if (filtroSemana !== 'todas') xs = xs.filter((s) => String(s.numero) === filtroSemana)
-    if (filtroTipo === 'todos') return xs
-    return xs
-      .map((s) => (s.kind === 'conteudo' ? { ...s, metas: s.metas.filter((m) => m.tipo === filtroTipo) } : s))
-      .filter((s) => s.kind !== 'conteudo' || s.metas.length > 0)
-  }, [grade, filtroSemana, filtroTipo])
 
   if (!catalogo.length) return null
 
@@ -250,140 +237,21 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
 
       {grade && (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              ['Semanas', grade.resumo.totalSemanas],
-              ['Dias por semana', grade.resumo.diasPorSemana],
-              ['Atividades', grade.resumo.atividades],
-              ['Conclusão', fmtBr(grade.resumo.conclusao)],
-            ].map(([rotulo, valor]) => (
-              <Card key={rotulo as string} className="p-4">
-                <p className="text-2xl font-bold tabular-nums">{valor as any}</p>
-                <p className="text-xs text-muted-foreground">{rotulo as string}</p>
-              </Card>
-            ))}
-          </div>
-
+          <ResumoGrade grade={grade} />
           <p className="text-sm text-muted-foreground">{grade.resumo.subtitulo}</p>
+          <GradeCronograma grade={grade} paletaSlug={paletaSlug} />
 
-          <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
-            <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
-              <Select value={filtroSemana} onValueChange={(v) => setFiltroSemana(v ?? 'todas')}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas as semanas</SelectItem>
-                  {grade.semanas.map((s) => (
-                    <SelectItem key={s.numero} value={String(s.numero)}>
-                      Semana {s.numero}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v ?? 'todos')}>
-                <SelectTrigger className="w-52">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os tipos</SelectItem>
-                  {ORDEM_TIPO.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {ROTULO_TELA[t]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <span className="ml-auto text-xs text-muted-foreground">
-                Os filtros são aplicados na hora — não é preciso gerar de novo.
-              </span>
-            </div>
-
-            <div className="divide-y">
-              {semanasVisiveis.map((s) => (
-                <div key={s.numero}>
-                  <div
-                    className="flex flex-wrap items-center gap-2 px-4 py-2 text-sm font-semibold text-white"
-                    style={{ background: s.kind === 'conteudo' ? paleta.primaria : paleta.revisao }}
-                  >
-                    <span>Semana {s.numero}</span>
-                    <span className="font-normal opacity-90">{fmtIntervalo(s.inicio, s.fim)}</span>
-                    {s.kind === 'revisao' && <Badge variant="secondary">Semana de revisão</Badge>}
-                    {s.kind === 'recesso' && <Badge variant="secondary">Semana de recesso</Badge>}
-                  </div>
-
-                  {s.kind === 'recesso' && (
-                    <p className="px-4 py-3 text-sm text-muted-foreground">
-                      Não há metas programadas nesta semana; o cronograma será retomado na próxima
-                      segunda-feira.
-                    </p>
-                  )}
-
-                  {s.kind === 'revisao' &&
-                    s.blocos.map((b) => (
-                      <div key={b.titulo} className="px-4 py-2">
-                        <p className="text-sm font-medium">{b.titulo}</p>
-                        <p className="text-sm text-muted-foreground">{b.texto}</p>
-                      </div>
-                    ))}
-
-                  {s.kind === 'conteudo' &&
-                    s.metas.map((m) => (
-                      <div key={m.id} className="flex flex-wrap items-start gap-3 px-4 py-2.5" style={{ background: paleta.celula }}>
-                        <div className="w-24 shrink-0 text-xs">
-                          <p className="font-medium">{fmtBr(m.data)}</p>
-                          <p className="text-muted-foreground">{m.diaNome}</p>
-                        </div>
-                        <Badge variant="outline" className="shrink-0">
-                          {ROTULO_TELA[m.tipo]}
-                        </Badge>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm">{m.titulo}</p>
-                          {m.complemento && <p className="text-xs text-muted-foreground">{m.complemento}</p>}
-                          {m.tipo === 'simulado' && m.simulado_externo_url && (
-                            <a
-                              href={m.simulado_externo_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs text-primary hover:underline"
-                            >
-                              {m.simulado_externo_nome ?? 'Abrir simulado'} <ExternalLink className="inline h-3 w-3" />
-                            </a>
-                          )}
-                        </div>
-                        {m.links && (
-                          <div className="flex shrink-0 flex-wrap gap-1.5">
-                            {m.links.urls.map((u) => (
-                              <a
-                                key={u.plataforma.id}
-                                href={u.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="rounded-md border px-2 py-0.5 text-xs text-primary hover:bg-background"
-                              >
-                                {u.plataforma.nome}
-                              </a>
-                            ))}
-                            {m.links.ausente && <span className="text-xs italic text-muted-foreground">{m.links.ausente}</span>}
-                          </div>
-                        )}
-                        {m.duracao && <span className="shrink-0 text-xs text-muted-foreground">{m.duracao}</span>}
-                      </div>
-                    ))}
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="flex flex-wrap items-center gap-3 p-4">
-            <Download className="h-5 w-5 text-muted-foreground" />
-            <p className="flex-1 text-sm text-muted-foreground">
-              As exportações em DOCX e CSV entram na próxima etapa. Seu cronograma fica salvo aqui — você pode
-              fechar a página e voltar depois.
-            </p>
-          </Card>
+          {emissaoId && (
+            <Card className="flex flex-wrap items-center gap-3 p-4">
+              <Save className="h-5 w-5 text-emerald-600" />
+              <p className="flex-1 text-sm text-muted-foreground">
+                Este cronograma ficou salvo na sua conta — você pode fechar a página e voltar quando quiser.
+              </p>
+              <Link href={`/aluno/cronograma/${emissaoId}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                Abrir
+              </Link>
+            </Card>
+          )}
         </>
       )}
     </div>
