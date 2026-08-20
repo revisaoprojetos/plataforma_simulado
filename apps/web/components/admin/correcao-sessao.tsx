@@ -308,8 +308,10 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   const [w3, setW3] = useState(456)
   const [wEsp, setWEsp] = useState(380)
   const [espelhoColuna, setEspelhoColuna] = useState(false)
-  useEffect(() => { try { const s = JSON.parse(localStorage.getItem('correcao_cols') || '{}'); if (s.w1) setW1(s.w1); if (s.w3) setW3(s.w3); if (s.wEsp) setWEsp(s.wEsp); if (typeof s.esp === 'boolean') setEspelhoColuna(s.esp) } catch {} }, [])
-  useEffect(() => { try { localStorage.setItem('correcao_cols', JSON.stringify({ w1, w3, wEsp, esp: espelhoColuna })) } catch {} }, [w1, w3, wEsp, espelhoColuna])
+  const [wAnot, setWAnot] = useState(320)
+  const [anotColuna, setAnotColuna] = useState(false)
+  useEffect(() => { try { const s = JSON.parse(localStorage.getItem('correcao_cols') || '{}'); if (s.w1) setW1(s.w1); if (s.w3) setW3(s.w3); if (s.wEsp) setWEsp(s.wEsp); if (s.wAnot) setWAnot(s.wAnot); if (typeof s.esp === 'boolean') setEspelhoColuna(s.esp); if (typeof s.anot === 'boolean') setAnotColuna(s.anot) } catch {} }, [])
+  useEffect(() => { try { localStorage.setItem('correcao_cols', JSON.stringify({ w1, w3, wEsp, wAnot, esp: espelhoColuna, anot: anotColuna })) } catch {} }, [w1, w3, wEsp, wAnot, espelhoColuna, anotColuna])
 
   useEffect(() => { for (const q of questoes) if (q.status !== 'corrigida') assumirCorrecao(q.respostaId) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -657,6 +659,40 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
     ...quesitosDaQ.map((l) => ({ titulo: `${l.codigo} · ${l.comp.nome}`, marcas: marcasResp.filter((m) => (m.competencia_id ?? null) === l.comp.id) })),
     { titulo: 'Geral (sem quesito)', marcas: marcasResp.filter((m) => !m.competencia_id) },
   ].filter((g) => g.marcas.length)
+  // Conteúdo do índice de anotações (reusado no inspetor E na coluna ao lado da prova).
+  const conteudoAnotacoes = (
+    <div className="space-y-2">
+      {marcasResp.length === 0 ? (
+        <p className="rounded-md border border-dashed bg-muted/30 p-2 text-[11px] text-muted-foreground">Nenhuma anotação. Use as ferramentas (Destaque, Ponto, Ícone, Bolinha, Texto) sobre a prova — cada marca vira “{corNome(corAtiva)} 1, 2…”.</p>
+      ) : gruposAnot.map((g, gi) => (
+        <div key={gi} className="space-y-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{g.titulo}</p>
+          {g.marcas.map((m) => {
+            const sel = m.id === selecionadaId
+            return (
+              <div key={m.id} className={cn('rounded-md border', sel ? 'border-primary bg-primary/5' : 'bg-card')}>
+                <button type="button" onClick={() => irParaMarca(m)} className="flex w-full items-center gap-2 px-2 py-1.5 text-left">
+                  <span className="h-3 w-3 shrink-0 rounded-full border border-white shadow" style={{ background: m.cor || COR_GERAL }} />
+                  <span className="shrink-0 text-xs font-medium">{corNome(m.cor)} {m.ordem}</span>
+                  <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground">{TIPO_NOME[m.tipo] ?? m.tipo}</span>
+                  {!sel && m.comentario?.trim() && <span className="ml-auto min-w-0 truncate text-[11px] text-muted-foreground">{m.comentario}</span>}
+                </button>
+                {sel && (
+                  <div className="border-t px-2 py-1.5">
+                    <textarea value={m.comentario ?? ''} onChange={(e) => patchMarcaLocal(m.id, { comentario: e.target.value })} onBlur={(e) => atualizarMarca(m.id, { comentario: e.target.value })} rows={2} placeholder="Comentário desta anotação (o aluno verá)…" className="w-full resize-y rounded border bg-[var(--input-bg,transparent)] px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring" />
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="text-[10px] text-muted-foreground">p. {(questaoAtiva?.paginas.findIndex((p) => p.arquivoId === (m.arquivo_id ?? '')) ?? -1) + 1 || 1}</span>
+                      <button type="button" onClick={() => removerMarca(m.id)} className="rounded border border-destructive/30 px-2 py-0.5 text-[11px] font-medium text-destructive hover:bg-destructive/5">Excluir</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
   const setArr = (key: string, campo: 'recognized' | 'missing', txt: string) => patchQ(key, { [campo]: txt.split('\n') } as Partial<CompCorrecao>)
 
   return (
@@ -753,6 +789,11 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
               title="Mostrar o espelho como coluna ao lado da prova">
               <FileText className="h-3.5 w-3.5" /> Espelho ao lado
             </button>
+            <button type="button" onClick={() => { setAnotColuna((v) => !v); setAba('prova') }}
+              className={cn('flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors', anotColuna ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}
+              title="Abrir a edição das anotações como coluna ao lado da prova">
+              <MapPin className="h-3.5 w-3.5" /> Anotações ao lado
+            </button>
             {aba === 'prova' && iaAtiva && (
               <button type="button" onClick={() => setShowDestaqueIA((v) => !v)}
                 className={cn('flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors', showDestaqueIA ? 'border-amber-400 bg-amber-100/60 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300' : 'text-muted-foreground hover:bg-muted')}>
@@ -819,6 +860,19 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
             </div>
           )}
         </div>
+
+        {/* ANOTAÇÕES como coluna — edição ao lado da prova */}
+        {anotColuna && (<>
+          <ColResizer onDelta={(dx) => setWAnot((w) => clampW(w - dx, 240, 560))} />
+          <aside style={{ width: wAnot }} className="flex shrink-0 flex-col overflow-hidden border-l bg-card">
+            <div className="flex shrink-0 items-center gap-1.5 border-b px-3 py-2 text-xs font-semibold text-muted-foreground">
+              <MapPin className="h-4 w-4 text-primary" /> Anotações da questão
+              <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">{marcasResp.length}</span>
+              <button type="button" onClick={() => setAnotColuna(false)} className="ml-auto rounded border px-1.5 py-0.5 text-[10px] font-medium hover:bg-muted">Fechar</button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-2">{conteudoAnotacoes}</div>
+          </aside>
+        </>)}
 
         {/* ESPELHO como coluna (opcional) */}
         {espelhoColuna && (<>
@@ -957,36 +1011,12 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
                   <MapPin className="h-3.5 w-3.5 text-primary" /> Anotações da questão
                   <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{marcasResp.length}</span>
                 </summary>
-                <div className="space-y-2 border-t p-2">
-                  {marcasResp.length === 0 ? (
-                    <p className="rounded-md border border-dashed bg-muted/30 p-2 text-[11px] text-muted-foreground">Nenhuma anotação. Use as ferramentas (Destaque, Ponto, Ícone, Bolinha, Texto) sobre a prova — cada marca vira “{corNome(corAtiva)} 1, 2…”.</p>
-                  ) : gruposAnot.map((g, gi) => (
-                    <div key={gi} className="space-y-1">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{g.titulo}</p>
-                      {g.marcas.map((m) => {
-                        const sel = m.id === selecionadaId
-                        return (
-                          <div key={m.id} className={cn('rounded-md border', sel ? 'border-primary bg-primary/5' : 'bg-card')}>
-                            <button type="button" onClick={() => irParaMarca(m)} className="flex w-full items-center gap-2 px-2 py-1.5 text-left">
-                              <span className="h-3 w-3 shrink-0 rounded-full border border-white shadow" style={{ background: m.cor || COR_GERAL }} />
-                              <span className="shrink-0 text-xs font-medium">{corNome(m.cor)} {m.ordem}</span>
-                              <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground">{TIPO_NOME[m.tipo] ?? m.tipo}</span>
-                              {!sel && m.comentario?.trim() && <span className="ml-auto min-w-0 truncate text-[11px] text-muted-foreground">{m.comentario}</span>}
-                            </button>
-                            {sel && (
-                              <div className="border-t px-2 py-1.5">
-                                <textarea value={m.comentario ?? ''} onChange={(e) => patchMarcaLocal(m.id, { comentario: e.target.value })} onBlur={(e) => atualizarMarca(m.id, { comentario: e.target.value })} rows={2} placeholder="Comentário desta anotação (o aluno verá)…" className="w-full resize-y rounded border bg-[var(--input-bg,transparent)] px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring" />
-                                <div className="mt-1 flex items-center justify-between">
-                                  <span className="text-[10px] text-muted-foreground">{ativo?.codigo ? '' : ''}p. {(questaoAtiva?.paginas.findIndex((p) => p.arquivoId === (m.arquivo_id ?? '')) ?? -1) + 1 || 1}</span>
-                                  <button type="button" onClick={() => removerMarca(m.id)} className="rounded border border-destructive/30 px-2 py-0.5 text-[11px] font-medium text-destructive hover:bg-destructive/5">Excluir</button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ))}
+                <div className="border-t p-2">
+                  <button type="button" onClick={() => setAnotColuna((v) => !v)}
+                    className="mb-2 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted">
+                    <MapPin className="h-3 w-3" /> {anotColuna ? 'Fechar edição ao lado da prova' : 'Abrir edição ao lado da prova'}
+                  </button>
+                  {conteudoAnotacoes}
                 </div>
               </details>
 
