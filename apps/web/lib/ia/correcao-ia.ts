@@ -159,13 +159,7 @@ async function chamarGemini(cfg: ConfigIA, input: EntradaIA, texto: string): Pro
   const parts: any[] = [{ text: `${texto}\n\n${FORMA_JSON}` }]
   if (input.gabaritoPdf) parts.push({ inlineData: { mimeType: 'application/pdf', data: input.gabaritoPdf } })
   for (const img of input.imagens) parts.push({ inlineData: { mimeType: img.media_type, data: img.base64 } })
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.modelo)}:generateContent?key=${encodeURIComponent(cfg.apiKey)}`
-  const resp = await fetch(url, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ systemInstruction: { parts: [{ text: SISTEMA }] }, contents: [{ role: 'user', parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 8192 } }),
-  })
-  const data = await resp.json().catch(() => ({}))
-  if (!resp.ok) throw new Error((data as any)?.error?.message || `Gemini retornou ${resp.status}.`)
+  const data = await gerarGemini(cfg.apiKey, cfg.modelo, { systemInstruction: { parts: [{ text: SISTEMA }] }, contents: [{ role: 'user', parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 8192 } })
   const txt = ((data as any)?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? '').join('')
   const raw = parseJson(txt)
   if (!raw) throw new Error('A IA (Gemini) não retornou JSON válido.')
@@ -203,6 +197,68 @@ function normalizar(raw: any, competencias: CompParaIA[]): PropostaIA {
       }
     }).filter((q: QuesitoIA) => q.competencia_id),
   }
+}
+
+// Chama o Gemini tolerando modelo inválido/retirado: tenta o configurado + nomes atuais;
+// se falhar por modelo, DESCOBRE os modelos reais da chave (ListModels) e usa um bom.
+const GEMINI_CONHECIDOS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-1.5-flash']
+const erroDeModelo = (m: string) => /model|not found|unexpected|invalid|404|400|supported/i.test(m)
+async function gerarGemini(apiKey: string, modelo: string, body: any): Promise<any> {
+  const base = (modelo || '').trim().replace(/^models\//, '')
+  let ultimoErro = 'Falha no Gemini.'
+  const tentar = async (m: string): Promise<{ ok: true; data: any } | { ok: false; erro: string }> => {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(apiKey)}`
+    const resp = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    const data = await resp.json().catch(() => ({}))
+    if (resp.ok) return { ok: true, data }
+    return { ok: false, erro: (data as any)?.error?.message || `Gemini retornou ${resp.status}.` }
+  }
+  // 1) nomes conhecidos (configurado primeiro)
+  for (const m of [...new Set([base, ...GEMINI_CONHECIDOS])].filter(Boolean)) {
+    const r = await tentar(m)
+    if (r.ok) return r.data
+    ultimoErro = r.erro
+    if (!erroDeModelo(ultimoErro)) throw new Error(ultimoErro) // erro real (chave/quota) → não adianta trocar de modelo
+  }
+  // 2) descobre os modelos REAIS da chave e tenta os que suportam generateContent
+  try {
+    const lr = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`)
+    const ld = await lr.json().catch(() => ({}))
+    const disp: string[] = ((ld as any)?.models ?? [])
+      .filter((m: any) => (m?.supportedGenerationMethods ?? []).includes('generateContent'))
+      .map((m: any) => String(m?.name || '').replace(/^models\//, ''))
+    const bons = disp.filter((n) => /gemini/i.test(n) && /flash|pro/i.test(n) && !/embedding|aqa|vision|thinking/i.test(n))
+    for (const m of [...bons, ...disp].slice(0, 4)) { const r = await tentar(m); if (r.ok) return r.data; ultimoErro = r.erro }
+  } catch { /* ListModels indisponível */ }
+  throw new Error(ultimoErro)
+}
+
+// ── Transcrição de UMA REGIÃO (recorte) — texto puro, sem correção ─────────────
+const PROMPT_REGIAO = 'Transcreva FIELMENTE, letra por letra, APENAS o texto manuscrito desta imagem (um trecho de uma prova). NÃO corrija ortografia, acentuação ou concordância; NÃO complete nem explique nada. Se algo for ilegível, escreva [ilegível]. Responda SOMENTE com a transcrição do que está escrito, sem comentários.'
+
+/** Transcreve o texto manuscrito de UMA imagem (recorte da área de destaque). Texto puro. */
+export async function transcreverImagemIA(cfg: ConfigIA, imagemBase64: string, mediaType: string): Promise<string> {
+  if (cfg.provider === 'anthropic') {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', headers: { 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: cfg.modelo, max_tokens: 2000, messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mediaType, data: imagemBase64 } }, { type: 'text', text: PROMPT_REGIAO }] }] }),
+    })
+    const data = await resp.json().catch(() => ({}))
+    if (!resp.ok) throw new Error((data as any)?.error?.message || `Anthropic retornou ${resp.status}.`)
+    return ((data as any)?.content ?? []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join('').trim()
+  }
+  if (cfg.provider === 'openai') {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST', headers: { authorization: `Bearer ${cfg.apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ model: cfg.modelo, max_tokens: 2000, temperature: 0, messages: [{ role: 'user', content: [{ type: 'text', text: PROMPT_REGIAO }, { type: 'image_url', image_url: { url: `data:${mediaType};base64,${imagemBase64}` } }] }] }),
+    })
+    const data = await resp.json().catch(() => ({}))
+    if (!resp.ok) throw new Error((data as any)?.error?.message || `OpenAI retornou ${resp.status}.`)
+    return String((data as any)?.choices?.[0]?.message?.content ?? '').trim()
+  }
+  // gemini
+  const data = await gerarGemini(cfg.apiKey, cfg.modelo, { contents: [{ role: 'user', parts: [{ text: PROMPT_REGIAO }, { inlineData: { mimeType: mediaType, data: imagemBase64 } }] }], generationConfig: { temperature: 0, maxOutputTokens: 2000 } })
+  return ((data as any)?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? '').join('').trim()
 }
 
 /** Monta o prompt + chama o PROVEDOR da config (fallback: env ANTHROPIC_API_KEY). */

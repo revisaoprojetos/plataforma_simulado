@@ -36,7 +36,7 @@ export function decifrar(blob: string): string {
 export const MODELOS_PADRAO: Record<Provedor, string> = {
   anthropic: process.env.IA_CORRECAO_MODELO || 'claude-opus-4-8',
   openai: 'gpt-4o',
-  gemini: 'gemini-1.5-pro',
+  gemini: 'gemini-2.0-flash',
 }
 export const PROVEDOR_LABEL: Record<Provedor, string> = {
   anthropic: 'Claude (Anthropic)', openai: 'GPT (OpenAI)', gemini: 'Gemini (Google)',

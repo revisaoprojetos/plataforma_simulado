@@ -179,6 +179,28 @@ function preprocessarOCR(dataUrl: string): Promise<{ url: string; w: number; h: 
   })
 }
 
+// Recorta EXATAMENTE a área da caixa (coords 0–1) da imagem → dataURL/base64 p/ OCR/IA.
+function recortarRegiao(fullDataUrl: string, box: { x: number; y: number; largura: number; altura: number }, escala = 2): Promise<{ dataUrl: string; base64: string; mediaType: string } | null> {
+  return new Promise((res) => {
+    const im = new Image()
+    im.onload = () => {
+      const W = im.naturalWidth, H = im.naturalHeight
+      if (!W || !H) { res(null); return }
+      const sx = clamp01(box.x) * W, sy = clamp01(box.y) * H
+      const sw = Math.max(1, Math.min(W - sx, clamp01(box.largura) * W)), sh = Math.max(1, Math.min(H - sy, clamp01(box.altura) * H))
+      const cw = Math.max(1, Math.round(sw * escala)), ch = Math.max(1, Math.round(sh * escala))
+      const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch
+      const ctx = cv.getContext('2d'); if (!ctx) { res(null); return }
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(im, sx, sy, sw, sh, 0, 0, cw, ch)
+      const dataUrl = cv.toDataURL('image/png')
+      res({ dataUrl, base64: dataUrl.split(',')[1] ?? '', mediaType: 'image/png' })
+    }
+    im.onerror = () => res(null)
+    im.src = fullDataUrl
+  })
+}
+
 /** Divisória arrastável entre colunas (chama onDelta com o dx do arraste). */
 function ColResizer({ onDelta }: { onDelta: (dx: number) => void }) {
   const st = useRef({ drag: false, x: 0, fn: onDelta }); st.current.fn = onDelta
@@ -418,6 +440,62 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
     } catch { toast.error('Falha no OCR.') } finally { setOcrPending(null) }
   }
 
+  // Área de destaque do quesito ativo (a SELECIONADA, senão a 1ª do quesito) — p/ ler só DENTRO dela.
+  function regiaoDoQuesito(): { box: Marca; url: string } | null {
+    if (!questaoAtiva || !ativo) return null
+    const marcas = anotPorResp[questaoAtiva.respostaId] ?? []
+    const doQuesito = (m: Marca) => m.tipo === 'destaque' && (m.competencia_id ?? null) === ativo.comp.id && m.largura != null && m.altura != null
+    const box = marcas.find((m) => m.id === selecionadaId && doQuesito(m)) ?? marcas.find(doQuesito)
+    if (!box) return null
+    const pag = questaoAtiva.paginas.find((p) => p.arquivoId === (box.arquivo_id ?? '')) ?? questaoAtiva.paginas[paginaIndex] ?? questaoAtiva.paginas[0]
+    if (!pag) return null
+    return { box, url: pag.url }
+  }
+
+  const WL_OCR = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÇÉÊÍÓÔÕÚàáâãçéêíóôõú0123456789.,;:!?()-–—/º ª°%\n'
+  // OCR lê APENAS o que está dentro da caixa (não move nem recria a caixa).
+  async function transcreverAreaOCR(reg: { box: Marca; url: string }) {
+    if (!ativo) return
+    const key = ativo.key
+    setOcrPending(0)
+    try {
+      const img = await imagemParaOCR(reg.url)
+      if (!img.ok || !img.dataUrl) { toast.error('Falha ao carregar a imagem.'); return }
+      const crop = await recortarRegiao(img.dataUrl, { x: reg.box.x, y: reg.box.y, largura: reg.box.largura ?? 0, altura: reg.box.altura ?? 0 }, 2)
+      if (!crop) { toast.error('Falha ao recortar a área.'); return }
+      const pre = await preprocessarOCR(crop.dataUrl)
+      const T: any = await import('tesseract.js'); const createWorker = T.createWorker ?? T.default?.createWorker
+      const worker = await createWorker('por', 1, { logger: (m: any) => { if (m.status === 'recognizing text') setOcrPending(Math.round((m.progress || 0) * 100)) } })
+      try { await worker.setParameters({ tessedit_pageseg_mode: (T.PSM?.SINGLE_BLOCK ?? '6'), preserve_interword_spaces: '1', tessedit_char_whitelist: WL_OCR }) } catch {}
+      let texto = ''
+      try { const { data } = await worker.recognize(pre.url, {}, { text: true }); texto = String(data?.text || '').replace(/[ \t]+\n/g, '\n').replace(/\n{2,}/g, '\n').trim() } finally { await worker.terminate() }
+      patchQ(key, { excerpt: texto } as Partial<CompCorrecao>); salvarCampo(key, { excerpt: texto })
+      toast.success('OCR da área concluído — trecho preenchido (letra de mão pode exigir ajuste).')
+    } catch { toast.error('Falha no OCR da área.') } finally { setOcrPending(null) }
+  }
+
+  // IA lê APENAS o que está dentro da caixa (recorta e manda ao provedor configurado).
+  async function transcreverAreaIA(reg: { box: Marca; url: string }) {
+    if (!ativo || !questaoAtiva) return
+    const key = ativo.key, resp = questaoAtiva.respostaId
+    setIaPending(resp)
+    try {
+      const img = await imagemParaOCR(reg.url)
+      if (!img.ok || !img.dataUrl) { toast.error('Falha ao carregar a imagem.'); return }
+      const crop = await recortarRegiao(img.dataUrl, { x: reg.box.x, y: reg.box.y, largura: reg.box.largura ?? 0, altura: reg.box.altura ?? 0 }, 2)
+      if (!crop) { toast.error('Falha ao recortar a área.'); return }
+      const r = await fetch('/api/admin/correcao/transcrever-regiao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ respostaId: resp, imagemBase64: crop.base64, mediaType: crop.mediaType }) })
+      const j = await r.json().catch(() => ({}))
+      if (!j.ok) { toast.error(j.error ?? 'Falha na IA'); return }
+      const texto = String(j.texto || '')
+      patchQ(key, { excerpt: texto } as Partial<CompCorrecao>); salvarCampo(key, { excerpt: texto })
+      toast.success('IA transcreveu a área — trecho preenchido.')
+    } catch { toast.error('Falha ao chamar a IA') } finally { setIaPending(null) }
+  }
+  // Dispatch dos botões: se há caixa no quesito, lê DENTRO dela; senão, página inteira / proposta completa.
+  function ocrDispatch() { const reg = regiaoDoQuesito(); if (reg) transcreverAreaOCR(reg); else transcreverOCR() }
+  function iaDispatch() { const reg = regiaoDoQuesito(); if (reg) transcreverAreaIA(reg); else sugerirIA() }
+
   // ── anotações (na questão ativa) ──
   // Cria uma marca com competência/cor EXPLÍCITAS (usada por OCR/IA, que marcam quesitos
   // que podem não ser o ativo). Otimista + reconciliação do id real.
@@ -480,6 +558,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   ]
 
   const alertasAtivo = ativo ? alertasDe(ativo) : []
+  const regQuesito = ativo ? regiaoDoQuesito() : null // há caixa no quesito ativo? então OCR/IA lêem DENTRO dela
   const setArr = (key: string, campo: 'recognized' | 'missing', txt: string) => patchQ(key, { [campo]: txt.split('\n') } as Partial<CompCorrecao>)
 
   return (
@@ -709,19 +788,19 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
               {/* ① Trecho do aluno */}
               <Cartao n={1} titulo="Trecho do aluno" extra={ativo.comp.pagina ? `p. ${ativo.comp.pagina}` : ''}>
                 <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                  <button type="button" onClick={transcreverOCR} disabled={ocrPending != null || !questaoAtiva?.paginas.length}
+                  <button type="button" onClick={ocrDispatch} disabled={ocrPending != null || !questaoAtiva?.paginas.length}
                     className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-60"
-                    title="Transcreve a resposta na folha (motor próprio) e marca a área na prova">
-                    {ocrPending != null ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> OCR {ocrPending}%</> : <><ScanText className="h-3.5 w-3.5" /> Transcrever (OCR)</>}
+                    title={regQuesito ? 'Lê SÓ o que está dentro da caixa de destaque (motor próprio)' : 'Transcreve a resposta na folha (motor próprio) e marca a área na prova'}>
+                    {ocrPending != null ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> OCR {ocrPending}%</> : <><ScanText className="h-3.5 w-3.5" /> {regQuesito ? 'Ler área (OCR)' : 'Transcrever (OCR)'}</>}
                   </button>
                   {iaAtiva && (
-                    <button type="button" onClick={sugerirIA} disabled={!!iaPending}
+                    <button type="button" onClick={iaDispatch} disabled={!!iaPending}
                       className="inline-flex items-center gap-1 rounded-md border border-violet-300/60 px-2 py-1 text-xs font-medium text-violet-700 hover:bg-violet-500/10 disabled:opacity-60 dark:text-violet-300"
-                      title="Transcreve e sugere a correção com IA (Claude visão)">
-                      {iaPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} IA
+                      title={regQuesito ? 'IA lê SÓ o que está dentro da caixa de destaque' : 'Transcreve e sugere a correção com IA'}>
+                      {iaPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} {regQuesito ? 'Ler área (IA)' : 'IA'}
                     </button>
                   )}
-                  <span className="text-[10px] leading-tight text-muted-foreground">preenche o trecho + marca a área na prova</span>
+                  <span className="text-[10px] leading-tight text-muted-foreground">{regQuesito ? 'lê exatamente dentro da caixa de destaque' : 'preenche o trecho + marca a área na prova'}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <input value={ativo.comp.pagina} onChange={(e) => patchQ(ativo.key, { pagina: e.target.value })} onBlur={(e) => salvarCampo(ativo.key, { pagina: e.target.value })} placeholder="pág." className="h-7 w-14 rounded border bg-[var(--input-bg,transparent)] px-1.5 text-xs outline-none focus:ring-1 focus:ring-ring" />
