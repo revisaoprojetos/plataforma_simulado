@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
-  ArrowLeft, Check, Flag, Lock, AlertTriangle, BookOpenCheck, Image as ImageIcon, FileText, Sparkles, Loader2,
+  ArrowLeft, Check, Flag, Lock, AlertTriangle, BookOpenCheck, Image as ImageIcon, FileText, Sparkles, Loader2, ExternalLink,
 } from 'lucide-react'
 import { useSidebar } from '@/components/ui/sidebar'
 import { CorrecaoFolha, ICONES, type Ferramenta, type Marca } from '@/components/admin/correcao-folha'
@@ -323,7 +323,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
                   selecionadaId={selecionadaId} onSelecionar={selecionarMarca} onCriar={criar} onAtualizar={atualizarMarca} focoId={focoId} focoKey={focoKey} />
               ) : <div className="flex h-full items-center justify-center rounded-lg border bg-card text-sm text-muted-foreground">Nenhuma foto enviada nesta questão.</div>
             ) : espelhoPdfUrl ? (
-              <iframe src={espelhoPdfUrl} title="Gabarito / espelho (PDF do banco)" className="h-full w-full rounded-lg border bg-white" />
+              <div className="h-full overflow-hidden rounded-lg border"><EspelhoPdf url={espelhoPdfUrl} /></div>
             ) : (
               <div className="mx-auto h-full max-w-3xl overflow-y-auto rounded-lg border bg-card p-6">
                 <p className="rounded-md border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground">Nenhum PDF de gabarito/espelho no banco deste simulado. Importe o gabarito na área do Banco de Simulado (caderno Gabarito / Espelho).</p>
@@ -349,16 +349,16 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
         {espelhoColuna && (<>
           <ColResizer onDelta={(dx) => setWEsp((w) => clampW(w - dx, 240, 720))} />
           <aside style={{ width: wEsp }} className="flex shrink-0 flex-col overflow-hidden border-l bg-card">
-            <div className="flex shrink-0 items-center gap-1.5 border-b px-3 py-2 text-xs font-semibold text-muted-foreground"><FileText className="h-4 w-4" /> ESPELHO (gabarito do banco)</div>
             {espelhoPdfUrl ? (
-              <iframe src={espelhoPdfUrl} title="Gabarito / espelho (PDF do banco)" className="min-h-0 flex-1 border-0 bg-white" />
-            ) : (
+              <EspelhoPdf url={espelhoPdfUrl} />
+            ) : (<>
+              <div className="flex shrink-0 items-center gap-1.5 border-b px-3 py-2 text-xs font-semibold text-muted-foreground"><FileText className="h-4 w-4" /> ESPELHO</div>
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
                 <p className="rounded-md border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground">Sem PDF de gabarito no banco. Importe-o no Banco de Simulado (caderno Gabarito / Espelho).</p>
                 <p className="mb-1 mt-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Enunciado</p>
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{questaoAtiva?.espelho.enunciado?.replace(/<[^>]+>/g, ' ') || '—'}</p>
               </div>
-            )}
+            </>)}
           </aside>
         </>)}
 
@@ -469,6 +469,23 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
           </>)}
         </aside>
       </div>
+    </div>
+  )
+}
+
+/** Painel do PDF do gabarito/espelho — object + iframe de fallback + botão "Abrir em nova aba". */
+function EspelhoPdf({ url }: { url: string }) {
+  return (
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b bg-card px-3 py-1.5 text-[11px]">
+        <span className="flex items-center gap-1.5 truncate font-semibold text-muted-foreground"><FileText className="h-3.5 w-3.5" /> Gabarito / espelho (PDF do banco)</span>
+        <a href={url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 font-medium text-primary transition-colors hover:bg-primary/5">
+          <ExternalLink className="h-3 w-3" /> Abrir em nova aba
+        </a>
+      </div>
+      <object data={url} type="application/pdf" className="min-h-0 flex-1 bg-white">
+        <iframe src={url} title="Gabarito / espelho" className="h-full w-full border-0 bg-white" />
+      </object>
     </div>
   )
 }
