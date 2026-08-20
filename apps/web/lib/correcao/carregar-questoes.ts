@@ -20,7 +20,7 @@ export async function carregarQuestoesCorrecao(svc: SupabaseClient, tenantId: st
   const questaoIds = [...new Set(respostas.map((r) => r.questao_id).filter(Boolean))] as string[]
   const respIds = respostas.map((r) => r.id)
 
-  const [questoes, comps, notas, juncoes, anots] = await Promise.all([
+  const [questoes, comps, notas, juncoes, anots, ias] = await Promise.all([
     fetchAllByIn<any>(questaoIds, (c) => svc.from('simulado_questoes').select('id, enunciado, comentario_professor').in('id', c)),
     (async () => {
       const full = await fetchAllByIn<any>(questaoIds, (c) => svc.from('simulado_competencias').select('id, questao_id, nome, pontos, ordem, descricao, conceitos').in('questao_id', c)).catch(() => null)
@@ -34,7 +34,12 @@ export async function carregarQuestoesCorrecao(svc: SupabaseClient, tenantId: st
     })(),
     (async () => { try { return await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_resposta_arquivos').select('resposta_id, arquivo_id, ordem').in('resposta_id', c)) } catch { return [] as any[] } })(),
     (async () => { try { return await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_anotacoes_discursivas').select('id, resposta_id, arquivo_id, competencia_id, tipo, x, y, largura, altura, cor, icone, numero, conteudo').in('resposta_id', c)) } catch { return [] as any[] } })(),
+    (async () => { try { return await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_respostas_discursivas').select('id, ia_payload').in('id', c)) } catch { return [] as any[] } })(),
   ])
+
+  // Transcrição do manuscrito (feita pela IA) por resposta — de ia_payload.transcricao (tolerante).
+  const transcricaoDe = new Map<string, string>()
+  for (const x of ias as any[]) { const t = x?.ia_payload?.transcricao; if (t) transcricaoDe.set(x.id, String(t)) }
 
   const qMap = new Map(questoes.map((q: any) => [q.id, q]))
   const arqIds = [...new Set(juncoes.map((j: any) => j.arquivo_id).filter(Boolean))] as string[]
@@ -92,6 +97,7 @@ export async function carregarQuestoesCorrecao(svc: SupabaseClient, tenantId: st
       enunciado: (q?.enunciado ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
       jaCorrigida: r.status === 'corrigida',
       feedbackInicial: r.feedback ?? '',
+      transcricao: transcricaoDe.get(r.id) ?? '',
       competencias,
       paginas: pagPorResp.get(r.id) ?? [],
       anotacoesIniciais: anotPorResp.get(r.id) ?? [],

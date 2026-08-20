@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
-  ArrowLeft, Check, Flag, Lock, AlertTriangle, BookOpenCheck, Image as ImageIcon, FileText, Sparkles, Loader2, ExternalLink,
+  ArrowLeft, Check, Flag, Lock, AlertTriangle, BookOpenCheck, Image as ImageIcon, FileText, Sparkles, Loader2, ExternalLink, ScrollText,
 } from 'lucide-react'
 import { useSidebar } from '@/components/ui/sidebar'
 import { CorrecaoFolha, ICONES, type Ferramenta, type Marca } from '@/components/admin/correcao-folha'
@@ -22,6 +22,7 @@ export interface CompCorrecao {
 }
 export interface QuestaoCorrecao {
   respostaId: string; numero: number; status: string; enunciado: string; jaCorrigida: boolean; feedbackInicial: string
+  transcricao: string
   competencias: CompCorrecao[]
   paginas: { arquivoId: string; url: string }[]
   anotacoesIniciais: Marca[]
@@ -74,10 +75,12 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
     Object.fromEntries(questoes.map((q) => [q.respostaId, q.anotacoesIniciais])))
   const [statusPorResp, setStatusPorResp] = useState<Record<string, string>>(() =>
     Object.fromEntries(questoes.map((q) => [q.respostaId, q.status])))
+  const [transcricaoPorResp, setTranscricaoPorResp] = useState<Record<string, string>>(() =>
+    Object.fromEntries(questoes.map((q) => [q.respostaId, q.transcricao ?? ''])))
 
   const [ativoKey, setAtivoKey] = useState<string>(linhas[0]?.key ?? '')
   const [filtro, setFiltro] = useState<Filtro>('todos')
-  const [aba, setAba] = useState<'prova' | 'espelho'>('prova')
+  const [aba, setAba] = useState<'prova' | 'espelho' | 'transcricao'>('prova')
   const [ferramenta, setFerramenta] = useState<Ferramenta>('selecionar')
   const [iconeAtivo, setIconeAtivo] = useState<string>('check')
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null)
@@ -186,6 +189,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
       const r = await fetch('/api/admin/correcao/ia', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ respostaId: resp }) })
       const j = await r.json().catch(() => ({}))
       if (!j.ok) { toast.error(j.error ?? 'Falha na IA'); return }
+      if (j.proposta?.transcricao) setTranscricaoPorResp((s) => ({ ...s, [resp]: String(j.proposta.transcricao) }))
       let aplicados = 0
       for (const q of (j.proposta?.quesitos ?? []) as any[]) {
         const linha = linhasRef.current.find((l) => l.respostaId === resp && l.comp.id === q.competencia_id)
@@ -329,6 +333,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
             <div className="flex items-center gap-0.5 rounded-lg border p-0.5">
               <button type="button" onClick={() => setAba('prova')} className={cn('flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium', aba === 'prova' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}><ImageIcon className="h-3.5 w-3.5" /> PROVA</button>
               {!espelhoColuna && <button type="button" onClick={() => setAba('espelho')} className={cn('flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium', aba === 'espelho' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}><FileText className="h-3.5 w-3.5" /> ESPELHO COMPLETO</button>}
+              <button type="button" onClick={() => setAba('transcricao')} className={cn('flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium', aba === 'transcricao' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}><ScrollText className="h-3.5 w-3.5" /> TRANSCRIÇÃO</button>
             </div>
             <button type="button" onClick={() => { setEspelhoColuna((v) => !v); setAba('prova') }}
               className={cn('flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors', espelhoColuna ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}
@@ -350,6 +355,29 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
                   ferramenta={ferramenta} corAtiva={corAtiva} iconeAtivo={iconeAtivo}
                   selecionadaId={selecionadaId} onSelecionar={selecionarMarca} onCriar={criar} onAtualizar={atualizarMarca} focoId={focoId} focoKey={focoKey} />
               ) : <div className="flex h-full items-center justify-center rounded-lg border bg-card text-sm text-muted-foreground">Nenhuma foto enviada nesta questão.</div>
+            ) : aba === 'transcricao' ? (
+              <div className="mx-auto flex h-full max-w-3xl flex-col overflow-hidden rounded-lg border bg-card">
+                <div className="flex shrink-0 items-center justify-between border-b px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="flex items-center gap-1.5"><ScrollText className="h-3.5 w-3.5" /> Transcrição do manuscrito (IA)</span>
+                  {questaoAtiva && (transcricaoPorResp[questaoAtiva.respostaId] ?? '') && (
+                    <button type="button" onClick={sugerirIA} disabled={!!iaPending} className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-medium normal-case text-primary hover:bg-primary/5 disabled:opacity-60">
+                      {iaPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />} Refazer
+                    </button>
+                  )}
+                </div>
+                {questaoAtiva && (transcricaoPorResp[questaoAtiva.respostaId] ?? '').trim() ? (
+                  <p className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap p-5 text-sm leading-relaxed">{transcricaoPorResp[questaoAtiva.respostaId]}</p>
+                ) : (
+                  <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
+                    <ScrollText className="h-8 w-8 opacity-50" />
+                    <p>A IA ainda não transcreveu esta questão.</p>
+                    <button type="button" onClick={sugerirIA} disabled={!!iaPending}
+                      className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-violet-300/60 bg-violet-500/10 px-3 py-1.5 text-sm font-semibold text-violet-700 hover:bg-violet-500/20 disabled:opacity-60 dark:text-violet-300">
+                      {iaPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Transcrevendo…</> : <><Sparkles className="h-4 w-4" /> Transcrever com IA</>}
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : espelhoPdfUrl ? (
               <div className="h-full overflow-hidden rounded-lg border"><EspelhoPdf url={espelhoPdfUrl} /></div>
             ) : (
