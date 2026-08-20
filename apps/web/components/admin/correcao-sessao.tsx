@@ -73,6 +73,12 @@ function ehCabecalho(txt: string): boolean {
   return /^RESPOSTA( DISCURSIVA| DA QUEST[AÃ]O)?\s*\d*$/.test(t) || /^FOLHA( DE RESPOSTAS?)?$/.test(t) || /^RASCUNHO$/.test(t) || /^GABARITO$/.test(t) || /^P[AÁ]GINA\s*\d+$/.test(t)
 }
 const mediana = (a: number[]) => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)] }
+// Junta palavra quebrada por hífen no fim da linha (ex.: "fi-\nduciário" → "fiduciário").
+function juntarHifenacao(t: string): string {
+  return String(t || '')
+    .replace(/([\p{L}])-[ \t]*\r?\n[ \t]*([\p{L}])/gu, '$1$2')  // hífen no fim da linha + quebra
+    .replace(/([\p{Ll}])-[ \t]+([\p{Ll}])/gu, '$1$2')           // "fi- duciário" (minúsculas — OCR/IA juntou na mesma linha)
+}
 /**
  * Estrutura a saída do OCR: agrupa as palavras em LINHAS por proximidade vertical
  * (robusto — independe das bordas da tabela), numera sequencialmente, pula o cabeçalho
@@ -117,8 +123,15 @@ function estruturarOCR(data: any, w: number, h: number): { numerado: string; lim
   }
   const linhas = numeros.length ? (numeros.length === 1 ? String(numeros[0]) : `${numeros[0]}–${numeros[numeros.length - 1]}`) : ''
   // junta linhas do mesmo parágrafo no texto "limpo" (parágrafos separados por linha em branco)
-  const limpoTxt = limpo.reduce((acc: string[], ln) => { if (ln === '') acc.push(''); else acc[acc.length - 1] = ((acc[acc.length - 1] ?? '') + ' ' + ln).trim(); return acc }, ['']).filter((s) => s.trim()).join('\n\n')
-  return { numerado: numerado.join('\n').trim(), limpo: limpoTxt.trim(), linhas, caixas }
+  const limpoTxt = limpo.reduce((acc: string[], ln) => {
+    if (ln === '') { acc.push(''); return acc }
+    const cur = (acc[acc.length - 1] ?? '').trimEnd()
+    // linha anterior terminou com "letra-" → palavra quebrada: junta SEM espaço, tirando o hífen
+    if (/[\p{L}]-$/u.test(cur)) acc[acc.length - 1] = cur.replace(/-$/, '') + ln
+    else acc[acc.length - 1] = (cur + ' ' + ln).trim()
+    return acc
+  }, ['']).filter((s) => s.trim()).join('\n\n')
+  return { numerado: numerado.join('\n').trim(), limpo: juntarHifenacao(limpoTxt.trim()), linhas, caixas }
 }
 // Pré-processa a foto p/ o OCR (canvas), direcionado a folha de resposta pautada:
 // upscale → grayscale → binarização ADAPTATIVA (tira o fundo/rosa) → remove as linhas
@@ -355,16 +368,17 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
       const r = await fetch('/api/admin/correcao/ia', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ respostaId: resp }) })
       const j = await r.json().catch(() => ({}))
       if (!j.ok) { toast.error(j.error ?? 'Falha na IA'); return }
-      if (j.proposta?.transcricao) setTranscricaoPorResp((s) => ({ ...s, [resp]: String(j.proposta.transcricao) }))
+      if (j.proposta?.transcricao) setTranscricaoPorResp((s) => ({ ...s, [resp]: juntarHifenacao(String(j.proposta.transcricao)) }))
       let aplicados = 0, caixas = 0
       for (const q of (j.proposta?.quesitos ?? []) as any[]) {
         const linha = linhasRef.current.find((l) => l.respostaId === resp && l.comp.id === q.competencia_id)
         if (!linha) continue
         const nota = Math.min(linha.comp.pontos, Math.max(0, Number(q.nota) || 0))
         const revisar = !!q.needs_review || q.status === 'revisar'
-        // Campos do quesito (UI + persistência)
-        const patchUI: Partial<CompCorrecao> = { nota, conceito: q.conceito || '', excerpt: q.excerpt || '', recognized: q.recognized ?? [], missing: q.missing ?? [], comentario: q.rationale || '', leituraDuvidosa: revisar || linha.comp.leituraDuvidosa }
-        const patchDB: QuesitoPatch = { nota, conceito: q.conceito || null, excerpt: q.excerpt || null, recognized: q.recognized ?? [], missing: q.missing ?? [], comentario: q.rationale || null, leitura_duvidosa: revisar || linha.comp.leituraDuvidosa }
+        // Campos do quesito (UI + persistência) — junta hifenação no trecho
+        const exc = juntarHifenacao(String(q.excerpt || ''))
+        const patchUI: Partial<CompCorrecao> = { nota, conceito: q.conceito || '', excerpt: exc, recognized: q.recognized ?? [], missing: q.missing ?? [], comentario: q.rationale || '', leituraDuvidosa: revisar || linha.comp.leituraDuvidosa }
+        const patchDB: QuesitoPatch = { nota, conceito: q.conceito || null, excerpt: exc || null, recognized: q.recognized ?? [], missing: q.missing ?? [], comentario: q.rationale || null, leitura_duvidosa: revisar || linha.comp.leituraDuvidosa }
         if (q.page != null) { patchUI.pagina = String(q.page); patchDB.pagina = String(q.page) }
         if (q.lines) { patchUI.linhas = String(q.lines); patchDB.linhas = String(q.lines) }
         if (revisar) { patchUI.audit_state = 'review'; patchDB.audit_state = 'review' }
@@ -468,7 +482,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
       const worker = await createWorker('por', 1, { logger: (m: any) => { if (m.status === 'recognizing text') setOcrPending(Math.round((m.progress || 0) * 100)) } })
       try { await worker.setParameters({ tessedit_pageseg_mode: (T.PSM?.SINGLE_BLOCK ?? '6'), preserve_interword_spaces: '1', tessedit_char_whitelist: WL_OCR }) } catch {}
       let texto = ''
-      try { const { data } = await worker.recognize(pre.url, {}, { text: true }); texto = String(data?.text || '').replace(/[ \t]+\n/g, '\n').replace(/\n{2,}/g, '\n').trim() } finally { await worker.terminate() }
+      try { const { data } = await worker.recognize(pre.url, {}, { text: true }); texto = juntarHifenacao(String(data?.text || '').replace(/[ \t]+\n/g, '\n').replace(/\n{2,}/g, '\n').trim()) } finally { await worker.terminate() }
       patchQ(key, { excerpt: texto } as Partial<CompCorrecao>); salvarCampo(key, { excerpt: texto })
       toast.success('OCR da área concluído — trecho preenchido (letra de mão pode exigir ajuste).')
     } catch { toast.error('Falha no OCR da área.') } finally { setOcrPending(null) }
@@ -487,7 +501,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
       const r = await fetch('/api/admin/correcao/transcrever-regiao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ respostaId: resp, imagemBase64: crop.base64, mediaType: crop.mediaType }) })
       const j = await r.json().catch(() => ({}))
       if (!j.ok) { toast.error(j.error ?? 'Falha na IA'); return }
-      const texto = String(j.texto || '')
+      const texto = juntarHifenacao(String(j.texto || ''))
       patchQ(key, { excerpt: texto } as Partial<CompCorrecao>); salvarCampo(key, { excerpt: texto })
       toast.success('IA transcreveu a área — trecho preenchido.')
     } catch { toast.error('Falha ao chamar a IA') } finally { setIaPending(null) }
