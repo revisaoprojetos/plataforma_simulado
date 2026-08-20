@@ -42,6 +42,9 @@ import {
   LogOut,
   Building2,
   Tag,
+  CalendarDays,
+  FileClock,
+  Link2 as LinkIcon,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -65,7 +68,7 @@ import {
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { OCULTAR_DISCURSIVA } from '@/lib/flags'
+import { OCULTAR_CRONOGRAMA, OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { useCan } from '@/components/auth/can-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { NotificationBell } from '@/components/admin/notification-bell'
@@ -189,6 +192,15 @@ const navGroups: NavGroup[] = [
       { label: 'Ajuda', href: '/admin/ajuda', icon: HelpCircle },
     ],
   },
+  {
+    label: 'Cronograma',
+    icon: CalendarDays,
+    items: [
+      { label: 'Catálogo', href: '/admin/cronogramas', icon: CalendarDays, perm: 'cronogramas:view' },
+      { label: 'Links de aula', href: '/admin/cronogramas/links', icon: LinkIcon, perm: 'cronogramas:view' },
+      { label: 'Emissões', href: '/admin/cronogramas/emissoes', icon: FileClock, perm: 'cronogramas:view' },
+    ],
+  },
 ]
 
 function itemAtivo(item: NavItem, pathname: string, search: URLSearchParams) {
@@ -230,7 +242,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
 
   // Filtra itens/grupos por permissão do usuário (super-admin gate + flag discursiva).
   const gruposVisiveis = navGroups
-    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !(i.superOnly && !isSuperAdmin) && !(OCULTAR_DISCURSIVA && i.href === '/admin/correcao')) }))
+    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !(i.superOnly && !isSuperAdmin) && !(OCULTAR_DISCURSIVA && i.href === '/admin/correcao') && !(OCULTAR_CRONOGRAMA && i.href.startsWith('/admin/cronogramas'))) }))
     .filter((g) => g.items.length > 0)
 
   const grupoAtivo = (group: NavGroup) => group.items.some((i) => itemAtivo(i, pathname, search))

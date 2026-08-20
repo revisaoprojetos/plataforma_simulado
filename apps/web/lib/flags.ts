@@ -18,3 +18,14 @@ export const OCULTAR_ALUNO_EXTRAS = true
 // Rotas do aluno ocultas enquanto OCULTAR_ALUNO_EXTRAS estiver ligado.
 // Banco de Questões reativado (área dedicada de prática com filtros + histórico).
 export const ROTAS_ALUNO_OCULTAS = ['/aluno/favoritos', '/aluno/cadernos']
+
+/**
+ * OCULTAR_CRONOGRAMA: esconde o módulo Cronograma de Estudos (menu do admin + menu do
+ * aluno) enquanto as telas estão em construção.
+ *
+ * O gate REAL de produção não é esta constante, e sim a coluna `ativo` de
+ * `simulado_cronograma_config`, que liga o módulo por tenant. Esta flag existe só para
+ * o período de desenvolvimento, em que nem as telas estão prontas. Ligar de volta
+ * (false) quando o CRUD e a tela do aluno estiverem navegáveis.
+ */
+export const OCULTAR_CRONOGRAMA = true
