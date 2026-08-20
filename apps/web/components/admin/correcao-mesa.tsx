@@ -41,7 +41,7 @@ const SEV_CLS: Record<string, string> = {
 
 export function CorrecaoMesa({
   respostaId, jaCorrigida, competencias, feedbackInicial, voltarUrl,
-  paginas, anotacoesIniciais, espelho,
+  paginas, anotacoesIniciais, espelho, embedded, onDevolvido,
 }: {
   respostaId: string
   jaCorrigida: boolean
@@ -51,6 +51,9 @@ export function CorrecaoMesa({
   paginas: { arquivoId: string; url: string }[]
   anotacoesIniciais: Marca[]
   espelho: { enunciado: string; comentarioProfessor: string | null }
+  /** Dentro da tela de tentativa: após devolver, avança p/ a próxima questão em vez de redirecionar. */
+  embedded?: boolean
+  onDevolvido?: () => void
 }) {
   const router = useRouter()
   const [comps, setComps] = useState<Comp[]>(competencias)
@@ -178,8 +181,10 @@ export function CorrecaoMesa({
   function salvar() {
     start(async () => {
       const r = await salvarCorrecao(respostaId, comps.map((c) => ({ competencia_id: c.id, nota: Number(c.nota) || 0, comentario: c.comentario })), feedback)
-      if (r.ok) { toast.success(jaCorrigida ? 'Correção atualizada' : 'Correção devolvida ao aluno'); router.push(voltarUrl); router.refresh() }
-      else toast.error(r.error ?? 'Erro ao salvar')
+      if (r.ok) {
+        if (embedded && onDevolvido) { onDevolvido() } // na tela de tentativa: avança sem sair
+        else { toast.success(jaCorrigida ? 'Correção atualizada' : 'Correção devolvida ao aluno'); router.push(voltarUrl); router.refresh() }
+      } else toast.error(r.error ?? 'Erro ao salvar')
     })
   }
 
