@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useSidebar } from '@/components/ui/sidebar'
 import { CorrecaoFolha, ICONES, type Ferramenta, type Marca } from '@/components/admin/correcao-folha'
+import { PdfPreview } from '@/components/admin/pdf-preview'
 import { assumirCorrecao, salvarCorrecao, salvarQuesito, salvarEspelhoQuesito, salvarAnotacao, removerAnotacao, atualizarAnotacao, type QuesitoPatch } from '@/app/admin/correcao/actions'
 
 export interface CompCorrecao {
@@ -473,7 +474,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   )
 }
 
-/** Painel do PDF do gabarito/espelho — object + iframe de fallback + botão "Abrir em nova aba". */
+/** Painel do PDF do gabarito/espelho — renderizado via PDF.js (canvas): aparece SEM baixar. */
 function EspelhoPdf({ url }: { url: string }) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -483,9 +484,7 @@ function EspelhoPdf({ url }: { url: string }) {
           <ExternalLink className="h-3 w-3" /> Abrir em nova aba
         </a>
       </div>
-      <object data={url} type="application/pdf" className="min-h-0 flex-1 bg-white">
-        <iframe src={url} title="Gabarito / espelho" className="h-full w-full border-0 bg-white" />
-      </object>
+      <PdfPreview url={url} titulo="gabarito" maxPag={40} className="relative min-h-0 flex-1 bg-white" />
     </div>
   )
 }

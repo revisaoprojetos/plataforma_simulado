@@ -8,7 +8,7 @@ import { Loader2, FileText } from 'lucide-react'
  * configurado para BAIXAR PDFs em vez de exibi-los (não depende do visualizador nativo).
  * Busca o arquivo pelo proxy same-origin (/api/pdf-view) p/ evitar CORS/download.
  */
-export function PdfPreview({ url, titulo, className }: { url: string; titulo?: string; className?: string }) {
+export function PdfPreview({ url, titulo, className, maxPag = 12 }: { url: string; titulo?: string; className?: string; maxPag?: number }) {
   const contRef = useRef<HTMLDivElement>(null)
   const [estado, setEstado] = useState<'load' | 'ok' | 'erro'>('load')
 
@@ -29,7 +29,7 @@ export function PdfPreview({ url, titulo, className }: { url: string; titulo?: s
         if (cancel || !cont) return
         cont.innerHTML = ''
         const largura = cont.clientWidth || 320
-        const maxPaginas = Math.min(doc.numPages, 12)
+        const maxPaginas = Math.min(doc.numPages, maxPag)
         for (let i = 1; i <= maxPaginas; i++) {
           const page = await doc.getPage(i)
           if (cancel) return
