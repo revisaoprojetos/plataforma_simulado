@@ -86,6 +86,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   const [paginaIndex, setPaginaIndex] = useState(0)
   const [pending, setPending] = useState(false)
   const [showDestaqueIA, setShowDestaqueIA] = useState(true)
+  const [iaPending, setIaPending] = useState<string | null>(null)
   // Larguras ajustáveis das colunas + espelho como coluna (persistidos no navegador).
   const [w1, setW1] = useState(256)
   const [w3, setW3] = useState(456)
@@ -174,6 +175,29 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
     if (primeira) { setSelecionadaId(primeira.id); foca(primeira.id) } else setSelecionadaId(null)
   }
   function verNaProva(key: string) { setAba('prova'); irPara(key) }
+
+  // Fase 3 — pede à IA (Claude visão) uma proposta de correção da QUESTÃO ativa e aplica em
+  // cinza (pending) p/ o professor revisar/aprovar. A nota final continua sendo do corretor.
+  async function sugerirIA() {
+    if (!questaoAtiva) return
+    const resp = questaoAtiva.respostaId
+    setIaPending(resp)
+    try {
+      const r = await fetch('/api/admin/correcao/ia', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ respostaId: resp }) })
+      const j = await r.json().catch(() => ({}))
+      if (!j.ok) { toast.error(j.error ?? 'Falha na IA'); return }
+      let aplicados = 0
+      for (const q of (j.proposta?.quesitos ?? []) as any[]) {
+        const linha = linhasRef.current.find((l) => l.respostaId === resp && l.comp.id === q.competencia_id)
+        if (!linha) continue
+        const nota = Math.min(linha.comp.pontos, Math.max(0, Number(q.nota) || 0))
+        patchQ(linha.key, { nota, conceito: q.conceito || '', excerpt: q.excerpt || '', recognized: q.recognized ?? [], missing: q.missing ?? [], comentario: q.rationale || '', ...(linha.comp.audit_state === 'approved' ? { audit_state: 'pending' } : {}) })
+        salvarCampo(linha.key, { nota, conceito: q.conceito || null, excerpt: q.excerpt || null, recognized: q.recognized ?? [], missing: q.missing ?? [], comentario: q.rationale || null })
+        aplicados++
+      }
+      toast.success(aplicados ? `IA sugeriu ${aplicados} quesito(s) — revise e aprove. A nota final é sua.` : 'IA não retornou quesitos aplicáveis.')
+    } catch { toast.error('Falha ao chamar a IA') } finally { setIaPending(null) }
+  }
 
   // ── anotações (na questão ativa) ──
   async function criar(m: Omit<Marca, 'id'>) {
@@ -377,6 +401,12 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
                 <span className={cn('font-semibold uppercase tracking-wide', ativo.comp.audit_state === 'approved' ? 'text-emerald-600 dark:text-emerald-400' : ativo.comp.audit_state === 'review' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>{ativo.comp.audit_state === 'approved' ? 'Aprovado' : ativo.comp.audit_state === 'review' ? 'Revisar' : 'Pendente'}</span>
               </div>
               <h2 className="text-base font-bold leading-snug">{ativo.comp.nome}</h2>
+
+              {/* Fase 3 — sugestão da IA p/ a questão inteira (o professor aprova) */}
+              <button type="button" onClick={sugerirIA} disabled={!!iaPending}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-300/60 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 py-2 text-sm font-semibold text-violet-700 transition-colors hover:from-violet-500/20 hover:to-fuchsia-500/20 disabled:opacity-60 dark:border-violet-500/40 dark:text-violet-300">
+                {iaPending ? <><Loader2 className="h-4 w-4 animate-spin" /> A IA está analisando…</> : <><Sparkles className="h-4 w-4" /> Sugerir correção com IA</>}
+              </button>
 
               {alertasAtivo.length > 0 && (
                 <div className="space-y-1.5">
