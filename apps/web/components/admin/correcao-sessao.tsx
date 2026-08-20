@@ -40,29 +40,20 @@ const nfmt = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2
 const clampW = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
-// ── OCR: extrai a REGIÃO do texto reconhecido (caixas do Tesseract) p/ desenhar o
-// destaque na folha. Coords do Tesseract são em px da imagem → normaliza p/ 0–1.
-type CaixaOCR = { x0: number; y0: number; x1: number; y1: number }
-function coletarCaixasOCR(data: any): CaixaOCR[] {
-  const out: CaixaOCR[] = []
+// ── OCR estruturado: usa as LINHAS da pauta como régua + as caixas de palavra do
+// Tesseract p/ (a) numerar a transcrição por linha, (b) pular o cabeçalho impresso
+// ("QUESTÃO 01"…), (c) detectar início/fim de parágrafo. Coords em px da imagem processada.
+type PalavraOCR = { text: string; x0: number; y0: number; x1: number; y1: number }
+function coletarPalavrasOCR(data: any): PalavraOCR[] {
+  const out: PalavraOCR[] = []
   const bom = (b: any) => b && Number.isFinite(b.x0) && b.x1 > b.x0 && b.y1 > b.y0
-  const words = data?.words
-  if (Array.isArray(words) && words.length) {
-    for (const w of words) if ((w?.confidence ?? 100) >= 20 && String(w?.text ?? '').trim() && bom(w?.bbox)) out.push(w.bbox)
-  }
-  if (!out.length && Array.isArray(data?.lines)) for (const l of data.lines) if (bom(l?.bbox)) out.push(l.bbox)
-  if (!out.length && Array.isArray(data?.blocks)) {
-    for (const bl of data.blocks) for (const p of (bl?.paragraphs ?? [])) for (const ln of (p?.lines ?? [])) {
-      const ws = ln?.words ?? []
-      if (ws.length) { for (const w of ws) if (String(w?.text ?? '').trim() && bom(w?.bbox)) out.push(w.bbox) }
-      else if (bom(ln?.bbox)) out.push(ln.bbox)
-    }
-    if (!out.length) for (const bl of data.blocks) if (bom(bl?.bbox)) out.push(bl.bbox)
-  }
+  // Mantém TODAS as palavras reconhecidas (base completa p/ o corretor editar) — sem filtro de confiança.
+  const add = (t: any, b: any) => { const s = String(t ?? '').trim(); if (s && bom(b)) out.push({ text: s, x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1 }) }
+  if (Array.isArray(data?.words) && data.words.length) for (const w of data.words) add(w?.text, w?.bbox)
+  if (!out.length && Array.isArray(data?.blocks)) for (const bl of data.blocks) for (const p of (bl?.paragraphs ?? [])) for (const ln of (p?.lines ?? [])) for (const w of (ln?.words ?? [])) add(w?.text, w?.bbox)
   return out
 }
-function regiaoOCR(data: any, w: number, h: number): { x: number; y: number; largura: number; altura: number } | null {
-  const caixas = coletarCaixasOCR(data)
+function regiaoDeCaixas(caixas: { x0: number; y0: number; x1: number; y1: number }[], w: number, h: number): { x: number; y: number; largura: number; altura: number } | null {
   if (!caixas.length || !w || !h) return null
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
   for (const b of caixas) { x0 = Math.min(x0, b.x0); y0 = Math.min(y0, b.y0); x1 = Math.max(x1, b.x1); y1 = Math.max(y1, b.y1) }
@@ -72,25 +63,83 @@ function regiaoOCR(data: any, w: number, h: number): { x: number; y: number; lar
   if (largura < 0.02 || altura < 0.02) return null
   return { x, y, largura, altura }
 }
+/** Uma "linha" da folha é referência impressa (cabeçalho), não resposta do aluno? */
+function ehCabecalho(txt: string): boolean {
+  const t = txt.toUpperCase().replace(/[^0-9A-ZÀ-Ú ]/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!t) return true
+  // "QUESTÃO 01" (mesmo com lixo curto do OCR grudado, ex.: "QUESTÃO 01 E.")
+  const semQ = t.replace(/^Q?UEST[AÃ]O\s*(N[º°.]?\s*)?\d+\s*/, '').trim()
+  if (semQ !== t && semQ.length < 5) return true
+  return /^RESPOSTA( DISCURSIVA| DA QUEST[AÃ]O)?\s*\d*$/.test(t) || /^FOLHA( DE RESPOSTAS?)?$/.test(t) || /^RASCUNHO$/.test(t) || /^GABARITO$/.test(t) || /^P[AÁ]GINA\s*\d+$/.test(t)
+}
+const mediana = (a: number[]) => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)] }
+/**
+ * Estrutura a saída do OCR: agrupa as palavras em LINHAS por proximidade vertical
+ * (robusto — independe das bordas da tabela), numera sequencialmente, pula o cabeçalho
+ * ("QUESTÃO 01"…) e detecta parágrafos (indentação à esquerda = início; linha curta = fim).
+ * Devolve texto numerado (leitura), texto limpo (excerpt), a faixa de linhas e as caixas
+ * das palavras do ALUNO (sem cabeçalho) p/ o destaque.
+ */
+function estruturarOCR(data: any, w: number, h: number): { numerado: string; limpo: string; linhas: string; caixas: PalavraOCR[] } {
+  const palavras = coletarPalavrasOCR(data)
+  if (!palavras.length) { const t = String(data?.text || '').trim(); return { numerado: t, limpo: t, linhas: '', caixas: [] } }
+  // altura típica de palavra → tolerância p/ agrupar na mesma linha
+  const alturas = palavras.map((p) => p.y1 - p.y0).sort((a, b) => a - b)
+  const hMed = alturas[Math.floor(alturas.length / 2)] || h / 25
+  const ordenadas = palavras.slice().sort((a, b) => (a.y0 + a.y1) / 2 - (b.y0 + b.y1) / 2)
+  // agrupa por ÂNCORA fixa (o topo de cada linha) p/ não "escorregar" e fundir linhas:
+  // a palavra entra na linha atual se seu centro está a até 0.75×altura do topo dela.
+  const grupos: { ws: PalavraOCR[]; topo: number }[] = []
+  for (const p of ordenadas) {
+    const yc = (p.y0 + p.y1) / 2, ult = grupos[grupos.length - 1]
+    if (ult && yc - ult.topo <= hMed * 0.75) ult.ws.push(p)
+    else grupos.push({ ws: [p], topo: yc })
+  }
+  const linhasTxt = grupos.map((L) => {
+    const ws = L.ws.slice().sort((a, b) => a.x0 - b.x0)
+    return { ws, txt: ws.map((x) => x.text).join(' ').replace(/\s+/g, ' ').trim(), left: Math.min(...ws.map((x) => x.x0)), right: Math.max(...ws.map((x) => x.x1)) }
+  }).filter((L) => L.txt)
+  const margemE = mediana(linhasTxt.map((L) => L.left)), margemD = mediana(linhasTxt.map((L) => L.right))
+  const indent = w * 0.035, curto = w * 0.14
+  const numerado: string[] = [], limpo: string[] = [], numeros: number[] = []
+  const caixas: PalavraOCR[] = []
+  let anteriorCurta = true // 1ª linha de conteúdo abre parágrafo
+  for (const L of linhasTxt) {
+    if (ehCabecalho(L.txt)) { anteriorCurta = true; continue } // cabeçalho não conta
+    caixas.push(...L.ws)
+    const numero = numeros.length + 1
+    numeros.push(numero)
+    const novoParag = anteriorCurta || (L.left - margemE > indent)
+    if (novoParag && limpo.length) { numerado.push(''); limpo.push('') }
+    numerado.push(`${String(numero).padStart(2, '0')}. ${L.txt}`)
+    limpo.push(L.txt)
+    anteriorCurta = L.right < margemD - curto
+  }
+  const linhas = numeros.length ? (numeros.length === 1 ? String(numeros[0]) : `${numeros[0]}–${numeros[numeros.length - 1]}`) : ''
+  // junta linhas do mesmo parágrafo no texto "limpo" (parágrafos separados por linha em branco)
+  const limpoTxt = limpo.reduce((acc: string[], ln) => { if (ln === '') acc.push(''); else acc[acc.length - 1] = ((acc[acc.length - 1] ?? '') + ' ' + ln).trim(); return acc }, ['']).filter((s) => s.trim()).join('\n\n')
+  return { numerado: numerado.join('\n').trim(), limpo: limpoTxt.trim(), linhas, caixas }
+}
 // Pré-processa a foto p/ o OCR (canvas), direcionado a folha de resposta pautada:
 // upscale → grayscale → binarização ADAPTATIVA (tira o fundo/rosa) → remove as linhas
 // da pauta e o grid (runs longos horizontais/verticais) → apaga a coluna de números à
 // esquerda. Reduz o "lixo" e ajuda o Tesseract. Devolve as dims processadas.
-function preprocessarOCR(dataUrl: string): Promise<{ url: string; w: number; h: number }> {
+function preprocessarOCR(dataUrl: string): Promise<{ url: string; w: number; h: number; linhasY: number[] }> {
   return new Promise((res) => {
     const im = new Image()
     im.onload = () => {
       const natW = im.naturalWidth || 0, natH = im.naturalHeight || 0
-      if (!natW || !natH) { res({ url: dataUrl, w: 0, h: 0 }); return }
+      if (!natW || !natH) { res({ url: dataUrl, w: 0, h: 0, linhasY: [] }); return }
       // upscale mirando ~2600px de largura, com teto de ~10MP p/ não estourar memória.
       let escala = Math.min(4, Math.max(1, 2600 / natW))
       if (natW * natH * escala * escala > 10_000_000) escala = Math.sqrt(10_000_000 / (natW * natH))
       const w = Math.max(1, Math.round(natW * escala)), h = Math.max(1, Math.round(natH * escala))
       const cv = document.createElement('canvas'); cv.width = w; cv.height = h
       const ctx = cv.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D | null
-      if (!ctx) { res({ url: dataUrl, w: natW, h: natH }); return }
+      if (!ctx) { res({ url: dataUrl, w: natW, h: natH, linhasY: [] }); return }
       ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
       ctx.drawImage(im, 0, 0, w, h)
+      const linhasY: number[] = []
       try {
         const img = ctx.getImageData(0, 0, w, h), d = img.data, N = w * h
         // 1) grayscale
@@ -110,9 +159,11 @@ function preprocessarOCR(dataUrl: string): Promise<{ url: string; w: number; h: 
             if (gray[y * w + x] < soma / area - C) ink[y * w + x] = 1
           }
         }
-        // 3) remove RUNS horizontais longos (linhas da pauta) e verticais longos (grade)
+        // 3) remove RUNS horizontais longos (linhas da pauta — e REGISTRA seu Y) e verticais longos (grade)
         const limH = Math.round(w * 0.30), limV = Math.round(h * 0.30)
-        for (let y = 0; y < h; y++) { let ini = -1; for (let x = 0; x <= w; x++) { const on = x < w && ink[y * w + x] === 1; if (on) { if (ini < 0) ini = x } else { if (ini >= 0 && x - ini >= limH) for (let k = ini; k < x; k++) ink[y * w + k] = 0; ini = -1 } } }
+        const ehLinha = new Uint8Array(h)
+        for (let y = 0; y < h; y++) { let ini = -1, tem = false; for (let x = 0; x <= w; x++) { const on = x < w && ink[y * w + x] === 1; if (on) { if (ini < 0) ini = x } else { if (ini >= 0 && x - ini >= limH) { for (let k = ini; k < x; k++) ink[y * w + k] = 0; tem = true } ini = -1 } } if (tem) ehLinha[y] = 1 }
+        for (let y = 0; y < h; y++) { if (ehLinha[y]) { let y2 = y; while (y2 + 1 < h && ehLinha[y2 + 1]) y2++; linhasY.push((y + y2) / 2); y = y2 } }
         for (let x = 0; x < w; x++) { let ini = -1; for (let y = 0; y <= h; y++) { const on = y < h && ink[y * w + x] === 1; if (on) { if (ini < 0) ini = y } else { if (ini >= 0 && y - ini >= limV) for (let k = ini; k < y; k++) ink[k * w + x] = 0; ini = -1 } } }
         // 4) apaga a coluna de números à esquerda (~6% da largura)
         const corte = Math.round(w * 0.06)
@@ -121,9 +172,9 @@ function preprocessarOCR(dataUrl: string): Promise<{ url: string; w: number; h: 
         for (let p = 0, i = 0; p < N; p++, i += 4) { const v = ink[p] ? 0 : 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255 }
         ctx.putImageData(img, 0, 0)
       } catch { /* canvas "tainted"/memória: usa o upscale puro */ }
-      res({ url: cv.toDataURL('image/png'), w, h })
+      res({ url: cv.toDataURL('image/png'), w, h, linhasY })
     }
-    im.onerror = () => res({ url: dataUrl, w: 0, h: 0 })
+    im.onerror = () => res({ url: dataUrl, w: 0, h: 0, linhasY: [] })
     im.src = dataUrl
   })
 }
@@ -334,7 +385,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
       const WL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÇÉÊÍÓÔÕÚàáâãçéêíóôõú0123456789.,;:!?()-–—/º ª°%\n'
       try { await worker.setParameters({ tessedit_pageseg_mode: (T.PSM?.SINGLE_BLOCK ?? '6'), preserve_interword_spaces: '1', tessedit_char_whitelist: WL }) } catch {}
       const itens: { arquivoId: string; regiao: { x: number; y: number; largura: number; altura: number } }[] = []
-      let texto = '', primeiraPag = -1
+      let numerado = '', limpo = '', linhasRef = '', primeiraPag = -1
       try {
         for (let i = 0; i < pgs.length; i++) {
           pgIdx = i
@@ -342,23 +393,28 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
           if (!img.ok || !img.dataUrl) continue
           const pre = await preprocessarOCR(img.dataUrl)
           const { data } = await worker.recognize(pre.url, {}, { blocks: true, text: true })
-          texto += (texto ? '\n\n' : '') + String(data?.text || '').trim()
-          const reg = regiaoOCR(data, pre.w, pre.h)
+          // agrupa em linhas (por proximidade vertical): numera, pula cabeçalho, detecta parágrafos
+          const est = estruturarOCR(data, pre.w, pre.h)
+          const pref = pgs.length > 1 ? `— Página ${i + 1} —\n` : ''
+          numerado += (numerado ? '\n\n' : '') + pref + est.numerado
+          limpo += (limpo ? '\n\n' : '') + est.limpo
+          if (est.linhas && !linhasRef) linhasRef = est.linhas
+          const reg = regiaoDeCaixas(est.caixas, pre.w, pre.h)
           if (reg) { itens.push({ arquivoId: pgs[i].arquivoId, regiao: reg }); if (primeiraPag < 0) primeiraPag = i }
         }
       } finally { await worker.terminate() }
-      texto = texto.trim()
-      // 1) transcrição completa (aba TRANSCRIÇÃO)
-      patchTranscricao(resp, texto); persistTranscricao(resp, texto)
-      // 2) preenche o "Trecho do aluno" do quesito ativo + página
-      const patchExc: QuesitoPatch = { excerpt: texto, ...(primeiraPag >= 0 ? { pagina: String(primeiraPag + 1) } : {}) }
+      numerado = numerado.trim(); limpo = limpo.trim()
+      // 1) transcrição por LINHA (aba TRANSCRIÇÃO — leitura com a numeração da folha)
+      patchTranscricao(resp, numerado); persistTranscricao(resp, numerado)
+      // 2) "Trecho do aluno" = texto limpo (sem cabeçalho, parágrafos) + página + faixa de linhas
+      const patchExc: QuesitoPatch = { excerpt: limpo || numerado, ...(primeiraPag >= 0 ? { pagina: String(primeiraPag + 1) } : {}), ...(linhasRef ? { linhas: linhasRef } : {}) }
       patchQ(key, patchExc as Partial<CompCorrecao>); salvarCampo(key, patchExc)
       // 3) marca a(s) região(ões) na prova ligada(s) ao quesito — substitui as marcas OCR anteriores
       const antigas = (anotRef.current[resp] ?? []).filter((a) => (a.competencia_id ?? null) === compId && a.tipo === 'destaque' && a.conteudo === 'ocr')
       for (const a of antigas) await removerMarca(a.id)
       for (const it of itens) await criar({ tipo: 'destaque', arquivo_id: it.arquivoId, conteudo: 'ocr', x: it.regiao.x, y: it.regiao.y, largura: it.regiao.largura, altura: it.regiao.altura })
       if (primeiraPag >= 0) { setAba('prova'); setPaginaIndex(primeiraPag) }
-      toast.success(itens.length ? 'OCR concluído — trecho preenchido e área marcada na prova. Revise (letra de mão sai imperfeita).' : 'OCR concluído — trecho preenchido. Revise (letra de mão sai imperfeita).')
+      toast.success(`OCR concluído — transcrição por linha${linhasRef ? ` (linhas ${linhasRef})` : ''}, cabeçalho ignorado${itens.length ? ' e área marcada na prova' : ''}. Revise (letra de mão sai imperfeita).`)
     } catch { toast.error('Falha no OCR.') } finally { setOcrPending(null) }
   }
 
