@@ -17,9 +17,9 @@ const DICA: Record<Prov, string> = {
 /** Detecção do provedor pelo formato da chave (espelha lib/ia/config.ts). */
 function detectar(k: string): Prov | null {
   const s = (k || '').trim()
-  if (/^sk-ant-/.test(s)) return 'anthropic'
-  if (/^AIza[0-9A-Za-z_-]{10,}/.test(s)) return 'gemini'
-  if (/^sk-/.test(s)) return 'openai'
+  if (/^sk-ant-/i.test(s)) return 'anthropic'
+  if (/^AIza/i.test(s) || /^AQ\.[\w-]+/i.test(s)) return 'gemini'
+  if (/^sk-/i.test(s)) return 'openai'
   return null
 }
 
@@ -27,17 +27,19 @@ export function TranscricaoForm({ inicial }: { inicial: StatusIA }) {
   const [status, setStatus] = useState<StatusIA>(inicial)
   const [chave, setChave] = useState('')
   const [modelo, setModelo] = useState('')
+  const [provManual, setProvManual] = useState<'auto' | Prov>('auto')
   const [ver, setVer] = useState(false)
   const [pending, start] = useTransition()
   const [testando, startTeste] = useTransition()
 
-  const prov = useMemo(() => detectar(chave), [chave])
-  const reconhecida = chave.trim().length > 0 ? prov : null
+  const detectado = useMemo(() => detectar(chave), [chave])
+  // Provedor efetivo = o escolhido à mão OU o detectado automaticamente.
+  const provEfetivo: Prov | null = provManual === 'auto' ? detectado : provManual
 
   function salvar() {
-    if (!prov) { toast.error('Chave não reconhecida — confira se copiou a chave inteira.'); return }
+    if (!provEfetivo) { toast.error('Escolha o provedor abaixo — não deu pra detectar automaticamente.'); return }
     start(async () => {
-      const r = await salvarConfigIA(chave.trim(), modelo.trim())
+      const r = await salvarConfigIA(chave.trim(), provManual === 'auto' ? null : provManual, modelo.trim())
       if (!r.ok) { toast.error(r.error ?? 'Erro ao salvar'); return }
       setStatus({ configurado: true, provider: r.provider, providerLabel: r.providerLabel, modelo: r.modelo, mascara: r.mascara, testadaEm: null })
       setChave(''); setModelo('')
@@ -110,26 +112,39 @@ export function TranscricaoForm({ inicial }: { inicial: StatusIA }) {
             </div>
           </label>
 
-          {/* Detecção ao vivo */}
-          {chave.trim().length > 0 && (
+          {/* Detecção ao vivo (quando em modo automático) */}
+          {provManual === 'auto' && chave.trim().length > 0 && (
             <div className="mt-2">
-              {reconhecida ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"><Sparkles className="h-3.5 w-3.5" /> Detectado: {LABEL[reconhecida]}</span>
+              {detectado ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"><Sparkles className="h-3.5 w-3.5" /> Detectado: {LABEL[detectado]}</span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300"><AlertTriangle className="h-3.5 w-3.5" /> Chave não reconhecida — confira se copiou inteira</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300"><AlertTriangle className="h-3.5 w-3.5" /> Não reconhecida — escolha o provedor abaixo</span>
               )}
             </div>
           )}
 
+          {/* Provedor: automático ou manual (fallback quando a detecção falha) */}
+          <label className="mt-3 block space-y-1">
+            <span className="text-xs font-medium text-muted-foreground">Provedor</span>
+            <select value={provManual} onChange={(e) => setProvManual(e.target.value as 'auto' | Prov)}
+              className="h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+              <option value="auto">Detectar automaticamente{detectado ? ` (${LABEL[detectado]})` : ''}</option>
+              <option value="gemini">{LABEL.gemini}</option>
+              <option value="openai">{LABEL.openai}</option>
+              <option value="anthropic">{LABEL.anthropic}</option>
+            </select>
+            {provManual !== 'auto' && <span className="text-[11px] text-muted-foreground">Provedor fixado manualmente — a detecção automática é ignorada.</span>}
+          </label>
+
           <label className="mt-3 block space-y-1">
             <span className="text-xs font-medium text-muted-foreground">Modelo (opcional)</span>
             <input value={modelo} onChange={(e) => setModelo(e.target.value)} spellCheck={false}
-              placeholder={reconhecida ? MODELO_PADRAO[reconhecida] : 'padrão do provedor'}
+              placeholder={provEfetivo ? MODELO_PADRAO[provEfetivo] : 'padrão do provedor'}
               className="h-9 w-full rounded-lg border bg-background px-3 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
-            <span className="text-[11px] text-muted-foreground">Deixe em branco para usar o padrão de visão do provedor{reconhecida ? ` (${MODELO_PADRAO[reconhecida]})` : ''}.</span>
+            <span className="text-[11px] text-muted-foreground">Deixe em branco para usar o padrão de visão do provedor{provEfetivo ? ` (${MODELO_PADRAO[provEfetivo]})` : ''}.</span>
           </label>
 
-          <button type="button" onClick={salvar} disabled={pending || !reconhecida}
+          <button type="button" onClick={salvar} disabled={pending || !chave.trim() || !provEfetivo}
             className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50">
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} {status.configurado ? 'Salvar nova chave' : 'Salvar chave'}
           </button>

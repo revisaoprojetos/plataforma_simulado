@@ -42,7 +42,6 @@ import {
   LogOut,
   Building2,
   Tag,
-  ScanText,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -114,7 +113,6 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Aplicação de Simulado', href: '/admin/simulados', icon: ClipboardList, perm: 'simulados:view' },
       { label: 'Correção (discursivas)', href: '/admin/correcao', icon: PenLine, perm: 'questoes:view' },
-      { label: 'APIs (IA + externas)', href: '/admin/transcricao', icon: ScanText, perm: 'configuracoes:view' },
       { label: 'Questões', href: '/admin/questoes', icon: BookOpen, perm: 'questoes:view' },
       { label: 'Etiquetas', href: '/admin/etiquetas', icon: Tag, perm: 'questoes:view' },
       { label: 'Banco de Simulado', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
@@ -181,7 +179,7 @@ const navGroups: NavGroup[] = [
       // Plataformas / Entrada / Compartilhar migraram para o CONSOLE isolado do super-admin
       // (/super) — gestão cross-tenant fica fora de qualquer plataforma.
       { label: 'Administradores', href: '/admin/administradores', icon: UserCog, perm: 'rbac:view' },
-      { label: 'API Keys', href: '/admin/api-keys', icon: KeyRound, perm: 'api_keys:manage' },
+      { label: 'Chaves de API', href: '/admin/transcricao', icon: KeyRound, perm: 'configuracoes:view' },
       // Aparência (identidade/cores/tema) MIGRADA para o Console (super-admin) → Plataformas → Aparência.
       { label: 'Sistema', href: '/admin/sistema', icon: ServerCog, perm: 'configuracoes:view' },
       { label: 'Mensagens', href: '/admin/configuracoes/mensagens', icon: MessageSquare, perm: 'configuracoes:view' },
@@ -232,7 +230,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
 
   // Filtra itens/grupos por permissão do usuário (super-admin gate + flag discursiva).
   const gruposVisiveis = navGroups
-    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !(i.superOnly && !isSuperAdmin) && !(OCULTAR_DISCURSIVA && (i.href === '/admin/correcao' || i.href === '/admin/transcricao'))) }))
+    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !(i.superOnly && !isSuperAdmin) && !(OCULTAR_DISCURSIVA && i.href === '/admin/correcao')) }))
     .filter((g) => g.items.length > 0)
 
   const grupoAtivo = (group: NavGroup) => group.items.some((i) => itemAtivo(i, pathname, search))

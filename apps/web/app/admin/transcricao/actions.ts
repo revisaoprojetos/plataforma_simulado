@@ -26,12 +26,15 @@ export async function statusConfigIA(): Promise<StatusIA> {
   } catch { return { configurado: false } }
 }
 
-/** Salva a chave: DETECTA o provedor pelo formato, criptografa e faz upsert (1 por tenant). */
-export async function salvarConfigIA(chave: string, modeloOverride?: string): Promise<{ ok: boolean; error?: string; provider?: Provedor; providerLabel?: string; modelo?: string; mascara?: string }> {
+/** Salva a chave: DETECTA o provedor pelo formato (ou usa o escolhido manualmente),
+ * criptografa e faz upsert (1 por tenant). */
+export async function salvarConfigIA(chave: string, providerManual?: Provedor | null, modeloOverride?: string): Promise<{ ok: boolean; error?: string; provider?: Provedor; providerLabel?: string; modelo?: string; mascara?: string }> {
   const { access, ok } = await gate(); if (!ok) return { ok: false, error: 'Sem permissão.' }
   const key = (chave || '').trim()
-  const provider = detectarProvedor(key)
-  if (!provider) return { ok: false, error: 'Chave não reconhecida. Use OpenAI (sk-…), Anthropic (sk-ant-…) ou Google Gemini (AIza…).' }
+  if (!key) return { ok: false, error: 'Cole a chave de API.' }
+  const valido = (p: any): p is Provedor => p === 'anthropic' || p === 'openai' || p === 'gemini'
+  const provider = valido(providerManual) ? providerManual : detectarProvedor(key)
+  if (!provider) return { ok: false, error: 'Não foi possível identificar o provedor. Escolha manualmente (OpenAI / Anthropic / Gemini).' }
   const modelo = (modeloOverride || '').trim() || MODELOS_PADRAO[provider]
   const svc = createAdminClient()
   const row = { tenant_id: access.tenantId, provider, modelo, api_key_cipher: cifrar(key), api_key_mascara: mascarar(key), ativo: true, atualizado_em: new Date().toISOString() }

@@ -45,9 +45,10 @@ export const PROVEDOR_LABEL: Record<Provedor, string> = {
 /** Detecta o provedor pelo FORMATO da chave (adaptativo). null = não reconhecido. */
 export function detectarProvedor(key: string): Provedor | null {
   const k = (key || '').trim()
-  if (/^sk-ant-/.test(k)) return 'anthropic'
-  if (/^AIza[0-9A-Za-z_-]{10,}/.test(k)) return 'gemini'
-  if (/^sk-/.test(k)) return 'openai' // sk-…, sk-proj-…
+  if (/^sk-ant-/i.test(k)) return 'anthropic'
+  if (/^AIza/i.test(k)) return 'gemini'          // chaves Google/Gemini começam com "AIza"
+  if (/^AQ\.[\w-]+/i.test(k)) return 'gemini'     // chaves efêmeras do Gemini (formato AQ.…)
+  if (/^sk-/i.test(k)) return 'openai'            // sk-…, sk-proj-…
   return null
 }
 /** Máscara p/ a UI: mostra só o começo e o fim. */
