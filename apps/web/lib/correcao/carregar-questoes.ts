@@ -7,11 +7,14 @@ import type { Marca } from '@/components/admin/correcao-folha'
 
 type RespInput = { id: string; questao_id: string; status: string; feedback: string | null }
 
-/**
- * Carrega os dados da MESA para uma lista de respostas discursivas (já na ordem de exibição):
- * enunciado/espelho, competências + notas (com ritual), páginas (URLs assinadas) e anotações.
- * Reutilizado pela correção da tentativa e pela correção unificada por aluno.
- */
+const r2 = (n: number) => Math.round(n * 100) / 100
+function conceitosDefault(pontos: number): { nome: string; pontos: number }[] {
+  if (pontos <= 0) return [{ nome: 'Conceito 0', pontos: 0 }]
+  return [{ nome: 'Conceito 0', pontos: 0 }, { nome: 'Conceito 1', pontos: r2(pontos / 2) }, { nome: 'Conceito 2', pontos: r2(pontos) }]
+}
+const arr = (v: any): string[] => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [])
+
+/** Carrega os dados da MESA (estilo AURÉA) para uma lista de respostas discursivas (já na ordem). */
 export async function carregarQuestoesCorrecao(svc: SupabaseClient, tenantId: string, respostas: RespInput[]): Promise<QuestaoCorrecao[]> {
   if (!respostas.length) return []
   const questaoIds = [...new Set(respostas.map((r) => r.questao_id).filter(Boolean))] as string[]
@@ -19,11 +22,15 @@ export async function carregarQuestoesCorrecao(svc: SupabaseClient, tenantId: st
 
   const [questoes, comps, notas, juncoes, anots] = await Promise.all([
     fetchAllByIn<any>(questaoIds, (c) => svc.from('simulado_questoes').select('id, enunciado, comentario_professor').in('id', c)),
-    fetchAllByIn<any>(questaoIds, (c) => svc.from('simulado_competencias').select('id, questao_id, nome, pontos, ordem').in('questao_id', c)),
     (async () => {
-      const full = await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_correcao_competencias').select('resposta_id, competencia_id, nota, comentario, audit_state, mensagem_aluno').in('resposta_id', c)).catch(() => null)
+      const full = await fetchAllByIn<any>(questaoIds, (c) => svc.from('simulado_competencias').select('id, questao_id, nome, pontos, ordem, descricao, conceitos').in('questao_id', c)).catch(() => null)
       if (full) return full
-      return fetchAllByIn<any>(respIds, (c) => svc.from('simulado_correcao_competencias').select('resposta_id, competencia_id, nota, comentario').in('resposta_id', c))
+      return fetchAllByIn<any>(questaoIds, (c) => svc.from('simulado_competencias').select('id, questao_id, nome, pontos, ordem').in('questao_id', c))
+    })(),
+    (async () => {
+      const full = await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_correcao_competencias').select('resposta_id, competencia_id, nota, comentario, audit_state, mensagem_aluno, conceito, excerpt, pagina, linhas, recognized, missing, leitura_duvidosa').in('resposta_id', c)).catch(() => null)
+      if (full) return full
+      return fetchAllByIn<any>(respIds, (c) => svc.from('simulado_correcao_competencias').select('resposta_id, competencia_id, nota, comentario').in('resposta_id', c)).catch(() => [] as any[])
     })(),
     (async () => { try { return await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_resposta_arquivos').select('resposta_id, arquivo_id, ordem').in('resposta_id', c)) } catch { return [] as any[] } })(),
     (async () => { try { return await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_anotacoes_discursivas').select('id, resposta_id, arquivo_id, competencia_id, tipo, x, y, largura, altura, cor, icone, numero, conteudo').in('resposta_id', c)) } catch { return [] as any[] } })(),
@@ -47,9 +54,9 @@ export async function carregarQuestoesCorrecao(svc: SupabaseClient, tenantId: st
   }
   const anotPorResp = new Map<string, Marca[]>()
   for (const a of anots as any[]) {
-    const arr = anotPorResp.get(a.resposta_id) ?? []
-    arr.push({ id: a.id, arquivo_id: a.arquivo_id, competencia_id: a.competencia_id, tipo: a.tipo, x: Number(a.x), y: Number(a.y), largura: a.largura != null ? Number(a.largura) : null, altura: a.altura != null ? Number(a.altura) : null, cor: a.cor, icone: a.icone, numero: a.numero != null ? Number(a.numero) : null, conteudo: a.conteudo })
-    anotPorResp.set(a.resposta_id, arr)
+    const list = anotPorResp.get(a.resposta_id) ?? []
+    list.push({ id: a.id, arquivo_id: a.arquivo_id, competencia_id: a.competencia_id, tipo: a.tipo, x: Number(a.x), y: Number(a.y), largura: a.largura != null ? Number(a.largura) : null, altura: a.altura != null ? Number(a.altura) : null, cor: a.cor, icone: a.icone, numero: a.numero != null ? Number(a.numero) : null, conteudo: a.conteudo })
+    anotPorResp.set(a.resposta_id, list)
   }
 
   return respostas.map((r, i) => {
@@ -57,7 +64,26 @@ export async function carregarQuestoesCorrecao(svc: SupabaseClient, tenantId: st
     const notaMap = notaPorResp.get(r.id) ?? new Map()
     const competencias = (compsPorQ.get(r.questao_id) ?? []).sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0)).map((c: any) => {
       const n = notaMap.get(c.id)
-      return { id: c.id, nome: c.nome, pontos: Number(c.pontos), nota: n?.nota != null ? Number(n.nota) : null, comentario: n?.comentario ?? '', audit_state: (n?.audit_state ?? 'pending') as string, mensagem: n?.mensagem_aluno ?? '' }
+      const pontos = Number(c.pontos)
+      const conceitos = Array.isArray(c.conceitos) && c.conceitos.length
+        ? c.conceitos.map((x: any) => ({ nome: String(x.nome ?? ''), pontos: Number(x.pontos ?? 0) }))
+        : conceitosDefault(pontos)
+      return {
+        id: c.id, nome: c.nome, pontos,
+        nota: n?.nota != null ? Number(n.nota) : null,
+        comentario: n?.comentario ?? '',
+        audit_state: (n?.audit_state ?? 'pending') as string,
+        mensagem: n?.mensagem_aluno ?? '',
+        descricao: (c.descricao ?? '') as string,
+        conceitos,
+        conceito: (n?.conceito ?? '') as string,
+        excerpt: (n?.excerpt ?? '') as string,
+        pagina: (n?.pagina ?? '') as string,
+        linhas: (n?.linhas ?? '') as string,
+        recognized: arr(n?.recognized),
+        missing: arr(n?.missing),
+        leituraDuvidosa: !!n?.leitura_duvidosa,
+      }
     })
     return {
       respostaId: r.id,

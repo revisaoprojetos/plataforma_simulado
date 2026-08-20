@@ -192,33 +192,57 @@ const HINT_RITUAL = 'Rode a migração 20260819000002_correcao_ritual.sql.'
 const semUnico = (m: string) => /no unique|exclusion constraint|on conflict|matching the on conflict/i.test(m)
 const colFaltando = (m: string) => /audit_state|mensagem_aluno|atualizado_em|column .* does not exist/i.test(m)
 
-export async function salvarQuesito(
-  respostaId: string,
-  competenciaId: string,
-  patch: { nota?: number; comentario?: string | null; audit_state?: string; mensagem_aluno?: string | null },
-): Promise<{ ok: boolean; error?: string }> {
+export interface QuesitoPatch {
+  nota?: number; comentario?: string | null; audit_state?: string; mensagem_aluno?: string | null
+  conceito?: string | null; excerpt?: string | null; pagina?: string | null; linhas?: string | null
+  recognized?: string[]; missing?: string[]; leitura_duvidosa?: boolean
+}
+
+export async function salvarQuesito(respostaId: string, competenciaId: string, patch: QuesitoPatch): Promise<{ ok: boolean; error?: string }> {
   const { access, ok } = await podeCorrigir()
   if (!ok) return { ok: false, error: 'Sem permissão para corrigir.' }
   if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
   const { data: r } = await svc.from('simulado_respostas_discursivas').select('id').eq('id', respostaId).eq('tenant_id', access.tenantId).maybeSingle()
   if (!r) return { ok: false, error: 'Resposta não encontrada.' }
+  const norm = (v: unknown) => (v == null ? null : String(v).trim() || null)
 
-  const full: Record<string, unknown> = { resposta_id: respostaId, competencia_id: competenciaId, atualizado_em: new Date().toISOString() }
-  if ('nota' in patch) full.nota = patch.nota ?? 0
-  if ('comentario' in patch) full.comentario = patch.comentario?.toString().trim() || null
-  if ('audit_state' in patch) full.audit_state = patch.audit_state
-  if ('mensagem_aluno' in patch) full.mensagem_aluno = patch.mensagem_aluno?.toString().trim() || null
+  // Base (sempre) → meio (migração 2: ritual) → full (migração 3: criterion). Fallback por camada.
+  const base: Record<string, unknown> = { resposta_id: respostaId, competencia_id: competenciaId }
+  if ('nota' in patch) base.nota = patch.nota ?? 0
+  if ('comentario' in patch) base.comentario = norm(patch.comentario)
 
-  let { error } = await svc.from('simulado_correcao_competencias').upsert(full, { onConflict: 'resposta_id,competencia_id' })
-  if (error && colFaltando(error.message)) {
-    // Colunas novas ausentes → grava só nota/comentário.
-    const basic: Record<string, unknown> = { resposta_id: respostaId, competencia_id: competenciaId }
-    if ('nota' in patch) basic.nota = patch.nota ?? 0
-    if ('comentario' in patch) basic.comentario = patch.comentario?.toString().trim() || null
-    ;({ error } = await svc.from('simulado_correcao_competencias').upsert(basic, { onConflict: 'resposta_id,competencia_id' }))
+  const meio: Record<string, unknown> = { ...base, atualizado_em: new Date().toISOString() }
+  if ('audit_state' in patch) meio.audit_state = patch.audit_state
+  if ('mensagem_aluno' in patch) meio.mensagem_aluno = norm(patch.mensagem_aluno)
+
+  const full: Record<string, unknown> = { ...meio }
+  if ('conceito' in patch) full.conceito = norm(patch.conceito)
+  if ('excerpt' in patch) full.excerpt = norm(patch.excerpt)
+  if ('pagina' in patch) full.pagina = norm(patch.pagina)
+  if ('linhas' in patch) full.linhas = norm(patch.linhas)
+  if ('recognized' in patch) full.recognized = patch.recognized ?? []
+  if ('missing' in patch) full.missing = patch.missing ?? []
+  if ('leitura_duvidosa' in patch) full.leitura_duvidosa = !!patch.leitura_duvidosa
+
+  let error: { message: string } | null = null
+  for (const row of [full, meio, base]) {
+    const res = await svc.from('simulado_correcao_competencias').upsert(row, { onConflict: 'resposta_id,competencia_id' })
+    error = res.error
+    if (!error || !colFaltando(error.message)) break // sucesso, ou erro que não é "coluna faltando"
   }
   if (error) return { ok: false, error: semUnico(error.message) ? HINT_RITUAL : error.message }
+  return { ok: true }
+}
+
+/** Salva o ESPELHO (descrição) do quesito na competência — reflete p/ todas as correções da questão. */
+export async function salvarEspelhoQuesito(competenciaId: string, descricao: string): Promise<{ ok: boolean; error?: string }> {
+  const { access, ok } = await podeCorrigir()
+  if (!ok) return { ok: false, error: 'Sem permissão.' }
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_competencias').update({ descricao: descricao?.trim() || null }).eq('id', competenciaId)
+  if (error) return { ok: false, error: /descricao|column .* does not exist/i.test(error.message) ? 'Rode a migração 20260820000001_correcao_criterion.sql.' : error.message }
   return { ok: true }
 }
 
