@@ -72,8 +72,36 @@ function regiaoOCR(data: any, w: number, h: number): { x: number; y: number; lar
   if (largura < 0.02 || altura < 0.02) return null
   return { x, y, largura, altura }
 }
-function medirImagem(dataUrl: string): Promise<{ w: number; h: number }> {
-  return new Promise((res) => { const im = new Image(); im.onload = () => res({ w: im.naturalWidth, h: im.naturalHeight }); im.onerror = () => res({ w: 0, h: 0 }); im.src = dataUrl })
+// Pré-processa a foto p/ o OCR (canvas): upscale + grayscale + "níveis" (escurece a
+// tinta, clareia o papel) — sem binarizar (não destrói traços finos). Devolve as dims
+// processadas p/ normalizar a região das caixas do Tesseract.
+function preprocessarOCR(dataUrl: string): Promise<{ url: string; w: number; h: number }> {
+  return new Promise((res) => {
+    const im = new Image()
+    im.onload = () => {
+      const escala = Math.min(3, Math.max(1, 2200 / Math.max(1, im.naturalWidth)))
+      const w = Math.round(im.naturalWidth * escala), h = Math.round(im.naturalHeight * escala)
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h
+      const ctx = cv.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D | null
+      if (!ctx) { res({ url: dataUrl, w: im.naturalWidth || 0, h: im.naturalHeight || 0 }); return }
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(im, 0, 0, w, h)
+      try {
+        const img = ctx.getImageData(0, 0, w, h), d = img.data
+        const preto = 70, branco = 195, faixa = branco - preto
+        for (let i = 0; i < d.length; i += 4) {
+          const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
+          let v = ((g - preto) / faixa) * 255
+          v = v < 0 ? 0 : v > 255 ? 255 : v
+          d[i] = d[i + 1] = d[i + 2] = v
+        }
+        ctx.putImageData(img, 0, 0)
+      } catch { /* canvas "tainted" ou sem dados: usa o upscale puro */ }
+      res({ url: cv.toDataURL('image/png'), w, h })
+    }
+    im.onerror = () => res({ url: dataUrl, w: 0, h: 0 })
+    im.src = dataUrl
+  })
 }
 
 /** Divisória arrastável entre colunas (chama onDelta com o dx do arraste). */
@@ -255,6 +283,8 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
       const createWorker = T.createWorker ?? T.default?.createWorker
       let pgIdx = 0
       const worker = await createWorker('por', 1, { logger: (m: any) => { if (m.status === 'recognizing text') setOcrPending(Math.round(((pgIdx + (m.progress || 0)) / pgs.length) * 100)) } })
+      // PSM 6 = bloco único de texto (melhor p/ folha pautada); mantém espaços entre palavras.
+      try { await worker.setParameters({ tessedit_pageseg_mode: (T.PSM?.SINGLE_BLOCK ?? '6'), preserve_interword_spaces: '1' }) } catch {}
       const itens: { arquivoId: string; regiao: { x: number; y: number; largura: number; altura: number } }[] = []
       let texto = '', primeiraPag = -1
       try {
@@ -262,10 +292,10 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
           pgIdx = i
           const img = await imagemParaOCR(pgs[i].url)
           if (!img.ok || !img.dataUrl) continue
-          const { data } = await worker.recognize(img.dataUrl, {}, { blocks: true, text: true })
+          const pre = await preprocessarOCR(img.dataUrl)
+          const { data } = await worker.recognize(pre.url, {}, { blocks: true, text: true })
           texto += (texto ? '\n\n' : '') + String(data?.text || '').trim()
-          const dims = await medirImagem(img.dataUrl)
-          const reg = regiaoOCR(data, dims.w, dims.h)
+          const reg = regiaoOCR(data, pre.w, pre.h)
           if (reg) { itens.push({ arquivoId: pgs[i].arquivoId, regiao: reg }); if (primeiraPag < 0) primeiraPag = i }
         }
       } finally { await worker.terminate() }
