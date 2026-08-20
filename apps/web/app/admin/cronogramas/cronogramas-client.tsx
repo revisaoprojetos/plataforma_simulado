@@ -1,10 +1,11 @@
 'use client'
 
+import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
-import { CalendarDays, Gift, Pencil, Plus, Trash2 } from 'lucide-react'
+import { CalendarDays, Gift, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -220,7 +221,9 @@ export function CronogramasClient({ inicial }: { inicial: CronogramaLista[] }) {
                   <div key={c.id} className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-muted/30">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="truncate font-medium">{c.nome}</span>
+                        <Link href={`/admin/cronogramas/${c.id}`} className="truncate font-medium hover:underline">
+                          {c.nome}
+                        </Link>
                         <Badge variant={c.status === 'liberado' ? 'default' : 'secondary'}>
                           {c.status === 'liberado' ? 'Liberado' : 'Rascunho'}
                         </Badge>
@@ -245,7 +248,10 @@ export function CronogramasClient({ inicial }: { inicial: CronogramaLista[] }) {
                       <Button size="sm" variant={c.status === 'liberado' ? 'secondary' : 'default'} onClick={() => liberar(c)} disabled={pendente}>
                         {c.status === 'liberado' ? 'Voltar a rascunho' : 'Liberar'}
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => abrirEdicao(c)} disabled={pendente}>
+                      <Link href={`/admin/cronogramas/${c.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })} title="Metas do cronograma">
+                        <ListChecks className="h-4 w-4" />
+                      </Link>
+                      <Button size="sm" variant="ghost" onClick={() => abrirEdicao(c)} disabled={pendente} title="Editar metadados">
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => excluir(c)} disabled={pendente}>
