@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
   try { body = await req.json() } catch { /* corpo inválido */ }
   const respostaId = String(body?.respostaId ?? '')
   let texto = String(body?.texto ?? '').trim()
+  const espelhoBody = String(body?.espelho ?? '').trim() // espelho DA QUESTÃO (cada questão tem o seu)
   if (!respostaId) return NextResponse.json({ ok: false, error: 'Resposta ausente.' }, { status: 400 })
 
   const svc = createAdminClient()
@@ -54,14 +55,17 @@ export async function POST(req: NextRequest) {
   }))
   if (!competencias.length) return NextResponse.json({ ok: false, error: 'Esta questão não tem quesitos (competências) cadastrados.' }, { status: 400 })
 
-  let espelhoTexto: string | null = null
-  try {
-    const { data: sim } = sessao ? await svc.from('simulado_simulados').select('regras').eq('id', (sessao as any).simulado_id).maybeSingle() : { data: null }
-    const bancoId = (sim as any)?.regras?.banco_base_id as string | undefined
-    const entrega = bancoId ? await carregarEntregaBanco(svc, tenantId, bancoId) : null
-    const pdfUrl = (entrega?.gabarito?.pdfUrl as string | undefined) ?? null
-    if (pdfUrl) { const resp = await fetch(pdfUrl); if (resp.ok) espelhoTexto = await extrairTextoPdf(Buffer.from(await resp.arrayBuffer())) }
-  } catch { /* sem espelho */ }
+  // Espelho DA QUESTÃO: usa o enviado pelo cliente (já recortado por questão); senão extrai o PDF do banco.
+  let espelhoTexto: string | null = espelhoBody || null
+  if (!espelhoTexto) {
+    try {
+      const { data: sim } = sessao ? await svc.from('simulado_simulados').select('regras').eq('id', (sessao as any).simulado_id).maybeSingle() : { data: null }
+      const bancoId = (sim as any)?.regras?.banco_base_id as string | undefined
+      const entrega = bancoId ? await carregarEntregaBanco(svc, tenantId, bancoId) : null
+      const pdfUrl = (entrega?.gabarito?.pdfUrl as string | undefined) ?? null
+      if (pdfUrl) { const resp = await fetch(pdfUrl); if (resp.ok) espelhoTexto = await extrairTextoPdf(Buffer.from(await resp.arrayBuffer())) }
+    } catch { /* sem espelho */ }
+  }
 
   try {
     const analise = await analisarComTextoIA(config, { textoAluno: texto, enunciado: questao?.enunciado ?? '', espelhoTexto, competencias })

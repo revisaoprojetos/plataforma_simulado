@@ -40,6 +40,26 @@ const nfmt = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2
 const clampW = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
+// Extrai do texto do gabarito o "ESPELHO COMENTADO" da questão `numero` (a parte após o
+// enunciado). Divide por "QUESTÃO N" e, no bloco, pega o que vem após "ESPELHO COMENTADO".
+function trechoEspelhoComentado(texto: string | undefined | null, numero: number): string {
+  const t = String(texto || '')
+  if (!t.trim()) return ''
+  const re = /QUEST[ÃA]O\s+0*(\d+)/gi
+  const marcas: { n: number; idx: number }[] = []
+  let m: RegExpExecArray | null
+  while ((m = re.exec(t))) marcas.push({ n: Number(m[1]), idx: m.index })
+  let bloco = t
+  if (marcas.length) {
+    let ini = marcas.find((x) => x.n === numero)?.idx
+    if (ini == null) ini = marcas[Math.min(numero - 1, marcas.length - 1)]?.idx ?? marcas[0].idx
+    const prox = marcas.map((x) => x.idx).filter((i) => i > (ini as number)).sort((a, b) => a - b)[0] ?? t.length
+    bloco = t.slice(ini as number, prox)
+  }
+  const i = bloco.search(/ESPELHO\s+COMENTAD[OA]/i)
+  return (i >= 0 ? bloco.slice(i) : bloco).replace(/\n{3,}/g, '\n\n').trim()
+}
+
 // ── OCR estruturado: usa as LINHAS da pauta como régua + as caixas de palavra do
 // Tesseract p/ (a) numerar a transcrição por linha, (b) pular o cabeçalho impresso
 // ("QUESTÃO 01"…), (c) detectar início/fim de parágrafo. Coords em px da imagem processada.
@@ -416,7 +436,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
     if (!texto) { toast.error('Transcreva a resposta antes de analisar (OCR ou IA).'); return }
     setAnalisePending(resp)
     try {
-      const r = await fetch('/api/admin/correcao/analisar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ respostaId: resp, texto }) })
+      const r = await fetch('/api/admin/correcao/analisar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ respostaId: resp, texto, espelho: espComentado }) })
       const j = await r.json().catch(() => ({}))
       if (!j.ok) { toast.error(j.error ?? 'Falha na análise'); return }
       let aplicados = 0
@@ -601,6 +621,8 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
 
   const alertasAtivo = ativo ? alertasDe(ativo) : []
   const regQuesito = ativo ? regiaoDoQuesito() : null // há caixa no quesito ativo? então OCR/IA lêem DENTRO dela
+  // Espelho comentado da QUESTÃO ativa (cada questão tem o seu, extraído do PDF do gabarito).
+  const espComentado = questaoAtiva ? trechoEspelhoComentado(espelhoTexto, questaoAtiva.numero) : ''
   const setArr = (key: string, campo: 'recognized' | 'missing', txt: string) => patchQ(key, { [campo]: txt.split('\n') } as Partial<CompCorrecao>)
 
   return (
@@ -856,6 +878,12 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
 
               {/* ② Espelho */}
               <Cartao n={2} titulo="Espelho" extra={ativo.comp.conceito || ''}>
+                {espComentado && (
+                  <details open className="mb-2 rounded-md border bg-muted/20">
+                    <summary className="flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><FileText className="h-3 w-3" /> Espelho comentado (gabarito da questão {questaoAtiva?.numero})</summary>
+                    <p className="max-h-56 select-text overflow-y-auto whitespace-pre-wrap border-t px-2.5 py-2 text-[12px] leading-snug text-foreground/90">{espComentado}</p>
+                  </details>
+                )}
                 {iaAtiva && (
                   <button type="button" onClick={analisarIA} disabled={!!analisePending}
                     className="mb-2 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-violet-300/60 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 py-1.5 text-xs font-semibold text-violet-700 transition-colors hover:from-violet-500/20 hover:to-fuchsia-500/20 disabled:opacity-60 dark:border-violet-500/40 dark:text-violet-300"
