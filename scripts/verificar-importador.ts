@@ -55,6 +55,15 @@ const vl = validarLinks(brutoLinks)
 eq('405 links aceitos', vl.itens.length, 405)
 eq('nenhum erro', vl.erros.length, 0)
 if (vl.erros.length) vl.erros.slice(0, 5).forEach((e) => console.log(`        linha ${e.linha} · ${e.campo}: ${e.problema}`))
+const comQc = vl.itens.filter((l) => l.urls.qc).length
+const comTec = vl.itens.filter((l) => l.urls.tec).length
+console.log(`       url_qc  -> plataforma "qc" : ${comQc}`)
+console.log(`       url_tec -> plataforma "tec": ${comTec}`)
+ok('colunas fixas do legado viram links por plataforma', comQc > 0 && comTec > 0)
+eq('  QC bate com a spec §2 (281 preenchidos)', comQc, 281)
+eq('  TEC bate com a spec §2 (399 preenchidos)', comTec, 399)
+const formatoNovo = validarLinks([{ disciplina: 'X', aula: '01', urls: { gran: 'https://gran.exemplo/1' } }])
+ok('formato novo (urls por slug) também é aceito', formatoNovo.itens[0]?.urls.gran === 'https://gran.exemplo/1')
 
 console.log('\n=== REJEIÇÃO DE PLANILHA COM AULA NUMÉRICA (o risco nº 1) ===')
 const comNumero = [{ ...brutoMetas[0], aula: 1 }]

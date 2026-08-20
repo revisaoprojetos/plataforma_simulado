@@ -74,18 +74,34 @@ export type MetaFonte = {
   simulado_externo_url: string | null
 }
 
+/** Uma plataforma de curso cadastrada (QConcursos, TEC, Gran…). */
+export type Plataforma = {
+  id: string
+  nome: string
+  slug: string
+  cor: string | null
+  ordem: number
+}
+
 export type LinkAula = {
   disciplina: string
   aula: string
   tema: string | null
-  url_qc: string | null
-  url_tec: string | null
+  /** N links, um por plataforma. Antes eram duas colunas fixas (url_qc/url_tec). */
+  urls: { plataforma: Plataforma; url: string }[]
 }
 
-/** R11 — o que a coluna "Links" mostra. Sem link o texto é explícito, nunca vazio. */
+/**
+ * R11 — o que a coluna "Links" mostra.
+ *
+ * Com N plataformas, listar "não há link" para cada uma cadastrada viraria ruído. O
+ * espírito da regra é preservado no `ausente`: quando a aula não tem link NENHUM, o
+ * texto é explícito, nunca em branco — o aluno precisa saber que não existe, e não
+ * achar que a página quebrou.
+ */
 export type LinksMeta = {
-  qc: { url: string } | { ausente: string }
-  tec: { url: string } | { ausente: string }
+  urls: { plataforma: Plataforma; url: string }[]
+  ausente: string | null
 }
 
 /** Meta já posicionada no calendário e pronta para exibir. */

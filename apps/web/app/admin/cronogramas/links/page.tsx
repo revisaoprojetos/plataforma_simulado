@@ -25,15 +25,15 @@ export default async function LinksAulaPage() {
           Links de aula
         </h1>
         <p className="text-muted-foreground">
-          Bancos de questões por disciplina e aula. Valem para todos os cronogramas que citarem aquela aula —
-          não são por cronograma.
+          Cada aula pode ter um link por plataforma de curso cadastrada. Valem para todos os cronogramas que
+          citarem aquela aula — não são por cronograma.
         </p>
       </div>
 
       {!r.ok ? (
         <SemPermissao>{r.error ?? 'Não foi possível carregar os links.'}</SemPermissao>
       ) : (
-        <LinksClient inicial={r.itens ?? []} faltandoInicial={r.faltando ?? []} />
+        <LinksClient inicial={r.itens ?? []} plataformasIniciais={r.plataformas ?? []} faltandoInicial={r.faltando ?? []} />
       )}
     </div>
   )

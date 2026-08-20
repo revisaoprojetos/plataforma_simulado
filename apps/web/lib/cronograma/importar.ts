@@ -55,8 +55,12 @@ export type LinkImportado = {
   disciplina: string
   aula: string
   tema: string | null
-  url_qc: string | null
-  url_tec: string | null
+  /**
+   * Links por plataforma, chaveados pelo SLUG dela. Os arquivos do gerador legado
+   * trazem `url_qc` e `url_tec`, que viram os slugs `qc` e `tec`; um arquivo novo pode
+   * trazer qualquer plataforma cadastrada, em `urls: { slug: url }`.
+   */
+  urls: Record<string, string>
 }
 
 const TIPOS_VALIDOS = new Set<string>(ORDEM_TIPO)
@@ -254,12 +258,24 @@ export function validarLinks(bruto: unknown): { itens: LinkImportado[]; erros: E
     if (vistos.has(chave)) return erros.push({ linha, campo: 'aula', problema: `par (disciplina, aula) repetido no arquivo: ${disciplina} · ${aula.valor}` })
     vistos.add(chave)
 
+    // Aceita os dois formatos: as colunas fixas do legado e o mapa por plataforma.
+    const urls: Record<string, string> = {}
+    const qc = texto(l?.url_qc)
+    const tec = texto(l?.url_tec)
+    if (qc) urls.qc = qc
+    if (tec) urls.tec = tec
+    if (l?.urls && typeof l.urls === 'object') {
+      for (const [slug, valor] of Object.entries(l.urls as Record<string, unknown>)) {
+        const u = texto(valor)
+        if (u) urls[slug.trim().toLowerCase()] = u
+      }
+    }
+
     itens.push({
       disciplina: normalizarDisciplina(disciplina),
       aula: aula.valor,
       tema: texto(l?.tema),
-      url_qc: texto(l?.url_qc),
-      url_tec: texto(l?.url_tec),
+      urls,
     })
   })
 
