@@ -39,6 +39,8 @@ export type Diagnostico = {
   semanasVazias: number[]
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 async function guard(perm: string) {
   if (!(await checkPermission(perm))) return { ok: false as const, error: 'Sem permissão.' }
   const access = await getCurrentAccess()
@@ -62,6 +64,10 @@ export async function carregarDetalhe(id: string): Promise<{
 }> {
   const g = await guard('cronogramas:view')
   if (!g.ok) return { ok: false, error: g.error }
+  // Sem esta guarda, um segmento de rota que não é uuid (ex.: uma sub-rota nova que
+  // ainda não existe e cai no [id]) vai como id para o banco e volta erro de sintaxe
+  // de uuid em vez de "não encontrado".
+  if (!UUID_RE.test(id)) return { ok: false, error: 'Cronograma não encontrado.' }
   const svc = createAdminClient()
 
   const { data: c, error } = await svc
