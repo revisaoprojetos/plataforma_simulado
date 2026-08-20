@@ -38,6 +38,43 @@ const gerarTemp = () => 'tmp-' + Date.now().toString(36) + Math.random().toStrin
 const dotEstado = (s: string) => (s === 'approved' ? 'bg-emerald-500' : s === 'review' ? 'bg-amber-500' : 'bg-muted-foreground/30')
 const nfmt = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const clampW = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+
+// ── OCR: extrai a REGIÃO do texto reconhecido (caixas do Tesseract) p/ desenhar o
+// destaque na folha. Coords do Tesseract são em px da imagem → normaliza p/ 0–1.
+type CaixaOCR = { x0: number; y0: number; x1: number; y1: number }
+function coletarCaixasOCR(data: any): CaixaOCR[] {
+  const out: CaixaOCR[] = []
+  const bom = (b: any) => b && Number.isFinite(b.x0) && b.x1 > b.x0 && b.y1 > b.y0
+  const words = data?.words
+  if (Array.isArray(words) && words.length) {
+    for (const w of words) if ((w?.confidence ?? 100) >= 20 && String(w?.text ?? '').trim() && bom(w?.bbox)) out.push(w.bbox)
+  }
+  if (!out.length && Array.isArray(data?.lines)) for (const l of data.lines) if (bom(l?.bbox)) out.push(l.bbox)
+  if (!out.length && Array.isArray(data?.blocks)) {
+    for (const bl of data.blocks) for (const p of (bl?.paragraphs ?? [])) for (const ln of (p?.lines ?? [])) {
+      const ws = ln?.words ?? []
+      if (ws.length) { for (const w of ws) if (String(w?.text ?? '').trim() && bom(w?.bbox)) out.push(w.bbox) }
+      else if (bom(ln?.bbox)) out.push(ln.bbox)
+    }
+    if (!out.length) for (const bl of data.blocks) if (bom(bl?.bbox)) out.push(bl.bbox)
+  }
+  return out
+}
+function regiaoOCR(data: any, w: number, h: number): { x: number; y: number; largura: number; altura: number } | null {
+  const caixas = coletarCaixasOCR(data)
+  if (!caixas.length || !w || !h) return null
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+  for (const b of caixas) { x0 = Math.min(x0, b.x0); y0 = Math.min(y0, b.y0); x1 = Math.max(x1, b.x1); y1 = Math.max(y1, b.y1) }
+  const pad = 0.012
+  const x = clamp01(x0 / w - pad), y = clamp01(y0 / h - pad)
+  const largura = clamp01(x1 / w + pad - x), altura = clamp01(y1 / h + pad - y)
+  if (largura < 0.02 || altura < 0.02) return null
+  return { x, y, largura, altura }
+}
+function medirImagem(dataUrl: string): Promise<{ w: number; h: number }> {
+  return new Promise((res) => { const im = new Image(); im.onload = () => res({ w: im.naturalWidth, h: im.naturalHeight }); im.onerror = () => res({ w: 0, h: 0 }); im.src = dataUrl })
+}
 
 /** Divisória arrastável entre colunas (chama onDelta com o dx do arraste). */
 function ColResizer({ onDelta }: { onDelta: (dx: number) => void }) {
@@ -73,6 +110,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   const linhasRef = useRef(linhas); useEffect(() => { linhasRef.current = linhas }, [linhas])
   const [anotPorResp, setAnotPorResp] = useState<Record<string, Marca[]>>(() =>
     Object.fromEntries(questoes.map((q) => [q.respostaId, q.anotacoesIniciais])))
+  const anotRef = useRef(anotPorResp); useEffect(() => { anotRef.current = anotPorResp }, [anotPorResp])
   const [statusPorResp, setStatusPorResp] = useState<Record<string, string>>(() =>
     Object.fromEntries(questoes.map((q) => [q.respostaId, q.status])))
   const [transcricaoPorResp, setTranscricaoPorResp] = useState<Record<string, string>>(() =>
@@ -209,21 +247,40 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   function patchTranscricao(resp: string, texto: string) { setTranscricaoPorResp((s) => ({ ...s, [resp]: texto })) }
   function persistTranscricao(resp: string, texto: string) { salvarTranscricao(resp, texto).then((r) => { if (!r.ok) toast.error(r.error ?? 'Erro ao salvar transcrição') }) }
   async function transcreverOCR() {
-    if (!questaoAtiva?.paginas.length) { toast.error('Sem foto p/ transcrever nesta questão.'); return }
-    const resp = questaoAtiva.respostaId, pgs = questaoAtiva.paginas
+    if (!questaoAtiva?.paginas.length || !ativo) { toast.error('Sem foto p/ transcrever nesta questão.'); return }
+    const resp = questaoAtiva.respostaId, pgs = questaoAtiva.paginas, key = ativo.key, compId = ativo.comp.id
     setOcrPending(0)
     try {
-      const Tesseract: any = (await import('tesseract.js')).default ?? (await import('tesseract.js'))
-      let texto = ''
-      for (let i = 0; i < pgs.length; i++) {
-        const img = await imagemParaOCR(pgs[i].url)
-        if (!img.ok || !img.dataUrl) continue
-        const { data } = await Tesseract.recognize(img.dataUrl, 'por', { logger: (m: any) => { if (m.status === 'recognizing text') setOcrPending(Math.round(((i + (m.progress || 0)) / pgs.length) * 100)) } })
-        texto += (texto ? '\n\n' : '') + String(data?.text || '').trim()
-      }
+      const T: any = await import('tesseract.js')
+      const createWorker = T.createWorker ?? T.default?.createWorker
+      let pgIdx = 0
+      const worker = await createWorker('por', 1, { logger: (m: any) => { if (m.status === 'recognizing text') setOcrPending(Math.round(((pgIdx + (m.progress || 0)) / pgs.length) * 100)) } })
+      const itens: { arquivoId: string; regiao: { x: number; y: number; largura: number; altura: number } }[] = []
+      let texto = '', primeiraPag = -1
+      try {
+        for (let i = 0; i < pgs.length; i++) {
+          pgIdx = i
+          const img = await imagemParaOCR(pgs[i].url)
+          if (!img.ok || !img.dataUrl) continue
+          const { data } = await worker.recognize(img.dataUrl, {}, { blocks: true, text: true })
+          texto += (texto ? '\n\n' : '') + String(data?.text || '').trim()
+          const dims = await medirImagem(img.dataUrl)
+          const reg = regiaoOCR(data, dims.w, dims.h)
+          if (reg) { itens.push({ arquivoId: pgs[i].arquivoId, regiao: reg }); if (primeiraPag < 0) primeiraPag = i }
+        }
+      } finally { await worker.terminate() }
       texto = texto.trim()
+      // 1) transcrição completa (aba TRANSCRIÇÃO)
       patchTranscricao(resp, texto); persistTranscricao(resp, texto)
-      toast.success('OCR concluído — revise/edite (letra de mão pode sair imperfeita).')
+      // 2) preenche o "Trecho do aluno" do quesito ativo + página
+      const patchExc: QuesitoPatch = { excerpt: texto, ...(primeiraPag >= 0 ? { pagina: String(primeiraPag + 1) } : {}) }
+      patchQ(key, patchExc as Partial<CompCorrecao>); salvarCampo(key, patchExc)
+      // 3) marca a(s) região(ões) na prova ligada(s) ao quesito — substitui as marcas OCR anteriores
+      const antigas = (anotRef.current[resp] ?? []).filter((a) => (a.competencia_id ?? null) === compId && a.tipo === 'destaque' && a.conteudo === 'ocr')
+      for (const a of antigas) await removerMarca(a.id)
+      for (const it of itens) await criar({ tipo: 'destaque', arquivo_id: it.arquivoId, conteudo: 'ocr', x: it.regiao.x, y: it.regiao.y, largura: it.regiao.largura, altura: it.regiao.altura })
+      if (primeiraPag >= 0) { setAba('prova'); setPaginaIndex(primeiraPag) }
+      toast.success(itens.length ? 'OCR concluído — trecho preenchido e área marcada na prova. Revise (letra de mão sai imperfeita).' : 'OCR concluído — trecho preenchido. Revise (letra de mão sai imperfeita).')
     } catch { toast.error('Falha no OCR.') } finally { setOcrPending(null) }
   }
 
@@ -503,6 +560,19 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
 
               {/* ① Trecho do aluno */}
               <Cartao n={1} titulo="Trecho do aluno" extra={ativo.comp.pagina ? `p. ${ativo.comp.pagina}` : ''}>
+                <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                  <button type="button" onClick={transcreverOCR} disabled={ocrPending != null || !questaoAtiva?.paginas.length}
+                    className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-60"
+                    title="Transcreve a resposta na folha (motor próprio) e marca a área na prova">
+                    {ocrPending != null ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> OCR {ocrPending}%</> : <><ScanText className="h-3.5 w-3.5" /> Transcrever (OCR)</>}
+                  </button>
+                  <button type="button" onClick={sugerirIA} disabled={!!iaPending}
+                    className="inline-flex items-center gap-1 rounded-md border border-violet-300/60 px-2 py-1 text-xs font-medium text-violet-700 hover:bg-violet-500/10 disabled:opacity-60 dark:text-violet-300"
+                    title="Transcreve e sugere a correção com IA (Claude visão)">
+                    {iaPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} IA
+                  </button>
+                  <span className="text-[10px] leading-tight text-muted-foreground">preenche o trecho + marca a área na prova</span>
+                </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <input value={ativo.comp.pagina} onChange={(e) => patchQ(ativo.key, { pagina: e.target.value })} onBlur={(e) => salvarCampo(ativo.key, { pagina: e.target.value })} placeholder="pág." className="h-7 w-14 rounded border bg-[var(--input-bg,transparent)] px-1.5 text-xs outline-none focus:ring-1 focus:ring-ring" />
                   <input value={ativo.comp.linhas} onChange={(e) => patchQ(ativo.key, { linhas: e.target.value })} onBlur={(e) => salvarCampo(ativo.key, { linhas: e.target.value })} placeholder="linhas (ex.: 1-5)" className="h-7 w-28 rounded border bg-[var(--input-bg,transparent)] px-1.5 text-xs outline-none focus:ring-1 focus:ring-ring" />
