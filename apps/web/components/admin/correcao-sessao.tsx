@@ -72,31 +72,55 @@ function regiaoOCR(data: any, w: number, h: number): { x: number; y: number; lar
   if (largura < 0.02 || altura < 0.02) return null
   return { x, y, largura, altura }
 }
-// Pré-processa a foto p/ o OCR (canvas): upscale + grayscale + "níveis" (escurece a
-// tinta, clareia o papel) — sem binarizar (não destrói traços finos). Devolve as dims
-// processadas p/ normalizar a região das caixas do Tesseract.
+// Pré-processa a foto p/ o OCR (canvas), direcionado a folha de resposta pautada:
+// upscale → grayscale → binarização ADAPTATIVA (tira o fundo/rosa) → remove as linhas
+// da pauta e o grid (runs longos horizontais/verticais) → apaga a coluna de números à
+// esquerda. Reduz o "lixo" e ajuda o Tesseract. Devolve as dims processadas.
 function preprocessarOCR(dataUrl: string): Promise<{ url: string; w: number; h: number }> {
   return new Promise((res) => {
     const im = new Image()
     im.onload = () => {
-      const escala = Math.min(3, Math.max(1, 2200 / Math.max(1, im.naturalWidth)))
-      const w = Math.round(im.naturalWidth * escala), h = Math.round(im.naturalHeight * escala)
+      const natW = im.naturalWidth || 0, natH = im.naturalHeight || 0
+      if (!natW || !natH) { res({ url: dataUrl, w: 0, h: 0 }); return }
+      // upscale mirando ~2600px de largura, com teto de ~10MP p/ não estourar memória.
+      let escala = Math.min(4, Math.max(1, 2600 / natW))
+      if (natW * natH * escala * escala > 10_000_000) escala = Math.sqrt(10_000_000 / (natW * natH))
+      const w = Math.max(1, Math.round(natW * escala)), h = Math.max(1, Math.round(natH * escala))
       const cv = document.createElement('canvas'); cv.width = w; cv.height = h
       const ctx = cv.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D | null
-      if (!ctx) { res({ url: dataUrl, w: im.naturalWidth || 0, h: im.naturalHeight || 0 }); return }
+      if (!ctx) { res({ url: dataUrl, w: natW, h: natH }); return }
       ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
       ctx.drawImage(im, 0, 0, w, h)
       try {
-        const img = ctx.getImageData(0, 0, w, h), d = img.data
-        const preto = 70, branco = 195, faixa = branco - preto
-        for (let i = 0; i < d.length; i += 4) {
-          const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
-          let v = ((g - preto) / faixa) * 255
-          v = v < 0 ? 0 : v > 255 ? 255 : v
-          d[i] = d[i + 1] = d[i + 2] = v
+        const img = ctx.getImageData(0, 0, w, h), d = img.data, N = w * h
+        // 1) grayscale
+        const gray = new Float32Array(N)
+        for (let i = 0, p = 0; i < d.length; i += 4, p++) gray[p] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
+        // 2) imagem integral p/ média local (limiar adaptativo)
+        const integ = new Float64Array((w + 1) * (h + 1))
+        for (let y = 0; y < h; y++) { let soma = 0; for (let x = 0; x < w; x++) { soma += gray[y * w + x]; integ[(y + 1) * (w + 1) + (x + 1)] = integ[y * (w + 1) + (x + 1)] + soma } }
+        const r = Math.min(30, Math.max(8, Math.round(w / 120))), C = 10
+        const ink = new Uint8Array(N) // 1 = tinta (preto)
+        for (let y = 0; y < h; y++) {
+          const y0 = Math.max(0, y - r), y1 = Math.min(h - 1, y + r)
+          for (let x = 0; x < w; x++) {
+            const x0 = Math.max(0, x - r), x1 = Math.min(w - 1, x + r)
+            const area = (x1 - x0 + 1) * (y1 - y0 + 1)
+            const soma = integ[(y1 + 1) * (w + 1) + (x1 + 1)] - integ[y0 * (w + 1) + (x1 + 1)] - integ[(y1 + 1) * (w + 1) + x0] + integ[y0 * (w + 1) + x0]
+            if (gray[y * w + x] < soma / area - C) ink[y * w + x] = 1
+          }
         }
+        // 3) remove RUNS horizontais longos (linhas da pauta) e verticais longos (grade)
+        const limH = Math.round(w * 0.30), limV = Math.round(h * 0.30)
+        for (let y = 0; y < h; y++) { let ini = -1; for (let x = 0; x <= w; x++) { const on = x < w && ink[y * w + x] === 1; if (on) { if (ini < 0) ini = x } else { if (ini >= 0 && x - ini >= limH) for (let k = ini; k < x; k++) ink[y * w + k] = 0; ini = -1 } } }
+        for (let x = 0; x < w; x++) { let ini = -1; for (let y = 0; y <= h; y++) { const on = y < h && ink[y * w + x] === 1; if (on) { if (ini < 0) ini = y } else { if (ini >= 0 && y - ini >= limV) for (let k = ini; k < y; k++) ink[k * w + x] = 0; ini = -1 } } }
+        // 4) apaga a coluna de números à esquerda (~6% da largura)
+        const corte = Math.round(w * 0.06)
+        for (let y = 0; y < h; y++) for (let x = 0; x < corte; x++) ink[y * w + x] = 0
+        // 5) escreve preto sobre branco
+        for (let p = 0, i = 0; p < N; p++, i += 4) { const v = ink[p] ? 0 : 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255 }
         ctx.putImageData(img, 0, 0)
-      } catch { /* canvas "tainted" ou sem dados: usa o upscale puro */ }
+      } catch { /* canvas "tainted"/memória: usa o upscale puro */ }
       res({ url: cv.toDataURL('image/png'), w, h })
     }
     im.onerror = () => res({ url: dataUrl, w: 0, h: 0 })
@@ -306,8 +330,9 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
       const createWorker = T.createWorker ?? T.default?.createWorker
       let pgIdx = 0
       const worker = await createWorker('por', 1, { logger: (m: any) => { if (m.status === 'recognizing text') setOcrPending(Math.round(((pgIdx + (m.progress || 0)) / pgs.length) * 100)) } })
-      // PSM 6 = bloco único de texto (melhor p/ folha pautada); mantém espaços entre palavras.
-      try { await worker.setParameters({ tessedit_pageseg_mode: (T.PSM?.SINGLE_BLOCK ?? '6'), preserve_interword_spaces: '1' }) } catch {}
+      // PSM 6 = bloco único de texto (melhor p/ folha pautada); mantém espaços; whitelist PT corta lixo.
+      const WL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÇÉÊÍÓÔÕÚàáâãçéêíóôõú0123456789.,;:!?()-–—/º ª°%\n'
+      try { await worker.setParameters({ tessedit_pageseg_mode: (T.PSM?.SINGLE_BLOCK ?? '6'), preserve_interword_spaces: '1', tessedit_char_whitelist: WL }) } catch {}
       const itens: { arquivoId: string; regiao: { x: number; y: number; largura: number; altura: number } }[] = []
       let texto = '', primeiraPag = -1
       try {
