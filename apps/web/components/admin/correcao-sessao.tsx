@@ -6,10 +6,11 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
-  ArrowLeft, Check, Flag, Lock, AlertTriangle, BookOpenCheck, Image as ImageIcon, FileText, Sparkles, Loader2, ExternalLink, ScrollText, ScanText, MapPin,
+  ArrowLeft, Check, Flag, Lock, AlertTriangle, BookOpenCheck, Image as ImageIcon, FileText, Sparkles, Loader2, ExternalLink, ScrollText, ScanText, MapPin, GraduationCap,
 } from 'lucide-react'
 import { useSidebar } from '@/components/ui/sidebar'
 import { CorrecaoFolha, ICONES, type Ferramenta, type Marca } from '@/components/admin/correcao-folha'
+import { DevolutivaAluno } from '@/components/admin/devolutiva-aluno'
 import { PdfPreview } from '@/components/admin/pdf-preview'
 import { assumirCorrecao, salvarCorrecao, salvarQuesito, salvarEspelhoQuesito, salvarTranscricao, imagemParaOCR, salvarAnotacao, removerAnotacao, atualizarAnotacao, type QuesitoPatch } from '@/app/admin/correcao/actions'
 
@@ -296,6 +297,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   const [focoKey, setFocoKey] = useState(0)
   const [paginaIndex, setPaginaIndex] = useState(0)
   const [pending, setPending] = useState(false)
+  const [verAluno, setVerAluno] = useState(false)
   const [showDestaqueIA, setShowDestaqueIA] = useState(true)
   const [iaPending, setIaPending] = useState<string | null>(null)
   const [analisePending, setAnalisePending] = useState<string | null>(null)
@@ -685,8 +687,13 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
               {f.nome} <span className="tabular-nums opacity-70">{cont(f.id)}</span>
             </button>
           ))}
+          <button type="button" onClick={() => setVerAluno(true)}
+            className="ml-1 inline-flex items-center gap-1.5 rounded-md border border-emerald-300/60 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-500/10 dark:text-emerald-300"
+            title="Prévia da devolutiva como o aluno vê no portal">
+            <GraduationCap className="h-3.5 w-3.5" /> Ver como aluno
+          </button>
           <button type="button" onClick={finalizar} disabled={pending}
-            className="ml-1 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60">
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60">
             {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Finalizar
           </button>
         </div>
@@ -1012,6 +1019,16 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
           </>)}
         </aside>
       </div>
+
+      {verAluno && (
+        <DevolutivaAluno
+          aluno={aluno} tentativa={tentativa} simuladoTitulo={simuladoTitulo}
+          questoes={questoes.map((q) => ({ numero: q.numero, respostaId: q.respostaId, paginas: q.paginas }))}
+          quesitos={linhas.map((l) => ({ codigo: l.codigo, qi: l.qi, respostaId: l.respostaId, nome: l.comp.nome, nota: l.comp.nota, pontos: l.comp.pontos, conceito: l.comp.conceito, mensagem: l.comp.mensagem }))}
+          marcasPorResp={Object.fromEntries(questoes.map((q) => [q.respostaId, comOrdem(anotPorResp[q.respostaId] ?? [])]))}
+          notaTotal={notaTotal} maxTotal={maxTotal} onFechar={() => setVerAluno(false)}
+        />
+      )}
     </div>
   )
 }

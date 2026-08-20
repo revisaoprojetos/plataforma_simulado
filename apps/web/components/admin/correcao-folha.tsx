@@ -91,7 +91,7 @@ function MarcaView({ m, selecionada, clicavel, movivel, onIniciarMover, onInicia
  */
 export function CorrecaoFolha({
   paginas, marcas, paginaIndex, onPagina, ferramenta, corAtiva, iconeAtivo,
-  selecionadaId, onSelecionar, onCriar, onAtualizar, focoId, focoKey = 0,
+  selecionadaId, onSelecionar, onCriar, onAtualizar, focoId, focoKey = 0, somenteLeitura = false,
 }: {
   paginas: { arquivoId: string; url: string }[]
   marcas: Marca[]
@@ -106,6 +106,7 @@ export function CorrecaoFolha({
   onAtualizar: (id: string, patch: Partial<Marca>) => void
   focoId: string | null
   focoKey?: number
+  somenteLeitura?: boolean // devolutiva do aluno: marcas visíveis/clicáveis, sem criar/mover
 }) {
   const [zoom, setZoom] = useState(1)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -131,6 +132,7 @@ export function CorrecaoFolha({
 
   function iniciarMover(e: React.PointerEvent, m: Marca) {
     e.stopPropagation()
+    if (somenteLeitura) { onSelecionar(m.id); return } // devolutiva: só seleciona (mostra comentário)
     if (ferramenta !== 'selecionar') return
     onSelecionar(m.id)
     // A captura de ponteiro redireciona o clique seguinte p/ o wrap; ignora-o (senão desmarcaria).
@@ -148,6 +150,7 @@ export function CorrecaoFolha({
 
   function onClickWrap(e: React.MouseEvent) {
     if (ignorarClique.current) { ignorarClique.current = false; return }
+    if (somenteLeitura) { onSelecionar(null); return }
     if (ferramenta === 'selecionar') { onSelecionar(null); return }
     if (ferramenta === 'destaque') return
     const { x, y } = pos(e)
@@ -161,7 +164,7 @@ export function CorrecaoFolha({
     }
   }
   function onDown(e: React.PointerEvent) {
-    if (ferramenta !== 'destaque') return
+    if (somenteLeitura || ferramenta !== 'destaque') return
     const { x, y } = pos(e); setDraw({ x0: x, y0: y, x1: x, y1: y })
     wrapRef.current?.setPointerCapture?.(e.pointerId)
   }
@@ -219,14 +222,14 @@ export function CorrecaoFolha({
         {pagina ? (
           <div style={{ width: `${zoom * 100}%` }}>
             <div ref={wrapRef} className="relative select-none" onClick={onClickWrap} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
-              style={{ cursor: ferramenta === 'selecionar' ? 'default' : 'crosshair', touchAction: draw || drag ? 'none' : undefined }}>
+              style={{ cursor: somenteLeitura || ferramenta === 'selecionar' ? 'default' : 'crosshair', touchAction: draw || drag ? 'none' : undefined }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={pagina.url} alt={`Página ${paginaIndex + 1}`} className="block w-full" draggable={false} />
               {marcasPagina.map((m) => {
                 const mm = drag?.id === m.id && live ? { ...m, ...live } : m
                 return (
                   <MarcaView key={m.id} m={mm} selecionada={m.id === selecionadaId}
-                    clicavel={ferramenta === 'selecionar'} movivel={ferramenta === 'selecionar'}
+                    clicavel={somenteLeitura || ferramenta === 'selecionar'} movivel={!somenteLeitura && ferramenta === 'selecionar'}
                     onIniciarMover={iniciarMover} onIniciarResize={iniciarResize} />
                 )
               })}
