@@ -114,7 +114,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Aplicação de Simulado', href: '/admin/simulados', icon: ClipboardList, perm: 'simulados:view' },
       { label: 'Correção (discursivas)', href: '/admin/correcao', icon: PenLine, perm: 'questoes:view' },
-      { label: 'Transcrição (IA)', href: '/admin/transcricao', icon: ScanText, perm: 'configuracoes:view' },
+      { label: 'APIs (IA + externas)', href: '/admin/transcricao', icon: ScanText, perm: 'configuracoes:view' },
       { label: 'Questões', href: '/admin/questoes', icon: BookOpen, perm: 'questoes:view' },
       { label: 'Etiquetas', href: '/admin/etiquetas', icon: Tag, perm: 'questoes:view' },
       { label: 'Banco de Simulado', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
