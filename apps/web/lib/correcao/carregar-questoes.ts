@@ -34,12 +34,16 @@ export async function carregarQuestoesCorrecao(svc: SupabaseClient, tenantId: st
     })(),
     (async () => { try { return await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_resposta_arquivos').select('resposta_id, arquivo_id, ordem').in('resposta_id', c)) } catch { return [] as any[] } })(),
     (async () => { try { return await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_anotacoes_discursivas').select('id, resposta_id, arquivo_id, competencia_id, tipo, x, y, largura, altura, cor, icone, numero, conteudo').in('resposta_id', c)) } catch { return [] as any[] } })(),
-    (async () => { try { return await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_respostas_discursivas').select('id, ia_payload').in('id', c)) } catch { return [] as any[] } })(),
+    (async () => {
+      const full = await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_respostas_discursivas').select('id, ia_payload, transcricao').in('id', c)).catch(() => null)
+      if (full) return full
+      try { return await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_respostas_discursivas').select('id, ia_payload').in('id', c)) } catch { return [] as any[] }
+    })(),
   ])
 
-  // Transcrição do manuscrito (feita pela IA) por resposta — de ia_payload.transcricao (tolerante).
+  // Transcrição por resposta: coluna `transcricao` (OCR/manual) → fallback ia_payload.transcricao (IA).
   const transcricaoDe = new Map<string, string>()
-  for (const x of ias as any[]) { const t = x?.ia_payload?.transcricao; if (t) transcricaoDe.set(x.id, String(t)) }
+  for (const x of ias as any[]) { const t = x?.transcricao || x?.ia_payload?.transcricao; if (t) transcricaoDe.set(x.id, String(t)) }
 
   const qMap = new Map(questoes.map((q: any) => [q.id, q]))
   const arqIds = [...new Set(juncoes.map((j: any) => j.arquivo_id).filter(Boolean))] as string[]

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { carregarQuestoesCorrecao } from '@/lib/correcao/carregar-questoes'
 import { carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
+import { extrairTextoPdf } from '@/lib/ia/pdf-texto'
 import { CorrecaoSessao } from '@/components/admin/correcao-sessao'
 
 export const dynamic = 'force-dynamic'
@@ -38,6 +39,9 @@ export default async function CorrecaoSessaoPage({ params }: { params: Promise<{
   const bancoId = (sim?.regras as any)?.banco_base_id as string | undefined
   const entrega = bancoId ? await carregarEntregaBanco(svc, tenantId, bancoId) : null
   const espelhoPdfUrl = (entrega?.gabarito?.pdfUrl as string | undefined) ?? null
+  // Texto do espelho extraído do PDF (camada de texto) — p/ ler/copiar o gabarito por questão.
+  let espelhoTexto = ''
+  if (espelhoPdfUrl) { try { const resp = await fetch(espelhoPdfUrl); if (resp.ok) espelhoTexto = await extrairTextoPdf(Buffer.from(await resp.arrayBuffer())) } catch { /* sem texto */ } }
 
   return (
     <CorrecaoSessao
@@ -47,6 +51,7 @@ export default async function CorrecaoSessaoPage({ params }: { params: Promise<{
       simuladoTitulo={sim?.titulo ?? ''}
       questoes={questoes}
       espelhoPdfUrl={espelhoPdfUrl}
+      espelhoTexto={espelhoTexto}
       voltarUrl={voltarUrl}
     />
   )

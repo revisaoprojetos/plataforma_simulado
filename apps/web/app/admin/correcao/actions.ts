@@ -235,6 +235,31 @@ export async function salvarQuesito(respostaId: string, competenciaId: string, p
   return { ok: true }
 }
 
+/** Salva a transcrição (OCR/manual) da resposta — reading aid, sem depender de IA. */
+export async function salvarTranscricao(respostaId: string, texto: string): Promise<{ ok: boolean; error?: string }> {
+  const { access, ok } = await podeCorrigir()
+  if (!ok) return { ok: false, error: 'Sem permissão.' }
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_respostas_discursivas').update({ transcricao: texto?.trim() || null }).eq('id', respostaId).eq('tenant_id', access.tenantId)
+  if (error) return { ok: false, error: /transcricao|column .* does not exist/i.test(error.message) ? 'Rode a migração 20260820000003_transcricao.sql.' : error.message }
+  return { ok: true }
+}
+
+/** Baixa a foto do aluno (bucket privado) e devolve como data URL — p/ o OCR client-side (Tesseract). */
+export async function imagemParaOCR(url: string): Promise<{ ok: boolean; dataUrl?: string; error?: string }> {
+  const { ok } = await podeCorrigir()
+  if (!ok) return { ok: false, error: 'Sem permissão.' }
+  const base = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '')
+  if (!base || !url.startsWith(`${base}/storage/`)) return { ok: false, error: 'URL inválida.' }
+  try {
+    const resp = await fetch(url, { cache: 'no-store' })
+    if (!resp.ok) return { ok: false, error: 'Falha ao baixar a imagem.' }
+    const ct = resp.headers.get('content-type') || 'image/jpeg'
+    return { ok: true, dataUrl: `data:${ct};base64,${Buffer.from(await resp.arrayBuffer()).toString('base64')}` }
+  } catch { return { ok: false, error: 'Falha ao baixar a imagem.' } }
+}
+
 /** Salva o ESPELHO (descrição) do quesito na competência — reflete p/ todas as correções da questão. */
 export async function salvarEspelhoQuesito(competenciaId: string, descricao: string): Promise<{ ok: boolean; error?: string }> {
   const { access, ok } = await podeCorrigir()

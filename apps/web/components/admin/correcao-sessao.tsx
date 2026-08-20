@@ -6,12 +6,12 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
-  ArrowLeft, Check, Flag, Lock, AlertTriangle, BookOpenCheck, Image as ImageIcon, FileText, Sparkles, Loader2, ExternalLink, ScrollText,
+  ArrowLeft, Check, Flag, Lock, AlertTriangle, BookOpenCheck, Image as ImageIcon, FileText, Sparkles, Loader2, ExternalLink, ScrollText, ScanText,
 } from 'lucide-react'
 import { useSidebar } from '@/components/ui/sidebar'
 import { CorrecaoFolha, ICONES, type Ferramenta, type Marca } from '@/components/admin/correcao-folha'
 import { PdfPreview } from '@/components/admin/pdf-preview'
-import { assumirCorrecao, salvarCorrecao, salvarQuesito, salvarEspelhoQuesito, salvarAnotacao, removerAnotacao, atualizarAnotacao, type QuesitoPatch } from '@/app/admin/correcao/actions'
+import { assumirCorrecao, salvarCorrecao, salvarQuesito, salvarEspelhoQuesito, salvarTranscricao, imagemParaOCR, salvarAnotacao, removerAnotacao, atualizarAnotacao, type QuesitoPatch } from '@/app/admin/correcao/actions'
 
 export interface CompCorrecao {
   id: string; nome: string; pontos: number
@@ -52,9 +52,9 @@ function ColResizer({ onDelta }: { onDelta: (dx: number) => void }) {
     className="w-1.5 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-primary/60" title="Arraste para redimensionar" />
 }
 
-export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questoes, voltarUrl, espelhoPdfUrl }: {
+export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questoes, voltarUrl, espelhoPdfUrl, espelhoTexto }: {
   aluno: string; email: string; tentativa: number | null; simuladoTitulo: string
-  questoes: QuestaoCorrecao[]; voltarUrl: string; espelhoPdfUrl?: string | null
+  questoes: QuestaoCorrecao[]; voltarUrl: string; espelhoPdfUrl?: string | null; espelhoTexto?: string
 }) {
   const router = useRouter()
   const { setOpen, open, state, isMobile } = useSidebar()
@@ -90,6 +90,8 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   const [pending, setPending] = useState(false)
   const [showDestaqueIA, setShowDestaqueIA] = useState(true)
   const [iaPending, setIaPending] = useState<string | null>(null)
+  const [ocrPending, setOcrPending] = useState<number | null>(null)
+  const [espelhoModo, setEspelhoModo] = useState<'pdf' | 'texto'>('pdf')
   // Larguras ajustáveis das colunas + espelho como coluna (persistidos no navegador).
   const [w1, setW1] = useState(256)
   const [w3, setW3] = useState(456)
@@ -201,6 +203,28 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
       }
       toast.success(aplicados ? `IA sugeriu ${aplicados} quesito(s) — revise e aprove. A nota final é sua.` : 'IA não retornou quesitos aplicáveis.')
     } catch { toast.error('Falha ao chamar a IA') } finally { setIaPending(null) }
+  }
+
+  // Transcrição por OCR (Tesseract, motor próprio — sem IA). Bom p/ texto impresso; letra de mão sai imperfeita.
+  function patchTranscricao(resp: string, texto: string) { setTranscricaoPorResp((s) => ({ ...s, [resp]: texto })) }
+  function persistTranscricao(resp: string, texto: string) { salvarTranscricao(resp, texto).then((r) => { if (!r.ok) toast.error(r.error ?? 'Erro ao salvar transcrição') }) }
+  async function transcreverOCR() {
+    if (!questaoAtiva?.paginas.length) { toast.error('Sem foto p/ transcrever nesta questão.'); return }
+    const resp = questaoAtiva.respostaId, pgs = questaoAtiva.paginas
+    setOcrPending(0)
+    try {
+      const Tesseract: any = (await import('tesseract.js')).default ?? (await import('tesseract.js'))
+      let texto = ''
+      for (let i = 0; i < pgs.length; i++) {
+        const img = await imagemParaOCR(pgs[i].url)
+        if (!img.ok || !img.dataUrl) continue
+        const { data } = await Tesseract.recognize(img.dataUrl, 'por', { logger: (m: any) => { if (m.status === 'recognizing text') setOcrPending(Math.round(((i + (m.progress || 0)) / pgs.length) * 100)) } })
+        texto += (texto ? '\n\n' : '') + String(data?.text || '').trim()
+      }
+      texto = texto.trim()
+      patchTranscricao(resp, texto); persistTranscricao(resp, texto)
+      toast.success('OCR concluído — revise/edite (letra de mão pode sair imperfeita).')
+    } catch { toast.error('Falha no OCR.') } finally { setOcrPending(null) }
   }
 
   // ── anotações (na questão ativa) ──
@@ -335,6 +359,12 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
               {!espelhoColuna && <button type="button" onClick={() => setAba('espelho')} className={cn('flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium', aba === 'espelho' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}><FileText className="h-3.5 w-3.5" /> ESPELHO COMPLETO</button>}
               <button type="button" onClick={() => setAba('transcricao')} className={cn('flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium', aba === 'transcricao' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}><ScrollText className="h-3.5 w-3.5" /> TRANSCRIÇÃO</button>
             </div>
+            {aba === 'espelho' && (espelhoPdfUrl || espelhoTexto) && (
+              <div className="flex items-center gap-0.5 rounded-lg border p-0.5">
+                <button type="button" onClick={() => setEspelhoModo('pdf')} disabled={!espelhoPdfUrl} className={cn('rounded-md px-2 py-1 text-xs font-medium disabled:opacity-40', espelhoModo === 'pdf' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}>PDF</button>
+                <button type="button" onClick={() => setEspelhoModo('texto')} disabled={!espelhoTexto} className={cn('rounded-md px-2 py-1 text-xs font-medium disabled:opacity-40', espelhoModo === 'texto' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}>Texto</button>
+              </div>
+            )}
             <button type="button" onClick={() => { setEspelhoColuna((v) => !v); setAba('prova') }}
               className={cn('flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors', espelhoColuna ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}
               title="Mostrar o espelho como coluna ao lado da prova">
@@ -357,26 +387,30 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
               ) : <div className="flex h-full items-center justify-center rounded-lg border bg-card text-sm text-muted-foreground">Nenhuma foto enviada nesta questão.</div>
             ) : aba === 'transcricao' ? (
               <div className="mx-auto flex h-full max-w-3xl flex-col overflow-hidden rounded-lg border bg-card">
-                <div className="flex shrink-0 items-center justify-between border-b px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  <span className="flex items-center gap-1.5"><ScrollText className="h-3.5 w-3.5" /> Transcrição do manuscrito (IA)</span>
-                  {questaoAtiva && (transcricaoPorResp[questaoAtiva.respostaId] ?? '') && (
-                    <button type="button" onClick={sugerirIA} disabled={!!iaPending} className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-medium normal-case text-primary hover:bg-primary/5 disabled:opacity-60">
-                      {iaPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />} Refazer
+                <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><ScrollText className="h-3.5 w-3.5" /> Transcrição da resposta</span>
+                  <div className="flex items-center gap-1.5">
+                    <button type="button" onClick={transcreverOCR} disabled={ocrPending != null || !questaoAtiva?.paginas.length}
+                      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-60">
+                      {ocrPending != null ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> OCR {ocrPending}%</> : <><ScanText className="h-3.5 w-3.5" /> Transcrever (OCR)</>}
                     </button>
-                  )}
-                </div>
-                {questaoAtiva && (transcricaoPorResp[questaoAtiva.respostaId] ?? '').trim() ? (
-                  <p className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap p-5 text-sm leading-relaxed">{transcricaoPorResp[questaoAtiva.respostaId]}</p>
-                ) : (
-                  <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
-                    <ScrollText className="h-8 w-8 opacity-50" />
-                    <p>A IA ainda não transcreveu esta questão.</p>
                     <button type="button" onClick={sugerirIA} disabled={!!iaPending}
-                      className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-violet-300/60 bg-violet-500/10 px-3 py-1.5 text-sm font-semibold text-violet-700 hover:bg-violet-500/20 disabled:opacity-60 dark:text-violet-300">
-                      {iaPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Transcrevendo…</> : <><Sparkles className="h-4 w-4" /> Transcrever com IA</>}
+                      className="inline-flex items-center gap-1 rounded-md border border-violet-300/60 px-2 py-1 text-xs font-medium text-violet-700 hover:bg-violet-500/10 disabled:opacity-60 dark:text-violet-300">
+                      {iaPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} IA
                     </button>
                   </div>
-                )}
+                </div>
+                <textarea value={questaoAtiva ? (transcricaoPorResp[questaoAtiva.respostaId] ?? '') : ''}
+                  onChange={(e) => questaoAtiva && patchTranscricao(questaoAtiva.respostaId, e.target.value)}
+                  onBlur={(e) => questaoAtiva && persistTranscricao(questaoAtiva.respostaId, e.target.value)}
+                  placeholder="Transcreva a resposta do aluno aqui — ou use o OCR (motor próprio) ou a IA. Letra de mão costuma exigir correção manual."
+                  className="min-h-0 flex-1 resize-none border-0 bg-transparent p-5 text-sm leading-relaxed outline-none focus:ring-0" />
+                <p className="shrink-0 border-t px-4 py-1.5 text-[11px] text-muted-foreground">O OCR é um motor próprio (Tesseract) — excelente p/ texto impresso; em manuscrito costuma sair imperfeito, edite acima.</p>
+              </div>
+            ) : (espelhoModo === 'texto' && espelhoTexto) ? (
+              <div className="mx-auto flex h-full max-w-3xl flex-col overflow-hidden rounded-lg border bg-card">
+                <div className="flex shrink-0 items-center gap-1.5 border-b px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><FileText className="h-3.5 w-3.5" /> Espelho (texto extraído do gabarito)</div>
+                <p className="min-h-0 flex-1 select-text overflow-y-auto whitespace-pre-wrap p-5 text-sm leading-relaxed">{espelhoTexto}</p>
               </div>
             ) : espelhoPdfUrl ? (
               <div className="h-full overflow-hidden rounded-lg border"><EspelhoPdf url={espelhoPdfUrl} /></div>
