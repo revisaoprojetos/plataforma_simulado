@@ -43,7 +43,7 @@ import {
   Building2,
   Tag,
   CalendarDays,
-  FileClock,
+  Upload,
   Link2 as LinkIcon,
 } from 'lucide-react'
 import {
@@ -198,7 +198,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Catálogo', href: '/admin/cronogramas', icon: CalendarDays, perm: 'cronogramas:view' },
       { label: 'Links de aula', href: '/admin/cronogramas/links', icon: LinkIcon, perm: 'cronogramas:view' },
-      { label: 'Emissões', href: '/admin/cronogramas/emissoes', icon: FileClock, perm: 'cronogramas:view' },
+      { label: 'Importar', href: '/admin/cronogramas/importar', icon: Upload, perm: 'cronogramas:update' },
     ],
   },
 ]
