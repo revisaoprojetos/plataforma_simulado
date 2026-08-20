@@ -56,8 +56,11 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   questoes: QuestaoCorrecao[]; voltarUrl: string; espelhoPdfUrl?: string | null
 }) {
   const router = useRouter()
-  const { setOpen, open } = useSidebar()
+  const { setOpen, open, state, isMobile } = useSidebar()
   useEffect(() => { const anterior = open; setOpen(false); return () => setOpen(anterior) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Mesa em tela cheia (fixed) à DIREITA do rail da sidebar: altura fixa do viewport (não estica a
+  // página, cada coluna rola sozinha) e a barra lateral continua visível/recolhida.
+  const leftPx = isMobile ? 0 : state === 'collapsed' ? 48 : 256
 
   // Flatten: 1 linha por QUESITO (Qx.y) de todas as questões.
   const [linhas, setLinhas] = useState<Linha[]>(() =>
@@ -227,7 +230,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   const setArr = (key: string, campo: 'recognized' | 'missing', txt: string) => patchQ(key, { [campo]: txt.split('\n') } as Partial<CompCorrecao>)
 
   return (
-    <div className="-m-6 flex h-[calc(100%+3rem)] flex-col overflow-hidden bg-background text-foreground">
+    <div style={{ left: leftPx }} className="fixed inset-y-0 right-0 z-40 flex flex-col overflow-hidden bg-background text-foreground transition-[left] duration-200">
       {/* ROW 1 — cabeçalho */}
       <header className="flex h-13 shrink-0 items-center gap-3 border-b bg-card px-3 py-2">
         <Link href={voltarUrl} className="flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted"><ArrowLeft className="h-4 w-4" /> Sair</Link>
@@ -484,7 +487,9 @@ function EspelhoPdf({ url }: { url: string }) {
           <ExternalLink className="h-3 w-3" /> Abrir em nova aba
         </a>
       </div>
-      <PdfPreview url={url} titulo="gabarito" maxPag={40} className="relative min-h-0 flex-1 bg-white" />
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-white">
+        <PdfPreview url={url} titulo="gabarito" maxPag={40} className="absolute inset-0" />
+      </div>
     </div>
   )
 }
