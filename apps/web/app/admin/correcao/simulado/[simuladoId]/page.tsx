@@ -6,7 +6,7 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { Card, CardContent } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { SecaoHeader } from '@/components/admin/secao-header'
-import { ArrowLeft, PenLine, Users, Images, CheckCircle2, User } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Users, Images, CheckCircle2, User } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { cn } from '@/lib/utils'
 
@@ -103,7 +103,7 @@ export default async function CorrecaoSimuladoPage({ params }: { params: Promise
                   {tudoCorrigido ? <><CheckCircle2 className="mr-0.5 inline h-3 w-3" />corrigido</> : `${a.pend} pendente${a.pend === 1 ? '' : 's'}`}
                 </span>
                 <span className={buttonVariants({ size: 'sm', variant: tudoCorrigido ? 'outline' : 'default' })}>
-                  <PenLine className="mr-1 h-3.5 w-3.5" /> {tudoCorrigido ? 'Rever' : 'Corrigir'}
+                  Acessar <ArrowRight className="ml-1 h-3.5 w-3.5" />
                 </span>
               </Link>
             )
