@@ -117,9 +117,10 @@ function ColResizer({ onDelta }: { onDelta: (dx: number) => void }) {
     className="w-1.5 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-primary/60" title="Arraste para redimensionar" />
 }
 
-export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questoes, voltarUrl, espelhoPdfUrl, espelhoTexto }: {
+export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questoes, voltarUrl, espelhoPdfUrl, espelhoTexto, iaAtiva = false }: {
   aluno: string; email: string; tentativa: number | null; simuladoTitulo: string
   questoes: QuestaoCorrecao[]; voltarUrl: string; espelhoPdfUrl?: string | null; espelhoTexto?: string
+  iaAtiva?: boolean
 }) {
   const router = useRouter()
   const { setOpen, open, state, isMobile } = useSidebar()
@@ -489,7 +490,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
               title="Mostrar o espelho como coluna ao lado da prova">
               <FileText className="h-3.5 w-3.5" /> Espelho ao lado
             </button>
-            {aba === 'prova' && (
+            {aba === 'prova' && iaAtiva && (
               <button type="button" onClick={() => setShowDestaqueIA((v) => !v)}
                 className={cn('flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors', showDestaqueIA ? 'border-amber-400 bg-amber-100/60 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300' : 'text-muted-foreground hover:bg-muted')}>
                 <Sparkles className="h-3.5 w-3.5" /> Destaque IA
@@ -513,10 +514,12 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
                       className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-60">
                       {ocrPending != null ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> OCR {ocrPending}%</> : <><ScanText className="h-3.5 w-3.5" /> Transcrever (OCR)</>}
                     </button>
-                    <button type="button" onClick={sugerirIA} disabled={!!iaPending}
-                      className="inline-flex items-center gap-1 rounded-md border border-violet-300/60 px-2 py-1 text-xs font-medium text-violet-700 hover:bg-violet-500/10 disabled:opacity-60 dark:text-violet-300">
-                      {iaPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} IA
-                    </button>
+                    {iaAtiva && (
+                      <button type="button" onClick={sugerirIA} disabled={!!iaPending}
+                        className="inline-flex items-center gap-1 rounded-md border border-violet-300/60 px-2 py-1 text-xs font-medium text-violet-700 hover:bg-violet-500/10 disabled:opacity-60 dark:text-violet-300">
+                        {iaPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} IA
+                      </button>
+                    )}
                   </div>
                 </div>
                 <textarea value={questaoAtiva ? (transcricaoPorResp[questaoAtiva.respostaId] ?? '') : ''}
@@ -583,11 +586,13 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
               </div>
               <h2 className="text-base font-bold leading-snug">{ativo.comp.nome}</h2>
 
-              {/* Fase 3 — sugestão da IA p/ a questão inteira (o professor aprova) */}
-              <button type="button" onClick={sugerirIA} disabled={!!iaPending}
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-300/60 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 py-2 text-sm font-semibold text-violet-700 transition-colors hover:from-violet-500/20 hover:to-fuchsia-500/20 disabled:opacity-60 dark:border-violet-500/40 dark:text-violet-300">
-                {iaPending ? <><Loader2 className="h-4 w-4 animate-spin" /> A IA está analisando…</> : <><Sparkles className="h-4 w-4" /> Sugerir correção com IA</>}
-              </button>
+              {/* Fase 3 — sugestão da IA p/ a questão inteira (o professor aprova). Só quando há chave. */}
+              {iaAtiva && (
+                <button type="button" onClick={sugerirIA} disabled={!!iaPending}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-300/60 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 py-2 text-sm font-semibold text-violet-700 transition-colors hover:from-violet-500/20 hover:to-fuchsia-500/20 disabled:opacity-60 dark:border-violet-500/40 dark:text-violet-300">
+                  {iaPending ? <><Loader2 className="h-4 w-4 animate-spin" /> A IA está analisando…</> : <><Sparkles className="h-4 w-4" /> Sugerir correção com IA</>}
+                </button>
+              )}
 
               {alertasAtivo.length > 0 && (
                 <div className="space-y-1.5">
@@ -628,11 +633,13 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
                     title="Transcreve a resposta na folha (motor próprio) e marca a área na prova">
                     {ocrPending != null ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> OCR {ocrPending}%</> : <><ScanText className="h-3.5 w-3.5" /> Transcrever (OCR)</>}
                   </button>
-                  <button type="button" onClick={sugerirIA} disabled={!!iaPending}
-                    className="inline-flex items-center gap-1 rounded-md border border-violet-300/60 px-2 py-1 text-xs font-medium text-violet-700 hover:bg-violet-500/10 disabled:opacity-60 dark:text-violet-300"
-                    title="Transcreve e sugere a correção com IA (Claude visão)">
-                    {iaPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} IA
-                  </button>
+                  {iaAtiva && (
+                    <button type="button" onClick={sugerirIA} disabled={!!iaPending}
+                      className="inline-flex items-center gap-1 rounded-md border border-violet-300/60 px-2 py-1 text-xs font-medium text-violet-700 hover:bg-violet-500/10 disabled:opacity-60 dark:text-violet-300"
+                      title="Transcreve e sugere a correção com IA (Claude visão)">
+                      {iaPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} IA
+                    </button>
+                  )}
                   <span className="text-[10px] leading-tight text-muted-foreground">preenche o trecho + marca a área na prova</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">

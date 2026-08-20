@@ -53,6 +53,7 @@ export default async function CorrecaoSessaoPage({ params }: { params: Promise<{
       espelhoPdfUrl={espelhoPdfUrl}
       espelhoTexto={espelhoTexto}
       voltarUrl={voltarUrl}
+      iaAtiva={!!process.env.ANTHROPIC_API_KEY}
     />
   )
 }
