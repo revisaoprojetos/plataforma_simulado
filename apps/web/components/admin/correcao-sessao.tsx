@@ -250,24 +250,46 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   // Fase 3 — pede à IA (Claude visão) uma proposta de correção da QUESTÃO ativa e aplica em
   // cinza (pending) p/ o professor revisar/aprovar. A nota final continua sendo do corretor.
   async function sugerirIA() {
-    if (!questaoAtiva) return
-    const resp = questaoAtiva.respostaId
+    if (!questaoAtiva || !ativo) return
+    const resp = questaoAtiva.respostaId, pags = questaoAtiva.paginas
     setIaPending(resp)
     try {
       const r = await fetch('/api/admin/correcao/ia', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ respostaId: resp }) })
       const j = await r.json().catch(() => ({}))
       if (!j.ok) { toast.error(j.error ?? 'Falha na IA'); return }
       if (j.proposta?.transcricao) setTranscricaoPorResp((s) => ({ ...s, [resp]: String(j.proposta.transcricao) }))
-      let aplicados = 0
+      let aplicados = 0, caixas = 0
       for (const q of (j.proposta?.quesitos ?? []) as any[]) {
         const linha = linhasRef.current.find((l) => l.respostaId === resp && l.comp.id === q.competencia_id)
         if (!linha) continue
         const nota = Math.min(linha.comp.pontos, Math.max(0, Number(q.nota) || 0))
-        patchQ(linha.key, { nota, conceito: q.conceito || '', excerpt: q.excerpt || '', recognized: q.recognized ?? [], missing: q.missing ?? [], comentario: q.rationale || '', ...(linha.comp.audit_state === 'approved' ? { audit_state: 'pending' } : {}) })
-        salvarCampo(linha.key, { nota, conceito: q.conceito || null, excerpt: q.excerpt || null, recognized: q.recognized ?? [], missing: q.missing ?? [], comentario: q.rationale || null })
+        const revisar = !!q.needs_review || q.status === 'revisar'
+        // Campos do quesito (UI + persistência)
+        const patchUI: Partial<CompCorrecao> = { nota, conceito: q.conceito || '', excerpt: q.excerpt || '', recognized: q.recognized ?? [], missing: q.missing ?? [], comentario: q.rationale || '', leituraDuvidosa: revisar || linha.comp.leituraDuvidosa }
+        const patchDB: QuesitoPatch = { nota, conceito: q.conceito || null, excerpt: q.excerpt || null, recognized: q.recognized ?? [], missing: q.missing ?? [], comentario: q.rationale || null, leitura_duvidosa: revisar || linha.comp.leituraDuvidosa }
+        if (q.page != null) { patchUI.pagina = String(q.page); patchDB.pagina = String(q.page) }
+        if (q.lines) { patchUI.linhas = String(q.lines); patchDB.linhas = String(q.lines) }
+        if (revisar) { patchUI.audit_state = 'review'; patchDB.audit_state = 'review' }
+        else if (linha.comp.audit_state === 'approved') { patchUI.audit_state = 'pending'; patchDB.audit_state = 'pending' }
+        patchQ(linha.key, patchUI); salvarCampo(linha.key, patchDB)
+        // Espelho (descrição do quesito) — só preenche se ainda estiver vazio (não sobrescreve o professor)
+        if (q.mirror_excerpt && !String(linha.comp.descricao || '').trim()) { patchQ(linha.key, { descricao: String(q.mirror_excerpt) }); salvarEspelho(q.competencia_id, String(q.mirror_excerpt)) }
+        // highlightRegions (% da página) → caixas de destaque na prova, ligadas ao quesito. Substitui as marcas IA anteriores.
+        const antigas = (anotRef.current[resp] ?? []).filter((a) => (a.competencia_id ?? null) === q.competencia_id && a.tipo === 'destaque' && a.conteudo === 'ia')
+        for (const a of antigas) await removerMarca(a.id)
+        const cor = corDoQuesito(q.competencia_id)
+        for (const reg of (q.regions ?? []) as any[]) {
+          const arquivoId = pags[Math.max(0, (Number(reg.page) || 1) - 1)]?.arquivoId ?? pags[0]?.arquivoId
+          if (!arquivoId) continue
+          const x = clamp01(Number(reg.leftPct) / 100), y = clamp01(Number(reg.topPct) / 100)
+          const largura = clamp01(Number(reg.widthPct) / 100), altura = clamp01(Number(reg.heightPct) / 100)
+          if (largura < 0.01 || altura < 0.01) continue
+          await adicionarMarca(resp, { tipo: 'destaque', competencia_id: q.competencia_id, cor, arquivo_id: arquivoId, conteudo: 'ia', x, y, largura, altura })
+          caixas++
+        }
         aplicados++
       }
-      toast.success(aplicados ? `IA sugeriu ${aplicados} quesito(s) — revise e aprove. A nota final é sua.` : 'IA não retornou quesitos aplicáveis.')
+      toast.success(aplicados ? `IA: ${aplicados} quesito(s) e ${caixas} caixa(s) na prova. Revise e aprove — a nota final é sua.` : 'IA não retornou quesitos aplicáveis.')
     } catch { toast.error('Falha ao chamar a IA') } finally { setIaPending(null) }
   }
 
@@ -315,6 +337,16 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   }
 
   // ── anotações (na questão ativa) ──
+  // Cria uma marca com competência/cor EXPLÍCITAS (usada por OCR/IA, que marcam quesitos
+  // que podem não ser o ativo). Otimista + reconciliação do id real.
+  async function adicionarMarca(resp: string, payload: Omit<Marca, 'id'>) {
+    const tempId = gerarTemp()
+    setAnotPorResp((s) => ({ ...s, [resp]: [...(s[resp] ?? []), { ...payload, id: tempId }] }))
+    const r = await salvarAnotacao(resp, payload)
+    if (r.ok && r.id) setAnotPorResp((s) => ({ ...s, [resp]: (s[resp] ?? []).map((x) => (x.id === tempId ? { ...x, id: r.id! } : x)) }))
+    else { setAnotPorResp((s) => ({ ...s, [resp]: (s[resp] ?? []).filter((x) => x.id !== tempId) })); if (r.error) toast.error(r.error) }
+    return r
+  }
   async function criar(m: Omit<Marca, 'id'>) {
     if (!questaoAtiva || !ativo) return
     const resp = questaoAtiva.respostaId, tempId = gerarTemp()
