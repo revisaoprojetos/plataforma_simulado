@@ -25,7 +25,11 @@ export const ROTAS_ALUNO_OCULTAS = ['/aluno/favoritos', '/aluno/cadernos']
  *
  * O gate REAL de produção não é esta constante, e sim a coluna `ativo` de
  * `simulado_cronograma_config`, que liga o módulo por tenant. Esta flag existe só para
- * o período de desenvolvimento, em que nem as telas estão prontas. Ligar de volta
- * (false) quando o CRUD e a tela do aluno estiverem navegáveis.
+ * o período de desenvolvimento, em que nem as telas estão prontas.
+ *
+ * Controlada por env (NEXT_PUBLIC_CRONOGRAMA_ATIVO=true para MOSTRAR), e não por
+ * constante, para o código não nascer com o módulo ligado por engano num merge. Mesmo
+ * formato que a branch da discursiva adotou para OCULTAR_DISCURSIVA. É BUILD-TIME
+ * (NEXT_PUBLIC_*, inlinado no bundle): mudar exige rebuild/restart do dev server.
  */
-export const OCULTAR_CRONOGRAMA = true
+export const OCULTAR_CRONOGRAMA = process.env.NEXT_PUBLIC_CRONOGRAMA_ATIVO !== 'true'
