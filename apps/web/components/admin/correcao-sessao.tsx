@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Check, User } from 'lucide-react'
 import { CorrecaoMesa } from '@/components/admin/correcao-mesa'
 import { type Marca } from '@/components/admin/correcao-folha'
 
@@ -22,17 +23,22 @@ export interface QuestaoCorrecao {
 }
 
 /**
- * Correção de uma TENTATIVA inteira: navegador com todas as questões discursivas da
- * sessão + a mesa da questão ativa. O professor corrige uma a uma sem sair da página;
- * ao "Devolver", avança para a próxima pendente (não redireciona).
+ * Shell de TELA CHEIA da correção (estilo AURÉA, imersivo): top bar com aluno + navegador de
+ * questões, e a mesa da questão ativa preenchendo o resto. Corrige a tentativa inteira sem sair.
  */
-export function CorrecaoSessao({ questoes, voltarUrl }: { questoes: QuestaoCorrecao[]; voltarUrl: string }) {
+export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questoes, voltarUrl }: {
+  aluno: string
+  email: string
+  tentativa: number | null
+  simuladoTitulo: string
+  questoes: QuestaoCorrecao[]
+  voltarUrl: string
+}) {
   const router = useRouter()
   const [ativo, setAtivo] = useState(0)
   const [override, setOverride] = useState<Record<string, string>>({})
   const statusDe = (q: QuestaoCorrecao) => override[q.respostaId] ?? q.status
   const q = questoes[ativo]
-
   const pendentes = questoes.filter((x) => statusDe(x) !== 'corrigida').length
 
   function handleDevolvido(respostaId: string) {
@@ -41,34 +47,43 @@ export function CorrecaoSessao({ questoes, voltarUrl }: { questoes: QuestaoCorre
     const next = questoes.findIndex((x, i) => i > idx && (override[x.respostaId] ?? x.status) !== 'corrigida')
     if (next >= 0) setAtivo(next)
     router.refresh()
-    toast.success(pendentes <= 1 ? 'Tentativa corrigida!' : 'Questão corrigida — próxima pendente aberta')
+    toast.success(pendentes <= 1 ? 'Tentativa corrigida!' : 'Questão corrigida — próxima aberta')
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {questoes.map((x, i) => {
-          const s = statusDe(x)
-          const at = i === ativo
-          return (
-            <button key={x.respostaId} type="button" onClick={() => setAtivo(i)}
-              className={cn('flex max-w-[15rem] items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors', at ? 'border-primary bg-primary/5' : 'hover:bg-muted/50')}>
-              <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
-                s === 'corrigida' ? 'bg-emerald-500 text-white' : s === 'em_correcao' ? 'bg-sky-500 text-white' : 'bg-muted text-muted-foreground')}>
-                {s === 'corrigida' ? <CheckCircle2 className="h-3.5 w-3.5" /> : x.numero}
-              </span>
-              <span className="min-w-0">
-                <span className="block text-xs font-semibold leading-tight">Questão {x.numero}</span>
-                <span className="block truncate text-[11px] leading-tight text-muted-foreground">{x.enunciado.slice(0, 38) || '—'}</span>
-              </span>
-            </button>
-          )
-        })}
-        <span className="ml-1 text-xs text-muted-foreground">
+    <div className="fixed inset-0 z-50 flex flex-col bg-background text-foreground">
+      {/* TOP BAR */}
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-card px-3 sm:px-4">
+        <Link href={voltarUrl} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition-colors hover:bg-muted" title="Voltar">
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><User className="h-4 w-4" /></span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold leading-tight">{aluno}{tentativa != null && ` · Tentativa ${tentativa}`}</p>
+          <p className="truncate text-[11px] leading-tight text-muted-foreground">{email || '—'} · {simuladoTitulo}</p>
+        </div>
+
+        {/* navegador de questões */}
+        <div className="mx-auto flex items-center gap-1.5">
+          {questoes.map((x, i) => {
+            const s = statusDe(x)
+            const at = i === ativo
+            return (
+              <button key={x.respostaId} type="button" onClick={() => setAtivo(i)} title={`Questão ${x.numero}`}
+                className={cn('flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg px-2 text-sm font-bold transition-colors',
+                  at ? 'bg-primary text-primary-foreground' : s === 'corrigida' ? 'bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25 dark:text-emerald-400' : 'bg-muted text-muted-foreground hover:bg-muted/70')}>
+                {s === 'corrigida' ? <Check className="h-4 w-4" /> : x.numero}
+              </button>
+            )
+          })}
+        </div>
+
+        <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
           {pendentes === 0 ? 'Tudo corrigido' : `${pendentes} pendente${pendentes === 1 ? '' : 's'}`}
         </span>
-      </div>
+      </header>
 
+      {/* MESA DA QUESTÃO ATIVA */}
       {q && (
         <CorrecaoMesa
           key={q.respostaId}

@@ -182,7 +182,7 @@ export function CorrecaoFolha({
   const btn = 'flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40'
 
   return (
-    <div className="space-y-2">
+    <div className="flex h-full flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1">
           {paginas.map((_, i) => (
@@ -200,7 +200,7 @@ export function CorrecaoFolha({
         </div>
       </div>
 
-      <div className="relative max-h-[68vh] overflow-auto rounded-lg border bg-muted/20">
+      <div className="relative min-h-0 flex-1 overflow-auto rounded-lg border bg-muted/20">
         {pagina ? (
           <div style={{ width: `${zoom * 100}%` }}>
             <div ref={wrapRef} className="relative select-none" onClick={onClickWrap} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}

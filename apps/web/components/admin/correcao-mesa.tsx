@@ -1,14 +1,14 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { MarkdownContent } from '@/components/markdown-content'
 import { cn } from '@/lib/utils'
 import {
-  MousePointer2, Highlighter, Circle, Hash, Type, Trash2, Save, Loader2, Lock, BookOpen, ListChecks, Shapes,
-  Flag, Check, RotateCcw, AlertTriangle, MessageSquare, Lightbulb,
+  MousePointer2, Highlighter, Circle, Hash, Type, Trash2, Save, Loader2, Lock, ListChecks, Shapes,
+  Flag, Check, RotateCcw, AlertTriangle, MessageSquare, Lightbulb, FileText, Image as ImageIcon,
 } from 'lucide-react'
 import { CorrecaoFolha, ICONES, type Ferramenta, type Marca } from '@/components/admin/correcao-folha'
 import { assumirCorrecao, salvarCorrecao, salvarQuesito, salvarAnotacao, removerAnotacao, atualizarAnotacao } from '@/app/admin/correcao/actions'
@@ -39,6 +39,12 @@ const SEV_CLS: Record<string, string> = {
   baixo: 'border-sky-300/50 bg-sky-50 text-sky-800 dark:bg-sky-900/20 dark:text-sky-300',
 }
 
+/**
+ * Mesa de correção (estilo AURÉA) — 3 colunas em altura cheia:
+ *  ① trilho de quesitos (estado/nota/marcas + filtros) · ② PROVA do aluno (grande, anotável) ou
+ *  o ENUNCIADO/espelho · ③ inspetor do quesito ATIVO (nota, fundamentação, devolutiva travada, ritual).
+ * Preenche o corpo do shell de tela cheia (CorrecaoSessao). Fecho da questão no rodapé do inspetor.
+ */
 export function CorrecaoMesa({
   respostaId, jaCorrigida, competencias, feedbackInicial, voltarUrl,
   paginas, anotacoesIniciais, espelho, embedded, onDevolvido,
@@ -51,7 +57,6 @@ export function CorrecaoMesa({
   paginas: { arquivoId: string; url: string }[]
   anotacoesIniciais: Marca[]
   espelho: { enunciado: string; comentarioProfessor: string | null }
-  /** Dentro da tela de tentativa: após devolver, avança p/ a próxima questão em vez de redirecionar. */
   embedded?: boolean
   onDevolvido?: () => void
 }) {
@@ -60,12 +65,13 @@ export function CorrecaoMesa({
   const compsRef = useRef(comps); useEffect(() => { compsRef.current = comps }, [comps])
   const [feedback, setFeedback] = useState(feedbackInicial)
   const [bloqueado, setBloqueado] = useState<string | null>(null)
-  const [pending, start] = useTransition()
+  const [pending, setPending] = useState(false)
   const [anotacoes, setAnotacoes] = useState<Marca[]>(anotacoesIniciais)
   const [ferramenta, setFerramenta] = useState<Ferramenta>('selecionar')
   const [iconeAtivo, setIconeAtivo] = useState<string>('check')
   const [quesitoAtivo, setQuesitoAtivo] = useState<string | null>(competencias[0]?.id ?? null)
   const [filtro, setFiltro] = useState<Filtro>('todos')
+  const [aba, setAba] = useState<'prova' | 'enunciado'>('prova')
   const [paginaIndex, setPaginaIndex] = useState(0)
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null)
   const [focoId, setFocoId] = useState<string | null>(null)
@@ -76,7 +82,6 @@ export function CorrecaoMesa({
     assumirCorrecao(respostaId).then((r) => { if (!r.ok) setBloqueado(r.error ?? 'Indisponível') })
   }, [respostaId, jaCorrigida])
 
-  // Atalhos: Esc desmarca; Delete/Backspace remove a marca selecionada (fora de campos de texto).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
@@ -100,17 +105,16 @@ export function CorrecaoMesa({
 
   function focar(id: string | null) { if (!id) return; setFocoId(id); setFocoKey((k) => k + 1) }
   function irParaQuesito(compId: string | null) {
-    setQuesitoAtivo(compId)
+    setQuesitoAtivo(compId); setAba('prova')
     const primeira = anotacoes.find((a) => (a.competencia_id ?? null) === compId)
     if (primeira) { setSelecionadaId(primeira.id); focar(primeira.id) }
   }
 
-  // ── Anotações ──
   async function criar(m: Omit<Marca, 'id'>) {
     const tempId = gerarTemp()
     const payload = { ...m, competencia_id: quesitoAtivo, cor: corDoQuesito(quesitoAtivo) }
     setAnotacoes((a) => [...a, { ...payload, id: tempId }])
-    if (m.tipo === 'texto') setSelecionadaId(tempId) // abre a edição inline do texto
+    if (m.tipo === 'texto') setSelecionadaId(tempId)
     const r = await salvarAnotacao(respostaId, payload)
     if (r.ok && r.id) { setAnotacoes((a) => a.map((x) => (x.id === tempId ? { ...x, id: r.id! } : x))); setSelecionadaId((s) => (s === tempId ? r.id! : s)) }
     else { setAnotacoes((a) => a.filter((x) => x.id !== tempId)); setSelecionadaId((s) => (s === tempId ? null : s)); toast.error(r.error ?? 'Erro ao salvar marca') }
@@ -131,13 +135,11 @@ export function CorrecaoMesa({
     if (!id.startsWith('tmp-')) atualizarAnotacao(id, patch)
   }
   function patchMarcaLocal(id: string, patch: Partial<Marca>) { setAnotacoes((a) => a.map((x) => (x.id === id ? { ...x, ...patch } : x))) }
-  // Clicar numa marca ativa o quesito dela (o inspetor à direita segue a marca).
   function selecionarMarca(id: string | null) {
     setSelecionadaId(id)
     if (id) { const m = anotacoes.find((a) => a.id === id); if (m?.competencia_id) setQuesitoAtivo(m.competencia_id) }
   }
 
-  // ── Ritual por quesito ──
   function patchComp(id: string, patch: Partial<Comp>) { setComps((cs) => cs.map((c) => (c.id === id ? { ...c, ...patch } : c))) }
   async function persistQuesito(id: string, override?: Partial<Comp>) {
     const c = { ...(compsRef.current.find((x) => x.id === id) ?? {} as Comp), ...override }
@@ -146,7 +148,6 @@ export function CorrecaoMesa({
   }
   function editarNota(id: string, nota: number) {
     const c = comps.find((x) => x.id === id)
-    // Editar um quesito aprovado rebaixa p/ pendente (AURÉA §14.5).
     patchComp(id, { nota, ...(c?.audit_state === 'approved' ? { audit_state: 'pending' } : {}) })
   }
   function mudarEstado(id: string, audit_state: string, avancar?: boolean) {
@@ -155,20 +156,20 @@ export function CorrecaoMesa({
     if (avancar) { const i = comps.findIndex((c) => c.id === id); const prox = comps[i + 1]; if (prox) irParaQuesito(prox.id) }
   }
 
-  function setFeedbackLocal(v: string) { setFeedback(v) }
-
   const total = comps.reduce((acc, c) => acc + (Number(c.nota) || 0), 0)
   const maxTotal = comps.reduce((acc, c) => acc + c.pontos, 0)
+  const auditados = comps.filter((c) => c.audit_state === 'approved').length
+  const pctAud = comps.length ? Math.round((auditados / comps.length) * 100) : 0
 
-  // ── Alertas mecânicos (sem IA) ──
-  const alertas: { sev: string; msg: string }[] = []
+  const alertas: { sev: string; msg: string; comp: string }[] = []
   for (const c of comps) {
     const nMarks = contarMarcas(c.id)
-    if (c.audit_state === 'approved' && c.nota == null) alertas.push({ sev: 'alto', msg: `“${c.nome}” aprovado sem nota definida.` })
-    if (c.nota != null && c.nota > c.pontos) alertas.push({ sev: 'alto', msg: `“${c.nome}”: nota acima do máximo (${c.pontos}).` })
-    if (c.nota != null && c.nota < c.pontos && nMarks === 0) alertas.push({ sev: 'medio', msg: `“${c.nome}” perdeu pontos sem nenhuma marca na folha.` })
-    if (c.audit_state === 'approved' && !c.mensagem.trim()) alertas.push({ sev: 'baixo', msg: `“${c.nome}” aprovado sem devolutiva ao aluno.` })
+    if (c.audit_state === 'approved' && c.nota == null) alertas.push({ sev: 'alto', comp: c.id, msg: `“${c.nome}” aprovado sem nota definida.` })
+    if (c.nota != null && c.nota > c.pontos) alertas.push({ sev: 'alto', comp: c.id, msg: `“${c.nome}”: nota acima do máximo (${c.pontos}).` })
+    if (c.nota != null && c.nota < c.pontos && nMarks === 0) alertas.push({ sev: 'medio', comp: c.id, msg: `“${c.nome}” perdeu pontos sem nenhuma marca na folha.` })
+    if (c.audit_state === 'approved' && !c.mensagem.trim()) alertas.push({ sev: 'baixo', comp: c.id, msg: `“${c.nome}” aprovado sem devolutiva ao aluno.` })
   }
+  const alertasAtivo = ativo ? alertas.filter((a) => a.comp === ativo.id) : []
 
   const quesitosVis = comps.filter((c) => {
     if (filtro === 'pendentes') return c.audit_state === 'pending' || !c.audit_state
@@ -179,31 +180,39 @@ export function CorrecaoMesa({
   })
 
   function salvar() {
-    start(async () => {
+    setPending(true)
+    ;(async () => {
       const r = await salvarCorrecao(respostaId, comps.map((c) => ({ competencia_id: c.id, nota: Number(c.nota) || 0, comentario: c.comentario })), feedback)
+      setPending(false)
       if (r.ok) {
-        if (embedded && onDevolvido) { onDevolvido() } // na tela de tentativa: avança sem sair
+        if (embedded && onDevolvido) { onDevolvido() }
         else { toast.success(jaCorrigida ? 'Correção atualizada' : 'Correção devolvida ao aluno'); router.push(voltarUrl); router.refresh() }
       } else toast.error(r.error ?? 'Erro ao salvar')
-    })
+    })()
   }
 
-  const btnTool = (a: boolean) => cn('flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors', a ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')
+  const btnTool = (a: boolean) => cn('flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors', a ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[15rem_minmax(0,1fr)_21rem]">
-      {/* ① ÍNDICE / TRILHO */}
-      <aside className="space-y-2">
-        <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><ListChecks className="h-4 w-4" /> Quesitos</p>
-        <div className="flex flex-wrap gap-1">
-          {FILTROS.map((f) => (
-            <button key={f.id} type="button" onClick={() => setFiltro(f.id)}
-              className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors', filtro === f.id ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}>
-              {f.nome}
-            </button>
-          ))}
+    <div className="flex min-h-0 flex-1 overflow-hidden">
+      {/* ① TRILHO */}
+      <aside className="flex w-64 shrink-0 flex-col border-r bg-card">
+        <div className="shrink-0 space-y-2 border-b p-3">
+          <div className="flex items-center justify-between">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><ListChecks className="h-4 w-4" /> Quesitos</p>
+            <span className="text-xs font-medium text-muted-foreground">{quesitosVis.length}/{comps.length}</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {FILTROS.map((f) => (
+              <button key={f.id} type="button" onClick={() => setFiltro(f.id)}
+                className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors', filtro === f.id ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}>
+                {f.nome}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="space-y-1.5">
+
+        <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2">
           {quesitosVis.map((c) => {
             const n = contarMarcas(c.id)
             const at = quesitoAtivo === c.id
@@ -230,64 +239,83 @@ export function CorrecaoMesa({
               <span className="flex-1 text-sm font-medium">Geral</span>
               {contarMarcas(null) > 0 && <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">{contarMarcas(null)}</span>}
             </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">Marcas sem quesito</p>
           </button>
         </div>
 
-        {/* Alertas mecânicos */}
-        {alertas.length > 0 && (
-          <div className="space-y-1.5 pt-1">
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><AlertTriangle className="h-4 w-4" /> Alertas ({alertas.length})</p>
-            {alertas.map((a, i) => (
-              <p key={i} className={cn('rounded-md border px-2 py-1.5 text-[11px] leading-snug', SEV_CLS[a.sev])}>{a.msg}</p>
-            ))}
-          </div>
-        )}
+        <div className="shrink-0 border-t p-3 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between"><span>Nota</span><span className="font-semibold text-foreground">{total.toFixed(1)} / {maxTotal.toFixed(1)}</span></div>
+          <div className="mt-1 flex items-center justify-between"><span>Auditado</span><span>{pctAud}%</span></div>
+        </div>
       </aside>
 
-      {/* ② FOLHA + FERRAMENTAS */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2">
-          <div className="flex flex-wrap items-center gap-1">
-            {FERRAMENTAS.map(({ id, nome, Icon }) => (
-              <button key={id} type="button" onClick={() => setFerramenta(id)} className={btnTool(ferramenta === id)} title={nome}>
-                <Icon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{nome}</span>
-              </button>
-            ))}
+      {/* ② PROVA / ENUNCIADO */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-muted/10">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-card px-3 py-2">
+          <div className="flex items-center gap-1 rounded-lg border p-0.5">
+            <button type="button" onClick={() => setAba('prova')} className={cn('flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium', aba === 'prova' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}><ImageIcon className="h-3.5 w-3.5" /> Prova</button>
+            <button type="button" onClick={() => setAba('enunciado')} className={cn('flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium', aba === 'enunciado' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}><FileText className="h-3.5 w-3.5" /> Enunciado</button>
           </div>
-          {ferramenta === 'icone' && (
-            <div className="flex items-center gap-1 border-l pl-2">
-              {Object.entries(ICONES).map(([k, Ic]) => (
-                <button key={k} type="button" onClick={() => setIconeAtivo(k)} title={k}
-                  className={cn('flex h-8 w-8 items-center justify-center rounded-md border', iconeAtivo === k ? 'border-primary bg-primary/10' : 'text-muted-foreground hover:bg-muted')}>
-                  <Ic className="h-4 w-4" style={{ color: corAtiva }} />
-                </button>
-              ))}
-            </div>
+          {aba === 'prova' && (
+            <>
+              <div className="flex flex-wrap items-center gap-1">
+                {FERRAMENTAS.map(({ id, nome, Icon }) => (
+                  <button key={id} type="button" onClick={() => setFerramenta(id)} className={btnTool(ferramenta === id)} title={nome}>
+                    <Icon className="h-3.5 w-3.5" /> <span className="hidden xl:inline">{nome}</span>
+                  </button>
+                ))}
+              </div>
+              {ferramenta === 'icone' && (
+                <div className="flex items-center gap-1 border-l pl-2">
+                  {Object.entries(ICONES).map(([k, Ic]) => (
+                    <button key={k} type="button" onClick={() => setIconeAtivo(k)} title={k}
+                      className={cn('flex h-8 w-8 items-center justify-center rounded-md border', iconeAtivo === k ? 'border-primary bg-primary/10' : 'text-muted-foreground hover:bg-muted')}>
+                      <Ic className="h-4 w-4" style={{ color: corAtiva }} />
+                    </button>
+                  ))}
+                </div>
+              )}
+              <span className="ml-auto inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: corAtiva }} />
+                {quesitoAtivo ? (comps.find((c) => c.id === quesitoAtivo)?.nome ?? 'Quesito') : 'Geral'}
+              </span>
+            </>
           )}
-          <div className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span>Marcando:</span>
-            <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium text-foreground">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ background: corAtiva }} />
-              {quesitoAtivo ? (comps.find((c) => c.id === quesitoAtivo)?.nome ?? 'Quesito') : 'Geral'}
-            </span>
-          </div>
         </div>
 
-        <CorrecaoFolha
-          paginas={paginas} marcas={anotacoes} paginaIndex={paginaIndex} onPagina={setPaginaIndex}
-          ferramenta={ferramenta} corAtiva={corAtiva} iconeAtivo={iconeAtivo}
-          selecionadaId={selecionadaId} onSelecionar={selecionarMarca}
-          onCriar={criar} onAtualizar={atualizarMarca} focoId={focoId} focoKey={focoKey}
-        />
+        <div className="min-h-0 flex-1 overflow-hidden p-3">
+          {aba === 'prova' ? (
+            <CorrecaoFolha
+              paginas={paginas} marcas={anotacoes} paginaIndex={paginaIndex} onPagina={setPaginaIndex}
+              ferramenta={ferramenta} corAtiva={corAtiva} iconeAtivo={iconeAtivo}
+              selecionadaId={selecionadaId} onSelecionar={selecionarMarca}
+              onCriar={criar} onAtualizar={atualizarMarca} focoId={focoId} focoKey={focoKey}
+            />
+          ) : (
+            <div className="mx-auto h-full max-w-3xl overflow-y-auto rounded-lg border bg-card p-6">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Enunciado</p>
+              <MarkdownContent className="text-sm leading-relaxed">{espelho.enunciado || '—'}</MarkdownContent>
+              {espelho.comentarioProfessor && (
+                <>
+                  <p className="mb-1 mt-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Gabarito / espelho</p>
+                  <MarkdownContent className="text-sm leading-relaxed">{espelho.comentarioProfessor}</MarkdownContent>
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
-        {selecionada && (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2.5 text-sm">
+        {selecionada && aba === 'prova' && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-t bg-card px-3 py-2 text-sm">
             <span className="inline-flex items-center gap-1.5 font-medium">
-              <span className="h-3 w-3 rounded-full" style={{ background: selecionada.cor || COR_GERAL }} />
-              Marca: {selecionada.tipo}
+              <span className="h-3 w-3 rounded-full" style={{ background: selecionada.cor || COR_GERAL }} /> Marca: {selecionada.tipo}
             </span>
-            <label className="ml-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+            {selecionada.tipo === 'texto' && (
+              <input value={selecionada.conteudo ?? ''} autoFocus
+                onChange={(e) => patchMarcaLocal(selecionada.id, { conteudo: e.target.value })}
+                onBlur={(e) => atualizarMarca(selecionada.id, { conteudo: e.target.value })}
+                placeholder="Texto da nota…" className="min-w-[8rem] flex-1 rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1 text-sm outline-none focus:ring-1 focus:ring-ring" />
+            )}
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
               Quesito
               <select value={selecionada.competencia_id ?? ''} onChange={(e) => religar(selecionada.id, e.target.value || null)}
                 className="rounded-md border bg-[var(--input-bg,transparent)] px-2 py-1 text-xs text-foreground outline-none focus:ring-1 focus:ring-ring">
@@ -296,125 +324,111 @@ export function CorrecaoMesa({
               </select>
             </label>
             <button type="button" onClick={() => remover(selecionada.id)} className="ml-auto inline-flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/5">
-              <Trash2 className="h-3.5 w-3.5" /> Excluir marca
+              <Trash2 className="h-3.5 w-3.5" /> Excluir
             </button>
-            {selecionada.tipo === 'texto' && (
-              <input value={selecionada.conteudo ?? ''} autoFocus
-                onChange={(e) => patchMarcaLocal(selecionada.id, { conteudo: e.target.value })}
-                onBlur={(e) => atualizarMarca(selecionada.id, { conteudo: e.target.value })}
-                placeholder="Texto da nota na folha…"
-                className="order-last w-full rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
-            )}
           </div>
         )}
       </div>
 
-      {/* ③ INSPETOR: espelho + quesito ativo (ritual) + fecho */}
-      <aside className="space-y-3">
-        <details className="rounded-lg border bg-muted/20 p-3" open>
-          <summary className="cursor-pointer text-xs font-semibold text-muted-foreground"><BookOpen className="mr-1 inline h-4 w-4" /> Espelho de correção</summary>
-          <div className="mt-2 space-y-2">
-            <div>
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Enunciado</p>
-              <MarkdownContent className="text-sm leading-relaxed">{espelho.enunciado || '—'}</MarkdownContent>
-            </div>
-            {espelho.comentarioProfessor && (
-              <div>
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Gabarito / comentário</p>
-                <MarkdownContent className="text-sm leading-relaxed">{espelho.comentarioProfessor}</MarkdownContent>
-              </div>
-            )}
-          </div>
-        </details>
-
+      {/* ③ INSPETOR DO QUESITO ATIVO */}
+      <aside className="flex w-[27rem] shrink-0 flex-col border-l bg-card">
         {bloqueado ? (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-300">
+          <div className="m-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-300">
             <Lock className="h-4 w-4" /> {bloqueado}
+          </div>
+        ) : !ativo ? (
+          <div className="m-3 flex flex-col items-center gap-1 rounded-lg border border-dashed p-6 text-center text-xs text-muted-foreground">
+            <Lightbulb className="h-4 w-4" /> Selecione um quesito no índice para avaliá-lo.
           </div>
         ) : (
           <>
-            {/* Quesito ativo — ritual */}
-            {ativo ? (
-              <div className="space-y-2.5 rounded-lg border bg-card p-3">
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full" style={{ background: corDoQuesito(ativo.id) }} />
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{ativo.nome}</span>
-                  <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                    ativo.audit_state === 'approved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                      : ativo.audit_state === 'review' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-                      : 'bg-muted text-muted-foreground')}>
-                    {ativo.audit_state === 'approved' ? 'Aprovado' : ativo.audit_state === 'review' ? 'Revisar' : 'Pendente'}
-                  </span>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+              {/* kicker + estado */}
+              <div className="flex items-center gap-2">
+                <span className="h-3.5 w-3.5 rounded-full" style={{ background: corDoQuesito(ativo.id) }} />
+                <h2 className="min-w-0 flex-1 truncate text-base font-bold">{ativo.nome}</h2>
+                <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                  ativo.audit_state === 'approved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                    : ativo.audit_state === 'review' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                    : 'bg-muted text-muted-foreground')}>
+                  {ativo.audit_state === 'approved' ? 'Aprovado' : ativo.audit_state === 'review' ? 'Revisar' : 'Pendente'}
+                </span>
+              </div>
+
+              {/* alertas do quesito */}
+              {alertasAtivo.length > 0 && (
+                <div className="space-y-1.5">
+                  {alertasAtivo.map((a, i) => (
+                    <p key={i} className={cn('flex items-start gap-1.5 rounded-md border px-2 py-1.5 text-[11px] leading-snug', SEV_CLS[a.sev])}>
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> {a.msg}
+                    </p>
+                  ))}
                 </div>
+              )}
 
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-muted-foreground">Nota do quesito</span>
-                  <div className="flex items-center gap-1 text-sm">
-                    <input type="number" step="0.5" min="0" max={ativo.pontos} value={ativo.nota ?? ''}
-                      onChange={(e) => editarNota(ativo.id, Math.min(ativo.pontos, Math.max(0, Number(e.target.value))))}
-                      onBlur={() => persistQuesito(ativo.id)}
-                      className="w-20 rounded-md border bg-[var(--input-bg,transparent)] px-2 py-1 text-right outline-none focus:ring-1 focus:ring-ring" />
-                    <span className="text-muted-foreground">/ {ativo.pontos}</span>
-                  </div>
+              {/* faixa de avaliação — nota */}
+              <div className="flex items-center justify-between rounded-lg border bg-muted/20 px-3 py-2">
+                <span className="text-sm font-medium">Nota do quesito</span>
+                <div className="flex items-center gap-1 text-sm">
+                  <input type="number" step="0.5" min="0" max={ativo.pontos} value={ativo.nota ?? ''}
+                    onChange={(e) => editarNota(ativo.id, Math.min(ativo.pontos, Math.max(0, Number(e.target.value))))}
+                    onBlur={() => persistQuesito(ativo.id)}
+                    className="w-24 rounded-md border bg-card px-2 py-1 text-right text-base font-semibold outline-none focus:ring-1 focus:ring-ring" />
+                  <span className="text-muted-foreground">/ {ativo.pontos}</span>
                 </div>
+              </div>
 
-                <input value={ativo.comentario} onChange={(e) => patchComp(ativo.id, { comentario: e.target.value })} onBlur={() => persistQuesito(ativo.id)}
-                  placeholder="Fundamentação do critério (privada)"
-                  className="w-full rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring" />
+              {/* ③ fundamentação */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Fundamentação (privada — só o corretor vê)</label>
+                <textarea value={ativo.comentario} onChange={(e) => patchComp(ativo.id, { comentario: e.target.value })} onBlur={() => persistQuesito(ativo.id)}
+                  rows={2} placeholder="Motivo do desconto, observações técnicas…"
+                  className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+              </div>
 
-                {/* Rodapé do ritual */}
-                <div className="flex items-center gap-1.5">
-                  {ativo.audit_state === 'approved' ? (
-                    <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => mudarEstado(ativo.id, 'pending')}>
-                      <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Reabrir
+              {/* ④ devolutiva (travada até aprovar) */}
+              <div className="space-y-1">
+                <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <MessageSquare className="h-3.5 w-3.5" /> Devolutiva do quesito ao aluno
+                  {ativo.audit_state !== 'approved' && <Lock className="h-3 w-3" />}
+                </label>
+                <textarea value={ativo.mensagem} disabled={ativo.audit_state !== 'approved'}
+                  onChange={(e) => patchComp(ativo.id, { mensagem: e.target.value })} onBlur={() => persistQuesito(ativo.id)}
+                  rows={4} placeholder={ativo.audit_state === 'approved' ? 'Mensagem ao aluno sobre este quesito…' : 'Aprove o quesito para liberar a devolutiva.'}
+                  className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-2 text-sm outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted/40 disabled:text-muted-foreground" />
+              </div>
+
+              {/* ritual do quesito */}
+              <div className="flex items-center gap-1.5">
+                {ativo.audit_state === 'approved' ? (
+                  <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => mudarEstado(ativo.id, 'pending')}>
+                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Reabrir
+                  </Button>
+                ) : (
+                  <>
+                    <Button type="button" variant="outline" size="sm" onClick={() => mudarEstado(ativo.id, 'review')}
+                      style={ativo.audit_state === 'review' ? { borderColor: '#f59e0b', color: '#b45309' } : undefined}>
+                      <Flag className="mr-1.5 h-3.5 w-3.5" /> Revisar
                     </Button>
-                  ) : (
-                    <>
-                      <Button type="button" variant="outline" size="sm" onClick={() => mudarEstado(ativo.id, 'review')}
-                        style={ativo.audit_state === 'review' ? { borderColor: '#f59e0b', color: '#b45309' } : undefined}>
-                        <Flag className="mr-1.5 h-3.5 w-3.5" /> Revisar
-                      </Button>
-                      <Button type="button" size="sm" className="flex-1" onClick={() => mudarEstado(ativo.id, 'approved', true)}>
-                        <Check className="mr-1.5 h-3.5 w-3.5" /> Aprovar e próximo
-                      </Button>
-                    </>
-                  )}
-                </div>
-
-                {/* Mensagem ao aluno — travada até aprovar (AURÉA) */}
-                <div className="space-y-1">
-                  <label className="flex items-center gap-1.5 text-xs font-medium">
-                    <MessageSquare className="h-3.5 w-3.5" /> Devolutiva do quesito ao aluno
-                    {ativo.audit_state !== 'approved' && <Lock className="h-3 w-3 text-muted-foreground" />}
-                  </label>
-                  <textarea value={ativo.mensagem} disabled={ativo.audit_state !== 'approved'}
-                    onChange={(e) => patchComp(ativo.id, { mensagem: e.target.value })} onBlur={() => persistQuesito(ativo.id)}
-                    rows={3} placeholder={ativo.audit_state === 'approved' ? 'Mensagem ao aluno sobre este quesito…' : 'Aprove o quesito para liberar a devolutiva.'}
-                    className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted/40 disabled:text-muted-foreground" />
-                </div>
+                    <Button type="button" size="sm" className="flex-1" onClick={() => mudarEstado(ativo.id, 'approved', true)}>
+                      <Check className="mr-1.5 h-3.5 w-3.5" /> Aprovar e próximo
+                    </Button>
+                  </>
+                )}
               </div>
-            ) : (
-              <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
-                <Lightbulb className="mx-auto mb-1 h-4 w-4" /> Selecione um quesito no índice para avaliá-lo.
-              </div>
-            )}
+            </div>
 
-            {/* Fecho */}
-            <div className="space-y-2.5 rounded-lg border bg-card p-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold">Nota final</h2>
+            {/* rodapé: fecho da QUESTÃO */}
+            <div className="shrink-0 space-y-2 border-t bg-card p-3">
+              <input value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Feedback geral da questão (opcional)"
+                className="w-full rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+              <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Total <strong className="text-foreground">{total.toFixed(1)}</strong> / {maxTotal.toFixed(1)}</span>
+                <Button onClick={salvar} disabled={pending} className="ml-auto">
+                  {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  {jaCorrigida ? 'Atualizar' : 'Devolver questão'}
+                </Button>
               </div>
-              {comps.length === 0 && <p className="text-xs text-muted-foreground">Sem competências — use o feedback abaixo (nota 0).</p>}
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Feedback geral</label>
-                <textarea value={feedback} onChange={(e) => setFeedbackLocal(e.target.value)} rows={3} placeholder="Observações gerais para o aluno…"
-                  className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
-              </div>
-              <Button onClick={salvar} disabled={pending} className="w-full">
-                {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                {jaCorrigida ? 'Atualizar correção' : 'Devolver ao aluno'}
-              </Button>
             </div>
           </>
         )}
