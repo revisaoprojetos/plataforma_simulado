@@ -1005,20 +1005,13 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
                 </div>
               </Cartao>
 
-              {/* Índice de ANOTAÇÕES (abre/fecha) — por quesito, com comentário editável */}
-              <details open className="rounded-lg border bg-muted/10">
-                <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2.5 py-2 text-xs font-semibold">
-                  <MapPin className="h-3.5 w-3.5 text-primary" /> Anotações da questão
-                  <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{marcasResp.length}</span>
-                </summary>
-                <div className="border-t p-2">
-                  <button type="button" onClick={() => setAnotColuna((v) => !v)}
-                    className="mb-2 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted">
-                    <MapPin className="h-3 w-3" /> {anotColuna ? 'Fechar edição ao lado da prova' : 'Abrir edição ao lado da prova'}
-                  </button>
-                  {conteudoAnotacoes}
-                </div>
-              </details>
+              {/* Anotações: só o ÍCONE no inspetor — abre a edição como coluna ao lado da prova */}
+              <button type="button" onClick={() => setAnotColuna(true)}
+                title="Anotações da questão — abrir edição ao lado da prova"
+                className={cn('flex items-center gap-1.5 self-start rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors', anotColuna ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}>
+                <MapPin className="h-4 w-4" />
+                {marcasResp.length > 0 && <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums">{marcasResp.length}</span>}
+              </button>
 
               {/* ③ Fundamentação */}
               <Cartao n={3} titulo="Fundamentação da pontuação" extra="privado">
