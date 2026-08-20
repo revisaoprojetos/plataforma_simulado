@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { ArrowLeft, Check, User } from 'lucide-react'
+import { useSidebar } from '@/components/ui/sidebar'
 import { CorrecaoMesa } from '@/components/admin/correcao-mesa'
 import { type Marca } from '@/components/admin/correcao-folha'
 
@@ -35,6 +36,14 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   voltarUrl: string
 }) {
   const router = useRouter()
+  // Ao entrar na correção, recolhe a barra lateral (mais espaço p/ a mesa) e restaura ao sair.
+  const { setOpen, open } = useSidebar()
+  useEffect(() => {
+    const anterior = open
+    setOpen(false)
+    return () => setOpen(anterior)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [ativo, setAtivo] = useState(0)
   const [override, setOverride] = useState<Record<string, string>>({})
   const statusDe = (q: QuestaoCorrecao) => override[q.respostaId] ?? q.status
@@ -51,7 +60,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background text-foreground">
+    <div className="-m-6 flex h-[calc(100%+3rem)] flex-col overflow-hidden bg-background text-foreground">
       {/* TOP BAR */}
       <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-card px-3 sm:px-4">
         <Link href={voltarUrl} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition-colors hover:bg-muted" title="Voltar">
