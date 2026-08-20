@@ -28,13 +28,17 @@ import { Card, CardContent } from '@/components/ui/card'
 import { SecaoHeader } from '@/components/admin/secao-header'
 import { criarApiKey, revogarApiKey } from './actions'
 
-const AVAILABLE_SCOPES = [
-  'questoes:create',
-  'questoes:view',
-  'import:run',
-  'simulados:view',
-  'relatorios:view',
+// Escopos = permissões que a chave concede a QUEM a usa na API pública (integração externa).
+// Cada um libera só um tipo de ação; escolha o mínimo necessário.
+const SCOPES: { id: string; label: string; descricao: string }[] = [
+  { id: 'questoes:view', label: 'Ler questões', descricao: 'Consultar e listar as questões do banco pela API.' },
+  { id: 'questoes:create', label: 'Criar questões', descricao: 'Cadastrar novas questões via API (ex.: enviadas de outro sistema).' },
+  { id: 'import:run', label: 'Executar importação', descricao: 'Disparar a ingestão em lote de questões/dados (webhook de importação).' },
+  { id: 'simulados:view', label: 'Ler simulados', descricao: 'Consultar os simulados e sua configuração pela API.' },
+  { id: 'relatorios:view', label: 'Ler relatórios', descricao: 'Acessar estatísticas e resultados (relatórios) pela API.' },
 ]
+const SCOPE_META: Record<string, { label: string; descricao: string }> =
+  Object.fromEntries(SCOPES.map(s => [s.id, { label: s.label, descricao: s.descricao }]))
 
 interface ApiKey {
   id: string
@@ -139,7 +143,7 @@ export function ApiKeysManager({ initialKeys }: Props) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">API Keys</h1>
-          <p className="text-muted-foreground">{keys.length} chave(s) registrada(s)</p>
+          <p className="text-muted-foreground">Chaves para sistemas externos acessarem a API da plataforma (via <code className="font-mono text-xs">Authorization: Bearer</code>). {keys.length} registrada(s).</p>
         </div>
 
         <Dialog open={open} onOpenChange={handleDialogClose}>
@@ -190,22 +194,40 @@ export function ApiKeysManager({ initialKeys }: Props) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Escopos</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {AVAILABLE_SCOPES.map(scope => (
-                      <button
-                        key={scope}
-                        type="button"
-                        onClick={() => toggleScope(scope)}
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                          escopos.includes(scope)
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-background border-border hover:border-primary/50'
-                        }`}
-                      >
-                        {scope}
-                      </button>
-                    ))}
+                  <Label>Escopos (o que esta chave poderá fazer)</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Cada escopo é uma permissão concedida a quem usar a chave na API. Marque só o necessário.
+                  </p>
+                  <div className="space-y-1.5">
+                    {SCOPES.map(s => {
+                      const on = escopos.includes(s.id)
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => toggleScope(s.id)}
+                          aria-pressed={on}
+                          className={`flex w-full items-start gap-2.5 rounded-lg border p-2.5 text-left transition-colors ${
+                            on ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
+                          }`}
+                        >
+                          <span
+                            className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                              on ? 'border-primary bg-primary text-primary-foreground' : 'border-input'
+                            }`}
+                          >
+                            {on && <Check className="h-3 w-3" />}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-sm font-medium">{s.label}</span>
+                              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] text-muted-foreground">{s.id}</code>
+                            </span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">{s.descricao}</span>
+                          </span>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
 
@@ -267,11 +289,14 @@ export function ApiKeysManager({ initialKeys }: Props) {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {key.escopos.map(s => (
-                          <Badge key={s} variant="secondary" className="text-xs">
-                            {s}
-                          </Badge>
-                        ))}
+                        {key.escopos.map(s => {
+                          const meta = SCOPE_META[s]
+                          return (
+                            <Badge key={s} variant="secondary" className="text-xs" title={meta ? `${s} — ${meta.descricao}` : s}>
+                              {meta?.label ?? s}
+                            </Badge>
+                          )
+                        })}
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
