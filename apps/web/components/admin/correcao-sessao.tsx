@@ -267,6 +267,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   const [pending, setPending] = useState(false)
   const [showDestaqueIA, setShowDestaqueIA] = useState(true)
   const [iaPending, setIaPending] = useState<string | null>(null)
+  const [analisePending, setAnalisePending] = useState<string | null>(null)
   const [ocrPending, setOcrPending] = useState<number | null>(null)
   const [espelhoModo, setEspelhoModo] = useState<'pdf' | 'texto'>('pdf')
   // Larguras ajustáveis das colunas + espelho como coluna (persistidos no navegador).
@@ -403,6 +404,33 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
       }
       toast.success(aplicados ? `IA: ${aplicados} quesito(s) e ${caixas} caixa(s) na prova. Revise e aprove — a nota final é sua.` : 'IA não retornou quesitos aplicáveis.')
     } catch { toast.error('Falha ao chamar a IA') } finally { setIaPending(null) }
+  }
+
+  // Análise por TEXTO: usa a transcrição já feita + o espelho → alcançado/faltou/conceito/nota por quesito.
+  async function analisarIA() {
+    if (!questaoAtiva || !ativo) return
+    const resp = questaoAtiva.respostaId
+    // Prioriza o TRECHO (curado por quesito, preenchido pelo "Ler área"); cai na aba TRANSCRIÇÃO.
+    let texto = linhasRef.current.filter((l) => l.respostaId === resp && l.comp.excerpt.trim()).map((l) => l.comp.excerpt.trim()).join('\n\n')
+    if (!texto) texto = (transcricaoPorResp[resp] ?? '').trim()
+    if (!texto) { toast.error('Transcreva a resposta antes de analisar (OCR ou IA).'); return }
+    setAnalisePending(resp)
+    try {
+      const r = await fetch('/api/admin/correcao/analisar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ respostaId: resp, texto }) })
+      const j = await r.json().catch(() => ({}))
+      if (!j.ok) { toast.error(j.error ?? 'Falha na análise'); return }
+      let aplicados = 0
+      for (const q of (j.analise?.quesitos ?? []) as any[]) {
+        const linha = linhasRef.current.find((l) => l.respostaId === resp && l.comp.id === q.competencia_id)
+        if (!linha) continue
+        const nota = Math.min(linha.comp.pontos, Math.max(0, Number(q.nota) || 0))
+        const rebaixa = linha.comp.audit_state === 'approved'
+        patchQ(linha.key, { nota, conceito: q.conceito || '', recognized: q.recognized ?? [], missing: q.missing ?? [], comentario: q.rationale || '', ...(rebaixa ? { audit_state: 'pending' } : {}) })
+        salvarCampo(linha.key, { nota, conceito: q.conceito || null, recognized: q.recognized ?? [], missing: q.missing ?? [], comentario: q.rationale || null, ...(rebaixa ? { audit_state: 'pending' } : {}) })
+        aplicados++
+      }
+      toast.success(aplicados ? `IA analisou ${aplicados} quesito(s): alcançado/faltou preenchidos. Revise e aprove — a nota é sua.` : 'IA não retornou análise aplicável.')
+    } catch { toast.error('Falha ao chamar a IA') } finally { setAnalisePending(null) }
   }
 
   // Transcrição por OCR (Tesseract, motor próprio — sem IA). Bom p/ texto impresso; letra de mão sai imperfeita.
@@ -828,6 +856,13 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
 
               {/* ② Espelho */}
               <Cartao n={2} titulo="Espelho" extra={ativo.comp.conceito || ''}>
+                {iaAtiva && (
+                  <button type="button" onClick={analisarIA} disabled={!!analisePending}
+                    className="mb-2 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-violet-300/60 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 py-1.5 text-xs font-semibold text-violet-700 transition-colors hover:from-violet-500/20 hover:to-fuchsia-500/20 disabled:opacity-60 dark:border-violet-500/40 dark:text-violet-300"
+                    title="A IA compara o TEXTO transcrito com o espelho e preenche Alcançado/Faltou + conceito/nota">
+                    {analisePending ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Analisando com base no espelho…</> : <><Sparkles className="h-3.5 w-3.5" /> Analisar do texto × espelho (IA)</>}
+                  </button>
+                )}
                 <textarea value={ativo.comp.descricao} onChange={(e) => patchQ(ativo.key, { descricao: e.target.value })} onBlur={(e) => salvarEspelho(ativo.comp.id, e.target.value)} rows={3} placeholder="O que o espelho espera neste quesito…" className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {ativo.comp.conceitos.map((cc) => (

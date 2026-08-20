@@ -267,6 +267,73 @@ export async function transcreverImagemIA(cfg: ConfigIA, imagemBase64: string, m
   return ((data as any)?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? '').join('').trim()
 }
 
+// ── Análise por TEXTO (transcrição × espelho) — alcançado/faltou/conceito/nota ──
+export interface QuesitoAnalise { competencia_id: string; nota: number; conceito?: string; recognized: string[]; missing: string[]; rationale?: string }
+export interface AnaliseIA { quesitos: QuesitoAnalise[] }
+
+const SISTEMA_ANALISE = [
+  'Você é um corretor de provas discursivas de concurso jurídico brasileiro. Recebe o TEXTO TRANSCRITO da resposta do aluno e o ESPELHO/gabarito, e avalia quesito a quesito.',
+  'Para CADA quesito: escolha um conceito da lista fornecida (a nota DEVE ser exatamente a pontuação desse conceito); liste, de forma OBJETIVA e curta (itens curtos), os pontos ALCANÇADOS (o que o aluno de fato atendeu do espelho) e os que FALTARAM ou estão equivocados; escreva uma fundamentação técnica curta ligando o texto do aluno ao espelho.',
+  'Avalie SOMENTE contra o espelho — não invente critérios além dele. Seja rigoroso, imparcial e conservador. Não reescreva a resposta do aluno. Sua análise é uma PROPOSTA: o corretor humano decide a nota final.',
+].join('\n')
+const FORMA_ANALISE = 'Responda com APENAS um JSON válido (sem cercas, sem texto fora): {"quesitos":[{"competencia_id":"<id exato>","nota":<número>,"conceito":"<nome do conceito|>","recognized":["ponto alcançado", "..."],"missing":["ponto que faltou/equivocado", "..."],"rationale":"fundamentação curta"}]}'
+
+/** Chamada de TEXTO (sem imagem) que devolve JSON — multi-provedor. */
+async function chamarTextoIA(cfg: ConfigIA, system: string, userText: string): Promise<string> {
+  if (cfg.provider === 'anthropic') {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', headers: { 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: cfg.modelo, max_tokens: 4096, system, messages: [{ role: 'user', content: userText }] }),
+    })
+    const data = await resp.json().catch(() => ({}))
+    if (!resp.ok) throw new Error((data as any)?.error?.message || `Anthropic retornou ${resp.status}.`)
+    return ((data as any)?.content ?? []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join('')
+  }
+  if (cfg.provider === 'openai') {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST', headers: { authorization: `Bearer ${cfg.apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ model: cfg.modelo, max_tokens: 4096, temperature: 0.2, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: userText }] }),
+    })
+    const data = await resp.json().catch(() => ({}))
+    if (!resp.ok) throw new Error((data as any)?.error?.message || `OpenAI retornou ${resp.status}.`)
+    return String((data as any)?.choices?.[0]?.message?.content ?? '')
+  }
+  const data = await gerarGemini(cfg.apiKey, cfg.modelo, { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: userText }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 4096 } })
+  return ((data as any)?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? '').join('')
+}
+
+/** Analisa o TEXTO transcrito contra o espelho e devolve alcançado/faltou/conceito/nota por quesito. */
+export async function analisarComTextoIA(cfg: ConfigIA, input: { textoAluno: string; enunciado: string; espelhoTexto?: string | null; competencias: CompParaIA[] }): Promise<AnaliseIA> {
+  if (!input.textoAluno?.trim()) throw new Error('Sem texto transcrito para analisar — transcreva a resposta antes.')
+  const compsTxt = input.competencias.map((c) => {
+    const conc = c.conceitos?.length ? ` | conceitos: ${c.conceitos.map((x) => `${x.nome}=${x.pontos}`).join(', ')}` : ''
+    const desc = c.descricao?.trim() ? ` | espelho: ${c.descricao.trim()}` : ''
+    return `- competencia_id=${c.id} · "${c.nome}" · máx ${c.pontos} ponto(s)${conc}${desc}`
+  }).join('\n')
+  const user = [
+    `ENUNCIADO DA QUESTÃO:\n${(input.enunciado || '—').replace(/<[^>]+>/g, ' ')}`,
+    input.espelhoTexto?.trim() ? `ESPELHO / GABARITO (texto):\n${input.espelhoTexto.trim().slice(0, 14000)}` : '',
+    `QUESITOS A AVALIAR (use exatamente estes competencia_id):\n${compsTxt}`,
+    `RESPOSTA TRANSCRITA DO ALUNO:\n${input.textoAluno.trim().slice(0, 14000)}`,
+    FORMA_ANALISE,
+  ].filter(Boolean).join('\n\n')
+
+  const out = await chamarTextoIA(cfg, SISTEMA_ANALISE, user)
+  const raw = parseJson(out)
+  if (!raw) throw new Error('A IA não retornou uma análise válida.')
+  const arr = (v: any): string[] => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()).map((x) => String(x).trim()) : [])
+  const maxDe = new Map(input.competencias.map((c) => [c.id, c.pontos]))
+  return {
+    quesitos: (raw?.quesitos ?? []).map((q: any) => {
+      const id = String(q?.competencia_id ?? '')
+      const max = maxDe.get(id)
+      let nota = Number(q?.nota ?? 0) || 0
+      if (typeof max === 'number') nota = Math.min(max, Math.max(0, nota))
+      return { competencia_id: id, nota, conceito: q?.conceito ? String(q.conceito) : undefined, recognized: arr(q?.recognized), missing: arr(q?.missing), rationale: q?.rationale ? String(q.rationale) : undefined }
+    }).filter((q: QuesitoAnalise) => q.competencia_id),
+  }
+}
+
 /** Monta o prompt + chama o PROVEDOR da config (fallback: env ANTHROPIC_API_KEY). */
 export async function proporCorrecaoIA(input: EntradaIA): Promise<PropostaIA> {
   let cfg = input.config ?? null
