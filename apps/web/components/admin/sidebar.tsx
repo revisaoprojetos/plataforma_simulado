@@ -42,6 +42,7 @@ import {
   LogOut,
   Building2,
   Tag,
+  ScanText,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -113,6 +114,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Aplicação de Simulado', href: '/admin/simulados', icon: ClipboardList, perm: 'simulados:view' },
       { label: 'Correção (discursivas)', href: '/admin/correcao', icon: PenLine, perm: 'questoes:view' },
+      { label: 'Transcrição (IA)', href: '/admin/transcricao', icon: ScanText, perm: 'configuracoes:view' },
       { label: 'Questões', href: '/admin/questoes', icon: BookOpen, perm: 'questoes:view' },
       { label: 'Etiquetas', href: '/admin/etiquetas', icon: Tag, perm: 'questoes:view' },
       { label: 'Banco de Simulado', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
@@ -230,7 +232,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
 
   // Filtra itens/grupos por permissão do usuário (super-admin gate + flag discursiva).
   const gruposVisiveis = navGroups
-    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !(i.superOnly && !isSuperAdmin) && !(OCULTAR_DISCURSIVA && i.href === '/admin/correcao')) }))
+    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !(i.superOnly && !isSuperAdmin) && !(OCULTAR_DISCURSIVA && (i.href === '/admin/correcao' || i.href === '/admin/transcricao'))) }))
     .filter((g) => g.items.length > 0)
 
   const grupoAtivo = (group: NavGroup) => group.items.some((i) => itemAtivo(i, pathname, search))

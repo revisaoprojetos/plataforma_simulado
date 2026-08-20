@@ -4,6 +4,7 @@ import { getCurrentAccess } from '@/lib/auth/permissions'
 import { carregarQuestoesCorrecao } from '@/lib/correcao/carregar-questoes'
 import { carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
 import { extrairTextoPdf } from '@/lib/ia/pdf-texto'
+import { iaDisponivel } from '@/lib/ia/config'
 import { CorrecaoSessao } from '@/components/admin/correcao-sessao'
 
 export const dynamic = 'force-dynamic'
@@ -43,6 +44,9 @@ export default async function CorrecaoSessaoPage({ params }: { params: Promise<{
   let espelhoTexto = ''
   if (espelhoPdfUrl) { try { const resp = await fetch(espelhoPdfUrl); if (resp.ok) espelhoTexto = await extrairTextoPdf(Buffer.from(await resp.arrayBuffer())) } catch { /* sem texto */ } }
 
+  // IA disponível? = chave do TENANT (Transcrição IA) OU env global.
+  const iaAtiva = await iaDisponivel(svc, tenantId)
+
   return (
     <CorrecaoSessao
       aluno={estudante?.nome ?? 'Aluno'}
@@ -53,7 +57,7 @@ export default async function CorrecaoSessaoPage({ params }: { params: Promise<{
       espelhoPdfUrl={espelhoPdfUrl}
       espelhoTexto={espelhoTexto}
       voltarUrl={voltarUrl}
-      iaAtiva={!!process.env.ANTHROPIC_API_KEY}
+      iaAtiva={iaAtiva}
     />
   )
 }
