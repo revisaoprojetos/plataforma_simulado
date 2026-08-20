@@ -119,6 +119,7 @@ export interface AnotacaoInput {
   icone?: string | null
   numero?: number | null
   conteudo?: string | null
+  comentario?: string | null
 }
 export interface AnotacaoRow extends AnotacaoInput { id: string; origem: string }
 
@@ -134,12 +135,10 @@ export async function listarAnotacoes(respostaId: string): Promise<AnotacaoRow[]
   if (!ok || !access.tenantId) return []
   const svc = createAdminClient()
   try {
-    const { data } = await svc
-      .from('simulado_anotacoes_discursivas')
-      .select('id, arquivo_id, competencia_id, tipo, x, y, largura, altura, cor, icone, numero, conteudo, origem')
-      .eq('resposta_id', respostaId).eq('tenant_id', access.tenantId)
-      .order('criado_em', { ascending: true })
-    return (data ?? []) as unknown as AnotacaoRow[]
+    const sel = 'id, arquivo_id, competencia_id, tipo, x, y, largura, altura, cor, icone, numero, conteudo, comentario, origem'
+    let res: { data: any[] | null; error: any } = await svc.from('simulado_anotacoes_discursivas').select(sel).eq('resposta_id', respostaId).eq('tenant_id', access.tenantId).order('criado_em', { ascending: true })
+    if (res.error && /comentario/i.test(String(res.error.message))) res = await svc.from('simulado_anotacoes_discursivas').select('id, arquivo_id, competencia_id, tipo, x, y, largura, altura, cor, icone, numero, conteudo, origem').eq('resposta_id', respostaId).eq('tenant_id', access.tenantId).order('criado_em', { ascending: true })
+    return (res.data ?? []) as unknown as AnotacaoRow[]
   } catch { return [] }
 }
 
@@ -150,15 +149,17 @@ export async function salvarAnotacao(respostaId: string, a: AnotacaoInput): Prom
   const svc = createAdminClient()
   const { data: r } = await svc.from('simulado_respostas_discursivas').select('id, questao_id').eq('id', respostaId).eq('tenant_id', access.tenantId).maybeSingle()
   if (!r) return { ok: false, error: 'Resposta não encontrada.' }
-  const { data, error } = await svc.from('simulado_anotacoes_discursivas').insert({
+  const base: Record<string, unknown> = {
     tenant_id: access.tenantId, resposta_id: respostaId, questao_id: (r as any).questao_id,
     arquivo_id: a.arquivo_id ?? null, competencia_id: a.competencia_id ?? null,
     tipo: a.tipo, x: a.x, y: a.y, largura: a.largura ?? null, altura: a.altura ?? null,
     cor: a.cor ?? null, icone: a.icone ?? null, numero: a.numero ?? null, conteudo: a.conteudo ?? null,
     origem: 'professor', criado_por: access.userId,
-  }).select('id').single()
-  if (error) return { ok: false, error: /anotacoes_discursivas|does not exist|relation/i.test(error.message) ? 'Rode a migração 20260819000001_anotacoes_discursivas.sql.' : error.message }
-  return { ok: true, id: (data as { id: string }).id }
+  }
+  let res = await svc.from('simulado_anotacoes_discursivas').insert({ ...base, comentario: a.comentario ?? null }).select('id').single()
+  if (res.error && /comentario/i.test(res.error.message)) res = await svc.from('simulado_anotacoes_discursivas').insert(base).select('id').single()
+  if (res.error) return { ok: false, error: /anotacoes_discursivas|does not exist|relation/i.test(res.error.message) ? 'Rode a migração 20260819000001_anotacoes_discursivas.sql.' : res.error.message }
+  return { ok: true, id: (res.data as { id: string }).id }
 }
 
 export async function atualizarAnotacao(id: string, patch: Partial<AnotacaoInput>): Promise<{ ok: boolean; error?: string }> {
@@ -167,11 +168,12 @@ export async function atualizarAnotacao(id: string, patch: Partial<AnotacaoInput
   if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
   const upd: Record<string, unknown> = { atualizado_em: new Date().toISOString() }
-  for (const k of ['competencia_id', 'tipo', 'x', 'y', 'largura', 'altura', 'cor', 'icone', 'numero', 'conteudo'] as const) {
+  for (const k of ['competencia_id', 'tipo', 'x', 'y', 'largura', 'altura', 'cor', 'icone', 'numero', 'conteudo', 'comentario'] as const) {
     if (k in patch) upd[k] = (patch as Record<string, unknown>)[k]
   }
-  const { error } = await svc.from('simulado_anotacoes_discursivas').update(upd).eq('id', id).eq('tenant_id', access.tenantId)
-  if (error) return { ok: false, error: error.message }
+  let res = await svc.from('simulado_anotacoes_discursivas').update(upd).eq('id', id).eq('tenant_id', access.tenantId)
+  if (res.error && /comentario/i.test(res.error.message)) { delete upd.comentario; res = await svc.from('simulado_anotacoes_discursivas').update(upd).eq('id', id).eq('tenant_id', access.tenantId) }
+  if (res.error) return { ok: false, error: res.error.message }
   return { ok: true }
 }
 

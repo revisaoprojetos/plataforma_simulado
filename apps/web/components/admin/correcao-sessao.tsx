@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
-  ArrowLeft, Check, Flag, Lock, AlertTriangle, BookOpenCheck, Image as ImageIcon, FileText, Sparkles, Loader2, ExternalLink, ScrollText, ScanText,
+  ArrowLeft, Check, Flag, Lock, AlertTriangle, BookOpenCheck, Image as ImageIcon, FileText, Sparkles, Loader2, ExternalLink, ScrollText, ScanText, MapPin,
 } from 'lucide-react'
 import { useSidebar } from '@/components/ui/sidebar'
 import { CorrecaoFolha, ICONES, type Ferramenta, type Marca } from '@/components/admin/correcao-folha'
@@ -34,6 +34,17 @@ type Filtro = 'todos' | 'revisar' | 'aprovados' | 'alterados' | 'integrais' | 'f
 
 const PALETA = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#65a30d']
 const COR_GERAL = '#64748b'
+const COR_NOME: Record<string, string> = {
+  '#e11d48': 'Vermelho', '#2563eb': 'Azul', '#16a34a': 'Verde', '#d97706': 'Âmbar',
+  '#7c3aed': 'Roxo', '#0891b2': 'Ciano', '#db2777': 'Rosa', '#65a30d': 'Lima', '#64748b': 'Cinza',
+}
+const corNome = (c?: string | null) => COR_NOME[(c || '').toLowerCase()] ?? 'Marca'
+const TIPO_NOME: Record<string, string> = { destaque: 'Destaque', ponto: 'Ponto', icone: 'Ícone', bolinha: 'Bolinha', texto: 'Texto' }
+/** Atribui o rótulo de ordem por cor (Amarelo 1, 2…) na ordem de criação (array já ordenado). */
+function comOrdem(marcas: Marca[]): Marca[] {
+  const cont: Record<string, number> = {}
+  return marcas.map((m) => { const k = (m.cor || '').toLowerCase(); cont[k] = (cont[k] ?? 0) + 1; return { ...m, ordem: cont[k] } })
+}
 const gerarTemp = () => 'tmp-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 const dotEstado = (s: string) => (s === 'approved' ? 'bg-emerald-500' : s === 'review' ? 'bg-amber-500' : 'bg-muted-foreground/30')
 const nfmt = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -303,7 +314,9 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   const metaQ = useMemo(() => questoes.map((q, qi) => ({ qi, numero: q.numero, respostaId: q.respostaId, paginas: q.paginas, espelho: q.espelho })), [questoes])
   const ativo = linhas.find((l) => l.key === ativoKey) ?? linhas[0] ?? null
   const questaoAtiva = ativo ? metaQ[ativo.qi] : null
-  const anotAtivas = questaoAtiva ? (anotPorResp[questaoAtiva.respostaId] ?? []) : []
+  // Marcas da resposta com rótulo de ordem por cor (Amarelo 1, 2…) — usadas na folha e no índice.
+  const marcasResp = questaoAtiva ? comOrdem(anotPorResp[questaoAtiva.respostaId] ?? []) : []
+  const anotAtivas = marcasResp
   const corDoQuesito = (compId: string | null) => { if (!compId) return COR_GERAL; const idx = linhas.filter((l) => l.qi === (ativo?.qi ?? 0)).findIndex((l) => l.comp.id === compId); return idx >= 0 ? PALETA[idx % PALETA.length] : COR_GERAL }
   const corAtiva = ativo ? corDoQuesito(ativo.comp.id) : COR_GERAL
 
@@ -590,6 +603,19 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
     setAnotPorResp((s) => ({ ...s, [resp]: (s[resp] ?? []).map((x) => (x.id === id ? { ...x, ...patch } : x)) }))
     if (!id.startsWith('tmp-')) atualizarAnotacao(id, patch)
   }
+  // Só estado (sem persistir) — p/ digitar o comentário; persiste no blur via atualizarMarca.
+  function patchMarcaLocal(id: string, patch: Partial<Marca>) {
+    if (!questaoAtiva) return; const resp = questaoAtiva.respostaId
+    setAnotPorResp((s) => ({ ...s, [resp]: (s[resp] ?? []).map((x) => (x.id === id ? { ...x, ...patch } : x)) }))
+  }
+  // Vai até a marca na folha e a seleciona (abre o comentário no índice).
+  function irParaMarca(m: Marca) {
+    if (m.competencia_id) { const alvo = linhas.find((l) => l.qi === ativo?.qi && l.comp.id === m.competencia_id); if (alvo) setAtivoKey(alvo.key) }
+    setAba('prova')
+    const pg = questaoAtiva?.paginas.findIndex((p) => p.arquivoId === (m.arquivo_id ?? ''))
+    if (pg != null && pg >= 0) setPaginaIndex(pg)
+    setSelecionadaId(m.id); foca(m.id)
+  }
   function selecionarMarca(id: string | null) {
     setSelecionadaId(id)
     if (id && questaoAtiva) { const m = (anotPorResp[questaoAtiva.respostaId] ?? []).find((a) => a.id === id); if (m?.competencia_id) { const alvo = linhas.find((l) => l.qi === ativo?.qi && l.comp.id === m.competencia_id); if (alvo) setAtivoKey(alvo.key) } }
@@ -623,6 +649,12 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   const regQuesito = ativo ? regiaoDoQuesito() : null // há caixa no quesito ativo? então OCR/IA lêem DENTRO dela
   // Espelho comentado da QUESTÃO ativa (cada questão tem o seu, extraído do PDF do gabarito).
   const espComentado = questaoAtiva ? trechoEspelhoComentado(espelhoTexto, questaoAtiva.numero) : ''
+  // Índice de anotações da questão ativa, agrupado por quesito (+ "Geral" p/ marcas sem quesito).
+  const quesitosDaQ = ativo ? linhas.filter((l) => l.qi === ativo.qi) : []
+  const gruposAnot = [
+    ...quesitosDaQ.map((l) => ({ titulo: `${l.codigo} · ${l.comp.nome}`, marcas: marcasResp.filter((m) => (m.competencia_id ?? null) === l.comp.id) })),
+    { titulo: 'Geral (sem quesito)', marcas: marcasResp.filter((m) => !m.competencia_id) },
+  ].filter((g) => g.marcas.length)
   const setArr = (key: string, campo: 'recognized' | 'missing', txt: string) => patchQ(key, { [campo]: txt.split('\n') } as Partial<CompCorrecao>)
 
   return (
@@ -911,6 +943,45 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
                   </div>
                 </div>
               </Cartao>
+
+              {/* Índice de ANOTAÇÕES (abre/fecha) — por quesito, com comentário editável */}
+              <details open className="rounded-lg border bg-muted/10">
+                <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2.5 py-2 text-xs font-semibold">
+                  <MapPin className="h-3.5 w-3.5 text-primary" /> Anotações da questão
+                  <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{marcasResp.length}</span>
+                </summary>
+                <div className="space-y-2 border-t p-2">
+                  {marcasResp.length === 0 ? (
+                    <p className="rounded-md border border-dashed bg-muted/30 p-2 text-[11px] text-muted-foreground">Nenhuma anotação. Use as ferramentas (Destaque, Ponto, Ícone, Bolinha, Texto) sobre a prova — cada marca vira “{corNome(corAtiva)} 1, 2…”.</p>
+                  ) : gruposAnot.map((g, gi) => (
+                    <div key={gi} className="space-y-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{g.titulo}</p>
+                      {g.marcas.map((m) => {
+                        const sel = m.id === selecionadaId
+                        return (
+                          <div key={m.id} className={cn('rounded-md border', sel ? 'border-primary bg-primary/5' : 'bg-card')}>
+                            <button type="button" onClick={() => irParaMarca(m)} className="flex w-full items-center gap-2 px-2 py-1.5 text-left">
+                              <span className="h-3 w-3 shrink-0 rounded-full border border-white shadow" style={{ background: m.cor || COR_GERAL }} />
+                              <span className="shrink-0 text-xs font-medium">{corNome(m.cor)} {m.ordem}</span>
+                              <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground">{TIPO_NOME[m.tipo] ?? m.tipo}</span>
+                              {!sel && m.comentario?.trim() && <span className="ml-auto min-w-0 truncate text-[11px] text-muted-foreground">{m.comentario}</span>}
+                            </button>
+                            {sel && (
+                              <div className="border-t px-2 py-1.5">
+                                <textarea value={m.comentario ?? ''} onChange={(e) => patchMarcaLocal(m.id, { comentario: e.target.value })} onBlur={(e) => atualizarMarca(m.id, { comentario: e.target.value })} rows={2} placeholder="Comentário desta anotação (o aluno verá)…" className="w-full resize-y rounded border bg-[var(--input-bg,transparent)] px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring" />
+                                <div className="mt-1 flex items-center justify-between">
+                                  <span className="text-[10px] text-muted-foreground">{ativo?.codigo ? '' : ''}p. {(questaoAtiva?.paginas.findIndex((p) => p.arquivoId === (m.arquivo_id ?? '')) ?? -1) + 1 || 1}</span>
+                                  <button type="button" onClick={() => removerMarca(m.id)} className="rounded border border-destructive/30 px-2 py-0.5 text-[11px] font-medium text-destructive hover:bg-destructive/5">Excluir</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </details>
 
               {/* ③ Fundamentação */}
               <Cartao n={3} titulo="Fundamentação da pontuação" extra="privado">

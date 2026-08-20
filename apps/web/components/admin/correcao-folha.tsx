@@ -17,6 +17,8 @@ export interface Marca {
   icone?: string | null
   numero?: number | null
   conteudo?: string | null
+  comentario?: string | null
+  ordem?: number // rótulo de ordem por cor (Amarelo 1, 2…), calculado no pai (transitório)
 }
 
 export const ICONES: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
@@ -36,11 +38,18 @@ function MarcaView({ m, selecionada, clicavel, movivel, onIniciarMover, onInicia
   const onDown = (e: React.PointerEvent) => onIniciarMover(e, m)
   const cursor = movivel ? 'cursor-move' : clicavel ? 'cursor-pointer' : undefined
 
+  const badge = m.ordem != null ? (
+    <span className="pointer-events-none absolute left-0 top-0 z-10 flex h-4 min-w-[1rem] -translate-x-1/3 -translate-y-1/3 items-center justify-center rounded-full border border-white px-1 text-[9px] font-bold leading-none text-white shadow" style={{ background: cor }}>{m.ordem}</span>
+  ) : null
+  const temComent = !!m.comentario?.trim()
+
   if (m.tipo === 'destaque') {
     return (
       <div id={`marca-${m.id}`} onClick={onClick} onPointerDown={onDown}
         className={cn('absolute rounded-sm', cursor, selecionada && 'ring-2 ring-foreground ring-offset-1')}
         style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%`, width: `${(m.largura ?? 0) * 100}%`, height: `${(m.altura ?? 0) * 100}%`, background: `${cor}33`, border: `2px solid ${cor}`, mixBlendMode: 'multiply' }}>
+        {badge}
+        {temComent && <span className="pointer-events-none absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-white ring-1" style={{ color: cor }} />}
         {selecionada && movivel && (
           <div onPointerDown={(e) => onIniciarResize(e, m)} className="absolute -bottom-1.5 -right-1.5 h-3.5 w-3.5 cursor-se-resize rounded-sm border-2 border-white bg-foreground" style={{ mixBlendMode: 'normal' }} />
         )}
@@ -61,9 +70,15 @@ function MarcaView({ m, selecionada, clicavel, movivel, onIniciarMover, onInicia
     <div id={`marca-${m.id}`} onClick={onClick} onPointerDown={onDown}
       className={cn('absolute -translate-x-1/2 -translate-y-1/2', cursor)}
       style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%` }}>
-      {m.tipo === 'ponto' && <span className={cn('block h-3.5 w-3.5 rounded-full border-2 border-white shadow', selecionada && 'ring-2 ring-foreground')} style={{ background: cor }} />}
-      {m.tipo === 'icone' && Icon && <span className={cn('flex h-6 w-6 items-center justify-center rounded-full bg-white shadow', selecionada && 'ring-2 ring-foreground')}><Icon className="h-5 w-5" style={{ color: cor }} /></span>}
-      {m.tipo === 'bolinha' && <span className={cn('flex h-6 w-6 items-center justify-center rounded-full border-2 border-white text-[11px] font-bold text-white shadow', selecionada && 'ring-2 ring-foreground')} style={{ background: cor }}>{m.numero ?? '•'}</span>}
+      <span className="relative inline-flex">
+        {m.tipo === 'ponto' && <span className={cn('block h-3.5 w-3.5 rounded-full border-2 border-white shadow', selecionada && 'ring-2 ring-foreground')} style={{ background: cor }} />}
+        {m.tipo === 'icone' && Icon && <span className={cn('flex h-6 w-6 items-center justify-center rounded-full bg-white shadow', selecionada && 'ring-2 ring-foreground')}><Icon className="h-5 w-5" style={{ color: cor }} /></span>}
+        {m.tipo === 'bolinha' && <span className={cn('flex h-6 w-6 items-center justify-center rounded-full border-2 border-white text-[11px] font-bold text-white shadow', selecionada && 'ring-2 ring-foreground')} style={{ background: cor }}>{m.ordem ?? m.numero ?? '•'}</span>}
+        {m.ordem != null && m.tipo !== 'bolinha' && (
+          <span className="pointer-events-none absolute -right-2 -top-2 z-10 flex h-4 min-w-[1rem] items-center justify-center rounded-full border border-white px-1 text-[9px] font-bold leading-none text-white shadow" style={{ background: cor }}>{m.ordem}</span>
+        )}
+        {temComent && <span className="pointer-events-none absolute -bottom-1 -right-1 h-2 w-2 rounded-full border border-white bg-foreground shadow" />}
+      </span>
     </div>
   )
 }

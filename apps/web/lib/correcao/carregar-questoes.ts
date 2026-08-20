@@ -33,7 +33,11 @@ export async function carregarQuestoesCorrecao(svc: SupabaseClient, tenantId: st
       return fetchAllByIn<any>(respIds, (c) => svc.from('simulado_correcao_competencias').select('resposta_id, competencia_id, nota, comentario').in('resposta_id', c)).catch(() => [] as any[])
     })(),
     (async () => { try { return await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_resposta_arquivos').select('resposta_id, arquivo_id, ordem').in('resposta_id', c)) } catch { return [] as any[] } })(),
-    (async () => { try { return await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_anotacoes_discursivas').select('id, resposta_id, arquivo_id, competencia_id, tipo, x, y, largura, altura, cor, icone, numero, conteudo').in('resposta_id', c)) } catch { return [] as any[] } })(),
+    (async () => {
+      const cols = 'id, resposta_id, arquivo_id, competencia_id, tipo, x, y, largura, altura, cor, icone, numero, conteudo'
+      try { return await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_anotacoes_discursivas').select(`${cols}, comentario`).in('resposta_id', c)) }
+      catch { try { return await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_anotacoes_discursivas').select(cols).in('resposta_id', c)) } catch { return [] as any[] } }
+    })(),
     (async () => {
       const full = await fetchAllByIn<any>(respIds, (c) => svc.from('simulado_respostas_discursivas').select('id, ia_payload, transcricao').in('id', c)).catch(() => null)
       if (full) return full
@@ -64,7 +68,7 @@ export async function carregarQuestoesCorrecao(svc: SupabaseClient, tenantId: st
   const anotPorResp = new Map<string, Marca[]>()
   for (const a of anots as any[]) {
     const list = anotPorResp.get(a.resposta_id) ?? []
-    list.push({ id: a.id, arquivo_id: a.arquivo_id, competencia_id: a.competencia_id, tipo: a.tipo, x: Number(a.x), y: Number(a.y), largura: a.largura != null ? Number(a.largura) : null, altura: a.altura != null ? Number(a.altura) : null, cor: a.cor, icone: a.icone, numero: a.numero != null ? Number(a.numero) : null, conteudo: a.conteudo })
+    list.push({ id: a.id, arquivo_id: a.arquivo_id, competencia_id: a.competencia_id, tipo: a.tipo, x: Number(a.x), y: Number(a.y), largura: a.largura != null ? Number(a.largura) : null, altura: a.altura != null ? Number(a.altura) : null, cor: a.cor, icone: a.icone, numero: a.numero != null ? Number(a.numero) : null, conteudo: a.conteudo, comentario: a.comentario ?? null })
     anotPorResp.set(a.resposta_id, list)
   }
 
