@@ -67,7 +67,7 @@ const SISTEMA = [
   '',
   'PRIORIDADES: (1) FIDELIDADE da transcrição; (2) PRECISÃO ESPACIAL das caixas; (3) COERÊNCIA interna (conceito, nota e status contando a mesma história); (4) HONESTIDADE sobre a dúvida.',
   '',
-  'TRANSCRIÇÃO (escriba, não revisor): transcreva o que ESTÁ escrito, não o que deveria estar. NÃO corrija ortografia/acentuação/concordância, não complete frases, não troque termo leigo por técnico. Trecho ilegível → [ilegível]; palpite → [?palavra]; rasura legível → [rasurado: x]. Na dúvida, marque em vez de adivinhar. Nunca transcreva o espelho como se fosse do aluno.',
+  'TRANSCRIÇÃO (escriba, não revisor): transcreva o que ESTÁ escrito, não o que deveria estar. NÃO corrija ortografia/acentuação/concordância, não complete frases, não troque termo leigo por técnico. Trecho ilegível → [ilegível]; palpite → [?palavra]; rasura legível → [rasurado: x]. Na dúvida, marque em vez de adivinhar. Nunca transcreva o espelho como se fosse do aluno. Escreva em TEXTO CORRIDO (não quebre a cada linha da folha; una as linhas da mesma frase; junte palavra partida por hífen no fim da linha; separe apenas parágrafos reais) e em grafia NORMAL de maiúsculas/minúsculas — NÃO escreva tudo em CAIXA ALTA.',
   '',
   'COORDENADAS (regions): retângulos em PERCENTUAL da página (0–100), origem no canto superior esquerdo, eixo vertical crescendo para BAIXO. Com linhas numeradas: topPct = T + ((linhaInicial−1)/N)×A e heightPct = ((linhaFinal−linhaInicial+1)/N)×A (T=topo da área de texto %, A=altura da área %, N=total de linhas). Regras: topPct<100 e leftPct<100; leftPct+widthPct≤100 e topPct+heightPct≤100; largura/altura≥1. A caixa cai SOBRE o trecho, não engloba a folha inteira. Um quesito pode ter várias caixas.',
   '',
@@ -234,7 +234,13 @@ async function gerarGemini(apiKey: string, modelo: string, body: any): Promise<a
 }
 
 // ── Transcrição de UMA REGIÃO (recorte) — texto puro, sem correção ─────────────
-const PROMPT_REGIAO = 'Transcreva FIELMENTE, letra por letra, APENAS o texto manuscrito desta imagem (um trecho de uma prova). NÃO corrija ortografia, acentuação ou concordância; NÃO complete nem explique nada. Se algo for ilegível, escreva [ilegível]. Responda SOMENTE com a transcrição do que está escrito, sem comentários.'
+const PROMPT_REGIAO = [
+  'Transcreva o texto manuscrito desta imagem (um trecho de uma prova de concurso).',
+  'FORMATO: escreva em TEXTO CORRIDO. NÃO quebre a linha a cada linha da folha — junte as linhas que formam a mesma frase/parágrafo; se uma palavra estiver partida por hífen no fim da linha (ex.: "fi-" e depois "duciário"), junte-a ("fiduciário"). Separe parágrafos apenas com UMA linha em branco.',
+  'GRAFIA: use maiúsculas e minúsculas NORMAIS do português (maiúscula só em início de frase, nomes próprios e siglas como IPTU/STJ). NÃO escreva tudo em CAIXA ALTA, mesmo que a letra do aluno pareça em caixa alta.',
+  'FIDELIDADE: preserve os erros de ortografia/acentuação/concordância do aluno (não corrija) e não complete nem invente nada. Se algo for ilegível, escreva [ilegível].',
+  'Responda SOMENTE com a transcrição, sem comentários.',
+].join('\n')
 
 /** Transcreve o texto manuscrito de UMA imagem (recorte da área de destaque). Texto puro. */
 export async function transcreverImagemIA(cfg: ConfigIA, imagemBase64: string, mediaType: string): Promise<string> {
