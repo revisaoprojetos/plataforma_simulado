@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { Card, CardContent } from '@/components/ui/card'
 import { SecaoHeader } from '@/components/admin/secao-header'
 import { Inbox, PenLine, ClipboardCheck, ArrowRight } from 'lucide-react'
@@ -37,7 +38,7 @@ export default async function CorrecaoPage() {
     const pq = await fetchAllByIn<any>(qdIds, (c) => svc.from('simulado_prova_questoes').select('simulado_id').in('questao_id', c))
     const simIds = [...new Set(pq.map((p) => p.simulado_id).filter(Boolean))] as string[]
     if (simIds.length) {
-      const rows = await fetchAllByIn<any>(simIds, (c) => svc.from('simulado_simulados').select('id, titulo, status, owner_estudante_id, deletado').in('id', c))
+      const rows = await fetchAllByIn<any>(simIds, (c) => svc.from('simulado_simulados').select('id, titulo, status, regras, owner_estudante_id, deletado').in('id', c))
       sims = rows.filter((s) => !s.owner_estudante_id && !s.deletado)
     }
   }
@@ -59,8 +60,11 @@ export default async function CorrecaoPage() {
     }
   }
 
+  // Identidade visual (capa/cor do banco de origem) — mesmos cards "pôster" do resto do app.
+  const visual = await resolverVisualSimulados(svc, sims)
+
   const cards = sims
-    .map((s) => ({ id: s.id, titulo: s.titulo as string, status: s.status as string, pend: cont.get(s.id)?.pend ?? 0, corr: cont.get(s.id)?.corr ?? 0 }))
+    .map((s) => ({ id: s.id, titulo: s.titulo as string, status: s.status as string, pend: cont.get(s.id)?.pend ?? 0, corr: cont.get(s.id)?.corr ?? 0, vis: visual.get(s.id) ?? null }))
     .sort((a, b) => b.pend - a.pend || a.titulo.localeCompare(b.titulo, 'pt-BR'))
   const totalPend = cards.reduce((n, c) => n + c.pend, 0)
 
@@ -80,23 +84,35 @@ export default async function CorrecaoPage() {
               <p className="text-sm">Nenhum simulado discursivo por aqui ainda.</p>
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {cards.map((c) => (
-                <Link key={c.id} href={`/admin/correcao/simulado/${c.id}`}
-                  className="group flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><PenLine className="h-4 w-4" /></span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                  </div>
-                  <h3 className="line-clamp-2 text-sm font-semibold leading-snug">{c.titulo}</h3>
-                  <div className="mt-auto flex flex-wrap items-center gap-1.5">
-                    {c.pend > 0
-                      ? <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">{c.pend} pendente{c.pend === 1 ? '' : 's'}</span>
-                      : <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Em dia</span>}
-                    {c.corr > 0 && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{c.corr} corrigida{c.corr === 1 ? '' : 's'}</span>}
-                  </div>
-                </Link>
-              ))}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {cards.map((c) => {
+                const cor = c.vis?.cor ?? '#6d28d9'
+                const capa = c.vis?.capa ?? c.vis?.capaBanner ?? null
+                return (
+                  <Link key={c.id} href={`/admin/correcao/simulado/${c.id}`}
+                    className="group relative flex aspect-[4/5] flex-col justify-end overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+                    {capa
+                      ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
+                      : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/5" />
+
+                    <div className="absolute inset-x-0 top-0 flex items-start justify-between p-3">
+                      {c.pend > 0
+                        ? <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-bold text-black shadow">{c.pend} pendente{c.pend === 1 ? '' : 's'}</span>
+                        : <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-bold text-white shadow">Em dia</span>}
+                      <ArrowRight className="h-4 w-4 text-white/80 transition-transform group-hover:translate-x-0.5" />
+                    </div>
+
+                    <div className="relative p-3.5">
+                      <h3 className="line-clamp-2 text-sm font-bold leading-snug text-white drop-shadow">{c.titulo}</h3>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/90 backdrop-blur-sm"><PenLine className="h-3 w-3" /> Discursivo</span>
+                        {c.corr > 0 && <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm">{c.corr} corrigida{c.corr === 1 ? '' : 's'}</span>}
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
             </div>
           )}
         </CardContent>
