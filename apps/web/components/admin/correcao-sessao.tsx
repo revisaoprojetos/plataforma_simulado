@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { useSidebar } from '@/components/ui/sidebar'
 import { CorrecaoFolha, ICONES, type Ferramenta, type Marca } from '@/components/admin/correcao-folha'
-import { assumirCorrecao, salvarCorrecao, salvarQuesito, salvarEspelhoQuesito, salvarAnotacao, removerAnotacao, atualizarAnotacao } from '@/app/admin/correcao/actions'
+import { assumirCorrecao, salvarCorrecao, salvarQuesito, salvarEspelhoQuesito, salvarAnotacao, removerAnotacao, atualizarAnotacao, type QuesitoPatch } from '@/app/admin/correcao/actions'
 
 export interface CompCorrecao {
   id: string; nome: string; pontos: number
@@ -35,6 +35,20 @@ const COR_GERAL = '#64748b'
 const gerarTemp = () => 'tmp-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 const dotEstado = (s: string) => (s === 'approved' ? 'bg-emerald-500' : s === 'review' ? 'bg-amber-500' : 'bg-muted-foreground/30')
 const nfmt = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const clampW = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
+
+/** Divisória arrastável entre colunas (chama onDelta com o dx do arraste). */
+function ColResizer({ onDelta }: { onDelta: (dx: number) => void }) {
+  const st = useRef({ drag: false, x: 0, fn: onDelta }); st.current.fn = onDelta
+  useEffect(() => {
+    const move = (e: PointerEvent) => { const s = st.current; if (!s.drag) return; const dx = e.clientX - s.x; s.x = e.clientX; s.fn(dx) }
+    const up = () => { st.current.drag = false; document.body.style.cursor = ''; document.body.style.userSelect = '' }
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
+    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
+  }, [])
+  return <div onPointerDown={(e) => { st.current.drag = true; st.current.x = e.clientX; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none' }}
+    className="w-1.5 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-primary/60" title="Arraste para redimensionar" />
+}
 
 export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questoes, voltarUrl }: {
   aluno: string; email: string; tentativa: number | null; simuladoTitulo: string
@@ -68,6 +82,13 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
   const [paginaIndex, setPaginaIndex] = useState(0)
   const [pending, setPending] = useState(false)
   const [showDestaqueIA, setShowDestaqueIA] = useState(true)
+  // Larguras ajustáveis das colunas + espelho como coluna (persistidos no navegador).
+  const [w1, setW1] = useState(256)
+  const [w3, setW3] = useState(456)
+  const [wEsp, setWEsp] = useState(380)
+  const [espelhoColuna, setEspelhoColuna] = useState(false)
+  useEffect(() => { try { const s = JSON.parse(localStorage.getItem('correcao_cols') || '{}'); if (s.w1) setW1(s.w1); if (s.w3) setW3(s.w3); if (s.wEsp) setWEsp(s.wEsp); if (typeof s.esp === 'boolean') setEspelhoColuna(s.esp) } catch {} }, [])
+  useEffect(() => { try { localStorage.setItem('correcao_cols', JSON.stringify({ w1, w3, wEsp, esp: espelhoColuna })) } catch {} }, [w1, w3, wEsp, espelhoColuna])
 
   useEffect(() => { for (const q of questoes) if (q.status !== 'corrigida') assumirCorrecao(q.respostaId) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -119,28 +140,25 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
 
   // ── edição / persistência do quesito ──
   function patchQ(key: string, patch: Partial<CompCorrecao>) { setLinhas((ls) => ls.map((l) => (l.key === key ? { ...l, comp: { ...l.comp, ...patch } } : l))) }
-  function persistQuesito(key: string, over?: Partial<CompCorrecao>) {
+  // Grava APENAS os campos do patch (upsert parcial) — evita corrida entre saves clobberando campos.
+  function salvarCampo(key: string, patch: QuesitoPatch) {
     const l = linhasRef.current.find((x) => x.key === key); if (!l) return
-    const c = { ...l.comp, ...over }
-    salvarQuesito(l.respostaId, c.id, {
-      nota: Number(c.nota) || 0, comentario: c.comentario, audit_state: c.audit_state, mensagem_aluno: c.mensagem,
-      conceito: c.conceito || null, excerpt: c.excerpt || null, pagina: c.pagina || null, linhas: c.linhas || null,
-      recognized: c.recognized.filter(Boolean), missing: c.missing.filter(Boolean), leitura_duvidosa: c.leituraDuvidosa,
-    }).then((r) => { if (!r.ok) toast.error(r.error ?? 'Erro ao salvar quesito') })
+    salvarQuesito(l.respostaId, l.comp.id, patch).then((r) => { if (!r.ok) toast.error(r.error ?? 'Erro ao salvar quesito') })
   }
-  function persistDescricao(key: string) { const l = linhasRef.current.find((x) => x.key === key); if (!l) return; salvarEspelhoQuesito(l.comp.id, l.comp.descricao).then((r) => { if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espelho') }) }
-  function editarNota(key: string, nota: number, conceito?: string) {
+  function salvarEspelho(competenciaId: string, descricao: string) { salvarEspelhoQuesito(competenciaId, descricao).then((r) => { if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espelho') }) }
+  function editarNota(key: string, nota: number) {
     const l = linhas.find((x) => x.key === key)
-    patchQ(key, { nota, ...(conceito != null ? { conceito } : {}), ...(l?.comp.audit_state === 'approved' ? { audit_state: 'pending' } : {}) })
+    patchQ(key, { nota, ...(l?.comp.audit_state === 'approved' ? { audit_state: 'pending' } : {}) })
   }
   function escolherConceito(key: string, nome: string) {
     const l = linhas.find((x) => x.key === key); const cc = l?.comp.conceitos.find((x) => x.nome === nome)
     const nota = cc ? cc.pontos : l?.comp.nota ?? 0
-    patchQ(key, { conceito: nome, nota, ...(l?.comp.audit_state === 'approved' ? { audit_state: 'pending' } : {}) })
-    persistQuesito(key, { conceito: nome, nota, audit_state: l?.comp.audit_state === 'approved' ? 'pending' : l?.comp.audit_state })
+    const rebaixa = l?.comp.audit_state === 'approved'
+    patchQ(key, { conceito: nome, nota, ...(rebaixa ? { audit_state: 'pending' } : {}) })
+    salvarCampo(key, { conceito: nome, nota, ...(rebaixa ? { audit_state: 'pending' } : {}) })
   }
   function mudarEstado(key: string, audit_state: string, avancar?: boolean) {
-    patchQ(key, { audit_state }); persistQuesito(key, { audit_state })
+    patchQ(key, { audit_state }); salvarCampo(key, { audit_state })
     if (avancar) { const i = visiveis.findIndex((l) => l.key === key); const prox = visiveis[i + 1]; if (prox) irPara(prox.key) }
   }
 
@@ -245,7 +263,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
       {/* 3 COLUNAS */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* ① QUESITOS */}
-        <aside className="flex w-64 shrink-0 flex-col border-r bg-card">
+        <aside style={{ width: w1 }} className="flex shrink-0 flex-col bg-card">
           <div className="flex shrink-0 items-center justify-between border-b px-3 py-2 text-xs font-semibold text-muted-foreground">
             <span>QUESITOS</span><span>{visiveis.length}/{linhas.length}</span>
           </div>
@@ -275,14 +293,20 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
             {visiveis.length === 0 && <p className="rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground">Nenhum quesito neste filtro.</p>}
           </div>
         </aside>
+        <ColResizer onDelta={(dx) => setW1((w) => clampW(w + dx, 180, 520))} />
 
         {/* ② VISUALIZADOR */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-muted/10">
           <div className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-card px-3 py-2">
             <div className="flex items-center gap-0.5 rounded-lg border p-0.5">
               <button type="button" onClick={() => setAba('prova')} className={cn('flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium', aba === 'prova' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}><ImageIcon className="h-3.5 w-3.5" /> PROVA</button>
-              <button type="button" onClick={() => setAba('espelho')} className={cn('flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium', aba === 'espelho' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}><FileText className="h-3.5 w-3.5" /> ESPELHO COMPLETO</button>
+              {!espelhoColuna && <button type="button" onClick={() => setAba('espelho')} className={cn('flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium', aba === 'espelho' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}><FileText className="h-3.5 w-3.5" /> ESPELHO COMPLETO</button>}
             </div>
+            <button type="button" onClick={() => { setEspelhoColuna((v) => !v); setAba('prova') }}
+              className={cn('flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors', espelhoColuna ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}
+              title="Mostrar o espelho como coluna ao lado da prova">
+              <FileText className="h-3.5 w-3.5" /> Espelho ao lado
+            </button>
             {aba === 'prova' && (
               <button type="button" onClick={() => setShowDestaqueIA((v) => !v)}
                 className={cn('flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors', showDestaqueIA ? 'border-amber-400 bg-amber-100/60 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300' : 'text-muted-foreground hover:bg-muted')}>
@@ -322,8 +346,25 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
           )}
         </div>
 
+        {/* ESPELHO como coluna (opcional) */}
+        {espelhoColuna && (<>
+          <ColResizer onDelta={(dx) => setWEsp((w) => clampW(w - dx, 240, 720))} />
+          <aside style={{ width: wEsp }} className="flex shrink-0 flex-col overflow-hidden border-l bg-card">
+            <div className="flex shrink-0 items-center gap-1.5 border-b px-3 py-2 text-xs font-semibold text-muted-foreground"><FileText className="h-4 w-4" /> ESPELHO</div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Enunciado</p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{questaoAtiva?.espelho.enunciado?.replace(/<[^>]+>/g, ' ') || '—'}</p>
+              {questaoAtiva?.espelho.comentarioProfessor && (<>
+                <p className="mb-1 mt-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Gabarito / espelho</p>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">{questaoAtiva.espelho.comentarioProfessor.replace(/<[^>]+>/g, ' ')}</p>
+              </>)}
+            </div>
+          </aside>
+        </>)}
+
+        <ColResizer onDelta={(dx) => setW3((w) => clampW(w - dx, 320, 720))} />
         {/* ③ INSPETOR */}
-        <aside className="flex w-[32rem] shrink-0 flex-col border-l bg-card">
+        <aside style={{ width: w3 }} className="flex shrink-0 flex-col border-l bg-card">
           {!ativo ? <div className="m-3 text-sm text-muted-foreground">Selecione um quesito.</div> : (<>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
               {/* kicker + título */}
@@ -357,7 +398,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
                   <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Pontuação</label>
                   <div className="mt-1 flex items-center gap-1">
                     <input type="number" step="0.01" min="0" max={ativo.comp.pontos} value={ativo.comp.nota ?? ''}
-                      onChange={(e) => editarNota(ativo.key, Math.min(ativo.comp.pontos, Math.max(0, Number(e.target.value))))} onBlur={() => persistQuesito(ativo.key)}
+                      onChange={(e) => editarNota(ativo.key, Math.min(ativo.comp.pontos, Math.max(0, Number(e.target.value))))} onBlur={(e) => salvarCampo(ativo.key, { nota: Math.min(ativo.comp.pontos, Math.max(0, Number(e.target.value))) })}
                       className="h-9 w-full rounded-md border bg-card px-2 text-right text-sm font-semibold outline-none focus:ring-1 focus:ring-ring" />
                     <span className="text-xs text-muted-foreground">/ {nfmt(ativo.comp.pontos)}</span>
                   </div>
@@ -367,18 +408,18 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
               {/* ① Trecho do aluno */}
               <Cartao n={1} titulo="Trecho do aluno" extra={ativo.comp.pagina ? `p. ${ativo.comp.pagina}` : ''}>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <input value={ativo.comp.pagina} onChange={(e) => patchQ(ativo.key, { pagina: e.target.value })} onBlur={() => persistQuesito(ativo.key)} placeholder="pág." className="h-7 w-14 rounded border bg-[var(--input-bg,transparent)] px-1.5 text-xs outline-none focus:ring-1 focus:ring-ring" />
-                  <input value={ativo.comp.linhas} onChange={(e) => patchQ(ativo.key, { linhas: e.target.value })} onBlur={() => persistQuesito(ativo.key)} placeholder="linhas (ex.: 1-5)" className="h-7 w-28 rounded border bg-[var(--input-bg,transparent)] px-1.5 text-xs outline-none focus:ring-1 focus:ring-ring" />
+                  <input value={ativo.comp.pagina} onChange={(e) => patchQ(ativo.key, { pagina: e.target.value })} onBlur={(e) => salvarCampo(ativo.key, { pagina: e.target.value })} placeholder="pág." className="h-7 w-14 rounded border bg-[var(--input-bg,transparent)] px-1.5 text-xs outline-none focus:ring-1 focus:ring-ring" />
+                  <input value={ativo.comp.linhas} onChange={(e) => patchQ(ativo.key, { linhas: e.target.value })} onBlur={(e) => salvarCampo(ativo.key, { linhas: e.target.value })} placeholder="linhas (ex.: 1-5)" className="h-7 w-28 rounded border bg-[var(--input-bg,transparent)] px-1.5 text-xs outline-none focus:ring-1 focus:ring-ring" />
                   <button type="button" onClick={() => verNaProva(ativo.key)} className="h-7 rounded border px-2 text-xs font-medium text-muted-foreground hover:bg-muted">Ver na prova</button>
-                  <button type="button" onClick={() => { patchQ(ativo.key, { leituraDuvidosa: !ativo.comp.leituraDuvidosa, audit_state: ativo.comp.audit_state === 'approved' ? 'pending' : ativo.comp.audit_state }); persistQuesito(ativo.key, { leituraDuvidosa: !ativo.comp.leituraDuvidosa }) }}
+                  <button type="button" onClick={() => { const nv = !ativo.comp.leituraDuvidosa; patchQ(ativo.key, { leituraDuvidosa: nv, ...(ativo.comp.audit_state === 'approved' ? { audit_state: 'pending' } : {}) }); salvarCampo(ativo.key, { leitura_duvidosa: nv }) }}
                     className={cn('h-7 rounded border px-2 text-xs font-medium', ativo.comp.leituraDuvidosa ? 'border-amber-400 bg-amber-100/60 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300' : 'text-muted-foreground hover:bg-muted')}>Marcar leitura</button>
                 </div>
-                <textarea value={ativo.comp.excerpt} onChange={(e) => patchQ(ativo.key, { excerpt: e.target.value })} onBlur={() => persistQuesito(ativo.key)} rows={3} placeholder="Transcreva o trecho do aluno referente a este quesito…" className="mt-1.5 w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+                <textarea value={ativo.comp.excerpt} onChange={(e) => patchQ(ativo.key, { excerpt: e.target.value })} onBlur={(e) => salvarCampo(ativo.key, { excerpt: e.target.value })} rows={3} placeholder="Transcreva o trecho do aluno referente a este quesito…" className="mt-1.5 w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
               </Cartao>
 
               {/* ② Espelho */}
               <Cartao n={2} titulo="Espelho" extra={ativo.comp.conceito || ''}>
-                <textarea value={ativo.comp.descricao} onChange={(e) => patchQ(ativo.key, { descricao: e.target.value })} onBlur={() => persistDescricao(ativo.key)} rows={3} placeholder="O que o espelho espera neste quesito…" className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+                <textarea value={ativo.comp.descricao} onChange={(e) => patchQ(ativo.key, { descricao: e.target.value })} onBlur={(e) => salvarEspelho(ativo.comp.id, e.target.value)} rows={3} placeholder="O que o espelho espera neste quesito…" className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {ativo.comp.conceitos.map((cc) => (
                     <button key={cc.nome} type="button" onClick={() => escolherConceito(ativo.key, cc.nome)}
@@ -390,18 +431,18 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <div className="rounded-md border border-emerald-300/40 bg-emerald-50/60 p-2 dark:bg-emerald-900/15">
                     <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Alcançado</p>
-                    <textarea value={ativo.comp.recognized.join('\n')} onChange={(e) => setArr(ativo.key, 'recognized', e.target.value)} onBlur={() => persistQuesito(ativo.key)} rows={3} placeholder="um por linha…" className="w-full resize-y bg-transparent text-[12px] leading-snug outline-none" />
+                    <textarea value={ativo.comp.recognized.join('\n')} onChange={(e) => setArr(ativo.key, 'recognized', e.target.value)} onBlur={(e) => salvarCampo(ativo.key, { recognized: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean) })} rows={3} placeholder="um por linha…" className="w-full resize-y bg-transparent text-[12px] leading-snug outline-none" />
                   </div>
                   <div className="rounded-md border border-rose-300/40 bg-rose-50/60 p-2 dark:bg-rose-900/15">
                     <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-400">Faltou / equivocado</p>
-                    <textarea value={ativo.comp.missing.join('\n')} onChange={(e) => setArr(ativo.key, 'missing', e.target.value)} onBlur={() => persistQuesito(ativo.key)} rows={3} placeholder="um por linha…" className="w-full resize-y bg-transparent text-[12px] leading-snug outline-none" />
+                    <textarea value={ativo.comp.missing.join('\n')} onChange={(e) => setArr(ativo.key, 'missing', e.target.value)} onBlur={(e) => salvarCampo(ativo.key, { missing: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean) })} rows={3} placeholder="um por linha…" className="w-full resize-y bg-transparent text-[12px] leading-snug outline-none" />
                   </div>
                 </div>
               </Cartao>
 
               {/* ③ Fundamentação */}
               <Cartao n={3} titulo="Fundamentação da pontuação" extra="privado">
-                <textarea value={ativo.comp.comentario} onChange={(e) => patchQ(ativo.key, { comentario: e.target.value })} onBlur={() => persistQuesito(ativo.key)} rows={3} placeholder="Raciocínio técnico do desconto (só o corretor vê)…" className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+                <textarea value={ativo.comp.comentario} onChange={(e) => patchQ(ativo.key, { comentario: e.target.value })} onBlur={(e) => salvarCampo(ativo.key, { comentario: e.target.value })} rows={3} placeholder="Raciocínio técnico do desconto (só o corretor vê)…" className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
               </Cartao>
 
               {/* ④ Mensagem */}
@@ -409,7 +450,7 @@ export function CorrecaoSessao({ aluno, email, tentativa, simuladoTitulo, questo
                 {ativo.comp.audit_state !== 'approved' ? (
                   <p className="rounded-md border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground"><Lock className="mr-1 inline h-3 w-3" /> Primeiro aprove a análise e a pontuação deste quesito.</p>
                 ) : (
-                  <textarea value={ativo.comp.mensagem} onChange={(e) => patchQ(ativo.key, { mensagem: e.target.value })} onBlur={() => persistQuesito(ativo.key)} rows={4} placeholder="Mensagem ao aluno sobre este quesito…" className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+                  <textarea value={ativo.comp.mensagem} onChange={(e) => patchQ(ativo.key, { mensagem: e.target.value })} onBlur={(e) => salvarCampo(ativo.key, { mensagem_aluno: e.target.value })} rows={4} placeholder="Mensagem ao aluno sobre este quesito…" className="w-full resize-y rounded-md border bg-[var(--input-bg,transparent)] px-2.5 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
                 )}
               </Cartao>
             </div>
