@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Loader2, Save, Sparkles } from 'lucide-react'
+import { Info, Loader2, Save, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -19,9 +19,12 @@ import { gerarCronograma } from './actions'
 
 const CARGAS_ROTULO = (h: number) => `${h}h`
 
-export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: CronogramaDoAluno[]; nomeAluno: string }) {
-  // ── Passo 1 e 2: nome e carga
-  const [nome, setNome] = useState(nomeAluno)
+export function CronogramaClient({ catalogo }: { catalogo: CronogramaDoAluno[] }) {
+  // ── Passo 1: como o aluno quer chamar ESTE cronograma (vira o título da emissão salva).
+  // O nome que aparece no documento é o do aluno, lido da sessão no servidor — não precisa ser digitado.
+  const [titulo, setTitulo] = useState('')
+
+  // ── Passo 2: carga horária
   const cargas = useMemo(() => [...new Set(catalogo.map((c) => c.carga_horaria))].sort((a, b) => a - b), [catalogo])
   const [carga, setCarga] = useState<number | null>(cargas[0] ?? null)
 
@@ -55,7 +58,6 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
   const [desatualizada, setDesatualizada] = useState(false)
   const [gerando, iniciar] = useTransition()
 
-
   // Trocar um parâmetro não apaga o resultado — marca como desatualizado.
   function aoMudar<T>(set: (v: T) => void) {
     return (v: T) => {
@@ -80,7 +82,7 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
             ? { modo: recessoModo, de: recessoDe || undefined, ate: recessoAte || undefined }
             : { modo: 'nenhum' },
         },
-        { nome, paleta: paletaSlug },
+        { nome: titulo, paleta: paletaSlug },
       )
       if (!r.ok) {
         toast.error(r.error)
@@ -94,15 +96,25 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
     })
   }
 
-
   if (!catalogo.length) return null
 
   return (
     <div className="space-y-6">
-      <Card className="p-5">
-        <div className="grid gap-5 md:grid-cols-2">
-          <Passo n={1} titulo="Seu nome">
-            <Input value={nome} maxLength={80} onChange={(e) => setNome(e.target.value)} placeholder="Como aparecerá no documento" />
+      <Card className="p-5 shadow-lg sm:p-7">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Monte seu plano personalizado
+        </p>
+        <div className="mb-5 mt-3 h-px bg-border" />
+
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          <Passo n={1} titulo="Nome do cronograma">
+            <Input
+              value={titulo}
+              maxLength={80}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder={escolhido ? escolhido.nome : 'Como quer chamar este plano?'}
+            />
+            <Dica>Só para você distinguir os seus cronogramas salvos.</Dica>
           </Passo>
 
           <Passo n={2} titulo="Quanto tempo por dia?">
@@ -111,12 +123,14 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
                 <button
                   key={h}
                   onClick={() => aoMudar(setCarga)(h)}
-                  className={`rounded-lg border px-4 py-2 text-sm transition ${
-                    carga === h ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted'
+                  className={`min-w-[74px] rounded-xl border px-3 py-2 text-center leading-tight transition ${
+                    carga === h
+                      ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                      : 'hover:border-primary/40 hover:bg-muted'
                   }`}
                 >
-                  <span className="font-semibold">{CARGAS_ROTULO(h)}</span>
-                  <span className={`ml-1.5 text-xs ${carga === h ? 'opacity-80' : 'text-muted-foreground'}`}>
+                  <span className="block text-sm font-bold">{CARGAS_ROTULO(h)}</span>
+                  <span className={`block text-[11px] ${carga === h ? 'opacity-80' : 'text-muted-foreground'}`}>
                     {catalogo.filter((c) => c.carga_horaria === h).length} opções
                   </span>
                 </button>
@@ -126,7 +140,7 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
 
           <Passo n={3} titulo="Quando você começa?">
             <Input type="date" value={inicio} min={hojeISO()} onChange={(e) => aoMudar(setInicio)(e.target.value)} />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <Dica>
               {dataAjustada ? (
                 <>
                   Todo cronograma começa numa segunda — ajustamos para <strong>{fmtBr(segunda)}</strong>.
@@ -134,13 +148,15 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
               ) : (
                 <>Começa na segunda {fmtBr(segunda)}.</>
               )}
-            </p>
+            </Dica>
           </Passo>
 
           <Passo n={4} titulo="Escolha seu cronograma">
             <Select value={cronogramaId} onValueChange={(v) => aoMudar(setCronogramaId)(v ?? '')}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione" />
+                <SelectValue placeholder="Selecione">
+                  {escolhido ? `${escolhido.nome} (${faixaSemanal(escolhido.dias_curso)})` : undefined}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {daCarga.map((c) => (
@@ -151,11 +167,11 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
               </SelectContent>
             </Select>
             {escolhido && (
-              <p className="mt-1 text-xs text-muted-foreground">
+              <Dica>
                 {escolhido.total_semanas} semanas cadastradas
                 {escolhido.semanas_revisao.length > 0 && `, ${escolhido.semanas_revisao.length} de revisão`} ·{' '}
                 {escolhido.dias_nome.length} dias por semana
-              </p>
+              </Dica>
             )}
           </Passo>
 
@@ -165,7 +181,7 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
               {revisaoAtiva && (
                 <Select value={String(revisaoCada)} onValueChange={(v) => aoMudar(setRevisaoCada)(Number(v) as PeriodicidadeRevisao)}>
                   <SelectTrigger className="w-44">
-                    <SelectValue />
+                    <SelectValue>A cada {revisaoCada} semanas</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {[4, 6, 8, 10, 12].map((k) => (
@@ -177,21 +193,23 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
                 </Select>
               )}
             </div>
+            {revisaoAtiva && <Dica>Uma semana exclusiva de revisão é inserida após cada bloco.</Dica>}
           </Passo>
 
           <Passo n={6} titulo="Incluir recesso?">
             <div className="flex flex-wrap items-center gap-2">
               <SimNao valor={recessoAtivo} aoTrocar={aoMudar(setRecessoAtivo)} />
               {recessoAtivo && (
-                <Select value={recessoModo} onValueChange={(v) => aoMudar(setRecessoModo)(v as any)}>
+                <Select value={recessoModo} onValueChange={(v) => aoMudar(setRecessoModo)(v as Exclude<ModoRecesso, 'nenhum'>)}>
                   <SelectTrigger className="w-52">
-                    <SelectValue />
+                    <SelectValue>{ROTULO_RECESSO[recessoModo]}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="natal">Natal</SelectItem>
-                    <SelectItem value="ano_novo">Ano Novo</SelectItem>
-                    <SelectItem value="natal_ano_novo">Natal + Ano Novo</SelectItem>
-                    <SelectItem value="outras">Outras semanas</SelectItem>
+                    {(Object.keys(ROTULO_RECESSO) as (keyof typeof ROTULO_RECESSO)[]).map((k) => (
+                      <SelectItem key={k} value={k}>
+                        {ROTULO_RECESSO[k]}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               )}
@@ -201,17 +219,16 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
                 <Input type="date" value={recessoDe} onChange={(e) => aoMudar(setRecessoDe)(e.target.value)} className="w-40" />
                 <span className="text-sm text-muted-foreground">até</span>
                 <Input type="date" value={recessoAte} onChange={(e) => aoMudar(setRecessoAte)(e.target.value)} className="w-40" />
-                <p className="w-full text-xs text-muted-foreground">
-                  O intervalo é esticado para semanas inteiras. Sem as duas datas, nenhuma semana é bloqueada.
-                </p>
+                <Dica>O intervalo é esticado para semanas inteiras. Sem as duas datas, nenhuma semana é bloqueada.</Dica>
               </div>
             )}
+            {recessoAtivo && recessoModo !== 'outras' && <Dica>As semanas de recesso empurram o conteúdo para a frente.</Dica>}
           </Passo>
 
           <Passo n={7} titulo="Cores das tabelas">
             <Select value={paletaSlug} onValueChange={(v) => setPaletaSlug(v ?? PALETAS[0].slug)}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue>{PALETAS.find((p) => p.slug === paletaSlug)?.nome}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {PALETAS.map((p) => (
@@ -221,10 +238,21 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
                 ))}
               </SelectContent>
             </Select>
+            <Dica>Vale para a tabela na tela e para o documento exportado.</Dica>
           </Passo>
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center gap-3 border-t pt-4">
+        {/* No gerador antigo este aviso dizia que nada era guardado. Aqui ele diz o contrário —
+            é a diferença que a plataforma trouxe, e vale dizer no mesmo lugar em que assustava. */}
+        <div className="mt-6 flex items-start gap-2.5 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <p className="text-muted-foreground">
+            <strong className="text-foreground">Seu cronograma fica salvo na sua conta.</strong> Você pode fechar a
+            página e reabrir quando quiser — e gerar quantos quiser, lado a lado.
+          </p>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center gap-3 border-t pt-5">
           <Button onClick={gerar} disabled={gerando || !cronogramaId} size="lg">
             {gerando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
             {grade ? 'Gerar de novo' : 'Gerar meu cronograma'}
@@ -235,11 +263,14 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
         </div>
       </Card>
 
-      {grade && (
+      {/* Os quatro números ficam na tela desde o início, como no gerador antigo: mostram o
+          formato do resultado antes de existir resultado, em vez de aparecerem do nada. */}
+      <ResumoGrade grade={grade} />
+
+      {grade ? (
         <>
-          <ResumoGrade grade={grade} />
           <p className="text-sm text-muted-foreground">{grade.resumo.subtitulo}</p>
-          <GradeCronograma grade={grade} paletaSlug={paletaSlug} />
+          <GradeCronograma grade={grade} paletaSlug={paletaSlug} titulo="Seu plano semana a semana" />
 
           {emissaoId && (
             <Card className="flex flex-wrap items-center gap-3 p-4">
@@ -253,16 +284,32 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
             </Card>
           )}
         </>
+      ) : (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold">Seu plano semana a semana</h2>
+          <Card className="border-dashed px-4 py-12 text-center">
+            <p className="text-sm text-muted-foreground">
+              Preencha suas escolhas e clique em <strong className="text-foreground">Gerar meu cronograma</strong>.
+            </p>
+          </Card>
+        </div>
       )}
     </div>
   )
 }
 
+const ROTULO_RECESSO = {
+  natal: 'Natal',
+  ano_novo: 'Ano Novo',
+  natal_ano_novo: 'Natal + Ano Novo',
+  outras: 'Outras semanas',
+} as const
+
 function Passo({ n, titulo, children }: { n: number; titulo: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label className="flex items-center gap-2">
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+      <Label className="flex items-center gap-2 text-sm">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
           {n}
         </span>
         {titulo}
@@ -272,9 +319,13 @@ function Passo({ n, titulo, children }: { n: number; titulo: string; children: R
   )
 }
 
+function Dica({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs text-muted-foreground">{children}</p>
+}
+
 function SimNao({ valor, aoTrocar }: { valor: boolean; aoTrocar: (v: boolean) => void }) {
   return (
-    <div className="flex overflow-hidden rounded-lg border">
+    <div className="flex overflow-hidden rounded-xl border">
       {[
         [true, 'Sim'],
         [false, 'Não'],

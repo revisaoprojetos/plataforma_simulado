@@ -17,26 +17,31 @@ import { fmtBr, fmtIntervalo } from '@/lib/cronograma/datas'
 import { acharPaleta } from '@/lib/cronograma/paletas'
 import type { Grade } from '@/lib/cronograma/tipos'
 
-export function ResumoGrade({ grade }: { grade: Grade }) {
+/**
+ * Os quatro números do topo. Aceita `null` de propósito: na tela do aluno eles ficam visíveis
+ * ANTES de gerar, com travessão no lugar do valor — assim o resultado preenche um formato que já
+ * estava na tela, em vez de surgir do nada.
+ */
+export function ResumoGrade({ grade }: { grade: Grade | null }) {
   const numeros: [string, string | number][] = [
-    ['Semanas', grade.resumo.totalSemanas],
-    ['Dias por semana', grade.resumo.diasPorSemana],
-    ['Atividades', grade.resumo.atividades],
-    ['Conclusão', grade.resumo.conclusao ? fmtBr(grade.resumo.conclusao) : '—'],
+    ['Semanas', grade?.resumo.totalSemanas ?? '—'],
+    ['Dias por semana', grade?.resumo.diasPorSemana ?? '—'],
+    ['Atividades', grade?.resumo.atividades ?? '—'],
+    ['Conclusão', grade?.resumo.conclusao ? fmtBr(grade.resumo.conclusao) : '—'],
   ]
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {numeros.map(([rotulo, valor]) => (
         <Card key={rotulo} className="p-4">
-          <p className="text-2xl font-bold tabular-nums">{valor}</p>
-          <p className="text-xs text-muted-foreground">{rotulo}</p>
+          <p className={`text-3xl font-bold tabular-nums ${grade ? '' : 'text-muted-foreground/40'}`}>{valor}</p>
+          <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{rotulo}</p>
         </Card>
       ))}
     </div>
   )
 }
 
-export function GradeCronograma({ grade, paletaSlug }: { grade: Grade; paletaSlug: string }) {
+export function GradeCronograma({ grade, paletaSlug, titulo }: { grade: Grade; paletaSlug: string; titulo?: string }) {
   const paleta = acharPaleta(paletaSlug)
   const [filtroSemana, setFiltroSemana] = useState('todas')
   const [filtroTipo, setFiltroTipo] = useState('todos')
@@ -68,6 +73,7 @@ export function GradeCronograma({ grade, paletaSlug }: { grade: Grade; paletaSlu
   return (
     <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
       <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
+        {titulo && <h2 className="mr-auto text-sm font-semibold">{titulo}</h2>}
         <Select value={filtroSemana} onValueChange={(v) => setFiltroSemana(v ?? 'todas')}>
           <SelectTrigger className="w-40">
             <SelectValue />
@@ -96,7 +102,7 @@ export function GradeCronograma({ grade, paletaSlug }: { grade: Grade; paletaSlu
           </SelectContent>
         </Select>
 
-        <span className="ml-auto text-xs text-muted-foreground">Os filtros valem na hora — não é preciso gerar de novo.</span>
+        <span className={`text-xs text-muted-foreground ${titulo ? 'w-full sm:w-auto' : 'ml-auto'}`}>Os filtros valem na hora — não é preciso gerar de novo.</span>
       </div>
 
       <div className="divide-y">
