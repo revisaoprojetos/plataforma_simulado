@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DisciplinaPicker } from '@/components/cronograma/disciplina-picker'
+import { SimuladoPicker, type SimuladoOpcao } from '@/components/cronograma/simulado-picker'
 import type { MetaFonte, TipoMeta, TipoMetaDef } from '@/lib/cronograma/tipos'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
 import {
@@ -53,12 +54,14 @@ export function MetasClient({
   metasIniciais,
   tipos,
   disciplinas,
+  simulados,
   diagnostico,
 }: {
   cronograma: CronogramaDetalhe
   metasIniciais: MetaFonte[]
   tipos: TipoMetaDef[]
   disciplinas: { id: string; nome: string }[]
+  simulados: SimuladoOpcao[]
   diagnostico: Diagnostico
 }) {
   // Rótulo e ordem vêm do cadastro de tipos, não de constantes no código.
@@ -286,67 +289,85 @@ export function MetasClient({
       </Card>
 
       <Dialog open={aberto} onOpenChange={setAberto}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-h-[88vh] overflow-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editando ? 'Editar meta' : 'Nova meta'}</DialogTitle>
-            <DialogDescription>Correção avulsa, sem precisar reimportar o cronograma inteiro.</DialogDescription>
+            <DialogDescription>
+              Correção avulsa, sem precisar reimportar o cronograma inteiro.
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5">
-                <Label>Semana</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={c.total_semanas}
-                  value={form.semana}
-                  onChange={(e) => setForm((f) => ({ ...f, semana: Number(e.target.value) }))}
-                />
+          <div className="space-y-5">
+            {/* ── Onde a meta fica na grade */}
+            <Secao titulo="Posição na grade">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Semana</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={c.total_semanas}
+                    value={form.semana}
+                    onChange={(e) => setForm((f) => ({ ...f, semana: Number(e.target.value) }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Dia</Label>
+                  <Select value={String(form.dia)} onValueChange={(v) => setForm((f) => ({ ...f, dia: Number(v) }))}>
+                    <SelectTrigger>
+                      <SelectValue>{c.dias_nome[form.dia] ?? `dia ${form.dia}`}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {c.dias_nome.map((nome, i) => (
+                        <SelectItem key={i} value={String(i)}>
+                          {nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Ordem</Label>
+                  <Input
+                    type="number"
+                    value={form.ordem}
+                    onChange={(e) => setForm((f) => ({ ...f, ordem: Number(e.target.value) }))}
+                  />
+                  <p className="text-xs text-muted-foreground">Desempate dentro do dia.</p>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>Dia</Label>
-                <Select value={String(form.dia)} onValueChange={(v) => setForm((f) => ({ ...f, dia: Number(v) }))}>
-                  <SelectTrigger>
-                    <SelectValue>{c.dias_nome[form.dia] ?? `dia ${form.dia}`}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {c.dias_nome.map((nome, i) => (
-                      <SelectItem key={i} value={String(i)}>
-                        {nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Ordem</Label>
-                <Input
-                  type="number"
-                  value={form.ordem}
-                  onChange={(e) => setForm((f) => ({ ...f, ordem: Number(e.target.value) }))}
-                />
-              </div>
-            </div>
+            </Secao>
 
-            <div className="space-y-1.5">
-              <Label>Tipo</Label>
-              <Select value={form.tipo} onValueChange={(v) => setForm((f) => ({ ...f, tipo: (v ?? '') as TipoMeta }))}>
-                <SelectTrigger>
-                  {/* O gatilho deste Select mostra o VALOR cru; passamos o rótulo. */}
-                  <SelectValue>{rotulo(form.tipo)}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {tipos.map((t) => (
-                    <SelectItem key={t.slug} value={t.slug}>
-                      {t.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* ── O que o aluno vê */}
+            <Secao titulo="Conteúdo">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Tipo</Label>
+                  <Select value={form.tipo} onValueChange={(v) => setForm((f) => ({ ...f, tipo: (v ?? '') as TipoMeta }))}>
+                    <SelectTrigger>
+                      {/* O gatilho deste Select mostra o VALOR cru; passamos o rótulo. */}
+                      <SelectValue>{rotulo(form.tipo)}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tipos.map((t) => (
+                        <SelectItem key={t.slug} value={t.slug}>
+                          {t.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Aula</Label>
+                  <Input
+                    value={form.aula ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, aula: e.target.value }))}
+                    placeholder="01"
+                  />
+                  <p className="text-xs text-muted-foreground">Texto, não número: “01” e “1” são aulas diferentes.</p>
+                </div>
+              </div>
 
-            <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label>Disciplina</Label>
                 <DisciplinaPicker
@@ -358,56 +379,37 @@ export function MetasClient({
               </div>
 
               <div className="space-y-1.5">
-                <Label>Aula</Label>
-                <Input
-                  value={form.aula ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, aula: e.target.value }))}
-                  placeholder="01"
+                <Label>Conteúdo</Label>
+                <Textarea
+                  rows={2}
+                  value={form.conteudo ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, conteudo: e.target.value }))}
+                  placeholder="O que o aluno estuda nesta meta"
                 />
-                <p className="text-xs text-muted-foreground">Texto, não número: "01" e "1" são aulas diferentes.</p>
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <Label>Conteúdo</Label>
-              <Textarea
-                rows={2}
-                value={form.conteudo ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, conteudo: e.target.value }))}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Duração</Label>
-              <Input
-                value={form.duracao ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, duracao: e.target.value }))}
-                placeholder="3 - 4h"
-              />
-            </div>
-
-            {(porSlug.get(form.tipo)?.slug === 'simulado' || form.simulado_externo_url) && (
-              <div className="space-y-3 rounded-md border border-dashed p-3">
-                <p className="text-xs text-muted-foreground">
-                  A meta pode apontar um simulado externo (nome + link). O vínculo com um simulado desta
-                  plataforma entra na próxima etapa.
-                </p>
-                <div className="space-y-1.5">
-                  <Label>Nome do simulado externo</Label>
-                  <Input
-                    value={form.simulado_externo_nome ?? ''}
-                    onChange={(e) => setForm((f) => ({ ...f, simulado_externo_nome: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Link</Label>
-                  <Input
-                    value={form.simulado_externo_url ?? ''}
-                    onChange={(e) => setForm((f) => ({ ...f, simulado_externo_url: e.target.value }))}
-                    placeholder="https://…"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <Label>Duração</Label>
+                <Input
+                  value={form.duracao ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, duracao: e.target.value }))}
+                  placeholder="3 - 4h"
+                  className="sm:w-48"
+                />
               </div>
+            </Secao>
+
+            {/* ── Só aparece quando o tipo aponta simulado */}
+            {form.tipo === 'simulado' && (
+              <Secao titulo="Destino do simulado">
+                <SimuladoPicker
+                  simulados={simulados}
+                  simuladoId={form.simulado_id}
+                  externoNome={form.simulado_externo_nome}
+                  externoUrl={form.simulado_externo_url}
+                  onChange={(v) => setForm((f) => ({ ...f, ...v }))}
+                />
+              </Secao>
             )}
           </div>
 
@@ -422,5 +424,15 @@ export function MetasClient({
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+/** Bloco do formulário com título — evita a coluna única e longa de antes. */
+function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</p>
+      {children}
+    </div>
   )
 }

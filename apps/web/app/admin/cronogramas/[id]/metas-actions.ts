@@ -62,6 +62,7 @@ export async function carregarDetalhe(id: string): Promise<{
   metas?: MetaFonte[]
   tipos?: TipoMetaDef[]
   disciplinas?: { id: string; nome: string }[]
+  simulados?: { id: string; titulo: string; status: string }[]
   diagnostico?: Diagnostico
   error?: string
 }> {
@@ -135,12 +136,24 @@ export async function carregarDetalhe(id: string): Promise<{
     .order('ordem')
     .order('nome')
 
+  // Simulados da própria plataforma, para a meta do tipo `simulado` poder apontar um
+  // deles em vez de só um link externo. O aluno sem matrícula no simulado apontado vê
+  // a meta com aviso de sem acesso, em vez de a linha sumir da grade dele.
+  const { data: simulados } = await svc
+    .from('simulado_simulados')
+    .select('id, titulo, status')
+    .eq('tenant_id', g.tenantId)
+    .eq('deletado', false)
+    .is('owner_estudante_id', null)
+    .order('titulo')
+
   return {
     ok: true,
     cronograma: cron,
     metas,
     tipos,
     disciplinas: (disciplinas ?? []) as { id: string; nome: string }[],
+    simulados: (simulados ?? []) as { id: string; titulo: string; status: string }[],
     diagnostico: diagnosticar(cron, metas, comLink),
   }
 }
@@ -218,6 +231,21 @@ function validarMeta(e: EntradaMeta, c: { total_semanas: number; dias_curso: num
   return null
 }
 
+/**
+ * Meta que aponta simulado precisa ter um destino: um simulado desta plataforma OU um
+ * externo com nome e link. Sem isso o aluno vê uma linha que não leva a lugar nenhum —
+ * e o CHECK do banco recusaria de qualquer forma.
+ */
+function validarDestinoSimulado(e: EntradaMeta, tipoApontaSimulado: boolean): string | null {
+  if (!tipoApontaSimulado) return null
+  const temInterno = !!e.simulado_id
+  const temExterno = !!(e.simulado_externo_nome?.trim() && e.simulado_externo_url?.trim())
+  if (!temInterno && !temExterno) {
+    return 'Escolha um simulado da plataforma ou informe nome e link de um simulado externo.'
+  }
+  return null
+}
+
 /** O tipo precisa existir no cadastro do tenant — o CHECK fixo do banco não existe mais. */
 async function validarTipo(svc: any, tenantId: string, slug: string): Promise<string | null> {
   const { data } = await svc
@@ -251,6 +279,8 @@ export async function criarMeta(cronogramaId: string, e: EntradaMeta): Promise<{
   if (erro) return { ok: false, error: erro }
   const erroTipo = await validarTipo(svc, g.tenantId, e.tipo)
   if (erroTipo) return { ok: false, error: erroTipo }
+  const erroDestino = validarDestinoSimulado(e, e.tipo === 'simulado')
+  if (erroDestino) return { ok: false, error: erroDestino }
 
   const { data, error } = await svc
     .from('simulado_cronograma_metas')
@@ -281,6 +311,8 @@ export async function atualizarMeta(cronogramaId: string, metaId: string, e: Ent
   if (erro) return { ok: false, error: erro }
   const erroTipo = await validarTipo(svc, g.tenantId, e.tipo)
   if (erroTipo) return { ok: false, error: erroTipo }
+  const erroDestino = validarDestinoSimulado(e, e.tipo === 'simulado')
+  if (erroDestino) return { ok: false, error: erroDestino }
 
   const { data: antes } = await svc
     .from('simulado_cronograma_metas')
