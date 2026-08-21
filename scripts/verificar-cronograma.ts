@@ -6,7 +6,30 @@ import { addDias, dow, offsetDesdeSegunda, proximaSegunda } from '../apps/web/li
 import { compactarSemanas, gerarGrade, montarPauta } from '../apps/web/lib/cronograma/gerador'
 import { faixaSemanal } from '../apps/web/lib/cronograma/faixa'
 import { rotuloConteudo } from '../apps/web/lib/cronograma/formato-meta'
-import type { CronogramaFonte, MetaFonte, TipoMeta } from '../apps/web/lib/cronograma/tipos'
+import type { CronogramaFonte, MapaTipos, MetaFonte, TipoMeta, TipoMetaDef } from '../apps/web/lib/cronograma/tipos'
+
+/**
+ * Os seis tipos com o comportamento que o cadastro semeia — as regras R10–R21 em forma
+ * tabular. O motor não conhece mais slug nenhum: lê estas flags.
+ */
+const def = (
+  slug: string, nome: string, ordem: number,
+  f: Partial<TipoMetaDef> = {},
+): TipoMetaDef => ({
+  id: slug, slug, nome, rotulo_docx: nome.toUpperCase(), ordem, cor: null,
+  mostra_links: false, prefixo_aula: true, aula_no_titulo: false,
+  quebra_conteudo: false, conta_atividade: true, destaque_docx: false, sempre_no_docx: true,
+  ...f,
+})
+
+const TIPOS: MapaTipos = new Map([
+  ['pdfull',   def('pdfull',   'PDFULL + Videoaula',    0, { destaque_docx: true })],
+  ['flash',    def('flash',    'PDFlash / Flashcards',  1)],
+  ['legproc',  def('legproc',  'Legproc',               2, { prefixo_aula: false, quebra_conteudo: true })],
+  ['quest',    def('quest',    'Resolução de Questões', 3, { mostra_links: true, prefixo_aula: false, aula_no_titulo: true })],
+  ['simulado', def('simulado', 'Simulado',              4, { conta_atividade: false, sempre_no_docx: false })],
+  ['juris',    def('juris',    'Atividade Extra',       5, { conta_atividade: false, sempre_no_docx: false })],
+].map(([k, v]) => [k as string, v as TipoMetaDef]))
 
 let passou = 0
 let falhou = 0
@@ -49,7 +72,7 @@ eq('offset da segunda (1)', offsetDesdeSegunda(1), 0)
 eq('offset do sábado (6)', offsetDesdeSegunda(6), 5)
 eq('offset do domingo (0) = 6, último dia', offsetDesdeSegunda(0), 6)
 const cronDom: CronogramaFonte = { ...cron34, dias_curso: [1, 2, 3, 4, 5, 6, 0], dias_nome: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'], semanas_revisao: [] }
-const gDom = gerarGrade(cronDom, [meta(1, 6, 'pdfull')], new Map(), { inicio: '2026-09-28', revisao: { ativo: false, cada: 12 }, recesso: { modo: 'nenhum' } })
+const gDom = gerarGrade(cronDom, [meta(1, 6, 'pdfull')], TIPOS, new Map(), { inicio: '2026-09-28', revisao: { ativo: false, cada: 12 }, recesso: { modo: 'nenhum' } })
 if (gDom.ok && gDom.grade.semanas[0].kind === 'conteudo') {
   const m0 = gDom.grade.semanas[0].metas[0]
   eq('meta com dia=6 cai no domingo 04/10', m0.data, '2026-10-04')
@@ -78,8 +101,8 @@ ok('  a ÚLTIMA posição da pauta é revisão (legado)', pauta24[pauta24.length
 
 console.log('\n=== R7/R8 — recesso empurra o conteúdo e adia a conclusão ===')
 const base = { inicio: '2026-11-30', revisao: { ativo: false, cada: 12 as const } }
-const semRecesso = gerarGrade(cron34, metas34, new Map(), { ...base, recesso: { modo: 'nenhum' } })
-const comNatal = gerarGrade(cron34, metas34, new Map(), { ...base, recesso: { modo: 'natal' } })
+const semRecesso = gerarGrade(cron34, metas34, TIPOS, new Map(), { ...base, recesso: { modo: 'nenhum' } })
+const comNatal = gerarGrade(cron34, metas34, TIPOS, new Map(), { ...base, recesso: { modo: 'natal' } })
 if (semRecesso.ok && comNatal.ok) {
   eq('sem recesso: 32 semanas', semRecesso.grade.resumo.totalSemanas, 32)
   eq('com Natal: 33 semanas (1 de recesso inserida)', comNatal.grade.resumo.totalSemanas, 33)
@@ -91,20 +114,20 @@ if (semRecesso.ok && comNatal.ok) {
   ok('  a semana de recesso contém 25/12', !!rec && rec.inicio <= '2026-12-25' && rec.fim >= '2026-12-25', `\n        ${rec?.inicio}..${rec?.fim}`)
   ok('  numeração é sequencial e sem buracos', comNatal.grade.semanas.every((s, i) => s.numero === i + 1))
 }
-const semDatas = gerarGrade(cron34, metas34, new Map(), { ...base, recesso: { modo: 'outras' } })
+const semDatas = gerarGrade(cron34, metas34, TIPOS, new Map(), { ...base, recesso: { modo: 'outras' } })
 ok('recesso "outras" sem as 2 datas → não bloqueia nada', semDatas.ok && semDatas.grade.resumo.semanasRecesso === 0)
 
 console.log('\n=== R16/R17 — os números do topo ===')
 const cronCont: CronogramaFonte = { ...cron34, semanas_revisao: [] }
 const metasCont = [meta(1, 0, 'pdfull'), meta(1, 1, 'quest'), meta(1, 2, 'simulado'), meta(1, 3, 'juris')]
-const gCont = gerarGrade(cronCont, metasCont, new Map(), { inicio: '2026-09-28', revisao: { ativo: false, cada: 12 }, recesso: { modo: 'nenhum' } })
+const gCont = gerarGrade(cronCont, metasCont, TIPOS, new Map(), { inicio: '2026-09-28', revisao: { ativo: false, cada: 12 }, recesso: { modo: 'nenhum' } })
 if (gCont.ok) {
   eq('atividades ignora simulado e juris (4 metas → 2)', gCont.grade.resumo.atividades, 2)
   eq('dias por semana = tamanho de dias_nome', gCont.grade.resumo.diasPorSemana, 6)
 }
 
 console.log('\n=== R10 — ordem dentro do dia: pdfull → flash → legproc → quest ===')
-const gOrd = gerarGrade(cronCont, [meta(1, 0, 'quest'), meta(1, 0, 'pdfull'), meta(1, 0, 'legproc'), meta(1, 0, 'flash')], new Map(),
+const gOrd = gerarGrade(cronCont, [meta(1, 0, 'quest'), meta(1, 0, 'pdfull'), meta(1, 0, 'legproc'), meta(1, 0, 'flash')], TIPOS, new Map(),
   { inicio: '2026-09-28', revisao: { ativo: false, cada: 12 }, recesso: { modo: 'nenhum' } })
 if (gOrd.ok && gOrd.grade.semanas[0].kind === 'conteudo') {
   eq('ordem fixa aplicada', gOrd.grade.semanas[0].metas.map((m) => m.tipo), ['pdfull', 'flash', 'legproc', 'quest'])
@@ -116,15 +139,15 @@ eq('[1..6] → Segunda - Sábado', faixaSemanal([1, 2, 3, 4, 5, 6]), 'Segunda - 
 eq('[1..6,0] → Semana Completa', faixaSemanal([1, 2, 3, 4, 5, 6, 0]), 'Semana Completa')
 
 console.log('\n=== R12/R13/R15 — formatação do conteúdo ===')
-eq('R15 quest com aula → "Disciplina: Aula N"', rotuloConteudo(meta(1, 0, 'quest')).titulo, 'Direito Constitucional: Aula 01')
-eq('R12 pdfull ganha prefixo "Aula NN -"', rotuloConteudo(meta(1, 0, 'pdfull')).titulo, 'Direito Constitucional: Aula 01 - Princípios fundamentais')
-eq('R12 zero à esquerda em 1 dígito', rotuloConteudo(meta(1, 0, 'pdfull', { aula: '7' })).titulo, 'Direito Constitucional: Aula 07 - Princípios fundamentais')
-eq('R13 "Atividade" não vira prefixo', rotuloConteudo(meta(1, 0, 'pdfull', { disciplina: 'Atividade', aula: null })).titulo, 'Princípios fundamentais')
+eq('R15 quest com aula → "Disciplina: Aula N"', rotuloConteudo(meta(1, 0, 'quest'), TIPOS.get('quest')!).titulo, 'Direito Constitucional: Aula 01')
+eq('R12 pdfull ganha prefixo "Aula NN -"', rotuloConteudo(meta(1, 0, 'pdfull'), TIPOS.get('pdfull')!).titulo, 'Direito Constitucional: Aula 01 - Princípios fundamentais')
+eq('R12 zero à esquerda em 1 dígito', rotuloConteudo(meta(1, 0, 'pdfull', { aula: '7' }), TIPOS.get('pdfull')!).titulo, 'Direito Constitucional: Aula 07 - Princípios fundamentais')
+eq('R13 "Atividade" não vira prefixo', rotuloConteudo(meta(1, 0, 'pdfull', { disciplina: 'Atividade', aula: null }), TIPOS.get('pdfull')!).titulo, 'Princípios fundamentais')
 
 console.log('\n=== Guardas ===')
-const gVazio = gerarGrade(cron34, [], new Map(), { inicio: '2026-09-28', revisao: { ativo: false, cada: 12 }, recesso: { modo: 'nenhum' } })
+const gVazio = gerarGrade(cron34, [], TIPOS, new Map(), { inicio: '2026-09-28', revisao: { ativo: false, cada: 12 }, recesso: { modo: 'nenhum' } })
 ok('cronograma sem metas devolve erro (não lança)', !gVazio.ok)
-const gLoop = gerarGrade(cron34, metas34, new Map(), { inicio: '2026-09-28', revisao: { ativo: false, cada: 12 }, recesso: { modo: 'outras', de: '2026-01-01', ate: '2046-01-01' } })
+const gLoop = gerarGrade(cron34, metas34, TIPOS, new Map(), { inicio: '2026-09-28', revisao: { ativo: false, cada: 12 }, recesso: { modo: 'outras', de: '2026-01-01', ate: '2046-01-01' } })
 ok('recesso absurdo é barrado pelo teto (não trava)', !gLoop.ok && gLoop.erro.includes('recesso'))
 
 console.log(`\n${'='.repeat(50)}\nPASSOU: ${passou}   FALHOU: ${falhou}\n${'='.repeat(50)}`)

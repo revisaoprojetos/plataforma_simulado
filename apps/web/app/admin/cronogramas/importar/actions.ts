@@ -34,6 +34,8 @@ export type EstadoAtual = {
   cronogramas: { slug: string; nome: string; status: string; metas: number }[]
   linksChaves: string[]
   plataformas: { id: string; nome: string; slug: string }[]
+  /** Slugs de tipo cadastrados — a validação das metas confere contra eles. */
+  tiposMeta: string[]
 }
 
 /** O que já existe no catálogo — o cliente usa para montar a prévia (o que entra/muda). */
@@ -42,7 +44,7 @@ export async function carregarEstadoAtual(): Promise<{ ok: boolean; estado?: Est
   if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
 
-  const [cronogramas, metas, links, plataformas] = await Promise.all([
+  const [cronogramas, metas, links, plataformas, tipos] = await Promise.all([
     fetchAll<{ id: string; slug: string; nome: string; status: string }>(() =>
       svc
         .from('simulado_cronogramas')
@@ -60,6 +62,9 @@ export async function carregarEstadoAtual(): Promise<{ ok: boolean; estado?: Est
     fetchAll<{ id: string; nome: string; slug: string }>(() =>
       svc.from('simulado_cronograma_plataformas').select('id, nome, slug').eq('tenant_id', g.tenantId).order('ordem') as any,
     ),
+    fetchAll<{ slug: string }>(() =>
+      svc.from('simulado_cronograma_tipos_meta').select('slug').eq('tenant_id', g.tenantId).eq('ativo', true).order('ordem') as any,
+    ),
   ])
 
   const porCron = new Map<string, number>()
@@ -71,6 +76,7 @@ export async function carregarEstadoAtual(): Promise<{ ok: boolean; estado?: Est
       cronogramas: cronogramas.map((c) => ({ slug: c.slug, nome: c.nome, status: c.status, metas: porCron.get(c.id) ?? 0 })),
       linksChaves: links.map((l) => chaveLink(l.disciplina, l.aula)).filter(Boolean) as string[],
       plataformas,
+      tiposMeta: tipos.map((t) => t.slug),
     },
   }
 }

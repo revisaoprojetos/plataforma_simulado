@@ -13,7 +13,8 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { chaveLink } from '@/lib/cronograma/formato-meta'
-import type { MetaFonte, TipoMeta } from '@/lib/cronograma/tipos'
+import { listarTiposMeta } from '@/lib/cronograma/carregar-tipos'
+import type { MetaFonte, TipoMeta, TipoMetaDef } from '@/lib/cronograma/tipos'
 
 export type CronogramaDetalhe = {
   id: string
@@ -59,6 +60,7 @@ export async function carregarDetalhe(id: string): Promise<{
   ok: boolean
   cronograma?: CronogramaDetalhe
   metas?: MetaFonte[]
+  tipos?: TipoMetaDef[]
   diagnostico?: Diagnostico
   error?: string
 }> {
@@ -119,7 +121,8 @@ export async function carregarDetalhe(id: string): Promise<{
     semanas_revisao: (c as any).semanas_revisao ?? [],
   } as CronogramaDetalhe
 
-  return { ok: true, cronograma: cron, metas, diagnostico: diagnosticar(cron, metas, comLink) }
+  const tipos = await listarTiposMeta(g.tenantId)
+  return { ok: true, cronograma: cron, metas, tipos, diagnostico: diagnosticar(cron, metas, comLink) }
 }
 
 /** Roda as invariantes da spec §8 sobre a grade carregada. */
@@ -191,10 +194,19 @@ function validarMeta(e: EntradaMeta, c: { total_semanas: number; dias_curso: num
     return `Dia precisa ser um índice entre 0 e ${c.dias_curso.length - 1} (é a posição dentro dos dias de curso, não o dia da semana).`
   }
   if (!e.disciplina.trim()) return 'Informe a disciplina.'
-  if (e.tipo === 'simulado' && !e.simulado_id && !(e.simulado_externo_nome && e.simulado_externo_url)) {
-    return 'Meta de simulado precisa apontar um simulado da plataforma ou informar nome e link de um externo.'
-  }
   return null
+}
+
+/** O tipo precisa existir no cadastro do tenant — o CHECK fixo do banco não existe mais. */
+async function validarTipo(svc: any, tenantId: string, slug: string): Promise<string | null> {
+  const { data } = await svc
+    .from('simulado_cronograma_tipos_meta')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('slug', slug)
+    .eq('ativo', true)
+    .maybeSingle()
+  return data ? null : `Tipo de meta "${slug}" não existe ou está inativo no cadastro.`
 }
 
 async function cronogramaDoTenant(svc: any, tenantId: string, cronogramaId: string) {
@@ -216,6 +228,8 @@ export async function criarMeta(cronogramaId: string, e: EntradaMeta): Promise<{
   if (!c) return { ok: false, error: 'Cronograma não encontrado.' }
   const erro = validarMeta(e, c)
   if (erro) return { ok: false, error: erro }
+  const erroTipo = await validarTipo(svc, g.tenantId, e.tipo)
+  if (erroTipo) return { ok: false, error: erroTipo }
 
   const { data, error } = await svc
     .from('simulado_cronograma_metas')
@@ -244,6 +258,8 @@ export async function atualizarMeta(cronogramaId: string, metaId: string, e: Ent
   if (!c) return { ok: false, error: 'Cronograma não encontrado.' }
   const erro = validarMeta(e, c)
   if (erro) return { ok: false, error: erro }
+  const erroTipo = await validarTipo(svc, g.tenantId, e.tipo)
+  if (erroTipo) return { ok: false, error: erroTipo }
 
   const { data: antes } = await svc
     .from('simulado_cronograma_metas')

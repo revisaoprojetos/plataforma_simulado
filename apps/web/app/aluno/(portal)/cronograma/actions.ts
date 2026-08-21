@@ -16,6 +16,7 @@ import { fetchAll } from '@/lib/supabase/fetch-all'
 import { verificarAcessoCronograma } from '@/lib/cronograma/acesso'
 import { indexarLinks } from '@/lib/cronograma/formato-meta'
 import { gerarGrade } from '@/lib/cronograma/gerador'
+import { mapaTiposMeta } from '@/lib/cronograma/carregar-tipos'
 import type { Grade, LinkAula, MetaFonte, OpcoesGeracao } from '@/lib/cronograma/tipos'
 
 export type ResultadoGeracao =
@@ -74,6 +75,7 @@ export async function gerarCronograma(
       semanas_revisao: (cron as any).semanas_revisao ?? [],
     },
     metas,
+    await mapaTiposMeta(sessao.tenantId),
     links,
     opcoes,
   )

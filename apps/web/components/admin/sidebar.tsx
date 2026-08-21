@@ -198,6 +198,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Catálogo', href: '/admin/cronogramas', icon: CalendarDays, perm: 'cronogramas:view' },
       { label: 'Links de aula', href: '/admin/cronogramas/links', icon: LinkIcon, perm: 'cronogramas:view' },
+      { label: 'Tipos de meta', href: '/admin/cronogramas/tipos', icon: Tag, perm: 'cronogramas:view' },
       { label: 'Importar', href: '/admin/cronogramas/importar', icon: Upload, perm: 'cronogramas:update' },
     ],
   },

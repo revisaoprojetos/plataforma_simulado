@@ -77,7 +77,7 @@ export function ImportarClient({ estado }: { estado: EstadoAtual }) {
     const mapa = new Map(vc.itens.map((c) => [c.slug, { total_semanas: c.total_semanas, dias_curso: c.dias_curso }]))
     // Cronogramas já no catálogo também valem como destino: dá para importar só metas.
     for (const c of estado.cronogramas) if (!mapa.has(c.slug)) mapa.set(c.slug, { total_semanas: 9999, dias_curso: [0, 1, 2, 3, 4, 5, 6] })
-    const vm = validarMetas(novos.metas ?? [], mapa)
+    const vm = validarMetas(novos.metas ?? [], mapa, new Set(estado.tiposMeta))
     const vl = validarLinks(novos.links ?? [])
 
     const todosErros = [...errosArquivo, ...vc.erros, ...vm.erros, ...vl.erros]

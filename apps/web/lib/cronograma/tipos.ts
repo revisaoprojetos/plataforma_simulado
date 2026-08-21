@@ -12,32 +12,74 @@
 
 import type { DataISO } from './datas'
 
-/** Os seis tipos de meta. `simulado` existe e aponta prova interna ou externa. */
-export type TipoMeta = 'pdfull' | 'quest' | 'legproc' | 'flash' | 'juris' | 'simulado'
+/**
+ * O tipo de uma meta é um SLUG livre — quem define os tipos válidos é o cadastro do
+ * tenant (`simulado_cronograma_tipos_meta`), não uma união fechada aqui.
+ */
+export type TipoMeta = string
 
-/** R10 — ordem fixa dentro do dia. Não é alfabética nem a ordem do enumerado. */
-export const ORDEM_TIPO: readonly TipoMeta[] = ['pdfull', 'flash', 'legproc', 'quest', 'simulado', 'juris']
-
-export const ROTULO_TELA: Record<TipoMeta, string> = {
-  pdfull: 'PDFULL + Videoaula',
-  quest: 'Resolução de Questões',
-  legproc: 'Legproc',
-  flash: 'PDFlash / Flashcards',
-  juris: 'Atividade Extra',
-  simulado: 'Simulado',
+/**
+ * Definição de um tipo de meta, com o comportamento explícito.
+ *
+ * Cada flag corresponde a uma regra que antes era um `if (tipo === 'x')` espalhado pelo
+ * motor. Ler este objeto é ler as regras R10–R21 de forma tabular — e criar um tipo novo
+ * passa a ser responder seis perguntas, em vez de mexer no código.
+ */
+export type TipoMetaDef = {
+  id: string
+  slug: string
+  /** Rótulo na tela. */
+  nome: string
+  /** Rótulo na coluna "TIPO DE META" do DOCX. */
+  rotulo_docx: string
+  /** R10 — ordem dentro do dia. */
+  ordem: number
+  cor: string | null
+  /** R11 — mostra os links de questões da aula. */
+  mostra_links: boolean
+  /** R12 — o conteúdo ganha o prefixo "Aula NN - ". */
+  prefixo_aula: boolean
+  /** R15 — com aula preenchida, exibe "Disciplina: Aula N" e ignora o conteúdo. */
+  aula_no_titulo: boolean
+  /** R14 — quebra o conteúdo em título + complemento. */
+  quebra_conteudo: boolean
+  /** R16 — entra na contagem de "Atividades". */
+  conta_atividade: boolean
+  /** Linha mais alta no DOCX. */
+  destaque_docx: boolean
+  /** Aparece em todas as páginas do DOCX, ou só onde houver meta dele. */
+  sempre_no_docx: boolean
 }
 
-export const ROTULO_DOCX: Record<TipoMeta, string> = {
-  pdfull: 'PDFULL OU VIDEOAULA',
-  quest: 'RESOLUÇÃO DE QUESTÕES',
-  legproc: 'LEGPROC',
-  flash: 'PDFLASH OU FLASHCARDS',
-  juris: 'ATIVIDADE EXTRA',
-  simulado: 'SIMULADO',
+/** Índice slug → definição, que o motor recebe pronto. */
+export type MapaTipos = Map<string, TipoMetaDef>
+
+/**
+ * Usado quando um slug não está no cadastro — meta importada com tipo que a equipe
+ * ainda não cadastrou, por exemplo. Comportamento neutro: aparece, conta, sem
+ * formatação especial. Melhor do que sumir da grade sem explicação.
+ */
+export function tipoPadrao(slug: string): TipoMetaDef {
+  return {
+    id: '',
+    slug,
+    nome: slug,
+    rotulo_docx: slug.toUpperCase(),
+    ordem: 999,
+    cor: null,
+    mostra_links: false,
+    prefixo_aula: true,
+    aula_no_titulo: false,
+    quebra_conteudo: false,
+    conta_atividade: true,
+    destaque_docx: false,
+    sempre_no_docx: false,
+  }
 }
 
-/** R16 — a contagem de "Atividades" do topo ignora estes dois. */
-export const TIPOS_FORA_DA_CONTAGEM: readonly TipoMeta[] = ['simulado', 'juris']
+export function acharTipo(tipos: MapaTipos, slug: string): TipoMetaDef {
+  return tipos.get(slug) ?? tipoPadrao(slug)
+}
 
 /** R13 — não é disciplina: é o valor usado quando a linha não pertence a uma matéria. */
 export const PSEUDO_DISCIPLINA = 'Atividade'
@@ -106,6 +148,8 @@ export type LinksMeta = {
 
 /** Meta já posicionada no calendário e pronta para exibir. */
 export type MetaDatada = MetaFonte & {
+  /** Definição do tipo já resolvida — a UI não precisa carregar o mapa. */
+  tipoDef: TipoMetaDef
   data: DataISO
   /** Rótulo do dia vindo de `dias_nome`. */
   diaNome: string

@@ -18,6 +18,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { verificarAcessoCronograma } from '@/lib/cronograma/acesso'
 import { gerarGrade } from '@/lib/cronograma/gerador'
+import { mapaTiposMeta } from '@/lib/cronograma/carregar-tipos'
 import { indexarLinks } from '@/lib/cronograma/formato-meta'
 import type { Grade, LinkAula, MetaFonte, OpcoesGeracao } from '@/lib/cronograma/tipos'
 
@@ -127,6 +128,7 @@ export async function abrirEmissao(emissaoId: string): Promise<{ ok: boolean; da
       semanas_revisao: (cron as any).semanas_revisao ?? [],
     },
     metas,
+    await mapaTiposMeta(sessao.tenantId),
     await carregarLinks(svc, sessao.tenantId),
     opcoes,
   )

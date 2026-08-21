@@ -15,8 +15,7 @@ import { linksDaMeta, rotuloConteudo } from './formato-meta'
 import { subtituloGrade } from './faixa'
 import { montarPredicadoRecesso } from './recesso'
 import {
-  ORDEM_TIPO,
-  TIPOS_FORA_DA_CONTAGEM,
+  acharTipo,
   type BlocoRevisao,
   type CronogramaFonte,
   type Grade,
@@ -24,8 +23,9 @@ import {
   type MetaDatada,
   type MetaFonte,
   type OpcoesGeracao,
+  type MapaTipos,
   type SemanaGrade,
-  type TipoMeta,
+  type TipoMetaDef,
 } from './tipos'
 
 /**
@@ -100,13 +100,15 @@ export function montarPauta(blocos: MetaFonte[][], revisao: OpcoesGeracao['revis
   return pauta
 }
 
-/** R10 — dentro da semana: por dia, depois por tipo (ordem fixa), depois pela ordem de origem. */
-export function ordenarMetas(metas: MetaFonte[]): MetaFonte[] {
+/**
+ * R10 — dentro da semana: por dia, depois por tipo, depois pela ordem de origem.
+ *
+ * A ordem dos tipos vem do CADASTRO (`ordem` de cada tipo), não de uma lista fixa: a
+ * equipe reordena pela interface sem tocar no código.
+ */
+export function ordenarMetas(metas: MetaFonte[], tipos: MapaTipos): MetaFonte[] {
   return [...metas].sort(
-    (a, b) =>
-      a.dia - b.dia ||
-      ORDEM_TIPO.indexOf(a.tipo) - ORDEM_TIPO.indexOf(b.tipo) ||
-      a.ordem - b.ordem,
+    (a, b) => a.dia - b.dia || acharTipo(tipos, a.tipo).ordem - acharTipo(tipos, b.tipo).ordem || a.ordem - b.ordem,
   )
 }
 
@@ -121,25 +123,28 @@ function datarMetas(
   metas: MetaFonte[],
   inicioSemana: DataISO,
   cron: CronogramaFonte,
+  tipos: MapaTipos,
   links: Map<string, LinkAula>,
   avisos: string[],
 ): MetaDatada[] {
   const ultimo = cron.dias_curso.length - 1
-  return ordenarMetas(metas).map((m) => {
+  return ordenarMetas(metas, tipos).map((m) => {
     let idx = m.dia
     if (idx > ultimo || idx < 0) {
       // Dado fora do intervalo: cai na última coluna em vez de sumir sem explicação.
       avisos.push(`Meta com dia ${m.dia} fora dos ${cron.dias_curso.length} dias de curso — exibida no último dia.`)
       idx = ultimo
     }
-    const { titulo, complemento } = rotuloConteudo(m)
+    const tipoDef = acharTipo(tipos, m.tipo)
+    const { titulo, complemento } = rotuloConteudo(m, tipoDef)
     return {
       ...m,
+      tipoDef,
       data: addDias(inicioSemana, offsetDesdeSegunda(cron.dias_curso[idx])),
       diaNome: cron.dias_nome[idx] ?? '',
       titulo,
       complemento,
-      links: linksDaMeta(m, links),
+      links: linksDaMeta(m, tipoDef, links),
     }
   })
 }
@@ -156,6 +161,7 @@ function alocarNoCalendario(
   segunda: DataISO,
   ehRecesso: (inicio: DataISO) => boolean,
   cron: CronogramaFonte,
+  tipos: MapaTipos,
   links: Map<string, LinkAula>,
   avisos: string[],
 ): { ok: true; semanas: SemanaGrade[] } | { ok: false; erro: string } {
@@ -184,7 +190,7 @@ function alocarNoCalendario(
     semanas.push(
       atual.kind === 'revisao'
         ? { kind: 'revisao', numero: numero++, inicio, fim, blocos: BLOCOS_REVISAO }
-        : { kind: 'conteudo', numero: numero++, inicio, fim, metas: datarMetas(atual.metas, inicio, cron, links, avisos) },
+        : { kind: 'conteudo', numero: numero++, inicio, fim, metas: datarMetas(atual.metas, inicio, cron, tipos, links, avisos) },
     )
   }
 
@@ -196,8 +202,8 @@ function alocarNoCalendario(
  * encontrada. Nos dados reais há 54 combinações com durações divergentes na mesma
  * semana e tipo; o comportamento é mantido fiel, mas o CRUD avisa a equipe.
  */
-export function duracaoPorTipo(metas: MetaDatada[]): Map<TipoMeta, string> {
-  const mapa = new Map<TipoMeta, string>()
+export function duracaoPorTipo(metas: MetaDatada[]): Map<string, string> {
+  const mapa = new Map<string, string>()
   for (const m of metas) {
     const d = (m.duracao ?? '').trim()
     if (d && !mapa.has(m.tipo)) mapa.set(m.tipo, d)
@@ -214,6 +220,7 @@ export function duracaoPorTipo(metas: MetaDatada[]): Map<TipoMeta, string> {
 export function gerarGrade(
   cron: CronogramaFonte,
   metas: MetaFonte[],
+  tipos: MapaTipos,
   links: Map<string, LinkAula>,
   op: OpcoesGeracao,
 ): { ok: true; grade: Grade } | { ok: false; erro: string } {
@@ -224,7 +231,7 @@ export function gerarGrade(
   if (!blocos.length) return { ok: false, erro: 'Este cronograma ainda não tem metas cadastradas.' }
 
   const pauta = montarPauta(blocos, op.revisao) // R6
-  const alocado = alocarNoCalendario(pauta, segunda, montarPredicadoRecesso(op), cron, links, avisos) // R7/R8
+  const alocado = alocarNoCalendario(pauta, segunda, montarPredicadoRecesso(op), cron, tipos, links, avisos) // R7/R8
   if (!alocado.ok) return alocado
 
   const { semanas } = alocado
@@ -232,11 +239,12 @@ export function gerarGrade(
   const semanasRevisao = semanas.filter((s) => s.kind === 'revisao').length
   const semanasRecesso = semanas.filter((s) => s.kind === 'recesso').length
 
-  // R16 — "Atividades" conta só as metas que não são `simulado` nem `juris`.
+  // R16 — "Atividades" conta só os tipos marcados como contáveis no cadastro. Nos seis
+  // tipos originais isso reproduz a regra da spec: simulado e atividade extra ficam fora.
   let atividades = 0
   for (const s of semanas) {
     if (s.kind !== 'conteudo') continue
-    for (const m of s.metas) if (!TIPOS_FORA_DA_CONTAGEM.includes(m.tipo)) atividades++
+    for (const m of s.metas) if (m.tipoDef.conta_atividade) atividades++
   }
 
   // R4 — a conclusão é o último DIA DE CURSO da última semana (não o domingo dela).

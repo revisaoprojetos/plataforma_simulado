@@ -38,7 +38,8 @@ ok('dias_curso e dias_nome sempre do mesmo tamanho', vc.itens.every((c) => c.dia
 
 console.log('\n=== VALIDAÇÃO DAS METAS (contra os cronogramas) ===')
 const mapa = new Map(vc.itens.map((c) => [c.slug, { total_semanas: c.total_semanas, dias_curso: c.dias_curso }]))
-const vm = validarMetas(brutoMetas, mapa)
+const TIPOS_CADASTRADOS = new Set(['pdfull', 'flash', 'legproc', 'quest', 'simulado', 'juris'])
+const vm = validarMetas(brutoMetas, mapa, TIPOS_CADASTRADOS)
 eq('16.697 metas aceitas', vm.itens.length, 16697)
 eq('nenhum erro', vm.erros.length, 0)
 if (vm.erros.length) vm.erros.slice(0, 8).forEach((e) => console.log(`        linha ${e.linha} · ${e.campo}: ${e.problema}`))
@@ -67,18 +68,18 @@ ok('formato novo (urls por slug) também é aceito', formatoNovo.itens[0]?.urls.
 
 console.log('\n=== REJEIÇÃO DE PLANILHA COM AULA NUMÉRICA (o risco nº 1) ===')
 const comNumero = [{ ...brutoMetas[0], aula: 1 }]
-const vn = validarMetas(comNumero, mapa)
+const vn = validarMetas(comNumero, mapa, TIPOS_CADASTRADOS)
 ok('meta com aula numérica é REJEITADA, não coagida', vn.itens.length === 0 && vn.erros.length === 1)
 ok('  e a mensagem explica o porquê', /texto/i.test(vn.erros[0]?.problema ?? ''), `\n        "${vn.erros[0]?.problema}"`)
 
 console.log('\n=== OUTRAS REJEIÇÕES ===')
 const cronTeste = new Map([['x', { total_semanas: 10, dias_curso: [1, 2, 3, 4, 5] }]])
 const base = { cronograma_slug: 'x', semana: 1, dia: 0, tipo: 'pdfull', disciplina: 'D', aula: '01', ordem: 0 }
-ok('semana fora do intervalo', validarMetas([{ ...base, semana: 11 }], cronTeste).erros.length === 1)
-ok('dia fora de dias_curso (5 dias → índice 5 inválido)', validarMetas([{ ...base, dia: 5 }], cronTeste).erros.length === 1)
-ok('tipo desconhecido', validarMetas([{ ...base, tipo: 'xpto' }], cronTeste).erros.length === 1)
-ok('disciplina vazia', validarMetas([{ ...base, disciplina: '  ' }], cronTeste).erros.length === 1)
-const desconhecido = validarMetas([{ ...base, cronograma_slug: 'nao-existe' }], cronTeste)
+ok('semana fora do intervalo', validarMetas([{ ...base, semana: 11 }], cronTeste, TIPOS_CADASTRADOS).erros.length === 1)
+ok('dia fora de dias_curso (5 dias → índice 5 inválido)', validarMetas([{ ...base, dia: 5 }], cronTeste, TIPOS_CADASTRADOS).erros.length === 1)
+ok('tipo não cadastrado', validarMetas([{ ...base, tipo: 'xpto' }], cronTeste, TIPOS_CADASTRADOS).erros.length === 1)
+ok('disciplina vazia', validarMetas([{ ...base, disciplina: '  ' }], cronTeste, TIPOS_CADASTRADOS).erros.length === 1)
+const desconhecido = validarMetas([{ ...base, cronograma_slug: 'nao-existe' }], cronTeste, TIPOS_CADASTRADOS)
 ok('cronograma inexistente vira UM erro agrupado', desconhecido.erros.length === 1 && /não existe/.test(desconhecido.erros[0].problema))
 
 console.log('\n=== PRÉVIA (catálogo vazio — a carga inicial) ===')

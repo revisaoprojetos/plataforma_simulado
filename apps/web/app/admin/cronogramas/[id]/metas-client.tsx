@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ORDEM_TIPO, ROTULO_TELA, type MetaFonte, type TipoMeta } from '@/lib/cronograma/tipos'
+import type { MetaFonte, TipoMeta, TipoMetaDef } from '@/lib/cronograma/tipos'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
 import {
   atualizarMeta,
@@ -32,10 +32,10 @@ import {
   type EntradaMeta,
 } from './metas-actions'
 
-const novaMeta = (semana: number): EntradaMeta => ({
+const novaMeta = (semana: number, tipo: string): EntradaMeta => ({
   semana,
   dia: 0,
-  tipo: 'pdfull',
+  tipo,
   disciplina: '',
   aula: null,
   conteudo: null,
@@ -49,18 +49,24 @@ const novaMeta = (semana: number): EntradaMeta => ({
 export function MetasClient({
   cronograma: c,
   metasIniciais,
+  tipos,
   diagnostico,
 }: {
   cronograma: CronogramaDetalhe
   metasIniciais: MetaFonte[]
+  tipos: TipoMetaDef[]
   diagnostico: Diagnostico
 }) {
+  // Rótulo e ordem vêm do cadastro de tipos, não de constantes no código.
+  const porSlug = useMemo(() => new Map(tipos.map((t) => [t.slug, t])), [tipos])
+  const rotulo = (slug: string) => porSlug.get(slug)?.nome ?? slug
+  const ordemDoTipo = (slug: string) => porSlug.get(slug)?.ordem ?? 999
   const [metas, setMetas] = useState(metasIniciais)
   const [pendente, iniciar] = useTransition()
   const [semanaAtiva, setSemanaAtiva] = useState<number>(1)
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<string | null>(null)
-  const [form, setForm] = useState<EntradaMeta>(novaMeta(1))
+  const [form, setForm] = useState<EntradaMeta>(novaMeta(1, tipos[0]?.slug ?? 'pdfull'))
 
   const revisao = useMemo(() => new Set(c.semanas_revisao), [c.semanas_revisao])
 
@@ -73,10 +79,10 @@ export function MetasClient({
       else mapa.set(m.semana, [m])
     }
     for (const lista of mapa.values()) {
-      lista.sort((a, b) => a.dia - b.dia || ORDEM_TIPO.indexOf(a.tipo) - ORDEM_TIPO.indexOf(b.tipo) || a.ordem - b.ordem)
+      lista.sort((a, b) => a.dia - b.dia || ordemDoTipo(a.tipo) - ordemDoTipo(b.tipo) || a.ordem - b.ordem)
     }
     return mapa
-  }, [metas])
+  }, [metas, porSlug])
 
   const daSemana = porSemana.get(semanaAtiva) ?? []
 
@@ -111,7 +117,7 @@ export function MetasClient({
 
   function abrirNova() {
     setEditando(null)
-    setForm(novaMeta(semanaAtiva))
+    setForm(novaMeta(semanaAtiva, tipos[0]?.slug ?? 'pdfull'))
     setAberto(true)
   }
 
@@ -250,7 +256,7 @@ export function MetasClient({
                   {c.dias_nome[m.dia] ?? `dia ${m.dia}`}
                 </Badge>
                 <Badge variant="secondary" className="shrink-0">
-                  {ROTULO_TELA[m.tipo]}
+                  {rotulo(m.tipo)}
                 </Badge>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">
@@ -325,9 +331,9 @@ export function MetasClient({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ORDEM_TIPO.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {ROTULO_TELA[t]}
+                  {tipos.map((t) => (
+                    <SelectItem key={t.slug} value={t.slug}>
+                      {t.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -372,7 +378,7 @@ export function MetasClient({
               />
             </div>
 
-            {form.tipo === 'simulado' && (
+            {(porSlug.get(form.tipo)?.slug === 'simulado' || form.simulado_externo_url) && (
               <div className="space-y-3 rounded-md border border-dashed p-3">
                 <p className="text-xs text-muted-foreground">
                   A meta pode apontar um simulado externo (nome + link). O vínculo com um simulado desta

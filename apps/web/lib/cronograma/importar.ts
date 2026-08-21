@@ -21,7 +21,7 @@
  */
 
 import { chaveLink } from './formato-meta'
-import { ORDEM_TIPO, type TipoMeta } from './tipos'
+import type { TipoMeta } from './tipos'
 
 export type ErroLinha = { linha: number; campo: string; problema: string }
 
@@ -62,8 +62,6 @@ export type LinkImportado = {
    */
   urls: Record<string, string>
 }
-
-const TIPOS_VALIDOS = new Set<string>(ORDEM_TIPO)
 
 /** Aparência canônica da disciplina: espaços colapsados, sem sobra nas pontas. */
 export function normalizarDisciplina(s: string): string {
@@ -167,6 +165,12 @@ export function validarCronogramas(bruto: unknown): { itens: CronogramaImportado
 export function validarMetas(
   bruto: unknown,
   cronogramas: Map<string, { total_semanas: number; dias_curso: number[] }>,
+  /**
+   * Slugs de tipo válidos, vindos do CADASTRO do tenant. Os tipos deixaram de ser uma
+   * lista fixa no código, então quem valida precisa dizer quais existem. Omitido, aceita
+   * qualquer slug não-vazio — usado em teste de unidade do parser.
+   */
+  tiposValidos?: Set<string>,
 ): { itens: MetaImportada[]; erros: ErroLinha[] } {
   const erros: ErroLinha[] = []
   const itens: MetaImportada[] = []
@@ -204,8 +208,13 @@ export function validarMetas(
     }
 
     const tipo = texto(m?.tipo)
-    if (!tipo || !TIPOS_VALIDOS.has(tipo)) {
-      return erros.push({ linha, campo: 'tipo', problema: `desconhecido: "${m?.tipo}". Válidos: ${[...TIPOS_VALIDOS].join(', ')}` })
+    if (!tipo) return erros.push({ linha, campo: 'tipo', problema: 'obrigatório' })
+    if (tiposValidos && tiposValidos.size && !tiposValidos.has(tipo)) {
+      return erros.push({
+        linha,
+        campo: 'tipo',
+        problema: `"${tipo}" não está cadastrado. Cadastre-o em Cronograma → Tipos de meta antes de importar, para o gerador saber como tratá-lo. Cadastrados: ${[...tiposValidos].join(', ')}`,
+      })
     }
 
     const disciplina = texto(m?.disciplina)

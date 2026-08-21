@@ -15,7 +15,7 @@ import { Card } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { fmtBr, fmtIntervalo } from '@/lib/cronograma/datas'
 import { acharPaleta } from '@/lib/cronograma/paletas'
-import { ORDEM_TIPO, ROTULO_TELA, type Grade } from '@/lib/cronograma/tipos'
+import type { Grade } from '@/lib/cronograma/tipos'
 
 export function ResumoGrade({ grade }: { grade: Grade }) {
   const numeros: [string, string | number][] = [
@@ -51,10 +51,16 @@ export function GradeCronograma({ grade, paletaSlug }: { grade: Grade; paletaSlu
   }, [grade, filtroSemana, filtroTipo])
 
   // Só oferece tipos que existem nesta grade — um filtro que nunca acha nada é ruído.
+  // A ordem e o rótulo vêm da definição do tipo, que o motor já anexou a cada meta.
   const tiposPresentes = useMemo(() => {
-    const s = new Set<string>()
-    for (const sem of grade.semanas) if (sem.kind === 'conteudo') for (const m of sem.metas) s.add(m.tipo)
-    return ORDEM_TIPO.filter((t) => s.has(t))
+    const vistos = new Map<string, { slug: string; nome: string; ordem: number }>()
+    for (const sem of grade.semanas) {
+      if (sem.kind !== 'conteudo') continue
+      for (const m of sem.metas) {
+        if (!vistos.has(m.tipo)) vistos.set(m.tipo, { slug: m.tipo, nome: m.tipoDef.nome, ordem: m.tipoDef.ordem })
+      }
+    }
+    return [...vistos.values()].sort((a, b) => a.ordem - b.ordem)
   }, [grade])
 
   if (!grade.semanas.length) return null
@@ -83,8 +89,8 @@ export function GradeCronograma({ grade, paletaSlug }: { grade: Grade; paletaSlu
           <SelectContent>
             <SelectItem value="todos">Todos os tipos</SelectItem>
             {tiposPresentes.map((t) => (
-              <SelectItem key={t} value={t}>
-                {ROTULO_TELA[t]}
+              <SelectItem key={t.slug} value={t.slug}>
+                {t.nome}
               </SelectItem>
             ))}
           </SelectContent>
@@ -128,7 +134,7 @@ export function GradeCronograma({ grade, paletaSlug }: { grade: Grade; paletaSlu
                     <p className="text-muted-foreground">{m.diaNome}</p>
                   </div>
                   <Badge variant="outline" className="shrink-0">
-                    {ROTULO_TELA[m.tipo]}
+                    {m.tipoDef.nome}
                   </Badge>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm">{m.titulo}</p>
