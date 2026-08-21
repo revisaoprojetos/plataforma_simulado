@@ -21,7 +21,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { PSEUDO_DISCIPLINA, type MetaFonte, type TipoMeta, type TipoMetaDef } from '@/lib/cronograma/tipos'
+import { DisciplinaPicker } from '@/components/cronograma/disciplina-picker'
+import type { MetaFonte, TipoMeta, TipoMetaDef } from '@/lib/cronograma/tipos'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
 import {
   atualizarMeta,
@@ -31,9 +32,6 @@ import {
   type Diagnostico,
   type EntradaMeta,
 } from './metas-actions'
-
-/** Valor do item que representa o pseudo-valor `Atividade` no seletor. */
-const ATIVIDADE = '__atividade__'
 
 const novaMeta = (semana: number, tipo: string): EntradaMeta => ({
   semana,
@@ -348,38 +346,17 @@ export function MetasClient({
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label>Disciplina</Label>
-                <Select
-                  value={form.disciplina_id ?? (form.disciplina === PSEUDO_DISCIPLINA ? ATIVIDADE : '')}
-                  onValueChange={(v) => {
-                    if (v === ATIVIDADE) return setForm((f) => ({ ...f, disciplina: PSEUDO_DISCIPLINA, disciplina_id: null }))
-                    const d = disciplinas.find((x) => x.id === v)
-                    setForm((f) => ({ ...f, disciplina: d?.nome ?? f.disciplina, disciplina_id: d?.id ?? null }))
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue>{form.disciplina || 'Selecione'}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {/* R13 — `Atividade` não é disciplina: é o valor usado quando a linha
-                        não pertence a uma matéria. Por isso não vive no cadastro. */}
-                    <SelectItem value={ATIVIDADE}>{PSEUDO_DISCIPLINA} (sem matéria)</SelectItem>
-                    {disciplinas.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.disciplina && !form.disciplina_id && form.disciplina !== PSEUDO_DISCIPLINA && (
-                  <p className="text-xs text-amber-600">
-                    “{form.disciplina}” não está no cadastro. Escolha a equivalente para os links da aula
-                    funcionarem.
-                  </p>
-                )}
+                <DisciplinaPicker
+                  disciplinas={disciplinas}
+                  nome={form.disciplina}
+                  disciplinaId={form.disciplina_id}
+                  onChange={(v) => setForm((f) => ({ ...f, ...v }))}
+                />
               </div>
+
               <div className="space-y-1.5">
                 <Label>Aula</Label>
                 <Input
