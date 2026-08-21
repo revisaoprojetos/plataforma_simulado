@@ -44,10 +44,12 @@ async function seedPadrao(svc: ReturnType<typeof createAdminClient>, tenantId: s
   // 1) dá função às que estão sem função e casam com um padrão (não sobrescreve o que o admin definiu).
   for (const e of lista) { if (!e.funcao) { const f = funcDe(e.nome); if (f) await svc.from('simulado_etiquetas').update({ funcao: f }).eq('id', e.id) } }
   // 2) garante UMA etiqueta por função (cria só se aquela função ainda não está representada).
+  // INSERT direto (não upsert onConflict — a constraint (tenant_id,nome) pode não existir); dedup pelo nome.
   const representadas = new Set<string>()
+  const nomes = new Set(lista.map((e) => e.nome.trim().toLowerCase()))
   for (const e of lista) { const f = FUNC(e.funcao) ?? funcDe(e.nome); if (f) representadas.add(f) }
-  const criar = PADRAO_CRIAR.filter((p) => !representadas.has(p.funcao))
-  if (criar.length) await svc.from('simulado_etiquetas').upsert(criar.map((p) => ({ tenant_id: tenantId, nome: p.nome, cor: p.cor, funcao: p.funcao })), { onConflict: 'tenant_id,nome', ignoreDuplicates: true })
+  const criar = PADRAO_CRIAR.filter((p) => !representadas.has(p.funcao) && !nomes.has(p.nome.toLowerCase()))
+  if (criar.length) await svc.from('simulado_etiquetas').insert(criar.map((p) => ({ tenant_id: tenantId, nome: p.nome, cor: p.cor, funcao: p.funcao })))
 }
 
 /** Lista as etiquetas do tenant (com a contagem de questões vinculadas) + garante a padrão. */
