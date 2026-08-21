@@ -99,6 +99,11 @@ export async function importarCronograma(
     .eq('deletado', false)
     .maybeSingle()
 
+  // A categoria vem como TEXTO nos arquivos (é assim que o gerador legado a registra) e
+  // aqui vira referência: resolve pelo nome, e cria se ainda não existir — importar não
+  // deveria falhar por falta de cadastro prévio.
+  const categoriaId = cron.categoria ? await resolverCategoria(svc, g.tenantId, cron.categoria) : null
+
   // Metadados do cronograma. `status` NUNCA entra no update: reimportar não pode
   // rebaixar um cronograma liberado (spec §9, item 5).
   const campos = {
@@ -109,7 +114,7 @@ export async function importarCronograma(
     dias_nome: cron.dias_nome,
     semanas_revisao: cron.semanas_revisao,
     carga_horaria: cron.carga_horaria,
-    categoria: cron.categoria,
+    categoria_id: categoriaId,
     fonte: cron.fonte,
     ordem: cron.ordem,
     atualizado_em: new Date().toISOString(),
@@ -245,6 +250,32 @@ export async function importarLinks(links: LinkImportado[]): Promise<{ ok: boole
   })
   revalidatePath('/admin/cronogramas/links')
   return { ok: true, total: links.length, urls: urlsGravadas, plataformasNovas }
+}
+
+/** Acha a categoria pelo nome (sem diferenciar caixa) ou cria uma nova. */
+async function resolverCategoria(svc: any, tenantId: string, nome: string): Promise<string | null> {
+  const n = nome.trim()
+  if (!n) return null
+  const { data: existente } = await svc
+    .from('simulado_cronograma_categorias')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .ilike('nome', n)
+    .maybeSingle()
+  if (existente) return (existente as any).id
+
+  const slug = n
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  const { data } = await svc
+    .from('simulado_cronograma_categorias')
+    .insert({ tenant_id: tenantId, nome: n, slug, ordem: 99 })
+    .select('id')
+    .single()
+  return (data as any)?.id ?? null
 }
 
 /** Chamada no fim da importação, para as telas refletirem o catálogo novo. */

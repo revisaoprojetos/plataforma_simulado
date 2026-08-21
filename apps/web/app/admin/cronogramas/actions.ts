@@ -14,6 +14,16 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
 
+export type CategoriaRow = {
+  id: string
+  nome: string
+  slug: string
+  cor: string | null
+  ordem: number
+  /** Quantos cronogramas usam esta categoria — evita excluir uma em uso sem saber. */
+  usos: number
+}
+
 export type CronogramaLista = {
   id: string
   slug: string
@@ -23,7 +33,8 @@ export type CronogramaLista = {
   dias_curso: number[]
   dias_nome: string[]
   semanas_revisao: number[]
-  categoria: string | null
+  categoria_id: string | null
+  categoria_nome: string | null
   status: 'rascunho' | 'liberado'
   acesso_gratuito: boolean
   ordem: number
@@ -82,7 +93,7 @@ export async function listarCronogramas(): Promise<{ ok: boolean; itens?: Cronog
 
   const { data, error } = await svc
     .from('simulado_cronogramas')
-    .select('id, slug, nome, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria, status, acesso_gratuito, ordem')
+    .select('id, slug, nome, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria_id, status, acesso_gratuito, ordem')
     .eq('tenant_id', g.tenantId)
     .eq('deletado', false)
     .order('ordem')
@@ -102,8 +113,15 @@ export async function listarCronogramas(): Promise<{ ok: boolean; itens?: Cronog
     for (const m of (metas ?? []) as any[]) totais.set(m.cronograma_id, (totais.get(m.cronograma_id) ?? 0) + 1)
   }
 
+  const { data: cats } = await svc
+    .from('simulado_cronograma_categorias')
+    .select('id, nome')
+    .eq('tenant_id', g.tenantId)
+  const nomeCategoria = new Map(((cats ?? []) as any[]).map((c) => [c.id, c.nome as string]))
+
   const itens = (data ?? []).map((c: any) => ({
     ...c,
+    categoria_nome: c.categoria_id ? (nomeCategoria.get(c.categoria_id) ?? null) : null,
     dias_curso: c.dias_curso ?? [],
     dias_nome: c.dias_nome ?? [],
     semanas_revisao: c.semanas_revisao ?? [],
@@ -122,7 +140,7 @@ export type EntradaCronograma = {
   dias_curso: number[]
   dias_nome: string[]
   semanas_revisao: number[]
-  categoria: string | null
+  categoria_id: string | null
   subtitulo: string | null
   ordem: number
 }
@@ -148,7 +166,7 @@ export async function criarCronograma(e: EntradaCronograma): Promise<{ ok: boole
       dias_nome: e.dias_nome,
       semanas_revisao: e.semanas_revisao,
       carga_horaria: e.carga_horaria,
-      categoria: e.categoria?.trim() || null,
+      categoria_id: e.categoria_id || null,
       ordem: e.ordem ?? 0,
       status: 'rascunho',
     })
@@ -179,7 +197,7 @@ export async function atualizarCronograma(id: string, e: EntradaCronograma): Pro
   const svc = createAdminClient()
   const { data: antes } = await svc
     .from('simulado_cronogramas')
-    .select('nome, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria, ordem')
+    .select('nome, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria_id, ordem')
     .eq('id', id)
     .eq('tenant_id', g.tenantId)
     .maybeSingle()
@@ -212,7 +230,7 @@ export async function atualizarCronograma(id: string, e: EntradaCronograma): Pro
     dias_nome: e.dias_nome,
     semanas_revisao: e.semanas_revisao,
     carga_horaria: e.carga_horaria,
-    categoria: e.categoria?.trim() || null,
+    categoria_id: e.categoria_id || null,
     ordem: e.ordem ?? 0,
     atualizado_em: new Date().toISOString(),
   }
@@ -308,6 +326,127 @@ export async function excluirCronograma(id: string): Promise<{ ok: boolean; erro
   await registrarAudit({
     operacao: 'DELETE',
     entidade: 'simulado_cronogramas',
+    entidadeId: id,
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  revalidatePath('/admin/cronogramas')
+  return { ok: true }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Categorias
+//
+// Cadastro por tenant, no mesmo desenho das plataformas de curso. Antes `categoria` era
+// texto livre no cronograma, e "Específicos" / "especificos" / "Específico" viravam três
+// categorias diferentes — agrupar o catálogo por elas passava a mentir.
+
+/** Lista as categorias com a contagem de cronogramas que as usam. */
+export async function listarCategorias(): Promise<{ ok: boolean; itens?: CategoriaRow[]; error?: string }> {
+  const g = await guard('cronogramas:view')
+  if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+
+  const [{ data: cats, error }, { data: usos }] = await Promise.all([
+    svc
+      .from('simulado_cronograma_categorias')
+      .select('id, nome, slug, cor, ordem')
+      .eq('tenant_id', g.tenantId)
+      .eq('ativo', true)
+      .order('ordem')
+      .order('nome'),
+    svc.from('simulado_cronogramas').select('categoria_id').eq('tenant_id', g.tenantId).eq('deletado', false),
+  ])
+  if (error) return { ok: false, error: error.message }
+
+  const conta = new Map<string, number>()
+  for (const u of (usos ?? []) as any[]) {
+    if (u.categoria_id) conta.set(u.categoria_id, (conta.get(u.categoria_id) ?? 0) + 1)
+  }
+  return { ok: true, itens: ((cats ?? []) as any[]).map((c) => ({ ...c, usos: conta.get(c.id) ?? 0 })) }
+}
+
+export async function criarCategoria(nome: string, cor: string | null): Promise<{ ok: boolean; id?: string; slug?: string; error?: string }> {
+  const g = await guard('cronogramas:update')
+  if (!g.ok) return { ok: false, error: g.error }
+  const n = nome.trim()
+  if (!n) return { ok: false, error: 'Informe o nome da categoria.' }
+  const slug = gerarSlug(n)
+  if (!slug) return { ok: false, error: 'O nome precisa ter ao menos uma letra ou número.' }
+
+  const svc = createAdminClient()
+  const { data: ultima } = await svc
+    .from('simulado_cronograma_categorias')
+    .select('ordem')
+    .eq('tenant_id', g.tenantId)
+    .order('ordem', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const { data, error } = await svc
+    .from('simulado_cronograma_categorias')
+    .insert({ tenant_id: g.tenantId, nome: n, slug, cor: cor || null, ordem: ((ultima as any)?.ordem ?? -1) + 1 })
+    .select('id, slug')
+    .single()
+  if (error) {
+    return { ok: false, error: /duplicate|unique/i.test(error.message) ? 'Já existe uma categoria com esse nome.' : error.message }
+  }
+  await registrarAudit({
+    operacao: 'INSERT',
+    entidade: 'simulado_cronograma_categorias',
+    entidadeId: (data as any).id,
+    depois: { nome: n, slug },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  revalidatePath('/admin/cronogramas')
+  return { ok: true, id: (data as any).id, slug: (data as any).slug }
+}
+
+/**
+ * Renomeia. O SLUG não muda junto: ele é a chave que a importação usa, e trocá-lo em
+ * silêncio quebraria arquivos que já referenciam a categoria.
+ */
+export async function atualizarCategoria(id: string, nome: string, cor: string | null): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('cronogramas:update')
+  if (!g.ok) return { ok: false, error: g.error }
+  const n = nome.trim()
+  if (!n) return { ok: false, error: 'Informe o nome da categoria.' }
+
+  const svc = createAdminClient()
+  const { error } = await svc
+    .from('simulado_cronograma_categorias')
+    .update({ nome: n, cor: cor || null, atualizado_em: new Date().toISOString() })
+    .eq('id', id)
+    .eq('tenant_id', g.tenantId)
+  if (error) {
+    return { ok: false, error: /duplicate|unique/i.test(error.message) ? 'Já existe uma categoria com esse nome.' : error.message }
+  }
+  await registrarAudit({
+    operacao: 'UPDATE',
+    entidade: 'simulado_cronograma_categorias',
+    entidadeId: id,
+    depois: { nome: n, cor },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  revalidatePath('/admin/cronogramas')
+  return { ok: true }
+}
+
+/**
+ * Excluir NÃO apaga cronograma nenhum: a FK é `ON DELETE SET NULL`, então os que usavam
+ * a categoria simplesmente ficam sem ela. A tela avisa quantos são antes de confirmar.
+ */
+export async function excluirCategoria(id: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('cronogramas:update')
+  if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_cronograma_categorias').delete().eq('id', id).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({
+    operacao: 'DELETE',
+    entidade: 'simulado_cronograma_categorias',
     entidadeId: id,
     atorId: g.atorId,
     tenantId: g.tenantId,

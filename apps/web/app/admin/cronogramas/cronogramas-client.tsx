@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
-import { CalendarDays, Gift, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
+import { CalendarDays, Gift, ListChecks, Pencil, Plus, Tags, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SecaoHeader } from '@/components/admin/secao-header'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import {
   Dialog,
@@ -22,9 +23,13 @@ import {
 import {
   alternarAcessoGratuito,
   alternarLiberacao,
+  atualizarCategoria,
   atualizarCronograma,
+  criarCategoria,
   criarCronograma,
+  excluirCategoria,
   excluirCronograma,
+  type CategoriaRow,
   type CronogramaLista,
   type EntradaCronograma,
 } from './actions'
@@ -47,13 +52,22 @@ const vazio = (): EntradaCronograma => ({
   dias_curso: [1, 2, 3, 4, 5, 6],
   dias_nome: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
   semanas_revisao: [],
-  categoria: null,
+  categoria_id: null,
   subtitulo: null,
   ordem: 0,
 })
 
-export function CronogramasClient({ inicial }: { inicial: CronogramaLista[] }) {
+export function CronogramasClient({
+  inicial,
+  categoriasIniciais,
+}: {
+  inicial: CronogramaLista[]
+  categoriasIniciais: CategoriaRow[]
+}) {
   const [itens, setItens] = useState(inicial)
+  const [categorias, setCategorias] = useState(categoriasIniciais)
+  const [categoriasAberto, setCategoriasAberto] = useState(false)
+  const [novaCategoria, setNovaCategoria] = useState('')
   const [pendente, iniciar] = useTransition()
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<string | null>(null)
@@ -92,7 +106,7 @@ export function CronogramasClient({ inicial }: { inicial: CronogramaLista[] }) {
       dias_curso: c.dias_curso,
       dias_nome: c.dias_nome,
       semanas_revisao: c.semanas_revisao,
-      categoria: c.categoria,
+      categoria_id: c.categoria_id,
       subtitulo: null,
       ordem: c.ordem,
     })
@@ -120,7 +134,13 @@ export function CronogramasClient({ inicial }: { inicial: CronogramaLista[] }) {
       toast.success(editando ? 'Cronograma atualizado' : 'Cronograma criado')
       setAberto(false)
       if (editando) {
-        setItens((xs) => xs.map((c) => (c.id === editando ? { ...c, ...form, faixa: c.faixa } : c)))
+        setItens((xs) =>
+          xs.map((c) =>
+            c.id === editando
+              ? { ...c, ...form, faixa: c.faixa, categoria_nome: categorias.find((k) => k.id === form.categoria_id)?.nome ?? null }
+              : c,
+          ),
+        )
       } else {
         // Sem os campos derivados do servidor; a lista recarrega no próximo acesso.
         setItens((xs) => [
@@ -175,6 +195,46 @@ export function CronogramasClient({ inicial }: { inicial: CronogramaLista[] }) {
     })
   }
 
+  function adicionarCategoria() {
+    const nome = novaCategoria.trim()
+    if (!nome) return
+    iniciar(async () => {
+      const r = await criarCategoria(nome, null)
+      if (!r.ok) return toast.error(r.error ?? 'Não foi possível criar.')
+      toast.success(`Categoria "${nome}" criada`)
+      setCategorias((xs) => [...xs, { id: (r as any).id, nome, slug: (r as any).slug ?? '', cor: null, ordem: xs.length, usos: 0 }])
+      setNovaCategoria('')
+    })
+  }
+
+  function renomearCategoria(c: CategoriaRow, nome: string) {
+    iniciar(async () => {
+      const r = await atualizarCategoria(c.id, nome, c.cor)
+      if (!r.ok) return toast.error(r.error ?? 'Não foi possível renomear.')
+      setCategorias((xs) => xs.map((x) => (x.id === c.id ? { ...x, nome } : x)))
+      setItens((xs) => xs.map((x) => (x.categoria_id === c.id ? { ...x, categoria_nome: nome } : x)))
+    })
+  }
+
+  function removerCategoria(c: CategoriaRow) {
+    iniciar(async () => {
+      const sim = await confirmar({
+        titulo: 'Excluir categoria',
+        mensagem:
+          c.usos > 0
+            ? `"${c.nome}" está em ${c.usos} cronograma(s). Eles não são excluídos — apenas ficam sem categoria.`
+            : `Excluir a categoria "${c.nome}"?`,
+        destrutivo: true,
+      })
+      if (!sim) return
+      const r = await excluirCategoria(c.id)
+      if (!r.ok) return toast.error(r.error ?? 'Não foi possível excluir.')
+      toast.success('Categoria excluída')
+      setCategorias((xs) => xs.filter((x) => x.id !== c.id))
+      setItens((xs) => xs.map((x) => (x.categoria_id === c.id ? { ...x, categoria_id: null, categoria_nome: null } : x)))
+    })
+  }
+
   return (
     <>
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
@@ -190,6 +250,10 @@ export function CronogramasClient({ inicial }: { inicial: CronogramaLista[] }) {
                 placeholder="Buscar…"
                 className="h-9 w-44"
               />
+              <Button size="sm" variant="outline" onClick={() => setCategoriasAberto(true)}>
+                <Tags className="mr-1 h-4 w-4" />
+                Categorias
+              </Button>
               <Button size="sm" onClick={abrirNovo}>
                 <Plus className="mr-1 h-4 w-4" />
                 Novo
@@ -233,7 +297,7 @@ export function CronogramasClient({ inicial }: { inicial: CronogramaLista[] }) {
                             Gratuito
                           </Badge>
                         )}
-                        {c.categoria && <Badge variant="outline">{c.categoria}</Badge>}
+                        {c.categoria_nome && <Badge variant="outline">{c.categoria_nome}</Badge>}
                       </div>
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         {c.faixa} · {c.total_semanas} semanas
@@ -361,12 +425,28 @@ export function CronogramasClient({ inicial }: { inicial: CronogramaLista[] }) {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Categoria</Label>
-              <Input
-                value={form.categoria ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))}
-                placeholder="Regulares, Específicos, Em Extinção…"
-              />
+              <div className="flex items-center justify-between">
+                <Label>Categoria</Label>
+                <button type="button" className="text-xs text-primary hover:underline" onClick={() => setCategoriasAberto(true)}>
+                  Gerenciar categorias
+                </button>
+              </div>
+              <Select
+                value={form.categoria_id ?? 'nenhuma'}
+                onValueChange={(v) => setForm((f) => ({ ...f, categoria_id: v === 'nenhuma' ? null : (v ?? null) }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sem categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nenhuma">Sem categoria</SelectItem>
+                  {categorias.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -376,6 +456,63 @@ export function CronogramasClient({ inicial }: { inicial: CronogramaLista[] }) {
             </Button>
             <Button onClick={salvar} disabled={pendente}>
               {pendente ? 'Salvando…' : 'Salvar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={categoriasAberto} onOpenChange={setCategoriasAberto}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Categorias</DialogTitle>
+            <DialogDescription>
+              Agrupam o catálogo. Renomear conserta em todos os cronogramas de uma vez; excluir não apaga
+              cronograma nenhum, só os deixa sem categoria.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            {categorias.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma categoria cadastrada ainda.</p>}
+
+            {categorias.map((c) => (
+              <div key={c.id} className="flex items-center gap-2">
+                <Input
+                  defaultValue={c.nome}
+                  onBlur={(e) => {
+                    const nome = e.target.value.trim()
+                    if (nome && nome !== c.nome) renomearCategoria(c, nome)
+                  }}
+                />
+                <span className="w-28 shrink-0 text-right text-xs text-muted-foreground">
+                  {c.usos === 0 ? 'sem uso' : `${c.usos} cronograma(s)`}
+                </span>
+                <Button size="sm" variant="ghost" onClick={() => removerCategoria(c)} disabled={pendente}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            ))}
+
+            <div className="flex items-center gap-2 border-t pt-3">
+              <Input
+                value={novaCategoria}
+                onChange={(e) => setNovaCategoria(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') adicionarCategoria()
+                }}
+                placeholder="Nome da categoria (ex.: Pré-Edital)"
+              />
+              <Button size="sm" onClick={adicionarCategoria} disabled={pendente || !novaCategoria.trim()}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Renomear é seguro: a chave usada pela importação não muda junto.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCategoriasAberto(false)}>
+              Fechar
             </Button>
           </DialogFooter>
         </DialogContent>
