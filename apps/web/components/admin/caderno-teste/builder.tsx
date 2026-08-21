@@ -138,6 +138,10 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
   const router = useRouter()
+  // Voltar SEMPRE para o banco a que este caderno pertence (aba "Caderno"). Cadernos só existem
+  // dentro de um banco — a lista standalone /admin/cadernos-teste não é destino. Sem banco (caso
+  // raro/órfão), cai na lista de bancos.
+  const voltarHref = builder.bancoId ? `/admin/banco-questoes/${builder.bancoId}?tab=caderno-teste` : '/admin/banco-questoes'
   // "Salvo × não salvo": salvoRef guarda o último builder persistido. A comparação por referência
   // casa com o histórico de undo/redo e evita perda silenciosa de edições ao sair do editor.
   const salvoRef = useRef<BuilderV3>(builderInicial)
@@ -181,7 +185,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
       <div className="-m-6 flex h-screen flex-col overflow-hidden bg-background">
         <div className="relative z-30 flex items-center justify-between gap-3 border-b bg-card/60 px-4 py-2.5">
           <div className="flex items-center gap-3">
-            <Link href="/admin/cadernos-teste" className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
+            <Link href={voltarHref} className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
             <div>
               <h1 className="text-lg font-bold leading-tight">Construtor de caderno (teste)</h1>
               <p className="text-xs text-muted-foreground">Escolha um modelo para começar.</p>
@@ -376,10 +380,10 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
       else toast.error(r.error ?? 'Erro ao salvar')
     })
   }
-  // Voltar para a lista — confirma se houver alterações não salvas (senão, perde tudo em silêncio).
+  // Voltar para o banco (aba Caderno) — confirma se houver alterações não salvas (senão, perde tudo em silêncio).
   async function sair() {
     if (sujo && !(await confirmar({ titulo: 'Sair sem salvar?', mensagem: 'Há alterações não salvas neste caderno. Se sair agora, elas serão perdidas.', confirmar: 'Sair sem salvar', destrutivo: true }))) return
-    router.push('/admin/cadernos-teste')
+    router.push(voltarHref)
   }
   /** Importa um caderno (Word/HTML) → cria um novo grupo de Diagnóstico já mapeado. */
   async function importar(file: File) {

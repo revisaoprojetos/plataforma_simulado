@@ -20,7 +20,6 @@ import {
   SlidersHorizontal,
   Flag,
   PenLine,
-  FileText,
   MessagesSquare,
   LogIn,
   FilePen,
@@ -116,7 +115,6 @@ const navGroups: NavGroup[] = [
       { label: 'Questões', href: '/admin/questoes', icon: BookOpen, perm: 'questoes:view' },
       { label: 'Etiquetas', href: '/admin/etiquetas', icon: Tag, perm: 'questoes:view' },
       { label: 'Banco de Simulado', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
-      { label: 'Cadernos', href: '/admin/cadernos-teste', icon: FileText, perm: 'questoes:view' },
     ],
   },
   {
