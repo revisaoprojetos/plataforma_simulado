@@ -282,7 +282,7 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
           </button>
           <div className="rounded-lg bg-black/40 backdrop-blur [&_button:hover]:!bg-white/20 [&_button]:!text-white/90">
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/50" title="Mais ações">
+              <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/50 data-popup-open:!bg-white data-popup-open:!text-neutral-900" title="Mais ações">
                 <MoreHorizontal className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-52">
