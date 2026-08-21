@@ -106,7 +106,10 @@ export type MetaFonte = {
   /** ÍNDICE em `dias_curso` — ver o cabeçalho deste arquivo. */
   dia: number
   tipo: TipoMeta
+  /** Rótulo de exibição — o nome que veio da origem. */
   disciplina: string
+  /** Referência a `simulado_disciplinas`; quando existe, é a CHAVE do casamento. */
+  disciplina_id?: string | null
   aula: string | null
   conteudo: string | null
   duracao: string | null
@@ -127,6 +130,7 @@ export type Plataforma = {
 
 export type LinkAula = {
   disciplina: string
+  disciplina_id?: string | null
   aula: string
   tema: string | null
   /** N links, um por plataforma. Antes eram duas colunas fixas (url_qc/url_tec). */

@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { MetaFonte, TipoMeta, TipoMetaDef } from '@/lib/cronograma/tipos'
+import { PSEUDO_DISCIPLINA, type MetaFonte, type TipoMeta, type TipoMetaDef } from '@/lib/cronograma/tipos'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
 import {
   atualizarMeta,
@@ -32,11 +32,15 @@ import {
   type EntradaMeta,
 } from './metas-actions'
 
+/** Valor do item que representa o pseudo-valor `Atividade` no seletor. */
+const ATIVIDADE = '__atividade__'
+
 const novaMeta = (semana: number, tipo: string): EntradaMeta => ({
   semana,
   dia: 0,
   tipo,
   disciplina: '',
+  disciplina_id: null,
   aula: null,
   conteudo: null,
   duracao: null,
@@ -50,11 +54,13 @@ export function MetasClient({
   cronograma: c,
   metasIniciais,
   tipos,
+  disciplinas,
   diagnostico,
 }: {
   cronograma: CronogramaDetalhe
   metasIniciais: MetaFonte[]
   tipos: TipoMetaDef[]
+  disciplinas: { id: string; nome: string }[]
   diagnostico: Diagnostico
 }) {
   // Rótulo e ordem vêm do cadastro de tipos, não de constantes no código.
@@ -128,6 +134,7 @@ export function MetasClient({
       dia: m.dia,
       tipo: m.tipo,
       disciplina: m.disciplina,
+      disciplina_id: m.disciplina_id ?? null,
       aula: m.aula,
       conteudo: m.conteudo,
       duracao: m.duracao,
@@ -303,7 +310,7 @@ export function MetasClient({
                 <Label>Dia</Label>
                 <Select value={String(form.dia)} onValueChange={(v) => setForm((f) => ({ ...f, dia: Number(v) }))}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>{c.dias_nome[form.dia] ?? `dia ${form.dia}`}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {c.dias_nome.map((nome, i) => (
@@ -326,9 +333,10 @@ export function MetasClient({
 
             <div className="space-y-1.5">
               <Label>Tipo</Label>
-              <Select value={form.tipo} onValueChange={(v) => setForm((f) => ({ ...f, tipo: v as TipoMeta }))}>
+              <Select value={form.tipo} onValueChange={(v) => setForm((f) => ({ ...f, tipo: (v ?? '') as TipoMeta }))}>
                 <SelectTrigger>
-                  <SelectValue />
+                  {/* O gatilho deste Select mostra o VALOR cru; passamos o rótulo. */}
+                  <SelectValue>{rotulo(form.tipo)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {tipos.map((t) => (
@@ -343,11 +351,34 @@ export function MetasClient({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Disciplina</Label>
-                <Input
-                  value={form.disciplina}
-                  onChange={(e) => setForm((f) => ({ ...f, disciplina: e.target.value }))}
-                  placeholder="Direito Constitucional"
-                />
+                <Select
+                  value={form.disciplina_id ?? (form.disciplina === PSEUDO_DISCIPLINA ? ATIVIDADE : '')}
+                  onValueChange={(v) => {
+                    if (v === ATIVIDADE) return setForm((f) => ({ ...f, disciplina: PSEUDO_DISCIPLINA, disciplina_id: null }))
+                    const d = disciplinas.find((x) => x.id === v)
+                    setForm((f) => ({ ...f, disciplina: d?.nome ?? f.disciplina, disciplina_id: d?.id ?? null }))
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue>{form.disciplina || 'Selecione'}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* R13 — `Atividade` não é disciplina: é o valor usado quando a linha
+                        não pertence a uma matéria. Por isso não vive no cadastro. */}
+                    <SelectItem value={ATIVIDADE}>{PSEUDO_DISCIPLINA} (sem matéria)</SelectItem>
+                    {disciplinas.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.disciplina && !form.disciplina_id && form.disciplina !== PSEUDO_DISCIPLINA && (
+                  <p className="text-xs text-amber-600">
+                    “{form.disciplina}” não está no cadastro. Escolha a equivalente para os links da aula
+                    funcionarem.
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>Aula</Label>

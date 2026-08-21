@@ -143,6 +143,8 @@ export async function importarCronograma(
     criado = true
   }
 
+  const discs = await indiceDisciplinas(svc, g.tenantId)
+
   const { data: resultado, error: erroRpc } = await svc.rpc('simulado_cronograma_substituir_metas', {
     p_tenant: g.tenantId,
     p_cronograma: id,
@@ -151,6 +153,7 @@ export async function importarCronograma(
       dia: m.dia,
       tipo: m.tipo,
       disciplina: m.disciplina,
+      disciplina_id: discs.get(normalizarNome(m.disciplina)) ?? null,
       aula: m.aula, // texto sempre — "01" não pode virar 1
       conteudo: m.conteudo,
       duracao: m.duracao,
@@ -191,6 +194,7 @@ export async function importarLinks(links: LinkImportado[]): Promise<{ ok: boole
     .eq('tenant_id', g.tenantId)
   const porSlug = new Map<string, string>(((existentes ?? []) as any[]).map((p) => [p.slug, p.id]))
 
+  const discs = await indiceDisciplinas(svc, g.tenantId)
   const slugsCitados = new Set<string>()
   for (const l of links) for (const slug of Object.keys(l.urls)) slugsCitados.add(slug)
 
@@ -215,7 +219,14 @@ export async function importarLinks(links: LinkImportado[]): Promise<{ ok: boole
     const { data: gravados, error } = await svc
       .from('simulado_cronograma_links')
       .upsert(
-        lote.map((l) => ({ tenant_id: g.tenantId, disciplina: l.disciplina, aula: l.aula, tema: l.tema, atualizado_em: new Date().toISOString() })),
+        lote.map((l) => ({
+          tenant_id: g.tenantId,
+          disciplina: l.disciplina,
+          disciplina_id: discs.get(normalizarNome(l.disciplina)) ?? null,
+          aula: l.aula,
+          tema: l.tema,
+          atualizado_em: new Date().toISOString(),
+        })),
         { onConflict: 'tenant_id,disciplina,aula' },
       )
       .select('id, disciplina, aula')
@@ -256,6 +267,33 @@ export async function importarLinks(links: LinkImportado[]): Promise<{ ok: boole
   })
   revalidatePath('/admin/cronogramas/links')
   return { ok: true, total: links.length, urls: urlsGravadas, plataformasNovas }
+}
+
+/**
+ * Índice das disciplinas do tenant por nome normalizado.
+ *
+ * Os arquivos trazem a disciplina em TEXTO, e a especificação relata que a origem já
+ * teve grafias erradas ("Consitucional", "Prev. Púb."). Casar pelo nome normalizado
+ * resolve caixa e acento; o que não casar fica registrado como texto e aparece no
+ * diagnóstico da tela de metas, para a equipe corrigir ou cadastrar.
+ *
+ * NÃO criamos disciplina automaticamente: o cadastro é compartilhado com os simulados,
+ * e poluí-lo com erros de digitação de um arquivo seria pior do que o problema.
+ */
+async function indiceDisciplinas(svc: any, tenantId: string): Promise<Map<string, string>> {
+  const { data } = await svc.from('simulado_disciplinas').select('id, nome').eq('tenant_id', tenantId)
+  const mapa = new Map<string, string>()
+  for (const d of ((data ?? []) as any[])) mapa.set(normalizarNome(d.nome), d.id)
+  return mapa
+}
+
+function normalizarNome(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 /** Acha a categoria pelo nome (sem diferenciar caixa) ou cria uma nova. */

@@ -31,7 +31,7 @@ export default async function CronogramaDetalhePage({ params }: { params: Promis
           Voltar ao catálogo
         </Link>
       </div>
-      <MetasClient cronograma={r.cronograma} metasIniciais={r.metas ?? []} tipos={r.tipos ?? []} diagnostico={r.diagnostico!} />
+      <MetasClient cronograma={r.cronograma} metasIniciais={r.metas ?? []} tipos={r.tipos ?? []} disciplinas={r.disciplinas ?? []} diagnostico={r.diagnostico!} />
     </div>
   )
 }

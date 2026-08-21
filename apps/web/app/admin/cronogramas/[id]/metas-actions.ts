@@ -61,6 +61,7 @@ export async function carregarDetalhe(id: string): Promise<{
   cronograma?: CronogramaDetalhe
   metas?: MetaFonte[]
   tipos?: TipoMetaDef[]
+  disciplinas?: { id: string; nome: string }[]
   diagnostico?: Diagnostico
   error?: string
 }> {
@@ -85,7 +86,7 @@ export async function carregarDetalhe(id: string): Promise<{
   const metas = await fetchAll<MetaFonte>(() =>
     svc
       .from('simulado_cronograma_metas')
-      .select('id, semana, dia, tipo, disciplina, aula, conteudo, duracao, ordem, simulado_id, simulado_externo_nome, simulado_externo_url')
+      .select('id, semana, dia, tipo, disciplina, disciplina_id, aula, conteudo, duracao, ordem, simulado_id, simulado_externo_nome, simulado_externo_url')
       .eq('tenant_id', g.tenantId)
       .eq('cronograma_id', id)
       .order('semana')
@@ -95,10 +96,12 @@ export async function carregarDetalhe(id: string): Promise<{
   )
 
   // Links do tenant, para apontar quais metas de questões estão órfãs (spec §8).
-  const links = await fetchAll<{ disciplina: string; aula: string }>(() =>
-    svc.from('simulado_cronograma_links').select('disciplina, aula').eq('tenant_id', g.tenantId).order('disciplina').order('aula') as any,
+  const links = await fetchAll<{ disciplina: string; disciplina_id: string | null; aula: string }>(() =>
+    svc.from('simulado_cronograma_links').select('disciplina, disciplina_id, aula').eq('tenant_id', g.tenantId).order('disciplina').order('aula') as any,
   )
-  const comLink = new Set(links.map((l) => chaveLink(l.disciplina, l.aula)).filter(Boolean) as string[])
+  const comLink = new Set(
+    links.flatMap((l) => [chaveLink(l.disciplina, l.aula, l.disciplina_id), chaveLink(l.disciplina, l.aula)]).filter(Boolean) as string[],
+  )
 
   // A categoria virou cadastro: o cronograma guarda a referência, o nome vem daqui.
   let categoriaNome: string | null = null
@@ -122,7 +125,24 @@ export async function carregarDetalhe(id: string): Promise<{
   } as CronogramaDetalhe
 
   const tipos = await listarTiposMeta(g.tenantId)
-  return { ok: true, cronograma: cron, metas, tipos, diagnostico: diagnosticar(cron, metas, comLink) }
+
+  // Reusa o cadastro de disciplinas dos simulados — um vocabulário só para o produto,
+  // em vez de um segundo cadastro que divergiria do primeiro.
+  const { data: disciplinas } = await svc
+    .from('simulado_disciplinas')
+    .select('id, nome')
+    .eq('tenant_id', g.tenantId)
+    .order('ordem')
+    .order('nome')
+
+  return {
+    ok: true,
+    cronograma: cron,
+    metas,
+    tipos,
+    disciplinas: (disciplinas ?? []) as { id: string; nome: string }[],
+    diagnostico: diagnosticar(cron, metas, comLink),
+  }
 }
 
 /** Roda as invariantes da spec §8 sobre a grade carregada. */
@@ -143,7 +163,7 @@ function diagnosticar(c: CronogramaDetalhe, metas: MetaFonte[], comLink: Set<str
     if (m.semana < 1 || m.semana > c.total_semanas) metasForaDasSemanas++
 
     if (m.tipo === 'quest' && m.aula) {
-      const k = chaveLink(m.disciplina, m.aula)
+      const k = chaveLink(m.disciplina, m.aula, m.disciplina_id)
       if (k && !comLink.has(k)) semLink.set(k, { disciplina: m.disciplina, aula: m.aula })
     }
 
@@ -176,6 +196,7 @@ export type EntradaMeta = {
   dia: number
   tipo: TipoMeta
   disciplina: string
+  disciplina_id: string | null
   aula: string | null
   conteudo: string | null
   duracao: string | null
@@ -323,6 +344,7 @@ function normalizar(e: EntradaMeta) {
     dia: e.dia,
     tipo: e.tipo,
     disciplina: e.disciplina.trim(),
+    disciplina_id: e.disciplina_id || null,
     aula: e.aula?.trim() || null,
     conteudo: e.conteudo?.trim() || null,
     duracao: e.duracao?.trim() || null,
