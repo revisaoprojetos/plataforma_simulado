@@ -417,9 +417,9 @@
 /* ── Cascata ────────────────────────────────────────────────────────────
    Modelo riseIn aplicado em:
    (a) .stagger > *  = grids/listas com escalonamento por nth-child (55ms);
-   (b) [data-cascata] = cards/seções escalonados por ÍNDICE calculado no JS
-       (o componente CascataEntrada percorre os cards na ordem de leitura e grava
-       animation-delay inline) → entrada LINHA POR LINHA, da esquerda para a direita. */
+   (b) a cascata dos CARDS, escalonada por índice calculado no JS. O CascataEntrada percorre os
+       cards na ordem de leitura e escreve as regras numa folha própria no <head> — em vez de marcar
+       os elementos, que fazia o React acusar erro de hidratação. Por isso a regra não mora aqui. */
 /* Esconde a página até o JS (CascataEntrada) calcular os delays — evita o "flash" de tudo
    visível antes da cascata. `cascata-pronta` revela; se não houver JS, o @media revela. */
 .cascata-root:not(.cascata-pronta) { opacity: 0; }
@@ -433,12 +433,7 @@
    (O loader mantém shimmer/spinner/dots, que ficam em filhos PROFUNDOS, não direto no container.) */
 .cascata-root > * { animation: none !important; }
 
-.stagger > *, [data-cascata] { animation: riseIn 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-/* Delay do card = índice × passo. O PASSO (`--cascata-step`, publicado no .cascata-root pelo JS)
-   se auto-ajusta ao nº de cards: fica em 75ms para páginas típicas e comprime quando há muitos, para
-   TODOS os cards entrarem na sequência sem arrastar. Atributo + var (não classe/style-inline) evita
-   que o React brigue com a mutação. */
-[data-cascata] { animation-delay: calc(var(--cascata-i, 0) * var(--cascata-step, 75ms)); }
+.stagger > * { animation: riseIn 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .stagger > *:nth-child(1)  { animation-delay: 0ms; }
 .stagger > *:nth-child(2)  { animation-delay: 55ms; }
 .stagger > *:nth-child(3)  { animation-delay: 110ms; }
@@ -454,12 +449,11 @@
 .stagger > *:nth-child(n + 13) { animation-delay: 660ms; }
 
 /* Compositor (GPU): entrada fluida mesmo enquanto a página hidrata. */
-.stagger > *, [data-cascata], .animate-rise { will-change: transform, opacity; }
+.stagger > *, .animate-rise { will-change: transform, opacity; }
 
 /* Enquanto o splash cobre a tela, PAUSA a entrada — senão a cascata roda escondida e, quando
    o splash some, os elementos já estão parados. O SplashSistema tira `splash-ativo` do <html>
    quando começa a sumir → a cascata dispara enquanto o splash dissolve. */
-html.splash-ativo [data-cascata],
 html.splash-ativo .stagger > *,
 html.splash-ativo .animate-rise,
 html.splash-ativo .animate-pop { animation-play-state: paused !important; }
@@ -467,7 +461,7 @@ html.splash-ativo .animate-pop { animation-play-state: paused !important; }
 /* Respeita quem pediu menos movimento. */
 @media (prefers-reduced-motion: reduce) {
   .animate-page, .animate-rise, .animate-pop, .popup-in, .grow-w, .grow-h, .bar-fill,
-  .stagger > *, [data-cascata] { animation: none !important; }
+  .stagger > * { animation: none !important; }
 }
 
 /* Shimmer para skeletons de carregamento. */

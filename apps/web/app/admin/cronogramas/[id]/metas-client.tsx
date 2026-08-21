@@ -133,7 +133,7 @@ export function MetasClient({
   function alternarPacote(p: { id: string; nome: string; alcance: number }, dentro: boolean) {
     iniciar(async () => {
       const r = await alternarCronogramaNoPacote(p.id, c.id, dentro)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível alterar.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível alterar.'); return }
       toast.success(dentro ? `Adicionado ao pacote "${p.nome}"` : `Removido do pacote "${p.nome}"`)
       setPac((x) =>
         dentro

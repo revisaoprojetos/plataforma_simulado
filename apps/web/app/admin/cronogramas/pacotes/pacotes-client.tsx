@@ -32,11 +32,11 @@ export function PacotesClient({ inicial }: { inicial: PacoteLista[] }) {
   function criar() {
     iniciar(async () => {
       const r = await criarPacote(nome, descricao)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível criar.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível criar.'); return }
       toast.success('Pacote criado')
       setItens((xs) => [
         ...xs,
-        { id: (r as any).id, nome, descricao: descricao || null, ativo: true, ordem: xs.length, cronogramas: 0, grupos: 0, estudantes: 0, alcance: 0 },
+        { id: r.id!, nome, descricao: descricao || null, ativo: true, acesso_gratuito: false, ordem: xs.length, cronogramas: 0, grupos: 0, estudantes: 0, alcance: 0 },
       ])
       setNome('')
       setDescricao('')

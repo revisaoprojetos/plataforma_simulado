@@ -211,7 +211,7 @@ export function CronogramasClient({
     if (!nome) return
     iniciar(async () => {
       const r = await criarCategoria(nome, null)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível criar.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível criar.'); return }
       toast.success(`Categoria "${nome}" criada`)
       setCategorias((xs) => [...xs, { id: (r as any).id, nome, slug: (r as any).slug ?? '', cor: null, ordem: xs.length, usos: 0 }])
       setNovaCategoria('')
@@ -221,7 +221,7 @@ export function CronogramasClient({
   function renomearCategoria(c: CategoriaRow, nome: string) {
     iniciar(async () => {
       const r = await atualizarCategoria(c.id, nome, c.cor)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível renomear.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível renomear.'); return }
       setCategorias((xs) => xs.map((x) => (x.id === c.id ? { ...x, nome } : x)))
       setItens((xs) => xs.map((x) => (x.categoria_id === c.id ? { ...x, categoria_nome: nome } : x)))
     })
@@ -239,7 +239,7 @@ export function CronogramasClient({
       })
       if (!sim) return
       const r = await excluirCategoria(c.id)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível excluir.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível excluir.'); return }
       toast.success('Categoria excluída')
       setCategorias((xs) => xs.filter((x) => x.id !== c.id))
       setItens((xs) => xs.map((x) => (x.categoria_id === c.id ? { ...x, categoria_id: null, categoria_nome: null } : x)))

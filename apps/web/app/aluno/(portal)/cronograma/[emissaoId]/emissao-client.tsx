@@ -32,7 +32,7 @@ export function EmissaoClient({
   function salvarTitulo() {
     iniciar(async () => {
       const r = await renomearEmissao(emissao.id, titulo)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível renomear.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível renomear.'); return }
       toast.success('Nome atualizado')
       setEditando(false)
     })
@@ -42,7 +42,7 @@ export function EmissaoClient({
     iniciar(async () => {
       const alvo = !arquivada
       const r = await arquivarEmissao(emissao.id, alvo)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível alterar.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível alterar.'); return }
       setArquivada(alvo)
       toast.success(alvo ? 'Cronograma arquivado' : 'Cronograma restaurado')
     })

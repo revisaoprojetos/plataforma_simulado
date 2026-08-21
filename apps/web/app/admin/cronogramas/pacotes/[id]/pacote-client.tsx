@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { alternarLiberacao } from '../../actions'
 import {
   adicionarCronogramas,
   alternarAcessoGratuitoPacote,
@@ -89,7 +90,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
     iniciar(async () => {
       if (modal === 'cronogramas') {
         const r = await adicionarCronogramas(d.pacote.id, ids)
-        if (!r.ok) return toast.error(r.error ?? 'Não foi possível adicionar.')
+        if (!r.ok) { toast.error(r.error ?? 'Não foi possível adicionar.'); return }
         const novos = d.cronogramasDisponiveis.filter((c) => selecao.has(c.id))
         setD((x) => ({
           ...x,
@@ -99,7 +100,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
         toast.success(`${novos.length} cronograma(s) adicionado(s)`)
       } else if (modal === 'grupos') {
         const r = await vincularGrupos(d.pacote.id, ids)
-        if (!r.ok) return toast.error(r.error ?? 'Não foi possível vincular.')
+        if (!r.ok) { toast.error(r.error ?? 'Não foi possível vincular.'); return }
         const novos = d.gruposDisponiveis.filter((g) => selecao.has(g.id))
         setD((x) => ({
           ...x,
@@ -111,7 +112,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
         toast.success(`${novos.length} grupo(s) vinculado(s) — ${(r.alcance ?? 0).toLocaleString('pt-BR')} aluno(s)`)
       } else {
         const r = await adicionarEstudantes(d.pacote.id, ids)
-        if (!r.ok) return toast.error(r.error ?? 'Não foi possível adicionar.')
+        if (!r.ok) { toast.error(r.error ?? 'Não foi possível adicionar.'); return }
         const novos = achados.filter((a) => selecao.has(a.id))
         setD((x) => ({ ...x, estudantes: [...x.estudantes, ...novos], alcance: x.alcance + novos.length }))
         toast.success(`${novos.length} aluno(s) com acesso`)
@@ -124,7 +125,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
   function addCronograma(c: { id: string; nome: string; status: string; metas: number }) {
     iniciar(async () => {
       const r = await alternarCronogramaNoPacote(d.pacote.id, c.id, true)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível adicionar.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível adicionar.'); return }
       setD((x) => ({
         ...x,
         // A contagem vem do catálogo; sem ela a linha aparecia com "0 metas".
@@ -137,7 +138,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
   function removeCronograma(c: { id: string; nome: string; status: string; metas: number }) {
     iniciar(async () => {
       const r = await alternarCronogramaNoPacote(d.pacote.id, c.id, false)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível remover.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível remover.'); return }
       setD((x) => ({
         ...x,
         cronogramas: x.cronogramas.filter((y) => y.id !== c.id),
@@ -149,7 +150,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
   function addGrupo(g: { id: string; nome: string; membros: number }) {
     iniciar(async () => {
       const r = await vincularGrupo(d.pacote.id, g.id)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível vincular.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível vincular.'); return }
       toast.success(`Grupo vinculado — ${(r.alcance ?? 0).toLocaleString('pt-BR')} aluno(s) alcançado(s)`)
       setD((x) => ({
         ...x,
@@ -187,7 +188,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
       if (!sim) return
 
       const r = await desvincularGrupo(d.pacote.id, g.id, true)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível desvincular.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível desvincular.'); return }
       toast.success(r.preservados ? `Grupo desvinculado — ${r.preservados} aluno(s) preservado(s)` : 'Grupo desvinculado')
       setD((x) => ({
         ...x,
@@ -198,11 +199,27 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
     })
   }
 
+  /* Liberar daqui evita a ida ao catálogo só para destravar um cronograma do pacote — e é a
+     MESMA ação do catálogo (mesma permissão `cronogramas:liberar`, mesma auditoria, mesma recusa
+     quando o cronograma não tem metas). */
+  function alternarStatusCronograma(c: { id: string; nome: string; status: string }) {
+    iniciar(async () => {
+      const liberar = c.status !== 'liberado'
+      const r = await alternarLiberacao(c.id, liberar)
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível alterar.'); return }
+      toast.success(liberar ? `"${c.nome}" liberado` : `"${c.nome}" voltou a rascunho`)
+      setD((x) => ({
+        ...x,
+        cronogramas: x.cronogramas.map((y) => (y.id === c.id ? { ...y, status: liberar ? 'liberado' : 'rascunho' } : y)),
+      }))
+    })
+  }
+
   function alternarGratuito() {
     iniciar(async () => {
       const alvo = !d.pacote.acesso_gratuito
       const r = await alternarAcessoGratuitoPacote(d.pacote.id, alvo)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível alterar.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível alterar.'); return }
       toast.success(alvo ? 'Liberado para todos os alunos' : 'Liberação para todos desligada')
       setD((x) => ({ ...x, pacote: { ...x.pacote, acesso_gratuito: alvo } }))
     })
@@ -249,7 +266,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
       const r = await buscarEstudantes(t)
       if (id !== buscaAtual.current) return
       setBuscando(false)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível buscar.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível buscar.'); return }
       setAchados((r.itens ?? []).filter((a) => !d.estudantes.some((e) => e.id === a.id)))
     }, 250)
   }
@@ -264,7 +281,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
   function addAluno(a: { id: string; nome: string; email: string | null }) {
     iniciar(async () => {
       const r = await alternarEstudanteNoPacote(d.pacote.id, a.id, true)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível adicionar.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível adicionar.'); return }
       toast.success(`${a.nome} recebeu acesso`)
       setD((x) => ({ ...x, estudantes: [...x.estudantes, a], alcance: x.alcance + 1 }))
       setAchados((xs) => xs.filter((x) => x.id !== a.id))
@@ -274,7 +291,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
   function removeAluno(a: { id: string; nome: string }) {
     iniciar(async () => {
       const r = await alternarEstudanteNoPacote(d.pacote.id, a.id, false)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível remover.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível remover.'); return }
       setD((x) => ({ ...x, estudantes: x.estudantes.filter((y) => y.id !== a.id), alcance: Math.max(x.alcance - 1, 0) }))
     })
   }
@@ -355,6 +372,20 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
                 <Badge variant={c.status === 'liberado' ? 'default' : 'secondary'} className="shrink-0">
                   {c.status === 'liberado' ? 'Liberado' : 'Rascunho'}
                 </Badge>
+                <Button
+                  size="sm"
+                  variant={c.status === 'liberado' ? 'ghost' : 'outline'}
+                  className="h-7 shrink-0 px-2 text-xs"
+                  onClick={() => alternarStatusCronograma(c)}
+                  disabled={pendente}
+                  title={
+                    c.status === 'liberado'
+                      ? 'Volta a rascunho — os alunos do pacote deixam de receber'
+                      : 'Libera — os alunos do pacote passam a receber'
+                  }
+                >
+                  {c.status === 'liberado' ? 'Voltar a rascunho' : 'Liberar'}
+                </Button>
                 <Button size="sm" variant="ghost" onClick={() => removeCronograma(c)} disabled={pendente}>
                   <X className="h-4 w-4" />
                 </Button>

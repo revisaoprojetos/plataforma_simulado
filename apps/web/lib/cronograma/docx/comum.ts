@@ -40,7 +40,7 @@ export const sz = (px: number) => Math.max(8, Math.round(px * 1.5))
 
 export const BRANCO = 'FFFFFF'
 
-const semBorda = (cor = BRANCO) => ({ style: BorderStyle.NONE as const, size: 0, color: cor })
+const semBorda = (cor = BRANCO) => ({ style: BorderStyle.NONE, size: 0, color: cor })
 export const SEM_BORDA = {
   top: semBorda(),
   bottom: semBorda(),
@@ -50,7 +50,7 @@ export const SEM_BORDA = {
   insideVertical: semBorda(),
 }
 
-const borda = (cor: string) => ({ style: BorderStyle.SINGLE as const, size: 4, color: cor })
+const borda = (cor: string) => ({ style: BorderStyle.SINGLE, size: 4, color: cor })
 export const COM_BORDA = (cor = 'D4D4D8') => ({
   top: borda(cor),
   bottom: borda(cor),
@@ -154,7 +154,7 @@ export function imagem(dados: Buffer, largura: number, altura: number, tipo: 'pn
   return new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { before: 0, after: 0 },
-    children: [new ImageRun({ data: new Uint8Array(dados), transformation: { width: largura, height: altura }, type })],
+    children: [new ImageRun({ data: new Uint8Array(dados), transformation: { width: largura, height: altura }, type: tipo })],
   })
 }
 

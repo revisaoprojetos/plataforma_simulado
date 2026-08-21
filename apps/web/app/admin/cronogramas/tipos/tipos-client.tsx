@@ -118,7 +118,7 @@ export function TiposClient({ inicial }: { inicial: TipoComUso[] }) {
   function salvar() {
     iniciar(async () => {
       const r = editando ? await atualizarTipo(editando, form) : await criarTipo(form)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível salvar.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível salvar.'); return }
       toast.success(editando ? 'Tipo atualizado' : 'Tipo criado')
       setAberto(false)
       if (editando) {
@@ -148,7 +148,7 @@ export function TiposClient({ inicial }: { inicial: TipoComUso[] }) {
     iniciar(async () => {
       const alvo = !t.ativo
       const r = await alternarAtivoTipo(t.id, alvo)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível alterar.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível alterar.'); return }
       toast.success(alvo ? 'Tipo reativado' : 'Tipo desativado')
       setItens((xs) => xs.map((x) => (x.id === t.id ? { ...x, ativo: alvo } : x)))
     })
@@ -157,12 +157,12 @@ export function TiposClient({ inicial }: { inicial: TipoComUso[] }) {
   function remover(t: TipoComUso) {
     iniciar(async () => {
       if (t.usos > 0) {
-        return toast.error(`"${t.nome}" está em ${t.usos} meta(s). Desative-o em vez de excluir.`)
+        { toast.error(`"${t.nome}" está em ${t.usos} meta(s). Desative-o em vez de excluir.`); return }
       }
       const sim = await confirmar({ titulo: 'Excluir tipo', mensagem: `Excluir o tipo "${t.nome}"?`, destrutivo: true })
       if (!sim) return
       const r = await excluirTipo(t.id)
-      if (!r.ok) return toast.error(r.error ?? 'Não foi possível excluir.')
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível excluir.'); return }
       toast.success('Tipo excluído')
       setItens((xs) => xs.filter((x) => x.id !== t.id))
     })

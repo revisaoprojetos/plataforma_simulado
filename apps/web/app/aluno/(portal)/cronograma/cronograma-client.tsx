@@ -69,7 +69,7 @@ export function CronogramaClient({ catalogo, nomeAluno }: { catalogo: Cronograma
   }, [daCarga, cronogramaId])
 
   function gerar() {
-    if (!cronogramaId) return toast.error('Escolha um cronograma.')
+    if (!cronogramaId) { toast.error('Escolha um cronograma.'); return }
     iniciar(async () => {
       const r = await gerarCronograma(
         cronogramaId,

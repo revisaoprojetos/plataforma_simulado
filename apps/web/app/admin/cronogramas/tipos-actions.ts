@@ -146,7 +146,7 @@ export async function atualizarTipo(id: string, e: EntradaTipo): Promise<{ ok: b
     operacao: 'UPDATE',
     entidade: 'simulado_cronograma_tipos_meta',
     entidadeId: id,
-    depois: { nome, ...e },
+    depois: { ...e },
     atorId: g.atorId,
     tenantId: g.tenantId,
   })

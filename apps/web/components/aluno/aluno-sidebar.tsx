@@ -5,13 +5,13 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { type LoginConfig } from '@/lib/login-config'
-import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy, Flame, Zap, Route } from 'lucide-react'
+import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy, Flame, Zap, Route, CalendarDays } from 'lucide-react'
 import {
   Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, useSidebar,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
-import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
+import { OCULTAR_ALUNO_EXTRAS, OCULTAR_CRONOGRAMA, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { NotificacaoBellAluno } from '@/components/aluno/notificacao-bell-aluno'
 import { AjudaDrawer } from '@/components/aluno/ajuda-drawer'
@@ -32,6 +32,7 @@ const NAV = [
   { href: '/aluno/questoes', label: 'Banco de Questões', icon: BookOpen, tour: 'nav-questoes' },
   { href: '/aluno/favoritos', label: 'Favoritos', icon: Star, tour: 'nav-favoritos' },
   { href: '/aluno/cadernos', label: 'Cadernos', icon: NotebookPen, tour: 'nav-cadernos' },
+  { href: '/aluno/cronograma', label: 'Cronograma', icon: CalendarDays, tour: 'nav-cronograma' },
 ]
 
 function filtroLogo(f?: string): string | undefined {
@@ -67,7 +68,10 @@ export function AlunoSidebar({
   // Trilha e Ligas (gamificação) só aparecem quando ativa; + oculta os extras configurados.
   const nav = NAV.filter((n) =>
     (gamAtivo || (n.href !== '/aluno/trilha' && n.href !== '/aluno/ligas')) &&
-    !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(n.href)),
+    !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(n.href)) &&
+    // Cronograma tem DOIS gates: esta flag (enquanto o módulo está em construção) e a coluna
+    // `ativo` de simulado_cronograma_config, que liga por tenant — respeitada dentro da página.
+    !(OCULTAR_CRONOGRAMA && n.href === '/aluno/cronograma'),
   )
 
   async function sair() {
