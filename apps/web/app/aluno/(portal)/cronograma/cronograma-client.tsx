@@ -106,7 +106,7 @@ export function CronogramaClient({ catalogo }: { catalogo: CronogramaDoAluno[] }
         </p>
         <div className="mb-5 mt-3 h-px bg-border" />
 
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid items-start gap-x-6 gap-y-5 md:grid-cols-2 lg:grid-cols-3">
           <Passo n={1} titulo="Nome do cronograma">
             <Input
               value={titulo}
@@ -123,14 +123,14 @@ export function CronogramaClient({ catalogo }: { catalogo: CronogramaDoAluno[] }
                 <button
                   key={h}
                   onClick={() => aoMudar(setCarga)(h)}
-                  className={`min-w-[74px] rounded-xl border px-3 py-2 text-center leading-tight transition ${
+                  className={`flex h-8 items-center gap-1.5 rounded-lg border px-3 text-sm transition ${
                     carga === h
                       ? 'border-primary bg-primary text-primary-foreground shadow-sm'
                       : 'hover:border-primary/40 hover:bg-muted'
                   }`}
                 >
-                  <span className="block text-sm font-bold">{CARGAS_ROTULO(h)}</span>
-                  <span className={`block text-[11px] ${carga === h ? 'opacity-80' : 'text-muted-foreground'}`}>
+                  <span className="font-bold">{CARGAS_ROTULO(h)}</span>
+                  <span className={`text-[11px] ${carga === h ? 'opacity-80' : 'text-muted-foreground'}`}>
                     {catalogo.filter((c) => c.carga_horaria === h).length} opções
                   </span>
                 </button>
@@ -153,7 +153,7 @@ export function CronogramaClient({ catalogo }: { catalogo: CronogramaDoAluno[] }
 
           <Passo n={4} titulo="Escolha seu cronograma">
             <Select value={cronogramaId} onValueChange={(v) => aoMudar(setCronogramaId)(v ?? '')}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecione">
                   {escolhido ? `${escolhido.nome} (${faixaSemanal(escolhido.dias_curso)})` : undefined}
                 </SelectValue>
@@ -227,7 +227,7 @@ export function CronogramaClient({ catalogo }: { catalogo: CronogramaDoAluno[] }
 
           <Passo n={7} titulo="Cores das tabelas">
             <Select value={paletaSlug} onValueChange={(v) => setPaletaSlug(v ?? PALETAS[0].slug)}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue>{PALETAS.find((p) => p.slug === paletaSlug)?.nome}</SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -308,7 +308,7 @@ const ROTULO_RECESSO = {
 function Passo({ n, titulo, children }: { n: number; titulo: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label className="flex items-center gap-2 text-sm">
+      <Label className="flex min-h-5 items-center gap-2 text-sm">
         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
           {n}
         </span>
@@ -325,7 +325,7 @@ function Dica({ children }: { children: React.ReactNode }) {
 
 function SimNao({ valor, aoTrocar }: { valor: boolean; aoTrocar: (v: boolean) => void }) {
   return (
-    <div className="flex overflow-hidden rounded-xl border">
+    <div className="flex h-8 overflow-hidden rounded-lg border">
       {[
         [true, 'Sim'],
         [false, 'Não'],
@@ -333,7 +333,7 @@ function SimNao({ valor, aoTrocar }: { valor: boolean; aoTrocar: (v: boolean) =>
         <button
           key={String(v)}
           onClick={() => aoTrocar(v as boolean)}
-          className={`px-4 py-2 text-sm transition ${valor === v ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+          className={`px-3.5 text-sm transition ${valor === v ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
         >
           {rotulo as string}
         </button>
