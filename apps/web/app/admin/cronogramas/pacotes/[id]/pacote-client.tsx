@@ -19,8 +19,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  adicionarCronogramas,
+  adicionarEstudantes,
   alternarCronogramaNoPacote,
   membrosDoGrupo,
+  vincularGrupos,
   alternarEstudanteNoPacote,
   buscarEstudantes,
   desvincularGrupo,
@@ -43,6 +46,8 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
   const [achados, setAchados] = useState<{ id: string; nome: string; email: string | null }[]>([])
   // Membros carregados sob demanda: buscar todos de todos os grupos na abertura seria
   // caro, e na maioria das vezes a equipe só quer conferir um.
+  // Seleção acumulada do diálogo — só vira gravação ao confirmar.
+  const [selecao, setSelecao] = useState<Set<string>>(new Set())
   const [buscando, setBuscando] = useState(false)
   const buscaAtual = useRef(0)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -64,6 +69,55 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
     setModal(qual)
     setBusca('')
     setAchados([])
+    setSelecao(new Set())
+  }
+
+  function alternarSelecao(id: string) {
+    setSelecao((s) => {
+      const novo = new Set(s)
+      if (novo.has(id)) novo.delete(id)
+      else novo.add(id)
+      return novo
+    })
+  }
+
+  /** Grava tudo o que foi selecionado, numa chamada só. */
+  function confirmarSelecao() {
+    const ids = [...selecao]
+    if (!ids.length) return
+    iniciar(async () => {
+      if (modal === 'cronogramas') {
+        const r = await adicionarCronogramas(d.pacote.id, ids)
+        if (!r.ok) return toast.error(r.error ?? 'Não foi possível adicionar.')
+        const novos = d.cronogramasDisponiveis.filter((c) => selecao.has(c.id))
+        setD((x) => ({
+          ...x,
+          cronogramas: [...x.cronogramas, ...novos],
+          cronogramasDisponiveis: x.cronogramasDisponiveis.filter((c) => !selecao.has(c.id)),
+        }))
+        toast.success(`${novos.length} cronograma(s) adicionado(s)`)
+      } else if (modal === 'grupos') {
+        const r = await vincularGrupos(d.pacote.id, ids)
+        if (!r.ok) return toast.error(r.error ?? 'Não foi possível vincular.')
+        const novos = d.gruposDisponiveis.filter((g) => selecao.has(g.id))
+        setD((x) => ({
+          ...x,
+          grupos: [...x.grupos, ...novos],
+          gruposDisponiveis: x.gruposDisponiveis.filter((g) => !selecao.has(g.id)),
+          // O alcance real vem do servidor: um aluno em dois grupos conta uma vez só.
+          alcance: x.alcance + (r.alcance ?? 0),
+        }))
+        toast.success(`${novos.length} grupo(s) vinculado(s) — ${(r.alcance ?? 0).toLocaleString('pt-BR')} aluno(s)`)
+      } else {
+        const r = await adicionarEstudantes(d.pacote.id, ids)
+        if (!r.ok) return toast.error(r.error ?? 'Não foi possível adicionar.')
+        const novos = achados.filter((a) => selecao.has(a.id))
+        setD((x) => ({ ...x, estudantes: [...x.estudantes, ...novos], alcance: x.alcance + novos.length }))
+        toast.success(`${novos.length} aluno(s) com acesso`)
+      }
+      setModal(null)
+      setSelecao(new Set())
+    })
   }
 
   function addCronograma(c: { id: string; nome: string; status: string; metas: number }) {
@@ -416,41 +470,34 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
           <div className="max-h-72 space-y-1 overflow-y-auto">
             {modal === 'cronogramas' &&
               (disponiveis.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">Todos os cronogramas já estão no pacote.</p>
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  {busca ? 'Nenhum cronograma com esse nome.' : 'Todos os cronogramas já estão no pacote.'}
+                </p>
               ) : (
                 (disponiveis as typeof d.cronogramasDisponiveis).map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => addCronograma(c)}
-                    disabled={pendente}
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
-                  >
-                    <Plus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <Opcao key={c.id} marcada={selecao.has(c.id)} onClick={() => alternarSelecao(c.id)}>
                     <span className="min-w-0 flex-1 truncate">{c.nome}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{c.metas.toLocaleString('pt-BR')} metas</span>
                     <Badge variant={c.status === 'liberado' ? 'outline' : 'secondary'} className="shrink-0 text-xs">
                       {c.status}
                     </Badge>
-                  </button>
+                  </Opcao>
                 ))
               ))}
 
             {modal === 'grupos' &&
               (disponiveis.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">Nenhum grupo disponível.</p>
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  {busca ? 'Nenhum grupo com esse nome.' : 'Todos os grupos já estão vinculados.'}
+                </p>
               ) : (
                 (disponiveis as typeof d.gruposDisponiveis).map((g) => (
-                  <button
-                    key={g.id}
-                    onClick={() => addGrupo(g)}
-                    disabled={pendente}
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
-                  >
-                    <Plus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <Opcao key={g.id} marcada={selecao.has(g.id)} onClick={() => alternarSelecao(g.id)}>
                     <span className="min-w-0 flex-1 truncate">{g.nome}</span>
                     <Badge variant="outline" className="shrink-0 text-xs">
-                      {g.membros.toLocaleString('pt-BR')}
+                      {g.membros.toLocaleString('pt-BR')} aluno(s)
                     </Badge>
-                  </button>
+                  </Opcao>
                 ))
               ))}
 
@@ -468,28 +515,55 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
                 </p>
               ) : (
                 achados.map((a) => (
-                  <button
-                    key={a.id}
-                    onClick={() => addAluno(a)}
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
-                  >
-                    <Check className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <Opcao key={a.id} marcada={selecao.has(a.id)} onClick={() => alternarSelecao(a.id)}>
                     <div className="min-w-0 flex-1">
                       <p className="truncate">{a.nome}</p>
                       {a.email && <p className="truncate text-xs text-muted-foreground">{a.email}</p>}
                     </div>
-                  </button>
+                  </Opcao>
                 ))
               ))}
           </div>
 
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setModal(null)}>
-              Fechar
-            </Button>
+          <DialogFooter className="items-center gap-2 sm:justify-between">
+            <span className="text-xs text-muted-foreground">
+              {selecao.size === 0
+                ? 'Nada selecionado'
+                : `${selecao.size} selecionado(s)${modal === 'alunos' ? ' — a busca mantém a seleção' : ''}`}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setModal(null)} disabled={pendente}>
+                Cancelar
+              </Button>
+              <Button onClick={confirmarSelecao} disabled={pendente || selecao.size === 0}>
+                {pendente ? 'Salvando…' : `Adicionar ${selecao.size || ''}`.trim()}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+/** Linha selecionável do diálogo — clicar marca, e só o botão Adicionar grava. */
+function Opcao({ marcada, onClick, children }: { marcada: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${
+        marcada ? 'bg-primary/10' : 'hover:bg-muted'
+      }`}
+    >
+      <span
+        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+          marcada ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'
+        }`}
+      >
+        {marcada && <Check className="h-3 w-3" />}
+      </span>
+      {children}
+    </button>
   )
 }

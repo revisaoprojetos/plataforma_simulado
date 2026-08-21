@@ -206,7 +206,8 @@ const navGroups: NavGroup[] = [
   },
 ]
 
-function itemAtivo(item: NavItem, pathname: string, search: URLSearchParams) {
+/** O item casa com a rota atual? (pode casar mais de um — ver `itemAtivo`) */
+function itemCasa(item: NavItem, pathname: string, search: URLSearchParams) {
   const [path, qs] = item.href.split('?')
   if (item.exact) return pathname === path
   if (qs) {
@@ -216,7 +217,25 @@ function itemAtivo(item: NavItem, pathname: string, search: URLSearchParams) {
     for (const [k, v] of want) if (search.get(k) !== v) return false
     return true
   }
-  return pathname.startsWith(path)
+  return pathname === path || pathname.startsWith(path + '/')
+}
+
+/** Todos os itens navegáveis, para decidir qual é o mais específico. */
+const TODOS_ITENS: NavItem[] = [dashboard, ...navGroups.flatMap((g) => g.items)]
+
+/**
+ * Qual item fica aceso — o MAIS ESPECÍFICO entre os que casam.
+ *
+ * Com `startsWith` puro, uma sub-rota acendia dois itens ao mesmo tempo:
+ * /admin/cronogramas/pacotes casa com "Catálogo" (/admin/cronogramas) e com
+ * "Pacotes e acesso". Ganha o href mais longo — assim o detalhe de um cronograma
+ * (/admin/cronogramas/<id>) continua acendendo o Catálogo, que é o que se espera.
+ */
+function itemAtivo(item: NavItem, pathname: string, search: URLSearchParams) {
+  if (!itemCasa(item, pathname, search)) return false
+  const candidatos = TODOS_ITENS.filter((i) => itemCasa(i, pathname, search))
+  const maisEspecifico = candidatos.reduce((a, b) => (b.href.length > a.href.length ? b : a))
+  return maisEspecifico.href === item.href
 }
 
 function frameLogo(estilo?: string): string {

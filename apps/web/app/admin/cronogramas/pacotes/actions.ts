@@ -573,3 +573,92 @@ export async function membrosDoGrupo(
     total: ids.length,
   }
 }
+
+/**
+ * Adiciona VÁRIOS cronogramas de uma vez.
+ *
+ * Um upsert só em vez de N idas ao servidor: escolher 20 cronogramas e confirmar deve
+ * ser uma operação, não vinte. `ignoreDuplicates` torna repetir inofensivo.
+ */
+export async function adicionarCronogramas(pacoteId: string, cronogramaIds: string[]): Promise<{ ok: boolean; adicionados?: number; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return { ok: false, error: g.error }
+  const ids = [...new Set(cronogramaIds.filter(Boolean))]
+  if (!ids.length) return { ok: true, adicionados: 0 }
+
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_cronograma_pacote_itens').upsert(
+    ids.map((cronograma_id) => ({ tenant_id: g.tenantId, pacote_id: pacoteId, cronograma_id })),
+    { onConflict: 'pacote_id,cronograma_id', ignoreDuplicates: true },
+  )
+  if (error) return { ok: false, error: error.message }
+
+  await registrarAudit({
+    operacao: 'LIBERAR',
+    entidade: 'simulado_cronograma_pacote_itens',
+    entidadeId: pacoteId,
+    depois: { cronogramas: ids.length },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  revalidatePath(`/admin/cronogramas/pacotes/${pacoteId}`)
+  return { ok: true, adicionados: ids.length }
+}
+
+/** Vincula VÁRIOS grupos de uma vez. Cada um continua sendo uma linha só. */
+export async function vincularGrupos(pacoteId: string, grupoIds: string[]): Promise<{ ok: boolean; vinculados?: number; alcance?: number; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return { ok: false, error: g.error }
+  const ids = [...new Set(grupoIds.filter(Boolean))]
+  if (!ids.length) return { ok: true, vinculados: 0, alcance: 0 }
+
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_cronograma_pacote_grupos').upsert(
+    ids.map((grupo_id) => ({ tenant_id: g.tenantId, pacote_id: pacoteId, grupo_id })),
+    { onConflict: 'pacote_id,grupo_id', ignoreDuplicates: true },
+  )
+  if (error) return { ok: false, error: error.message }
+
+  // Alcance real: alunos distintos, sem contar duas vezes quem está em mais de um grupo.
+  const membros = await fetchAllByIn<any>(ids, (chunk) =>
+    svc.from('simulado_grupo_membros').select('estudante_id').in('grupo_id', chunk).order('estudante_id') as any,
+  )
+  const alcance = new Set(membros.map((m) => m.estudante_id)).size
+
+  await registrarAudit({
+    operacao: 'LIBERAR',
+    entidade: 'simulado_cronograma_pacote_grupos',
+    entidadeId: pacoteId,
+    depois: { grupos: ids.length, alunos_alcancados: alcance },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  revalidatePath(`/admin/cronogramas/pacotes/${pacoteId}`)
+  return { ok: true, vinculados: ids.length, alcance }
+}
+
+/** Adiciona VÁRIOS alunos avulsos de uma vez. */
+export async function adicionarEstudantes(pacoteId: string, estudanteIds: string[]): Promise<{ ok: boolean; adicionados?: number; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return { ok: false, error: g.error }
+  const ids = [...new Set(estudanteIds.filter(Boolean))]
+  if (!ids.length) return { ok: true, adicionados: 0 }
+
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_cronograma_pacote_estudantes').upsert(
+    ids.map((estudante_id) => ({ tenant_id: g.tenantId, pacote_id: pacoteId, estudante_id })),
+    { onConflict: 'pacote_id,estudante_id', ignoreDuplicates: true },
+  )
+  if (error) return { ok: false, error: error.message }
+
+  await registrarAudit({
+    operacao: 'LIBERAR',
+    entidade: 'simulado_cronograma_pacote_estudantes',
+    entidadeId: pacoteId,
+    depois: { estudantes: ids.length },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  revalidatePath(`/admin/cronogramas/pacotes/${pacoteId}`)
+  return { ok: true, adicionados: ids.length }
+}
