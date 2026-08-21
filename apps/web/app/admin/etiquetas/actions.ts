@@ -37,7 +37,9 @@ const PADRAO_CRIAR: { nome: string; cor: string; funcao: FuncaoEtiqueta }[] = [
  * Tolerante: se a coluna `funcao` ainda não foi migrada, não faz nada.
  */
 async function seedPadrao(svc: ReturnType<typeof createAdminClient>, tenantId: string) {
-  const { data, error } = await svc.from('simulado_etiquetas').select('id, nome, funcao').eq('tenant_id', tenantId)
+  let sel = await svc.from('simulado_etiquetas').select('id, nome, funcao').eq('tenant_id', tenantId).eq('deletado', false)
+  if (sel.error && /deletado|column/i.test(String(sel.error.message))) sel = await svc.from('simulado_etiquetas').select('id, nome, funcao').eq('tenant_id', tenantId)
+  const { data, error } = sel
   if (error) return // coluna `funcao` ausente (migração pendente) ou tabela ausente
   let lista = (data ?? []) as { id: string; nome: string; funcao: string | null }[]
   const funcDe = (nome: string) => PADRAO_MATCH.find((x) => x.re.test(nome))?.funcao ?? null
@@ -80,8 +82,11 @@ export async function listarEtiquetas(): Promise<{ ok: boolean; itens?: Etiqueta
   const g = await guard('questoes:view'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   await seedPadrao(svc, g.tenantId)
-  let res: { data: any[] | null; error: any } = await svc.from('simulado_etiquetas').select('id, nome, cor, funcao').eq('tenant_id', g.tenantId).order('nome')
-  if (res.error && /funcao|column/i.test(String(res.error.message))) res = await svc.from('simulado_etiquetas').select('id, nome, cor').eq('tenant_id', g.tenantId).order('nome')
+  // deletado=false: a tabela participa da lixeira (soft-delete) — não mostrar apagadas.
+  let res: { data: any[] | null; error: any } = await svc.from('simulado_etiquetas').select('id, nome, cor, funcao').eq('tenant_id', g.tenantId).eq('deletado', false).order('nome')
+  if (res.error && /funcao|deletado|column/i.test(String(res.error.message))) {
+    res = await svc.from('simulado_etiquetas').select('id, nome, cor').eq('tenant_id', g.tenantId).order('nome')
+  }
   if (res.error) return { ok: false, error: res.error.message }
   const data = res.data
   const ids = (data ?? []).map((e: any) => e.id as string)
