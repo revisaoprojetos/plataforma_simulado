@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { tipoDoSimulado, type TipoSimulado } from '@/lib/simulado/tipo'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
-import { OCULTAR_DISCURSIVA } from '@/lib/flags'
+import { getOcultarDiscursiva } from '@/lib/sistema/manutencao-areas-server'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { resumosSimuladosRows } from '@/lib/data/relatorios.repo'
 import { resumosRowsViaApi } from '@/lib/data/relatorios-api'
@@ -68,6 +68,7 @@ function compararResumos(sql: ResumoSimulado[], pg: ResumoSimulado[]): void {
  */
 async function resumosViaSql(svc: SupabaseClient, tenantId: string | null): Promise<ResumoSimulado[] | null> {
   const tid = tenantId ?? TENANT_FALLBACK
+  const ocultarDiscursiva = await getOcultarDiscursiva()
   // Strangler: tenta a API dedicada primeiro; se ela não responder, o SQL direto local.
   const rows = (await resumosRowsViaApi(tid)) ?? (await resumosSimuladosRows(tid))
   if (!rows) return null // API e SQL indisponíveis → deixa o chamador usar PostgREST
@@ -90,11 +91,12 @@ async function resumosViaSql(svc: SupabaseClient, tenantId: string | null): Prom
       icone: vis?.icone ?? null,
       capa: vis?.capa ?? null,
     }
-  }).filter((r) => !OCULTAR_DISCURSIVA || r.tipo !== 'discursiva')
+  }).filter((r) => !ocultarDiscursiva || r.tipo !== 'discursiva')
 }
 
 /** Caminho PostgREST original (fallback): 4 fetchAllByIn + agregação em memória. */
 async function resumosViaPostgrest(svc: SupabaseClient, tenantId: string | null): Promise<ResumoSimulado[]> {
+  const ocultarDiscursiva = await getOcultarDiscursiva()
   const { data: sims } = await svc
     .from('simulado_simulados')
     .select('id, titulo, status, created_at, regras')
@@ -158,5 +160,5 @@ async function resumosViaPostgrest(svc: SupabaseClient, tenantId: string | null)
       icone: vis?.icone ?? null,
       capa: vis?.capa ?? null,
     }
-  }).filter((r) => !OCULTAR_DISCURSIVA || r.tipo !== 'discursiva')
+  }).filter((r) => !ocultarDiscursiva || r.tipo !== 'discursiva')
 }

@@ -8,13 +8,14 @@ import { SimuladosBoard, type SimuladoCard } from '@/components/admin/simulados-
 import { onlinePorSimulado } from '@/app/admin/simulados/actions'
 import { tiposDeSimulados } from '@/lib/simulado/tipo'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
-import { OCULTAR_DISCURSIVA } from '@/lib/flags'
+import { getOcultarDiscursiva } from '@/lib/sistema/manutencao-areas-server'
 
 export default async function SimuladosPage({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
   const { pasta: pastaParam } = await searchParams
   const supabase = await createServiceClient()
   const tenantId = await getCurrentTenantId()
   const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
+  const ocultarDiscursiva = await getOcultarDiscursiva()
 
   // Simulados + pastas (Aplicação) + bancos em PARALELO — 3 leituras independentes (só dependem do tenant).
   const [simulados, folders, bancos] = await Promise.all([
@@ -57,7 +58,7 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
     resolverVisualSimulados(supabase, simulados.map((s) => ({ id: s.id, regras: s.regras }))),
   ])
   const comTipo = simulados.map((s) => ({ ...s, tipo: tipos.get(s.id) ?? null, vis: visual.get(s.id) ?? null }))
-    .filter((s) => !OCULTAR_DISCURSIVA || s.tipo !== 'discursiva')
+    .filter((s) => !ocultarDiscursiva || s.tipo !== 'discursiva')
 
   // Nº de simulados por pasta.
   const contPasta = new Map<string, number>()

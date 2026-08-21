@@ -19,7 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Loader2, Plus, Trash2, ImagePlus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { OCULTAR_DISCURSIVA } from '@/lib/flags'
+import { useOcultarDiscursiva } from '@/components/auth/can-provider'
 import { hospedarImagemQuestaoAction } from '@/app/admin/questoes/actions'
 
 /** Redimensiona a imagem no cliente (máx. 1600px) e devolve um data URL JPEG leve. */
@@ -99,6 +99,7 @@ interface QuestaoFormProps {
 const LETRA = ['A', 'B', 'C', 'D', 'E']
 
 export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSugestoes = [], bancos = [], onSubmit }: QuestaoFormProps) {
+  const ocultarDiscursiva = useOcultarDiscursiva()
   const [isLoading, setIsLoading] = useState(false)
 
   const {
@@ -201,7 +202,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="objetiva">Objetiva</SelectItem>
-                  {!OCULTAR_DISCURSIVA && <SelectItem value="discursiva">Discursiva</SelectItem>}
+                  {!ocultarDiscursiva && <SelectItem value="discursiva">Discursiva</SelectItem>}
                 </SelectContent>
               </Select>
             </div>

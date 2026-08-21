@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { BRT_LABEL } from '@/lib/brt'
-import { OCULTAR_DISCURSIVA } from '@/lib/flags'
+import { useOcultarDiscursiva } from '@/components/auth/can-provider'
 import { buscarEstudantesSimulado, listarEstudanteIdsSimulado, buscarQuestoesWizard, listarQuestoesDoBanco, type QuestaoWizardItem } from '@/app/admin/simulados/actions'
 import { toast } from 'sonner'
 
@@ -40,6 +40,7 @@ export function SimuladoWizard({
   disciplinas: { id: string; nome: string }[]
   onSubmit: (data: any) => Promise<{ error?: string } | void>
 }) {
+  const ocultarDiscursiva = useOcultarDiscursiva()
   const [step, setStep] = useState(0)
   const [pending, start] = useTransition()
 
@@ -296,7 +297,7 @@ export function SimuladoWizard({
                   </label>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {([['todos', 'Todos'], ['objetiva', 'Objetivas'], ...(OCULTAR_DISCURSIVA ? [] : [['discursiva', 'Discursivas']])] as const).map(([v, label]) => {
+                  {([['todos', 'Todos'], ['objetiva', 'Objetivas'], ...(ocultarDiscursiva ? [] : [['discursiva', 'Discursivas']])] as const).map(([v, label]) => {
                     const on = filtroBanco === v
                     return (
                       <button key={v} type="button" onClick={() => setFiltroBanco(v as any)}
@@ -362,7 +363,7 @@ export function SimuladoWizard({
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 {([['objetivo', ListChecks, 'Objetivo', 'Questões de múltipla escolha (A–E), correção automática.'],
                    ['discursivo', PenLine, 'Discursivo', 'Questões dissertativas, correção manual por competências.']] as const)
-                  .filter(([val]) => !OCULTAR_DISCURSIVA || val !== 'discursivo').map(([val, Icon, titulo, desc]) => (
+                  .filter(([val]) => !ocultarDiscursiva || val !== 'discursivo').map(([val, Icon, titulo, desc]) => (
                   <button key={val} type="button" onClick={() => setTipo(val as any)}
                     className={cn('flex flex-col items-start gap-2 rounded-xl border-2 p-5 text-left transition-colors',
                       tipo === val ? 'border-primary bg-primary/5' : 'hover:border-primary/50')}>

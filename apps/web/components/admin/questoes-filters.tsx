@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { OCULTAR_DISCURSIVA } from '@/lib/flags'
+import { useOcultarDiscursiva } from '@/components/auth/can-provider'
 import { X } from 'lucide-react'
 import { useCallback } from 'react'
 
@@ -37,6 +37,7 @@ const rotuloDe = (opts: { valor: string; rotulo: string }[], v: string) =>
   opts.find((o) => o.valor === v)?.rotulo ?? opts[0].rotulo
 
 export function QuestoesFilters({ disciplinas = [] }: { disciplinas?: Disciplina[] }) {
+  const ocultarDiscursiva = useOcultarDiscursiva()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -92,7 +93,7 @@ export function QuestoesFilters({ disciplinas = [] }: { disciplinas?: Disciplina
       >
         <SelectTrigger className="w-[140px]"><SelectValue placeholder="Tipo">{(v: string) => rotuloDe(TIPOS, v)}</SelectValue></SelectTrigger>
         <SelectContent>
-          {TIPOS.filter((o) => o.valor !== 'discursiva' || !OCULTAR_DISCURSIVA).map((o) => (
+          {TIPOS.filter((o) => o.valor !== 'discursiva' || !ocultarDiscursiva).map((o) => (
             <SelectItem key={o.valor} value={o.valor}>{o.rotulo}</SelectItem>
           ))}
         </SelectContent>

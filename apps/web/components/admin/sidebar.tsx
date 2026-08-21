@@ -64,7 +64,6 @@ import {
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { OCULTAR_DISCURSIVA } from '@/lib/flags'
 import { useCan } from '@/components/auth/can-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { NotificationBell } from '@/components/admin/notification-bell'
@@ -215,7 +214,7 @@ function filtroLogo(f?: string): string | undefined {
   return undefined
 }
 
-export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', isSuperAdmin = false, userName = 'Administrador', userEmail, loginConfig, counts }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; isSuperAdmin?: boolean; userName?: string; userEmail?: string | null; loginConfig?: LoginConfig; counts?: Record<string, number> }) {
+export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', isSuperAdmin = false, userName = 'Administrador', userEmail, loginConfig, counts, areasBloqueadas = [] }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; isSuperAdmin?: boolean; userName?: string; userEmail?: string | null; loginConfig?: LoginConfig; counts?: Record<string, number>; areasBloqueadas?: string[] }) {
   const pathname = usePathname()
   const [saindo, setSaindo] = useState(false)
   const search = useSearchParams()
@@ -226,9 +225,11 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
   const iniciais = userName.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || 'A'
   const btnFooter = 'flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-medium text-sidebar-foreground/70 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-[color:var(--sidebar-text-active)]'
 
-  // Filtra itens/grupos por permissão do usuário (super-admin gate + flag discursiva).
+  // Filtra itens/grupos por permissão do usuário (super-admin gate + áreas em manutenção).
+  // `areasBloqueadas` já inclui /admin/correcao quando a discursiva está oculta (env ou manutenção).
+  const emManutencao = (href: string) => areasBloqueadas.some((h) => href === h || href.startsWith(h + '/'))
   const gruposVisiveis = navGroups
-    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !(i.superOnly && !isSuperAdmin) && !(OCULTAR_DISCURSIVA && i.href === '/admin/correcao')) }))
+    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !(i.superOnly && !isSuperAdmin) && !emManutencao(i.href)) }))
     .filter((g) => g.items.length > 0)
 
   const grupoAtivo = (group: NavGroup) => group.items.some((i) => itemAtivo(i, pathname, search))

@@ -1,5 +1,6 @@
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { getManutencaoSistema } from '@/lib/sistema/manutencao'
+import { getManutencaoAreas } from '@/lib/sistema/manutencao-areas-server'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { ServerCog } from 'lucide-react'
 import { SistemaTabs } from './sistema-tabs'
@@ -17,7 +18,7 @@ export default async function SistemaPage() {
     )
   }
 
-  const manutencao = await getManutencaoSistema()
+  const [manutencao, areas] = await Promise.all([getManutencaoSistema(), getManutencaoAreas()])
 
   return (
     <div className="space-y-6">
@@ -31,7 +32,7 @@ export default async function SistemaPage() {
         </div>
       </div>
 
-      <SistemaTabs manutencao={manutencao} />
+      <SistemaTabs manutencao={manutencao} areas={areas} />
     </div>
   )
 }

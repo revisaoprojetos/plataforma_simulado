@@ -17,10 +17,11 @@ import {
 import { Plus, Loader2, ListChecks, PenLine, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { OCULTAR_DISCURSIVA } from '@/lib/flags'
+import { useOcultarDiscursiva } from '@/components/auth/can-provider'
 import { criarBanco } from '@/app/admin/banco-questoes/actions'
 
 export function NovoBancoForm({ pastaId = null }: { pastaId?: string | null }) {
+  const ocultarDiscursiva = useOcultarDiscursiva()
   const [open, setOpen] = useState(false)
   const [nome, setNome] = useState('')
   const [tipo, setTipo] = useState<'objetiva' | 'discursiva'>('objetiva')
@@ -76,7 +77,7 @@ export function NovoBancoForm({ pastaId = null }: { pastaId?: string | null }) {
               <Label>Tipo do banco</Label>
               <div className="grid grid-cols-2 gap-2">
                 {([['objetiva', ListChecks, 'Objetiva'], ['discursiva', PenLine, 'Discursiva']] as const)
-                  .filter(([val]) => !OCULTAR_DISCURSIVA || val !== 'discursiva')
+                  .filter(([val]) => !ocultarDiscursiva || val !== 'discursiva')
                   .map(([val, Icon, label]) => (
                     <button key={val} type="button" onClick={() => setTipo(val)}
                       className={cn('flex items-center gap-2 rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-colors', tipo === val ? 'border-primary bg-primary/5 text-primary' : 'hover:border-primary/40')}>

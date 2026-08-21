@@ -5,6 +5,8 @@ import { AdminSidebar } from '@/components/admin/sidebar'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
 import { CanProvider } from '@/components/auth/can-provider'
+import { normalizarManutencaoAreas, areaBloqueadaDoPath, hrefsBloqueados, ocultarDiscursivaDe } from '@/lib/sistema/manutencao-areas'
+import { AreaEmManutencao } from '@/components/admin/area-em-manutencao'
 import { getCurrentAccess, isSuperAdmin, accessCan, getAuthUser } from '@/lib/auth/permissions'
 import { getTenantTheme } from '@/lib/tenant-theme'
 import { resolverLoginConfig } from '@/lib/login-config'
@@ -104,18 +106,27 @@ export default async function AdminLayout({
     redirect('/login')
   }
 
+  const pathname = (await headers()).get('x-pathname') ?? ''
+
   // Gate de ROTA por permissão: cargos SEM acesso total que abrem (ou digitam a URL de) uma área
   // bloqueada na matriz são mandados de volta ao painel. Casa com o menu, que já esconde a área.
   if (!access.isAdmin) {
-    const pathname = (await headers()).get('x-pathname') ?? ''
     const area = AREA_PERM.find((a) => pathname === a.prefix || pathname.startsWith(a.prefix + '/'))
     if (area && !accessCan(access, area.perm) && !(area.ou && accessCan(access, area.ou))) {
       redirect('/admin?erro=sem-acesso')
     }
   }
 
+  // Manutenção POR ÁREA (por-tenant): esconde do menu + bloqueia a rota. A discursiva, além disso,
+  // esconde as opções espalhadas (via `ocultarDiscursiva` no CanProvider). Guardado em tema.manutencao_areas.
+  const manutencaoAreas = normalizarManutencaoAreas((ti as { manutencao_areas?: unknown }).manutencao_areas)
+  const ocultarDiscursiva = ocultarDiscursivaDe(manutencaoAreas)
+  const areasBloqueadas = hrefsBloqueados(manutencaoAreas)
+  const areaEmManutencao = areaBloqueadaDoPath(pathname, manutencaoAreas)
+  const podeGerenciarManutencao = access.isAdmin || access.permissions.includes('configuracoes:view')
+
   return (
-    <CanProvider isAdmin={access.isAdmin} permissions={access.permissions}>
+    <CanProvider isAdmin={access.isAdmin} permissions={access.permissions} ocultarDiscursiva={ocultarDiscursiva}>
       {/* O script anti-flash do splash (classe splash-ativo antes do 1º paint) foi movido para o
           <head> do layout raiz — renderizar um <script> aqui, dentro do CanProvider (client),
           fazia o React 19 avisar ("script tag while rendering React component"). */}
@@ -127,14 +138,16 @@ export default async function AdminLayout({
       />
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
-          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none'} isSuperAdmin={superAdmin} userName={userName} userEmail={userEmail} loginConfig={resolverLoginConfig(ti.login)} counts={counts} />
+          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none'} isSuperAdmin={superAdmin} userName={userName} userEmail={userEmail} loginConfig={resolverLoginConfig(ti.login)} counts={counts} areasBloqueadas={areasBloqueadas} />
           <TourProvider>
             <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
               <SidebarEdgeToggle mode="icon" />
               <Suspense fallback={null}><NavProgress /></Suspense>
               <Suspense fallback={null}><AvisoSemAcesso /></Suspense>
               <main className="flex-1 overflow-y-auto p-6">
-                {children}
+                {areaEmManutencao
+                  ? <AreaEmManutencao area={areaEmManutencao} podeGerenciar={podeGerenciarManutencao} />
+                  : children}
               </main>
             </div>
           </TourProvider>
