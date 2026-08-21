@@ -27,7 +27,6 @@ export type CronogramaDetalhe = {
   semanas_revisao: number[]
   categoria_nome: string | null
   status: 'rascunho' | 'liberado'
-  acesso_gratuito: boolean
 }
 
 /** Problemas de DADO que a equipe precisa ver — não são erros de uso. */
@@ -76,7 +75,7 @@ export async function carregarDetalhe(id: string): Promise<{
 
   const { data: c, error } = await svc
     .from('simulado_cronogramas')
-    .select('id, slug, nome, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria_id, status, acesso_gratuito')
+    .select('id, slug, nome, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria_id, status')
     .eq('id', id)
     .eq('tenant_id', g.tenantId)
     .eq('deletado', false)

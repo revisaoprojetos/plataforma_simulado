@@ -39,6 +39,7 @@ export type PacoteLista = {
   nome: string
   descricao: string | null
   ativo: boolean
+  acesso_gratuito: boolean
   ordem: number
   cronogramas: number
   grupos: number
@@ -55,7 +56,7 @@ export async function listarPacotes(): Promise<{ ok: boolean; itens?: PacoteList
 
   const [pacotes, itens, grupos, estudantes] = await Promise.all([
     fetchAll<any>(() =>
-      svc.from('simulado_cronograma_pacotes').select('id, nome, descricao, ativo, ordem').eq('tenant_id', g.tenantId).order('ordem').order('nome') as any,
+      svc.from('simulado_cronograma_pacotes').select('id, nome, descricao, ativo, acesso_gratuito, ordem').eq('tenant_id', g.tenantId).order('ordem').order('nome') as any,
     ),
     fetchAll<any>(() => svc.from('simulado_cronograma_pacote_itens').select('pacote_id').eq('tenant_id', g.tenantId).order('id') as any),
     fetchAll<any>(() => svc.from('simulado_cronograma_pacote_grupos').select('pacote_id, grupo_id').eq('tenant_id', g.tenantId).order('id') as any),
@@ -105,7 +106,7 @@ export async function listarPacotes(): Promise<{ ok: boolean; itens?: PacoteList
 }
 
 export type PacoteDetalhe = {
-  pacote: { id: string; nome: string; descricao: string | null; ativo: boolean }
+  pacote: { id: string; nome: string; descricao: string | null; ativo: boolean; acesso_gratuito: boolean }
   cronogramas: { id: string; nome: string; status: string; metas: number }[]
   grupos: { id: string; nome: string; membros: number }[]
   estudantes: { id: string; nome: string; email: string | null }[]
@@ -123,7 +124,7 @@ export async function carregarPacote(id: string): Promise<{ ok: boolean; dados?:
 
   const { data: pacote } = await svc
     .from('simulado_cronograma_pacotes')
-    .select('id, nome, descricao, ativo')
+    .select('id, nome, descricao, ativo, acesso_gratuito')
     .eq('id', id)
     .eq('tenant_id', g.tenantId)
     .maybeSingle()
@@ -661,4 +662,40 @@ export async function adicionarEstudantes(pacoteId: string, estudanteIds: string
   })
   revalidatePath(`/admin/cronogramas/pacotes/${pacoteId}`)
   return { ok: true, adicionados: ids.length }
+}
+
+/**
+ * Liberar o pacote para TODOS os alunos do tenant.
+ *
+ * Antes isso era uma flag do cronograma, no catálogo — o que criava duas portas de
+ * entrada em telas diferentes: o pacote decidia quem recebe, e o catálogo tinha um
+ * atalho que furava o pacote sem aparecer aqui. Agora quem recebe é sempre decisão
+ * desta tela.
+ *
+ * Não escreve vínculo nenhum: a resolução de acesso já considera o pacote gratuito,
+ * então liberar para 14 mil alunos continua sendo uma linha alterada.
+ */
+export async function alternarAcessoGratuitoPacote(pacoteId: string, gratuito: boolean): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('cronogramas:liberar')
+  if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+
+  const { error } = await svc
+    .from('simulado_cronograma_pacotes')
+    .update({ acesso_gratuito: gratuito, atualizado_em: new Date().toISOString() })
+    .eq('id', pacoteId)
+    .eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+
+  await registrarAudit({
+    operacao: gratuito ? 'LIBERAR' : 'BLOQUEAR',
+    entidade: 'simulado_cronograma_pacotes',
+    entidadeId: pacoteId,
+    depois: { acesso_gratuito: gratuito },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  revalidatePath('/admin/cronogramas/pacotes')
+  revalidatePath(`/admin/cronogramas/pacotes/${pacoteId}`)
+  return { ok: true }
 }

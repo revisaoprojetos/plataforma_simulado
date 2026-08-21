@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { AlertTriangle, CalendarDays, Check, ChevronDown, ChevronRight, Loader2, Plus, Search, Trash2, UserPlus, Users, X } from 'lucide-react'
+import { AlertTriangle, CalendarDays, Check, ChevronDown, ChevronRight, Gift, Loader2, Plus, Search, Trash2, UserPlus, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   adicionarCronogramas,
+  alternarAcessoGratuitoPacote,
   adicionarEstudantes,
   alternarCronogramaNoPacote,
   membrosDoGrupo,
@@ -197,6 +198,16 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
     })
   }
 
+  function alternarGratuito() {
+    iniciar(async () => {
+      const alvo = !d.pacote.acesso_gratuito
+      const r = await alternarAcessoGratuitoPacote(d.pacote.id, alvo)
+      if (!r.ok) return toast.error(r.error ?? 'Não foi possível alterar.')
+      toast.success(alvo ? 'Liberado para todos os alunos' : 'Liberação para todos desligada')
+      setD((x) => ({ ...x, pacote: { ...x.pacote, acesso_gratuito: alvo } }))
+    })
+  }
+
   function alternarExpandir(grupoId: string) {
     if (expandido === grupoId) return setExpandido(null)
     setExpandido(grupoId)
@@ -272,15 +283,35 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
 
   return (
     <>
+      <Card className={`flex flex-wrap items-center gap-3 p-4 ${d.pacote.acesso_gratuito ? 'border-primary/40 bg-primary/5' : ''}`}>
+        <Gift className={`h-5 w-5 shrink-0 ${d.pacote.acesso_gratuito ? 'text-primary' : 'text-muted-foreground'}`} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">Liberar para todos os alunos</p>
+          <p className="text-xs text-muted-foreground">
+            {d.pacote.acesso_gratuito
+              ? 'Qualquer aluno da plataforma recebe os cronogramas deste pacote, sem precisar de grupo nem vínculo individual.'
+              : 'Ligado, dispensa grupos e vínculos: todo aluno da plataforma passa a receber os cronogramas deste pacote.'}
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant={d.pacote.acesso_gratuito ? 'secondary' : 'outline'}
+          onClick={alternarGratuito}
+          disabled={pendente}
+        >
+          {d.pacote.acesso_gratuito ? 'Desligar' : 'Liberar para todos'}
+        </Button>
+      </Card>
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
+        {([
           ['Cronogramas', d.cronogramas.length],
           ['Grupos', d.grupos.length],
           ['Alunos avulsos', d.estudantes.length],
-          ['Alcance total', d.alcance],
-        ].map(([rotulo, n]) => (
+          ['Alcance total', d.pacote.acesso_gratuito ? 'todos' : d.alcance],
+        ] as [string, number | string][]).map(([rotulo, n]) => (
           <Card key={rotulo as string} className="p-4">
-            <p className="text-2xl font-bold tabular-nums">{(n as number).toLocaleString('pt-BR')}</p>
+            <p className="text-2xl font-bold tabular-nums">{typeof n === 'number' ? n.toLocaleString('pt-BR') : n}</p>
             <p className="text-xs text-muted-foreground">{rotulo as string}</p>
           </Card>
         ))}

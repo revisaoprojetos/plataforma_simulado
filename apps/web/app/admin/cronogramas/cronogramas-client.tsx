@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
-import { CalendarDays, Clock, Gift, ListChecks, Package, Pencil, Plus, Tags, Trash2 } from 'lucide-react'
+import { CalendarDays, Clock, ListChecks, Package, Pencil, Plus, Tags, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -22,7 +22,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  alternarAcessoGratuito,
   alternarLiberacao,
   atualizarCategoria,
   atualizarCronograma,
@@ -77,10 +76,11 @@ export function CronogramasClient({
   const [filtro, setFiltro] = useState<'todos' | 'liberados' | 'rascunhos' | 'sem_pacote' | 'sem_metas'>('todos')
 
   /**
-   * "Invisível": liberado, mas fora de qualquer pacote e sem acesso gratuito. É o estado
-   * que mais engana — a tela diz "Liberado" e mesmo assim ninguém recebe.
+   * "Invisível": liberado, mas fora de qualquer pacote. É o estado que mais engana — a
+   * tela diz "Liberado" e mesmo assim ninguém recebe, porque quem entrega o cronograma
+   * ao aluno é o pacote.
    */
-  const ehInvisivel = (c: CronogramaLista) => c.status === 'liberado' && c.pacotes === 0 && !c.acesso_gratuito
+  const ehInvisivel = (c: CronogramaLista) => c.status === 'liberado' && c.pacotes === 0
 
   const contagens = useMemo(
     () => ({
@@ -169,7 +169,7 @@ export function CronogramasClient({
         // Sem os campos derivados do servidor; a lista recarrega no próximo acesso.
         setItens((xs) => [
           ...xs,
-          { ...(form as any), id: (r as any).id, slug: '', status: 'rascunho', acesso_gratuito: false, metas: 0, faixa: '' },
+          { ...(form as any), id: (r as any).id, slug: '', status: 'rascunho', metas: 0, pacotes: 0, faixa: '' },
         ])
       }
     })
@@ -185,19 +185,6 @@ export function CronogramasClient({
       }
       toast.success(alvo ? 'Liberado para os alunos' : 'Voltou a rascunho')
       setItens((xs) => xs.map((x) => (x.id === c.id ? { ...x, status: alvo ? 'liberado' : 'rascunho' } : x)))
-    })
-  }
-
-  function gratuito(c: CronogramaLista) {
-    iniciar(async () => {
-      const alvo = !c.acesso_gratuito
-      const r = await alternarAcessoGratuito(c.id, alvo)
-      if (!r.ok) {
-        toast.error(r.error ?? 'Não foi possível alterar.')
-        return
-      }
-      toast.success(alvo ? 'Liberado para todos os alunos' : 'Acesso gratuito desligado')
-      setItens((xs) => xs.map((x) => (x.id === c.id ? { ...x, acesso_gratuito: alvo } : x)))
     })
   }
 
@@ -369,12 +356,6 @@ export function CronogramasClient({
                           <Link href={`/admin/cronogramas/${c.id}`} className="truncate font-medium hover:underline">
                             {c.nome}
                           </Link>
-                          {c.acesso_gratuito && (
-                            <Badge variant="outline" className="gap-1">
-                              <Gift className="h-3 w-3" />
-                              Gratuito
-                            </Badge>
-                          )}
                           {c.categoria_nome && <Badge variant="outline">{c.categoria_nome}</Badge>}
                         </div>
 
@@ -407,15 +388,6 @@ export function CronogramasClient({
                       </div>
 
                       <div className="flex shrink-0 items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => gratuito(c)}
-                          disabled={pendente}
-                          title={c.acesso_gratuito ? 'Desligar acesso gratuito' : 'Liberar para todos os alunos, sem pacote'}
-                        >
-                          <Gift className={c.acesso_gratuito ? 'h-4 w-4 text-primary' : 'h-4 w-4'} />
-                        </Button>
                         <Button
                           size="sm"
                           variant={c.status === 'liberado' ? 'secondary' : 'default'}

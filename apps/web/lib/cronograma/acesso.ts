@@ -9,11 +9,11 @@ import 'server-only'
  *
  * Cinco vias, checadas nesta ordem:
  *   1. testador  — atravessa tudo, inclusive rascunho (marca a emissão como teste)
- *   2. gratuito  — o cronograma libera para todos os alunos do tenant
- *   3. pacote    — o caminho normal: o cronograma está num pacote ao qual o aluno, ou um
- *                  grupo dele, está vinculado
- *   4. matrícula — exceção individual, fora do que os pacotes dizem
- *   5. avulso    — concessão com prazo, enquanto não expirar
+ *   2. pacote    — o caminho normal. O cronograma está num pacote ao qual o aluno chega
+ *                  por três vias, todas resolvidas pela mesma função no banco: vínculo
+ *                  direto, grupo, ou o pacote estar liberado para TODOS
+ *   3. matrícula — exceção individual, fora do que os pacotes dizem
+ *   4. avulso    — concessão com prazo, enquanto não expirar
  *
  * O acesso por pacote é resolvido por JUNÇÃO, não materializado: vincular um grupo de
  * 3.000 alunos grava UMA linha, e revogar é imediato. O simulado materializa (é de onde
@@ -22,7 +22,7 @@ import 'server-only'
 
 import { fetchAllByIn } from './../supabase/fetch-all'
 
-export type ViaAcesso = 'testador' | 'gratuito' | 'pacote' | 'matricula' | 'avulso'
+export type ViaAcesso = 'testador' | 'pacote' | 'matricula' | 'avulso'
 
 const SEM_TENANT = '00000000-0000-0000-0000-000000000000'
 
@@ -52,15 +52,13 @@ export async function verificarAcessoCronograma(
 
   const { data: cron } = await svc
     .from('simulado_cronogramas')
-    .select('id, status, acesso_gratuito')
+    .select('id, status')
     .eq('id', cronogramaId)
     .eq('tenant_id', tid)
     .eq('deletado', false)
     .maybeSingle()
   // Fora do testador, cronograma em rascunho não existe para o aluno.
   if (!cron || (cron as any).status !== 'liberado') return { permitido: false, via: null }
-  if ((cron as any).acesso_gratuito) return { permitido: true, via: 'gratuito' }
-
   // Pacotes: uma chamada resolve aluno → (vínculo direto | grupo) → pacote → cronograma.
   const { data: porPacote } = await svc.rpc('simulado_cronograma_do_aluno', {
     p_tenant: tid,
@@ -121,7 +119,7 @@ export async function cronogramasDoAluno(
   const tid = tenantId ?? SEM_TENANT
   const agora = new Date().toISOString()
 
-  const [mats, avulsos, testes, gratuitos, pacotes] = await Promise.all([
+  const [mats, avulsos, testes, pacotes] = await Promise.all([
     svc
       .from('simulado_cronograma_matriculas')
       .select('cronograma_id, liberado, status')
@@ -134,11 +132,10 @@ export async function cronogramasDoAluno(
       .eq('estudante_id', estudanteId)
       .gt('expira_em', agora),
     svc.from('simulado_cronograma_testadores').select('cronograma_id').eq('tenant_id', tid).eq('estudante_id', estudanteId),
-    svc.from('simulado_cronogramas').select('id').eq('tenant_id', tid).eq('deletado', false).eq('status', 'liberado').eq('acesso_gratuito', true),
     svc.rpc('simulado_cronograma_do_aluno', { p_tenant: tid, p_estudante: estudanteId }),
   ])
 
-  // A via mais forte vence: testador > gratuito > pacote > matrícula > avulso.
+  // A via mais forte vence: testador > pacote > matrícula > avulso.
   const via = new Map<string, ViaAcesso>()
   for (const a of (avulsos.data ?? []) as any[]) if (a.cronograma_id) via.set(a.cronograma_id, 'avulso')
   for (const m of (mats.data ?? []) as any[]) {
@@ -146,7 +143,6 @@ export async function cronogramasDoAluno(
   }
 
   for (const p of (pacotes.data ?? []) as any[]) if (p.cronograma_id) via.set(p.cronograma_id, 'pacote')
-  for (const g of (gratuitos.data ?? []) as any[]) via.set(g.id, 'gratuito')
   // Testador do módulo inteiro (cronograma_id null) é resolvido depois, sobre o catálogo.
   const testadorGeral = ((testes.data ?? []) as any[]).some((t) => !t.cronograma_id)
   for (const t of (testes.data ?? []) as any[]) if (t.cronograma_id) via.set(t.cronograma_id, 'testador')

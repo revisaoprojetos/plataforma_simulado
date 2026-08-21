@@ -36,7 +36,6 @@ export type CronogramaLista = {
   categoria_id: string | null
   categoria_nome: string | null
   status: 'rascunho' | 'liberado'
-  acesso_gratuito: boolean
   ordem: number
   faixa: string
   metas: number
@@ -95,7 +94,7 @@ export async function listarCronogramas(): Promise<{ ok: boolean; itens?: Cronog
 
   const { data, error } = await svc
     .from('simulado_cronogramas')
-    .select('id, slug, nome, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria_id, status, acesso_gratuito, ordem')
+    .select('id, slug, nome, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria_id, status, ordem')
     .eq('tenant_id', g.tenantId)
     .eq('deletado', false)
     .order('ordem')
@@ -103,17 +102,17 @@ export async function listarCronogramas(): Promise<{ ok: boolean; itens?: Cronog
     .order('nome')
   if (error) return { ok: false, error: error.message }
 
-  const ids = (data ?? []).map((c: any) => c.id as string)
+  /**
+   * Contagem AGREGADA no banco, não com select + contar aqui.
+   *
+   * O `select cronograma_id` esbarrava no teto de 1.000 linhas do PostgREST: com 16.697
+   * metas, só as primeiras voltavam, e os demais cronogramas apareciam como "sem metas"
+   * — o que ainda desabilitava o botão de liberar. Paginar corrigiria, mas puxaria
+   * 16.697 linhas a cada abertura da tela para produzir 25 números.
+   */
+  const { data: contagemMetas } = await svc.rpc('simulado_cronograma_contar_metas', { p_tenant: g.tenantId })
   const totais = new Map<string, number>()
-  if (ids.length) {
-    // Contagem por cronograma. Só os ids (não as metas) — são ~16.700 linhas no catálogo real.
-    const { data: metas } = await svc
-      .from('simulado_cronograma_metas')
-      .select('cronograma_id')
-      .eq('tenant_id', g.tenantId)
-      .in('cronograma_id', ids)
-    for (const m of (metas ?? []) as any[]) totais.set(m.cronograma_id, (totais.get(m.cronograma_id) ?? 0) + 1)
-  }
+  for (const m of ((contagemMetas ?? []) as any[])) totais.set(m.cronograma_id, Number(m.total))
 
   const { data: cats } = await svc
     .from('simulado_cronograma_categorias')
@@ -122,14 +121,9 @@ export async function listarCronogramas(): Promise<{ ok: boolean; itens?: Cronog
 
   // Vínculos com pacotes: é por eles que o aluno recebe acesso. Um cronograma
   // liberado mas fora de qualquer pacote não chega a ninguém (salvo gratuito).
-  const { data: vinculos } = await svc
-    .from('simulado_cronograma_pacote_itens')
-    .select('cronograma_id')
-    .eq('tenant_id', g.tenantId)
+  const { data: contagemPacotes } = await svc.rpc('simulado_cronograma_contar_pacotes', { p_tenant: g.tenantId })
   const pacotesPorCron = new Map<string, number>()
-  for (const v of ((vinculos ?? []) as any[])) {
-    pacotesPorCron.set(v.cronograma_id, (pacotesPorCron.get(v.cronograma_id) ?? 0) + 1)
-  }
+  for (const v of ((contagemPacotes ?? []) as any[])) pacotesPorCron.set(v.cronograma_id, Number(v.total))
   const nomeCategoria = new Map(((cats ?? []) as any[]).map((c) => [c.id, c.nome as string]))
 
   const itens = (data ?? []).map((c: any) => ({
@@ -296,29 +290,6 @@ export async function alternarLiberacao(id: string, liberar: boolean): Promise<{
     entidade: 'simulado_cronogramas',
     entidadeId: id,
     depois: { status: patch.status },
-    atorId: g.atorId,
-    tenantId: g.tenantId,
-  })
-  revalidatePath('/admin/cronogramas')
-  return { ok: true }
-}
-
-/** Liga/desliga o acesso gratuito (válvula: libera para todos os alunos do tenant). */
-export async function alternarAcessoGratuito(id: string, gratuito: boolean): Promise<{ ok: boolean; error?: string }> {
-  const g = await guard('cronogramas:liberar')
-  if (!g.ok) return { ok: false, error: g.error }
-  const svc = createAdminClient()
-  const { error } = await svc
-    .from('simulado_cronogramas')
-    .update({ acesso_gratuito: gratuito, atualizado_em: new Date().toISOString() })
-    .eq('id', id)
-    .eq('tenant_id', g.tenantId)
-  if (error) return { ok: false, error: error.message }
-  await registrarAudit({
-    operacao: gratuito ? 'LIBERAR' : 'BLOQUEAR',
-    entidade: 'simulado_cronogramas',
-    entidadeId: id,
-    depois: { acesso_gratuito: gratuito },
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
