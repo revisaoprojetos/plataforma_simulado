@@ -7,6 +7,8 @@
 //  - desconsidera: a questão sai do total (não conta pra ninguém).
 // Questões não anuladas: acerto normal (respostas.correta).
 
+import { funcaoEtiquetaPorQuestao } from './etiqueta-funcao'
+
 type AnyClient = { from: (t: string) => any }
 type Politica = 'pontua_todos' | 'desconsidera'
 
@@ -33,6 +35,13 @@ export async function contextoNota(svc: AnyClient, simuladoId: string): Promise<
   const anuladas = new Map<string, Politica>()
   for (const q of (pq ?? []) as any[]) {
     if (q.anulada) anuladas.set(q.questao_id, politicaPorQ.get(q.questao_id) ?? 'pontua_todos')
+  }
+  // Etiquetas FUNCIONAIS da questão (nível banco): 'anular' → pontua_todos; 'desconsiderar' → sai do total.
+  const funcs = await funcaoEtiquetaPorQuestao(svc, (pq ?? []).map((q: any) => q.questao_id))
+  for (const [qid, ef] of funcs) {
+    if (ef.funcao === 'anular') anuladas.set(qid, 'pontua_todos')
+    else if (ef.funcao === 'desconsiderar') anuladas.set(qid, 'desconsidera')
+    // 'avisar' não afeta a nota
   }
   return { totalQuestoes: (pq ?? []).length, anuladas }
 }

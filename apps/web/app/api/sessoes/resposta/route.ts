@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sessaoExpirada } from '@/lib/simulado/sessao-expiry'
+import { funcaoEtiquetaPorQuestao, funcaoBloqueia } from '@/lib/simulado/etiqueta-funcao'
 
 // POST /api/sessoes/resposta — auto-save idempotente de uma resposta.
 // Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
@@ -59,6 +60,11 @@ export async function POST(request: NextRequest) {
   if (pqAnulada?.anulada === true) {
     return NextResponse.json({ saved: false, anulada: true })
   }
+  // Etiqueta FUNCIONAL (anular/desconsiderar) também bloqueia a resposta (ponto automático/nulo).
+  try {
+    const funcs = await funcaoEtiquetaPorQuestao(supabase, [questao_id])
+    if (funcaoBloqueia(funcs.get(questao_id)?.funcao)) return NextResponse.json({ saved: false, anulada: true })
+  } catch { /* etiquetas ausentes */ }
 
   // Valida a alternativa e já resolve a LETRA (por ordem) para armazenar — assim a
   // exibição (caderno, gabarito, mala direta) lê o valor pronto, sem recalcular.

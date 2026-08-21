@@ -32,6 +32,8 @@ interface Questao {
   id: string
   tipo?: string
   anulada?: boolean
+  bloqueada?: boolean // anulada do simulado OU etiqueta funcional (anular/desconsiderar)
+  aviso?: { nome: string; cor: string | null; funcao: string } | null
   enunciado: string
   imagem_url?: string | null
   pontuacao_total?: number | null
@@ -199,15 +201,15 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
   }, [sessao?.id])
 
   function handleResponder(questaoId: string, alternativaId: string) {
-    // Questão anulada é bloqueada para resposta (ponto garantido a todos).
-    if (sessao?.questoes.find((x) => x.id === questaoId)?.anulada) return
+    // Questão bloqueada (anulada/desconsiderada) não aceita resposta (ponto automático/nulo).
+    if (sessao?.questoes.find((x) => x.id === questaoId)?.bloqueada) return
     setRespostas((prev) => ({ ...prev, [questaoId]: alternativaId }))
     autoSave(questaoId, alternativaId)
   }
 
   // Discursiva: salva com debounce (não a cada tecla).
   function handleDiscursiva(questaoId: string, texto: string) {
-    if (sessao?.questoes.find((x) => x.id === questaoId)?.anulada) return // anulada = bloqueada
+    if (sessao?.questoes.find((x) => x.id === questaoId)?.bloqueada) return // bloqueada = anulada/desconsiderada
     setRespDiscursivas((prev) => ({ ...prev, [questaoId]: texto }))
     if (discTimers.current[questaoId]) clearTimeout(discTimers.current[questaoId])
     discTimers.current[questaoId] = setTimeout(async () => {
@@ -285,8 +287,8 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
   const questaoAtual = sessao.questoes[questaoIndex]
   const totalQuestoes = sessao.questoes.length
   const respondidaDe = (q: Questao) =>
-    // Anulada não é respondível — conta como "concluída" para o progresso chegar a 100%.
-    q.anulada ? true : (q.tipo === 'discursiva' ? (!!respDiscursivas[q.id]?.trim() || (discPaginas[q.id] ?? 0) > 0) : !!respostas[q.id])
+    // Bloqueada (anulada/desconsiderada) não é respondível — conta como "concluída" p/ o progresso chegar a 100%.
+    q.bloqueada ? true : (q.tipo === 'discursiva' ? (!!respDiscursivas[q.id]?.trim() || (discPaginas[q.id] ?? 0) > 0) : !!respostas[q.id])
   const totalRespondidas = sessao.questoes.filter(respondidaDe).length
   const progresso = (totalRespondidas / totalQuestoes) * 100
   const timerWarning = segundosRestantes !== null && segundosRestantes < 300
@@ -356,10 +358,15 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
 
         <Card>
           <CardContent className="pt-5">
-            {questaoAtual.anulada && (
-              <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                Questão anulada — ponto garantido a todos. As alternativas ficam bloqueadas.
+            {questaoAtual.aviso && (
+              <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border px-3 py-2 text-xs font-semibold"
+                style={{ borderColor: `${questaoAtual.aviso.cor ?? '#ef4444'}66`, background: `${questaoAtual.aviso.cor ?? '#ef4444'}14`, color: questaoAtual.aviso.cor ?? '#ef4444' }}>
+                <AlertCircle className="h-4 w-4 shrink-0" /> {questaoAtual.aviso.nome}
+                <span className="font-normal opacity-80">
+                  {questaoAtual.aviso.funcao === 'anular' ? '· ponto garantido a todos — não precisa responder'
+                    : questaoAtual.aviso.funcao === 'desconsiderar' ? '· questão fora do total da prova'
+                    : '· atenção ao responder'}
+                </span>
               </div>
             )}
             {questaoAtual.tipo === 'discursiva' && questaoAtual.categoria_discursiva && (
@@ -392,10 +399,10 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
             <QuestaoDiscursivaEnvio
               sessaoId={sessao.id}
               questaoId={questaoAtual.id}
-              bloqueada={!!questaoAtual.anulada}
+              bloqueada={!!questaoAtual.bloqueada}
               onCount={(n) => setDiscPaginas((p) => ({ ...p, [questaoAtual.id]: n }))}
             />
-            {!questaoAtual.anulada && (
+            {!questaoAtual.bloqueada && (
               <details>
                 <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">Observações (opcional) — digite se quiser complementar</summary>
                 <textarea
@@ -413,7 +420,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
           <div className="space-y-2">
             {questaoAtual.alternativas.map((alt, i) => {
               const isSelected = respostas[questaoAtual.id] === alt.id
-              const bloqueada = !!questaoAtual.anulada
+              const bloqueada = !!questaoAtual.bloqueada
               return (
                 <button
                   key={alt.id}
@@ -472,13 +479,13 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
                     'h-6 w-6 rounded text-xs font-medium transition-colors',
                     atual
                       ? 'bg-primary text-primary-foreground'
-                      : q.anulada
+                      : q.bloqueada
                       ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
                       : respondida
                       ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
                   )}
-                  title={q.anulada ? `Questão ${i + 1} — anulada (ponto garantido)` : `Questão ${i + 1}`}
+                  title={q.aviso ? `Questão ${i + 1} — ${q.aviso.nome}` : `Questão ${i + 1}`}
                 >
                   {i + 1}
                 </button>
@@ -531,17 +538,17 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
                   <button
                     key={q.id}
                     onClick={() => { setQuestaoIndex(i); setShowRevisao(false) }}
-                    title={q.anulada ? 'Anulada — ponto garantido' : undefined}
+                    title={q.aviso ? q.aviso.nome : undefined}
                     className={cn(
                       'flex h-9 w-9 items-center justify-center rounded-md text-xs font-medium',
-                      q.anulada
+                      q.bloqueada
                         ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
                         : respondida
                         ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400'
                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
                     )}
                   >
-                    {q.anulada ? '★' : respondida ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
+                    {q.bloqueada ? '★' : respondida ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
                   </button>
                 )
               })}

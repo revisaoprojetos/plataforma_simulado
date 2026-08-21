@@ -5,28 +5,38 @@ import { toast } from 'sonner'
 import { Tag, Plus, Pencil, Trash2, Check, X, Loader2 } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
-import { criarEtiqueta, atualizarEtiqueta, excluirEtiqueta, type Etiqueta } from './actions'
+import { criarEtiqueta, atualizarEtiqueta, excluirEtiqueta, type Etiqueta, type FuncaoEtiqueta } from './actions'
 
 const CORES = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#64748b']
 const ordenar = (a: Etiqueta, b: Etiqueta) => a.nome.localeCompare(b.nome, 'pt-BR')
+
+// Funções (comportamento da etiqueta no simulado).
+const FUNCOES: { id: FuncaoEtiqueta; nome: string; desc: string; badge: string }[] = [
+  { id: 'anular', nome: 'Anular questão', desc: 'No simulado: bloqueia a questão, mostra o aviso no topo e dá o ponto a todos (acerte, erre ou nem responda).', badge: 'Anula + ponto' },
+  { id: 'avisar', nome: 'Só avisar', desc: 'Mostra um alerta no topo da questão; ela continua respondível e pontua normalmente.', badge: 'Aviso' },
+  { id: 'desconsiderar', nome: 'Desconsiderar', desc: 'Tira a questão do total da prova (não pontua ninguém) e bloqueia a resposta.', badge: 'Fora do total' },
+]
+const funcInfo = (f?: FuncaoEtiqueta | null) => FUNCOES.find((x) => x.id === f) ?? null
 
 export function EtiquetasClient({ inicial }: { inicial: Etiqueta[] }) {
   const [itens, setItens] = useState<Etiqueta[]>(inicial)
   const [nome, setNome] = useState('')
   const [cor, setCor] = useState(CORES[5])
+  const [funcao, setFuncao] = useState<FuncaoEtiqueta | ''>('')
   const [editId, setEditId] = useState<string | null>(null)
   const [editNome, setEditNome] = useState('')
   const [editCor, setEditCor] = useState(CORES[5])
+  const [editFuncao, setEditFuncao] = useState<FuncaoEtiqueta | ''>('')
   const [pending, start] = useTransition()
 
   function criar() {
     const n = nome.trim()
     if (!n) { toast.error('Informe um nome.'); return }
     start(async () => {
-      const r = await criarEtiqueta(n, cor)
+      const r = await criarEtiqueta(n, cor, funcao || null)
       if (!r.ok) { toast.error(r.error ?? 'Erro ao criar.'); return }
-      setItens((p) => [...p, { id: r.id!, nome: n, cor, total: 0 }].sort(ordenar))
-      setNome('')
+      setItens((p) => [...p, { id: r.id!, nome: n, cor, funcao: funcao || null, total: 0 }].sort(ordenar))
+      setNome(''); setFuncao('')
       toast.success('Etiqueta criada')
     })
   }
@@ -35,9 +45,9 @@ export function EtiquetasClient({ inicial }: { inicial: Etiqueta[] }) {
     const n = editNome.trim()
     if (!n || !editId) return
     start(async () => {
-      const r = await atualizarEtiqueta(editId, n, editCor)
+      const r = await atualizarEtiqueta(editId, n, editCor, editFuncao || null)
       if (!r.ok) { toast.error(r.error ?? 'Erro ao salvar.'); return }
-      setItens((p) => p.map((e) => (e.id === editId ? { ...e, nome: n, cor: editCor } : e)).sort(ordenar))
+      setItens((p) => p.map((e) => (e.id === editId ? { ...e, nome: n, cor: editCor, funcao: editFuncao || null } : e)).sort(ordenar))
       setEditId(null)
       toast.success('Etiqueta atualizada')
     })
@@ -71,10 +81,13 @@ export function EtiquetasClient({ inicial }: { inicial: Etiqueta[] }) {
         />
         <p className="mb-1.5 text-xs text-muted-foreground">Cor</p>
         <PaletaCor value={cor} onChange={setCor} />
+        <p className="mb-1.5 mt-3 text-xs text-muted-foreground">Função (comportamento no simulado)</p>
+        <FuncaoSelect value={funcao} onChange={setFuncao} />
         <div className="mt-3">
           <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium" style={{ background: `${cor}22`, color: cor }}>
             <Tag className="h-3 w-3" /> {nome.trim() || 'Prévia'}
           </span>
+          {funcInfo(funcao || null) && <span className="ml-1.5 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{funcInfo(funcao || null)!.badge}</span>}
         </div>
         <button
           onClick={criar}
@@ -102,6 +115,7 @@ export function EtiquetasClient({ inicial }: { inicial: Etiqueta[] }) {
                     className="flex-1 rounded-lg border bg-[var(--input-bg,transparent)] px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
                   />
                   <PaletaCor value={editCor} onChange={setEditCor} compact />
+                  <FuncaoSelect value={editFuncao} onChange={setEditFuncao} />
                   <div className="flex gap-1">
                     <button onClick={salvarEdicao} disabled={pending} title="Salvar" className="rounded-md border p-1.5 text-emerald-600 hover:bg-emerald-500/10"><Check className="h-4 w-4" /></button>
                     <button onClick={() => setEditId(null)} title="Cancelar" className="rounded-md border p-1.5 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
@@ -112,9 +126,10 @@ export function EtiquetasClient({ inicial }: { inicial: Etiqueta[] }) {
                   <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium" style={{ background: `${e.cor ?? '#64748b'}22`, color: e.cor ?? '#64748b' }}>
                     <Tag className="h-3 w-3" /> {e.nome}
                   </span>
+                  {funcInfo(e.funcao) && <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground" title={funcInfo(e.funcao)!.desc}>{funcInfo(e.funcao)!.badge}</span>}
                   <span className="text-xs text-muted-foreground">{e.total ?? 0} quest{(e.total ?? 0) === 1 ? 'ão' : 'ões'}</span>
                   <div className="ml-auto flex gap-1">
-                    <button onClick={() => { setEditId(e.id); setEditNome(e.nome); setEditCor(e.cor ?? CORES[5]) }} title="Editar" className="rounded-md border p-1.5 text-muted-foreground transition hover:border-primary hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => { setEditId(e.id); setEditNome(e.nome); setEditCor(e.cor ?? CORES[5]); setEditFuncao(e.funcao ?? '') }} title="Editar" className="rounded-md border p-1.5 text-muted-foreground transition hover:border-primary hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
                     <button onClick={() => excluir(e)} title="Excluir" className="rounded-md border p-1.5 text-muted-foreground transition hover:border-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
                 </>
@@ -123,6 +138,20 @@ export function EtiquetasClient({ inicial }: { inicial: Etiqueta[] }) {
           ))
         )}
       </div>
+    </div>
+  )
+}
+
+function FuncaoSelect({ value, onChange }: { value: FuncaoEtiqueta | ''; onChange: (v: FuncaoEtiqueta | '') => void }) {
+  const info = funcInfo(value || null)
+  return (
+    <div className="min-w-[11rem]">
+      <select value={value} onChange={(e) => onChange(e.target.value as FuncaoEtiqueta | '')}
+        className="h-9 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2.5 text-sm outline-none focus:ring-1 focus:ring-ring">
+        <option value="">Nenhuma (só rótulo)</option>
+        {FUNCOES.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+      </select>
+      {info && <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{info.desc}</p>}
     </div>
   )
 }

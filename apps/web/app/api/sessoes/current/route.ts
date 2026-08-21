@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { type HudCores } from '@/lib/caderno-designer/types'
 import { resolverHudConfig } from '@/lib/hud/resolve-hud'
+import { funcaoEtiquetaPorQuestao, funcaoBloqueia } from '@/lib/simulado/etiqueta-funcao'
 
 // GET /api/sessoes/current?token={embed_token}&st={sessao_id}
 // Carrega o estado da sessão para o runner do aluno.
@@ -75,6 +76,8 @@ export async function GET(request: NextRequest) {
     id: row.questoes?.id,
     tipo: row.questoes?.tipo ?? 'objetiva',
     anulada: row.anulada === true,
+    bloqueada: row.anulada === true, // bloqueia responder (anulada do simulado OU etiqueta funcional — abaixo)
+    aviso: null as { nome: string; cor: string | null; funcao: string } | null, // faixa no topo (anulada/desatualizada/aviso)
     enunciado: row.questoes?.enunciado ?? '',
     disciplina: row.questoes?.disciplinas?.nome ?? null,
     imagem_url: row.questoes?.imagem_url ?? null,
@@ -96,6 +99,17 @@ export async function GET(request: NextRequest) {
       for (const q of questoes) { const e = ex.get(q.id); if (e) { q.pontuacao_total = e.pontuacao_total ?? null; q.linhas = e.linhas ?? null; q.categoria_discursiva = e.categoria_discursiva ?? null } }
     }
   } catch { /* colunas não migradas */ }
+
+  // Etiquetas FUNCIONAIS por questão → aviso no topo + bloqueio (anular/desconsiderar bloqueiam; avisar não).
+  try {
+    const qids = questoes.map((q) => q.id).filter(Boolean)
+    const funcs = await funcaoEtiquetaPorQuestao(admin, qids)
+    for (const q of questoes) {
+      const ef = funcs.get(q.id)
+      if (ef) { q.aviso = { nome: ef.nome, cor: ef.cor, funcao: ef.funcao }; if (funcaoBloqueia(ef.funcao)) q.bloqueada = true }
+      else if (q.anulada) q.aviso = { nome: 'Questão anulada', cor: '#ef4444', funcao: 'anular' } // anulada do simulado sem etiqueta
+    }
+  } catch { /* etiquetas ausentes */ }
 
   const respMap: Record<string, string> = {}
   for (const r of respostas ?? []) {

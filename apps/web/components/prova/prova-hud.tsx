@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Card, CardContent } from '@/components/ui/card'
-import { ChevronLeft, ChevronRight, Clock, BookOpen, Send, Loader2, Flag, Eye, EyeOff, Scissors } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, BookOpen, Send, Loader2, Flag, Eye, EyeOff, Scissors, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
 import { FitaTopo, FITA_GRADIENT } from '@/components/prova/fita-topo'
@@ -31,7 +31,7 @@ function frameLogo(estilo?: string): string {
 }
 
 export type ProvaHudAlternativa = { id: string; texto: string }
-export type ProvaHudQuestao = { id: string; tipo?: string; enunciado: string; disciplina?: string | null; imagem_url?: string | null; pontuacao_total?: number | null; linhas?: number | null; categoria_discursiva?: string | null; alternativas: ProvaHudAlternativa[] }
+export type ProvaHudQuestao = { id: string; tipo?: string; enunciado: string; disciplina?: string | null; imagem_url?: string | null; pontuacao_total?: number | null; linhas?: number | null; categoria_discursiva?: string | null; bloqueada?: boolean; aviso?: { nome: string; cor: string | null; funcao: string } | null; alternativas: ProvaHudAlternativa[] }
 
 export interface ProvaHudProps {
   titulo: string
@@ -81,6 +81,7 @@ export interface ProvaHudProps {
 /** HUD do simulado em andamento — usado pela prova real E pelo preview do caderno (idênticos). */
 export function ProvaHud(p: ProvaHudProps) {
   const { questaoAtual: q, compact } = p
+  const bloqueada = !!q.bloqueada // anulada/desconsiderada: não responde (ponto automático/nulo)
   const isLast = p.questaoIndex === p.totalQuestoes - 1
   const mostrarTempo = p.mostrarTempo ?? true
   const podeMarcar = !!p.onToggleMarcar
@@ -152,6 +153,17 @@ export function ProvaHud(p: ProvaHudProps) {
                 )}
               </div>
               <CardContent className="pt-10">
+                {q.aviso && (
+                  <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border px-3 py-2 text-sm font-semibold"
+                    style={{ borderColor: `${q.aviso.cor ?? '#ef4444'}66`, background: `${q.aviso.cor ?? '#ef4444'}14`, color: q.aviso.cor ?? '#ef4444' }}>
+                    <AlertTriangle className="h-4 w-4 shrink-0" /> {q.aviso.nome}
+                    <span className="font-normal opacity-80">
+                      {q.aviso.funcao === 'anular' ? '· ponto garantido a todos — não precisa responder'
+                        : q.aviso.funcao === 'desconsiderar' ? '· questão fora do total da prova'
+                        : '· atenção ao responder'}
+                    </span>
+                  </div>
+                )}
                 {q.tipo === 'discursiva' && q.categoria_discursiva && (
                   <p className={cn('mb-1.5 text-sm font-semibold', /pe[çc]a/i.test(q.categoria_discursiva) ? 'text-amber-700 dark:text-amber-400' : 'text-primary')}>{q.categoria_discursiva}</p>
                 )}
@@ -180,11 +192,11 @@ export function ProvaHud(p: ProvaHudProps) {
                 {p.slotDiscursiva}
               </div>
             ) : (
-            <div className="space-y-2">
+            <div className={cn('space-y-2', bloqueada && 'pointer-events-none opacity-50')}>
               {q.alternativas.map((alt, i) => {
                 const eliminada = !!p.eliminadas?.includes(alt.id)
                 const isSelected = p.respostaId === alt.id && !eliminada
-                const podeCortar = !!p.onToggleEliminar
+                const podeCortar = !!p.onToggleEliminar && !bloqueada
                 return (
                   <div key={alt.id} className="flex items-center gap-2">
                     {podeCortar && (

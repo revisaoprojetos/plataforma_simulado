@@ -31,6 +31,8 @@ interface Questao {
   disciplina?: string | null
   imagem_url?: string | null
   anulada?: boolean
+  bloqueada?: boolean // anulada do simulado OU etiqueta funcional (anular/desconsiderar) → não responde
+  aviso?: { nome: string; cor: string | null; funcao: string } | null // faixa no topo (anulada/desatualizada/aviso)
   pontuacao_total?: number | null
   linhas?: number | null
   categoria_discursiva?: string | null
@@ -302,6 +304,8 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
   }, [enviarResposta])
 
   function handleResponder(questaoId: string, alternativaId: string) {
+    // Questão bloqueada (anulada/desconsiderada): não aceita resposta (o ponto é automático/nulo).
+    if (sessao?.questoes.find((q) => q.id === questaoId)?.bloqueada) return
     setRespostas((prev) => {
       const next = { ...prev, [questaoId]: alternativaId }
       // Backup local imediato — sobrevive a fechar a página / queda de internet.
@@ -438,7 +442,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
   const questaoAtual = sessao.questoes[questaoIndex]
   const totalQuestoes = sessao.questoes.length
   // "Respondida": objetiva = tem alternativa marcada; discursiva = tem ao menos 1 foto enviada.
-  const respondida = (q: Questao) => (q.tipo === 'discursiva' ? (discPaginas[q.id] ?? 0) > 0 : !!respostas[q.id])
+  const respondida = (q: Questao) => q.bloqueada ? true : (q.tipo === 'discursiva' ? (discPaginas[q.id] ?? 0) > 0 : !!respostas[q.id])
   const respondidasArr = sessao.questoes.map(respondida)
   const totalRespondidas = respondidasArr.filter(Boolean).length
   const progresso = (totalRespondidas / totalQuestoes) * 100
@@ -474,7 +478,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
           key={questaoAtual.id}
           sessaoId={sessao.id}
           questaoId={questaoAtual.id}
-          bloqueada={!!questaoAtual.anulada}
+          bloqueada={!!questaoAtual.bloqueada}
           onCount={(n) => setDiscPaginas((prev) => ({ ...prev, [questaoAtual.id]: n }))}
         />
       ) : undefined}
