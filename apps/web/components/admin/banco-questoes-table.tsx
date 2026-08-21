@@ -2,12 +2,13 @@
 
 import { useState, useTransition, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Search, Check, Trash2, Loader2, GripVertical, ChevronUp, ChevronDown, ChevronRight, ListChecks } from 'lucide-react'
+import { Search, Check, Trash2, Loader2, GripVertical, ChevronUp, ChevronDown, ChevronRight, ListChecks, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { removerQuestoes, reordenarQuestoesBanco, carregarDetalheQuestao, type DetalheQuestao } from '@/app/admin/banco-questoes/actions'
@@ -262,8 +263,20 @@ export function BancoQuestoesTable({ bancoId, questoes, acao, cor = '#6d28d9' }:
                             <ChevronRight className={cn('h-4 w-4 transition-transform', open && 'rotate-90')} />
                           </button>
                           <div className="min-w-0">
-                            <div className="mb-1"><CopiarCodigo codigo={codigoQuestao(q.id)} /></div>
-                            {enun}
+                            <div className="mb-1 flex items-center gap-1.5">
+                              <CopiarCodigo codigo={codigoQuestao(q.id)} />
+                              <Link
+                                href={`/admin/questoes/${q.id}/editar`}
+                                onClick={(e) => e.stopPropagation()}
+                                title="Abrir esta questão no editor"
+                                className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                              >
+                                <ExternalLink className="h-3 w-3" /> Abrir
+                              </Link>
+                            </div>
+                            <Link href={`/admin/questoes/${q.id}/editar`} onClick={(e) => e.stopPropagation()} className="block transition-colors hover:text-primary hover:underline">
+                              {enun}
+                            </Link>
                           </div>
                         </div>
                       </TableCell>

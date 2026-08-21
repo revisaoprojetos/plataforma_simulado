@@ -17,7 +17,7 @@ import { Pencil, BookOpen } from 'lucide-react'
 import { QuestoesFilters } from '@/components/admin/questoes-filters'
 import { PaginationControls } from '@/components/admin/pagination-controls'
 import { CopiarCodigo } from '@/components/admin/copiar-codigo'
-import { codigoQuestao } from '@/lib/codigo-questao'
+import { codigoQuestao, faixaUuidDoCodigo } from '@/lib/codigo-questao'
 import { NovaQuestaoDialog } from '@/components/admin/nova-questao-dialog'
 import { ExportQuestoesButton } from '@/components/admin/export-questoes-button'
 import { SecaoHeader } from '@/components/admin/secao-header'
@@ -50,7 +50,9 @@ const dificuldadeLabel: Record<string, string> = {
 export default async function QuestoesPage({ searchParams }: PageProps) {
   const params = await searchParams
   const page = Number(params.page ?? 1)
-  const q = params.q ?? ''
+  const q = (params.q ?? '').trim()
+  // Se o termo for um código de questão (ex.: "Q-6BA4EF94"), busca pelo id (faixa de UUID).
+  const faixaCodigo = q ? faixaUuidDoCodigo(q) : null
   const status = params.status ?? ''
   const disciplina = params.disciplina ?? ''
   const dificuldade = params.dificuldade ?? ''
@@ -80,7 +82,8 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       .order('created_at', { ascending: false })
       .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)
 
-    if (q) query = comCodigo ? query.or(`enunciado.ilike.%${q}%,codigo.ilike.%${q}%`) : query.ilike('enunciado', `%${q}%`)
+    if (faixaCodigo) query = query.gte('id', faixaCodigo.lo).lte('id', faixaCodigo.hi)
+    else if (q) query = comCodigo ? query.or(`enunciado.ilike.%${q}%,codigo.ilike.%${q}%`) : query.ilike('enunciado', `%${q}%`)
     if (status) query = query.eq('status', status)
     if (disciplina) query = query.eq('disciplina_id', disciplina)
     if (dificuldade) query = query.eq('nivel_dificuldade', dificuldade)
