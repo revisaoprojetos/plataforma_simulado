@@ -1,20 +1,21 @@
 'use client'
 
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Check, Copy, ExternalLink } from 'lucide-react'
 import { abrirLinkTemado } from '@/lib/hud/abrir-temado'
+import { copiarTexto } from '@/lib/clipboard'
 
 export function CopyLink({ url }: { url: string }) {
   const [copiado, setCopiado] = useState(false)
 
   async function copiar() {
-    try {
-      await navigator.clipboard.writeText(url)
+    if (await copiarTexto(url)) {
       setCopiado(true)
       setTimeout(() => setCopiado(false), 2000)
-    } catch {
-      /* clipboard indisponível */
+    } else {
+      toast.error('Não foi possível copiar. Selecione e copie o link manualmente.')
     }
   }
 

@@ -55,6 +55,7 @@ import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { abrirLinkTemado } from '@/lib/hud/abrir-temado'
+import { copiarTexto } from '@/lib/clipboard'
 import { isoParaBrtLocal } from '@/lib/brt'
 import { toast } from 'sonner'
 import {
@@ -213,9 +214,10 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
     })
   }
 
-  function copiarLink() {
-    if (!linkAcesso) return toast.error('Link indisponível.')
-    navigator.clipboard.writeText(linkAcesso).then(() => toast.success('Link copiado'))
+  async function copiarLink() {
+    if (!linkAcesso) return toast.error('Link indisponível — este simulado ainda não tem token de acesso.')
+    if (await copiarTexto(linkAcesso)) toast.success('Link copiado')
+    else toast.error(`Não foi possível copiar automaticamente. Link: ${linkAcesso}`)
   }
 
   function abrirSimulado() {
