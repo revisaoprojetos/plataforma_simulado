@@ -68,4 +68,8 @@ export const PRESETS = {
   imagem: { permitidos: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'], maxBytes: 5 * 1024 * 1024 },
   documento: { permitidos: ['application/pdf'], maxBytes: 20 * 1024 * 1024 },
   imagemOuPdf: { permitidos: ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'], maxBytes: 20 * 1024 * 1024 },
+  // HTML não tem magic bytes → sniff devolve null e vale o declaredMime ('text/html').
+  html: { permitidos: ['text/html'], maxBytes: 5 * 1024 * 1024 },
+  // .docx é um ZIP (assinatura PK..) → validar passando declaredMime='application/zip'.
+  docx: { permitidos: ['application/zip', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'], maxBytes: 20 * 1024 * 1024 },
 } satisfies Record<string, ValidateOptions>

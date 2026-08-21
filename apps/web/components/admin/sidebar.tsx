@@ -41,6 +41,7 @@ import {
   LogOut,
   Building2,
   Tag,
+  Library,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -72,6 +73,7 @@ import { logoutAction } from '@/app/login/actions'
 import { confirmarDescartarAlteracoes } from '@/components/admin/use-unsaved-guard'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { LOGIN_DEFAULT, type LoginConfig } from '@/lib/login-config'
+import { LEITURA_ATIVA } from '@/lib/flags'
 
 type IconType = React.ComponentType<{ className?: string; style?: React.CSSProperties }>
 
@@ -82,6 +84,7 @@ interface NavItem {
   exact?: boolean
   perm?: string // permissão necessária para ver o item
   superOnly?: boolean // só aparece para super-admin GLOBAL (não por-tenant)
+  oculto?: boolean // escondido por flag (ex.: feature em construção)
 }
 
 interface NavGroup {
@@ -114,6 +117,7 @@ const navGroups: NavGroup[] = [
       { label: 'Questões', href: '/admin/questoes', icon: BookOpen, perm: 'questoes:view' },
       { label: 'Etiquetas', href: '/admin/etiquetas', icon: Tag, perm: 'questoes:view' },
       { label: 'Banco de Simulado', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
+      { label: 'Área de Leitura', href: '/admin/leitura', icon: Library, perm: 'leitura:view', oculto: !LEITURA_ATIVA },
     ],
   },
   {
@@ -143,6 +147,7 @@ const navGroups: NavGroup[] = [
       { label: 'Relatório Estudantes', href: '/admin/relatorios/estudantes', icon: GraduationCap, perm: 'relatorios:view' },
       { label: 'Ranking', href: '/admin/relatorios/ranking', icon: Trophy, perm: 'relatorios:view' },
       { label: 'NPS / Satisfação', href: '/admin/relatorios/nps', icon: Star, perm: 'relatorios:view' },
+      { label: 'Relatório Leitura', href: '/admin/relatorios/leitura', icon: Library, perm: 'relatorios:view', oculto: !LEITURA_ATIVA },
     ],
   },
   {
@@ -229,7 +234,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
   // `areasBloqueadas` já inclui /admin/correcao quando a discursiva está oculta (env ou manutenção).
   const emManutencao = (href: string) => areasBloqueadas.some((h) => href === h || href.startsWith(h + '/'))
   const gruposVisiveis = navGroups
-    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !(i.superOnly && !isSuperAdmin) && !emManutencao(i.href)) }))
+    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !i.oculto && !(i.superOnly && !isSuperAdmin) && !emManutencao(i.href)) }))
     .filter((g) => g.items.length > 0)
 
   const grupoAtivo = (group: NavGroup) => group.items.some((i) => itemAtivo(i, pathname, search))

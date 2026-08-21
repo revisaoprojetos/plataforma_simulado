@@ -1,6 +1,6 @@
 import { recomputarCache } from './cache'
 
-export type OrigemXp = 'simulado' | 'pratica' | 'streak' | 'chest' | 'missao' | 'conquista' | 'meta_dia' | 'backfill'
+export type OrigemXp = 'simulado' | 'pratica' | 'streak' | 'chest' | 'missao' | 'conquista' | 'meta_dia' | 'backfill' | 'leitura'
 
 export interface AwardArgs {
   tenantId: string

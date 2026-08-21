@@ -5,13 +5,13 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { type LoginConfig } from '@/lib/login-config'
-import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy, Flame, Zap, Route } from 'lucide-react'
+import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy, Flame, Zap, Route, Library } from 'lucide-react'
 import {
   Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, useSidebar,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
-import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS } from '@/lib/flags'
+import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS, LEITURA_ATIVA } from '@/lib/flags'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { NotificacaoBellAluno } from '@/components/aluno/notificacao-bell-aluno'
 import { AjudaDrawer } from '@/components/aluno/ajuda-drawer'
@@ -30,6 +30,7 @@ const NAV = [
   { href: '/aluno/recomendado', label: 'Recomendado', icon: Sparkles, tour: 'nav-recomendado' },
   { href: '/aluno/ligas', label: 'Ligas', icon: Trophy, tour: 'nav-liga' },
   { href: '/aluno/questoes', label: 'Banco de Questões', icon: BookOpen, tour: 'nav-questoes' },
+  { href: '/aluno/leitura', label: 'Leitura', icon: Library, tour: 'nav-leitura' },
   { href: '/aluno/favoritos', label: 'Favoritos', icon: Star, tour: 'nav-favoritos' },
   { href: '/aluno/cadernos', label: 'Cadernos', icon: NotebookPen, tour: 'nav-cadernos' },
 ]
@@ -67,6 +68,7 @@ export function AlunoSidebar({
   // Trilha e Ligas (gamificação) só aparecem quando ativa; + oculta os extras configurados.
   const nav = NAV.filter((n) =>
     (gamAtivo || (n.href !== '/aluno/trilha' && n.href !== '/aluno/ligas')) &&
+    (LEITURA_ATIVA || n.href !== '/aluno/leitura') &&
     !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(n.href)),
   )
 

@@ -91,6 +91,29 @@ export async function onPraticaRespondida(
   }
 }
 
+/** Concluiu a leitura de um documento → XP (uma vez por documento) + streak + missões + conquistas. */
+export async function onLeituraConcluida(
+  svc: any,
+  { tenantId, estudanteId, documentoId }: { tenantId: string | null; estudanteId: string | null; documentoId: string },
+): Promise<void> {
+  try {
+    if (!tenantId || !estudanteId) return
+    const config = await getGamConfig(svc, tenantId)
+    if (!config?.ativo) return
+    // Regra de XP de leitura (opcional no config; fallback fixo). Idempotente por documento (refId).
+    const r = (config.xp_regras as any).leitura ?? {}
+    const mult = multiplicadorDia(config, diaLocal(config.timezone))
+    const xp = Math.round(Math.max(0, r.base ?? 15) * mult)
+    await awardXp(svc, { tenantId, estudanteId, origem: 'leitura', refId: documentoId, xp, meta: { documentoId, mult } })
+    await registrarAtividade(svc, { tenantId, estudanteId })
+    // (missão de leitura fica p/ quando existir um MissaoTipo próprio; XP + streak + conquistas já contam.)
+    await avaliarConquistas(svc, { tenantId, estudanteId })
+    await verificarMetaDiaria(svc, config, tenantId, estudanteId)
+  } catch (e) {
+    console.error('[gamificacao] onLeituraConcluida:', (e as Error)?.message)
+  }
+}
+
 /** Acesso diário ao portal → registra atividade (streak) + avalia conquistas. */
 export async function onAtividadeDiaria(svc: any, { tenantId, estudanteId }: { tenantId: string | null; estudanteId: string | null }): Promise<void> {
   try {

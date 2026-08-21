@@ -23,3 +23,10 @@ export const OCULTAR_ALUNO_EXTRAS = true
 // Rotas do aluno ocultas enquanto OCULTAR_ALUNO_EXTRAS estiver ligado.
 // Banco de Questões reativado (área dedicada de prática com filtros + histórico).
 export const ROTAS_ALUNO_OCULTAS = ['/aluno/favoritos', '/aluno/cadernos']
+
+/**
+ * LEITURA_ATIVA: liga a nova Área de Leitura (biblioteca de documentos + leitor
+ * estilo Kindle) no menu do aluno e do admin. Default OFF (em construção) — defina
+ * NEXT_PUBLIC_LEITURA_ATIVA=true no deploy para liberar.
+ */
+export const LEITURA_ATIVA = process.env.NEXT_PUBLIC_LEITURA_ATIVA === 'true'
