@@ -118,7 +118,7 @@ export function EtiquetasClient({ inicial }: { inicial: Etiqueta[] }) {
       </div>
 
       {/* Lista */}
-      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <div className="self-start overflow-hidden rounded-2xl border bg-card shadow-sm">
         {itens.length === 0 ? (
           <p className="p-8 text-center text-sm text-muted-foreground">Nenhuma etiqueta ainda. Crie a primeira ao lado.</p>
         ) : (
