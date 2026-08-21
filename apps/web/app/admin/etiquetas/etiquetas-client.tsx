@@ -30,6 +30,7 @@ export function EtiquetasClient({ inicial }: { inicial: Etiqueta[] }) {
   const [editCor, setEditCor] = useState(CORES[5])
   const [editFuncao, setEditFuncao] = useState<FuncaoEtiqueta | ''>('')
   const [modalEt, setModalEt] = useState<Etiqueta | null>(null)
+  const [hoverId, setHoverId] = useState<string | null>(null)
   const [qCache, setQCache] = useState<Record<string, QuestaoDaEtiqueta[]>>({})
   const [carregandoQ, setCarregandoQ] = useState<string | null>(null)
   const [pending, start] = useTransition()
@@ -126,6 +127,8 @@ export function EtiquetasClient({ inicial }: { inicial: Etiqueta[] }) {
               <div
                 className={cn('flex flex-wrap items-center gap-3 px-4 py-3', editId !== e.id && 'cursor-pointer transition-colors hover:bg-muted/40')}
                 onClick={editId === e.id ? undefined : () => abrirQuestoes(e)}
+                onMouseEnter={() => setHoverId(e.id)}
+                onMouseLeave={() => setHoverId((h) => (h === e.id ? null : h))}
                 title={editId === e.id ? undefined : 'Ver as questões desta etiqueta'}
               >
                 {editId === e.id ? (
@@ -146,7 +149,15 @@ export function EtiquetasClient({ inicial }: { inicial: Etiqueta[] }) {
                   </div>
                 ) : (
                   <>
-                    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium" style={{ background: `${e.cor ?? '#64748b'}22`, color: e.cor ?? '#64748b' }}>
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-all duration-150"
+                      style={{
+                        background: `${e.cor ?? '#64748b'}${hoverId === e.id ? '3d' : '22'}`,
+                        color: e.cor ?? '#64748b',
+                        boxShadow: hoverId === e.id ? `0 0 0 1.5px ${e.cor ?? '#64748b'}` : 'none',
+                        transform: hoverId === e.id ? 'translateY(-1px)' : 'none',
+                      }}
+                    >
                       <Tag className="h-3 w-3" /> {e.nome}
                     </span>
                     {funcInfo(e.funcao) && <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground" title={funcInfo(e.funcao)!.desc}>{funcInfo(e.funcao)!.badge}</span>}
