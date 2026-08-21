@@ -23,9 +23,10 @@ import type { ProgressoAluno } from '@/components/aluno/aluno-sidebar'
 export default async function AlunoPortalLayout({ children }: { children: React.ReactNode }) {
   const sessao = await getSessaoAluno()
   if (!sessao) {
-    // Sessão ausente/expirada: manda pro login preservando a PÁGINA de origem (ex.: link direto
-    // de uma pasta de simulados) — o proxy expõe o caminho atual em `x-pathname`.
-    const path = (await headers()).get('x-pathname') || ''
+    // Sessão ausente/expirada: manda pro login preservando a PÁGINA de origem COM query (ex.: link
+    // direto de uma pasta de simulados) — o proxy expõe o caminho+query em `x-full-path`.
+    const h = await headers()
+    const path = h.get('x-full-path') || h.get('x-pathname') || ''
     const rt = /^\/(aluno|simulado)(\/|$|\?)/.test(path) ? path : ''
     redirect(rt ? `/aluno/entrar?redirectTo=${encodeURIComponent(rt)}` : '/aluno/entrar')
   }

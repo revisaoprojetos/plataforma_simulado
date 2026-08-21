@@ -7,7 +7,8 @@ export async function proxy(request: NextRequest) {
   // por permissão no layout do /admin. Reconstruído junto com os cookies do Supabase (sem alterar auth).
   const comPath = () => {
     const h = new Headers(request.headers)
-    h.set('x-pathname', request.nextUrl.pathname)
+    h.set('x-pathname', request.nextUrl.pathname)                                 // só o caminho (gate de rota do admin)
+    h.set('x-full-path', request.nextUrl.pathname + request.nextUrl.search)       // caminho + query (p/ redirectTo pós-login)
     return NextResponse.next({ request: { headers: h } })
   }
   let supabaseResponse = comPath()
@@ -64,7 +65,7 @@ export async function proxy(request: NextRequest) {
 
   if (isAdminPath && !user) {
     const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('redirectTo', pathname)
+    loginUrl.searchParams.set('redirectTo', pathname + request.nextUrl.search) // preserva a query do link
     return NextResponse.redirect(loginUrl)
   }
 
