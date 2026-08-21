@@ -123,7 +123,11 @@ export function EtiquetasClient({ inicial }: { inicial: Etiqueta[] }) {
         ) : (
           itens.map((e, i) => (
             <div key={e.id} className={cn(i > 0 && 'border-t')}>
-              <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <div
+                className={cn('flex flex-wrap items-center gap-3 px-4 py-3', editId !== e.id && 'cursor-pointer transition-colors hover:bg-muted/40')}
+                onClick={editId === e.id ? undefined : () => abrirQuestoes(e)}
+                title={editId === e.id ? undefined : 'Ver as questões desta etiqueta'}
+              >
                 {editId === e.id ? (
                   <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
                     <input
@@ -146,17 +150,13 @@ export function EtiquetasClient({ inicial }: { inicial: Etiqueta[] }) {
                       <Tag className="h-3 w-3" /> {e.nome}
                     </span>
                     {funcInfo(e.funcao) && <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground" title={funcInfo(e.funcao)!.desc}>{funcInfo(e.funcao)!.badge}</span>}
-                    {(e.total ?? 0) > 0 ? (
-                      <button type="button" onClick={() => abrirQuestoes(e)} className="inline-flex items-center gap-1 rounded-full border border-transparent px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground" title="Ver as questões com esta etiqueta">
-                        {carregandoQ === e.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                        {e.total} quest{(e.total ?? 0) === 1 ? 'ão' : 'ões'}
-                      </button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">0 questões</span>
-                    )}
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      {carregandoQ === e.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                      {e.total ?? 0} quest{(e.total ?? 0) === 1 ? 'ão' : 'ões'}
+                    </span>
                     <div className="ml-auto flex gap-1">
-                      <button onClick={() => { setEditId(e.id); setEditNome(e.nome); setEditCor(e.cor ?? CORES[5]); setEditFuncao(e.funcao ?? '') }} title="Editar" className="rounded-md border p-1.5 text-muted-foreground transition hover:border-primary hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
-                      <button onClick={() => excluir(e)} title="Excluir" className="rounded-md border p-1.5 text-muted-foreground transition hover:border-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={(ev) => { ev.stopPropagation(); setEditId(e.id); setEditNome(e.nome); setEditCor(e.cor ?? CORES[5]); setEditFuncao(e.funcao ?? '') }} title="Editar" className="rounded-md border p-1.5 text-muted-foreground transition hover:border-primary hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
+                      <button onClick={(ev) => { ev.stopPropagation(); excluir(e) }} title="Excluir" className="rounded-md border p-1.5 text-muted-foreground transition hover:border-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
                   </>
                 )}

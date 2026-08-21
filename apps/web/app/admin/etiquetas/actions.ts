@@ -39,8 +39,31 @@ const PADRAO_CRIAR: { nome: string; cor: string; funcao: FuncaoEtiqueta }[] = [
 async function seedPadrao(svc: ReturnType<typeof createAdminClient>, tenantId: string) {
   const { data, error } = await svc.from('simulado_etiquetas').select('id, nome, funcao').eq('tenant_id', tenantId)
   if (error) return // coluna `funcao` ausente (migração pendente) ou tabela ausente
-  const lista = (data ?? []) as { id: string; nome: string; funcao: string | null }[]
+  let lista = (data ?? []) as { id: string; nome: string; funcao: string | null }[]
   const funcDe = (nome: string) => PADRAO_MATCH.find((x) => x.re.test(nome))?.funcao ?? null
+
+  // 0) DEDUP (auto-cura): nomes repetidos no mesmo tenant — mantém 1, reaponta os vínculos
+  //    das cópias para o sobrevivente e apaga o restante. (Sem constraint única no banco,
+  //    seeds antigos criaram duplicatas; isto limpa a cada carga da página.)
+  const porNome = new Map<string, typeof lista>()
+  for (const e of lista) { const k = e.nome.trim().toLowerCase(); const arr = porNome.get(k) ?? []; arr.push(e); porNome.set(k, arr) }
+  const removidos = new Set<string>()
+  for (const grupo of porNome.values()) {
+    if (grupo.length < 2) continue
+    const sobrevivente = grupo.find((e) => FUNC(e.funcao)) ?? grupo[0]
+    const perdedores = grupo.filter((e) => e.id !== sobrevivente.id).map((e) => e.id)
+    if (!perdedores.length) continue
+    // Reaponta vínculos das cópias p/ o sobrevivente (ignora duplicados) e apaga cópias + vínculos.
+    const { data: vinc } = await svc.from('simulado_questao_etiquetas').select('questao_id').eq('tenant_id', tenantId).in('etiqueta_id', perdedores)
+    for (const v of (vinc ?? []) as any[]) {
+      await svc.from('simulado_questao_etiquetas').upsert({ tenant_id: tenantId, questao_id: v.questao_id, etiqueta_id: sobrevivente.id }, { onConflict: 'questao_id,etiqueta_id', ignoreDuplicates: true })
+    }
+    await svc.from('simulado_questao_etiquetas').delete().eq('tenant_id', tenantId).in('etiqueta_id', perdedores)
+    await svc.from('simulado_etiquetas').delete().eq('tenant_id', tenantId).in('id', perdedores)
+    perdedores.forEach((id) => removidos.add(id))
+  }
+  if (removidos.size) lista = lista.filter((e) => !removidos.has(e.id))
+
   // 1) dá função às que estão sem função e casam com um padrão (não sobrescreve o que o admin definiu).
   for (const e of lista) { if (!e.funcao) { const f = funcDe(e.nome); if (f) await svc.from('simulado_etiquetas').update({ funcao: f }).eq('id', e.id) } }
   // 2) garante UMA etiqueta por função (cria só se aquela função ainda não está representada).
