@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, FileText, ClipboardList, BookOpenCheck, BarChart3, Check, Download } from 'lucide-react'
+import { X, FileText, ClipboardList, BookOpenCheck, BarChart3, Check, Download, FilePlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Previa } from '@/lib/caderno-teste/previa'
 import { PreviaBlocos } from '@/lib/caderno-teste/previa-blocos'
@@ -27,11 +27,13 @@ function MiniPrevia({ modalidade, modeloId }: { modalidade: Modalidade; modeloId
   )
 }
 
-export function ModeloPicker({ open, onClose, atual, onSelecionar }: {
+export function ModeloPicker({ open, onClose, atual, onSelecionar, onEmBranco }: {
   open: boolean
   onClose: () => void
   atual: { modalidade: Modalidade; modelo: string }
   onSelecionar: (modalidade: Modalidade, modelo: string) => void
+  /** Cria um caderno totalmente EM BRANCO (do zero), independente da aba/modalidade. */
+  onEmBranco: () => void
 }) {
   const [tab, setTab] = useState<Modalidade>(atual.modalidade)
   useEffect(() => { if (open) setTab(atual.modalidade) }, [open, atual.modalidade])
@@ -48,12 +50,18 @@ export function ModeloPicker({ open, onClose, atual, onSelecionar }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b px-5 py-3.5">
-          <div>
+        <div className="flex items-center justify-between gap-3 border-b px-5 py-3.5">
+          <div className="min-w-0">
             <h2 className="text-lg font-bold">Escolher modelo</h2>
             <p className="text-xs text-muted-foreground">Selecione a modalidade (abas) e o modelo. Você ajusta os detalhes depois.</p>
           </div>
-          <button onClick={onClose} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-5 w-5" /></button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button type="button" onClick={onEmBranco} title="Criar um caderno totalmente em branco (do zero) — você adiciona os blocos depois"
+              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:border-primary/50 hover:bg-primary/5">
+              <FilePlus className="h-4 w-4" /> <span className="hidden sm:inline">Modelo em branco</span><span className="sm:hidden">Em branco</span>
+            </button>
+            <button onClick={onClose} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-5 w-5" /></button>
+          </div>
         </div>
 
         {/* Abas por modalidade */}

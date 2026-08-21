@@ -6,14 +6,27 @@
 
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ItemCaderno, PreviewQuestao, CapaConfig } from './tipos'
-import { DIAG_PADRAO, slugDiag, topicosParaTexto, prefFonte, type DiagPilar } from './diagnostico'
+import { DIAG_PADRAO, slugDiag, topicosParaTexto, prefFonte, type DiagPilar, type DiagSugestao } from './diagnostico'
 import { CORES_PILAR_PADRAO, CAPA_PADRAO } from './tipos'
 import { formatarInline, formatarMarcadores } from './formato'
-import { cssDaFonte } from '@/lib/caderno-designer/theme'
+import { cssDaFonte, resolveTheme } from '@/lib/caderno-designer/theme'
+import { BlockRender, createBlock } from '@/lib/caderno-designer/blocks'
+import { montarCadernoData, docDoPreset } from './previa-blocos'
 
 const A4_W = 794
 const A4_H = 1123
 const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
+
+// Bloco "Dados do estudante" = o MESMO bloco `identificacao` da Folha de Respostas — EXTRAÍDO do preset
+// (não uma cópia). Procura no caderno-objetivo (folha); cai em outros presets / no default se não achar.
+function acharIdentificacao(bs: any[]): any { for (const b of (bs ?? [])) { if (b?.type === 'identificacao') return b; const d = b?.innerBlocks ? acharIdentificacao(b.innerBlocks) : null; if (d) return d } return null }
+function blocoDadosEstudante(): any {
+  for (const pid of ['caderno-objetivo', 'caderno-perguntas', 'caderno-completo']) {
+    const doc = docDoPreset(pid); if (!doc) continue
+    for (const p of doc.pages) { const b = acharIdentificacao(p.blocks as any[]); if (b) return b }
+  }
+  return createBlock('identificacao')
+}
 
 export type DiscBanco = { nome: string; chave: string; pilar?: string }
 /** Tipo de bloco (p/ ícone no painel de estrutura). */
@@ -36,6 +49,9 @@ function preencher(t: string, vars: Record<string, string>): string {
   return applyVars(t, vars).replace(/\{\s*([\w-]+)\s*\}/g, (m, k) => {
     if (k === 'total_questoes') return '100'
     if (k === 'nome') return '[NOME COMPLETO ALUNO]'
+    if (k === 'email') return 'aluno@email.com'
+    if (k === 'tempo_total' || k === 'tempo') return '—'
+    if (k === 'data' || k === 'inicio' || k === 'termino' || k === 'respondidas' || k === 'em_branco') return '—'
     if (k === 'simulado') return 'Simulado'
     if (k === 'nota') return 'X,X'
     if (/^pct/.test(k) || k === 'percentual') return 'X%'
@@ -92,6 +108,8 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   const alignP = (parte: string, def: any) => ((a.alinhamentoParte ?? {})[parte] as any) || def
   // Cor do TEXTO por PARTE (cascata para os filhos que não têm cor própria — ex.: "0/100").
   const corTextoP = (parte: string, def: any) => (a.coresTextoParte ?? {})[parte] || def
+  // Cor de FUNDO por PARTE (cards com fundo editável — disciplina/sugestão individual).
+  const corFundoP = (parte: string, def: any) => (a.coresFundoParte ?? {})[parte] || def
   // Multiplicador de TAMANHO do texto por PARTE (1 = padrão). Usado no atr e nos textos internos dos cards.
   const escP = (parte: string) => (a.tamanhoParte ?? {})[parte] ?? 1
   const fs = (parte: string, px: number) => Math.round(px * escP(parte) * 10) / 10
@@ -238,8 +256,8 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   const addCont = (key: string, node: ReactNode, parte: string) => entradas.push({ key, node, label: '', tipo: 'card', parte, removivel: false, apagar: parte, juntar: true, outlineOculto: true })
   if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); add('diag_cab', (
     <div {...atr('diag_cab', 'Cabeçalho (fundo)', cor, { background: cor, color: '#fff', padding: '12px 16px' })}>
-      <div {...atr('diag_cab_titulo', 'Título do cabeçalho', cor, { fontSize: fs('diag_cab_titulo', 20), fontWeight: 800 })}>{V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>
-      {c.subtitulo && <div {...atr('diag_cab_sub', 'Subtítulo do cabeçalho', cor, { fontSize: fs('diag_cab_sub', 11), opacity: 0.85, marginTop: 2 })}>{V(c.subtitulo)}</div>}
+      <div {...atr('diag_cab_titulo', 'Título do cabeçalho', corP('diag_cab_titulo', '#fff'), { fontSize: fs('diag_cab_titulo', 20), fontWeight: 800, color: corP('diag_cab_titulo', '#fff') })}>{V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>
+      {c.subtitulo && <div {...atr('diag_cab_sub', 'Subtítulo do cabeçalho', corP('diag_cab_sub', '#fff'), { fontSize: fs('diag_cab_sub', 11), opacity: 0.85, marginTop: 2, color: corP('diag_cab_sub', '#fff') })}>{V(c.subtitulo)}</div>}
     </div>
   ), 'Cabeçalho', 'cabecalho', 'diag_cab', true) }
   if (a.mostrarDadosAluno && !ocultasP.has('nome')) { const corN = corP('diag_nome_rot', prim), corV = corP('diag_nome_val', amar); add('diag_nome', (
@@ -247,7 +265,24 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
       <div {...atr('diag_nome_rot', 'Rótulo NOME', corN, { background: corN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '8px 14px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' })}>{V(c.rotuloNome ?? 'NOME:')}</div>
       <div {...atr('diag_nome_val', 'Faixa do nome', corV, { background: corV, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '8px 14px', fontSize: corpo, fontWeight: 600 })}>{V('{nome}')}</div>
     </div>
-  ), 'Dados do aluno', 'nome', 'diag_nome_rot', true) }
+  ), 'Nome do aluno', 'nome', 'diag_nome_rot', true) }
+  // Card "Dados do estudante" — o MESMO bloco `identificacao` da folha (extraído do preset, sem cópia).
+  if (c.dadosCard) {
+    const identData = montarCadernoData([], vars, a.titulo || 'Simulado', { gabaritoLiberado: true })
+    const bloco = blocoDadosEstudante()
+    // Overrides de cor (letra/fundo/topo/acertos/erros/média…) — aplicados sobre os atributos do bloco.
+    const attrs: any = { ...bloco.attributes }
+    for (const [k, v] of Object.entries(c.dadosCardCores ?? {})) {
+      if (!v) continue
+      if (k === 'corMedia') { attrs.corMediaBaixa = v; attrs.corMediaMedia = v; attrs.corMediaAlta = v; attrs.corMediaMax = v }
+      else attrs[k] = v
+    }
+    add('dados_card', (
+      <div {...atr('dados_card', 'Dados do estudante', corP('dados_card', prim), {})}>
+        <BlockRender block={{ ...bloco, attributes: attrs }} theme={resolveTheme({ primaria: prim, secundaria: amar, acento: amar })} data={identData} />
+      </div>
+    ), 'Dados do estudante', 'card', 'dados_card', true)
+  }
   if (!ocultasP.has('nota')) { const corNum = corP('diag_nota_num', '#9b6800'), corFx = corP('diag_nota_faixa', amar); add('diag_nota', (
     <div style={{ display: 'flex', border: `1px solid ${prim}33`, overflow: 'hidden' }}>
       <div {...atr('diag_nota_num', 'Bloco da nota', corNum, { background: corNum, color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'baseline' })}><span style={{ fontSize: fs('diag_nota_num', 32), fontWeight: 800 }}>{V('{acertos}')}</span><span style={{ fontSize: fs('diag_nota_num', 16), fontWeight: 700 }}>/{V(c.notaTotal)}</span></div>
@@ -255,6 +290,16 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     </div>
   ), 'Nota', 'nota', 'diag_nota_num', true) }
   c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); add(`intro:${i}`, <p key={`intro${i}`} {...atr(`intro:${i}`, `Parágrafo de abertura ${i + 1}`, cor, { fontSize: corpo, lineHeight: 1.4, textAlign: 'justify', margin: '0 0 3px', color: cor })}>{V(p)}</p>, `Introdução ${i + 1}`, 'texto', `intro:${i}`, true) })
+  // Faixa de seção (título) — mesmo estilo das seções do diagnóstico (ex.: "GABARITO OFICIAL DESATUALIZADO").
+  ;(c.cards ?? []).forEach((cd, i) => { const cor = corP(`card:${i}`, prim); add(`card:${i}`, (
+    <div key={`card${i}`} {...atr(`card:${i}`, `Seção ${i + 1}`, cor, { background: cor, color: '#fff', fontWeight: 700, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', padding: '6px 12px', borderRadius: 2, margin: '3px 0 7px' })}>{V(cd.texto)}</div>
+  ), `Seção ${i + 1}`, 'secao', `card:${i}`, true) })
+  // Card com fita: fundo claro + faixa colorida (lateral OU topo) + uma linha de texto por observação.
+  ;(c.fitas ?? []).forEach((ft, i) => { const cor = corP(`fita:${i}`, prim); const borda = ft.pos === 'top' ? { borderTop: `4px solid ${cor}` } : { borderLeft: `4px solid ${cor}` }; add(`fita:${i}`, (
+    <div key={`fita${i}`} {...atr(`fita:${i}`, `Card com fita ${i + 1}`, cor, { background: '#f5f3ff', ...borda, padding: '8px 12px' })}>
+      {(ft.texto || '').split('\n').map((linha, j) => <div key={j} style={{ fontSize: fs(`fita:${i}`, corpo), color: '#5a5570', lineHeight: 1.5, textAlign: alignP(`fita:${i}`, 'left') }}>{V(linha)}</div>)}
+    </div>
+  ), `Card com fita ${i + 1}`, 'card', `fita:${i}`, true) })
   if (c.linguaPortuguesa && !ocultasP.has('lingua')) {
     const lp = c.linguaPortuguesa
     add('sec_lingua', <Sec parte="sec_lingua" t={lp.secTitulo || 'Desempenho em Língua Portuguesa'} />, `Seção: ${lp.secTitulo || 'Língua Portuguesa'}`, 'secao', 'sec_lingua', true)
@@ -276,14 +321,14 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
       </div>
     ), `Card: ${lp.titulo}`, 'card', 'lingua_card', true)
   }
-  if (c.pilares.length && !ocultasP.has('pilares')) {
-    add('sec_pilares', <Sec parte="sec_pilares" t={c.tituloPilares ?? 'Desempenho por pilar'} />, `Seção: ${c.tituloPilares ?? 'Desempenho por pilar'}`, 'secao', 'sec_pilares', true)
-    add('pilares', (
+  // Renderiza UM grupo de cards de pilar. keyBase = prefixo das partes (pilar:i na seção; pilarG:gi:j nos grupos).
+  const emitirPilares = (pilares: DiagPilar[], keyBase: string, blockKey: string) => {
+    add(blockKey, (
       <div style={{ display: 'flex', gap: 14, alignItems: 'stretch', marginBottom: 4 }}>
-        {c.pilares.map((pl, i) => {
+        {pilares.map((pl, i) => {
           const banda = bandaAdaptativa(pl, vars)
           const bandas = banda ? [banda] : pl.bandas // com dado do aluno mostra só a faixa; sem dado, todas (modelo)
-          const parte = `pilar:${i}` // ÍNDICE (único) — não a chave, que pode repetir e causar conflito entre cards
+          const parte = `${keyBase}:${i}`
           const cor = corP(parte, prim) // destaque do card (nome + %)
           return (
             <div key={i} {...atr(parte, pl.nome, cor, { flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${cor}22`, padding: 8 })}>
@@ -300,70 +345,85 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
           )
         })}
       </div>
-    ), 'Cards de pilar', 'desempenho', '', true, 'sec_pilares')
+    ), 'Desempenho por pilar', 'desempenho', '', true, blockKey)
   }
+  if (c.pilares.length && !ocultasP.has('sec_pilares')) add('sec_pilares', <Sec parte="sec_pilares" t={c.tituloPilares ?? 'Desempenho por pilar'} />, `Faixa de seção · ${c.tituloPilares ?? 'Desempenho por pilar'}`, 'secao', 'sec_pilares', true, 'sec_pilares')
+  if (c.pilares.length && !ocultasP.has('pilares')) emitirPilares(c.pilares, 'pilar', 'pilares')
+  // Grupos de pilar SEPARADOS: cada "Desempenho por pilar" adicionado vira um bloco próprio (não junta no mesmo).
+  ;(c.pilaresGrupos ?? []).forEach((grupo, gi) => { if (grupo.length) emitirPilares(grupo, `pilarG:${gi}`, `pilaresG:${gi}`) })
   // Disciplinas: do BANCO quando houver (nome+chave reais); senão as do modelo. Assuntos/nº/pct vêm das variáveis.
   const ocultas = new Set(c.discOcultas ?? [])
   const discs: DiscBanco[] = (discBanco.length ? discBanco : c.disciplinas.map((d) => ({ nome: d.nome, chave: d.chave || slugDiag(d.nome) }))).filter((d) => !ocultas.has(d.chave))
+  // Emite UM card de disciplina: cabeçalho (nome + acerto/total/%) com a "fita" no topo + assuntos abaixo.
+  // `dk` = chave do bloco (disc:<slug> na seção; discInd:<i> quando é um card avulso individual).
+  const emitirCardDisc = (d: DiscBanco, dk: string, pos: 'top' | 'left' = 'top') => {
+    const fonte = c.discFonte?.[d.chave] ?? d.chave // disciplina cujos assuntos/estatísticas o card exibe
+    const assuntos = (vars[`assuntos_${fonte}`] ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
+    // cor da disciplina: parte (coresParte) → individual legado (coresDisc) → cor do pilar → secundária.
+    const corDisc = corP(dk, (a.coresDisc ?? {})[d.chave] || corDoPilar(d.pilar, a.coresPilar ?? {}, amar))
+    const corTxt = c.discCorTexto?.[d.chave] ?? prim
+    // Acertou tudo (sem assuntos errados) com dados reais → não mostra nada; sem dados → rótulo placeholder.
+    const temDadosAluno = Object.keys(vars).length > 0
+    const lista = assuntos.length ? assuntos : (temDadosAluno ? [] : ['Assuntos das questões erradas'])
+    const fita = pos === 'left' ? { borderLeft: `3px solid ${corDisc}` } : { borderTop: `3px solid ${corDisc}` }
+    const bg = corFundoP(dk, '#f5f3ff') // fundo editável do card
+    const corNome = corTextoP(dk, corTxt) // cor do texto (nome/assuntos) editável
+    add(dk, (
+      <div {...atr(dk, d.nome, corDisc, { background: bg, ...fita, padding: lista.length ? '6px 10px 2px' : '6px 10px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 })}>
+        <div style={{ fontSize: fs(dk, 11), fontWeight: 700, color: corNome }}>{V(c.discNomes?.[d.chave] ?? d.nome)}</div>
+        <div style={{ fontSize: fs(dk, 11), whiteSpace: 'nowrap' }}><span style={{ color: '#9590b0' }}>{V(`{acerto_${fonte}}`)}/{V(`{total_${fonte}}`)}</span> <span style={{ fontWeight: 800, color: corDisc }}>{V(`{pct_${fonte}}`)}</span></div>
+      </div>
+    ), c.discNomes?.[d.chave] ?? d.nome, 'card', dk, true)
+    lista.forEach((as, k) => addCont(`${dk}:a${k}`, (
+      <div {...atr(dk, d.nome, corDisc, { background: bg, ...(pos === 'left' ? { borderLeft: `3px solid ${corDisc}` } : {}), padding: `0 10px ${k === lista.length - 1 ? 6 : 1}px`, marginBottom: k === lista.length - 1 ? 5 : 0 })}>
+        <div style={{ fontSize: fs(dk, corpo), color: corNome, fontStyle: 'italic', opacity: 0.85 }}>- {V(as)}</div>
+      </div>
+    ), dk))
+  }
+  if (discs.length && !ocultasP.has('sec_disciplinas')) add('sec_disciplinas', <Sec parte="sec_disciplinas" t={c.tituloDisciplinas ?? 'Desempenho por disciplina'} />, `Faixa de seção · ${c.tituloDisciplinas ?? 'Desempenho por disciplina'}`, 'secao', 'sec_disciplinas', true, 'sec_disciplinas')
   if (discs.length && !ocultasP.has('disciplinas')) {
-    add('sec_disciplinas', <Sec parte="sec_disciplinas" t={c.tituloDisciplinas ?? 'Desempenho por disciplina'} />, `Seção: ${c.tituloDisciplinas ?? 'Desempenho por disciplina'}`, 'secao', 'sec_disciplinas', true)
     if (c.disciplinasIntro) { const cor = corP('disc_intro', '#5a5570'); add('disc_intro', <p {...atr('disc_intro', 'Introdução das disciplinas', cor, { fontSize: corpo, color: cor, margin: '0 0 8px', lineHeight: 1.4 })}>{V(c.disciplinasIntro)}</p>, 'Introdução (disciplinas)', 'texto', 'disc_intro') }
-    for (const d of discs) {
-      const fonte = c.discFonte?.[d.chave] ?? d.chave // disciplina cujos assuntos/estatísticas o card exibe
-      const assuntos = (vars[`assuntos_${fonte}`] ?? '').split('\n').map((s) => s.trim()).filter(Boolean)
-      // cor da disciplina: parte (coresParte) → individual legado (coresDisc) → cor do pilar → secundária.
-      const corDisc = corP(`disc:${d.chave}`, (a.coresDisc ?? {})[d.chave] || corDoPilar(d.pilar, a.coresPilar ?? {}, amar))
-      const corTxt = c.discCorTexto?.[d.chave] ?? prim
-      const dk = `disc:${d.chave}`
-      // Acertou tudo (sem assuntos errados) num render com dados reais do aluno → não mostra nada;
-      // sem dados (modelo/preview vazio) → mantém o rótulo placeholder p/ ilustrar o campo no editor.
-      const temDadosAluno = Object.keys(vars).length > 0
-      const lista = assuntos.length ? assuntos : (temDadosAluno ? [] : ['Assuntos das questões erradas'])
-      // Cabeçalho do card (nome + estatística) — bloco selecionável. Sem sub-linhas (gabaritou) → fecha o padding.
-      add(dk, (
-        <div {...atr(dk, d.nome, corDisc, { background: '#f5f3ff', borderTop: `3px solid ${corDisc}`, padding: lista.length ? '6px 10px 2px' : '6px 10px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 })}>
-          <div style={{ fontSize: fs(dk, 11), fontWeight: 700, color: corTxt }}>{V(c.discNomes?.[d.chave] ?? d.nome)}</div>
-          <div style={{ fontSize: fs(dk, 11), whiteSpace: 'nowrap' }}><span style={{ color: '#9590b0' }}>{V(`{acerto_${fonte}}`)}/{V(`{total_${fonte}}`)}</span> <span style={{ fontWeight: 800, color: corDisc }}>{V(`{pct_${fonte}}`)}</span></div>
-        </div>
-      ), c.discNomes?.[d.chave] ?? d.nome, 'card', dk, true)
-      // Cada assunto = sub-bloco colado (mesma cor de fundo) → o card pode quebrar entre páginas.
-      lista.forEach((as, k) => addCont(`${dk}:a${k}`, (
-        <div {...atr(dk, d.nome, corDisc, { background: '#f5f3ff', padding: `0 10px ${k === lista.length - 1 ? 6 : 1}px`, marginBottom: k === lista.length - 1 ? 5 : 0 })}>
-          <div style={{ fontSize: fs(dk, corpo), color: '#5a5570', fontStyle: 'italic' }}>- {V(as)}</div>
-        </div>
-      ), dk))
-    }
+    for (const d of discs) emitirCardDisc(d, `disc:${d.chave}`)
   }
-  if (c.sugestoes.length && !ocultasP.has('sugestoes')) {
-    add('sec_sugestoes', <Sec parte="sec_sugestoes" t={c.tituloSugestoes ?? 'Sugestões de estudo'} />, `Seção: ${c.tituloSugestoes ?? 'Sugestões de estudo'}`, 'secao', 'sec_sugestoes', true)
-    c.sugestoes.forEach((s, si) => {
-      const cor = corP(`sug:${si}`, '#fdf3d0'); const sk = `sug:${si}`
-      // Cabeçalho (título + prioridade) — bloco selecionável.
-      add(sk, (
-        <div {...atr(sk, `Sugestão · ${s.titulo}`, cor, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: cor, padding: '5px 12px' })}>
-          <span style={{ fontWeight: 800, fontSize: fs(sk, 11), color: s.corTitulo || '#9a6e00' }}>{V(s.titulo)}</span>
-          {s.prioridade && <span style={{ fontWeight: 700, fontSize: fs(sk, 9), color: '#9a6e00' }}>[!] {V(s.prioridade)}</span>}
-        </div>
-      ), `Sugestão · ${s.titulo}`, 'card', sk, true)
-      const nItens = s.itens.length
-      // Intro (colado) + cada item (colado): #f0eeff contínuo → o bloco pode quebrar entre páginas.
-      if (s.intro) addCont(`${sk}:intro`, (
-        <div {...atr(sk, `Sugestão · ${s.titulo}`, cor, { background: '#f0eeff', padding: `8px 12px ${nItens ? 4 : 8}px` })}>
-          <p style={{ fontSize: fs(sk, corpo), margin: 0, lineHeight: 1.4, textAlign: alignP(sk, 'justify') }}>{V(s.intro)}</p>
-        </div>
-      ), sk)
-      s.itens.forEach((it, ii) => addCont(`${sk}:i${ii}`, (
-        <div {...atr(sk, `Sugestão · ${s.titulo}`, cor, { background: '#f0eeff', padding: `${!s.intro && ii === 0 ? 8 : 0}px 12px ${ii === nItens - 1 ? 8 : 2}px` })}>
-          <div style={{ fontSize: fs(sk, corpo), lineHeight: 1.5, textAlign: alignP(sk, 'justify') }}>{Vm(topicosParaTexto([it]))}</div>
-        </div>
-      ), sk))
-    })
+  // Cards de disciplina INDIVIDUAIS: só o card com a fita (topo OU lateral), SEM faixa de seção nem introdução.
+  ;(c.discsIndividuais ?? []).forEach((di, i) => {
+    const db = discBanco.find((x) => x.chave === di.chave)
+    const d: DiscBanco = db ?? { nome: c.discNomes?.[di.chave] ?? 'Disciplina', chave: di.chave }
+    emitirCardDisc(d, `discInd:${i}`, di.pos ?? 'top')
+  })
+  // Renderiza UM card de sugestão (cabeçalho + intro + tópicos). sk = chave (sug:i na seção; sugInd:i individual).
+  const emitirCardSugestao = (s: DiagSugestao, sk: string) => {
+    const cor = corP(sk, '#fdf3d0') // fundo do TOPO
+    const corTopoTxt = corTextoP(`${sk}:topo`, s.corTitulo || '#9a6e00') // texto do topo
+    const bgInfo = corFundoP(sk, '#f0eeff') // fundo das INFORMAÇÕES
+    const corInfoTxt = corTextoP(`${sk}:info`, '#243b53') // texto das informações
+    add(sk, (
+      <div {...atr(sk, `Sugestão · ${s.titulo}`, cor, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: cor, padding: '5px 12px' })}>
+        <span style={{ fontWeight: 800, fontSize: fs(sk, 11), color: corTopoTxt }}>{V(s.titulo)}</span>
+        {s.prioridade && <span style={{ fontWeight: 700, fontSize: fs(sk, 9), color: corTopoTxt }}>[!] {V(s.prioridade)}</span>}
+      </div>
+    ), `Sugestão · ${s.titulo}`, 'card', sk, true)
+    const nItens = s.itens.length
+    if (s.intro) addCont(`${sk}:intro`, (
+      <div {...atr(sk, `Sugestão · ${s.titulo}`, cor, { background: bgInfo, padding: `8px 12px ${nItens ? 4 : 8}px` })}>
+        <p style={{ fontSize: fs(sk, corpo), margin: 0, lineHeight: 1.4, color: corInfoTxt, textAlign: alignP(sk, 'justify') }}>{V(s.intro)}</p>
+      </div>
+    ), sk)
+    s.itens.forEach((it, ii) => addCont(`${sk}:i${ii}`, (
+      <div {...atr(sk, `Sugestão · ${s.titulo}`, cor, { background: bgInfo, padding: `${!s.intro && ii === 0 ? 8 : 0}px 12px ${ii === nItens - 1 ? 8 : 2}px` })}>
+        <div style={{ fontSize: fs(sk, corpo), lineHeight: 1.5, color: corInfoTxt, textAlign: alignP(sk, 'justify') }}>{Vm(topicosParaTexto([it]))}</div>
+      </div>
+    ), sk))
   }
+  if (c.sugestoes.length && !ocultasP.has('sec_sugestoes')) add('sec_sugestoes', <Sec parte="sec_sugestoes" t={c.tituloSugestoes ?? 'Sugestões de estudo'} />, `Faixa de seção · ${c.tituloSugestoes ?? 'Sugestões de estudo'}`, 'secao', 'sec_sugestoes', true, 'sec_sugestoes')
+  if (c.sugestoes.length && !ocultasP.has('sugestoes')) c.sugestoes.forEach((s, si) => emitirCardSugestao(s, `sug:${si}`))
+  // Cards de sugestão INDIVIDUAIS (só o card, sem faixa de seção).
+  ;(c.sugsIndividuais ?? []).forEach((s, i) => emitirCardSugestao(s, `sugInd:${i}`))
   if ((c.fechamento?.length ?? 0) > 0 && !ocultasP.has('fechamento')) {
     (c.fechamento ?? []).forEach((p, i) => { const cor = corP(`fechamento:${i}`, '#1a202c'); add(`fechamento:${i}`, <p key={`fech${i}`} {...atr(`fechamento:${i}`, `Parágrafo de fechamento ${i + 1}`, cor, { fontSize: corpo, lineHeight: 1.4, textAlign: 'justify', margin: '0 0 3px', color: cor })}>{V(p)}</p>, `Fechamento ${i + 1}`, 'texto', `fechamento:${i}`, true) })
   }
+  if ((c.gabaritoObs.length || c.gabaritoIntro.length) && !ocultasP.has('sec_gabarito')) add('sec_gabarito', <Sec parte="sec_gabarito" t={c.gabaritoTitulo || 'Gabarito oficial desatualizado'} />, `Faixa de seção · ${c.gabaritoTitulo || 'Gabarito'}`, 'secao', 'sec_gabarito', true, 'sec_gabarito')
   if ((c.gabaritoObs.length || c.gabaritoIntro.length) && !ocultasP.has('gabarito')) {
-    add('sec_gabarito', <Sec parte="sec_gabarito" t={c.gabaritoTitulo || 'Gabarito oficial desatualizado'} />, `Seção: ${c.gabaritoTitulo || 'Gabarito'}`, 'secao', 'sec_gabarito', true)
     c.gabaritoIntro.forEach((p, i) => { const cor = corP(`gabIntro:${i}`, '#243b53'); add(`gab:${i}`, <p key={`gabi${i}`} {...atr(`gabIntro:${i}`, `Gabarito — parágrafo ${i + 1}`, cor, { fontSize: corpo, margin: '0 0 6px', lineHeight: 1.4, textAlign: 'justify', color: cor })}>{V(p)}</p>, `Gabarito — parágrafo ${i + 1}`, 'texto', `gabIntro:${i}`, true, `gabIntro:${i}`) })
     if (c.gabaritoObs.length) { const cor = corP('gab_obs', '#a32d2d'); add('gab_obs', <div {...atr('gab_obs', 'Gabarito — observações', cor, { background: '#f5f3ff', borderTop: `3px solid ${cor}`, padding: '6px 10px' })}>{c.gabaritoObs.map((o, i) => <div key={i} style={{ fontSize: fs('gab_obs', corpo), color: '#5a5570' }}>{V(o)}</div>)}</div>, 'Gabarito — observações', 'card', 'gab_obs', true, 'gab_obs') }
   }
@@ -505,7 +565,11 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
     return () => { cancel = true }
   }, [chave, availH]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const pages = paginas ?? [blocos.map((_, i) => i)]
+  const pagesRaw = paginas ?? [blocos.map((_, i) => i)]
+  // Descarta índices DEFASADOS: logo após adicionar/remover um bloco (ou trocar o grupo por um em
+  // branco), `paginas` ainda aponta para blocos que já não existem → blocos[i] indefinido → crash
+  // "Cannot read properties of undefined (reading 'node')". Filtramos até o re-cálculo da paginação.
+  const pages = pagesRaw.map((idxs) => idxs.filter((i) => i >= 0 && i < blocos.length))
   const temCapa = !!a.capaUrl
   const total = (temCapa ? 1 : 0) + pages.length
 

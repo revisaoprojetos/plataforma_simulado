@@ -1,8 +1,10 @@
 'use client'
 
-import { Fragment, useEffect, useRef, useState, useTransition } from 'react'
+import { Component, Fragment, useEffect, useRef, useState, useTransition, type ReactNode } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { confirmar } from '@/components/ui/confirm-dialog'
 import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, BookOpenCheck, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown, Check, Undo2, Redo2, Trash2, Menu, ArrowUp, ArrowDown, GripVertical, Type, Heading, LayoutGrid } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -11,7 +13,7 @@ import { Previa, outlineDoItem, type DiagEntrada, type TipoBloco } from '@/lib/c
 import { PreviaBlocos, capaPadraoDoPreset, docDoPreset, idsDeterministicos } from '@/lib/caderno-teste/previa-blocos'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
-import { metaDaModalidade, itemAtivo, novoItem, presetDoItem, CAPA_PADRAO, CORES_PILAR_PADRAO, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
+import { metaDaModalidade, itemAtivo, novoItem, novoItemVazio, presetDoItem, CAPA_PADRAO, CORES_PILAR_PADRAO, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PreviewQuestao, type ItemCaderno } from '@/lib/caderno-teste/tipos'
 import { camposDoBloco, aplicarCampoBloco, podeRemoverParte, removerParteDiag, type CampoTexto } from '@/lib/caderno-teste/edicao'
 import { acharBloco, atualizarBlocoAttrs, removerBloco, camposDoBlocoDoc, NOME_BLOCO, type CampoBlocoDoc } from '@/lib/caderno-teste/edicao-doc'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
@@ -22,6 +24,25 @@ import { FONTES_CADERNO } from '@/lib/caderno-designer/theme'
 import { Users, ChevronRight, Download } from 'lucide-react'
 
 const ICONE_MOD: Record<Modalidade, any> = { caderno_questoes: FileText, caderno_completo: BookOpenCheck, folha_respostas: ClipboardList, diagnostico: BarChart3 }
+// Blocos que o painel "Estrutura" pode adicionar a um diagnóstico (inclui o canvas em branco).
+// `contavel` = pilar com sub-opções (1 a 4 pilares). `grupo` separa individuais × compostos (faixa+conteúdo).
+const BLOCOS_ADD: { tipo: string; label: string; icon: any; contavel?: boolean; grupo?: 'composto' }[] = [
+  // Individuais: um único elemento por bloco.
+  { tipo: 'cabecalho', label: 'Cabeçalho', icon: LayoutTemplate },
+  { tipo: 'nome', label: 'Nome do aluno', icon: FileText },
+  { tipo: 'dados_card', label: 'Dados do estudante', icon: Users },
+  { tipo: 'nota', label: 'Nota', icon: BarChart3 },
+  { tipo: 'texto', label: 'Texto / parágrafo', icon: Type },
+  { tipo: 'card', label: 'Faixa de seção', icon: Heading },
+  { tipo: 'fita', label: 'Card com fita', icon: LayoutGrid },
+  { tipo: 'disc_individual', label: 'Disciplina individual', icon: LayoutGrid },
+  { tipo: 'sug_individual', label: 'Sugestão individual', icon: ClipboardList },
+  // Compostos: trazem a faixa de seção + o conteúdo. (pilares 1º da coluna 1 → row-span-2 c/ 2 ao lado.)
+  { tipo: 'pilares', label: 'Desempenho por pilar', icon: BarChart3, contavel: true, grupo: 'composto' },
+  { tipo: 'disciplinas', label: 'Por disciplina', icon: Heading, grupo: 'composto' },
+  { tipo: 'sugestoes', label: 'Sugestões', icon: ClipboardList, grupo: 'composto' },
+  { tipo: 'gabarito', label: 'Gabarito desatualizado', icon: BarChart3, grupo: 'composto' },
+]
 const SEM_VARS: Record<string, string> = {} // referência estável (evita re-render em loop no PreviaBlocos)
 
 /** Zoom da prévia para caber na largura do painel direito. */
@@ -38,7 +59,31 @@ function useZoomAjustado(alvoLargura = 794) {
   return { ref, zoom }
 }
 
-export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoesIniciais, registrosIniciais = [], disciplinasIniciais = [], abrirPickerInicial = false }: {
+/** Boundary: um erro de render no editor mostra a MENSAGEM na tela (em vez de tela branca) — ajuda a
+ *  diagnosticar e deixa "tentar de novo" sem recarregar tudo. */
+class EditorBoundary extends Component<{ children: ReactNode }, { erro: Error | null }> {
+  state: { erro: Error | null } = { erro: null }
+  static getDerivedStateFromError(erro: Error) { return { erro } }
+  componentDidCatch(erro: Error) { console.error('[CadernoTesteBuilder] erro de render:', erro) }
+  render() {
+    if (this.state.erro) return (
+      <div className="-m-6 flex h-screen flex-col items-center justify-center gap-3 bg-background p-6 text-center">
+        <div className="max-w-xl rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-destructive">
+          <p className="text-sm font-semibold">Ocorreu um erro ao montar o editor.</p>
+          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap text-left text-xs">{String(this.state.erro?.message ?? this.state.erro)}</pre>
+        </div>
+        <button type="button" onClick={() => this.setState({ erro: null })} className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted">Tentar de novo</button>
+      </div>
+    )
+    return this.props.children
+  }
+}
+
+export function CadernoTesteBuilder(props: Parameters<typeof CadernoTesteBuilderBase>[0]) {
+  return <EditorBoundary><CadernoTesteBuilderBase {...props} /></EditorBoundary>
+}
+
+function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIniciais, registrosIniciais = [], disciplinasIniciais = [], abrirPickerInicial = false }: {
   cadernoId: string
   builderInicial: BuilderV3
   bancos: BancoOpcao[]
@@ -92,18 +137,33 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const importRef = useRef<HTMLInputElement>(null)
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
+  const router = useRouter()
+  // "Salvo × não salvo": salvoRef guarda o último builder persistido. A comparação por referência
+  // casa com o histórico de undo/redo e evita perda silenciosa de edições ao sair do editor.
+  const salvoRef = useRef<BuilderV3>(builderInicial)
+  const sujo = builder !== salvoRef.current
+  const sujoRef = useRef(false)
+  sujoRef.current = sujo
 
-  // Atalhos: Ctrl/Cmd+Z = desfazer, Ctrl/Cmd+Shift+Z ou Ctrl+Y = refazer.
+  // Avisa ao fechar/atualizar a aba quando há alterações não salvas.
+  useEffect(() => {
+    const h = (e: BeforeUnloadEvent) => { if (sujoRef.current) { e.preventDefault(); e.returnValue = '' } }
+    window.addEventListener('beforeunload', h)
+    return () => window.removeEventListener('beforeunload', h)
+  }, [])
+
+  // Atalhos: Ctrl/Cmd+Z = desfazer, Ctrl/Cmd+Shift+Z ou Ctrl+Y = refazer, Ctrl/Cmd+S = salvar.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return
       const k = e.key.toLowerCase()
       if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
       else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo() }
+      else if (k === 's') { e.preventDefault(); salvar() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }) // sem deps: undo/redo leem refs atuais
+  }) // sem deps: undo/redo/salvar leem refs/closures atuais
 
   // Metadados (número/disciplina/assunto) das questões do banco — p/ listar no editor do card de disciplina.
   useEffect(() => {
@@ -139,7 +199,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             </div>
           </div>
         </div>
-        <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: 'caderno_questoes', modelo: 'classico' }} onSelecionar={onPicker} />
+        <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: 'caderno_questoes', modelo: 'classico' }} onSelecionar={onPicker} onEmBranco={criarEmBranco} />
       </div>
     )
   }
@@ -153,6 +213,45 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const bancoAtual = bancos.find((b) => b.id === builder.bancoId) ?? null
   const setAjuste = (patch: Partial<BuilderAjustes>) => setBuilder((b) => ({ ...b, itens: b.itens.map((it) => it.id === b.ativo ? { ...it, ajustes: { ...it.ajustes, ...patch } } : it) }))
   const setConteudo = (conteudo: DiagConteudo) => setBuilder((b) => ({ ...b, itens: b.itens.map((it) => it.id === b.ativo ? { ...it, conteudo } : it) }))
+  // Patch combinado do grupo ativo (ajustes + conteúdo numa única entrada de histórico).
+  const patchAtivo = (fn: (it: ItemCaderno) => ItemCaderno) => setBuilder((b) => ({ ...b, itens: b.itens.map((it) => it.id === b.ativo ? fn(it) : it) }))
+  // Adiciona um bloco ao diagnóstico (canvas em branco ou qualquer diagnóstico). Estruturais saem de
+  // partesOcultas (voltam a renderizar); listas ganham um item novo com texto placeholder editável.
+  const adicionarBloco = (tipo: string, count?: number) => {
+    // Congela a ordem VISÍVEL atual: como o bloco novo tem chave inédita (não está em `ordem`), ele
+    // renderiza depois de todos os listados = ENTRA POR ÚLTIMO (em vez de pular pra ordem natural fixa).
+    const ordem = outline.map((e) => e.key)
+    const dc = <T,>(v: T): T => { try { return structuredClone(v) } catch { return JSON.parse(JSON.stringify(v)) } }
+    patchAtivo((it) => {
+      const c = it.conteudo ?? DIAG_PADRAO
+      const most = (...chaves: string[]) => (c.partesOcultas ?? []).filter((p) => !chaves.includes(p))
+      const base: ItemCaderno = (() => {
+        switch (tipo) {
+          case 'cabecalho': return { ...it, ajustes: { ...it.ajustes, mostrarCabecalho: true } }
+          case 'nome': return { ...it, ajustes: { ...it.ajustes, mostrarDadosAluno: true }, conteudo: { ...c, partesOcultas: most('nome') } }
+          case 'dados_card': return { ...it, conteudo: { ...c, dadosCard: true } }
+          case 'nota': return { ...it, conteudo: { ...c, partesOcultas: most('nota') } }
+          case 'texto': return { ...it, conteudo: { ...c, intro: [...c.intro, 'Novo parágrafo — clique na prévia para editar.'] } }
+          case 'card': return { ...it, conteudo: { ...c, cards: [...(c.cards ?? []), { texto: 'NOVA SEÇÃO' }] } }
+          case 'fita': return { ...it, conteudo: { ...c, fitas: [...(c.fitas ?? []), { texto: 'Observação 1 — clique na prévia para editar.\nObservação 2\nObservação 3' }] } }
+          case 'fechamento': return { ...it, conteudo: { ...c, fechamento: [...(c.fechamento ?? []), 'Novo parágrafo de fechamento — clique na prévia para editar.'] } }
+          case 'pilares': {
+            // Sub-opções 1–4: cada clique cria um GRUPO de pilar SEPARADO (não junta no mesmo bloco).
+            const n = Math.max(1, Math.min(4, count ?? 3))
+            const base4 = [dc(DIAG_PADRAO.pilares[0]), dc(DIAG_PADRAO.pilares[1]), dc(DIAG_PADRAO.pilares[2]), { nome: 'NOVO PILAR', chave: '', totalTxt: '', bandas: [{ faixa: '0-49', texto: '' }, { faixa: '50-80', texto: '' }, { faixa: '81-100', texto: '' }] }]
+            return { ...it, conteudo: { ...c, pilaresGrupos: [...(c.pilaresGrupos ?? []), base4.slice(0, n)] } }
+          }
+          case 'disciplinas': return { ...it, conteudo: { ...c, disciplinas: c.disciplinas.length ? c.disciplinas : [{ nome: 'Disciplina', chave: 'disciplina', total: 'x/N', categoria: 'Assunto' }], disciplinasIntro: c.disciplinasIntro || DIAG_PADRAO.disciplinasIntro, partesOcultas: most('disciplinas', 'sec_disciplinas') } }
+          case 'disc_individual': return { ...it, conteudo: { ...c, discsIndividuais: [...(c.discsIndividuais ?? []), { chave: disciplinasBanco[0]?.chave ?? 'disciplina', pos: 'top' as const }] } }
+          case 'sug_individual': return { ...it, conteudo: { ...c, sugsIndividuais: [...(c.sugsIndividuais ?? []), { titulo: 'NOVA SUGESTÃO', prioridade: 'Prioridade Alta', intro: '', itens: [] }] } }
+          case 'sugestoes': return { ...it, conteudo: { ...c, sugestoes: [...c.sugestoes, { titulo: 'NOVA SUGESTÃO', prioridade: 'Prioridade Alta', intro: '', itens: [] }], tituloSugestoes: c.tituloSugestoes ?? 'Sugestões de estudo', partesOcultas: most('sugestoes', 'sec_sugestoes') } }
+          case 'gabarito': return { ...it, conteudo: { ...c, gabaritoTitulo: c.gabaritoTitulo || 'GABARITO OFICIAL DESATUALIZADO', gabaritoIntro: c.gabaritoIntro.length ? c.gabaritoIntro : ['Observações sobre questões que sofreram atualização legislativa ou jurisprudencial.'], partesOcultas: most('gabarito', 'sec_gabarito') } }
+          default: return it
+        }
+      })()
+      return { ...base, conteudo: { ...(base.conteudo ?? c), ordem } }
+    })
+  }
   // Título da capa (modelos prontos): config efetiva (item.capa OU default do preset) + patch.
   const capaEfetiva: CapaConfig = ativo.capa ?? (presetAtivo ? capaPadraoDoPreset(presetAtivo) : CAPA_PADRAO)
   const setCapa = (patch: Partial<CapaConfig>) => setBuilder((b) => ({ ...b, itens: b.itens.map((it) => {
@@ -192,6 +291,18 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
       const itens = b.itens.filter((it) => it.id !== id)
       return { ...b, itens, ativo: b.ativo === id ? itens[0].id : b.ativo }
     })
+  }
+  // Cria um grupo "em branco total" (canvas do zero). Respeita o modo do picker: adiciona um grupo
+  // novo (ou é o 1º do caderno) ou substitui o grupo ativo (aberto por "Trocar").
+  function criarEmBranco() {
+    try {
+      setBuilder((b) => {
+        const it = novoItemVazio()
+        if (pickerMode === 'add' || b.itens.length === 0) return { ...b, itens: [...b.itens, it], ativo: it.id }
+        return { ...b, itens: b.itens.map((x) => x.id === b.ativo ? { ...it, id: x.id } : x), ativo: b.ativo }
+      })
+      setPickerOpen(false)
+    } catch (err) { console.error('criarEmBranco', err); toast.error('Não foi possível criar o modelo em branco.') }
   }
   function onPicker(m: Modalidade, modeloId: string) {
     setBuilder((b) => {
@@ -234,7 +345,18 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   const reordenar = (keys: string[]) => setConteudo({ ...conteudoBase(), ordem: keys })
   function moverEntrada(idx: number, dir: -1 | 1) { const keys = outline.map((e) => e.key); const j = idx + dir; if (j < 0 || j >= keys.length) return; [keys[idx], keys[j]] = [keys[j], keys[idx]]; reordenar(keys) }
   function soltarEntrada(from: number, to: number) { if (from === to) return; const keys = outline.map((e) => e.key); const [k] = keys.splice(from, 1); keys.splice(to, 0, k); reordenar(keys) }
-  function apagarEntrada(e: DiagEntrada) { if (e.apagar === 'diag_cab') setAjuste({ mostrarCabecalho: false }); else setConteudo(removerParteDiag(ativo.conteudo, e.apagar)) }
+  // Apaga uma "parte": cabeçalho desliga via ajustes; o resto sai do conteúdo (removerParteDiag).
+  function apagarParte(parte: string) {
+    if (parte === 'diag_cab' || parte === 'diag_cab_titulo' || parte === 'diag_cab_sub') { setAjuste({ mostrarCabecalho: false }); return }
+    setConteudo(removerParteDiag(ativo.conteudo, parte))
+  }
+  function apagarEntrada(e: DiagEntrada) {
+    try {
+      apagarParte(e.apagar)
+      // Fecha o editor lateral se ele estava aberto no bloco que acabou de sumir.
+      if (pickerCor && (pickerCor.parte === e.parte || pickerCor.parte === e.apagar)) setPickerCor(null)
+    } catch (err) { console.error('apagarEntrada', err); toast.error('Não foi possível apagar este bloco.') }
+  }
   function editarEntrada(e: DiagEntrada) { if (!e.parte) return; abrirEdicaoDeParte(e.parte, e.label) }
   function abrirEdicaoDeParte(parte: string, label: string) { setOrigemEstrutura(true); setEstruturaAberta(false); setPickerBloco(null); setPickerCapa(false); setPickerCor({ parte, label, cor: a.coresParte?.[parte] ?? a.corPrimaria }) }
   // Pilares: cada card é listado individualmente no painel (editar/apagar/reordenar dentro do array).
@@ -246,10 +368,18 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
   // Saída FIEL: abre a prévia A4 (mesma render) p/ imprimir / salvar como PDF pelo navegador.
   const pdfUrl = `/imprimir/caderno-teste/${cadernoId}?grupo=${ativo.id}${alunoAtual ? `&aluno=${alunoAtual.id}` : ''}`
   function salvar() {
+    if (!builder.itens.length) return
+    const snap = builder
     start(async () => {
-      const r = await salvarBuilderTeste(cadernoId, builder)
-      if (r.ok) toast.success('Caderno de teste salvo'); else toast.error(r.error ?? 'Erro ao salvar')
+      const r = await salvarBuilderTeste(cadernoId, snap)
+      if (r.ok) { salvoRef.current = snap; bump(); toast.success('Caderno de teste salvo') }
+      else toast.error(r.error ?? 'Erro ao salvar')
     })
+  }
+  // Voltar para a lista — confirma se houver alterações não salvas (senão, perde tudo em silêncio).
+  async function sair() {
+    if (sujo && !(await confirmar({ titulo: 'Sair sem salvar?', mensagem: 'Há alterações não salvas neste caderno. Se sair agora, elas serão perdidas.', confirmar: 'Sair sem salvar', destrutivo: true }))) return
+    router.push('/admin/cadernos-teste')
   }
   /** Importa um caderno (Word/HTML) → cria um novo grupo de Diagnóstico já mapeado. */
   async function importar(file: File) {
@@ -292,7 +422,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
     <div className="-m-6 flex h-screen flex-col overflow-hidden bg-background">
       <div className="relative z-30 flex items-center justify-between gap-3 border-b bg-card/60 px-4 py-2.5">
         <div className="flex items-center gap-3">
-          <Link href="/admin/cadernos-teste" className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></Link>
+          <button type="button" onClick={sair} title="Voltar" className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></button>
           <div>
             <h1 className="text-lg font-bold leading-tight">Construtor de caderno (teste)</h1>
             <p className="text-xs text-muted-foreground">Vários grupos (modalidades) num caderno. Escolha o modelo e o banco nos pop-ups e ajuste à esquerda.</p>
@@ -331,6 +461,10 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
               </>
             )}
           </div>
+          <span className={cn('hidden items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium sm:inline-flex', sujo ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400')} title={sujo ? 'Há alterações não salvas' : 'Tudo salvo'}>
+            <span className={cn('h-1.5 w-1.5 rounded-full', sujo ? 'bg-amber-500' : 'bg-emerald-500')} />
+            {sujo ? 'Não salvo' : 'Salvo'}
+          </span>
           <Button onClick={salvar} disabled={pending} size="sm">{pending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />} Salvar</Button>
         </div>
       </div>
@@ -429,8 +563,13 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             <span className="mb-1 block">Título</span>
             <input value={a.titulo} onChange={(e) => setAjuste({ titulo: e.target.value })} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm text-foreground" />
           </label>
-          <div className="col-span-1 rounded-md border bg-background px-2 py-1.5"><div className="mb-1 text-[11px] text-muted-foreground">Cor primária</div><HexColorField value={a.corPrimaria} onChange={(v) => setAjuste({ corPrimaria: v })} /></div>
-          <div className="col-span-1 rounded-md border bg-background px-2 py-1.5"><div className="mb-1 text-[11px] text-muted-foreground">Cor secundária</div><HexColorField value={a.corSecundaria} onChange={(v) => setAjuste({ corSecundaria: v })} /></div>
+          {/* Diagnóstico: cores são POR BLOCO (clique na prévia). As demais modalidades mantêm o global. */}
+          {ativo.modalidade !== 'diagnostico' ? (<>
+            <div className="col-span-1 rounded-md border bg-background px-2 py-1.5"><div className="mb-1 text-[11px] text-muted-foreground">Cor primária</div><HexColorField value={a.corPrimaria} onChange={(v) => setAjuste({ corPrimaria: v })} /></div>
+            <div className="col-span-1 rounded-md border bg-background px-2 py-1.5"><div className="mb-1 text-[11px] text-muted-foreground">Cor secundária</div><HexColorField value={a.corSecundaria} onChange={(v) => setAjuste({ corSecundaria: v })} /></div>
+          </>) : (
+            <div className="col-span-2 rounded-md border border-dashed px-2.5 py-2 text-[11px] leading-snug text-muted-foreground">🎨 As cores são <strong>por bloco</strong>: clique em qualquer bloco na prévia para mudar a cor dele individualmente.</div>
+          )}
           {(ativo.modalidade === 'caderno_questoes' || ativo.modalidade === 'caderno_completo') && <>
             <div className="col-span-1"><Tog campo="mostrarGabarito" label="Gabarito" /></div>
             <div className="col-span-1"><Tog campo="mostrarComentarios" label="Comentários" /></div>
@@ -459,7 +598,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
         <div ref={ref} className="scroll-claro relative min-h-0 overflow-auto bg-[radial-gradient(circle,theme(colors.slate.300)_1px,transparent_1px)] [background-size:18px_18px] px-3 py-5 dark:bg-[radial-gradient(circle,theme(colors.slate.700)_1px,transparent_1px)]">
           {ativo.modalidade === 'diagnostico' && builder.bancoId && (
             <div className="pointer-events-none sticky top-0 z-20 -mt-2 mb-1 flex justify-end pr-1">
-              <button type="button" onClick={() => setEstruturaAberta(true)} title="Estrutura do diagnóstico (ordenar/editar/adicionar blocos)"
+              <button type="button" onClick={() => { setPickerCor(null); setPickerCapa(false); setPickerBloco(null); setEstruturaAberta(true) }} title="Estrutura do diagnóstico (ordenar/editar/adicionar blocos)"
                 className="pointer-events-auto flex items-center gap-1.5 rounded-lg border bg-background/95 px-2.5 py-1.5 text-xs font-medium shadow-sm backdrop-blur transition-colors hover:border-primary/50">
                 <Menu className="h-4 w-4" /> Estrutura
               </button>
@@ -471,12 +610,12 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
             <div key={`${ativo.id}:${ativo.modalidade}:${ativo.modelo}`} className="mx-auto" style={{ zoom } as any}>
               {presetAtivo ? (
                 <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} folhaUrl={a.folhaUrl}
-                  capa={ativo.capa} onPickCapa={() => { setPickerCapa(true); setPickerCor(null); setPickerBloco(null) }} selCapa={pickerCapa}
-                  docOverride={ativo.docEdit} onPickBloco={(id) => { setPickerBloco(id); setPickerCapa(false); setPickerCor(null) }} selBlocoId={pickerBloco} />
+                  capa={ativo.capa} onPickCapa={() => { setEstruturaAberta(false); setPickerCapa(true); setPickerCor(null); setPickerBloco(null) }} selCapa={pickerCapa}
+                  docOverride={ativo.docEdit} onPickBloco={(id) => { setEstruturaAberta(false); setPickerBloco(id); setPickerCapa(false); setPickerCor(null) }} selBlocoId={pickerBloco} />
               ) : (
                 <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} selParte={pickerCor?.parte}
-                  onPick={(parte, label, cor) => { setPickerCapa(false); setPickerBloco(null); setPickerCor({ parte, label, cor }) }}
-                  onPickCapa={() => { setPickerCapa(true); setPickerCor(null); setPickerBloco(null) }} selCapa={pickerCapa} />
+                  onPick={(parte, label, cor) => { setEstruturaAberta(false); setOrigemEstrutura(false); setPickerCapa(false); setPickerBloco(null); setPickerCor({ parte, label, cor }) }}
+                  onPickCapa={() => { setEstruturaAberta(false); setOrigemEstrutura(false); setPickerCapa(true); setPickerCor(null); setPickerBloco(null) }} selCapa={pickerCapa} />
               )}
             </div>
           ) : (
@@ -491,12 +630,12 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
         </div>
       </div>
 
-      <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: ativo.modalidade, modelo: ativo.modelo }} onSelecionar={onPicker} />
+      <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: ativo.modalidade, modelo: ativo.modelo }} onSelecionar={onPicker} onEmBranco={criarEmBranco} />
       <BancoPicker open={bancoPickerOpen} onClose={() => setBancoPickerOpen(false)} bancos={bancos} atual={builder.bancoId} onSelecionar={trocarBanco} />
       {pickerCor && (() => {
         const campos = camposDoBloco(ativo, pickerCor.parte, pickerCor.label)
         const onCampo = (campo: (typeof campos)[number], v: string) => campo.alvo === 'titulo' ? setAjuste({ titulo: v }) : setConteudo(aplicarCampoBloco(ativo.conteudo, pickerCor.parte, campo.id, v))
-        const temCorTexto = ['diag_nota_num', 'diag_nota_faixa', 'diag_cab', 'diag_cab_titulo', 'diag_cab_sub', 'diag_nome_rot', 'diag_nome_val'].includes(pickerCor.parte) || pickerCor.parte.startsWith('sec_')
+        const temCorTexto = pickerCor.parte === 'diag_cab' || pickerCor.parte.startsWith('sec_') || pickerCor.parte.startsWith('card:')
         return (
         <>
           <div className="pointer-events-none fixed inset-0 z-40 bg-black/5" />
@@ -544,7 +683,7 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                     <HexColorField value={a.coresTextoParte?.[pickerCor.parte] || '#ffffff'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [pickerCor.parte]: v } })} />
                   </div>
                 </div>
-              ) : (
+              ) : (pickerCor.parte.startsWith('fita:') || pickerCor.parte.startsWith('sugInd:') || pickerCor.parte === 'dados_card' || ['diag_nota_num', 'diag_nota_faixa', 'diag_nome_rot', 'diag_nome_val'].includes(pickerCor.parte)) ? null : (
                 <>
                   <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cor</div>
                   <HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />
@@ -553,15 +692,46 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                   )}
                 </>
               )}
-              {(pickerCor.parte.startsWith('pilar:') || pickerCor.parte === 'lingua_card') && (() => {
+              {(pickerCor.parte === 'diag_nota_num' || pickerCor.parte === 'diag_nota_faixa') && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div><div className="mb-1 text-[11px] text-muted-foreground">Esquerda (fundo)</div><HexColorField value={a.coresParte?.['diag_nota_num'] ?? '#9b6800'} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), ['diag_nota_num']: v } })} /></div>
+                  <div><div className="mb-1 text-[11px] text-muted-foreground">Direita (fundo)</div><HexColorField value={a.coresParte?.['diag_nota_faixa'] ?? a.corSecundaria} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), ['diag_nota_faixa']: v } })} /></div>
+                  <div><div className="mb-1 text-[11px] text-muted-foreground">Esquerda (texto)</div><HexColorField value={a.coresTextoParte?.['diag_nota_num'] ?? '#ffffff'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), ['diag_nota_num']: v } })} /></div>
+                  <div><div className="mb-1 text-[11px] text-muted-foreground">Direita (texto)</div><HexColorField value={a.coresTextoParte?.['diag_nota_faixa'] ?? '#3b2f00'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), ['diag_nota_faixa']: v } })} /></div>
+                </div>
+              )}
+              {(pickerCor.parte === 'diag_nome_rot' || pickerCor.parte === 'diag_nome_val') && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div><div className="mb-1 text-[11px] text-muted-foreground">Esquerda (NOME)</div><HexColorField value={a.coresParte?.['diag_nome_rot'] ?? a.corPrimaria} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), ['diag_nome_rot']: v } })} /></div>
+                  <div><div className="mb-1 text-[11px] text-muted-foreground">Direita (faixa)</div><HexColorField value={a.coresParte?.['diag_nome_val'] ?? a.corSecundaria} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), ['diag_nome_val']: v } })} /></div>
+                  <div><div className="mb-1 text-[11px] text-muted-foreground">Esquerda (texto)</div><HexColorField value={a.coresTextoParte?.['diag_nome_rot'] ?? '#ffffff'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), ['diag_nome_rot']: v } })} /></div>
+                  <div><div className="mb-1 text-[11px] text-muted-foreground">Direita (texto)</div><HexColorField value={a.coresTextoParte?.['diag_nome_val'] ?? '#3b2f00'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), ['diag_nome_val']: v } })} /></div>
+                </div>
+              )}
+              {pickerCor.parte.startsWith('sugInd:') && (() => {
+                const sk = pickerCor.parte
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><div className="mb-1 text-[11px] text-muted-foreground">Topo (fundo)</div><HexColorField value={a.coresParte?.[sk] ?? '#fdf3d0'} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [sk]: v } })} /></div>
+                    <div><div className="mb-1 text-[11px] text-muted-foreground">Topo (texto)</div><HexColorField value={a.coresTextoParte?.[`${sk}:topo`] ?? '#9a6e00'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [`${sk}:topo`]: v } })} /></div>
+                    <div><div className="mb-1 text-[11px] text-muted-foreground">Informações (fundo)</div><HexColorField value={a.coresFundoParte?.[sk] ?? '#f0eeff'} onChange={(v) => setAjuste({ coresFundoParte: { ...(a.coresFundoParte ?? {}), [sk]: v } })} /></div>
+                    <div><div className="mb-1 text-[11px] text-muted-foreground">Informações (texto)</div><HexColorField value={a.coresTextoParte?.[`${sk}:info`] ?? '#243b53'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [`${sk}:info`]: v } })} /></div>
+                  </div>
+                )
+              })()}
+              {(pickerCor.parte.startsWith('pilar:') || pickerCor.parte.startsWith('pilarG:') || pickerCor.parte === 'lingua_card') && (() => {
                 const cf = (ativo.conteudo ?? {}) as DiagConteudo
                 const isLP = pickerCor.parte === 'lingua_card'
-                const idx = Number(pickerCor.parte.slice(pickerCor.parte.indexOf(':') + 1))
-                const alvo = isLP ? cf.linguaPortuguesa : (cf.pilares ?? [])[idx]
+                const isG = pickerCor.parte.startsWith('pilarG:')
+                const [, giS, pjS] = pickerCor.parte.split(':')
+                const gi = Number(giS), pj = Number(pjS)
+                const idx = isG ? pj : Number(pickerCor.parte.slice('pilar:'.length))
+                const alvo = isLP ? cf.linguaPortuguesa : isG ? cf.pilaresGrupos?.[gi]?.[pj] : (cf.pilares ?? [])[idx]
                 const chave = alvo?.chave ?? '', tipo = (alvo?.tipoFonte ?? 'pilar') as 'pilar' | 'disciplina'
                 const val = (tipo === 'disciplina' ? 'd' : 'p') + ':' + chave
                 const sel = (nc: string, nt: 'pilar' | 'disciplina') => {
                   if (isLP) { if (cf.linguaPortuguesa) setConteudo({ ...cf, linguaPortuguesa: { ...cf.linguaPortuguesa, chave: nc, tipoFonte: nt, totalTxt: totalTxtDe(nc, nt) } }) }
+                  else if (isG) setConteudo({ ...cf, pilaresGrupos: (cf.pilaresGrupos ?? []).map((g, i) => i === gi ? g.map((pl, j) => j === pj ? { ...pl, chave: nc, tipoFonte: nt, totalTxt: totalTxtDe(nc, nt) } : pl) : g) })
                   else setConteudo({ ...cf, pilares: (cf.pilares ?? []).map((pl, i) => i === idx ? { ...pl, chave: nc, tipoFonte: nt, totalTxt: totalTxtDe(nc, nt) } : pl) })
                 }
                 const existe = fontesDisponiveis.some((f) => (f.tipo === 'disciplina' ? 'd' : 'p') + ':' + f.chave === val)
@@ -690,9 +860,91 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                   </div>
                 )
               })()}
+              {pickerCor.parte === 'dados_card' && (() => {
+                const cf = (ativo.conteudo ?? {}) as DiagConteudo
+                const cores = cf.dadosCardCores ?? {}
+                const setCor = (k: string, v: string) => setConteudo({ ...cf, dadosCardCores: { ...cores, [k]: v } })
+                const campos: [string, string, string][] = [
+                  ['corHeader', 'Topo (fundo)', '#1e3a5f'], ['corHeaderTexto', 'Topo (texto)', '#ffffff'],
+                  ['corValor', 'Letra (valores)', '#243b53'], ['corRotulo', 'Rótulos', '#94a3b8'],
+                  ['corDestaque', 'Fundo das faixas', '#eef2f8'], ['corBorda', 'Borda', '#c7d2e0'],
+                  ['corAcertos', 'Acertos', '#16a34a'], ['corErros', 'Erros', '#dc2626'],
+                  ['corMedia', 'Média', '#16a34a'], ['corAcento', 'Linha (acento)', '#f6b420'],
+                ]
+                return (
+                  <div className="mt-1 space-y-2">
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cores do card</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {campos.map(([k, lbl, def]) => (
+                        <div key={k}>
+                          <div className="mb-1 text-[11px] text-muted-foreground">{lbl}</div>
+                          <HexColorField value={cores[k] || def} onChange={(v) => setCor(k, v)} />
+                        </div>
+                      ))}
+                    </div>
+                    {Object.keys(cores).length > 0 && <button type="button" onClick={() => setConteudo({ ...cf, dadosCardCores: {} })} className="text-[11px] text-muted-foreground hover:underline">Restaurar cores padrão</button>}
+                  </div>
+                )
+              })()}
+              {pickerCor.parte.startsWith('discInd:') && (() => {
+                const i = Number(pickerCor.parte.slice('discInd:'.length))
+                const cf = (ativo.conteudo ?? {}) as DiagConteudo
+                const di = cf.discsIndividuais?.[i]
+                const atual = di?.chave ?? ''
+                const pos = di?.pos ?? 'top'
+                const setDi = (patch: Partial<{ chave: string; pos: 'top' | 'left' }>) => setConteudo({ ...cf, discsIndividuais: (cf.discsIndividuais ?? []).map((x, j) => j === i ? { ...x, ...patch } : x) })
+                return (
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <div className="mb-1 text-[11px] text-muted-foreground">Disciplina (dados/assuntos)</div>
+                      <select value={atual} onChange={(e) => setDi({ chave: e.target.value })} className="w-full rounded border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary">
+                        {!disciplinasBanco.some((x) => x.chave === atual) && <option value={atual}>{atual || '(escolher)'}</option>}
+                        {disciplinasBanco.map((x) => <option key={x.chave} value={x.chave}>{x.nome}</option>)}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><div className="mb-1 text-[11px] text-muted-foreground">Cor do texto</div><HexColorField value={a.coresTextoParte?.[pickerCor.parte] ?? a.corPrimaria} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [pickerCor.parte]: v } })} /></div>
+                      <div><div className="mb-1 text-[11px] text-muted-foreground">Cor de fundo</div><HexColorField value={a.coresFundoParte?.[pickerCor.parte] ?? '#f5f3ff'} onChange={(v) => setAjuste({ coresFundoParte: { ...(a.coresFundoParte ?? {}), [pickerCor.parte]: v } })} /></div>
+                    </div>
+                    <div>
+                      <div className="mb-1 text-[11px] text-muted-foreground">Posição da fita</div>
+                      <div className="flex overflow-hidden rounded-md border">
+                        {([['top', 'Topo'], ['left', 'Lateral']] as const).map(([v, lbl]) => (
+                          <button key={v} type="button" onClick={() => setDi({ pos: v })} className={cn('flex-1 py-1 text-[11px]', pos === v ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-muted')}>{lbl}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+              {pickerCor.parte.startsWith('fita:') && (() => {
+                const i = Number(pickerCor.parte.slice('fita:'.length))
+                const cf = (ativo.conteudo ?? {}) as DiagConteudo
+                const pos = cf.fitas?.[i]?.pos ?? 'left'
+                const setPos = (p: 'left' | 'top') => setConteudo({ ...cf, fitas: (cf.fitas ?? []).map((f, j) => j === i ? { ...f, pos: p } : f) })
+                return (
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <div className="mb-1 text-[11px] text-muted-foreground">Cor da fita</div>
+                      <HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />
+                      {a.coresParte?.[pickerCor.parte] && (
+                        <button type="button" onClick={() => { const cp = { ...(a.coresParte ?? {}) }; delete cp[pickerCor.parte]; setAjuste({ coresParte: cp }) }} className="mt-1.5 text-[11px] text-muted-foreground hover:underline">Restaurar cor padrão</button>
+                      )}
+                    </div>
+                    <div>
+                      <div className="mb-1 text-[11px] text-muted-foreground">Posição da fita</div>
+                      <div className="flex overflow-hidden rounded-md border">
+                        {([['left', 'Lateral'], ['top', 'Topo']] as const).map(([v, lbl]) => (
+                          <button key={v} type="button" onClick={() => setPos(v)} className={cn('flex-1 py-1 text-[11px]', pos === v ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-muted')}>{lbl}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
               <p className="mt-4 text-[10px] leading-snug text-muted-foreground">Personaliza só este bloco. Clique em qualquer bloco da prévia para editá-lo.</p>
               {podeRemoverParte(pickerCor.parte) && (
-                <button type="button" onClick={() => { setConteudo(removerParteDiag(ativo.conteudo, pickerCor.parte)); setPickerCor(null) }} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-destructive/40 px-2 py-1.5 text-[12px] font-medium text-destructive transition-colors hover:bg-destructive/10">
+                <button type="button" onClick={() => { try { apagarParte(pickerCor.parte); setPickerCor(null) } catch (err) { console.error('apagar bloco', err); toast.error('Não foi possível apagar este bloco.') } }} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-destructive/40 px-2 py-1.5 text-[12px] font-medium text-destructive transition-colors hover:bg-destructive/10">
                   <Trash2 className="h-3.5 w-3.5" /> Apagar este bloco
                 </button>
               )}
@@ -874,8 +1126,33 @@ export function CadernoTesteBuilder({ cadernoId, builderInicial, bancos, questoe
                 })}
                 {outline.length === 0 && <p className="px-1 py-4 text-center text-xs text-muted-foreground">Sem blocos para exibir.</p>}
               </div>
-              <div className="mt-3 rounded-md border border-dashed px-2.5 py-2 text-[11px] leading-snug text-muted-foreground">
-                <Plus className="mr-1 inline h-3.5 w-3.5" /> Adicionar novos blocos (texto, card, desempenho) — em breve.
+              <div className="mt-4 border-t pt-3">
+                <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Plus className="mr-1 inline h-3.5 w-3.5" /> Adicionar bloco</p>
+                {(['individual', 'composto'] as const).map((g) => (
+                  <div key={g} className="mt-3 first:mt-0">
+                    <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/80">{g === 'individual' ? 'Blocos individuais' : 'Seção + conteúdo'}</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {BLOCOS_ADD.filter((b) => (b.grupo ?? 'individual') === g).map((b) => b.contavel ? (
+                        <div key={b.tipo} className="row-span-2 flex flex-col justify-center rounded-md border bg-background px-2 py-1.5">
+                          <div className="mb-1 flex items-center gap-1.5 text-[12px] font-medium"><b.icon className="h-3.5 w-3.5 shrink-0 text-primary" /> <span className="min-w-0 truncate">{b.label}</span></div>
+                          <div className="mb-1 text-[10px] leading-tight text-muted-foreground">Quantos pilares adicionar</div>
+                          <div className="flex gap-0.5">
+                            {[1, 2, 3, 4].map((n) => (
+                              <button key={n} type="button" onClick={() => adicionarBloco(b.tipo, n)} title={`Adicionar ${n} pilar(es)`}
+                                className="flex-1 rounded border py-0.5 text-[11px] transition-colors hover:border-primary/50 hover:bg-primary/5">{n}</button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <button key={b.tipo} type="button" onClick={() => adicionarBloco(b.tipo)}
+                          className="flex items-center gap-1.5 rounded-md border bg-background px-2 py-1.5 text-left text-[12px] font-medium transition-colors hover:border-primary/50 hover:bg-primary/5">
+                          <b.icon className="h-3.5 w-3.5 shrink-0 text-primary" /> <span className="min-w-0 truncate">{b.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <p className="mt-2 px-1 text-[10px] leading-snug text-muted-foreground">O bloco entra no fim; arraste/usa as setas acima para reordenar e clique nele na prévia para editar.</p>
               </div>
             </div>
           </aside>

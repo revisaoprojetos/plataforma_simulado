@@ -1,0 +1,47 @@
+name: PR — integração (conflito + código + montagem)
+
+# É AQUI que as branches "se encontram" com segurança: num Pull Request para a main, o GitHub
+# testa a branch JÁ MESCLADA com a main. Se houver conflito de merge, o PR aparece "com conflitos"
+# na própria interface; se o merge compilar/buildar com erro, este check falha ANTES de mergear.
+# Assim uma branch em andamento não entra na main quebrando código ou build.
+on:
+  pull_request:
+    branches: [main]
+
+# Cancela runs antigos do mesmo PR quando você faz um novo push (economiza minutos).
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  integrar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (branch já MESCLADA com a main)
+        # Em pull_request o checkout pega refs/pull/N/merge = a branch aplicada sobre a main.
+        uses: actions/checkout@v4
+
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck do resultado mesclado (código)
+        run: pnpm --filter web exec tsc --noEmit
+
+      - name: Build do resultado mesclado (montagem)
+        run: pnpm --filter web build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_APP_URL: https://simulado.revisaopge.com.br
+          NEXT_PUBLIC_COOKIE_DOMAIN: ${{ secrets.NEXT_PUBLIC_COOKIE_DOMAIN || '.revisaopge.com.br' }}

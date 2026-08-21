@@ -2,7 +2,10 @@ name: Build e Push para GHCR
 
 on:
   push:
-    branches: [main]
+    # Build em QUALQUER branch — assim dá para testar uma branch no Portainer (colando a imagem
+    # por SHA) ANTES de mergear na main. O `latest` e o deploy automático só acontecem na main
+    # (produção fica intacta enquanto você trabalha na branch).
+    branches: ['**']
   # Permite disparar o build manualmente pela aba Actions (Run workflow) — útil quando um push
   # nao dispara o CI (ex.: push via URL antigo apos o repo ser renomeado).
   workflow_dispatch:
@@ -26,6 +29,24 @@ jobs:
       - name: Normalizar owner para minúsculas (GHCR exige)
         run: echo "IMAGE_OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
+      - name: Definir tags (SHA sempre; `latest` SÓ na main)
+        id: tags
+        run: |
+          BASE="ghcr.io/${IMAGE_OWNER}/${IMAGE_NAME}"
+          # Toda imagem sempre ganha a tag por SHA (é o que você cola no Portainer p/ deployar).
+          web="${BASE}:${GITHUB_SHA}"
+          wk="${BASE}-worker:${GITHUB_SHA}"
+          api="${BASE}-api:${GITHUB_SHA}"
+          # Só a main atualiza o `latest` (produção) — branches NÃO mexem no `latest`.
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            web="${web}"$'\n'"${BASE}:latest"
+            wk="${wk}"$'\n'"${BASE}-worker:latest"
+            api="${api}"$'\n'"${BASE}-api:latest"
+          fi
+          { echo "web<<EOF"; echo "$web"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+          { echo "wk<<EOF"; echo "$wk"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+          { echo "api<<EOF"; echo "$api"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+
       - name: Login no GHCR
         uses: docker/login-action@v3
         with:
@@ -42,9 +63,7 @@ jobs:
           context: .
           file: ./apps/web/Dockerfile
           push: true
-          tags: |
-            ghcr.io/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:latest
-            ghcr.io/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          tags: ${{ steps.tags.outputs.web }}
           build-args: |
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
@@ -59,9 +78,7 @@ jobs:
           context: ./apps/worker
           file: ./apps/worker/Dockerfile
           push: true
-          tags: |
-            ghcr.io/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}-worker:latest
-            ghcr.io/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}-worker:${{ github.sha }}
+          tags: ${{ steps.tags.outputs.wk }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -75,14 +92,32 @@ jobs:
           context: .
           file: ./apps/api/Dockerfile
           push: true
-          tags: |
-            ghcr.io/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}-api:latest
-            ghcr.io/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}-api:${{ github.sha }}
+          tags: ${{ steps.tags.outputs.api }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Redeploy automático no Portainer (SÓ na main, se o webhook estiver configurado)
+        # Auto-deploy sem colar SHA na mão: o Portainer re-pulla a tag `latest` e reinicia o serviço.
+        # Pré-requisitos (feitos 1x): (1) serviço web apontando para `:latest`; (2) webhook do serviço
+        # criado no Portainer; (3) a URL do webhook salva no secret PORTAINER_WEBHOOK do repositório.
+        # Sem o secret, este passo é um no-op (deploy segue manual). Branches NUNCA disparam (só a main).
+        if: github.ref == 'refs/heads/main'
+        env:
+          HOOK: ${{ secrets.PORTAINER_WEBHOOK }}
+        run: |
+          if [ -n "$HOOK" ]; then
+            echo "Disparando redeploy no Portainer (re-pull da :latest + restart do serviço)…"
+            curl -fsSL -X POST "$HOOK"
+            echo "OK — Portainer vai puxar a imagem nova e reiniciar o serviço."
+          else
+            echo "PORTAINER_WEBHOOK ausente — pulando auto-deploy (deploy manual pelo Portainer)."
+          fi
+
   deploy:
     needs: build-and-push
+    # Deploy automático (docker service update → `latest`) SÓ na main. Uma branch nunca dispara
+    # deploy — você a testa colando a imagem por SHA no Portainer, sem afetar produção.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
