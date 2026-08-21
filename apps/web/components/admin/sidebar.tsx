@@ -44,6 +44,7 @@ import {
   Tag,
   CalendarDays,
   Upload,
+  Package,
   Link2 as LinkIcon,
 } from 'lucide-react'
 import {
@@ -197,6 +198,7 @@ const navGroups: NavGroup[] = [
     icon: CalendarDays,
     items: [
       { label: 'Catálogo', href: '/admin/cronogramas', icon: CalendarDays, perm: 'cronogramas:view' },
+      { label: 'Pacotes e acesso', href: '/admin/cronogramas/pacotes', icon: Package, perm: 'cronogramas:view' },
       { label: 'Links de aula', href: '/admin/cronogramas/links', icon: LinkIcon, perm: 'cronogramas:view' },
       { label: 'Tipos de meta', href: '/admin/cronogramas/tipos', icon: Tag, perm: 'cronogramas:view' },
       { label: 'Importar', href: '/admin/cronogramas/importar', icon: Upload, perm: 'cronogramas:update' },
