@@ -40,6 +40,8 @@ export type CronogramaLista = {
   ordem: number
   faixa: string
   metas: number
+  /** Em quantos pacotes está — zero significa invisível para o aluno. */
+  pacotes: number
 }
 
 async function guard(perm: string) {
@@ -117,6 +119,17 @@ export async function listarCronogramas(): Promise<{ ok: boolean; itens?: Cronog
     .from('simulado_cronograma_categorias')
     .select('id, nome')
     .eq('tenant_id', g.tenantId)
+
+  // Vínculos com pacotes: é por eles que o aluno recebe acesso. Um cronograma
+  // liberado mas fora de qualquer pacote não chega a ninguém (salvo gratuito).
+  const { data: vinculos } = await svc
+    .from('simulado_cronograma_pacote_itens')
+    .select('cronograma_id')
+    .eq('tenant_id', g.tenantId)
+  const pacotesPorCron = new Map<string, number>()
+  for (const v of ((vinculos ?? []) as any[])) {
+    pacotesPorCron.set(v.cronograma_id, (pacotesPorCron.get(v.cronograma_id) ?? 0) + 1)
+  }
   const nomeCategoria = new Map(((cats ?? []) as any[]).map((c) => [c.id, c.nome as string]))
 
   const itens = (data ?? []).map((c: any) => ({
@@ -128,6 +141,7 @@ export async function listarCronogramas(): Promise<{ ok: boolean; itens?: Cronog
     carga_horaria: Number(c.carga_horaria),
     faixa: faixaSemanal(c.dias_curso ?? []), // R19 — lida de dias_curso, não do nome
     metas: totais.get(c.id) ?? 0,
+    pacotes: pacotesPorCron.get(c.id) ?? 0,
   })) as CronogramaLista[]
 
   return { ok: true, itens }

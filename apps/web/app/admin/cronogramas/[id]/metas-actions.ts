@@ -11,7 +11,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
-import { fetchAll } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { chaveLink } from '@/lib/cronograma/formato-meta'
 import { listarTiposMeta } from '@/lib/cronograma/carregar-tipos'
 import type { MetaFonte, TipoMeta, TipoMetaDef } from '@/lib/cronograma/tipos'
@@ -384,5 +384,69 @@ function normalizar(e: EntradaMeta) {
     simulado_id: e.simulado_id || null,
     simulado_externo_nome: e.simulado_externo_nome?.trim() || null,
     simulado_externo_url: e.simulado_externo_url?.trim() || null,
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pacotes deste cronograma
+//
+// O pacote é o caminho pelo qual o aluno recebe o cronograma. Poder ver e mexer nisso
+// daqui evita a ida e volta até a tela de pacotes só para conferir "quem recebe este".
+
+export type PacotesDoCronograma = {
+  dentro: { id: string; nome: string; alcance: number }[]
+  fora: { id: string; nome: string; alcance: number }[]
+}
+
+export async function pacotesDoCronograma(cronogramaId: string): Promise<{ ok: boolean; dados?: PacotesDoCronograma; error?: string }> {
+  const g = await guard('cronogramas:view')
+  if (!g.ok) return { ok: false, error: g.error }
+  if (!UUID_RE.test(cronogramaId)) return { ok: false, error: 'Cronograma não encontrado.' }
+  const svc = createAdminClient()
+
+  const [pacotes, itens, vgrupos, vest] = await Promise.all([
+    fetchAll<any>(() =>
+      svc.from('simulado_cronograma_pacotes').select('id, nome').eq('tenant_id', g.tenantId).eq('ativo', true).order('nome') as any,
+    ),
+    fetchAll<any>(() =>
+      svc.from('simulado_cronograma_pacote_itens').select('pacote_id').eq('tenant_id', g.tenantId).eq('cronograma_id', cronogramaId).order('id') as any,
+    ),
+    fetchAll<any>(() => svc.from('simulado_cronograma_pacote_grupos').select('pacote_id, grupo_id').eq('tenant_id', g.tenantId).order('id') as any),
+    fetchAll<any>(() => svc.from('simulado_cronograma_pacote_estudantes').select('pacote_id, estudante_id').eq('tenant_id', g.tenantId).order('id') as any),
+  ])
+
+  // Alcance de cada pacote: membros dos grupos vinculados + avulsos, sem duplicar.
+  const gruposUsados = [...new Set(vgrupos.map((x) => x.grupo_id))]
+  const membrosPorGrupo = new Map<string, string[]>()
+  if (gruposUsados.length) {
+    const membros = await fetchAllByIn<any>(gruposUsados, (chunk) =>
+      svc.from('simulado_grupo_membros').select('grupo_id, estudante_id').in('grupo_id', chunk).order('estudante_id') as any,
+    )
+    for (const m of membros) {
+      const l = membrosPorGrupo.get(m.grupo_id)
+      if (l) l.push(m.estudante_id)
+      else membrosPorGrupo.set(m.grupo_id, [m.estudante_id])
+    }
+  }
+
+  const alcanceDe = (pacoteId: string) => {
+    const s = new Set<string>()
+    for (const vg of vgrupos) {
+      if (vg.pacote_id !== pacoteId) continue
+      for (const e of membrosPorGrupo.get(vg.grupo_id) ?? []) s.add(e)
+    }
+    for (const ve of vest) if (ve.pacote_id === pacoteId) s.add(ve.estudante_id)
+    return s.size
+  }
+
+  const dentroIds = new Set(itens.map((i) => i.pacote_id))
+  const comAlcance = pacotes.map((p) => ({ id: p.id, nome: p.nome, alcance: alcanceDe(p.id) }))
+
+  return {
+    ok: true,
+    dados: {
+      dentro: comAlcance.filter((p) => dentroIds.has(p.id)),
+      fora: comAlcance.filter((p) => !dentroIds.has(p.id)),
+    },
   }
 }

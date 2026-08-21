@@ -1,7 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
-import { AlertTriangle, CalendarDays, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, CalendarDays, ListChecks, Package, Pencil, Plus, Trash2, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -23,12 +24,14 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DisciplinaPicker } from '@/components/cronograma/disciplina-picker'
 import { SimuladoPicker, type SimuladoOpcao } from '@/components/cronograma/simulado-picker'
+import { alternarCronogramaNoPacote } from '../pacotes/actions'
 import type { MetaFonte, TipoMeta, TipoMetaDef } from '@/lib/cronograma/tipos'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
 import {
   atualizarMeta,
   criarMeta,
   excluirMeta,
+  type PacotesDoCronograma,
   type CronogramaDetalhe,
   type Diagnostico,
   type EntradaMeta,
@@ -55,6 +58,7 @@ export function MetasClient({
   tipos,
   disciplinas,
   simulados,
+  pacotes,
   diagnostico,
 }: {
   cronograma: CronogramaDetalhe
@@ -62,6 +66,7 @@ export function MetasClient({
   tipos: TipoMetaDef[]
   disciplinas: { id: string; nome: string }[]
   simulados: SimuladoOpcao[]
+  pacotes: PacotesDoCronograma
   diagnostico: Diagnostico
 }) {
   // Rótulo e ordem vêm do cadastro de tipos, não de constantes no código.
@@ -74,6 +79,8 @@ export function MetasClient({
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<string | null>(null)
   const [form, setForm] = useState<EntradaMeta>(novaMeta(1, tipos[0]?.slug ?? 'pdfull'))
+  const [pac, setPac] = useState(pacotes)
+  const [pacotesAberto, setPacotesAberto] = useState(false)
 
   const revisao = useMemo(() => new Set(c.semanas_revisao), [c.semanas_revisao])
 
@@ -121,6 +128,20 @@ export function MetasClient({
     }
     return xs
   }, [diagnostico, c])
+
+  /** Adiciona ou tira este cronograma de um pacote, sem sair da tela. */
+  function alternarPacote(p: { id: string; nome: string; alcance: number }, dentro: boolean) {
+    iniciar(async () => {
+      const r = await alternarCronogramaNoPacote(p.id, c.id, dentro)
+      if (!r.ok) return toast.error(r.error ?? 'Não foi possível alterar.')
+      toast.success(dentro ? `Adicionado ao pacote "${p.nome}"` : `Removido do pacote "${p.nome}"`)
+      setPac((x) =>
+        dentro
+          ? { dentro: [...x.dentro, p], fora: x.fora.filter((y) => y.id !== p.id) }
+          : { dentro: x.dentro.filter((y) => y.id !== p.id), fora: [...x.fora, p] },
+      )
+    })
+  }
 
   function abrirNova() {
     setEditando(null)
@@ -200,6 +221,51 @@ export function MetasClient({
           {c.status === 'liberado' ? 'Liberado' : 'Rascunho'}
         </Badge>
       </div>
+
+      {/* ── Por onde o aluno recebe este cronograma */}
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader
+          icon={Package}
+          titulo="Pacotes"
+          subtitulo={
+            pac.dentro.length === 0
+              ? 'Este cronograma não está em nenhum pacote — nenhum aluno o recebe'
+              : `Em ${pac.dentro.length} pacote(s) · ${pac.dentro.reduce((n, p) => n + p.alcance, 0).toLocaleString('pt-BR')} aluno(s) alcançado(s)`
+          }
+          acao={
+            pac.fora.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => setPacotesAberto(true)} disabled={pendente}>
+                <Plus className="mr-1 h-4 w-4" />
+                Adicionar a um pacote
+              </Button>
+            )
+          }
+        />
+
+        {pac.dentro.length === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+            O aluno recebe cronogramas pelos pacotes. Enquanto este não estiver em nenhum, só chega a quem
+            tiver acesso gratuito ou vínculo individual.
+          </p>
+        ) : (
+          <div className="divide-y">
+            {pac.dentro.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 px-4 py-2.5">
+                <Link href={`/admin/cronogramas/pacotes/${p.id}`} className="min-w-0 flex-1 truncate text-sm hover:underline">
+                  {p.nome}
+                </Link>
+                <Badge variant="outline" className="shrink-0 gap-1">
+                  <Users className="h-3 w-3" />
+                  {p.alcance.toLocaleString('pt-BR')}
+                </Badge>
+                <Button size="sm" variant="ghost" onClick={() => alternarPacote(p, false)} disabled={pendente} title="Remover deste pacote">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {avisos.length > 0 && (
         <AlertBox variante="aviso" titulo="Pontos de atenção nos dados" icon={AlertTriangle}>
@@ -419,6 +485,49 @@ export function MetasClient({
             </Button>
             <Button onClick={salvar} disabled={pendente}>
               {pendente ? 'Salvando…' : 'Salvar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={pacotesAberto} onOpenChange={setPacotesAberto}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Adicionar a um pacote</DialogTitle>
+            <DialogDescription>
+              O pacote é o que liga o cronograma aos alunos. Quem estiver nele passa a receber este
+              cronograma — desde que ele esteja liberado.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-72 space-y-1 overflow-y-auto">
+            {pac.fora.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">Já está em todos os pacotes.</p>
+            ) : (
+              pac.fora.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    alternarPacote(p, true)
+                    setPacotesAberto(false)
+                  }}
+                  disabled={pendente}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
+                >
+                  <Plus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate">{p.nome}</span>
+                  <Badge variant="outline" className="shrink-0 gap-1 text-xs">
+                    <Users className="h-3 w-3" />
+                    {p.alcance.toLocaleString('pt-BR')}
+                  </Badge>
+                </button>
+              ))
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPacotesAberto(false)}>
+              Fechar
             </Button>
           </DialogFooter>
         </DialogContent>

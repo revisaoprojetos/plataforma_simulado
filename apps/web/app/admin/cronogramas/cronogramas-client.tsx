@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
-import { CalendarDays, Gift, ListChecks, Pencil, Plus, Tags, Trash2 } from 'lucide-react'
+import { CalendarDays, Clock, Gift, ListChecks, Package, Pencil, Plus, Tags, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SecaoHeader } from '@/components/admin/secao-header'
+import { AlertBox } from '@/components/ui/alert-box'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import {
@@ -73,12 +74,35 @@ export function CronogramasClient({
   const [editando, setEditando] = useState<string | null>(null)
   const [form, setForm] = useState<EntradaCronograma>(vazio())
   const [busca, setBusca] = useState('')
+  const [filtro, setFiltro] = useState<'todos' | 'liberados' | 'rascunhos' | 'sem_pacote' | 'sem_metas'>('todos')
+
+  /**
+   * "Invisível": liberado, mas fora de qualquer pacote e sem acesso gratuito. É o estado
+   * que mais engana — a tela diz "Liberado" e mesmo assim ninguém recebe.
+   */
+  const ehInvisivel = (c: CronogramaLista) => c.status === 'liberado' && c.pacotes === 0 && !c.acesso_gratuito
+
+  const contagens = useMemo(
+    () => ({
+      liberados: itens.filter((c) => c.status === 'liberado').length,
+      rascunhos: itens.filter((c) => c.status !== 'liberado').length,
+      semPacote: itens.filter((c) => c.pacotes === 0).length,
+      semMetas: itens.filter((c) => c.metas === 0).length,
+      invisiveis: itens.filter(ehInvisivel).length,
+    }),
+    [itens],
+  )
 
   const filtrados = useMemo(() => {
     const t = busca.trim().toLowerCase()
-    if (!t) return itens
-    return itens.filter((c) => c.nome.toLowerCase().includes(t) || (c.categoria_nome ?? '').toLowerCase().includes(t))
-  }, [itens, busca])
+    let xs = itens
+    if (filtro === 'liberados') xs = xs.filter((c) => c.status === 'liberado')
+    else if (filtro === 'rascunhos') xs = xs.filter((c) => c.status !== 'liberado')
+    else if (filtro === 'sem_pacote') xs = xs.filter((c) => c.pacotes === 0)
+    else if (filtro === 'sem_metas') xs = xs.filter((c) => c.metas === 0)
+    if (!t) return xs
+    return xs.filter((c) => c.nome.toLowerCase().includes(t) || (c.categoria_nome ?? '').toLowerCase().includes(t))
+  }, [itens, busca, filtro])
 
   // Agrupa por carga horária — é assim que o aluno escolhe (spec §4, passo 2).
   const porCarga = useMemo(() => {
@@ -237,11 +261,49 @@ export function CronogramasClient({
 
   return (
     <>
+      {/* Filtros por SITUAÇÃO, não por atributo: o que se procura aqui é o que precisa de
+          ação — sem metas não dá para liberar, e liberado sem pacote não chega a ninguém. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {(
+          [
+            ['todos', 'Todos', itens.length],
+            ['liberados', 'Liberados', contagens.liberados],
+            ['rascunhos', 'Rascunhos', contagens.rascunhos],
+            ['sem_pacote', 'Sem pacote', contagens.semPacote],
+            ['sem_metas', 'Sem metas', contagens.semMetas],
+          ] as const
+        ).map(([v, rotulo, n]) => (
+          <button
+            key={v}
+            onClick={() => setFiltro(v)}
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition ${
+              filtro === v ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted'
+            } ${n === 0 && v !== 'todos' ? 'opacity-50' : ''}`}
+          >
+            {rotulo}
+            <span className={`tabular-nums text-xs ${filtro === v ? 'opacity-80' : 'text-muted-foreground'}`}>{n}</span>
+          </button>
+        ))}
+      </div>
+
+      {contagens.invisiveis > 0 && filtro !== 'sem_pacote' && (
+        <AlertBox variante="aviso" titulo={`${contagens.invisiveis} cronograma(s) liberado(s) que ninguém recebe`}>
+          <p className="text-sm">
+            Estão liberados, mas fora de qualquer pacote e sem acesso gratuito — então não chegam a aluno
+            nenhum.{' '}
+            <button className="font-medium underline" onClick={() => setFiltro('sem_pacote')}>
+              Ver quais são
+            </button>
+            .
+          </p>
+        </AlertBox>
+      )}
+
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
         <SecaoHeader
           icon={CalendarDays}
           titulo="Catálogo"
-          subtitulo={`${itens.length} cronograma(s) · ${itens.filter((c) => c.status === 'liberado').length} liberado(s)`}
+          subtitulo={`${filtrados.length} de ${itens.length} cronograma(s)`}
           acao={
             <div className="flex items-center gap-2">
               <Input
@@ -269,61 +331,117 @@ export function CronogramasClient({
             <p className="mt-1 text-sm text-muted-foreground">
               Crie um cronograma e depois importe as metas, ou use a importação para trazer o catálogo inteiro.
             </p>
-            <Button className="mt-4" onClick={abrirNovo}>
-              <Plus className="mr-1 h-4 w-4" />
-              Criar o primeiro
-            </Button>
+            <div className="mt-4 flex justify-center gap-2">
+              <Button onClick={abrirNovo}>
+                <Plus className="mr-1 h-4 w-4" />
+                Criar o primeiro
+              </Button>
+              <Link href="/admin/cronogramas/importar" className={buttonVariants({ variant: 'outline' })}>
+                Importar planilha
+              </Link>
+            </div>
           </div>
+        ) : filtrados.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Nenhum cronograma nesse filtro.</p>
         ) : (
           <div className="divide-y">
             {porCarga.map(([carga, lista]) => (
               <div key={carga}>
-                <div className="bg-muted/40 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {carga}h por dia · {lista.length} cronograma(s)
+                <div className="flex items-center gap-1.5 bg-muted/40 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5" />
+                  {carga}h por dia
+                  <span className="font-normal normal-case">· {lista.length} cronograma(s)</span>
                 </div>
-                {lista.map((c) => (
-                  <div key={c.id} className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-muted/30">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link href={`/admin/cronogramas/${c.id}`} className="truncate font-medium hover:underline">
-                          {c.nome}
-                        </Link>
-                        <Badge variant={c.status === 'liberado' ? 'default' : 'secondary'}>
-                          {c.status === 'liberado' ? 'Liberado' : 'Rascunho'}
-                        </Badge>
-                        {c.acesso_gratuito && (
-                          <Badge variant="outline" className="gap-1">
-                            <Gift className="h-3 w-3" />
-                            Gratuito
-                          </Badge>
-                        )}
-                        {c.categoria_nome && <Badge variant="outline">{c.categoria_nome}</Badge>}
+                {lista.map((c) => {
+                  const invisivel = ehInvisivel(c)
+                  return (
+                    <div key={c.id} className="flex flex-wrap items-start gap-3 px-4 py-3 transition hover:bg-muted/30">
+                      {/* Marca de status à esquerda: dá para varrer a coluna e achar o que falta. */}
+                      <span
+                        className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                          c.status === 'liberado' ? (invisivel ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-muted-foreground/30'
+                        }`}
+                        title={c.status === 'liberado' ? (invisivel ? 'Liberado, mas ninguém recebe' : 'Liberado') : 'Rascunho'}
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link href={`/admin/cronogramas/${c.id}`} className="truncate font-medium hover:underline">
+                            {c.nome}
+                          </Link>
+                          {c.acesso_gratuito && (
+                            <Badge variant="outline" className="gap-1">
+                              <Gift className="h-3 w-3" />
+                              Gratuito
+                            </Badge>
+                          )}
+                          {c.categoria_nome && <Badge variant="outline">{c.categoria_nome}</Badge>}
+                        </div>
+
+                        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                          <span>{c.faixa}</span>
+                          <span>·</span>
+                          <span>{c.total_semanas} semanas</span>
+                          {c.semanas_revisao.length > 0 && <span>({c.semanas_revisao.length} de revisão)</span>}
+                          <span>·</span>
+                          {c.metas === 0 ? (
+                            <span className="font-medium text-amber-600">sem metas</span>
+                          ) : (
+                            <span>{c.metas.toLocaleString('pt-BR')} metas</span>
+                          )}
+                          <span>·</span>
+                          {c.pacotes === 0 ? (
+                            <Link
+                              href={`/admin/cronogramas/${c.id}`}
+                              className={invisivel ? 'font-medium text-amber-600 hover:underline' : 'hover:underline'}
+                            >
+                              em nenhum pacote
+                            </Link>
+                          ) : (
+                            <span className="inline-flex items-center gap-1">
+                              <Package className="h-3 w-3" />
+                              {c.pacotes} pacote(s)
+                            </span>
+                          )}
+                        </p>
                       </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {c.faixa} · {c.total_semanas} semanas
-                        {c.semanas_revisao.length > 0 && ` (${c.semanas_revisao.length} de revisão)`} ·{' '}
-                        {c.metas === 0 ? <span className="text-amber-600">sem metas</span> : `${c.metas} metas`}
-                      </p>
+
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => gratuito(c)}
+                          disabled={pendente}
+                          title={c.acesso_gratuito ? 'Desligar acesso gratuito' : 'Liberar para todos os alunos, sem pacote'}
+                        >
+                          <Gift className={c.acesso_gratuito ? 'h-4 w-4 text-primary' : 'h-4 w-4'} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={c.status === 'liberado' ? 'secondary' : 'default'}
+                          onClick={() => liberar(c)}
+                          disabled={pendente || (c.status !== 'liberado' && c.metas === 0)}
+                          title={c.status !== 'liberado' && c.metas === 0 ? 'Cadastre metas antes de liberar' : undefined}
+                        >
+                          {c.status === 'liberado' ? 'Voltar a rascunho' : 'Liberar'}
+                        </Button>
+                        <Link
+                          href={`/admin/cronogramas/${c.id}`}
+                          className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                          title="Metas e pacotes"
+                        >
+                          <ListChecks className="h-4 w-4" />
+                        </Link>
+                        <Button size="sm" variant="ghost" onClick={() => abrirEdicao(c)} disabled={pendente} title="Editar metadados">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => excluir(c)} disabled={pendente} title="Excluir">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => gratuito(c)} disabled={pendente} title="Acesso gratuito para todos os alunos">
-                        <Gift className={c.acesso_gratuito ? 'h-4 w-4 text-primary' : 'h-4 w-4'} />
-                      </Button>
-                      <Button size="sm" variant={c.status === 'liberado' ? 'secondary' : 'default'} onClick={() => liberar(c)} disabled={pendente}>
-                        {c.status === 'liberado' ? 'Voltar a rascunho' : 'Liberar'}
-                      </Button>
-                      <Link href={`/admin/cronogramas/${c.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })} title="Metas do cronograma">
-                        <ListChecks className="h-4 w-4" />
-                      </Link>
-                      <Button size="sm" variant="ghost" onClick={() => abrirEdicao(c)} disabled={pendente} title="Editar metadados">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => excluir(c)} disabled={pendente}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ))}
           </div>

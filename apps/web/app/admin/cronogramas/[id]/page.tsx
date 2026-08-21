@@ -2,14 +2,14 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { SemPermissao } from '@/components/ui/alert-box'
-import { carregarDetalhe } from './metas-actions'
+import { carregarDetalhe, pacotesDoCronograma } from './metas-actions'
 import { MetasClient } from './metas-client'
 
 export const dynamic = 'force-dynamic'
 
 export default async function CronogramaDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const r = await carregarDetalhe(id)
+  const [r, p] = await Promise.all([carregarDetalhe(id), pacotesDoCronograma(id)])
 
   if (!r.ok || !r.cronograma) {
     return (
@@ -31,7 +31,7 @@ export default async function CronogramaDetalhePage({ params }: { params: Promis
           Voltar ao catálogo
         </Link>
       </div>
-      <MetasClient cronograma={r.cronograma} metasIniciais={r.metas ?? []} tipos={r.tipos ?? []} disciplinas={r.disciplinas ?? []} simulados={r.simulados ?? []} diagnostico={r.diagnostico!} />
+      <MetasClient cronograma={r.cronograma} metasIniciais={r.metas ?? []} tipos={r.tipos ?? []} disciplinas={r.disciplinas ?? []} simulados={r.simulados ?? []} pacotes={p.dados ?? { dentro: [], fora: [] }} diagnostico={r.diagnostico!} />
     </div>
   )
 }
