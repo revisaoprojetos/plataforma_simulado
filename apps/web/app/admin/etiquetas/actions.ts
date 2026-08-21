@@ -125,6 +125,24 @@ export async function etiquetasDaQuestao(questaoId: string): Promise<{ ok: boole
   }
 }
 
+export type QuestaoDaEtiqueta = { id: string; titulo: string; disciplina: string | null }
+
+/** Questões que têm a etiqueta (para expandir na lista e abrir o editor de cada uma). */
+export async function questoesDaEtiqueta(etiquetaId: string): Promise<{ ok: boolean; itens?: QuestaoDaEtiqueta[]; error?: string }> {
+  const g = await guard('questoes:view'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: links } = await svc.from('simulado_questao_etiquetas').select('questao_id').eq('tenant_id', g.tenantId).eq('etiqueta_id', etiquetaId)
+  const ids = [...new Set(((links ?? []) as any[]).map((l) => l.questao_id).filter(Boolean))]
+  if (!ids.length) return { ok: true, itens: [] }
+  // Enunciado (rótulo) + disciplina (embed tolerante). Sem embed, cai só no enunciado.
+  let res = await svc.from('simulado_questoes').select('id, enunciado, disciplinas:simulado_disciplinas(nome)').in('id', ids)
+  if (res.error) res = await svc.from('simulado_questoes').select('id, enunciado').in('id', ids) as any
+  const snippet = (s: unknown) => String(s ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140)
+  const itens = ((res.data ?? []) as any[]).map((q) => ({ id: q.id as string, titulo: snippet(q.enunciado) || 'Questão sem enunciado', disciplina: (q.disciplinas?.nome ?? null) as string | null }))
+    .sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'))
+  return { ok: true, itens }
+}
+
 export async function aplicarEtiqueta(questaoId: string, etiquetaId: string): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('questoes:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
