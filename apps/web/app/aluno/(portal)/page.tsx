@@ -99,10 +99,13 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const sessoesPorSim = new Map<string, any[]>()
   if (ids.length) {
     // owner_estudante_id IS NULL: exclui simulados PESSOAIS do aluno (sessão do runner pessoal os arrastaria pra cá).
-    sims = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_simulados').select('id, titulo, status, embed_token, regras, modo_aplicacao, data_inicio, data_fim, created_at').in('id', chunk).eq('deletado', false).is('owner_estudante_id', null).order('id', { ascending: true }))
+    sims = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_simulados').select('id, titulo, status, embed_token, regras, modo_aplicacao, data_inicio, data_fim, created_at, pasta_id').in('id', chunk).eq('deletado', false).is('owner_estudante_id', null).order('id', { ascending: true }))
     for (const x of (sessAll ?? []) as any[]) { const arr = sessoesPorSim.get(x.simulado_id) ?? []; arr.push(x); sessoesPorSim.set(x.simulado_id, arr) }
   }
   const feitosSet = new Set(sims.filter((s) => (sessoesPorSim.get(s.id) ?? []).some((x) => x.status === 'finalizada')).map((s) => s.id))
+  // Pasta (folder_area='simulado') de cada simulado no admin — usado p/ o link "Copiar link da pasta"
+  // levar o aluno à MESMA pasta que o admin vê (o grupo do catálogo é por banco→pai, um id diferente).
+  const pastaBySim = new Map<string, string | null>(sims.map((s: any) => [s.id, s.pasta_id ?? null]))
 
   // Visual dos simulados + mapa pasta→simulado de TODOS os sims (usado nos banners de vitrine):
   // ambos só dependem de `sims`, então rodam em paralelo.
@@ -127,7 +130,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     const url = !liberado ? null
       : info?.pdf ? info.pdf
       : (info?.temCaderno && i.embed_token) ? `/api/aluno/caderno-teste-questoes?token=${encodeURIComponent(i.embed_token)}` : null
-    return { ...i, grupoId: grupoPorSim.get(i.id) ?? null, enunciadoUrl: url }
+    return { ...i, grupoId: grupoPorSim.get(i.id) ?? null, pastaId: pastaBySim.get(i.id) ?? null, enunciadoUrl: url }
   })
 
   // Progresso por pasta (concluídos / total dos acessíveis).
@@ -245,30 +248,35 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     })
   }
 
-  // VISÃO DE PASTA — só o conteúdo da pasta (sem saudação/atalhos).
+  // VISÃO DE PASTA — só o conteúdo da pasta (sem saudação/atalhos). Casa pelo GRUPO do catálogo
+  // (banco→pai) OU pelo pasta_id do admin (link "Copiar link da pasta" da Aplicação de Simulado).
   if (pasta) {
-    const naPasta = itensCat.filter((i) => i.grupoId === pasta)
+    const naPasta = itensCat.filter((i) => i.grupoId === pasta || i.pastaId === pasta)
+    // Cabeçalho: grupo do catálogo, senão a pasta manual do admin (nome/cor vindos de simulado_pastas).
+    const grupoInfo = grupos.find((g) => g.id === pasta) ?? null
+    let pastaInfo: { nome: string | null; cor: string | null } | null = grupoInfo ? { nome: grupoInfo.nome, cor: grupoInfo.cor } : null
     let semAcesso: React.ReactNode = null
-    if (naPasta.length === 0) {
-      // Chegou por um banner de vitrine, mas não tem acesso → pop-up com dados da pasta + suporte.
-      const [{ data: pRow }, { data: contatoRow }] = await Promise.all([
-        svc.from('simulado_pastas').select('nome, capa_url').eq('id', pasta).maybeSingle(),
-        svc.from('simulado_tenant_contatos').select('whatsapp, email_suporte, link_ajuda, horario_atendimento').eq('tenant_id', sessao!.tenantId).maybeSingle().then((r) => r, () => ({ data: null })),
-      ])
-      const ct = (contatoRow ?? null) as any
-      // Imagem do BANNER que leva a esta pasta (fallback: capa da pasta).
-      const bannerImg = todosBanners.find((b: any) => typeof b.link === 'string' && b.link.includes('pasta=' + pasta))?.imagem_url ?? null
-      semAcesso = (
-        <SemAcessoModal
-          pastaNome={(pRow as any)?.nome ?? null}
-          capa={bannerImg || (pRow as any)?.capa_url || null}
-          suporte={ct ? { whatsapp: ct.whatsapp, email: ct.email_suporte, link: ct.link_ajuda, horario: ct.horario_atendimento } : undefined}
-        />
-      )
+    if (!pastaInfo || naPasta.length === 0) {
+      const { data: pRow } = await svc.from('simulado_pastas').select('nome, cor, capa_url').eq('id', pasta).maybeSingle()
+      if (!pastaInfo && pRow) pastaInfo = { nome: (pRow as any).nome ?? null, cor: (pRow as any).cor ?? null }
+      if (naPasta.length === 0) {
+        // Chegou por um link/banner mas não tem acesso → pop-up com dados da pasta + suporte.
+        const { data: contatoRow } = await svc.from('simulado_tenant_contatos').select('whatsapp, email_suporte, link_ajuda, horario_atendimento').eq('tenant_id', sessao!.tenantId).maybeSingle().then((r) => r, () => ({ data: null } as any))
+        const ct = (contatoRow ?? null) as any
+        // Imagem do BANNER que leva a esta pasta (fallback: capa da pasta).
+        const bannerImg = todosBanners.find((b: any) => typeof b.link === 'string' && b.link.includes('pasta=' + pasta))?.imagem_url ?? null
+        semAcesso = (
+          <SemAcessoModal
+            pastaNome={(pRow as any)?.nome ?? null}
+            capa={bannerImg || (pRow as any)?.capa_url || null}
+            suporte={ct ? { whatsapp: ct.whatsapp, email: ct.email_suporte, link: ct.link_ajuda, horario: ct.horario_atendimento } : undefined}
+          />
+        )
+      }
     }
     return (
       <div className="animate-page">
-        <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} pastaAtiva={pasta} />
+        <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} pastaAtiva={pasta} pastaInfo={pastaInfo} />
         {semAcesso}
       </div>
     )

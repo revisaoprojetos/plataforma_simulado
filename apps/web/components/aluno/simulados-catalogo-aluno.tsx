@@ -7,7 +7,7 @@ import { FileiraHorizontal } from '@/components/fileira-horizontal'
 import type { ItemSimulado } from '@/lib/aluno/simulado-item'
 import type { GrupoCatalogo } from '@/lib/aluno/grupos-catalogo'
 
-export type ItemSimuladoCat = ItemSimulado & { grupoId: string | null }
+export type ItemSimuladoCat = ItemSimulado & { grupoId: string | null; pastaId?: string | null }
 export type ProgressoGrupo = Record<string, { done: number; total: number }>
 
 // Largura de cada card na fileira (deixa espiar um pedaço do próximo).
@@ -101,28 +101,32 @@ function CardPasta({ g, count, prog }: { g: GrupoCatalogo; count: number; prog?:
  * com progresso no hover). Ao abrir uma pasta (?pasta=id), mostra os simulados de dentro.
  * Os sem pasta (avulsos) aparecem em grade. A área "Simulados" foi absorvida por aqui.
  */
-export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pastaAtiva, full, recentesConcluidos }: {
+export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pastaAtiva, pastaInfo, full, recentesConcluidos }: {
   itens: ItemSimuladoCat[]
   grupos: GrupoCatalogo[]
   progresso?: ProgressoGrupo
   recentes?: ItemSimuladoCat[]
   pastaAtiva?: string | null
+  /** Nome/cor da pasta ativa quando ela é uma pasta manual do admin (não um grupo do catálogo). */
+  pastaInfo?: { nome: string | null; cor: string | null } | null
   /** Largura total (gamificação desativada, sem coluna lateral) → grades de 5 por linha. */
   full?: boolean
   /** Aluno já fez todos os simulados recentes disponíveis (sem pendentes, mas com histórico). */
   recentesConcluidos?: boolean
 }) {
-  // VISÃO DA PASTA — só os simulados de dentro dela.
+  // VISÃO DA PASTA — só os simulados de dentro dela (por grupo do catálogo OU por pasta_id do admin).
   if (pastaAtiva) {
     const g = grupos.find((x) => x.id === pastaAtiva)
-    const its = itens.filter((s) => s.grupoId === pastaAtiva)
+    const nome = g?.nome ?? pastaInfo?.nome ?? 'Pasta'
+    const cor = g?.cor ?? pastaInfo?.cor ?? '#6d28d9'
+    const its = itens.filter((s) => s.grupoId === pastaAtiva || s.pastaId === pastaAtiva)
     return (
       <div className="space-y-5">
         <Link href="/aluno" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Início</Link>
         <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: g?.cor ?? '#6d28d9' }}><FolderOpen className="h-5 w-5" /></span>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}><FolderOpen className="h-5 w-5" /></span>
           <div className="min-w-0">
-            <h1 className="truncate text-2xl font-bold tracking-tight">{g?.nome ?? 'Pasta'}</h1>
+            <h1 className="truncate text-2xl font-bold tracking-tight">{nome}</h1>
             <p className="text-muted-foreground">{its.length} simulado(s) nesta pasta.</p>
           </div>
         </div>

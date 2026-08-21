@@ -285,7 +285,7 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
               <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/50" title="Mais ações">
                 <MoreHorizontal className="h-4 w-4" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuContent align="start" className="w-52">
                 <DropdownMenuItem onClick={() => setDetalhes(true)}><Info className="mr-2 h-4 w-4" /> Detalhes</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}/ao-vivo`)}><Radio className="mr-2 h-4 w-4" /> Ao vivo (online/progresso)</DropdownMenuItem>
@@ -616,9 +616,17 @@ function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerencia
   const st = statusPasta(sims)
   const cor = folder.cor ?? '#6d28d9'
   const Icon = iconeBanco(folder.icone)
+  // Link da PASTA para o aluno: abre a home filtrada nesta pasta. Sem login, o proxy manda para
+  // /aluno/entrar preservando a query (redirectTo) e, após entrar, cai direto aqui.
+  async function copiarLinkPasta() {
+    const url = `${appUrl}/aluno?pasta=${folder.id}`
+    if (await copiarTexto(url)) toast.success('Link da pasta copiado')
+    else toast.error(`Não foi possível copiar. Link: ${url}`)
+  }
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
         <button type="button" onClick={toggle} aria-expanded={aberto} className="group flex min-w-0 items-center gap-2 text-left">
           <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:text-foreground', !aberto && '-rotate-90')} />
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white shadow-sm" style={{ background: cor }}><Icon className="h-3.5 w-3.5" /></span>
@@ -626,6 +634,11 @@ function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerencia
           <span className="shrink-0 text-sm text-muted-foreground">{sims.length} simulado(s)</span>
           {st && <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide', st.cls)}>{st.label}</span>}
         </button>
+        <button type="button" onClick={copiarLinkPasta} title="Copiar link desta pasta (leva o aluno direto a ela após o login)"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md border bg-card px-2 py-1 text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:border-primary hover:text-primary">
+          <Copy className="h-3.5 w-3.5" /> Copiar link
+        </button>
+        </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <button type="button" onClick={() => onAlternar('nota')} disabled={pendingBulk}
             className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary disabled:opacity-50">
