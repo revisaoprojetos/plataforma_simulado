@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
-import { AlertTriangle, CalendarDays, Check, Package, Plus, Search, Trash2, UserPlus, Users, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { AlertTriangle, CalendarDays, Check, ChevronDown, ChevronRight, Loader2, Plus, Search, Trash2, UserPlus, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   alternarCronogramaNoPacote,
+  membrosDoGrupo,
   alternarEstudanteNoPacote,
   buscarEstudantes,
   desvincularGrupo,
@@ -40,6 +41,13 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
   const [modal, setModal] = useState<'cronogramas' | 'grupos' | 'alunos' | null>(null)
   const [busca, setBusca] = useState('')
   const [achados, setAchados] = useState<{ id: string; nome: string; email: string | null }[]>([])
+  // Membros carregados sob demanda: buscar todos de todos os grupos na abertura seria
+  // caro, e na maioria das vezes a equipe só quer conferir um.
+  const [buscando, setBuscando] = useState(false)
+  const buscaAtual = useRef(0)
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [expandido, setExpandido] = useState<string | null>(null)
+  const [membros, setMembros] = useState<Record<string, { itens: { id: string; nome: string; email: string | null }[]; total: number } | 'carregando'>>({})
 
   const disponiveis = useMemo(() => {
     const t = normalizar(busca)
@@ -58,13 +66,14 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
     setAchados([])
   }
 
-  function addCronograma(c: { id: string; nome: string; status: string }) {
+  function addCronograma(c: { id: string; nome: string; status: string; metas: number }) {
     iniciar(async () => {
       const r = await alternarCronogramaNoPacote(d.pacote.id, c.id, true)
       if (!r.ok) return toast.error(r.error ?? 'Não foi possível adicionar.')
       setD((x) => ({
         ...x,
-        cronogramas: [...x.cronogramas, { ...c, metas: 0 }],
+        // A contagem vem do catálogo; sem ela a linha aparecia com "0 metas".
+        cronogramas: [...x.cronogramas, c],
         cronogramasDisponiveis: x.cronogramasDisponiveis.filter((y) => y.id !== c.id),
       }))
     })
@@ -77,7 +86,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
       setD((x) => ({
         ...x,
         cronogramas: x.cronogramas.filter((y) => y.id !== c.id),
-        cronogramasDisponiveis: [...x.cronogramasDisponiveis, { id: c.id, nome: c.nome, status: c.status }],
+        cronogramasDisponiveis: [...x.cronogramasDisponiveis, { id: c.id, nome: c.nome, status: c.status, metas: c.metas }],
       }))
     })
   }
@@ -134,13 +143,58 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
     })
   }
 
-  function procurarAlunos(termo: string) {
-    setBusca(termo)
+  function alternarExpandir(grupoId: string) {
+    if (expandido === grupoId) return setExpandido(null)
+    setExpandido(grupoId)
+    if (membros[grupoId]) return
+    setMembros((m) => ({ ...m, [grupoId]: 'carregando' }))
     iniciar(async () => {
-      const r = await buscarEstudantes(termo)
-      if (r.ok) setAchados((r.itens ?? []).filter((a) => !d.estudantes.some((e) => e.id === a.id)))
+      const r = await membrosDoGrupo(grupoId)
+      if (!r.ok) {
+        toast.error(r.error ?? 'Não foi possível carregar os alunos.')
+        setMembros((m) => { const { [grupoId]: _, ...resto } = m; return resto })
+        return
+      }
+      setMembros((m) => ({ ...m, [grupoId]: { itens: r.itens ?? [], total: r.total ?? 0 } }))
     })
   }
+
+  /**
+   * Busca de alunos com debounce e FORA do `useTransition` das mutações.
+   *
+   * Antes ela usava o mesmo `iniciar`, então `pendente` ficava true enquanto se digitava
+   * e os resultados apareciam DESABILITADOS — dava a impressão de que a busca não achava
+   * ninguém. Agora tem estado próprio, espera entre teclas, e descarta resposta que
+   * chega fora de ordem (a de "an" pode voltar depois da de "ana").
+   */
+  function procurarAlunos(termo: string) {
+    setBusca(termo)
+    if (debounce.current) clearTimeout(debounce.current)
+
+    const t = termo.trim()
+    if (t.length < 2) {
+      setAchados([])
+      setBuscando(false)
+      return
+    }
+
+    setBuscando(true)
+    debounce.current = setTimeout(async () => {
+      const id = ++buscaAtual.current
+      const r = await buscarEstudantes(t)
+      if (id !== buscaAtual.current) return
+      setBuscando(false)
+      if (!r.ok) return toast.error(r.error ?? 'Não foi possível buscar.')
+      setAchados((r.itens ?? []).filter((a) => !d.estudantes.some((e) => e.id === a.id)))
+    }, 250)
+  }
+
+  useEffect(
+    () => () => {
+      if (debounce.current) clearTimeout(debounce.current)
+    },
+    [],
+  )
 
   function addAluno(a: { id: string; nome: string; email: string | null }) {
     iniciar(async () => {
@@ -242,17 +296,63 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
           <p className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhum grupo vinculado.</p>
         ) : (
           <div className="divide-y">
-            {d.grupos.map((g) => (
-              <div key={g.id} className="flex items-center gap-3 px-4 py-2.5">
-                <span className="min-w-0 flex-1 truncate text-sm">{g.nome}</span>
-                <Badge variant="outline" className="shrink-0">
-                  {g.membros.toLocaleString('pt-BR')} aluno(s)
-                </Badge>
-                <Button size="sm" variant="ghost" onClick={() => removeGrupo(g)} disabled={pendente}>
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
-            ))}
+            {d.grupos.map((g) => {
+              const dados = membros[g.id]
+              const aberto = expandido === g.id
+              return (
+                <div key={g.id}>
+                  <div className="flex items-center gap-3 px-4 py-2.5">
+                    <button
+                      onClick={() => alternarExpandir(g.id)}
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                      title="Ver os alunos deste grupo"
+                    >
+                      {aberto ? (
+                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      )}
+                      <span className="truncate text-sm">{g.nome}</span>
+                    </button>
+                    <Badge variant="outline" className="shrink-0">
+                      {g.membros.toLocaleString('pt-BR')} aluno(s)
+                    </Badge>
+                    <Button size="sm" variant="ghost" onClick={() => removeGrupo(g)} disabled={pendente}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+
+                  {aberto && (
+                    <div className="border-t bg-muted/20 px-4 py-2">
+                      {dados === 'carregando' || dados === undefined ? (
+                        <p className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Carregando alunos…
+                        </p>
+                      ) : dados.itens.length === 0 ? (
+                        <p className="py-2 text-sm text-muted-foreground">Este grupo não tem alunos.</p>
+                      ) : (
+                        <>
+                          <div className="max-h-64 space-y-0.5 overflow-y-auto">
+                            {dados.itens.map((a) => (
+                              <div key={a.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-background/60">
+                                <span className="min-w-0 flex-1 truncate">{a.nome}</span>
+                                {a.email && <span className="shrink-0 truncate text-xs text-muted-foreground">{a.email}</span>}
+                              </div>
+                            ))}
+                          </div>
+                          {dados.total > dados.itens.length && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Mostrando {dados.itens.length} de {dados.total.toLocaleString('pt-BR')} — todos têm acesso.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </Card>
@@ -355,16 +455,22 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
               ))}
 
             {modal === 'alunos' &&
-              (achados.length === 0 ? (
+              (buscando ? (
+                <p className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Buscando…
+                </p>
+              ) : achados.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
-                  {busca.trim().length < 2 ? 'Digite ao menos 2 letras.' : 'Nenhum aluno encontrado.'}
+                  {busca.trim().length < 2
+                    ? 'Digite ao menos 2 letras do nome ou do e-mail.'
+                    : `Nenhum aluno encontrado para “${busca.trim()}”.`}
                 </p>
               ) : (
                 achados.map((a) => (
                   <button
                     key={a.id}
                     onClick={() => addAluno(a)}
-                    disabled={pendente}
                     className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
                   >
                     <Check className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />

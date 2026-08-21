@@ -110,7 +110,7 @@ export type PacoteDetalhe = {
   grupos: { id: string; nome: string; membros: number }[]
   estudantes: { id: string; nome: string; email: string | null }[]
   /** Catálogo e grupos disponíveis para vincular. */
-  cronogramasDisponiveis: { id: string; nome: string; status: string }[]
+  cronogramasDisponiveis: { id: string; nome: string; status: string; metas: number }[]
   gruposDisponiveis: { id: string; nome: string; membros: number }[]
   alcance: number
 }
@@ -179,7 +179,7 @@ export async function carregarPacote(id: string): Promise<{ ok: boolean; dados?:
         .map((c) => ({ ...c, metas: metasPorCron.get(c.id) ?? 0 })),
       grupos: todosGrupos.filter((x) => idsGrupo.has(x.id)).map((x) => ({ ...x, membros: membrosPorGrupo.get(x.id) ?? 0 })),
       estudantes: nomesEstudantes.map((e) => ({ id: e.id, nome: e.nome, email: e.email ?? null })),
-      cronogramasDisponiveis: catalogo.filter((c) => !idsCron.has(c.id)),
+      cronogramasDisponiveis: catalogo.filter((c) => !idsCron.has(c.id)).map((c) => ({ ...c, metas: metasPorCron.get(c.id) ?? 0 })),
       gruposDisponiveis: todosGrupos.filter((x) => !idsGrupo.has(x.id)).map((x) => ({ ...x, membros: membrosPorGrupo.get(x.id) ?? 0 })),
       alcance: alcancados.size,
     },
@@ -461,9 +461,11 @@ export async function desvincularGrupo(
 export async function buscarEstudantes(termo: string): Promise<{ ok: boolean; itens?: { id: string; nome: string; email: string | null }[]; error?: string }> {
   const g = await guard('cronogramas:view')
   if (!g.ok) return { ok: false, error: g.error }
-  const t = termo.trim().replace(/[%,()*]/g, ' ')
+  // Os caracteres removidos são os que o PostgREST usa como sintaxe de filtro.
+  const t = termo.trim().replace(/[%,()*]/g, ' ').replace(/\s+/g, ' ')
   if (t.length < 2) return { ok: true, itens: [] }
   const svc = createAdminClient()
+
   const { data, error } = await svc
     .from('simulado_estudantes')
     .select('id, nome, email')
@@ -473,7 +475,42 @@ export async function buscarEstudantes(termo: string): Promise<{ ok: boolean; it
     .order('nome')
     .limit(30)
   if (error) return { ok: false, error: error.message }
-  return { ok: true, itens: (data ?? []) as any }
+
+  const achados = (data ?? []) as { id: string; nome: string; email: string | null }[]
+  const partes = t.split(' ').filter((x) => x.length >= 2)
+
+  // Segunda tentativa quando a frase inteira não casa: busca pelo termo MAIS LONGO e
+  // filtra em memória exigindo todos os pedaços. Assim "luiza ana" acha "Ana Luiza" —
+  // que o ilike da frase inteira não acharia — sem trazer todas as Anas.
+  if (achados.length === 0 && partes.length > 1) {
+    const maior = partes.reduce((a, b) => (b.length > a.length ? b : a))
+    const { data: amplo } = await svc
+      .from('simulado_estudantes')
+      .select('id, nome, email')
+      .eq('tenant_id', g.tenantId)
+      .eq('deletado', false)
+      .or(`nome.ilike.%${maior}%,email.ilike.%${maior}%`)
+      .order('nome')
+      .limit(200)
+
+    const norm = (x: string) =>
+      x
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toLowerCase()
+    const alvo = partes.map(norm)
+    return {
+      ok: true,
+      itens: ((amplo ?? []) as any[])
+        .filter((a) => {
+          const campo = norm(`${a.nome} ${a.email ?? ''}`)
+          return alvo.every((x) => campo.includes(x))
+        })
+        .slice(0, 30),
+    }
+  }
+
+  return { ok: true, itens: achados }
 }
 
 export async function alternarEstudanteNoPacote(pacoteId: string, estudanteId: string, dentro: boolean): Promise<{ ok: boolean; error?: string }> {
@@ -506,4 +543,33 @@ export async function alternarEstudanteNoPacote(pacoteId: string, estudanteId: s
   })
   revalidatePath(`/admin/cronogramas/pacotes/${pacoteId}`)
   return { ok: true }
+}
+
+/**
+ * Alunos de um grupo, para a tela mostrar QUEM recebe — não só quantos.
+ *
+ * Paginado: um grupo pode passar de 1.000 membros, e sem isso a lista mentiria sobre o
+ * próprio tamanho. O corte em 500 é de exibição; a contagem vem do total real.
+ */
+export async function membrosDoGrupo(
+  grupoId: string,
+): Promise<{ ok: boolean; itens?: { id: string; nome: string; email: string | null }[]; total?: number; error?: string }> {
+  const g = await guard('cronogramas:view')
+  if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+
+  const membros = await fetchAll<any>(() =>
+    svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id') as any,
+  )
+  const ids = [...new Set(membros.map((m) => m.estudante_id))]
+  if (!ids.length) return { ok: true, itens: [], total: 0 }
+
+  const alunos = await fetchAllByIn<any>(ids.slice(0, 500), (chunk) =>
+    svc.from('simulado_estudantes').select('id, nome, email').in('id', chunk).eq('tenant_id', g.tenantId).order('nome') as any,
+  )
+  return {
+    ok: true,
+    itens: alunos.map((a) => ({ id: a.id, nome: a.nome, email: a.email ?? null })),
+    total: ids.length,
+  }
 }
