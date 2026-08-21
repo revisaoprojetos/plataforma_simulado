@@ -24,7 +24,7 @@ export type CronogramaDetalhe = {
   dias_curso: number[]
   dias_nome: string[]
   semanas_revisao: number[]
-  categoria: string | null
+  categoria_nome: string | null
   status: 'rascunho' | 'liberado'
   acesso_gratuito: boolean
 }
@@ -72,7 +72,7 @@ export async function carregarDetalhe(id: string): Promise<{
 
   const { data: c, error } = await svc
     .from('simulado_cronogramas')
-    .select('id, slug, nome, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria, status, acesso_gratuito')
+    .select('id, slug, nome, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria_id, status, acesso_gratuito')
     .eq('id', id)
     .eq('tenant_id', g.tenantId)
     .eq('deletado', false)
@@ -98,8 +98,21 @@ export async function carregarDetalhe(id: string): Promise<{
   )
   const comLink = new Set(links.map((l) => chaveLink(l.disciplina, l.aula)).filter(Boolean) as string[])
 
+  // A categoria virou cadastro: o cronograma guarda a referência, o nome vem daqui.
+  let categoriaNome: string | null = null
+  if ((c as any).categoria_id) {
+    const { data: cat } = await svc
+      .from('simulado_cronograma_categorias')
+      .select('nome')
+      .eq('id', (c as any).categoria_id)
+      .eq('tenant_id', g.tenantId)
+      .maybeSingle()
+    categoriaNome = (cat as any)?.nome ?? null
+  }
+
   const cron = {
     ...(c as any),
+    categoria_nome: categoriaNome,
     carga_horaria: Number((c as any).carga_horaria),
     dias_curso: (c as any).dias_curso ?? [],
     dias_nome: (c as any).dias_nome ?? [],

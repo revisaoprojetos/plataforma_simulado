@@ -77,7 +77,7 @@ export function CronogramasClient({
   const filtrados = useMemo(() => {
     const t = busca.trim().toLowerCase()
     if (!t) return itens
-    return itens.filter((c) => c.nome.toLowerCase().includes(t) || (c.categoria ?? '').toLowerCase().includes(t))
+    return itens.filter((c) => c.nome.toLowerCase().includes(t) || (c.categoria_nome ?? '').toLowerCase().includes(t))
   }, [itens, busca])
 
   // Agrupa por carga horária — é assim que o aluno escolhe (spec §4, passo 2).
