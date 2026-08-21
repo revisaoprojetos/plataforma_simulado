@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getTenantTheme } from '@/lib/tenant-theme'
@@ -21,7 +22,13 @@ import type { ProgressoAluno } from '@/components/aluno/aluno-sidebar'
 
 export default async function AlunoPortalLayout({ children }: { children: React.ReactNode }) {
   const sessao = await getSessaoAluno()
-  if (!sessao) redirect('/aluno/entrar')
+  if (!sessao) {
+    // Sessão ausente/expirada: manda pro login preservando a PÁGINA de origem (ex.: link direto
+    // de uma pasta de simulados) — o proxy expõe o caminho atual em `x-pathname`.
+    const path = (await headers()).get('x-pathname') || ''
+    const rt = /^\/(aluno|simulado)(\/|$|\?)/.test(path) ? path : ''
+    redirect(rt ? `/aluno/entrar?redirectTo=${encodeURIComponent(rt)}` : '/aluno/entrar')
+  }
 
   // Tudo que o layout precisa roda em PARALELO (esta função executa a CADA navegação do portal):
   // tema + contagens da sidebar + progresso de gamificação + personalização. Antes eram 4

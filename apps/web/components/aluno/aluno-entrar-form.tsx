@@ -36,6 +36,14 @@ export function AlunoEntrarForm({
   const screen = preview ? 'h-full' : 'min-h-screen'
   const rootVars = loginVars(c)
 
+  // Preserva o DESTINO original (?redirectTo=) do link acessado antes do login (ex.: proxy
+  // manda /admin/... → /login?redirectTo=/admin/...). Só aceita caminho interno, nunca /login.
+  const destinoRedirect = (): string | null => {
+    if (typeof window === 'undefined') return null
+    const rt = new URLSearchParams(window.location.search).get('redirectTo')
+    return rt && rt.startsWith('/') && !rt.startsWith('/login') ? rt : null
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (preview) return
@@ -54,19 +62,25 @@ export function AlunoEntrarForm({
       }
       // Marca "acabou de logar" → o portal mostra o pop-up 1x (só no login, não a cada visita à home).
       try { sessionStorage.setItem('popup-login', '1') } catch {}
-      setEntrando(true); router.push('/aluno'); router.refresh()
+      // Se veio de um link do aluno (ex.: /aluno/... ou /simulado/...), volta pra lá; senão, home.
+      const rt = destinoRedirect()
+      const destino = rt && /^\/(aluno|simulado)(\/|$|\?)/.test(rt) ? rt : '/aluno'
+      setEntrando(true); router.push(destino); router.refresh()
     } catch { setErro('Erro de conexão. Tente novamente.') } finally { setCarregando(false) }
   }
 
-  // Login administrativo (e-mail + senha). Após autenticar, o /login roteia: admin comum → /admin;
-  // super-admin → seletor de plataformas + console.
+  // Login administrativo (e-mail + senha). Após autenticar, mantém o ?redirectTo= (o proxy leva ao
+  // destino); sem ele, vai ao /login que roteia: admin comum → /admin; super-admin → seletor + console.
   async function entrarAdmin() {
     setErro(null); setManutencao(null); setCarregando(true)
     try {
       const { error } = await createClient().auth.signInWithPassword({ email, password: senha })
       if (error) { setErro(error.message === 'Invalid login credentials' ? 'Credenciais inválidas. Verifique e-mail e senha.' : error.message); return }
       void fetch('/api/audit/login', { method: 'POST' }).catch(() => {})
-      setEntrando(true); router.push('/login'); router.refresh()
+      // Com destino (link direto) → vai DIRETO pra ele (o cookie de sessão já foi setado pelo signIn).
+      // Sem destino → /login, que roteia: admin comum → /admin; super-admin → seletor de plataformas.
+      const rt = destinoRedirect()
+      setEntrando(true); router.push(rt ?? '/login'); router.refresh()
     } catch { setErro('Erro de conexão. Tente novamente.') } finally { setCarregando(false) }
   }
 
