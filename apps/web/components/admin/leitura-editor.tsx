@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   ArrowLeft, Save, Loader2, Eye, EyeOff, Upload, ClipboardPaste, PenLine, FileText,
-  Bold, Italic, Underline, Heading, List, Trophy, Highlighter, Scale, Send,
+  Bold, Italic, Underline, Heading, List, Trophy, Highlighter, Scale, Send, ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { atualizarDocumento, publicarVersao, type Documento, type Materia, type SituacaoEditorial } from '@/app/admin/leitura/actions'
@@ -55,6 +55,16 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
   const [savingConteudo, setSavingConteudo] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const htmlFileRef = useRef<HTMLInputElement>(null)
+
+  // Lê um arquivo .html/.htm como texto e processa (mesmo caminho do colar).
+  function enviarArquivoHtml(file: File) {
+    if (!/\.(html?|txt)$/i.test(file.name) && file.type !== 'text/html') { toast.error('Envie um arquivo .html'); return }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Arquivo muito grande (máx. 5 MB).'); return }
+    const reader = new FileReader()
+    reader.onload = () => { const txt = String(reader.result ?? ''); setHtmlColar(txt); processarConteudo(txt) }
+    reader.readAsText(file)
+  }
 
   function salvarMeta() {
     startMeta(async () => {
@@ -163,99 +173,15 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
       )}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        {/* Esquerda: configurações + entrada de conteúdo */}
+        {/* Esquerda: entrada de conteúdo (ação principal) + configurações */}
         <div className="space-y-5">
-          {/* Dados */}
-          <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
-            <p className="text-sm font-semibold">Dados do documento</p>
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Título</label>
-              <input value={titulo} onChange={(e) => setTitulo(e.target.value)} className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Descrição</label>
-              <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} className="w-full resize-none rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs text-muted-foreground">Cor do card</label>
-              <div className="flex flex-wrap gap-1.5">
-                {CORES.map((cc) => (
-                  <button key={cc} onClick={() => setCor(cc)} className={cn('h-7 w-7 rounded-full border-2 transition', cor === cc ? 'border-foreground' : 'border-transparent')} style={{ background: cc }} aria-label={cc} />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Metadados da lei (A1) */}
-          <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
-            <p className="flex items-center gap-1.5 text-sm font-semibold"><Scale className="h-4 w-4 text-primary" /> Metadados da lei <span className="text-xs font-normal text-muted-foreground">(opcional)</span></p>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="col-span-2 text-xs text-muted-foreground">Matéria
-                <select value={materiaId} onChange={(e) => setMateriaId(e.target.value)} className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring">
-                  <option value="">— sem matéria —</option>
-                  {materias.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                </select>
-              </label>
-              <label className="text-xs text-muted-foreground">Tipo
-                <select value={tipoNorma} onChange={(e) => setTipoNorma(e.target.value)} className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring">
-                  <option value="">—</option>
-                  {TIPOS_NORMA.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs text-muted-foreground">Número
-                  <input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="9.868" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
-                </label>
-                <label className="text-xs text-muted-foreground">Ano
-                  <input type="number" value={ano} onChange={(e) => setAno(e.target.value === '' ? '' : Number(e.target.value))} placeholder="1999" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
-                </label>
-              </div>
-            </div>
-            <label className="block text-xs text-muted-foreground">Título oficial
-              <input value={tituloOficial} onChange={(e) => setTituloOficial(e.target.value)} placeholder="Dispõe sobre o processo e julgamento da ADI e ADC…" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2.5 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
-            </label>
-            <label className="block text-xs text-muted-foreground">Ementa
-              <textarea value={ementa} onChange={(e) => setEmenta(e.target.value)} rows={2} className="mt-1 w-full resize-none rounded-lg border bg-[var(--input-bg,transparent)] px-2.5 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs text-muted-foreground">Esfera / origem
-                <input value={esfera} onChange={(e) => setEsfera(e.target.value)} placeholder="Federal" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
-              </label>
-              <label className="text-xs text-muted-foreground">Situação editorial
-                <select value={situacao} onChange={(e) => setSituacao(e.target.value as SituacaoEditorial)} className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring">
-                  {SITUACOES.map((s) => <option key={s.v} value={s.v}>{s.label}</option>)}
-                </select>
-              </label>
-            </div>
-            <label className="block text-xs text-muted-foreground">Fonte oficial (URL)
-              <input value={fonteOficial} onChange={(e) => setFonteOficial(e.target.value)} placeholder="https://planalto.gov.br/…" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2.5 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
-            </label>
-          </div>
-
-          {/* Desafio */}
-          <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
-            <p className="flex items-center gap-1.5 text-sm font-semibold"><Trophy className="h-4 w-4 text-amber-500" /> Desafio de leitura</p>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={desafioAtivo} onChange={(e) => setDesafioAtivo(e.target.checked)} className="h-4 w-4 rounded border" />
-              Rastrear conclusão (aparece no relatório e na gamificação)
-            </label>
-            <label className={cn('flex items-center gap-2 text-sm', !desafioAtivo && 'opacity-40')}>
-              <input type="checkbox" disabled={!desafioAtivo} checked={exigeFim} onChange={(e) => setExigeFim(e.target.checked)} className="h-4 w-4 rounded border" />
-              Exigir ler até o fim (100%) para concluir
-            </label>
-            <div className={cn('flex items-center gap-2 text-sm', !desafioAtivo && 'opacity-40')}>
-              <span>Tempo mínimo de leitura:</span>
-              <input type="number" min={0} disabled={!desafioAtivo} value={tempoMin} onChange={(e) => setTempoMin(Math.max(0, Number(e.target.value) || 0))} className="w-16 rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring" />
-              <span className="text-muted-foreground">min</span>
-            </div>
-          </div>
-
-          {/* Conteúdo */}
+          {/* Conteúdo — ação principal, no topo */}
           {podeEditar && (
             <div className="rounded-2xl border bg-card p-4 shadow-sm">
-              <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><FileText className="h-4 w-4 text-primary" /> Conteúdo</p>
+              <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold"><FileText className="h-4 w-4 text-primary" /> Conteúdo da lei</p>
+              <p className="mb-3 text-xs text-muted-foreground">Envie um arquivo <span className="font-medium text-foreground">.html</span> ou <span className="font-medium text-foreground">.docx</span>, cole o HTML, ou escreva no editor. O texto é processado e aparece na prévia ao lado.</p>
               <div className="mb-3 flex gap-1 rounded-lg border bg-muted/40 p-1 text-sm">
-                {([['colar', 'Colar HTML', ClipboardPaste], ['word', 'Word (.docx)', Upload], ['editor', 'Editor', PenLine]] as const).map(([m, label, Icon]) => (
+                {([['colar', 'HTML', ClipboardPaste], ['word', 'Word', Upload], ['editor', 'Editor', PenLine]] as const).map(([m, label, Icon]) => (
                   <button key={m} onClick={() => setModo(m)} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 transition-colors', modo === m ? 'bg-card font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
                     <Icon className="h-3.5 w-3.5" /> {label}
                   </button>
@@ -264,8 +190,20 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
 
               {modo === 'colar' && (
                 <div className="space-y-2">
-                  <textarea value={htmlColar} onChange={(e) => setHtmlColar(e.target.value)} rows={8} placeholder="Cole aqui o HTML do documento (ex.: lei com artigos)…" className="w-full resize-y rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 font-mono text-xs outline-none focus:ring-1 focus:ring-ring" />
-                  <button onClick={() => processarConteudo(htmlColar)} disabled={savingConteudo} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
+                  {/* Enviar arquivo .html (clique ou arraste) */}
+                  <input ref={htmlFileRef} type="file" accept=".html,.htm,text/html" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarArquivoHtml(f); e.target.value = '' }} />
+                  <div
+                    onClick={() => !savingConteudo && htmlFileRef.current?.click()}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) enviarArquivoHtml(f) }}
+                    className="flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border border-dashed py-6 text-sm text-muted-foreground transition-colors hover:border-primary hover:bg-muted/30 hover:text-foreground"
+                  >
+                    {savingConteudo ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
+                    <span>Enviar arquivo <span className="font-medium text-foreground">.html</span> — clique ou arraste aqui</span>
+                  </div>
+                  <p className="text-center text-[11px] uppercase tracking-wide text-muted-foreground">ou cole o HTML abaixo</p>
+                  <textarea value={htmlColar} onChange={(e) => setHtmlColar(e.target.value)} rows={7} placeholder="Cole aqui o HTML da lei (com artigos, §, incisos…)" className="w-full resize-y rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 font-mono text-xs outline-none focus:ring-1 focus:ring-ring" />
+                  <button onClick={() => processarConteudo(htmlColar)} disabled={savingConteudo || !htmlColar.trim()} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
                     {savingConteudo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Processar e salvar
                   </button>
                 </div>
@@ -298,6 +236,103 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
               )}
             </div>
           )}
+
+          {/* Dados do card */}
+          <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
+            <p className="text-sm font-semibold">Dados do card</p>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">Título</label>
+              <input value={titulo} onChange={(e) => setTitulo(e.target.value)} className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">Descrição</label>
+              <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} className="w-full resize-none rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs text-muted-foreground">Cor do card</label>
+              <div className="flex flex-wrap gap-1.5">
+                {CORES.map((cc) => (
+                  <button key={cc} onClick={() => setCor(cc)} className={cn('h-7 w-7 rounded-full border-2 transition', cor === cc ? 'border-foreground' : 'border-transparent')} style={{ background: cc }} aria-label={cc} />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Metadados da lei (A1) — recolhível */}
+          <details className="group rounded-2xl border bg-card shadow-sm">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+              <Scale className="h-4 w-4 text-primary" /> Metadados da lei
+              <span className="text-xs font-normal text-muted-foreground">(matéria, tipo, número…)</span>
+              <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-3 border-t px-4 py-4">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="col-span-2 text-xs text-muted-foreground">Matéria
+                  <select value={materiaId} onChange={(e) => setMateriaId(e.target.value)} className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring">
+                    <option value="">— sem matéria —</option>
+                    {materias.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                  </select>
+                </label>
+                <label className="text-xs text-muted-foreground">Tipo
+                  <select value={tipoNorma} onChange={(e) => setTipoNorma(e.target.value)} className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring">
+                    <option value="">—</option>
+                    {TIPOS_NORMA.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs text-muted-foreground">Número
+                    <input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="9.868" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+                  </label>
+                  <label className="text-xs text-muted-foreground">Ano
+                    <input type="number" value={ano} onChange={(e) => setAno(e.target.value === '' ? '' : Number(e.target.value))} placeholder="1999" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+                  </label>
+                </div>
+              </div>
+              <label className="block text-xs text-muted-foreground">Título oficial
+                <input value={tituloOficial} onChange={(e) => setTituloOficial(e.target.value)} placeholder="Dispõe sobre o processo e julgamento da ADI e ADC…" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2.5 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+              </label>
+              <label className="block text-xs text-muted-foreground">Ementa
+                <textarea value={ementa} onChange={(e) => setEmenta(e.target.value)} rows={2} className="mt-1 w-full resize-none rounded-lg border bg-[var(--input-bg,transparent)] px-2.5 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-muted-foreground">Esfera / origem
+                  <input value={esfera} onChange={(e) => setEsfera(e.target.value)} placeholder="Federal" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+                </label>
+                <label className="text-xs text-muted-foreground">Situação editorial
+                  <select value={situacao} onChange={(e) => setSituacao(e.target.value as SituacaoEditorial)} className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring">
+                    {SITUACOES.map((s) => <option key={s.v} value={s.v}>{s.label}</option>)}
+                  </select>
+                </label>
+              </div>
+              <label className="block text-xs text-muted-foreground">Fonte oficial (URL)
+                <input value={fonteOficial} onChange={(e) => setFonteOficial(e.target.value)} placeholder="https://planalto.gov.br/…" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2.5 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+              </label>
+            </div>
+          </details>
+
+          {/* Desafio — recolhível */}
+          <details className="group rounded-2xl border bg-card shadow-sm">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+              <Trophy className="h-4 w-4 text-amber-500" /> Desafio de leitura
+              {desafioAtivo && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">ativo</span>}
+              <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-3 border-t px-4 py-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={desafioAtivo} onChange={(e) => setDesafioAtivo(e.target.checked)} className="h-4 w-4 rounded border" />
+                Rastrear conclusão (aparece no relatório e na gamificação)
+              </label>
+              <label className={cn('flex items-center gap-2 text-sm', !desafioAtivo && 'opacity-40')}>
+                <input type="checkbox" disabled={!desafioAtivo} checked={exigeFim} onChange={(e) => setExigeFim(e.target.checked)} className="h-4 w-4 rounded border" />
+                Exigir ler até o fim (100%) para concluir
+              </label>
+              <div className={cn('flex items-center gap-2 text-sm', !desafioAtivo && 'opacity-40')}>
+                <span>Tempo mínimo de leitura:</span>
+                <input type="number" min={0} disabled={!desafioAtivo} value={tempoMin} onChange={(e) => setTempoMin(Math.max(0, Number(e.target.value) || 0))} className="w-16 rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring" />
+                <span className="text-muted-foreground">min</span>
+              </div>
+            </div>
+          </details>
         </div>
 
         {/* Direita: prévia do conteúdo salvo */}
