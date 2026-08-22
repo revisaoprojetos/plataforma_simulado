@@ -33,6 +33,8 @@ export type EmissaoResumo = {
   arquivada: boolean
   resumo: {
     totalSemanas?: number
+    semanasConteudo?: number
+    semanasRevisao?: number
     atividades?: number
     conclusao?: string
     subtitulo?: string

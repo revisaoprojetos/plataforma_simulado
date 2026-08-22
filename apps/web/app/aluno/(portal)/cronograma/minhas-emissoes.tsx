@@ -10,9 +10,25 @@ import { fmtBr } from '@/lib/cronograma/datas'
 import type { EmissaoResumo } from './emissoes-actions'
 
 /** Instante da geração — timestamptz, então vale o fuso do aluno (não é data civil do plano). */
-function fmtGeradoEm(iso: string): string {
+function geradoEm(iso: string): { data: string; hora: string } {
   const d = new Date(iso)
-  return `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+  return {
+    data: d.toLocaleDateString('pt-BR'),
+    hora: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+  }
+}
+
+/**
+ * "9 Matérias Essenciais (4 horas)" → { carga: '4h', nome: '9 Matérias Essenciais' }.
+ *
+ * A carga vira etiqueta na lateral: é o primeiro filtro de quem procura ("qual era o de 4h?")
+ * e, repetida por extenso dentro do nome em toda linha, era metade do ruído. Nome fora do
+ * padrão fica inteiro, sem etiqueta — melhor sem do que com adivinhação.
+ */
+function separarCarga(nome: string): { carga: string | null; nome: string } {
+  const m = /^(.*?)\s*\((\d+(?:[.,]\d+)?)\s*horas?\)\s*$/i.exec(nome)
+  if (!m) return { carga: null, nome }
+  return { carga: `${m[2].replace(',', '.')}h`, nome: m[1].trim() }
 }
 
 /**
@@ -121,34 +137,51 @@ export function MinhasEmissoes({
         <div className="divide-y">
           {visiveis.map((e) => {
             const inicio = e.formulario?.inicio as string | undefined
+            const { carga, nome } = separarCarga(e.cronograma_nome)
+            const g = geradoEm(e.criado_em)
+            const semanas = e.resumo?.semanasConteudo ?? e.resumo?.totalSemanas
+            const revisoes = e.resumo?.semanasRevisao ?? 0
+            // Três linhas de texto do mesmo peso viravam parede. Aqui a linha tem hierarquia:
+            // etiqueta da carga, título, uma linha de apoio, e o carimbo da geração à direita.
+            const apoio = [
+              e.titulo ? nome : null,
+              inicio ? `começa ${fmtBr(inicio)}` : null,
+              semanas ? `${semanas} semanas${revisoes ? ` + ${revisoes} rev.` : ''}` : null,
+            ].filter(Boolean)
             return (
               <Link
                 key={e.id}
                 href={`/aluno/cronograma/${e.id}`}
-                className="flex items-center gap-3 px-4 py-3 transition hover:bg-muted/40"
+                className="flex items-center gap-3 px-4 py-2.5 transition hover:bg-muted/40"
               >
+                {carga ? (
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                    {carga}
+                  </span>
+                ) : (
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <CalendarCheck className="h-4 w-4 text-muted-foreground" />
+                  </span>
+                )}
+
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{e.titulo || e.cronograma_nome}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {e.titulo && `${e.cronograma_nome} · `}
-                    {inicio && `começa em ${fmtBr(inicio)} · `}
-                    gerado em {fmtGeradoEm(e.criado_em)}
+                  <p className="flex items-center gap-2 truncate font-medium">
+                    <span className="truncate">{e.titulo || nome}</span>
+                    {e.arquivada && (
+                      <Badge variant="secondary" className="shrink-0 gap-1 px-1.5 py-0 text-[10px]">
+                        <Archive className="h-2.5 w-2.5" />
+                        Arquivado
+                      </Badge>
+                    )}
                   </p>
-                  {e.resumo?.subtitulo && (
-                    <p className="truncate text-xs text-muted-foreground/80">{e.resumo.subtitulo}</p>
-                  )}
+                  <p className="truncate text-xs text-muted-foreground">{apoio.join(' · ')}</p>
                 </div>
-                {e.arquivada && (
-                  <Badge variant="secondary" className="shrink-0">
-                    <Archive className="mr-1 h-3 w-3" />
-                    Arquivado
-                  </Badge>
-                )}
-                {e.resumo?.conclusao && (
-                  <Badge variant="outline" className="hidden shrink-0 sm:inline-flex">
-                    termina em {fmtBr(e.resumo.conclusao)}
-                  </Badge>
-                )}
+
+                <div className="hidden shrink-0 text-right leading-tight sm:block">
+                  <p className="text-xs text-muted-foreground">{g.data}</p>
+                  <p className="text-[11px] text-muted-foreground/60">{g.hora}</p>
+                </div>
+
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </Link>
             )
