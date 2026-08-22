@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   ArrowLeft, ScrollText, BookOpen, ChevronLeft, ChevronRight, Minus, Plus,
-  Sun, Moon, Coffee, CheckCircle2, Loader2, X, PanelLeft, Highlighter, Trash2, StickyNote, Crosshair,
+  Sun, Moon, Coffee, CheckCircle2, Loader2, X, PanelLeft, Highlighter, Trash2, StickyNote, Crosshair, Search, ChevronUp, ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { DocumentoCarregado, AnotacaoAluno } from '@/lib/leitura/acesso'
@@ -46,6 +46,12 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   // Questões inline (Fase 2)
   const [respostas, setRespostas] = useState<Record<string, boolean>>(() => Object.fromEntries((doc.questoes ?? []).filter((q) => q.resposta).map((q) => [q.questaoId, true])))
   const [slots, setSlots] = useState<{ q: DocumentoCarregado['questoes'][number]; el: HTMLElement }[]>([])
+
+  // Busca dentro da lei
+  const [buscaAberta, setBuscaAberta] = useState(false)
+  const [buscaQ, setBuscaQ] = useState('')
+  const [matches, setMatches] = useState<{ rects: RectRel[]; el: HTMLElement | null }[]>([])
+  const [matchIdx, setMatchIdx] = useState(0)
 
   // Grifos editoriais (conteúdo compartilhado) + modo sem grifos
   const grifos = doc.grifos ?? []
@@ -162,6 +168,24 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   }, [anotacoes, grifos])
   useIsoLayout(() => { recomputarGrifos() }, [recomputarGrifos, modo, colW, fonte, doc.html, slots])
 
+  // ── Busca dentro da lei: acha ocorrências na espinha, gera rects p/ realçar + navegar. ──
+  useIsoLayout(() => {
+    const root = contentRef.current, ov = overlayRef.current
+    const q = buscaQ.trim()
+    if (!root || !ov || q.length < 2) { setMatches([]); return }
+    const esp = espinhaRef.current ?? construirEspinha(root)
+    const base = ov.getBoundingClientRect()
+    const S = esp.S, ql = q.toLowerCase(), Sl = S.toLowerCase()
+    const res: { rects: RectRel[]; el: HTMLElement | null }[] = []
+    let i = Sl.indexOf(ql)
+    while (i >= 0 && res.length < 500) {
+      const range = ancoraParaRange(esp, { inicio: i, fim: i + q.length, exact: S.slice(i, i + q.length), prefix: '', suffix: '' })
+      if (range) { const rs = rectsDoRange(range, base); if (rs.length) res.push({ rects: rs, el: range.startContainer.parentElement }) }
+      i = Sl.indexOf(ql, i + Math.max(1, q.length))
+    }
+    setMatches(res); setMatchIdx(0)
+  }, [buscaQ, modo, colW, fonte, doc.html, slots])
+
   // ── Cálculo de progresso (%, artigo alcançado) ──
   const atualizarProgresso = useCallback(() => {
     const vp = viewportRef.current, ct = contentRef.current
@@ -251,6 +275,16 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     if (!el) return
     if (modo === 'scroll') { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
     else { const alvo = Math.floor(el.offsetLeft / (colW + GAP)); irPara(alvo) }
+  }
+
+  function irMatch(delta: number) {
+    if (!matches.length) return
+    const n = (matchIdx + delta + matches.length) % matches.length
+    setMatchIdx(n)
+    const el = matches[n]?.el
+    if (!el) return
+    if (modo === 'scroll') el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    else irPara(Math.floor(el.offsetLeft / (colW + GAP)))
   }
 
   // ── Anotações: seleção → popover, criar/editar/excluir, pular ──
@@ -383,6 +417,9 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
           )}
           <span className="truncate text-sm font-semibold" style={{ color: cores.fg }}>{doc.titulo}</span>
           <div className="ml-auto flex items-center gap-3">
+            <button onClick={() => setBuscaAberta((v) => !v)} title="Buscar na lei" className={cn('rounded-lg border p-1.5 transition-colors', buscaAberta && 'ring-2 ring-primary')} style={{ borderColor: '#0000001a', color: cores.fg }} aria-label="Buscar">
+              <Search className="h-4 w-4" />
+            </button>
             <button onClick={() => setBarraDir((v) => !v)} title="Minhas anotações" className={cn('inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors', barraDir && 'ring-2 ring-primary')} style={{ borderColor: '#0000001a', color: cores.fg }}>
               <Highlighter className="h-4 w-4" /> {anotacoes.length > 0 && <span className="tabular-nums">{anotacoes.length}</span>}
             </button>
@@ -401,6 +438,18 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
             ) : null}
           </div>
         </div>
+
+        {/* Barra de busca dentro da lei */}
+        {buscaAberta && (
+          <div className="flex items-center gap-2 border-b px-3 py-1.5" style={{ borderColor: '#0000001a' }}>
+            <Search className="h-4 w-4 shrink-0" style={{ color: cores.muted }} />
+            <input autoFocus value={buscaQ} onChange={(e) => setBuscaQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') irMatch(e.shiftKey ? -1 : 1); if (e.key === 'Escape') { setBuscaAberta(false); setBuscaQ('') } }} placeholder="Buscar nesta lei…" className="min-w-32 flex-1 bg-transparent text-sm outline-none" style={{ color: cores.fg }} />
+            <span className="shrink-0 text-xs tabular-nums" style={{ color: cores.muted }}>{matches.length ? `${matchIdx + 1}/${matches.length}` : (buscaQ.trim().length >= 2 ? '0' : '')}</span>
+            <button onClick={() => irMatch(-1)} disabled={!matches.length} className="rounded p-1 disabled:opacity-30" style={{ color: cores.fg }} aria-label="Anterior"><ChevronUp className="h-4 w-4" /></button>
+            <button onClick={() => irMatch(1)} disabled={!matches.length} className="rounded p-1 disabled:opacity-30" style={{ color: cores.fg }} aria-label="Próximo"><ChevronDown className="h-4 w-4" /></button>
+            <button onClick={() => { setBuscaAberta(false); setBuscaQ('') }} className="rounded p-1" style={{ color: cores.muted }} aria-label="Fechar busca"><X className="h-4 w-4" /></button>
+          </div>
+        )}
 
         {/* Conteúdo */}
         <div className="relative min-h-0 flex-1">
@@ -448,6 +497,14 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
                   <div key={`${a.id}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: a.cor, opacity: 0.4, mixBlendMode: 'multiply' }} />
                 )))}
               </div>
+              {/* Overlay dos resultados de busca (realce laranja; atual mais forte) */}
+              {matches.length > 0 && (
+                <div className="pointer-events-none absolute inset-0" aria-hidden>
+                  {matches.map((m, mi) => m.rects.map((r, i) => (
+                    <div key={`m-${mi}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: '#f97316', opacity: mi === matchIdx ? 0.6 : 0.32, outline: mi === matchIdx ? '1px solid #ea580c' : 'none' }} />
+                  )))}
+                </div>
+              )}
             </div>
           </div>
 
