@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import {
   ArrowLeft, Save, Loader2, Eye, EyeOff, Upload, ClipboardPaste, PenLine, FileText,
   Bold, Italic, Underline, Heading, List, Trophy, Scale, Send, ChevronDown,
-  ImagePlus, Trash2, RefreshCw, Users,
+  ImagePlus, Trash2, RefreshCw, Users, Settings2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { atualizarDocumento, publicarVersao, type Documento, type Materia, type SituacaoEditorial } from '@/app/admin/leitura/actions'
@@ -43,7 +43,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
 }) {
   const versaoAutoria = versaoEdicao ?? documento.versao
   const router = useRouter()
-  const [aba, setAba] = useState<'conteudo' | 'acesso'>('conteudo')
+  const [aba, setAba] = useState<'conteudo' | 'config' | 'acesso'>('conteudo')
   const [capa, setCapa] = useState<string | null>(documento.capa_url ?? null)
   const [processandoCapa, setProcessandoCapa] = useState(false)
   const capaRef = useRef<HTMLInputElement>(null)
@@ -199,23 +199,31 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
         </div>
       )}
 
-      {/* Abas: Conteúdo × Acesso — sublinhado animado */}
+      {/* Abas: Conteúdo · Configuração · Acesso — sublinhado animado */}
       <div className="relative flex border-b text-sm">
-        {([['conteudo', 'Conteúdo', FileText], ['acesso', 'Acesso dos alunos', Users]] as const).map(([a, label, Icon]) => (
+        {([['conteudo', 'Conteúdo', FileText], ['config', 'Configuração', Settings2], ['acesso', 'Acesso dos alunos', Users]] as const).map(([a, label, Icon]) => (
           <button key={a} onClick={() => setAba(a)} className={cn('flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 font-medium transition-colors', aba === a ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
             <Icon className="h-4 w-4" /> {label}
           </button>
         ))}
-        <span className="absolute bottom-[-1px] h-0.5 rounded-full bg-primary transition-all duration-300 ease-out" style={{ width: '50%', left: aba === 'conteudo' ? '0%' : '50%' }} />
+        <span className="absolute bottom-[-1px] h-0.5 rounded-full bg-primary transition-all duration-300 ease-out" style={{ width: '33.3333%', left: `${(aba === 'conteudo' ? 0 : aba === 'config' ? 1 : 2) * 33.3333}%` }} />
       </div>
 
       {aba === 'acesso' && <LeituraAcesso documentoId={documento.id} />}
 
+      {/* CONTEÚDO: prévia (edição de grifos) + questões */}
       {aba === 'conteudo' && (<>
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
-        {/* Esquerda: dados do card + entrada de conteúdo + configurações */}
+        <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} />
+        {podeEditar && htmlAtual && (
+          <LeituraQuestoesAdmin documentoId={documento.id} versao={versaoAutoria} html={htmlAtual} />
+        )}
+      </>)}
+
+      {/* CONFIGURAÇÃO: dados do card + importação + metadados + desafio */}
+      {aba === 'config' && (
+      <div className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-5">
-          {/* Dados do card — no topo, com capa */}
+          {/* Dados do card — com capa */}
           <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
             <p className="text-sm font-semibold">Dados do card</p>
             <div>
@@ -315,7 +323,10 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
               )}
             </div>
           )}
+        </div>
 
+        {/* Segunda coluna da configuração: metadados + desafio */}
+        <div className="space-y-5">
           {/* Metadados da lei (A1) — recolhível */}
           <details className="group rounded-2xl border bg-card shadow-sm">
             <summary className="flex cursor-pointer list-none items-center gap-1.5 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
@@ -392,18 +403,8 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
             </div>
           </details>
         </div>
-
-        {/* Direita: prévia + editor de grifos (unificado) */}
-        <div className="lg:sticky lg:top-4 lg:self-start">
-          <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} />
-        </div>
       </div>
-
-      {/* Questões no meio da leitura (Fase 2) */}
-      {podeEditar && htmlAtual && (
-        <LeituraQuestoesAdmin documentoId={documento.id} versao={versaoAutoria} html={htmlAtual} />
       )}
-      </>)}
     </div>
   )
 }
