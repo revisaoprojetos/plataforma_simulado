@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
-  ArrowLeft, List, ScrollText, BookOpen, ChevronLeft, ChevronRight, Minus, Plus,
+  ArrowLeft, ScrollText, BookOpen, ChevronLeft, ChevronRight, Minus, Plus,
   Sun, Moon, Coffee, CheckCircle2, Loader2, X, PanelLeft,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -20,6 +20,8 @@ const TEMAS: Record<Tema, { bg: string; fg: string; muted: string }> = {
   escuro: { bg: '#1a1a1e', fg: '#d8d8dc', muted: '#8a8a92' },
 }
 const GAP = 48 // entre "páginas" no modo virar
+// useLayoutEffect só faz sentido no cliente (evita warning de SSR do leitor).
+const useIsoLayout = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
 export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   const [modo, setModo] = useState<Modo>('scroll')
@@ -41,10 +43,15 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   const artigoMaxRef = useRef(doc.progresso.artigoMax)
   const tempoRef = useRef(0)          // segundos acumulados desde o último flush
   const pctRef = useRef(doc.progresso.pct)
+  const scrollRaf = useRef(0)
+  const touchX = useRef<number | null>(null)
   const cores = TEMAS[tema]
 
+  // No mobile, começa com o menu fechado (a barra de 256px cobriria a leitura).
+  useEffect(() => { if (typeof window !== 'undefined' && window.innerWidth < 768) setMenuAberto(false) }, [])
+
   // ── Sumário (TOC) a partir das âncoras de artigo/seção ──
-  useLayoutEffect(() => {
+  useIsoLayout(() => {
     const root = contentRef.current
     if (!root) return
     const nós = Array.from(root.querySelectorAll<HTMLElement>('[data-art]'))
@@ -55,29 +62,27 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     })))
   }, [doc.html])
 
-  // ── Medição do modo virar-página (largura da coluna + total de páginas) ──
-  const medir = useCallback(() => {
-    const vp = viewportRef.current, ct = contentRef.current
-    if (!vp || !ct) return
-    if (modo === 'flip') {
-      const w = vp.clientWidth
-      setColW(w)
-      // após aplicar colunas, o scrollWidth revela o total
-      requestAnimationFrame(() => {
-        if (!contentRef.current) return
-        const total = Math.max(1, Math.round(contentRef.current.scrollWidth / (w + GAP)))
-        setTotalPag(total)
-        setPagina((p) => Math.min(p, total - 1))
-      })
-    }
-  }, [modo])
-
-  useLayoutEffect(() => { medir() }, [medir, fonte, doc.html])
-  useEffect(() => {
-    const ro = new ResizeObserver(() => medir())
+  // ── Medição do modo virar-página ──
+  // 1) Largura da coluna = largura da viewport (muda em resize/modo). Ao mudar colW,
+  //    o React aplica columnWidth no DOM; SÓ ENTÃO (efeito 2) medimos o total de páginas —
+  //    senão o scrollWidth seria lido antes das colunas existirem (total errado = 1).
+  useIsoLayout(() => {
+    const medirColW = () => { const vp = viewportRef.current; if (vp) setColW(vp.clientWidth) }
+    medirColW()
+    const ro = new ResizeObserver(medirColW)
     if (viewportRef.current) ro.observe(viewportRef.current)
     return () => ro.disconnect()
-  }, [medir])
+  }, [modo])
+
+  // 2) Total de páginas — recalcula quando colW/fonte/conteúdo mudam (colunas já no DOM).
+  useIsoLayout(() => {
+    if (modo !== 'flip') { setTotalPag(1); return }
+    const ct = contentRef.current
+    if (!ct || !colW) return
+    const total = Math.max(1, Math.round(ct.scrollWidth / (colW + GAP)))
+    setTotalPag(total)
+    setPagina((p) => Math.min(p, total - 1))
+  }, [modo, colW, fonte, doc.html])
 
   // ── Cálculo de progresso (%, artigo alcançado) ──
   const atualizarProgresso = useCallback(() => {
@@ -105,6 +110,12 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
 
   useEffect(() => { atualizarProgresso() }, [pagina, atualizarProgresso])
 
+  // Scroll é frequente → recalcula no máx. 1x por frame (rAF), sem varrer o DOM a cada pixel.
+  const onScroll = useCallback(() => {
+    if (scrollRaf.current) return
+    scrollRaf.current = requestAnimationFrame(() => { scrollRaf.current = 0; atualizarProgresso() })
+  }, [atualizarProgresso])
+
   // ── Heartbeat: acumula tempo de leitura (só com aba visível) e envia progresso ──
   const flush = useCallback((concluir = false) => {
     const inc = tempoRef.current; tempoRef.current = 0
@@ -115,10 +126,23 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   useEffect(() => {
     const tick = setInterval(() => { if (document.visibilityState === 'visible') tempoRef.current += 1 }, 1000)
     const save = setInterval(() => { if (tempoRef.current > 0) flush().catch(() => {}) }, 20000)
-    const onHide = () => { if (tempoRef.current > 0) navigator.sendBeacon?.('/api/leitura/progresso', new Blob([JSON.stringify({ documento_id: doc.id, versao: doc.versao, pct: pctRef.current, artigo_max: artigoMaxRef.current, tempo_inc: tempoRef.current })], { type: 'application/json' })) }
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') onHide() })
+    // Ao esconder/fechar a aba: envia o tempo pendente via sendBeacon e ZERA (senão o próximo
+    // flush contaria o mesmo tempo de novo). Listeners nomeados p/ remover no cleanup (sem leak).
+    const onHide = () => {
+      if (tempoRef.current <= 0) return
+      const body = new Blob([JSON.stringify({ documento_id: doc.id, versao: doc.versao, pct: pctRef.current, artigo_max: artigoMaxRef.current, tempo_inc: tempoRef.current })], { type: 'application/json' })
+      navigator.sendBeacon?.('/api/leitura/progresso', body)
+      tempoRef.current = 0
+    }
+    const onVis = () => { if (document.visibilityState === 'hidden') onHide() }
+    document.addEventListener('visibilitychange', onVis)
     window.addEventListener('pagehide', onHide)
-    return () => { clearInterval(tick); clearInterval(save); window.removeEventListener('pagehide', onHide); flush().catch(() => {}) }
+    return () => {
+      clearInterval(tick); clearInterval(save)
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('pagehide', onHide)
+      flush().catch(() => {})
+    }
   }, [flush, doc.id, doc.versao])
 
   // ── Navegação virar-página (teclado) ──
@@ -132,6 +156,15 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [modo, pagina, irPara])
+
+  // ── Swipe (mobile) no modo virar-página ──
+  function onTouchStart(e: React.TouchEvent) { touchX.current = e.touches[0]?.clientX ?? null }
+  function onTouchEnd(e: React.TouchEvent) {
+    if (modo !== 'flip' || touchX.current == null) return
+    const dx = (e.changedTouches[0]?.clientX ?? 0) - touchX.current
+    if (Math.abs(dx) > 40) irPara(pagina + (dx < 0 ? 1 : -1))
+    touchX.current = null
+  }
 
   // ── Pular para uma seção (sumário) ──
   function pular(s: Secao) {
@@ -237,7 +270,9 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
         <div className="relative min-h-0 flex-1">
           <div
             ref={viewportRef}
-            onScroll={modo === 'scroll' ? atualizarProgresso : undefined}
+            onScroll={modo === 'scroll' ? onScroll : undefined}
+            onTouchStart={modo === 'flip' ? onTouchStart : undefined}
+            onTouchEnd={modo === 'flip' ? onTouchEnd : undefined}
             className={cn('h-full', modo === 'scroll' ? 'overflow-y-auto' : 'overflow-hidden')}
           >
             <div

@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -66,6 +66,13 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar }: { documento:
   }
 
   const exec = (cmd: string, val?: string) => { document.execCommand(cmd, false, val); editorRef.current?.focus() }
+
+  // Ao abrir a aba "Editor", carrega o conteúdo salvo (permite editar em vez de recomeçar do zero).
+  useEffect(() => {
+    if (modo === 'editor' && editorRef.current && !editorRef.current.innerHTML.trim() && htmlAtual) {
+      editorRef.current.innerHTML = htmlAtual
+    }
+  }, [modo, htmlAtual])
 
   return (
     <div className="space-y-5">
