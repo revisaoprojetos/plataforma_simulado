@@ -31,6 +31,9 @@ export type EmissaoResumo = {
   titulo: string | null
   criado_em: string
   arquivada: boolean
+  /** Só vem no caminho de renderização (PDF); a lista do aluno não precisa. */
+  estudante_id?: string
+  estudante_nome?: string | null
   resumo: {
     totalSemanas?: number
     semanasConteudo?: number
@@ -135,28 +138,43 @@ export type EmissaoAberta = {
  * visível mas marcado como indisponível — o aluno não perde o registro do que fez, que é
  * o mesmo princípio do detalhe de simulado concluído.
  */
-export async function abrirEmissao(emissaoId: string): Promise<{ ok: boolean; dados?: EmissaoAberta; error?: string }> {
-  const sessao = await getSessaoAluno()
-  if (!sessao) return { ok: false, error: 'Sua sessão expirou.' }
+/**
+ * Remonta a grade de uma emissão. É o miolo compartilhado por dois caminhos de entrada:
+ * o aluno abrindo a própria emissão (sessão) e o Gotenberg renderizando a página de
+ * impressão (token assinado, sem cookie).
+ *
+ * Fica numa função só de propósito: uma segunda remontagem seria um segundo lugar para o
+ * PDF divergir do que o aluno viu na tela.
+ *
+ * `estudanteIdEsperado` só é passado no caminho da sessão; no do token, a autorização já
+ * foi feita pela assinatura e o dono sai da própria linha.
+ */
+async function montarEmissao(
+  emissaoId: string,
+  tenantId: string,
+  estudanteIdEsperado?: string,
+): Promise<{ ok: boolean; dados?: EmissaoAberta; error?: string }> {
   if (!UUID_RE.test(emissaoId)) return { ok: false, error: 'Cronograma não encontrado.' }
   const svc = createAdminClient()
 
-  const { data: emissao } = await svc
+  let q = svc
     .from('simulado_cronograma_emissoes')
-    .select('id, cronograma_id, cronograma_nome, titulo, criado_em, arquivada, resumo, formulario')
+    .select('id, cronograma_id, cronograma_nome, titulo, criado_em, arquivada, resumo, formulario, estudante_id, estudante_nome')
     .eq('id', emissaoId)
-    .eq('tenant_id', sessao.tenantId)
-    .eq('estudante_id', sessao.estudanteId) // só as próprias
-    .maybeSingle()
+    .eq('tenant_id', tenantId)
+  if (estudanteIdEsperado) q = q.eq('estudante_id', estudanteIdEsperado) // só as próprias
+
+  const { data: emissao } = await q.maybeSingle()
   if (!emissao) return { ok: false, error: 'Cronograma não encontrado.' }
 
-  const acesso = await verificarAcessoCronograma(svc, sessao.tenantId, sessao.estudanteId, (emissao as any).cronograma_id)
+  const dono = (emissao as { estudante_id: string }).estudante_id
+  const acesso = await verificarAcessoCronograma(svc, tenantId, dono, (emissao as any).cronograma_id)
 
   const { data: cron } = await svc
     .from('simulado_cronogramas')
     .select('id, slug, nome, total_semanas, dias_curso, dias_nome, semanas_revisao, carga_horaria')
     .eq('id', (emissao as any).cronograma_id)
-    .eq('tenant_id', sessao.tenantId)
+    .eq('tenant_id', tenantId)
     .eq('deletado', false)
     .maybeSingle()
 
@@ -168,7 +186,7 @@ export async function abrirEmissao(emissaoId: string): Promise<{ ok: boolean; da
     svc
       .from('simulado_cronograma_metas')
       .select('id, semana, dia, tipo, disciplina, aula, conteudo, duracao, ordem, simulado_id, simulado_externo_nome, simulado_externo_url')
-      .eq('tenant_id', sessao.tenantId)
+      .eq('tenant_id', tenantId)
       .eq('cronograma_id', (emissao as any).cronograma_id)
       .order('semana')
       .order('dia')
@@ -192,13 +210,47 @@ export async function abrirEmissao(emissaoId: string): Promise<{ ok: boolean; da
       semanas_revisao: (cron as any).semanas_revisao ?? [],
     },
     metas,
-    await mapaTiposMeta(sessao.tenantId),
-    await carregarLinks(svc, sessao.tenantId),
+    await mapaTiposMeta(tenantId),
+    await carregarLinks(svc, tenantId),
     opcoes,
   )
   if (!r.ok) return { ok: false, error: r.erro }
 
   return { ok: true, dados: { emissao: emissao as EmissaoResumo, grade: r.grade, indisponivel: false } }
+}
+
+export async function abrirEmissao(emissaoId: string): Promise<{ ok: boolean; dados?: EmissaoAberta; error?: string }> {
+  const sessao = await getSessaoAluno()
+  if (!sessao) return { ok: false, error: 'Sua sessão expirou.' }
+  return montarEmissao(emissaoId, sessao.tenantId, sessao.estudanteId)
+}
+
+/**
+ * Caminho do RENDER: o Gotenberg busca a página de impressão sem cookie nenhum, com um token
+ * HMAC de vida curta que o web assinou. Quem chama já verificou a assinatura — aqui só o
+ * tenant e o id do token entram, e nunca um id vindo cru da URL.
+ */
+export async function abrirEmissaoParaRender(
+  emissaoId: string,
+  tenantId: string,
+): Promise<{ ok: boolean; dados?: EmissaoAberta; error?: string }> {
+  return montarEmissao(emissaoId, tenantId)
+}
+
+/** Metas concluídas de uma emissão, para o render por token (sem sessão do aluno). */
+export async function checksParaRender(emissaoId: string, tenantId: string): Promise<Record<string, string>> {
+  const svc = createAdminClient()
+  const linhas = await fetchAll<{ meta_id: string; marcada_em: string }>(() =>
+    svc
+      .from('simulado_cronograma_meta_checks')
+      .select('meta_id, marcada_em')
+      .eq('tenant_id', tenantId)
+      .eq('emissao_id', emissaoId)
+      .order('meta_id') as never,
+  )
+  const mapa: Record<string, string> = {}
+  for (const l of linhas) mapa[l.meta_id] = l.marcada_em
+  return mapa
 }
 
 export async function renomearEmissao(emissaoId: string, titulo: string): Promise<{ ok: boolean; error?: string }> {

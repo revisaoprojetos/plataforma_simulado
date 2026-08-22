@@ -56,9 +56,13 @@ export function CronogramaImprimivel({
                  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .caixa { display: inline-block; width: 9px; height: 9px; border: 1px solid #71717a; border-radius: 2px; }
         .caixa.feita { background: #18181b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        /* A margem da folha vem do PADDING, não do @page. É o que faz os dois caminhos
+           coincidirem: o worker manda o Gotenberg renderizar com margem ZERO (para o HTML
+           mandar na paginação, decisão que já existia para o caderno), então um @page com
+           margem só valeria na impressão do navegador e o PDF sairia diferente da tela. */
         @media print {
-          .folha { padding: 0; max-width: none; }
-          @page { margin: 12mm 10mm; }
+          .folha { padding: 12mm 10mm; max-width: none; }
+          @page { margin: 0; }
         }
       `}</style>
 
