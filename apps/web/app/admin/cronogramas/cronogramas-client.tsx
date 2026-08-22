@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock, ListChecks, Loader2, Package, Pencil, Plus, Tags, Trash2, X } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, ListChecks, Loader2, Package, Pencil, Plus, Search, Tags, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -60,8 +60,6 @@ const vazio = (): EntradaCronograma => ({
   ordem: 0,
 })
 
-const POR_PAGINA = 25
-
 export function CronogramasClient({
   inicial,
   categoriasIniciais,
@@ -99,6 +97,12 @@ export function CronogramasClient({
   const [form, setForm] = useState<EntradaCronograma>(vazio())
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<'todos' | 'liberados' | 'rascunhos' | 'sem_pacote' | 'sem_metas'>('todos')
+  /* Carga horária é o primeiro corte de quem usa o catálogo — é por ela que o aluno escolhe
+     (spec §4, passo 2) e por ela que a equipe monta os pacotes. Estava só como agrupamento
+     visual: para ver "os de 6 horas" era preciso rolar até o bloco certo. */
+  const [carga, setCarga] = useState<number | 'todas'>('todas')
+  const [ordem, setOrdem] = useState<'padrao' | 'metas' | 'semanas'>('padrao')
+  const [porPagina, setPorPagina] = useState(25)
 
   /**
    * "Invisível": liberado, mas fora de qualquer pacote. É o estado que mais engana — a
@@ -118,6 +122,14 @@ export function CronogramasClient({
     [itens],
   )
 
+  const cargas = useMemo(
+    () =>
+      [...new Set(itens.map((c) => c.carga_horaria))]
+        .sort((a, b) => a - b)
+        .map((h) => ({ h, n: itens.filter((c) => c.carga_horaria === h).length })),
+    [itens],
+  )
+
   const filtrados = useMemo(() => {
     const t = busca.trim().toLowerCase()
     let xs = itens
@@ -125,19 +137,35 @@ export function CronogramasClient({
     else if (filtro === 'rascunhos') xs = xs.filter((c) => c.status !== 'liberado')
     else if (filtro === 'sem_pacote') xs = xs.filter((c) => c.pacotes === 0)
     else if (filtro === 'sem_metas') xs = xs.filter((c) => c.metas === 0)
-    if (!t) return xs
-    return xs.filter((c) => c.nome.toLowerCase().includes(t) || (c.categoria_nome ?? '').toLowerCase().includes(t))
-  }, [itens, busca, filtro])
+    if (carga !== 'todas') xs = xs.filter((c) => c.carga_horaria === carga)
+    if (t) {
+      xs = xs.filter((c) => c.nome.toLowerCase().includes(t) || (c.categoria_nome ?? '').toLowerCase().includes(t))
+    }
+    // A ordenação vale DENTRO de cada carga: reordenar por cima do agrupamento embaralharia
+    // os blocos e tiraria justamente a leitura que o agrupamento dá.
+    if (ordem !== 'padrao') {
+      const chave = ordem === 'metas' ? (c: CronogramaLista) => c.metas : (c: CronogramaLista) => c.total_semanas
+      xs = [...xs].sort((a, b) => a.carga_horaria - b.carga_horaria || chave(b) - chave(a))
+    }
+    return xs
+  }, [itens, busca, filtro, carga, ordem])
+
+  const filtrando = filtro !== 'todos' || carga !== 'todas' || busca.trim().length > 0
+  function limparFiltros() {
+    setFiltro('todos')
+    setCarga('todas')
+    setBusca('')
+  }
 
   /* Paginação da LISTA. O filtro e a busca continuam valendo sobre o catálogo inteiro — o que
      pagina é só o que se desenha. Com 25 cronogramas não faz diferença; com 300 o navegador
      deixa de montar 300 linhas para mostrar as 25 primeiras. */
   const [pagina, setPagina] = useState(0)
-  useEffect(() => setPagina(0), [busca, filtro])
-  const ultimaPagina = Math.max(0, Math.ceil(filtrados.length / POR_PAGINA) - 1)
+  useEffect(() => setPagina(0), [busca, filtro, carga, ordem, porPagina])
+  const ultimaPagina = Math.max(0, Math.ceil(filtrados.length / porPagina) - 1)
   const daPagina = useMemo(
-    () => filtrados.slice(pagina * POR_PAGINA, (pagina + 1) * POR_PAGINA),
-    [filtrados, pagina],
+    () => filtrados.slice(pagina * porPagina, (pagina + 1) * porPagina),
+    [filtrados, pagina, porPagina],
   )
 
   // Agrupa por carga horária — é assim que o aluno escolhe (spec §4, passo 2).
@@ -327,9 +355,14 @@ export function CronogramasClient({
 
   return (
     <>
-      {/* Filtros por SITUAÇÃO, não por atributo: o que se procura aqui é o que precisa de
-          ação — sem metas não dá para liberar, e liberado sem pacote não chega a ninguém. */}
+      {/* Duas réguas de filtro, cada uma respondendo a uma pergunta diferente: "o que precisa
+          de ação?" (situação) e "qual rotina?" (carga). Sem rótulo, viravam uma fileira só de
+          pílulas em que ninguém sabia o que era o quê. */}
+      <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
+        <span className="w-16 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Situação
+        </span>
         {(
           [
             ['todos', 'Todos', itens.length],
@@ -352,6 +385,35 @@ export function CronogramasClient({
         ))}
       </div>
 
+      {cargas.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="w-16 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Carga
+          </span>
+          <button
+            onClick={() => setCarga('todas')}
+            className={`rounded-full border px-3 py-1 text-sm transition ${
+              carga === 'todas' ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted'
+            }`}
+          >
+            Todas
+          </button>
+          {cargas.map(({ h, n }) => (
+            <button
+              key={h}
+              onClick={() => setCarga(h)}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition ${
+                carga === h ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted'
+              }`}
+            >
+              {h}h
+              <span className={`tabular-nums text-xs ${carga === h ? 'opacity-80' : 'text-muted-foreground'}`}>{n}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      </div>
+
       {contagens.invisiveis > 0 && filtro !== 'sem_pacote' && (
         <AlertBox variante="aviso" titulo={`${contagens.invisiveis} cronograma(s) liberado(s) que ninguém recebe`}>
           <p className="text-sm">
@@ -369,15 +431,35 @@ export function CronogramasClient({
         <SecaoHeader
           icon={CalendarDays}
           titulo="Catálogo"
-          subtitulo={`${filtrados.length} de ${itens.length} cronograma(s)`}
+          subtitulo={
+            filtrando
+              ? `${filtrados.length.toLocaleString('pt-BR')} de ${itens.length.toLocaleString('pt-BR')} cronograma(s) no filtro`
+              : `${itens.length.toLocaleString('pt-BR')} cronograma(s)`
+          }
           acao={
-            <div className="flex items-center gap-2">
-              <Input
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                placeholder="Buscar…"
-                className="h-9 w-44"
-              />
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar por nome ou categoria"
+                  className="h-8 w-56 pl-7"
+                />
+              </div>
+
+              <Select value={ordem} onValueChange={(v) => setOrdem((v ?? 'padrao') as typeof ordem)}>
+                <SelectTrigger className="h-8 w-40">
+                  <SelectValue>
+                    {ordem === 'padrao' ? 'Ordem do cadastro' : ordem === 'metas' ? 'Mais metas' : 'Mais semanas'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="padrao">Ordem do cadastro</SelectItem>
+                  <SelectItem value="metas">Mais metas</SelectItem>
+                  <SelectItem value="semanas">Mais semanas</SelectItem>
+                </SelectContent>
+              </Select>
               <Button size="sm" variant="outline" onClick={() => setCategoriasAberto(true)}>
                 <Tags className="mr-1 h-4 w-4" />
                 Categorias
@@ -408,7 +490,13 @@ export function CronogramasClient({
             </div>
           </div>
         ) : filtrados.length === 0 ? (
-          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Nenhum cronograma nesse filtro.</p>
+          <div className="px-4 py-10 text-center">
+            <p className="text-sm text-muted-foreground">Nenhum cronograma nesse filtro.</p>
+            <Button size="sm" variant="outline" className="mt-3" onClick={limparFiltros}>
+              <X className="mr-1 h-4 w-4" />
+              Limpar filtros
+            </Button>
+          </div>
         ) : (
           <div className="divide-y">
             {selecao.size > 0 && (
@@ -475,32 +563,41 @@ export function CronogramasClient({
                           {c.categoria_nome && <Badge variant="outline">{c.categoria_nome}</Badge>}
                         </div>
 
-                        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                          <span>{c.faixa}</span>
-                          <span>·</span>
-                          <span>{c.total_semanas} semanas</span>
-                          {c.semanas_revisao.length > 0 && <span>({c.semanas_revisao.length} de revisão)</span>}
-                          <span>·</span>
+                        {/* Quatro dados encadeados por "·" viravam uma frase que não se lê.
+                            Como etiquetas, o que está errado salta: âmbar é problema. */}
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                          <span className="rounded border px-1.5 py-0.5 text-muted-foreground">{c.faixa}</span>
+                          <span className="rounded border px-1.5 py-0.5 text-muted-foreground">
+                            {c.total_semanas} semanas
+                            {c.semanas_revisao.length > 0 && ` · ${c.semanas_revisao.length} rev.`}
+                          </span>
                           {c.metas === 0 ? (
-                            <span className="font-medium text-amber-600">sem metas</span>
+                            <span className="rounded border border-amber-400 bg-amber-100 px-1.5 py-0.5 font-medium text-amber-900 dark:border-amber-500/60 dark:bg-amber-500/20 dark:text-amber-200">
+                              sem metas
+                            </span>
                           ) : (
-                            <span>{c.metas.toLocaleString('pt-BR')} metas</span>
+                            <span className="rounded border px-1.5 py-0.5 text-muted-foreground">
+                              {c.metas.toLocaleString('pt-BR')} metas
+                            </span>
                           )}
-                          <span>·</span>
                           {c.pacotes === 0 ? (
-                            <Link
-                              href={`/admin/cronogramas/${c.id}`}
-                              className={invisivel ? 'font-medium text-amber-600 hover:underline' : 'hover:underline'}
+                            <span
+                              className={`rounded border px-1.5 py-0.5 ${
+                                invisivel
+                                  ? 'border-amber-400 bg-amber-100 font-medium text-amber-900 dark:border-amber-500/60 dark:bg-amber-500/20 dark:text-amber-200'
+                                  : 'text-muted-foreground'
+                              }`}
+                              title={invisivel ? 'Liberado, mas fora de qualquer pacote — nenhum aluno recebe' : undefined}
                             >
                               em nenhum pacote
-                            </Link>
+                            </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1">
+                            <span className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-muted-foreground">
                               <Package className="h-3 w-3" />
                               {c.pacotes} pacote(s)
                             </span>
                           )}
-                        </p>
+                        </div>
                       </div>
 
                       <div className="flex shrink-0 items-center gap-1">
@@ -535,21 +632,49 @@ export function CronogramasClient({
           </div>
         )}
 
-        {filtrados.length > POR_PAGINA && (
-          <div className="flex flex-wrap items-center gap-2 border-t px-4 py-2.5">
+        {filtrados.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 border-t px-4 py-2.5">
             <span className="text-xs text-muted-foreground">
-              {(pagina * POR_PAGINA + 1).toLocaleString('pt-BR')}–
-              {Math.min((pagina + 1) * POR_PAGINA, filtrados.length).toLocaleString('pt-BR')} de{' '}
+              {(pagina * porPagina + 1).toLocaleString('pt-BR')}–
+              {Math.min((pagina + 1) * porPagina, filtrados.length).toLocaleString('pt-BR')} de{' '}
               {filtrados.length.toLocaleString('pt-BR')}
             </span>
-            <div className="ml-auto flex items-center gap-1">
-              <Button size="sm" variant="outline" onClick={() => setPagina((p) => Math.max(0, p - 1))} disabled={pagina === 0} aria-label="Página anterior">
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setPagina((p) => Math.min(ultimaPagina, p + 1))} disabled={pagina >= ultimaPagina} aria-label="Próxima página">
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">por página</span>
+              <Select value={String(porPagina)} onValueChange={(v) => setPorPagina(Number(v ?? 25))}>
+                <SelectTrigger className="h-7 w-16">
+                  <SelectValue>{porPagina}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {[10, 25, 50, 100].map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
+            {ultimaPagina > 0 && (
+              <div className="ml-auto flex items-center gap-1">
+                <Button size="sm" variant="outline" onClick={() => setPagina(0)} disabled={pagina === 0} aria-label="Primeira página">
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setPagina((p) => Math.max(0, p - 1))} disabled={pagina === 0} aria-label="Página anterior">
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="min-w-24 text-center text-xs tabular-nums text-muted-foreground">
+                  página {pagina + 1} de {ultimaPagina + 1}
+                </span>
+                <Button size="sm" variant="outline" onClick={() => setPagina((p) => Math.min(ultimaPagina, p + 1))} disabled={pagina >= ultimaPagina} aria-label="Próxima página">
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setPagina(ultimaPagina)} disabled={pagina >= ultimaPagina} aria-label="Última página">
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </Card>
