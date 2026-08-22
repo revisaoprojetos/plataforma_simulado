@@ -72,6 +72,7 @@ export function MetasClient({
   // Rótulo e ordem vêm do cadastro de tipos, não de constantes no código.
   const porSlug = useMemo(() => new Map(tipos.map((t) => [t.slug, t])), [tipos])
   const rotulo = (slug: string) => porSlug.get(slug)?.nome ?? slug
+  const corTipo = (slug: string) => porSlug.get(slug)?.cor || null
   const ordemDoTipo = (slug: string) => porSlug.get(slug)?.ordem ?? 999
   const [metas, setMetas] = useState(metasIniciais)
   const [pendente, iniciar] = useTransition()
@@ -104,6 +105,17 @@ export function MetasClient({
      tinha navegação semana a semana: achar "a aula 12 de Constitucional" num cronograma de 71
      semanas era abrir 71 abas de uma em uma. Quando há busca, a régua sai e a lista mostra de
      onde cada resultado veio. */
+  /* Semanas sem meta e não marcadas como revisão. Vem das metas EM MEMÓRIA, não do
+     diagnóstico do servidor: adicionar a primeira meta de uma semana tem de tirá-la da lista
+     na hora, sem recarregar a página. */
+  const semanasVazias = useMemo(
+    () =>
+      Array.from({ length: c.total_semanas }, (_, i) => i + 1).filter(
+        (n) => !revisao.has(n) && !(porSemana.get(n)?.length ?? 0),
+      ),
+    [c.total_semanas, revisao, porSemana],
+  )
+
   const [busca, setBusca] = useState('')
   const [filtroTipo, setFiltroTipo] = useState<string>('todos')
   const buscando = busca.trim().length > 0 || filtroTipo !== 'todos'
@@ -360,37 +372,72 @@ export function MetasClient({
           {Array.from({ length: c.total_semanas }, (_, i) => i + 1).map((s) => {
             const n = porSemana.get(s)?.length ?? 0
             const ehRevisao = revisao.has(s)
+            const vazia = n === 0 && !ehRevisao
             return (
               <button
                 key={s}
                 onClick={() => setSemanaAtiva(s)}
-                title={ehRevisao ? 'Semana de revisão original' : `${n} meta(s)`}
-                className={`h-8 min-w-8 rounded-md border px-1.5 text-xs transition ${
+                title={
+                  ehRevisao
+                    ? `Semana ${s} — revisão original, sem metas de propósito`
+                    : vazia
+                      ? `Semana ${s} — SEM METAS: ela some da grade que o aluno recebe`
+                      : `Semana ${s} — ${n} meta(s)`
+                }
+                className={`relative h-8 min-w-8 shrink-0 rounded-md border px-1.5 text-xs transition ${
                   s === semanaAtiva
-                    ? 'border-primary bg-primary text-primary-foreground'
+                    ? 'border-primary bg-primary font-semibold text-primary-foreground'
                     : ehRevisao
-                      ? 'border-dashed text-muted-foreground'
-                      : n === 0
-                        ? 'border-amber-300 text-amber-700 dark:text-amber-500'
+                      ? 'border-dashed text-muted-foreground/70'
+                      : vazia
+                        ? // Preenchida, não só contornada: com 71 semanas na régua, uma borda âmbar
+                          // de 1px passa despercebida — e semana vazia é justamente o que a equipe
+                          // precisa achar, porque ela desaparece da grade do aluno sem avisar.
+                          'border-amber-400 bg-amber-100 font-semibold text-amber-900 dark:border-amber-500/60 dark:bg-amber-500/20 dark:text-amber-200'
                         : 'hover:bg-muted'
                 }`}
               >
                 {s}
+                {vazia && (
+                  <span
+                    aria-hidden
+                    className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-card"
+                  />
+                )}
               </button>
             )
           })}
         </div>
-        {/* A régua usava três cores sem dizer o que significavam. */}
+
+        {/* Legenda com os MESMOS desenhos dos botões — swatch redondo ao lado de botão quadrado
+            obrigava a traduzir. E o atalho para a próxima semana vazia, que numa régua de 71
+            é o que resolve, em vez de caçar a olho. */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-1.5 text-[11px] text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm border" /> com metas
+            <span className="h-3.5 w-3.5 rounded-[3px] border" /> com metas
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm border border-dashed" /> revisão original (sem metas, de propósito)
+            <span className="h-3.5 w-3.5 rounded-[3px] border border-dashed" /> revisão original (sem metas, de propósito)
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm border border-amber-300" /> vazia — some da grade gerada
+            <span className="h-3.5 w-3.5 rounded-[3px] border border-amber-400 bg-amber-100 dark:border-amber-500/60 dark:bg-amber-500/20" />
+            vazia — some da grade do aluno
           </span>
+
+          {semanasVazias.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                const proxima = semanasVazias.find((x) => x > semanaAtiva) ?? semanasVazias[0]
+                setSemanaAtiva(proxima)
+              }}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-amber-400 bg-amber-100 px-2 py-0.5 font-medium text-amber-900 transition hover:brightness-95 dark:border-amber-500/60 dark:bg-amber-500/20 dark:text-amber-200"
+              title={`Semanas vazias: ${semanasVazias.join(', ')}`}
+            >
+              <AlertTriangle className="h-3 w-3" />
+              {semanasVazias.length} vazia{semanasVazias.length > 1 ? 's' : ''} — ir para a próxima
+            </button>
+          )}
         </div>
         </>
         )}
@@ -400,46 +447,75 @@ export function MetasClient({
             linha. No mobile continua embrulhando. */
          }
         {(() => {
-          const Linha = ({ m, comOrigem }: { m: MetaFonte; comOrigem?: boolean }) => (
+          /**
+           * Uma linha de meta.
+           *
+           * O dia é COLUNA, escrito só na primeira meta daquele dia. Com um cabeçalho por dia,
+           * um cronograma de 1 meta por dia gastava DUAS linhas para mostrar uma — metade da
+           * tela virava rótulo. A faixa de fundo alternada mantém o agrupamento visível sem
+           * gastar altura.
+           */
+          const Linha = ({
+            m,
+            comOrigem,
+            rotuloEsq,
+            faixa,
+          }: {
+            m: MetaFonte
+            comOrigem?: boolean
+            rotuloEsq?: string | null
+            faixa?: boolean
+          }) => (
             <div
-              className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 hover:bg-muted/30 sm:grid ${
-                comOrigem
-                  ? 'sm:grid-cols-[5rem_10.5rem_minmax(0,1fr)_5.5rem_auto]'
-                  : 'sm:grid-cols-[10.5rem_minmax(0,1fr)_5.5rem_auto]'
+              className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-2 hover:bg-muted/40 sm:grid sm:grid-cols-[3.5rem_11rem_minmax(0,1fr)_4rem_auto] ${
+                faixa ? 'bg-muted/20' : ''
               }`}
             >
-              {/* Na busca, cada resultado precisa dizer de onde veio — dentro da semana isso já
-                  está no cabeçalho do dia, e repetir em toda linha seria ruído. */}
-              {comOrigem && (
+              {comOrigem ? (
                 <button
                   type="button"
                   onClick={() => { setBusca(''); setFiltroTipo('todos'); setSemanaAtiva(m.semana) }}
                   className="justify-self-start text-left leading-tight"
                   title={`Abrir a semana ${m.semana}`}
                 >
-                  <span className="block text-xs font-semibold text-primary hover:underline">Sem {m.semana}</span>
-                  <span className="block text-[11px] text-muted-foreground">
-                    {c.dias_nome[m.dia] ?? `dia ${m.dia}`}
+                  <span className="block text-xs font-semibold text-primary hover:underline">S{m.semana}</span>
+                  <span className="block text-[10px] uppercase text-muted-foreground">
+                    {c.dias_nome[m.dia] ?? m.dia}
                   </span>
                 </button>
+              ) : (
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {rotuloEsq ?? ''}
+                </span>
               )}
-              <Badge variant="secondary" className="max-w-full shrink-0 justify-self-start truncate">
-                {rotulo(m.tipo)}
-              </Badge>
-              <div className="min-w-0 flex-1">
+
+              <span className="flex min-w-0 items-center gap-1.5">
+                {/* Ponto na cor do tipo: dá para varrer a coluna sem ler rótulo nenhum. */}
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ background: corTipo(m.tipo) ?? 'var(--muted-foreground)' }}
+                />
+                <span className="truncate text-xs text-muted-foreground">{rotulo(m.tipo)}</span>
+              </span>
+
+              <div className="min-w-0">
                 <p className="truncate text-sm font-medium">
                   {m.disciplina}
-                  {m.aula && <span className="text-muted-foreground"> · aula {m.aula}</span>}
+                  {m.aula && <span className="font-normal text-muted-foreground"> · aula {m.aula}</span>}
                 </p>
                 {m.conteudo && <p className="truncate text-xs text-muted-foreground">{m.conteudo}</p>}
               </div>
-              <span className="shrink-0 text-xs text-muted-foreground sm:text-right">{m.duracao ?? ''}</span>
-              <div className="flex shrink-0 items-center gap-1">
-                <Button size="sm" variant="ghost" onClick={() => abrirEdicao(m)} disabled={pendente}>
-                  <Pencil className="h-4 w-4" />
+
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground sm:text-right">
+                {m.duracao ?? ''}
+              </span>
+
+              <div className="flex shrink-0 items-center">
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => abrirEdicao(m)} disabled={pendente} title="Editar">
+                  <Pencil className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => remover(m)} disabled={pendente}>
-                  <Trash2 className="h-4 w-4 text-destructive" />
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => remover(m)} disabled={pendente} title="Excluir">
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
                 </Button>
               </div>
             </div>
@@ -475,15 +551,17 @@ export function MetasClient({
           /* Agrupado por DIA: uma lista corrida de 12 metas com o dia repetido em cada linha
              esconde a estrutura que o cronograma tem. */
           return (
-            <div className="divide-y">
-              {porDia.map(([dia, lista]) => (
-                <div key={dia}>
-                  <div className="flex items-center gap-1.5 bg-muted/40 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {c.dias_nome[dia] ?? `dia ${dia}`}
-                    <span className="font-normal normal-case">· {lista.length} meta(s)</span>
-                  </div>
-                  {lista.map((m) => (
-                    <Linha key={m.id} m={m} />
+            <div>
+              {porDia.map(([dia, lista], iDia) => (
+                <div key={dia} className="border-b last:border-b-0">
+                  {lista.map((m, i) => (
+                    <Linha
+                      key={m.id}
+                      m={m}
+                      // O dia aparece uma vez por bloco; as metas seguintes alinham sob ele.
+                      rotuloEsq={i === 0 ? (c.dias_nome[dia] ?? String(dia)) : null}
+                      faixa={iDia % 2 === 1}
+                    />
                   ))}
                 </div>
               ))}
