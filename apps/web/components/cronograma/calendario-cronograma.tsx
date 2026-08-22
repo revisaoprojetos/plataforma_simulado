@@ -1,9 +1,12 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { CalendarOff, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarOff, Check, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { CaixaCheck } from '@/components/cronograma/caixa-check'
 import {
   addDias,
   domingoSeguinteOuIgual,
@@ -12,6 +15,7 @@ import {
   segundaAnteriorOuIgual,
   type DataISO,
 } from '@/lib/cronograma/datas'
+import { fmtBr } from '@/lib/cronograma/datas'
 import { fmtFaixa, somarDuracoes } from '@/lib/cronograma/duracao'
 import { acharPaleta } from '@/lib/cronograma/paletas'
 import type { Grade, MetaDatada } from '@/lib/cronograma/tipos'
@@ -63,7 +67,10 @@ export function CalendarioCronograma({
 }) {
   const paleta = acharPaleta(paletaSlug)
   const hoje = hojeISO()
-  const [expandido, setExpandido] = useState<DataISO | null>(null)
+  /* A célula do mês não cabe o texto de uma meta: "PDFULL + Vid…" e "Direito Constitucion…"
+     não dizem o que é. Clicar no dia abre o detalhe, onde o texto cabe inteiro — a grade fica
+     para a visão geral, o diálogo para a leitura. */
+  const [diaAberto, setDiaAberto] = useState<DataISO | null>(null)
 
   const { porDia, meses } = useMemo(() => {
     const mapa = new Map<DataISO, Dia>()
@@ -206,15 +213,18 @@ export function CalendarioCronograma({
 
               {linha.dias.map((dia) => {
                 const total = somarDuracoes(dia.metas.map((m) => m.duracao))
-                const aberto = expandido === dia.data
-                const visiveis = aberto ? dia.metas : dia.metas.slice(0, PILULAS_VISIVEIS)
+                const visiveis = dia.metas.slice(0, PILULAS_VISIVEIS)
                 const ocultas = dia.metas.length - visiveis.length
                 return (
-                  <div
+                  <button
                     key={dia.data}
-                    className={`min-h-24 border-r p-1.5 last:border-r-0 ${
+                    type="button"
+                    onClick={() => dia.metas.length && setDiaAberto(dia.data)}
+                    disabled={!dia.metas.length}
+                    aria-label={`Ver as ${dia.metas.length} metas de ${fmtBr(dia.data)}`}
+                    className={`min-h-24 border-r p-1.5 text-left transition last:border-r-0 ${
                       !dia.doMes ? 'bg-muted/30 opacity-55' : dia.marca === 'recesso' ? 'bg-muted/40' : ''
-                    }`}
+                    } ${dia.metas.length ? 'cursor-pointer hover:bg-primary/5' : 'cursor-default'}`}
                   >
                     {/* Cabeçalho do dia: número à esquerda, sinalização de carga à direita. */}
                     <div className="mb-1 flex items-center gap-1">
@@ -266,21 +276,8 @@ export function CalendarioCronograma({
                           feita ? 'opacity-50 line-through' : ''
                         }`
                         const estilo = { borderLeftColor: cor }
-                        const dica = `${m.tipoDef.nome} · ${m.titulo}${m.duracao ? ` · ${m.duracao}` : ''}${
-                          feita ? ' — concluída, clique para desmarcar' : aoAlternarCheck ? ' — clique para marcar' : ''
-                        }`
-                        return aoAlternarCheck ? (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => aoAlternarCheck(m, !feita)}
-                            title={dica}
-                            style={estilo}
-                            className={`${classe} transition hover:bg-background hover:shadow-sm`}
-                          >
-                            {conteudo}
-                          </button>
-                        ) : (
+                        const dica = `${m.tipoDef.nome} · ${m.titulo}${m.duracao ? ` · ${m.duracao}` : ''}${feita ? ' — concluída' : ''}`
+                        return (
                           <div key={m.id} className={classe} style={estilo} title={dica}>
                             {conteudo}
                           </div>
@@ -288,25 +285,12 @@ export function CalendarioCronograma({
                       })}
 
                       {ocultas > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setExpandido(dia.data)}
-                          className="w-full rounded px-1 py-0.5 text-left text-[10px] font-medium text-muted-foreground hover:bg-muted"
-                        >
+                        <span className="block px-1 text-[10px] font-medium text-muted-foreground">
                           +{ocultas} mais
-                        </button>
-                      )}
-                      {aberto && dia.metas.length > PILULAS_VISIVEIS && (
-                        <button
-                          type="button"
-                          onClick={() => setExpandido(null)}
-                          className="w-full rounded px-1 py-0.5 text-left text-[10px] font-medium text-muted-foreground hover:bg-muted"
-                        >
-                          mostrar menos
-                        </button>
+                        </span>
                       )}
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
@@ -323,8 +307,111 @@ export function CalendarioCronograma({
           <CalendarOff className="h-3 w-3" />
           recesso
         </span>
-        <span>as horas vêm da duração cadastrada em cada meta; dias sem duração não somam</span>
+        <span>clique num dia para ver as metas por inteiro</span>
+        <span className="ml-auto">as horas vêm da duração cadastrada em cada meta</span>
       </div>
+
+      {/* ── Detalhe do dia: o texto que não cabe na célula cabe aqui, e a marcação acontece
+             com uma caixa de verdade em vez de um clique na pílula truncada. */}
+      <Dialog open={diaAberto !== null} onOpenChange={(v) => !v && setDiaAberto(null)}>
+        <DialogContent className="max-h-[85vh] overflow-auto sm:max-w-lg">
+          {(() => {
+            const dia = diaAberto ? porDia.get(diaAberto) : null
+            if (!diaAberto || !dia) return null
+            const total = somarDuracoes(dia.metas.map((m) => m.duracao))
+            const feitasNoDia = dia.metas.filter((m) => checks?.[m.id]).length
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex flex-wrap items-center gap-2">
+                    {fmtBr(diaAberto)}
+                    {dia.semana !== null && <Badge variant="outline">Semana {dia.semana}</Badge>}
+                    {dia.marca === 'revisao' && <Badge variant="secondary">Revisão</Badge>}
+                    {dia.marca === 'recesso' && <Badge variant="secondary">Recesso</Badge>}
+                  </DialogTitle>
+                  <p className="text-sm text-muted-foreground">
+                    {dia.metas.length} tarefa{dia.metas.length > 1 ? 's' : ''}
+                    {total && ` · ${fmtFaixa(total)}`}
+                    {aoAlternarCheck && ` · ${feitasNoDia} concluída${feitasNoDia === 1 ? '' : 's'}`}
+                  </p>
+                </DialogHeader>
+
+                <div className="space-y-2">
+                  {dia.metas.map((m) => {
+                    const feita = !!checks?.[m.id]
+                    const cor = m.tipoDef.cor || paleta.primaria
+                    return (
+                      <div
+                        key={m.id}
+                        className="flex gap-3 rounded-lg border border-l-[3px] p-3"
+                        style={{ borderLeftColor: cor }}
+                      >
+                        {aoAlternarCheck && (
+                          <CaixaCheck
+                            marcada={feita}
+                            aoTrocar={(marcar) => aoAlternarCheck(m, marcar)}
+                            rotulo={`Marcar "${m.titulo}" como concluída`}
+                            className="mt-0.5"
+                          />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">{m.tipoDef.nome}</Badge>
+                            {m.duracao && <span className="text-xs text-muted-foreground">{m.duracao}</span>}
+                            {feita && (
+                              <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+                                <Check className="h-3 w-3" strokeWidth={3} />
+                                concluída
+                              </span>
+                            )}
+                          </div>
+                          {/* Sem truncar: é para isto que o diálogo existe. */}
+                          <p className={`mt-1 text-sm font-medium ${feita ? 'text-muted-foreground line-through' : ''}`}>
+                            {m.titulo}
+                          </p>
+                          {m.complemento && <p className="text-sm text-muted-foreground">{m.complemento}</p>}
+
+                          {m.links && (m.links.urls.length > 0 || m.links.ausente) && (
+                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                              {m.links.urls.map((u) => (
+                                <a
+                                  key={u.plataforma.id}
+                                  href={u.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-primary hover:bg-muted"
+                                >
+                                  {u.plataforma.nome}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ))}
+                              {m.links.ausente && (
+                                <span className="text-xs italic text-muted-foreground">{m.links.ausente}</span>
+                              )}
+                            </div>
+                          )}
+
+                          {m.tipo === 'simulado' && m.simulado_externo_url && (
+                            <a
+                              href={m.simulado_externo_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                            >
+                              {m.simulado_externo_nome ?? 'Abrir simulado'}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )
+          })()}
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
