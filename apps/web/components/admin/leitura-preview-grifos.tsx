@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Pencil, Save, Loader2, Bold, Eraser, X, Highlighter, Check } from 'lucide-react'
@@ -36,9 +36,27 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
 }) {
   const router = useRouter()
   const boxRef = useRef<HTMLDivElement>(null)
+  const conteudoRef = useRef<HTMLDivElement | null>(null)
   const [editando, setEditando] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [salvando, setSalvando] = useState(false)
+  const [maxH, setMaxH] = useState<number>()
+
+  // Adapta a altura da prévia à tela: mede o topo do conteúdo e ocupa até um
+  // pequeno espaço (16px) do fim da janela. Recalcula em resize/edição/conteúdo.
+  const refEditavel = useCallback((el: HTMLDivElement | null) => { boxRef.current = el; conteudoRef.current = el }, [])
+  useEffect(() => {
+    const medir = () => {
+      const el = conteudoRef.current
+      if (!el) return
+      const top = el.getBoundingClientRect().top
+      setMaxH(Math.max(320, Math.round(window.innerHeight - top - 16)))
+    }
+    medir()
+    const t = setTimeout(medir, 120)
+    window.addEventListener('resize', medir)
+    return () => { clearTimeout(t); window.removeEventListener('resize', medir) }
+  }, [editando, html])
 
   // Ao entrar no modo de edição, injeta o HTML atual (imperativo: contentEditable
   // não pode ser controlado pelo React sem clobber das edições do usuário).
@@ -152,10 +170,10 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
           <span className="text-xs text-muted-foreground">{artigos} seções</span>
         </div>
         {editando ? (
-          <div ref={boxRef} contentEditable suppressContentEditableWarning spellCheck={false} onInput={() => setDirty(true)}
-            className={cn(CONTENT_CLASS, 'focus:ring-1 focus:ring-inset focus:ring-ring')} />
+          <div ref={refEditavel} contentEditable suppressContentEditableWarning spellCheck={false} onInput={() => setDirty(true)}
+            style={{ maxHeight: maxH }} className={cn(CONTENT_CLASS, 'focus:ring-1 focus:ring-inset focus:ring-ring')} />
         ) : html ? (
-          <div className={CONTENT_CLASS} dangerouslySetInnerHTML={{ __html: html }} />
+          <div ref={conteudoRef} style={{ maxHeight: maxH }} className={CONTENT_CLASS} dangerouslySetInnerHTML={{ __html: html }} />
         ) : (
           <p className="px-5 py-10 text-center text-sm text-muted-foreground">Sem conteúdo ainda. Importe na aba <span className="font-medium text-foreground">Configuração</span>.</p>
         )}
