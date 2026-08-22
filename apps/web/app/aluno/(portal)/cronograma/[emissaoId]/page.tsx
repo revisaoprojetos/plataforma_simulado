@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { AlertBox } from '@/components/ui/alert-box'
 import { abrirEmissao } from '../emissoes-actions'
+import { listarChecks } from '../checks-actions'
 import { EmissaoClient } from './emissao-client'
 
 export const dynamic = 'force-dynamic'
@@ -10,6 +11,9 @@ export const dynamic = 'force-dynamic'
 export default async function EmissaoPage({ params }: { params: Promise<{ emissaoId: string }> }) {
   const { emissaoId } = await params
   const r = await abrirEmissao(emissaoId)
+  // As metas concluídas vêm junto: pedir depois faria a tela abrir com tudo desmarcado e
+  // "corrigir" um instante mais tarde, que é pior do que abrir certo.
+  const c = await listarChecks(emissaoId)
 
   return (
     <div className="animate-page space-y-6">
@@ -25,7 +29,12 @@ export default async function EmissaoPage({ params }: { params: Promise<{ emissa
           <p className="text-sm">{r.error ?? 'Ele pode ter sido removido.'}</p>
         </AlertBox>
       ) : (
-        <EmissaoClient emissao={r.dados.emissao} grade={r.dados.grade} indisponivel={r.dados.indisponivel} />
+        <EmissaoClient
+          emissao={r.dados.emissao}
+          grade={r.dados.grade}
+          indisponivel={r.dados.indisponivel}
+          checks={c.checks ?? {}}
+        />
       )}
     </div>
   )

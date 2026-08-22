@@ -15,13 +15,22 @@ import { Card } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { fmtBr, fmtIntervalo } from '@/lib/cronograma/datas'
 import { acharPaleta } from '@/lib/cronograma/paletas'
-import type { Grade } from '@/lib/cronograma/tipos'
+import type { Grade, MetaDatada } from '@/lib/cronograma/tipos'
 
 /**
  * Os quatro números do topo. Aceita `null` de propósito: na tela do aluno eles ficam visíveis
  * ANTES de gerar, com travessão no lugar do valor — assim o resultado preenche um formato que já
  * estava na tela, em vez de surgir do nada.
  */
+/**
+ * O carimbo do check é um INSTANTE (timestamptz), não uma data civil do cronograma — por isso
+ * aqui vale o fuso do navegador, ao contrário das datas das metas, que usam UTC de propósito.
+ */
+function fmtDataHora(iso: string): string {
+  const d = new Date(iso)
+  return `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+}
+
 export function ResumoGrade({ grade }: { grade: Grade | null }) {
   const numeros: [string, string | number][] = [
     ['Semanas', grade?.resumo.totalSemanas ?? '—'],
@@ -41,7 +50,21 @@ export function ResumoGrade({ grade }: { grade: Grade | null }) {
   )
 }
 
-export function GradeCronograma({ grade, paletaSlug, titulo }: { grade: Grade; paletaSlug: string; titulo?: string }) {
+export function GradeCronograma({
+  grade,
+  paletaSlug,
+  titulo,
+  checks,
+  aoAlternarCheck,
+}: {
+  grade: Grade
+  paletaSlug: string
+  titulo?: string
+  /** metaId → instante em que o aluno marcou. Ausente = a tela não tem marcação. */
+  checks?: Record<string, string>
+  aoAlternarCheck?: (meta: MetaDatada, marcar: boolean) => void
+}) {
+  const comCheck = !!aoAlternarCheck
   const paleta = acharPaleta(paletaSlug)
   const [filtroSemana, setFiltroSemana] = useState('todas')
   const [filtroTipo, setFiltroTipo] = useState('todos')
@@ -142,9 +165,27 @@ export function GradeCronograma({ grade, paletaSlug, titulo }: { grade: Grade; p
                    (vazias quando não há), senão a coluna seguinte escorrega. */
                 <div
                   key={m.id}
-                  className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 py-2.5 sm:grid sm:grid-cols-[6rem_10.5rem_minmax(0,1fr)_auto_5.5rem]"
+                  className={`flex flex-wrap items-start gap-x-3 gap-y-1 px-4 py-2.5 sm:grid ${
+                    comCheck
+                      ? 'sm:grid-cols-[1.5rem_6rem_10.5rem_minmax(0,1fr)_auto_5.5rem]'
+                      : 'sm:grid-cols-[6rem_10.5rem_minmax(0,1fr)_auto_5.5rem]'
+                  }`}
                   style={{ background: paleta.celula }}
                 >
+                  {comCheck && (
+                    <input
+                      type="checkbox"
+                      checked={!!checks?.[m.id]}
+                      onChange={(e) => aoAlternarCheck?.(m, e.target.checked)}
+                      className="mt-1 h-4 w-4 shrink-0 accent-[var(--primary)]"
+                      aria-label={`Marcar "${m.titulo}" como concluída`}
+                      title={
+                        checks?.[m.id]
+                          ? `Concluída em ${fmtDataHora(checks[m.id])}`
+                          : 'Marcar como concluída'
+                      }
+                    />
+                  )}
                   <div className="w-24 shrink-0 text-xs">
                     <p className="font-medium">{fmtBr(m.data)}</p>
                     <p className="text-muted-foreground">{m.diaNome}</p>
@@ -153,8 +194,11 @@ export function GradeCronograma({ grade, paletaSlug, titulo }: { grade: Grade; p
                     {m.tipoDef.nome}
                   </Badge>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm">{m.titulo}</p>
+                    <p className={`text-sm ${checks?.[m.id] ? 'text-muted-foreground line-through' : ''}`}>{m.titulo}</p>
                     {m.complemento && <p className="text-xs text-muted-foreground">{m.complemento}</p>}
+                    {checks?.[m.id] && (
+                      <p className="text-xs text-emerald-600">Concluída em {fmtDataHora(checks[m.id])}</p>
+                    )}
                     {m.tipo === 'simulado' && m.simulado_externo_url && (
                       <a href={m.simulado_externo_url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
                         {m.simulado_externo_nome ?? 'Abrir simulado'} <ExternalLink className="inline h-3 w-3" />

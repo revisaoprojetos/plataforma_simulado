@@ -7,7 +7,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AlertBox } from '@/components/ui/alert-box'
-import { GradeCronograma, ResumoGrade } from '@/components/cronograma/grade-cronograma'
+import { ResumoGrade } from '@/components/cronograma/grade-cronograma'
+import { VisaoCronograma } from '@/components/cronograma/visao-cronograma'
+import type { ChecksDaEmissao } from '../checks-actions'
 import { fmtBr } from '@/lib/cronograma/datas'
 import type { Grade } from '@/lib/cronograma/tipos'
 import { arquivarEmissao, renomearEmissao, type EmissaoResumo } from '../emissoes-actions'
@@ -16,10 +18,12 @@ export function EmissaoClient({
   emissao,
   grade,
   indisponivel,
+  checks,
 }: {
   emissao: EmissaoResumo
   grade: Grade
   indisponivel: boolean
+  checks: ChecksDaEmissao
 }) {
   const [titulo, setTitulo] = useState(emissao.titulo ?? '')
   const [editando, setEditando] = useState(false)
@@ -98,7 +102,7 @@ export function EmissaoClient({
         <>
           <ResumoGrade grade={grade} />
           <p className="text-sm text-muted-foreground">{grade.resumo.subtitulo}</p>
-          <GradeCronograma grade={grade} paletaSlug={paleta} />
+          <VisaoCronograma grade={grade} paletaSlug={paleta} emissaoId={emissao.id} checksIniciais={checks} />
         </>
       )}
     </div>

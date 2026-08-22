@@ -9,7 +9,8 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { GradeCronograma, ResumoGrade } from '@/components/cronograma/grade-cronograma'
+import { ResumoGrade } from '@/components/cronograma/grade-cronograma'
+import { VisaoCronograma } from '@/components/cronograma/visao-cronograma'
 import { fmtBr, hojeISO, proximaSegunda } from '@/lib/cronograma/datas'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
 import { CHAVE_PALETA_LOCAL, PALETAS } from '@/lib/cronograma/paletas'
@@ -274,7 +275,7 @@ export function CronogramaClient({ catalogo }: { catalogo: CronogramaDoAluno[] }
       {grade ? (
         <>
           <p className="text-sm text-muted-foreground">{grade.resumo.subtitulo}</p>
-          <GradeCronograma grade={grade} paletaSlug={paletaSlug} titulo="Seu plano semana a semana" />
+          <VisaoCronograma grade={grade} paletaSlug={paletaSlug} emissaoId={emissaoId} />
 
           {naoSalvou && (
             <Card className="flex flex-wrap items-start gap-3 border-destructive/40 bg-destructive/5 p-4">
