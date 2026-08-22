@@ -16,7 +16,10 @@ export default async function LeituraEditorPage({ params }: { params: Promise<{ 
   const { data: doc } = await svc.from('simulado_documentos').select('*').eq('id', id).eq('tenant_id', access.tenantId).eq('deletado', false).maybeSingle()
   if (!doc) notFound()
   const versao = (doc as any).versao ?? 1
-  const { data: cont } = await svc.from('simulado_documento_conteudos').select('html, artigos').eq('documento_id', id).eq('versao', versao).maybeSingle()
+  const publicadaVersao = (doc as any).versao_publicada ?? versao
+  const rascunhoVersao = (doc as any).versao_rascunho ?? versao
+  // O admin edita/pré-visualiza o RASCUNHO (A2); genéricos usam a versão única.
+  const { data: cont } = await svc.from('simulado_documento_conteudos').select('html, artigos').eq('documento_id', id).eq('versao', rascunhoVersao).maybeSingle()
 
   const d = doc as any
   const documento: Documento = {
@@ -32,6 +35,18 @@ export default async function LeituraEditorPage({ params }: { params: Promise<{ 
     situacao_editorial: d.situacao_editorial ?? 'em_preparacao',
   }
   const materias = (await listarMaterias()).itens ?? []
+  const temRascunhoPendente = rascunhoVersao > publicadaVersao
 
-  return <LeituraEditor documento={documento} htmlAtual={(cont as any)?.html ?? ''} podeEditar={await checkPermission('leitura:update')} materias={materias} />
+  return (
+    <LeituraEditor
+      documento={documento}
+      htmlAtual={(cont as any)?.html ?? ''}
+      podeEditar={await checkPermission('leitura:update')}
+      podePublicar={await checkPermission('leitura:publicar')}
+      materias={materias}
+      publicadaVersao={publicadaVersao}
+      temRascunhoPendente={temRascunhoPendente}
+      versaoEdicao={rascunhoVersao}
+    />
+  )
 }

@@ -29,12 +29,13 @@ export interface DocumentoAluno {
  */
 export async function documentosDoAluno(estudanteId: string, tenantId: string): Promise<DocumentoAluno[]> {
   const svc = createAdminClient()
-  // Detecta se as colunas de lei (migração A1) existem → select tolerante.
-  const probe = await svc.from('simulado_documentos').select('materia_id').limit(1)
-  const temLei = !probe.error
-  const cols = temLei
-    ? 'id, titulo, descricao, cor, icone, capa_url, versao, materia_id, tipo_norma, numero, ano, ementa'
-    : 'id, titulo, descricao, cor, icone, capa_url, versao'
+  // Detecta colunas de lei (A1) e de versionamento (A2) → select tolerante.
+  const [pLei, pVers] = await Promise.all([
+    svc.from('simulado_documentos').select('materia_id').limit(1),
+    svc.from('simulado_documentos').select('versao_publicada').limit(1),
+  ])
+  const temLei = !pLei.error, temVers = !pVers.error
+  const cols = ['id, titulo, descricao, cor, icone, capa_url, versao', temVers && 'versao_publicada', temLei && 'materia_id, tipo_norma, numero, ano, ementa'].filter(Boolean).join(', ')
   const docs = await fetchAll<any>(() =>
     svc.from('simulado_documentos').select(cols)
       .eq('tenant_id', tenantId).eq('deletado', false).eq('publicado', true).order('atualizado_em', { ascending: false }))
@@ -76,7 +77,7 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string): 
     svc.from('simulado_documento_conteudos').select('documento_id, versao, artigos').in('documento_id', visIds),
     svc.from('simulado_leitura_progresso').select('documento_id, documento_versao, pct, concluido_em').eq('estudante_id', estudanteId).in('documento_id', visIds),
   ])
-  const versaoDoc = new Map(visiveis.map((d) => [d.id, d.versao]))
+  const versaoDoc = new Map(visiveis.map((d) => [d.id, d.versao_publicada ?? d.versao]))
   const artigosPorDoc = new Map<string, number>()
   for (const c of (cont ?? []) as any[]) if (c.versao === versaoDoc.get(c.documento_id)) artigosPorDoc.set(c.documento_id, c.artigos ?? 0)
   const progPorDoc = new Map<string, { pct: number; concluido: boolean }>()
@@ -153,9 +154,14 @@ async function garantirAnotacoesBase(svc: ReturnType<typeof createAdminClient>, 
 /** Carrega o documento para o leitor do aluno (após checar acesso). null = sem acesso/não existe. */
 export async function carregarDocumentoAluno(documentoId: string, estudanteId: string, tenantId: string): Promise<DocumentoCarregado | null> {
   const svc = createAdminClient()
-  const { data: doc } = await svc.from('simulado_documentos')
-    .select('id, titulo, descricao, versao, publicado, deletado, desafio_ativo, desafio_exige_fim, desafio_tempo_min')
+  // Tolerante: `versao_publicada` só existe após a migração A2.
+  let dsel = await svc.from('simulado_documentos')
+    .select('id, titulo, descricao, versao, versao_publicada, publicado, deletado, desafio_ativo, desafio_exige_fim, desafio_tempo_min')
     .eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle()
+  if (dsel.error && /versao_publicada|column/i.test(String(dsel.error.message))) {
+    dsel = await svc.from('simulado_documentos').select('id, titulo, descricao, versao, publicado, deletado, desafio_ativo, desafio_exige_fim, desafio_tempo_min').eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle() as any
+  }
+  const doc = dsel.data
   if (!doc || (doc as any).deletado || !(doc as any).publicado) return null
 
   // Visibilidade (mesma regra do catálogo)
@@ -174,7 +180,8 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     if (!ok) return null
   }
 
-  const versao = (doc as any).versao ?? 1
+  // Aluno lê a versão PUBLICADA vigente (A2); genéricos usam a versão única.
+  const versao = (doc as any).versao_publicada ?? (doc as any).versao ?? 1
   const { data: cont } = await svc.from('simulado_documento_conteudos').select('html, artigos').eq('documento_id', documentoId).eq('versao', versao).maybeSingle()
   const { data: prog } = await svc.from('simulado_leitura_progresso')
     .select('pct, artigo_max, tempo_seg, concluido_em').eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).maybeSingle()

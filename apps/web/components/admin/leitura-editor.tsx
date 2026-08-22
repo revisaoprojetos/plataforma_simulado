@@ -6,10 +6,10 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   ArrowLeft, Save, Loader2, Eye, EyeOff, Upload, ClipboardPaste, PenLine, FileText,
-  Bold, Italic, Underline, Heading, List, Trophy, Highlighter, Scale,
+  Bold, Italic, Underline, Heading, List, Trophy, Highlighter, Scale, Send,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { atualizarDocumento, type Documento, type Materia, type SituacaoEditorial } from '@/app/admin/leitura/actions'
+import { atualizarDocumento, publicarVersao, type Documento, type Materia, type SituacaoEditorial } from '@/app/admin/leitura/actions'
 import { salvarConteudoHtml, importarDocx } from '@/app/admin/leitura/upload-actions'
 import { LeituraAutorAnotacoes } from '@/components/admin/leitura-autor-anotacoes'
 import { LeituraQuestoesAdmin } from '@/components/admin/leitura-questoes-admin'
@@ -22,8 +22,15 @@ const SITUACOES: { v: SituacaoEditorial; label: string }[] = [
   { v: 'publicada', label: 'Publicada' }, { v: 'arquivada', label: 'Arquivada' }, { v: 'revogada', label: 'Revogada' },
 ]
 
-export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [] }: { documento: Documento; htmlAtual: string; podeEditar: boolean; materias?: Materia[] }) {
+export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [], podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao }: {
+  documento: Documento; htmlAtual: string; podeEditar: boolean; materias?: Materia[]; podePublicar?: boolean; publicadaVersao?: number; temRascunhoPendente?: boolean; versaoEdicao?: number
+}) {
+  const versaoAutoria = versaoEdicao ?? documento.versao
   const router = useRouter()
+  const [pubOpen, setPubOpen] = useState(false)
+  const [pubTipo, setPubTipo] = useState('alteracao')
+  const [pubDesc, setPubDesc] = useState('')
+  const [publicando, setPublicando] = useState(false)
   const [titulo, setTitulo] = useState(documento.titulo)
   const [descricao, setDescricao] = useState(documento.descricao ?? '')
   const [cor, setCor] = useState(documento.cor ?? CORES[5])
@@ -61,6 +68,16 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [] 
       if (r.ok) { toast.success('Documento salvo'); router.refresh() }
       else toast.error(r.error ?? 'Erro ao salvar.')
     })
+  }
+
+  function publicar() {
+    setPublicando(true)
+    ;(async () => {
+      const r = await publicarVersao(documento.id, { tipo: pubTipo, descricao: pubDesc || undefined })
+      setPublicando(false)
+      if (r.ok) { toast.success(`Versão ${r.versao} publicada`); setPubOpen(false); setPubDesc(''); router.refresh() }
+      else toast.error(r.error ?? 'Erro ao publicar.')
+    })()
   }
 
   async function processarConteudo(html: string) {
@@ -103,18 +120,47 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [] 
             <ArrowLeft className="h-4 w-4" /> Documentos
           </Link>
           <h1 className="text-xl font-bold tracking-tight">{titulo || 'Documento'}</h1>
+          {temRascunhoPendente
+            ? <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">Rascunho não publicado</span>
+            : <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">Publicada v{publicadaVersao}</span>}
         </div>
         {podeEditar && (
           <div className="flex items-center gap-2">
             <button onClick={() => setPublicado((p) => !p)} className={cn('inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors', publicado ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground hover:text-foreground')}>
-              {publicado ? <><Eye className="h-4 w-4" /> Publicado</> : <><EyeOff className="h-4 w-4" /> Rascunho</>}
+              {publicado ? <><Eye className="h-4 w-4" /> Visível</> : <><EyeOff className="h-4 w-4" /> Oculto</>}
             </button>
-            <button onClick={salvarMeta} disabled={savingMeta} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
+            <button onClick={salvarMeta} disabled={savingMeta} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold transition hover:bg-muted disabled:opacity-50">
               {savingMeta ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar
             </button>
+            {podePublicar && temRascunhoPendente && (
+              <button onClick={() => setPubOpen((v) => !v)} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
+                <Send className="h-4 w-4" /> Publicar versão
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Publicar versão — relatório de atualização */}
+      {pubOpen && podePublicar && (
+        <div className="space-y-2 rounded-2xl border border-primary/30 bg-primary/[0.03] p-4">
+          <p className="text-sm font-semibold">Publicar nova versão</p>
+          <p className="text-xs text-muted-foreground">Cria uma versão imutável e passa a ser a que os alunos leem. Anotações/progresso são reancorados.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={pubTipo} onChange={(e) => setPubTipo(e.target.value)} className="h-9 rounded-lg border bg-[var(--input-bg,transparent)] px-2 text-sm outline-none focus:ring-1 focus:ring-ring">
+              <option value="nova_lei">Inclusão (nova lei)</option>
+              <option value="alteracao">Alteração</option>
+              <option value="revogacao">Revogação</option>
+              <option value="correcao_editorial">Correção editorial</option>
+            </select>
+            <input value={pubDesc} onChange={(e) => setPubDesc(e.target.value)} placeholder="Resumo da atualização (aparece no relatório)…" className="min-w-52 flex-1 rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+            <button onClick={publicar} disabled={publicando} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
+              {publicando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Publicar
+            </button>
+            <button onClick={() => setPubOpen(false)} className="rounded-lg border px-3 py-2 text-sm text-muted-foreground hover:bg-muted">Cancelar</button>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* Esquerda: configurações + entrada de conteúdo */}
@@ -280,13 +326,13 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [] 
             <h2 className="flex items-center gap-1.5 text-sm font-semibold"><Highlighter className="h-4 w-4 text-primary" /> Anotações que vêm no documento</h2>
             <p className="text-xs text-muted-foreground">Grife trechos importantes — todos os alunos recebem uma cópia (que cada um pode editar ou apagar).</p>
           </div>
-          <LeituraAutorAnotacoes documentoId={documento.id} versao={documento.versao} html={htmlAtual} />
+          <LeituraAutorAnotacoes documentoId={documento.id} versao={versaoAutoria} html={htmlAtual} />
         </div>
       )}
 
       {/* Questões no meio da leitura (Fase 2) */}
       {podeEditar && htmlAtual && (
-        <LeituraQuestoesAdmin documentoId={documento.id} versao={documento.versao} html={htmlAtual} />
+        <LeituraQuestoesAdmin documentoId={documento.id} versao={versaoAutoria} html={htmlAtual} />
       )}
     </div>
   )

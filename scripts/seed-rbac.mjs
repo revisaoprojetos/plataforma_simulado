@@ -16,6 +16,7 @@ const json = (r) => r.json()
 // Espelha apps/web/lib/rbac-catalogo.ts (permissões que o app realmente verifica).
 const CATALOGO = [
   ['questoes', 'view'], ['questoes', 'create'], ['questoes', 'update'],
+  ['leitura', 'view'], ['leitura', 'create'], ['leitura', 'update'], ['leitura', 'delete'], ['leitura', 'publicar'],
   ['simulados', 'view'], ['simulados', 'create'], ['simulados', 'update'], ['simulados', 'delete'],
   ['estudantes', 'view'], ['estudantes', 'create'], ['estudantes', 'update'], ['estudantes', 'delete'],
   ['grupos', 'view'],

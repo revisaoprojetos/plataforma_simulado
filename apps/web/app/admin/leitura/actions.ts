@@ -6,6 +6,7 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { faixaUuidDoCodigo } from '@/lib/codigo-questao'
+import { espinhaDeHtml, reancorar } from '@/lib/leitura/reanchor'
 
 export type SituacaoEditorial = 'em_preparacao' | 'rascunho' | 'em_revisao' | 'publicada' | 'arquivada' | 'revogada'
 
@@ -111,6 +112,83 @@ export async function atualizarDocumento(
 
 export async function publicarDocumento(id: string, publicado: boolean): Promise<{ ok: boolean; error?: string }> {
   return atualizarDocumento(id, { publicado })
+}
+
+// ── Versionamento / publicação (A2) ──────────────────────────────────────────
+
+/** Carry-over aditivo da versão publicada → nova versão (progresso, questões, anotações). */
+async function carryOver(svc: ReturnType<typeof createAdminClient>, tenantId: string, documentoId: string, vAnt: number, vNova: number, htmlNovo: string) {
+  if (vAnt === vNova) return
+  // Progresso: copia p/ a nova versão (ignora se já existir).
+  const { data: prog } = await svc.from('simulado_leitura_progresso').select('estudante_id, pct, artigo_max, tempo_seg, iniciado_em, concluido_em').eq('documento_id', documentoId).eq('documento_versao', vAnt)
+  if (prog?.length) await svc.from('simulado_leitura_progresso').upsert((prog as any[]).map((p) => ({ tenant_id: tenantId, estudante_id: p.estudante_id, documento_id: documentoId, documento_versao: vNova, pct: p.pct, artigo_max: p.artigo_max, tempo_seg: p.tempo_seg, iniciado_em: p.iniciado_em, concluido_em: p.concluido_em })), { onConflict: 'estudante_id,documento_id,documento_versao', ignoreDuplicates: true })
+  // Questões inline: re-liga à nova versão.
+  const { data: qs } = await svc.from('simulado_documento_questoes').select('questao_id, apos_artigo, obrigatoria, ordem').eq('documento_id', documentoId).eq('documento_versao', vAnt).eq('deletado', false)
+  if (qs?.length) await svc.from('simulado_documento_questoes').upsert((qs as any[]).map((q) => ({ tenant_id: tenantId, documento_id: documentoId, documento_versao: vNova, questao_id: q.questao_id, apos_artigo: q.apos_artigo, obrigatoria: q.obrigatoria, ordem: q.ordem })), { onConflict: 'documento_id,documento_versao,questao_id', ignoreDuplicates: true })
+  // Anotações (aluno + base): re-ancora pela espinha da nova versão; falha → revisao_necessaria.
+  const S = espinhaDeHtml(htmlNovo)
+  for (const tabela of ['simulado_leitura_anotacoes', 'simulado_documento_anotacoes_base'] as const) {
+    const ehAluno = tabela === 'simulado_leitura_anotacoes'
+    // Do aluno, carrega só as PRÓPRIAS (grifos base são re-clonados das novas base rows → sem duplicar).
+    let q = svc.from(tabela).select('*').eq('documento_id', documentoId).eq('documento_versao', vAnt).eq('deletado', false)
+    if (ehAluno) q = q.eq('origem', 'propria')
+    const { data: anots, error } = await q
+    if (error || !anots?.length) continue
+    const novas = (anots as any[]).map((a) => {
+      const rec = reancorar(S, { inicio: a.inicio_char, fim: a.fim_char, exact: a.exact, prefix: a.prefix ?? '', suffix: a.suffix ?? '' })
+      const base: Record<string, unknown> = {
+        tenant_id: tenantId, documento_id: documentoId, documento_versao: vNova,
+        inicio_char: rec?.inicio ?? a.inicio_char, fim_char: rec?.fim ?? a.fim_char,
+        exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor: a.cor, nota: a.nota,
+      }
+      if (ehAluno) { base.estudante_id = a.estudante_id; base.origem = a.origem; base.base_id = a.base_id; base.revisao_necessaria = !rec }
+      else { base.ordem = a.ordem; if ('tipo_grifo' in a) { base.tipo_grifo = a.tipo_grifo; base.editorial = a.editorial } }
+      return base
+    })
+    if (ehAluno) await svc.from(tabela).upsert(novas as any, { onConflict: 'estudante_id,documento_versao,base_id', ignoreDuplicates: true })
+    else await svc.from(tabela).insert(novas as any)
+  }
+}
+
+/** Publica o rascunho como versão IMUTÁVEL e vira o ponteiro (commit num único UPDATE). */
+export async function publicarVersao(documentoId: string, relatorio?: { tipo?: string; descricao?: string }): Promise<{ ok: boolean; versao?: number; error?: string }> {
+  const g = await guard('leitura:publicar'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: doc, error: derr } = await svc.from('simulado_documentos').select('versao, versao_publicada, versao_rascunho').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
+  if (derr && /versao_publicada|column/i.test(derr.message)) return { ok: false, error: 'Rode a migração de versionamento (20260823000002).' }
+  if (!doc) return { ok: false, error: 'Documento não encontrado.' }
+  const pub = (doc as any).versao_publicada ?? (doc as any).versao ?? 1
+  const rasc = (doc as any).versao_rascunho ?? pub
+  if (rasc <= pub) return { ok: false, error: 'Não há rascunho novo para publicar. Edite o conteúdo primeiro.' }
+
+  const { data: cont } = await svc.from('simulado_documento_conteudos').select('html').eq('documento_id', documentoId).eq('versao', rasc).maybeSingle()
+  const html = (cont as any)?.html as string | undefined
+  if (!html || !html.replace(/<[^>]+>/g, '').trim()) return { ok: false, error: 'Rascunho vazio — nada a publicar.' }
+
+  // 1) carry-over aditivo (mantém linhas antigas → seguro/re-executável)
+  try { await carryOver(svc, g.tenantId, documentoId, pub, rasc, html) } catch (e) { console.error('[leitura] carryOver:', (e as Error)?.message) }
+  // 2) marca a linha como publicada (imutável a partir daqui)
+  await svc.from('simulado_documento_conteudos').update({ estado: 'publicada', publicado_em: new Date().toISOString(), publicado_por: g.atorId }).eq('documento_id', documentoId).eq('versao', rasc)
+  // 3) COMMIT — vira o ponteiro num único UPDATE (aluno passa a ver a nova versão)
+  const { error } = await svc.from('simulado_documentos').update({ versao_publicada: rasc, versao: rasc, publicado: true, situacao_editorial: 'publicada', atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  // 4) relatório público + auditoria
+  const tipo = relatorio?.tipo || (pub === rasc - 1 && pub <= 1 ? 'nova_lei' : 'alteracao')
+  await svc.from('simulado_lei_atualizacoes').insert({ tenant_id: g.tenantId, documento_id: documentoId, versao: rasc, tipo, descricao: relatorio?.descricao || null, criado_por: g.atorId })
+  await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_documentos', entidadeId: documentoId, depois: { versao_publicada: rasc, tipo }, atorId: g.atorId, tenantId: g.tenantId })
+  revalidatePath('/admin/leitura'); revalidatePath(`/admin/leitura/${documentoId}`)
+  return { ok: true, versao: rasc }
+}
+
+/** Arquiva a lei (some do catálogo comum; preserva versões/anotações). */
+export async function arquivarDocumento(documentoId: string, arquivar: boolean): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_documentos').update({ situacao_editorial: arquivar ? 'arquivada' : 'publicada', publicado: !arquivar, atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: arquivar ? 'BLOQUEAR' : 'LIBERAR', entidade: 'simulado_documentos', entidadeId: documentoId, depois: { arquivada: arquivar }, atorId: g.atorId, tenantId: g.tenantId })
+  revalidatePath('/admin/leitura'); revalidatePath(`/admin/leitura/${documentoId}`)
+  return { ok: true }
 }
 
 // ── Matérias (áreas do direito) — organização do catálogo ────────────────────

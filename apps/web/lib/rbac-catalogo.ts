@@ -5,7 +5,7 @@
 
 export const RBAC_CATALOGO: { resource: string; action: string }[] = [
   { resource: 'questoes', action: 'view' }, { resource: 'questoes', action: 'create' }, { resource: 'questoes', action: 'update' },
-  { resource: 'leitura', action: 'view' }, { resource: 'leitura', action: 'create' }, { resource: 'leitura', action: 'update' }, { resource: 'leitura', action: 'delete' },
+  { resource: 'leitura', action: 'view' }, { resource: 'leitura', action: 'create' }, { resource: 'leitura', action: 'update' }, { resource: 'leitura', action: 'delete' }, { resource: 'leitura', action: 'publicar' },
   { resource: 'correcao', action: 'view' }, { resource: 'correcao', action: 'corrigir' },
   { resource: 'simulados', action: 'view' }, { resource: 'simulados', action: 'create' }, { resource: 'simulados', action: 'update' }, { resource: 'simulados', action: 'delete' },
   { resource: 'estudantes', action: 'view' }, { resource: 'estudantes', action: 'create' }, { resource: 'estudantes', action: 'update' }, { resource: 'estudantes', action: 'delete' },
