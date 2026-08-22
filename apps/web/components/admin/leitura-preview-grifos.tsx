@@ -29,7 +29,7 @@ const CAIXAS = [
 ] as const
 
 const CONTENT_CLASS =
-  'leitura-prosa max-h-[calc(100vh-15rem)] min-h-[360px] overflow-auto px-5 py-4 text-sm leading-relaxed outline-none [&_a]:text-primary [&_a]:underline [&_h1]:mb-2 [&_h1]:mt-3 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:mb-1.5 [&_h2]:mt-3 [&_h2]:text-base [&_h2]:font-bold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_p]:mb-2 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1'
+  'leitura-prosa max-h-[calc(100vh-16.5rem)] min-h-[340px] overflow-auto px-5 py-4 text-sm leading-relaxed outline-none [&_a]:text-primary [&_a]:underline [&_h1]:mb-2 [&_h1]:mt-3 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:mb-1.5 [&_h2]:mt-3 [&_h2]:text-base [&_h2]:font-bold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_p]:mb-2 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1'
 
 export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 0 }: {
   documentoId: string; html: string; podeEditar: boolean; artigos?: number
