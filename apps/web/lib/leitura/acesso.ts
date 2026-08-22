@@ -131,7 +131,10 @@ export interface DocumentoCarregado {
   progresso: { pct: number; artigoMax: number; tempoSeg: number; concluido: boolean }
   anotacoes: AnotacaoAluno[]
   questoes: QuestaoLeituraDados[]
+  grifos: GrifoLei[]
 }
+
+export interface GrifoLei { id: string; inicio: number; fim: number; exact: string; prefix: string; suffix: string; tipo: string; nota: string | null }
 
 /**
  * Clona as anotações BASE (pré-definidas do admin) para o conjunto do aluno, uma vez.
@@ -139,9 +142,14 @@ export interface DocumentoCarregado {
  * pelo aluno NÃO ressuscita (nunca sobrescreve, só insere se ausente).
  */
 async function garantirAnotacoesBase(svc: ReturnType<typeof createAdminClient>, tenantId: string, documentoId: string, versao: number, estudanteId: string) {
-  const { data: bases } = await svc.from('simulado_documento_anotacoes_base')
-    .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota')
+  // Grifos editoriais (editorial=true) NÃO são clonados — são pintados como conteúdo (A4).
+  let sel = await svc.from('simulado_documento_anotacoes_base')
+    .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota, editorial')
     .eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
+  if (sel.error && /editorial|column/i.test(String(sel.error.message))) {
+    sel = await svc.from('simulado_documento_anotacoes_base').select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota').eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false) as any
+  }
+  const bases = (sel.data ?? []).filter((b: any) => b.editorial !== true)
   if (!bases?.length) return
   const rows = (bases as any[]).map((b) => ({
     tenant_id: tenantId, estudante_id: estudanteId, documento_id: documentoId, documento_versao: versao,
@@ -231,6 +239,15 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     }
   } catch { /* migração fase 2 ausente */ }
 
+  // Grifos editoriais (A4) — conteúdo compartilhado, pintado por tipo. Tolerante.
+  let grifos: GrifoLei[] = []
+  try {
+    const { data: gs } = await svc.from('simulado_documento_anotacoes_base')
+      .select('id, inicio_char, fim_char, exact, prefix, suffix, nota, tipo_grifo')
+      .eq('documento_id', documentoId).eq('documento_versao', versao).eq('editorial', true).eq('deletado', false)
+    grifos = ((gs ?? []) as any[]).map((g) => ({ id: g.id, inicio: g.inicio_char, fim: g.fim_char, exact: g.exact, prefix: g.prefix ?? '', suffix: g.suffix ?? '', tipo: g.tipo_grifo ?? 'nucleo', nota: g.nota ?? null }))
+  } catch { /* migração A4 ausente */ }
+
   return {
     id: documentoId,
     titulo: (doc as any).titulo,
@@ -247,5 +264,6 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     },
     anotacoes,
     questoes,
+    grifos,
   }
 }

@@ -297,38 +297,38 @@ export async function definirGruposDocumento(documentoId: string, grupoIds: stri
 
 // ── Anotações BASE (pré-definidas do admin) — vêm no documento p/ todos os alunos ──
 
-export type AnotacaoBase = { id: string; inicio: number; fim: number; exact: string; prefix: string; suffix: string; cor: string; nota: string | null }
+export type AnotacaoBase = { id: string; inicio: number; fim: number; exact: string; prefix: string; suffix: string; cor: string; nota: string | null; tipoGrifo: string | null }
 
-/** Lista as anotações base da versão vigente do documento. */
+/** Lista as anotações/grifos base da versão vigente do documento. */
 export async function listarAnotacoesBase(documentoId: string, versao: number): Promise<{ ok: boolean; itens?: AnotacaoBase[]; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { data, error } = await svc.from('simulado_documento_anotacoes_base')
-    .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota')
-    .eq('tenant_id', g.tenantId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
-  if (error) return { ok: false, error: error.message }
-  return { ok: true, itens: (data ?? []).map((a: any) => ({ id: a.id, inicio: a.inicio_char, fim: a.fim_char, exact: a.exact, prefix: a.prefix ?? '', suffix: a.suffix ?? '', cor: a.cor, nota: a.nota ?? null })) }
+  let sel = await svc.from('simulado_documento_anotacoes_base').select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota, tipo_grifo').eq('tenant_id', g.tenantId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
+  if (sel.error && /tipo_grifo|column/i.test(String(sel.error.message))) sel = await svc.from('simulado_documento_anotacoes_base').select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota').eq('tenant_id', g.tenantId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false) as any
+  if (sel.error) return { ok: false, error: sel.error.message }
+  return { ok: true, itens: (sel.data ?? []).map((a: any) => ({ id: a.id, inicio: a.inicio_char, fim: a.fim_char, exact: a.exact, prefix: a.prefix ?? '', suffix: a.suffix ?? '', cor: a.cor, nota: a.nota ?? null, tipoGrifo: a.tipo_grifo ?? null })) }
 }
 
-export async function criarAnotacaoBase(documentoId: string, versao: number, a: { inicio: number; fim: number; exact: string; prefix: string; suffix: string; cor: string; nota?: string | null }): Promise<{ ok: boolean; id?: string; error?: string }> {
+export async function criarAnotacaoBase(documentoId: string, versao: number, a: { inicio: number; fim: number; exact: string; prefix: string; suffix: string; cor: string; nota?: string | null; tipoGrifo?: string | null }): Promise<{ ok: boolean; id?: string; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { data, error } = await svc.from('simulado_documento_anotacoes_base').insert({
-    tenant_id: g.tenantId, documento_id: documentoId, documento_versao: versao,
-    inicio_char: a.inicio, fim_char: a.fim, exact: String(a.exact).slice(0, 4000), prefix: a.prefix ?? null, suffix: a.suffix ?? null, cor: a.cor, nota: a.nota || null,
-  }).select('id').single()
-  if (error) return { ok: false, error: error.message }
-  return { ok: true, id: (data as any).id }
+  const base: Record<string, unknown> = { tenant_id: g.tenantId, documento_id: documentoId, documento_versao: versao, inicio_char: a.inicio, fim_char: a.fim, exact: String(a.exact).slice(0, 4000), prefix: a.prefix ?? null, suffix: a.suffix ?? null, cor: a.cor, nota: a.nota || null }
+  let res = await svc.from('simulado_documento_anotacoes_base').insert({ ...base, tipo_grifo: a.tipoGrifo ?? null, editorial: !!a.tipoGrifo }).select('id').single()
+  if (res.error && /tipo_grifo|editorial|column/i.test(String(res.error.message))) res = await svc.from('simulado_documento_anotacoes_base').insert(base).select('id').single()
+  if (res.error) return { ok: false, error: res.error.message }
+  return { ok: true, id: (res.data as any).id }
 }
 
-export async function atualizarAnotacaoBase(id: string, patch: { cor?: string; nota?: string | null }): Promise<{ ok: boolean; error?: string }> {
+export async function atualizarAnotacaoBase(id: string, patch: { cor?: string; nota?: string | null; tipoGrifo?: string | null }): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const dados: Record<string, unknown> = {}
   if ('cor' in patch) dados.cor = patch.cor
   if ('nota' in patch) dados.nota = patch.nota || null
-  const { error } = await svc.from('simulado_documento_anotacoes_base').update(dados).eq('id', id).eq('tenant_id', g.tenantId)
-  if (error) return { ok: false, error: error.message }
+  if ('tipoGrifo' in patch) { dados.tipo_grifo = patch.tipoGrifo ?? null; dados.editorial = !!patch.tipoGrifo }
+  let res = await svc.from('simulado_documento_anotacoes_base').update(dados).eq('id', id).eq('tenant_id', g.tenantId)
+  if (res.error && /tipo_grifo|editorial|column/i.test(String(res.error.message))) { const { tipo_grifo, editorial, ...base } = dados as any; res = await svc.from('simulado_documento_anotacoes_base').update(base).eq('id', id).eq('tenant_id', g.tenantId) }
+  if (res.error) return { ok: false, error: res.error.message }
   return { ok: true }
 }
 

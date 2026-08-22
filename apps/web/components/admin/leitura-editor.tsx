@@ -323,8 +323,8 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
       {podeEditar && htmlAtual && (
         <div className="space-y-2">
           <div>
-            <h2 className="flex items-center gap-1.5 text-sm font-semibold"><Highlighter className="h-4 w-4 text-primary" /> Anotações que vêm no documento</h2>
-            <p className="text-xs text-muted-foreground">Grife trechos importantes — todos os alunos recebem uma cópia (que cada um pode editar ou apagar).</p>
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold"><Highlighter className="h-4 w-4 text-primary" /> Grifos editoriais</h2>
+            <p className="text-xs text-muted-foreground">Marque trechos por tipo (núcleo, prazo, exceção, comentário, STF/STJ/TST…). Aparecem coloridos para todos os alunos, com o "modo sem grifos".</p>
           </div>
           <LeituraAutorAnotacoes documentoId={documento.id} versao={versaoAutoria} html={htmlAtual} />
         </div>

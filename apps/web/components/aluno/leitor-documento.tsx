@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import type { DocumentoCarregado, AnotacaoAluno } from '@/lib/leitura/acesso'
 import { construirEspinha, rangeParaAncora, ancoraParaRange, rectsDoRange, type Espinha, type RectRel } from '@/lib/leitura/anotacoes-engine'
 import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
+import { GRIFOS, corDoGrifo, ehEstrutural } from '@/lib/leitura/grifos'
 
 type Modo = 'scroll' | 'flip'
 type Tema = 'claro' | 'sepia' | 'escuro'
@@ -45,6 +46,11 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   // Questões inline (Fase 2)
   const [respostas, setRespostas] = useState<Record<string, boolean>>(() => Object.fromEntries((doc.questoes ?? []).filter((q) => q.resposta).map((q) => [q.questaoId, true])))
   const [slots, setSlots] = useState<{ q: DocumentoCarregado['questoes'][number]; el: HTMLElement }[]>([])
+
+  // Grifos editoriais (conteúdo compartilhado) + modo sem grifos
+  const grifos = doc.grifos ?? []
+  const [semGrifos, setSemGrifos] = useState(false)
+  const [grifosRects, setGrifosRects] = useState<Record<string, { rects: RectRel[]; tipo: string }>>({})
 
   // Anotações (grifos/notas)
   const [anotacoes, setAnotacoes] = useState<AnotacaoAluno[]>(doc.anotacoes ?? [])
@@ -146,7 +152,14 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
       if (range) { const rs = rectsDoRange(range, base); if (rs.length) map[a.id] = rs }
     }
     setRectsPorId(map)
-  }, [anotacoes])
+    // Grifos editoriais (mesmo motor de rects)
+    const gmap: Record<string, { rects: RectRel[]; tipo: string }> = {}
+    for (const g of grifos) {
+      const range = ancoraParaRange(esp, { inicio: g.inicio, fim: g.fim, exact: g.exact, prefix: g.prefix, suffix: g.suffix })
+      if (range) { const rs = rectsDoRange(range, base); if (rs.length) gmap[g.id] = { rects: rs, tipo: g.tipo } }
+    }
+    setGrifosRects(gmap)
+  }, [anotacoes, grifos])
   useIsoLayout(() => { recomputarGrifos() }, [recomputarGrifos, modo, colW, fonte, doc.html, slots])
 
   // ── Cálculo de progresso (%, artigo alcançado) ──
@@ -339,6 +352,12 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
                 ))}
               </div>
             </div>
+            {grifos.length > 0 && (
+              <label className="flex items-center justify-between text-xs" style={{ color: cores.muted }}>
+                <span className="inline-flex items-center gap-1"><Highlighter className="h-3.5 w-3.5" /> Modo sem grifos</span>
+                <input type="checkbox" checked={semGrifos} onChange={(e) => setSemGrifos(e.target.checked)} className="h-4 w-4 rounded border" />
+              </label>
+            )}
           </div>
 
           {/* Sumário */}
@@ -407,7 +426,23 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
                   : proseStyle}
                 dangerouslySetInnerHTML={{ __html: doc.html }}
               />
-              {/* Overlay de grifos (não intercepta cliques → seleção livre sobre o texto) */}
+              {/* Overlay de GRIFOS EDITORIAIS (conteúdo). Some no "modo sem grifos" (exceto estruturais). */}
+              <div className="pointer-events-none absolute inset-0" aria-hidden>
+                {grifos.map((g) => {
+                  if (semGrifos && !ehEstrutural(g.tipo)) return null
+                  const gr = grifosRects[g.id]; if (!gr) return null
+                  const info = (GRIFOS as any)[g.tipo]
+                  const label = info?.label ?? 'Grifo'
+                  return gr.rects.map((r, i) => (
+                    <div key={`g-${g.id}-${i}`} className="absolute rounded-[2px]" title={label} style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: corDoGrifo(g.tipo), opacity: 0.42, mixBlendMode: 'multiply' }}>
+                      {i === 0 && ehEstrutural(g.tipo) && (
+                        <span className="absolute -top-4 left-0 whitespace-nowrap rounded px-1 text-[9px] font-bold uppercase tracking-wide text-white" style={{ background: corDoGrifo(g.tipo), mixBlendMode: 'normal' }}>{label}</span>
+                      )}
+                    </div>
+                  ))
+                })}
+              </div>
+              {/* Overlay das anotações PESSOAIS (por cima dos grifos) */}
               <div ref={overlayRef} className="pointer-events-none absolute inset-0" aria-hidden>
                 {anotacoes.map((a) => (rectsPorId[a.id] ?? []).map((r, i) => (
                   <div key={`${a.id}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: a.cor, opacity: 0.4, mixBlendMode: 'multiply' }} />
