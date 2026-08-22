@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { LeituraEditor } from '@/components/admin/leitura-editor'
-import type { Documento } from '../actions'
+import { listarMaterias, type Documento } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,13 +18,20 @@ export default async function LeituraEditorPage({ params }: { params: Promise<{ 
   const versao = (doc as any).versao ?? 1
   const { data: cont } = await svc.from('simulado_documento_conteudos').select('html, artigos').eq('documento_id', id).eq('versao', versao).maybeSingle()
 
+  const d = doc as any
   const documento: Documento = {
-    id: (doc as any).id, titulo: (doc as any).titulo, descricao: (doc as any).descricao ?? null,
-    cor: (doc as any).cor ?? null, icone: (doc as any).icone ?? null, capa_url: (doc as any).capa_url ?? null,
-    pasta_id: (doc as any).pasta_id ?? null, versao, publicado: !!(doc as any).publicado,
-    desafio_ativo: !!(doc as any).desafio_ativo, desafio_exige_fim: !!(doc as any).desafio_exige_fim,
-    desafio_tempo_min: (doc as any).desafio_tempo_min ?? null, artigos: (cont as any)?.artigos ?? 0,
+    id: d.id, titulo: d.titulo, descricao: d.descricao ?? null,
+    cor: d.cor ?? null, icone: d.icone ?? null, capa_url: d.capa_url ?? null,
+    pasta_id: d.pasta_id ?? null, versao, publicado: !!d.publicado,
+    desafio_ativo: !!d.desafio_ativo, desafio_exige_fim: !!d.desafio_exige_fim,
+    desafio_tempo_min: d.desafio_tempo_min ?? null, artigos: (cont as any)?.artigos ?? 0,
+    // metadados de lei (podem ser null se a migração A1 ainda não rodou)
+    materia_id: d.materia_id ?? null, tipo_norma: d.tipo_norma ?? null, numero: d.numero ?? null, ano: d.ano ?? null,
+    titulo_oficial: d.titulo_oficial ?? null, ementa: d.ementa ?? null, slug: d.slug ?? null, esfera: d.esfera ?? null,
+    fonte_oficial: d.fonte_oficial ?? null, ultima_verificacao: d.ultima_verificacao ?? null, ordem: d.ordem ?? null,
+    situacao_editorial: d.situacao_editorial ?? 'em_preparacao',
   }
+  const materias = (await listarMaterias()).itens ?? []
 
-  return <LeituraEditor documento={documento} htmlAtual={(cont as any)?.html ?? ''} podeEditar={await checkPermission('leitura:update')} />
+  return <LeituraEditor documento={documento} htmlAtual={(cont as any)?.html ?? ''} podeEditar={await checkPermission('leitura:update')} materias={materias} />
 }

@@ -1,4 +1,5 @@
-import { Library } from 'lucide-react'
+import Link from 'next/link'
+import { Library, Layers } from 'lucide-react'
 import { listarDocumentosAdmin } from './actions'
 import { LeituraCard } from '@/components/admin/leitura-card'
 import { NovoDocumentoButton } from '@/components/admin/leitura-novo'
@@ -16,7 +17,10 @@ export default async function LeituraAdminPage() {
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Library className="h-6 w-6 text-primary" /> Área de Leitura</h1>
           <p className="text-muted-foreground">Documentos (leis/materiais) que o aluno lê num leitor dinâmico, com progresso e anotações.</p>
         </div>
-        <NovoDocumentoButton />
+        <div className="flex items-center gap-2">
+          <Link href="/admin/leitura/materias" className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"><Layers className="h-4 w-4" /> Matérias</Link>
+          <NovoDocumentoButton />
+        </div>
       </div>
 
       {!r.ok ? (

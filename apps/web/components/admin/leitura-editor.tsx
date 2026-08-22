@@ -6,18 +6,23 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   ArrowLeft, Save, Loader2, Eye, EyeOff, Upload, ClipboardPaste, PenLine, FileText,
-  Bold, Italic, Underline, Heading, List, Trophy, Highlighter,
+  Bold, Italic, Underline, Heading, List, Trophy, Highlighter, Scale,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { atualizarDocumento, type Documento } from '@/app/admin/leitura/actions'
+import { atualizarDocumento, type Documento, type Materia, type SituacaoEditorial } from '@/app/admin/leitura/actions'
 import { salvarConteudoHtml, importarDocx } from '@/app/admin/leitura/upload-actions'
 import { LeituraAutorAnotacoes } from '@/components/admin/leitura-autor-anotacoes'
 import { LeituraQuestoesAdmin } from '@/components/admin/leitura-questoes-admin'
 
 const CORES = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#64748b']
 type Modo = 'colar' | 'word' | 'editor'
+const TIPOS_NORMA = ['Constituição', 'Lei', 'Lei Complementar', 'Decreto', 'Decreto-Lei', 'Medida Provisória', 'Súmula', 'Resolução', 'Portaria', 'Emenda Constitucional']
+const SITUACOES: { v: SituacaoEditorial; label: string }[] = [
+  { v: 'em_preparacao', label: 'Em preparação' }, { v: 'rascunho', label: 'Rascunho' }, { v: 'em_revisao', label: 'Em revisão' },
+  { v: 'publicada', label: 'Publicada' }, { v: 'arquivada', label: 'Arquivada' }, { v: 'revogada', label: 'Revogada' },
+]
 
-export function LeituraEditor({ documento, htmlAtual, podeEditar }: { documento: Documento; htmlAtual: string; podeEditar: boolean }) {
+export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [] }: { documento: Documento; htmlAtual: string; podeEditar: boolean; materias?: Materia[] }) {
   const router = useRouter()
   const [titulo, setTitulo] = useState(documento.titulo)
   const [descricao, setDescricao] = useState(documento.descricao ?? '')
@@ -26,6 +31,16 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar }: { documento:
   const [desafioAtivo, setDesafioAtivo] = useState(documento.desafio_ativo)
   const [exigeFim, setExigeFim] = useState(documento.desafio_exige_fim)
   const [tempoMin, setTempoMin] = useState(documento.desafio_tempo_min ?? 0)
+  // Metadados de lei (A1)
+  const [materiaId, setMateriaId] = useState(documento.materia_id ?? '')
+  const [tipoNorma, setTipoNorma] = useState(documento.tipo_norma ?? '')
+  const [numero, setNumero] = useState(documento.numero ?? '')
+  const [ano, setAno] = useState(documento.ano ?? ('' as number | ''))
+  const [tituloOficial, setTituloOficial] = useState(documento.titulo_oficial ?? '')
+  const [ementa, setEmenta] = useState(documento.ementa ?? '')
+  const [esfera, setEsfera] = useState(documento.esfera ?? '')
+  const [fonteOficial, setFonteOficial] = useState(documento.fonte_oficial ?? '')
+  const [situacao, setSituacao] = useState<SituacaoEditorial>(documento.situacao_editorial ?? 'em_preparacao')
   const [savingMeta, startMeta] = useTransition()
 
   const [modo, setModo] = useState<Modo>('colar')
@@ -39,6 +54,9 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar }: { documento:
       const r = await atualizarDocumento(documento.id, {
         titulo, descricao: descricao || null, cor, publicado,
         desafio_ativo: desafioAtivo, desafio_exige_fim: exigeFim, desafio_tempo_min: tempoMin > 0 ? tempoMin : null,
+        materia_id: materiaId || null, tipo_norma: tipoNorma || null, numero: numero || null, ano: ano === '' ? null : Number(ano),
+        titulo_oficial: tituloOficial || null, ementa: ementa || null, esfera: esfera || null, fonte_oficial: fonteOficial || null,
+        situacao_editorial: situacao,
       })
       if (r.ok) { toast.success('Documento salvo'); router.refresh() }
       else toast.error(r.error ?? 'Erro ao salvar.')
@@ -120,6 +138,52 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar }: { documento:
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* Metadados da lei (A1) */}
+          <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
+            <p className="flex items-center gap-1.5 text-sm font-semibold"><Scale className="h-4 w-4 text-primary" /> Metadados da lei <span className="text-xs font-normal text-muted-foreground">(opcional)</span></p>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="col-span-2 text-xs text-muted-foreground">Matéria
+                <select value={materiaId} onChange={(e) => setMateriaId(e.target.value)} className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring">
+                  <option value="">— sem matéria —</option>
+                  {materias.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                </select>
+              </label>
+              <label className="text-xs text-muted-foreground">Tipo
+                <select value={tipoNorma} onChange={(e) => setTipoNorma(e.target.value)} className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring">
+                  <option value="">—</option>
+                  {TIPOS_NORMA.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-muted-foreground">Número
+                  <input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="9.868" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+                </label>
+                <label className="text-xs text-muted-foreground">Ano
+                  <input type="number" value={ano} onChange={(e) => setAno(e.target.value === '' ? '' : Number(e.target.value))} placeholder="1999" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+                </label>
+              </div>
+            </div>
+            <label className="block text-xs text-muted-foreground">Título oficial
+              <input value={tituloOficial} onChange={(e) => setTituloOficial(e.target.value)} placeholder="Dispõe sobre o processo e julgamento da ADI e ADC…" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2.5 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+            </label>
+            <label className="block text-xs text-muted-foreground">Ementa
+              <textarea value={ementa} onChange={(e) => setEmenta(e.target.value)} rows={2} className="mt-1 w-full resize-none rounded-lg border bg-[var(--input-bg,transparent)] px-2.5 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-xs text-muted-foreground">Esfera / origem
+                <input value={esfera} onChange={(e) => setEsfera(e.target.value)} placeholder="Federal" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring" />
+              </label>
+              <label className="text-xs text-muted-foreground">Situação editorial
+                <select value={situacao} onChange={(e) => setSituacao(e.target.value as SituacaoEditorial)} className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring">
+                  {SITUACOES.map((s) => <option key={s.v} value={s.v}>{s.label}</option>)}
+                </select>
+              </label>
+            </div>
+            <label className="block text-xs text-muted-foreground">Fonte oficial (URL)
+              <input value={fonteOficial} onChange={(e) => setFonteOficial(e.target.value)} placeholder="https://planalto.gov.br/…" className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2.5 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+            </label>
           </div>
 
           {/* Desafio */}

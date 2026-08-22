@@ -12,20 +12,41 @@ export interface DocumentoAluno {
   artigos: number
   pct: number
   concluido: boolean
+  // metadados de lei (A1) — null em documentos genéricos
+  materiaId: string | null
+  materiaNome: string | null
+  materiaCor: string | null
+  tipoNorma: string | null
+  numero: string | null
+  ano: number | null
+  ementa: string | null
 }
 
 /**
  * Documentos PUBLICADOS que o aluno pode ver. Regra de visibilidade:
  * SEM nenhuma atribuição = liberado a todos; COM atribuição = só grupos/estudantes
- * atribuídos. Já traz artigos (versão vigente) + progresso do aluno.
+ * atribuídos. Já traz artigos (versão vigente), progresso e metadados de lei/matéria.
  */
 export async function documentosDoAluno(estudanteId: string, tenantId: string): Promise<DocumentoAluno[]> {
   const svc = createAdminClient()
+  // Detecta se as colunas de lei (migração A1) existem → select tolerante.
+  const probe = await svc.from('simulado_documentos').select('materia_id').limit(1)
+  const temLei = !probe.error
+  const cols = temLei
+    ? 'id, titulo, descricao, cor, icone, capa_url, versao, materia_id, tipo_norma, numero, ano, ementa'
+    : 'id, titulo, descricao, cor, icone, capa_url, versao'
   const docs = await fetchAll<any>(() =>
-    svc.from('simulado_documentos').select('id, titulo, descricao, cor, icone, capa_url, versao')
+    svc.from('simulado_documentos').select(cols)
       .eq('tenant_id', tenantId).eq('deletado', false).eq('publicado', true).order('atualizado_em', { ascending: false }))
   if (!docs.length) return []
   const ids = docs.map((d) => d.id)
+
+  // Matérias (id → nome/cor)
+  const materiaMap = new Map<string, { nome: string; cor: string | null }>()
+  if (temLei) {
+    const { data: mats } = await svc.from('simulado_materias').select('id, nome, cor').eq('tenant_id', tenantId).eq('deletado', false)
+    for (const m of (mats ?? []) as any[]) materiaMap.set(m.id, { nome: m.nome, cor: m.cor ?? null })
+  }
 
   // Atribuições
   const [{ data: dg }, { data: de }, { data: gm }] = await Promise.all([
@@ -61,12 +82,17 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string): 
   const progPorDoc = new Map<string, { pct: number; concluido: boolean }>()
   for (const p of (prog ?? []) as any[]) if (p.documento_versao === versaoDoc.get(p.documento_id)) progPorDoc.set(p.documento_id, { pct: p.pct ?? 0, concluido: !!p.concluido_em })
 
-  return visiveis.map((d) => ({
-    id: d.id, titulo: d.titulo, descricao: d.descricao ?? null, cor: d.cor ?? null, icone: d.icone ?? null, capa_url: d.capa_url ?? null,
-    artigos: artigosPorDoc.get(d.id) ?? 0,
-    pct: progPorDoc.get(d.id)?.pct ?? 0,
-    concluido: progPorDoc.get(d.id)?.concluido ?? false,
-  }))
+  return visiveis.map((d) => {
+    const mat = d.materia_id ? materiaMap.get(d.materia_id) : null
+    return {
+      id: d.id, titulo: d.titulo, descricao: d.descricao ?? null, cor: d.cor ?? null, icone: d.icone ?? null, capa_url: d.capa_url ?? null,
+      artigos: artigosPorDoc.get(d.id) ?? 0,
+      pct: progPorDoc.get(d.id)?.pct ?? 0,
+      concluido: progPorDoc.get(d.id)?.concluido ?? false,
+      materiaId: d.materia_id ?? null, materiaNome: mat?.nome ?? null, materiaCor: mat?.cor ?? null,
+      tipoNorma: d.tipo_norma ?? null, numero: d.numero ?? null, ano: d.ano ?? null, ementa: d.ementa ?? null,
+    }
+  })
 }
 
 export interface AnotacaoAluno {

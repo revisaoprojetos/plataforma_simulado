@@ -7,6 +7,8 @@ import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { faixaUuidDoCodigo } from '@/lib/codigo-questao'
 
+export type SituacaoEditorial = 'em_preparacao' | 'rascunho' | 'em_revisao' | 'publicada' | 'arquivada' | 'revogada'
+
 export type Documento = {
   id: string
   titulo: string
@@ -21,6 +23,27 @@ export type Documento = {
   desafio_exige_fim: boolean
   desafio_tempo_min: number | null
   artigos?: number
+  // Metadados de LEI (Fase A / A1) — todos opcionais (documentos genéricos ficam null).
+  materia_id?: string | null
+  tipo_norma?: string | null
+  numero?: string | null
+  ano?: number | null
+  titulo_oficial?: string | null
+  ementa?: string | null
+  slug?: string | null
+  esfera?: string | null
+  fonte_oficial?: string | null
+  ultima_verificacao?: string | null
+  ordem?: number | null
+  situacao_editorial?: SituacaoEditorial | null
+}
+
+export type Materia = { id: string; nome: string; slug: string | null; descricao: string | null; cor: string | null; icone: string | null; ordem: number }
+
+/** slug seguro a partir de um texto (sem acento, minúsculo, hífens). */
+function slugify(s: string): string {
+  return (s ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80)
 }
 
 async function guard(perm: string) {
@@ -46,18 +69,40 @@ export async function criarDocumento(titulo: string, pastaId?: string | null): P
   return { ok: true, id: (data as any).id }
 }
 
+const CAMPOS_DOC = [
+  'titulo', 'descricao', 'cor', 'icone', 'capa_url', 'publicado', 'desafio_ativo', 'desafio_exige_fim', 'desafio_tempo_min', 'pasta_id',
+  // metadados de lei (A1) — tolerante: se a coluna não existir, o update refaz sem elas.
+  'materia_id', 'tipo_norma', 'numero', 'ano', 'titulo_oficial', 'ementa', 'slug', 'esfera', 'fonte_oficial', 'ultima_verificacao', 'ordem', 'situacao_editorial',
+] as const
+const CAMPOS_LEI = new Set(['materia_id', 'tipo_norma', 'numero', 'ano', 'titulo_oficial', 'ementa', 'slug', 'esfera', 'fonte_oficial', 'ultima_verificacao', 'ordem', 'situacao_editorial'])
+
 export async function atualizarDocumento(
   id: string,
-  patch: Partial<Pick<Documento, 'titulo' | 'descricao' | 'cor' | 'icone' | 'capa_url' | 'publicado' | 'desafio_ativo' | 'desafio_exige_fim' | 'desafio_tempo_min' | 'pasta_id'>>,
+  patch: Partial<Pick<Documento, (typeof CAMPOS_DOC)[number]>>,
 ): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const dados: Record<string, unknown> = { atualizado_em: new Date().toISOString() }
-  for (const k of ['titulo', 'descricao', 'cor', 'icone', 'capa_url', 'publicado', 'desafio_ativo', 'desafio_exige_fim', 'desafio_tempo_min', 'pasta_id'] as const) {
-    if (k in patch) dados[k] = (patch as any)[k]
-  }
+  for (const k of CAMPOS_DOC) { if (k in patch) dados[k] = (patch as any)[k] }
   if (typeof dados.titulo === 'string') dados.titulo = (dados.titulo as string).trim() || 'Documento'
-  const { error } = await svc.from('simulado_documentos').update(dados).eq('id', id).eq('tenant_id', g.tenantId)
+  // Slug: normaliza + registra o slug ANTERIOR no histórico (redireciona links antigos).
+  if ('slug' in dados) {
+    const novo = dados.slug ? slugify(String(dados.slug)) : null
+    dados.slug = novo
+    if (novo) {
+      const { data: atual } = await svc.from('simulado_documentos').select('slug').eq('id', id).eq('tenant_id', g.tenantId).maybeSingle()
+      const antigo = (atual as any)?.slug as string | null
+      if (antigo && antigo !== novo) await svc.from('simulado_lei_slug_historico').upsert({ tenant_id: g.tenantId, documento_id: id, slug: antigo }, { onConflict: 'tenant_id,slug', ignoreDuplicates: true })
+    }
+  }
+
+  let { error } = await svc.from('simulado_documentos').update(dados).eq('id', id).eq('tenant_id', g.tenantId)
+  // Tolerante: se as colunas de lei ainda não migraram, salva só os campos base.
+  if (error && /column|materia_id|situacao_editorial|titulo_oficial/i.test(error.message)) {
+    const base: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(dados)) if (!CAMPOS_LEI.has(k)) base[k] = v
+    ;({ error } = await svc.from('simulado_documentos').update(base).eq('id', id).eq('tenant_id', g.tenantId))
+  }
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_documentos', entidadeId: id, depois: dados, atorId: g.atorId, tenantId: g.tenantId })
   revalidatePath('/admin/leitura'); revalidatePath(`/admin/leitura/${id}`)
@@ -66,6 +111,51 @@ export async function atualizarDocumento(
 
 export async function publicarDocumento(id: string, publicado: boolean): Promise<{ ok: boolean; error?: string }> {
   return atualizarDocumento(id, { publicado })
+}
+
+// ── Matérias (áreas do direito) — organização do catálogo ────────────────────
+
+export async function listarMaterias(): Promise<{ ok: boolean; itens?: Materia[]; error?: string }> {
+  const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data, error } = await svc.from('simulado_materias').select('id, nome, slug, descricao, cor, icone, ordem').eq('tenant_id', g.tenantId).eq('deletado', false).order('ordem').order('nome')
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, itens: (data ?? []).map((m: any) => ({ id: m.id, nome: m.nome, slug: m.slug ?? null, descricao: m.descricao ?? null, cor: m.cor ?? null, icone: m.icone ?? null, ordem: m.ordem ?? 0 })) }
+}
+
+export async function criarMateria(nome: string, cor?: string | null, icone?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const g = await guard('leitura:create'); if (!g.ok) return { ok: false, error: g.error }
+  const n = (nome ?? '').trim(); if (!n) return { ok: false, error: 'Informe um nome.' }
+  const svc = createAdminClient()
+  const { data, error } = await svc.from('simulado_materias').insert({ tenant_id: g.tenantId, nome: n, slug: slugify(n), cor: cor ?? null, icone: icone ?? null }).select('id').single()
+  if (error) return { ok: false, error: /duplicate|unique/i.test(error.message) ? 'Já existe uma matéria com esse nome.' : error.message }
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_materias', entidadeId: (data as any).id, depois: { nome: n }, atorId: g.atorId, tenantId: g.tenantId })
+  revalidatePath('/admin/leitura/materias')
+  return { ok: true, id: (data as any).id }
+}
+
+export async function atualizarMateria(id: string, patch: Partial<Pick<Materia, 'nome' | 'cor' | 'icone' | 'ordem'>>): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const dados: Record<string, unknown> = { atualizado_em: new Date().toISOString() }
+  for (const k of ['nome', 'cor', 'icone', 'ordem'] as const) if (k in patch) dados[k] = (patch as any)[k]
+  if (typeof dados.nome === 'string') { dados.nome = (dados.nome as string).trim(); dados.slug = slugify(dados.nome as string) }
+  const { error } = await svc.from('simulado_materias').update(dados).eq('id', id).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/admin/leitura/materias')
+  return { ok: true }
+}
+
+export async function excluirMateria(id: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:delete'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  // Solta as leis dessa matéria (não apaga leis) + soft-delete da matéria.
+  await svc.from('simulado_documentos').update({ materia_id: null }).eq('materia_id', id).eq('tenant_id', g.tenantId)
+  const { error } = await svc.from('simulado_materias').update({ deletado: true }).eq('id', id).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_materias', entidadeId: id, atorId: g.atorId, tenantId: g.tenantId })
+  revalidatePath('/admin/leitura/materias')
+  return { ok: true }
 }
 
 /** Soft-delete (some das listagens; a lixeira restaura). */
