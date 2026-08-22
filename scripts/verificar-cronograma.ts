@@ -5,6 +5,7 @@
 import { addDias, dow, offsetDesdeSegunda, proximaSegunda } from '../apps/web/lib/cronograma/datas'
 import { compactarSemanas, gerarGrade, montarPauta } from '../apps/web/lib/cronograma/gerador'
 import { faixaSemanal } from '../apps/web/lib/cronograma/faixa'
+import { duracaoEmMinutos, fmtFaixa, somarDuracoes } from '../apps/web/lib/cronograma/duracao'
 import { rotuloConteudo } from '../apps/web/lib/cronograma/formato-meta'
 import type { CronogramaFonte, MapaTipos, MetaFonte, TipoMeta, TipoMetaDef } from '../apps/web/lib/cronograma/tipos'
 
@@ -149,6 +150,32 @@ const gVazio = gerarGrade(cron34, [], TIPOS, new Map(), { inicio: '2026-09-28', 
 ok('cronograma sem metas devolve erro (não lança)', !gVazio.ok)
 const gLoop = gerarGrade(cron34, metas34, TIPOS, new Map(), { inicio: '2026-09-28', revisao: { ativo: false, cada: 12 }, recesso: { modo: 'outras', de: '2026-01-01', ate: '2046-01-01' } })
 ok('recesso absurdo é barrado pelo teto (não trava)', !gLoop.ok && gLoop.erro.includes('recesso'))
+
+console.log('=== Duração — os 13 formatos que existem nas 16.697 metas reais ===')
+/* Levantados direto do banco. A coluna é texto livre e vem da planilha da equipe: qualquer
+   um destes que deixe de ser lido faz o calendário parar de somar as horas do dia. */
+const DURACOES: [string | null, string | null][] = [
+  ['30 min - 1h', '30min – 1h'],
+  ['1:30', '1h30'],
+  ['3 - 4h', '3h – 4h'],
+  ['40 min - 1:30h', '40min – 1h30'],
+  ['1h', '1h'],
+  ['30m', '30min'],
+  ['30 min', '30min'],
+  ['3h', '3h'],
+  ['30min - 1h', '30min – 1h'],
+  ['2h - 3h', '2h – 3h'],
+  ['1:30h - 2h', '1h30 – 2h'],
+  ['2h', '2h'],
+  [null, null],
+]
+for (const [entrada, esperado] of DURACOES) {
+  const f = duracaoEmMinutos(entrada)
+  eq(`duração ${JSON.stringify(entrada)}`, f ? fmtFaixa(f) : null, esperado)
+}
+eq('soma de um dia (3-4h + 30min-1h)', fmtFaixa(somarDuracoes(['3 - 4h', '30 min - 1h'])!), '3h30 – 5h')
+ok('texto irreconhecível NÃO vira total parcial', somarDuracoes(['1h', 'até acabar']) === null)
+eq('meta sem duração não impede a soma', fmtFaixa(somarDuracoes(['1h', null, '30m'])!), '1h30')
 
 console.log(`\n${'='.repeat(50)}\nPASSOU: ${passou}   FALHOU: ${falhou}\n${'='.repeat(50)}`)
 process.exit(falhou ? 1 : 0)

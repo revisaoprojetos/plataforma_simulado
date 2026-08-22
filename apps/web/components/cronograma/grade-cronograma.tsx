@@ -10,6 +10,7 @@
 
 import { useMemo, useState } from 'react'
 import { ExternalLink } from 'lucide-react'
+import { CaixaCheck } from '@/components/cronograma/caixa-check'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -173,17 +174,12 @@ export function GradeCronograma({
                   style={{ background: paleta.celula }}
                 >
                   {comCheck && (
-                    <input
-                      type="checkbox"
-                      checked={!!checks?.[m.id]}
-                      onChange={(e) => aoAlternarCheck?.(m, e.target.checked)}
-                      className="mt-1 h-4 w-4 shrink-0 accent-[var(--primary)]"
-                      aria-label={`Marcar "${m.titulo}" como concluída`}
-                      title={
-                        checks?.[m.id]
-                          ? `Concluída em ${fmtDataHora(checks[m.id])}`
-                          : 'Marcar como concluída'
-                      }
+                    <CaixaCheck
+                      marcada={!!checks?.[m.id]}
+                      aoTrocar={(marcar) => aoAlternarCheck?.(m, marcar)}
+                      rotulo={`Marcar "${m.titulo}" como concluída`}
+                      titulo={checks?.[m.id] ? `Concluída em ${fmtDataHora(checks[m.id])}` : 'Marcar como concluída'}
+                      className="mt-0.5"
                     />
                   )}
                   <div className="w-24 shrink-0 text-xs">

@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
+import { CaixaCheck } from '@/components/cronograma/caixa-check'
 import { SecaoHeader } from '@/components/admin/secao-header'
 import { AlertBox } from '@/components/ui/alert-box'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -439,12 +440,11 @@ export function CronogramasClient({
                         selecao.has(c.id) ? 'bg-primary/5' : ''
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={selecao.has(c.id)}
-                        onChange={() => alternarSelecao(c.id)}
-                        className="mt-1 h-4 w-4 shrink-0 accent-[var(--primary)]"
-                        aria-label={`Selecionar ${c.nome}`}
+                      <CaixaCheck
+                        marcada={selecao.has(c.id)}
+                        aoTrocar={() => alternarSelecao(c.id)}
+                        rotulo={`Selecionar ${c.nome}`}
+                        className="mt-0.5"
                       />
                       {/* Marca de status à esquerda: dá para varrer a coluna e achar o que falta. */}
                       <span

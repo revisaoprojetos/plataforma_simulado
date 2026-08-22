@@ -83,19 +83,25 @@ export default async function CronogramaAlunoPage() {
             {salvos > 0 ? ' e guardado na sua conta.' : ' e guardado na sua conta, para você voltar quando quiser.'}
           </p>
           {salvos > 0 && (
-            <a
-              href="#meus-cronogramas"
-              className="mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-white/85 ring-1 ring-inset ring-white/25 transition hover:bg-white/10"
-            >
+            <p className="mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-white/85 ring-1 ring-inset ring-white/25">
               <CalendarDays className="h-3.5 w-3.5" />
-              {salvos === 1 ? '1 cronograma salvo' : `${salvos} cronogramas salvos`}
-            </a>
+              {salvos === 1 ? '1 cronograma salvo — logo abaixo' : `${salvos} cronogramas salvos — logo abaixo`}
+            </p>
           )}
         </div>
       </section>
 
       {/* O cartão sobe sobre o herói, como no gerador antigo. */}
       <div className="relative z-10 -mt-20 space-y-6 sm:mx-4">
+        {/* Para quem JÁ gerou, o que ele tem vem antes do formulário de gerar mais um. Estava no
+            rodapé, depois da grade inteira — quem voltava para reabrir um cronograma tinha de
+            rolar a página toda para achá-lo. */}
+        {temHistorico && (
+          <div id="meus-cronogramas" className="scroll-mt-6">
+            <MinhasEmissoes itens={emissoes.itens ?? []} />
+          </div>
+        )}
+
         {!catalogo.length ? (
           <Card className="px-4 py-12 text-center">
             <CalendarDays className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
@@ -110,11 +116,6 @@ export default async function CronogramaAlunoPage() {
           <CronogramaClient catalogo={catalogo} />
         )}
 
-        {temHistorico && (
-          <div id="meus-cronogramas" className="scroll-mt-6">
-            <MinhasEmissoes itens={emissoes.itens ?? []} />
-          </div>
-        )}
       </div>
     </div>
   )
