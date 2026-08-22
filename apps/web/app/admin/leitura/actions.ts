@@ -295,6 +295,48 @@ export async function definirGruposDocumento(documentoId: string, grupoIds: stri
   return { ok: true }
 }
 
+// ── Atribuição por ALUNO individual (além dos grupos) ────────────────────────
+
+export type EstudanteRef = { id: string; nome: string; email: string | null }
+
+/** Alunos individualmente atribuídos a este documento. */
+export async function carregarEstudantesDocumento(documentoId: string): Promise<{ ok: boolean; itens?: EstudanteRef[]; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: at } = await svc.from('simulado_documento_estudantes').select('estudante_id').eq('documento_id', documentoId).eq('tenant_id', g.tenantId)
+  const ids = [...new Set((at ?? []).map((r: any) => r.estudante_id))]
+  if (!ids.length) return { ok: true, itens: [] }
+  const { data: es } = await svc.from('simulado_estudantes').select('id, nome, email').in('id', ids)
+  return { ok: true, itens: (es ?? []).map((e: any) => ({ id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null })) }
+}
+
+/** Define os alunos atribuídos (substitui o conjunto atual). */
+export async function definirEstudantesDocumento(documentoId: string, estudanteIds: string[]): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const ids = [...new Set((estudanteIds ?? []).filter(Boolean))]
+  await svc.from('simulado_documento_estudantes').delete().eq('documento_id', documentoId).eq('tenant_id', g.tenantId)
+  if (ids.length) {
+    const { error } = await svc.from('simulado_documento_estudantes').insert(ids.map((estudante_id) => ({ tenant_id: g.tenantId, documento_id: documentoId, estudante_id })))
+    if (error) return { ok: false, error: error.message }
+  }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_documento_estudantes', entidadeId: documentoId, depois: { estudantes: ids.length }, atorId: g.atorId, tenantId: g.tenantId })
+  revalidatePath(`/admin/leitura/${documentoId}`)
+  return { ok: true }
+}
+
+/** Busca alunos do tenant (nome/email/cpf) para atribuir acesso. */
+export async function buscarEstudantesLeitura(query: string): Promise<{ ok: boolean; itens?: EstudanteRef[]; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const q = (query ?? '').trim().replace(/[,%()]/g, ' ').trim()
+  let sel = svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', g.tenantId).eq('deletado', false).order('nome').limit(20)
+  if (q) sel = sel.or(`nome.ilike.%${q}%,email.ilike.%${q}%,cpf.ilike.%${q}%`)
+  const { data, error } = await sel
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, itens: (data ?? []).map((e: any) => ({ id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null })) }
+}
+
 // ── Anotações BASE (pré-definidas do admin) — vêm no documento p/ todos os alunos ──
 
 export type AnotacaoBase = { id: string; inicio: number; fim: number; exact: string; prefix: string; suffix: string; cor: string; nota: string | null; tipoGrifo: string | null }

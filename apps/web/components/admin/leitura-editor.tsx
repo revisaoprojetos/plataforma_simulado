@@ -7,12 +7,28 @@ import { toast } from 'sonner'
 import {
   ArrowLeft, Save, Loader2, Eye, EyeOff, Upload, ClipboardPaste, PenLine, FileText,
   Bold, Italic, Underline, Heading, List, Trophy, Scale, Send, ChevronDown,
+  ImagePlus, Trash2, RefreshCw, Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { atualizarDocumento, publicarVersao, type Documento, type Materia, type SituacaoEditorial } from '@/app/admin/leitura/actions'
 import { salvarConteudoHtml, importarDocx } from '@/app/admin/leitura/upload-actions'
 import { LeituraPreviewGrifos } from '@/components/admin/leitura-preview-grifos'
 import { LeituraQuestoesAdmin } from '@/components/admin/leitura-questoes-admin'
+import { LeituraAcesso } from '@/components/admin/leitura-acesso'
+
+// Redimensiona a imagem no cliente → data URL leve (WebP/JPEG). Mesmo padrão do banco.
+async function redimensionarImagem(file: File, max = 1600): Promise<string> {
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
+  const w = Math.round(bitmap.width * scale), h = Math.round(bitmap.height * scale)
+  const canvas = document.createElement('canvas')
+  canvas.width = w; canvas.height = h
+  const ctx = canvas.getContext('2d'); if (!ctx) throw new Error('canvas')
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(bitmap, 0, 0, w, h)
+  const webp = canvas.toDataURL('image/webp', 0.9)
+  return webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', 0.9)
+}
 
 const CORES = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#64748b']
 type Modo = 'colar' | 'word' | 'editor'
@@ -27,6 +43,10 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
 }) {
   const versaoAutoria = versaoEdicao ?? documento.versao
   const router = useRouter()
+  const [aba, setAba] = useState<'conteudo' | 'acesso'>('conteudo')
+  const [capa, setCapa] = useState<string | null>(documento.capa_url ?? null)
+  const [processandoCapa, setProcessandoCapa] = useState(false)
+  const capaRef = useRef<HTMLInputElement>(null)
   const [pubOpen, setPubOpen] = useState(false)
   const [pubTipo, setPubTipo] = useState('alteracao')
   const [pubDesc, setPubDesc] = useState('')
@@ -66,10 +86,17 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
     reader.readAsText(file)
   }
 
+  async function enviarCapa(file: File | null) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem.'); return }
+    setProcessandoCapa(true)
+    try { setCapa(await redimensionarImagem(file)) } catch { toast.error('Falha ao processar a imagem.') } finally { setProcessandoCapa(false) }
+  }
+
   function salvarMeta() {
     startMeta(async () => {
       const r = await atualizarDocumento(documento.id, {
-        titulo, descricao: descricao || null, cor, publicado,
+        titulo, descricao: descricao || null, cor, capa_url: capa || null, publicado,
         desafio_ativo: desafioAtivo, desafio_exige_fim: exigeFim, desafio_tempo_min: tempoMin > 0 ? tempoMin : null,
         materia_id: materiaId || null, tipo_norma: tipoNorma || null, numero: numero || null, ano: ano === '' ? null : Number(ano),
         titulo_oficial: tituloOficial || null, ementa: ementa || null, esfera: esfera || null, fonte_oficial: fonteOficial || null,
@@ -172,14 +199,66 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
         </div>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        {/* Esquerda: entrada de conteúdo (ação principal) + configurações */}
+      {/* Abas: Conteúdo × Acesso — sublinhado animado */}
+      <div className="relative flex border-b text-sm">
+        {([['conteudo', 'Conteúdo', FileText], ['acesso', 'Acesso dos alunos', Users]] as const).map(([a, label, Icon]) => (
+          <button key={a} onClick={() => setAba(a)} className={cn('flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 font-medium transition-colors', aba === a ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
+            <Icon className="h-4 w-4" /> {label}
+          </button>
+        ))}
+        <span className="absolute bottom-[-1px] h-0.5 rounded-full bg-primary transition-all duration-300 ease-out" style={{ width: '50%', left: aba === 'conteudo' ? '0%' : '50%' }} />
+      </div>
+
+      {aba === 'acesso' && <LeituraAcesso documentoId={documento.id} />}
+
+      {aba === 'conteudo' && (<>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+        {/* Esquerda: dados do card + entrada de conteúdo + configurações */}
         <div className="space-y-5">
-          {/* Conteúdo — ação principal, no topo */}
+          {/* Dados do card — no topo, com capa */}
+          <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
+            <p className="text-sm font-semibold">Dados do card</p>
+            <div>
+              <label className="mb-1.5 block text-xs text-muted-foreground">Capa do card</label>
+              <input ref={capaRef} type="file" accept="image/*" className="hidden" onChange={(e) => { enviarCapa(e.target.files?.[0] ?? null); e.target.value = '' }} />
+              {capa ? (
+                <div className="relative overflow-hidden rounded-xl border">
+                  <img src={capa} alt="Capa" className="h-28 w-full object-cover" />
+                  <div className="absolute right-1.5 top-1.5 flex gap-1">
+                    <button type="button" onClick={() => capaRef.current?.click()} className="inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/70"><RefreshCw className="h-3 w-3" /> Trocar</button>
+                    <button type="button" onClick={() => setCapa(null)} className="inline-flex items-center rounded-md bg-black/60 px-1.5 py-1 text-xs font-medium text-white backdrop-blur hover:bg-rose-600" aria-label="Remover capa"><Trash2 className="h-3 w-3" /></button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => capaRef.current?.click()} disabled={processandoCapa}
+                  className="flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:opacity-60">
+                  {processandoCapa ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+                  <span className="text-xs font-medium">{processandoCapa ? 'Processando…' : 'Adicionar capa'}</span>
+                </button>
+              )}
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">Título</label>
+              <input value={titulo} onChange={(e) => setTitulo(e.target.value)} className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">Descrição</label>
+              <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} className="w-full resize-none rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs text-muted-foreground">Cor do card</label>
+              <div className="flex flex-wrap gap-1.5">
+                {CORES.map((cc) => (
+                  <button key={cc} onClick={() => setCor(cc)} className={cn('h-7 w-7 rounded-full border-2 transition', cor === cc ? 'border-foreground' : 'border-transparent')} style={{ background: cc }} aria-label={cc} />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Conteúdo — importar/editar */}
           {podeEditar && (
             <div className="rounded-2xl border bg-card p-4 shadow-sm">
-              <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold"><FileText className="h-4 w-4 text-primary" /> Conteúdo da lei</p>
-              <p className="mb-3 text-xs text-muted-foreground">Envie um arquivo <span className="font-medium text-foreground">.html</span> ou <span className="font-medium text-foreground">.docx</span>, cole o HTML, ou escreva no editor. O texto é processado e aparece na prévia ao lado.</p>
+              <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><FileText className="h-4 w-4 text-primary" /> Conteúdo da lei</p>
               <div className="mb-3 flex gap-1 rounded-lg border bg-muted/40 p-1 text-sm">
                 {([['colar', 'HTML', ClipboardPaste], ['word', 'Word', Upload], ['editor', 'Editor', PenLine]] as const).map(([m, label, Icon]) => (
                   <button key={m} onClick={() => setModo(m)} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 transition-colors', modo === m ? 'bg-card font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
@@ -196,13 +275,13 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
                     onClick={() => !savingConteudo && htmlFileRef.current?.click()}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) enviarArquivoHtml(f) }}
-                    className="flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border border-dashed py-6 text-sm text-muted-foreground transition-colors hover:border-primary hover:bg-muted/30 hover:text-foreground"
+                    className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-dashed py-4 text-xs text-muted-foreground transition-colors hover:border-primary hover:bg-muted/30 hover:text-foreground"
                   >
-                    {savingConteudo ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
-                    <span>Enviar arquivo <span className="font-medium text-foreground">.html</span> — clique ou arraste aqui</span>
+                    {savingConteudo ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+                    <span>Arquivo <span className="font-medium text-foreground">.html</span> — clique ou arraste</span>
                   </div>
-                  <p className="text-center text-[11px] uppercase tracking-wide text-muted-foreground">ou cole o HTML abaixo</p>
-                  <textarea value={htmlColar} onChange={(e) => setHtmlColar(e.target.value)} rows={7} placeholder="Cole aqui o HTML da lei (com artigos, §, incisos…)" className="w-full resize-y rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 font-mono text-xs outline-none focus:ring-1 focus:ring-ring" />
+                  <p className="text-center text-[11px] uppercase tracking-wide text-muted-foreground">ou cole o HTML</p>
+                  <textarea value={htmlColar} onChange={(e) => setHtmlColar(e.target.value)} rows={4} placeholder="Cole o HTML da lei…" className="w-full resize-y rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 font-mono text-xs outline-none focus:ring-1 focus:ring-ring" />
                   <button onClick={() => processarConteudo(htmlColar)} disabled={savingConteudo || !htmlColar.trim()} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
                     {savingConteudo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Processar e salvar
                   </button>
@@ -236,27 +315,6 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
               )}
             </div>
           )}
-
-          {/* Dados do card */}
-          <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
-            <p className="text-sm font-semibold">Dados do card</p>
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Título</label>
-              <input value={titulo} onChange={(e) => setTitulo(e.target.value)} className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Descrição</label>
-              <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} className="w-full resize-none rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs text-muted-foreground">Cor do card</label>
-              <div className="flex flex-wrap gap-1.5">
-                {CORES.map((cc) => (
-                  <button key={cc} onClick={() => setCor(cc)} className={cn('h-7 w-7 rounded-full border-2 transition', cor === cc ? 'border-foreground' : 'border-transparent')} style={{ background: cc }} aria-label={cc} />
-                ))}
-              </div>
-            </div>
-          </div>
 
           {/* Metadados da lei (A1) — recolhível */}
           <details className="group rounded-2xl border bg-card shadow-sm">
@@ -345,6 +403,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
       {podeEditar && htmlAtual && (
         <LeituraQuestoesAdmin documentoId={documento.id} versao={versaoAutoria} html={htmlAtual} />
       )}
+      </>)}
     </div>
   )
 }
