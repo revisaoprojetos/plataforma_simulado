@@ -156,7 +156,7 @@ export function ProvaHud(p: ProvaHudProps) {
                   </span>
                 )}
               </div>
-              <CardContent className="pt-10">
+              <CardContent className="pt-9">
                 {q.aviso && (
                   <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border px-3 py-2 text-sm font-semibold"
                     style={{ borderColor: `${q.aviso.cor ?? '#ef4444'}66`, background: `${q.aviso.cor ?? '#ef4444'}14`, color: q.aviso.cor ?? '#ef4444' }}>
