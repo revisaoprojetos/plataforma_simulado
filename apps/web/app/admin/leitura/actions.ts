@@ -126,6 +126,51 @@ export async function definirGruposDocumento(documentoId: string, grupoIds: stri
   return { ok: true }
 }
 
+// ── Anotações BASE (pré-definidas do admin) — vêm no documento p/ todos os alunos ──
+
+export type AnotacaoBase = { id: string; inicio: number; fim: number; exact: string; prefix: string; suffix: string; cor: string; nota: string | null }
+
+/** Lista as anotações base da versão vigente do documento. */
+export async function listarAnotacoesBase(documentoId: string, versao: number): Promise<{ ok: boolean; itens?: AnotacaoBase[]; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data, error } = await svc.from('simulado_documento_anotacoes_base')
+    .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota')
+    .eq('tenant_id', g.tenantId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, itens: (data ?? []).map((a: any) => ({ id: a.id, inicio: a.inicio_char, fim: a.fim_char, exact: a.exact, prefix: a.prefix ?? '', suffix: a.suffix ?? '', cor: a.cor, nota: a.nota ?? null })) }
+}
+
+export async function criarAnotacaoBase(documentoId: string, versao: number, a: { inicio: number; fim: number; exact: string; prefix: string; suffix: string; cor: string; nota?: string | null }): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data, error } = await svc.from('simulado_documento_anotacoes_base').insert({
+    tenant_id: g.tenantId, documento_id: documentoId, documento_versao: versao,
+    inicio_char: a.inicio, fim_char: a.fim, exact: String(a.exact).slice(0, 4000), prefix: a.prefix ?? null, suffix: a.suffix ?? null, cor: a.cor, nota: a.nota || null,
+  }).select('id').single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, id: (data as any).id }
+}
+
+export async function atualizarAnotacaoBase(id: string, patch: { cor?: string; nota?: string | null }): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const dados: Record<string, unknown> = {}
+  if ('cor' in patch) dados.cor = patch.cor
+  if ('nota' in patch) dados.nota = patch.nota || null
+  const { error } = await svc.from('simulado_documento_anotacoes_base').update(dados).eq('id', id).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+export async function excluirAnotacaoBase(id: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_documento_anotacoes_base').update({ deletado: true }).eq('id', id).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
 /** Lista de documentos do admin (grade), com a contagem de artigos da versão vigente. */
 export async function listarDocumentosAdmin(): Promise<{ ok: boolean; itens?: Documento[]; error?: string }> {
   const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }

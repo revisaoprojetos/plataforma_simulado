@@ -69,6 +69,18 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string): 
   }))
 }
 
+export interface AnotacaoAluno {
+  id: string
+  inicio: number
+  fim: number
+  exact: string
+  prefix: string
+  suffix: string
+  cor: string
+  nota: string | null
+  origem: 'propria' | 'base'
+}
+
 export interface DocumentoCarregado {
   id: string
   titulo: string
@@ -78,6 +90,25 @@ export interface DocumentoCarregado {
   artigos: number
   desafio: { ativo: boolean; exigeFim: boolean; tempoMin: number }
   progresso: { pct: number; artigoMax: number; tempoSeg: number; concluido: boolean }
+  anotacoes: AnotacaoAluno[]
+}
+
+/**
+ * Clona as anotações BASE (pré-definidas do admin) para o conjunto do aluno, uma vez.
+ * Idempotente por (estudante, versão, base_id) com ignoreDuplicates → base apagada
+ * pelo aluno NÃO ressuscita (nunca sobrescreve, só insere se ausente).
+ */
+async function garantirAnotacoesBase(svc: ReturnType<typeof createAdminClient>, tenantId: string, documentoId: string, versao: number, estudanteId: string) {
+  const { data: bases } = await svc.from('simulado_documento_anotacoes_base')
+    .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota')
+    .eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
+  if (!bases?.length) return
+  const rows = (bases as any[]).map((b) => ({
+    tenant_id: tenantId, estudante_id: estudanteId, documento_id: documentoId, documento_versao: versao,
+    inicio_char: b.inicio_char, fim_char: b.fim_char, exact: b.exact, prefix: b.prefix, suffix: b.suffix,
+    cor: b.cor, nota: b.nota, origem: 'base', base_id: b.id,
+  }))
+  await svc.from('simulado_leitura_anotacoes').upsert(rows, { onConflict: 'estudante_id,documento_versao,base_id', ignoreDuplicates: true })
 }
 
 /** Carrega o documento para o leitor do aluno (após checar acesso). null = sem acesso/não existe. */
@@ -109,6 +140,20 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
   const { data: prog } = await svc.from('simulado_leitura_progresso')
     .select('pct, artigo_max, tempo_seg, concluido_em').eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).maybeSingle()
 
+  // Clona as anotações base do admin (idempotente) e carrega as do aluno. Tolerante:
+  // se a migração de anotações (Fase 1b) ainda não rodou, degrada sem quebrar o leitor.
+  let anotacoes: AnotacaoAluno[] = []
+  try {
+    await garantirAnotacoesBase(svc, tenantId, documentoId, versao, estudanteId)
+    const { data: anot } = await svc.from('simulado_leitura_anotacoes')
+      .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota, origem')
+      .eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
+    anotacoes = ((anot ?? []) as any[]).map((a) => ({
+      id: a.id, inicio: a.inicio_char, fim: a.fim_char, exact: a.exact, prefix: a.prefix ?? '', suffix: a.suffix ?? '',
+      cor: a.cor, nota: a.nota ?? null, origem: (a.origem === 'base' ? 'base' : 'propria') as 'base' | 'propria',
+    }))
+  } catch { /* migração de anotações ausente */ }
+
   return {
     id: documentoId,
     titulo: (doc as any).titulo,
@@ -123,5 +168,6 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
       tempoSeg: (prog as any)?.tempo_seg ?? 0,
       concluido: !!(prog as any)?.concluido_em,
     },
+    anotacoes,
   }
 }
