@@ -6,12 +6,12 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   ArrowLeft, Save, Loader2, Eye, EyeOff, Upload, ClipboardPaste, PenLine, FileText,
-  Bold, Italic, Underline, Heading, List, Trophy, Highlighter, Scale, Send, ChevronDown,
+  Bold, Italic, Underline, Heading, List, Trophy, Scale, Send, ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { atualizarDocumento, publicarVersao, type Documento, type Materia, type SituacaoEditorial } from '@/app/admin/leitura/actions'
 import { salvarConteudoHtml, importarDocx } from '@/app/admin/leitura/upload-actions'
-import { LeituraAutorAnotacoes } from '@/components/admin/leitura-autor-anotacoes'
+import { LeituraPreviewGrifos } from '@/components/admin/leitura-preview-grifos'
 import { LeituraQuestoesAdmin } from '@/components/admin/leitura-questoes-admin'
 
 const CORES = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#64748b']
@@ -335,35 +335,11 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
           </details>
         </div>
 
-        {/* Direita: prévia do conteúdo salvo */}
+        {/* Direita: prévia + editor de grifos (unificado) */}
         <div className="lg:sticky lg:top-4 lg:self-start">
-          <div className="rounded-2xl border bg-card shadow-sm">
-            <div className="flex items-center justify-between border-b px-4 py-2.5">
-              <p className="text-sm font-semibold">Prévia</p>
-              <span className="text-xs text-muted-foreground">{documento.artigos ?? 0} seções detectadas</span>
-            </div>
-            {htmlAtual ? (
-              <div
-                className="leitura-prosa max-h-[70vh] overflow-auto px-5 py-4 text-sm leading-relaxed [&_a]:text-primary [&_a]:underline [&_h1]:mb-2 [&_h1]:mt-3 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:mb-1.5 [&_h2]:mt-3 [&_h2]:text-base [&_h2]:font-bold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_p]:mb-2 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1"
-                dangerouslySetInnerHTML={{ __html: htmlAtual }}
-              />
-            ) : (
-              <p className="px-5 py-10 text-center text-sm text-muted-foreground">Sem conteúdo ainda. Cole o HTML, importe um Word ou use o editor.</p>
-            )}
-          </div>
+          <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} />
         </div>
       </div>
-
-      {/* Anotações base (pré-definidas) — modo autor */}
-      {podeEditar && htmlAtual && (
-        <div className="space-y-2">
-          <div>
-            <h2 className="flex items-center gap-1.5 text-sm font-semibold"><Highlighter className="h-4 w-4 text-primary" /> Grifos editoriais</h2>
-            <p className="text-xs text-muted-foreground">Marque trechos por tipo (núcleo, prazo, exceção, comentário, STF/STJ/TST…). Aparecem coloridos para todos os alunos, com o "modo sem grifos".</p>
-          </div>
-          <LeituraAutorAnotacoes documentoId={documento.id} versao={versaoAutoria} html={htmlAtual} />
-        </div>
-      )}
 
       {/* Questões no meio da leitura (Fase 2) */}
       {podeEditar && htmlAtual && (
