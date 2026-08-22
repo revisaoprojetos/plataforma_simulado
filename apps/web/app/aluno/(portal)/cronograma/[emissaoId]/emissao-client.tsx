@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Archive, ArchiveRestore, Check, Pencil, X } from 'lucide-react'
+import { Archive, ArchiveRestore, Check, Pencil, X, FileDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AlertBox } from '@/components/ui/alert-box'
 import { ResumoGrade } from '@/components/cronograma/grade-cronograma'
@@ -85,6 +85,17 @@ export function EmissaoClient({
 
         <div className="flex items-center gap-2">
           {arquivada && <Badge variant="secondary">Arquivado</Badge>}
+          {/* Abre em aba nova com ?print=1: o PrintButton da página de impressão dispara o
+              diálogo do navegador sozinho, e o aluno escolhe "Salvar como PDF". */}
+          <a
+            href={`/imprimir/cronograma/${emissao.id}?print=1`}
+            target="_blank"
+            rel="noreferrer"
+            className={buttonVariants({ variant: 'outline', size: 'sm' })}
+          >
+            <FileDown className="mr-1 h-4 w-4" />
+            Salvar em PDF
+          </a>
           <Button size="sm" variant="outline" onClick={alternarArquivo} disabled={pendente}>
             {arquivada ? <ArchiveRestore className="mr-1 h-4 w-4" /> : <Archive className="mr-1 h-4 w-4" />}
             {arquivada ? 'Restaurar' : 'Arquivar'}

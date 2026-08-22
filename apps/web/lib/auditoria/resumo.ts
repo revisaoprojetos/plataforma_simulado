@@ -89,6 +89,7 @@ const SUBSTANTIVO: Record<string, string> = {
   simulado_assinaturas: 'acesso', simulado_webhook_saida: 'webhook', simulado_matriculas: 'matrícula',
   simulado_cronogramas: 'cronograma', simulado_cronograma_pacotes: 'pacote de cronogramas',
   simulado_cronograma_meta_checks: 'meta de cronograma', simulado_cronograma_tipos_meta: 'tipo de meta',
+  simulado_cronograma_downloads: 'exportação de cronograma',
   auth: 'painel',
 }
 
@@ -107,6 +108,11 @@ export function resumoRegistro(log: any, nomes: Map<string, string>): string {
   const comAlvo = alvo ? `${noun} "${alvo}"` : `um ${noun}`
 
   if (ent === 'auth') return op === 'LOGIN' ? 'Entrou no painel' : op === 'LOGOUT' ? 'Saiu do painel' : op
+
+  if (ent === 'simulado_cronograma_downloads') {
+    const fmt = String(d.botao ?? '').toUpperCase() || 'arquivo'
+    return `Baixou o cronograma em ${fmt}${d.cronograma ? ` — ${d.cronograma}` : ''}`
+  }
 
   if (ent === 'simulado_cronograma_meta_checks') {
     const nome = d.titulo ?? a.titulo ?? null

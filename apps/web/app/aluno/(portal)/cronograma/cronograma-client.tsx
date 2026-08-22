@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Info, Loader2, Save, Sparkles } from 'lucide-react'
+import { FileDown, Info, Loader2, Save, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -296,6 +296,15 @@ export function CronogramaClient({ catalogo }: { catalogo: CronogramaDoAluno[] }
               <p className="flex-1 text-sm text-muted-foreground">
                 Este cronograma ficou salvo na sua conta — você pode fechar a página e voltar quando quiser.
               </p>
+              <a
+                href={`/imprimir/cronograma/${emissaoId}?print=1`}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonVariants({ variant: 'outline', size: 'sm' })}
+              >
+                <FileDown className="mr-1 h-4 w-4" />
+                Salvar em PDF
+              </a>
               <Link href={`/aluno/cronograma/${emissaoId}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
                 Abrir
               </Link>
