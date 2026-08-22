@@ -32,6 +32,9 @@ export default async function CronogramaAlunoPage() {
   const emissoes = await listarMinhasEmissoes()
   const { tenantNome } = await getTenantTheme()
   const salvos = (emissoes.itens ?? []).filter((e) => !e.arquivada).length
+  // A seção aparece enquanto EXISTIR registro, inclusive só arquivados — senão arquivar o último
+  // cronograma fazia a seção sumir, e com ela a única porta para restaurar.
+  const temHistorico = (emissoes.itens ?? []).length > 0
   // "Revisão / Ensino Jurídico" no meio da frase fica arrastado — a manchete usa só a primeira
   // parte do nome do tenant, que é como a marca é dita ("do Revisão").
   const marca = (tenantNome ?? '').split(/[/|–—-]/)[0].trim()
@@ -107,7 +110,7 @@ export default async function CronogramaAlunoPage() {
           <CronogramaClient catalogo={catalogo} />
         )}
 
-        {salvos > 0 && (
+        {temHistorico && (
           <div id="meus-cronogramas" className="scroll-mt-6">
             <MinhasEmissoes itens={emissoes.itens ?? []} />
           </div>
