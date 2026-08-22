@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
-import { AlertTriangle, CalendarDays, ListChecks, Package, Pencil, Plus, Trash2, Users, X } from 'lucide-react'
+import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Clock, ListChecks, Package, Pencil, Plus, Search, Trash2, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -99,6 +99,41 @@ export function MetasClient({
   }, [metas, porSlug])
 
   const daSemana = porSemana.get(semanaAtiva) ?? []
+
+  /* Busca e filtro valem sobre o CRONOGRAMA INTEIRO, não sobre a semana aberta. A tela só
+     tinha navegação semana a semana: achar "a aula 12 de Constitucional" num cronograma de 71
+     semanas era abrir 71 abas de uma em uma. Quando há busca, a régua sai e a lista mostra de
+     onde cada resultado veio. */
+  const [busca, setBusca] = useState('')
+  const [filtroTipo, setFiltroTipo] = useState<string>('todos')
+  const buscando = busca.trim().length > 0 || filtroTipo !== 'todos'
+
+  const resultados = useMemo(() => {
+    if (!buscando) return []
+    const t = busca.trim().toLowerCase()
+    return metas
+      .filter((m) => filtroTipo === 'todos' || m.tipo === filtroTipo)
+      .filter(
+        (m) =>
+          !t ||
+          m.disciplina.toLowerCase().includes(t) ||
+          (m.conteudo ?? '').toLowerCase().includes(t) ||
+          (m.aula ?? '').toLowerCase().includes(t),
+      )
+      .sort((a, b) => a.semana - b.semana || a.dia - b.dia || a.ordem - b.ordem)
+  }, [metas, busca, filtroTipo, buscando])
+
+  /* Dentro da semana, as metas ficam agrupadas por DIA. Uma lista corrida de 12 metas com o
+     dia repetido em cada linha esconde a estrutura que o cronograma tem. */
+  const porDia = useMemo(() => {
+    const mapa = new Map<number, MetaFonte[]>()
+    for (const m of daSemana) {
+      const l = mapa.get(m.dia)
+      if (l) l.push(m)
+      else mapa.set(m.dia, [m])
+    }
+    return [...mapa.entries()].sort((a, b) => a[0] - b[0])
+  }, [daSemana])
 
   const avisos = useMemo(() => {
     const xs: string[] = []
@@ -212,16 +247,253 @@ export function MetasClient({
             <CalendarDays className="h-6 w-6 text-primary" />
             {c.nome}
           </h1>
-          <p className="text-muted-foreground">
-            {c.carga_horaria}h/dia · {faixaSemanal(c.dias_curso)} · {c.total_semanas} semanas · {metas.length} metas
-            {c.semanas_revisao.length > 0 && ` · revisão original nas semanas ${c.semanas_revisao.join(', ')}`}
-          </p>
+          {/* Uma frase corrida com cinco dados encadeados por "·" não se lê — vira etiquetas. */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+            <Badge variant="outline" className="gap-1">
+              <Clock className="h-3 w-3" />
+              {c.carga_horaria}h/dia
+            </Badge>
+            <Badge variant="outline">{faixaSemanal(c.dias_curso)}</Badge>
+            <Badge variant="outline">{c.total_semanas} semanas</Badge>
+            <Badge variant="outline">{metas.length.toLocaleString('pt-BR')} metas</Badge>
+            {c.semanas_revisao.length > 0 && (
+              <Badge variant="outline" className="border-dashed" title={`Semanas ${c.semanas_revisao.join(', ')}`}>
+                {c.semanas_revisao.length} de revisão
+              </Badge>
+            )}
+          </div>
         </div>
         <Badge variant={c.status === 'liberado' ? 'default' : 'secondary'}>
           {c.status === 'liberado' ? 'Liberado' : 'Rascunho'}
         </Badge>
       </div>
 
+      {avisos.length > 0 && (
+        <AlertBox variante="aviso" titulo="Pontos de atenção nos dados" icon={AlertTriangle}>
+          <ul className="ml-4 list-disc space-y-1 text-sm">
+            {avisos.map((a, i) => (
+              <li key={i}>{a}</li>
+            ))}
+          </ul>
+        </AlertBox>
+      )}
+
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader
+          icon={ListChecks}
+          titulo="Metas"
+          subtitulo={
+            buscando
+              ? `${resultados.length.toLocaleString('pt-BR')} de ${metas.length.toLocaleString('pt-BR')} metas no filtro`
+              : `Semana ${semanaAtiva} de ${c.total_semanas}${revisao.has(semanaAtiva) ? ' · marcada como revisão' : ''} · ${daSemana.length} meta(s)`
+          }
+          acao={
+            <Button size="sm" onClick={abrirNova} disabled={pendente}>
+              <Plus className="mr-1 h-4 w-4" />
+              Nova meta
+            </Button>
+          }
+        />
+
+        {/* Barra de ferramentas: buscar em todo o cronograma, filtrar por tipo, andar nas semanas. */}
+        <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2.5">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar disciplina, aula ou conteúdo"
+              className="h-8 w-60 pl-7"
+            />
+          </div>
+
+          <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v ?? 'todos')}>
+            <SelectTrigger className="h-8 w-48">
+              <SelectValue>{filtroTipo === 'todos' ? 'Todos os tipos' : rotulo(filtroTipo)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os tipos</SelectItem>
+              {tipos.map((t) => (
+                <SelectItem key={t.slug} value={t.slug}>
+                  {t.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {buscando ? (
+            <Button size="sm" variant="ghost" onClick={() => { setBusca(''); setFiltroTipo('todos') }}>
+              <X className="mr-1 h-4 w-4" />
+              Limpar filtro
+            </Button>
+          ) : (
+            <div className="ml-auto flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setSemanaAtiva((n) => Math.max(1, n - 1))}
+                disabled={semanaAtiva <= 1}
+                aria-label="Semana anterior"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="min-w-24 text-center text-sm font-medium tabular-nums">Semana {semanaAtiva}</span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setSemanaAtiva((n) => Math.min(c.total_semanas, n + 1))}
+                disabled={semanaAtiva >= c.total_semanas}
+                aria-label="Próxima semana"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Régua de semanas: mostra de relance onde há conteúdo, revisão e buracos. Some durante a
+            busca, que não é por semana. Uma faixa rolável em vez de um bloco embrulhado — com 71
+            semanas o bloco tomava meia tela antes da primeira meta. */}
+        {!buscando && (
+        <>
+        <div className="flex gap-1 overflow-x-auto border-b px-4 py-3">
+          {Array.from({ length: c.total_semanas }, (_, i) => i + 1).map((s) => {
+            const n = porSemana.get(s)?.length ?? 0
+            const ehRevisao = revisao.has(s)
+            return (
+              <button
+                key={s}
+                onClick={() => setSemanaAtiva(s)}
+                title={ehRevisao ? 'Semana de revisão original' : `${n} meta(s)`}
+                className={`h-8 min-w-8 rounded-md border px-1.5 text-xs transition ${
+                  s === semanaAtiva
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : ehRevisao
+                      ? 'border-dashed text-muted-foreground'
+                      : n === 0
+                        ? 'border-amber-300 text-amber-700 dark:text-amber-500'
+                        : 'hover:bg-muted'
+                }`}
+              >
+                {s}
+              </button>
+            )
+          })}
+        </div>
+        {/* A régua usava três cores sem dizer o que significavam. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-1.5 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm border" /> com metas
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm border border-dashed" /> revisão original (sem metas, de propósito)
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm border border-amber-300" /> vazia — some da grade gerada
+          </span>
+        </div>
+        </>
+        )}
+
+        {/* Colunas FIXAS. Em flex, a largura das etiquetas variava com o texto ("Legproc" vs
+            "PDFULL + Videoaula"), então disciplina e conteúdo começavam num x diferente em cada
+            linha. No mobile continua embrulhando. */
+         }
+        {(() => {
+          const Linha = ({ m, comOrigem }: { m: MetaFonte; comOrigem?: boolean }) => (
+            <div
+              className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 hover:bg-muted/30 sm:grid ${
+                comOrigem
+                  ? 'sm:grid-cols-[5rem_10.5rem_minmax(0,1fr)_5.5rem_auto]'
+                  : 'sm:grid-cols-[10.5rem_minmax(0,1fr)_5.5rem_auto]'
+              }`}
+            >
+              {/* Na busca, cada resultado precisa dizer de onde veio — dentro da semana isso já
+                  está no cabeçalho do dia, e repetir em toda linha seria ruído. */}
+              {comOrigem && (
+                <button
+                  type="button"
+                  onClick={() => { setBusca(''); setFiltroTipo('todos'); setSemanaAtiva(m.semana) }}
+                  className="justify-self-start text-left leading-tight"
+                  title={`Abrir a semana ${m.semana}`}
+                >
+                  <span className="block text-xs font-semibold text-primary hover:underline">Sem {m.semana}</span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    {c.dias_nome[m.dia] ?? `dia ${m.dia}`}
+                  </span>
+                </button>
+              )}
+              <Badge variant="secondary" className="max-w-full shrink-0 justify-self-start truncate">
+                {rotulo(m.tipo)}
+              </Badge>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">
+                  {m.disciplina}
+                  {m.aula && <span className="text-muted-foreground"> · aula {m.aula}</span>}
+                </p>
+                {m.conteudo && <p className="truncate text-xs text-muted-foreground">{m.conteudo}</p>}
+              </div>
+              <span className="shrink-0 text-xs text-muted-foreground sm:text-right">{m.duracao ?? ''}</span>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button size="sm" variant="ghost" onClick={() => abrirEdicao(m)} disabled={pendente}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => remover(m)} disabled={pendente}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            </div>
+          )
+
+          if (buscando) {
+            if (!resultados.length) {
+              return (
+                <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  Nenhuma meta encontrada em todo o cronograma.
+                </div>
+              )
+            }
+            return (
+              <div className="divide-y">
+                {resultados.map((m) => (
+                  <Linha key={m.id} m={m} comOrigem />
+                ))}
+              </div>
+            )
+          }
+
+          if (!daSemana.length) {
+            return (
+              <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                {revisao.has(semanaAtiva)
+                  ? 'Semana de revisão original — por definição não tem metas.'
+                  : 'Nenhuma meta nesta semana. Semanas vazias somem da grade gerada.'}
+              </div>
+            )
+          }
+
+          /* Agrupado por DIA: uma lista corrida de 12 metas com o dia repetido em cada linha
+             esconde a estrutura que o cronograma tem. */
+          return (
+            <div className="divide-y">
+              {porDia.map(([dia, lista]) => (
+                <div key={dia}>
+                  <div className="flex items-center gap-1.5 bg-muted/40 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {c.dias_nome[dia] ?? `dia ${dia}`}
+                    <span className="font-normal normal-case">· {lista.length} meta(s)</span>
+                  </div>
+                  {lista.map((m) => (
+                    <Linha key={m.id} m={m} />
+                  ))}
+                </div>
+              ))}
+            </div>
+          )
+        })()}
+      </Card>
+
+      {/* Os pacotes vêm DEPOIS das metas: editar metas é o trabalho desta tela, e o cartão de
+          pacotes empurrava a lista para baixo da dobra em todo carregamento. */}
       {/* ── Por onde o aluno recebe este cronograma */}
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
         <SecaoHeader
@@ -267,98 +539,6 @@ export function MetasClient({
         )}
       </Card>
 
-      {avisos.length > 0 && (
-        <AlertBox variante="aviso" titulo="Pontos de atenção nos dados" icon={AlertTriangle}>
-          <ul className="ml-4 list-disc space-y-1 text-sm">
-            {avisos.map((a, i) => (
-              <li key={i}>{a}</li>
-            ))}
-          </ul>
-        </AlertBox>
-      )}
-
-      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
-        <SecaoHeader
-          icon={ListChecks}
-          titulo={`Semana ${semanaAtiva}${revisao.has(semanaAtiva) ? ' · revisão original' : ''}`}
-          subtitulo={`${daSemana.length} meta(s) nesta semana`}
-          acao={
-            <Button size="sm" onClick={abrirNova} disabled={pendente}>
-              <Plus className="mr-1 h-4 w-4" />
-              Nova meta
-            </Button>
-          }
-        />
-
-        {/* Régua de semanas: mostra de relance onde há conteúdo, revisão e buracos. */}
-        <div className="flex flex-wrap gap-1 border-b px-4 py-3">
-          {Array.from({ length: c.total_semanas }, (_, i) => i + 1).map((s) => {
-            const n = porSemana.get(s)?.length ?? 0
-            const ehRevisao = revisao.has(s)
-            return (
-              <button
-                key={s}
-                onClick={() => setSemanaAtiva(s)}
-                title={ehRevisao ? 'Semana de revisão original' : `${n} meta(s)`}
-                className={`h-8 min-w-8 rounded-md border px-1.5 text-xs transition ${
-                  s === semanaAtiva
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : ehRevisao
-                      ? 'border-dashed text-muted-foreground'
-                      : n === 0
-                        ? 'border-amber-300 text-amber-700 dark:text-amber-500'
-                        : 'hover:bg-muted'
-                }`}
-              >
-                {s}
-              </button>
-            )
-          })}
-        </div>
-
-        {daSemana.length === 0 ? (
-          <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-            {revisao.has(semanaAtiva)
-              ? 'Semana de revisão original — por definição não tem metas.'
-              : 'Nenhuma meta nesta semana. Semanas vazias somem da grade gerada.'}
-          </div>
-        ) : (
-          <div className="divide-y">
-            {daSemana.map((m) => (
-              /* Colunas FIXAS. Em flex, a largura das duas etiquetas variava com o texto
-                 ("Legproc" vs "PDFULL + Videoaula"), então disciplina e conteúdo começavam num
-                 x diferente em cada linha. No mobile continua embrulhando. */
-              <div
-                key={m.id}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 hover:bg-muted/30 sm:grid sm:grid-cols-[3.25rem_10.5rem_minmax(0,1fr)_5.5rem_auto]"
-              >
-                <Badge variant="outline" className="shrink-0 justify-self-start">
-                  {c.dias_nome[m.dia] ?? `dia ${m.dia}`}
-                </Badge>
-                <Badge variant="secondary" className="max-w-full shrink-0 justify-self-start truncate">
-                  {rotulo(m.tipo)}
-                </Badge>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {m.disciplina}
-                    {m.aula && <span className="text-muted-foreground"> · aula {m.aula}</span>}
-                  </p>
-                  {m.conteudo && <p className="truncate text-xs text-muted-foreground">{m.conteudo}</p>}
-                </div>
-                <span className="shrink-0 text-xs text-muted-foreground sm:text-right">{m.duracao ?? ''}</span>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => abrirEdicao(m)} disabled={pendente}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => remover(m)} disabled={pendente}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
 
       <Dialog open={aberto} onOpenChange={setAberto}>
         <DialogContent className="max-h-[88vh] overflow-auto sm:max-w-2xl">
