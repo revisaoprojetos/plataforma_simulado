@@ -158,7 +158,7 @@ export function ProvaHud(p: ProvaHudProps) {
               </div>
               <CardContent className="pt-10">
                 {q.aviso && (
-                  <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border px-3 py-2 text-sm font-semibold"
+                  <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border px-3 py-1 text-sm font-semibold"
                     style={{ borderColor: `${q.aviso.cor ?? '#ef4444'}66`, background: `${q.aviso.cor ?? '#ef4444'}14`, color: q.aviso.cor ?? '#ef4444' }}>
                     <AlertTriangle className="h-4 w-4 shrink-0" /> {q.aviso.nome}
                     <span className="font-normal opacity-80">
