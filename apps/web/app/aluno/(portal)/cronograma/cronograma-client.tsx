@@ -55,6 +55,7 @@ export function CronogramaClient({ catalogo }: { catalogo: CronogramaDoAluno[] }
 
   const [grade, setGrade] = useState<Grade | null>(null)
   const [emissaoId, setEmissaoId] = useState<string | null>(null)
+  const [naoSalvou, setNaoSalvou] = useState(false)
   const [desatualizada, setDesatualizada] = useState(false)
   const [gerando, iniciar] = useTransition()
 
@@ -90,9 +91,12 @@ export function CronogramaClient({ catalogo }: { catalogo: CronogramaDoAluno[] }
       }
       setGrade(r.grade)
       setEmissaoId(r.emissaoId)
+      setNaoSalvou(!!r.erroAoSalvar)
       setDesatualizada(false)
       localStorage.setItem(CHAVE_PALETA_LOCAL, paletaSlug)
-      if (r.grade.avisos.length) toast.info(r.grade.avisos[0])
+      // Não salvar é falha de verdade: a tela promete que o cronograma fica guardado.
+      if (r.erroAoSalvar) toast.error('A grade foi montada, mas não conseguimos salvá-la na sua conta.')
+      else if (r.grade.avisos.length) toast.info(r.grade.avisos[0])
     })
   }
 
@@ -271,6 +275,19 @@ export function CronogramaClient({ catalogo }: { catalogo: CronogramaDoAluno[] }
         <>
           <p className="text-sm text-muted-foreground">{grade.resumo.subtitulo}</p>
           <GradeCronograma grade={grade} paletaSlug={paletaSlug} titulo="Seu plano semana a semana" />
+
+          {naoSalvou && (
+            <Card className="flex flex-wrap items-start gap-3 border-destructive/40 bg-destructive/5 p-4">
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+              <p className="flex-1 text-sm">
+                <strong>Este cronograma não ficou salvo na sua conta.</strong>{' '}
+                <span className="text-muted-foreground">
+                  A grade abaixo está correta e você pode usá-la agora, mas ela não vai aparecer em
+                  &quot;Meus cronogramas&quot;. Avise o suporte.
+                </span>
+              </p>
+            </Card>
+          )}
 
           {emissaoId && (
             <Card className="flex flex-wrap items-center gap-3 p-4">

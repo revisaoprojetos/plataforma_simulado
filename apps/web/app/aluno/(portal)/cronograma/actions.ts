@@ -20,7 +20,7 @@ import { mapaTiposMeta } from '@/lib/cronograma/carregar-tipos'
 import type { Grade, LinkAula, MetaFonte, OpcoesGeracao } from '@/lib/cronograma/tipos'
 
 export type ResultadoGeracao =
-  | { ok: true; grade: Grade; emissaoId: string | null }
+  | { ok: true; grade: Grade; emissaoId: string | null; erroAoSalvar?: string }
   | { ok: false; error: string; semAcesso?: boolean }
 
 /**
@@ -81,10 +81,20 @@ export async function gerarCronograma(
   )
   if (!r.ok) return { ok: false, error: r.erro }
 
-  // Emissão: best-effort. Falhar o registro não pode impedir o aluno de ver a grade.
+  /**
+   * Emissão: falhar o registro não pode impedir o aluno de ver a grade — mas também não pode
+   * passar em silêncio, que foi o que aconteceu.
+   *
+   * O bloco era um try/catch lendo só `data`. O cliente do Supabase NÃO lança: devolve
+   * { data: null, error }. Então o catch nunca rodava, o `error` nunca era lido, e um CHECK
+   * recusando via_acesso='pacote' deixou a tabela em ZERO linhas sem um aviso sequer — bem no
+   * recurso que justificava trazer o gerador para a plataforma. Agora o erro é lido, vai para o
+   * log do servidor e sobe para a tela.
+   */
   let emissaoId: string | null = null
-  try {
-    const { data } = await svc
+  let erroAoSalvar: string | undefined
+  {
+    const { data, error } = await svc
       .from('simulado_cronograma_emissoes')
       .insert({
         tenant_id: sessao.tenantId,
@@ -103,12 +113,15 @@ export async function gerarCronograma(
       })
       .select('id')
       .single()
-    emissaoId = (data as any)?.id ?? null
-  } catch {
-    /* registro de uso nunca bloqueia a geração */
+    if (error) {
+      console.error('[cronograma] emissão NÃO gravada:', error.message)
+      erroAoSalvar = error.message
+    } else {
+      emissaoId = (data as { id: string } | null)?.id ?? null
+    }
   }
 
-  return { ok: true, grade: r.grade, emissaoId }
+  return { ok: true, grade: r.grade, emissaoId, erroAoSalvar }
 }
 
 /** Links de aula do tenant, já indexados pela chave (disciplina, aula). */
