@@ -346,7 +346,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
 
   return (
     <>
-      <Card className={`flex flex-wrap items-center gap-3 p-4 ${d.pacote.acesso_gratuito ? 'border-primary/40 bg-primary/5' : ''}`}>
+      <Card className={`flex flex-row flex-wrap items-center gap-3 p-4 ${d.pacote.acesso_gratuito ? 'border-primary/40 bg-primary/5' : ''}`}>
         <Gift className={`h-5 w-5 shrink-0 ${d.pacote.acesso_gratuito ? 'text-primary' : 'text-muted-foreground'}`} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">Liberar para todos os alunos</p>

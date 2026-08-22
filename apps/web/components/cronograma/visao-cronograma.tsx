@@ -44,6 +44,7 @@ export function VisaoCronograma({
     return ids.size
   }, [grade, checks])
   const pct = total ? Math.round((feitas / total) * 100) : 0
+  const pctRotulo = feitas > 0 && pct === 0 ? '<1%' : `${pct}%`
 
   function alternar(meta: MetaDatada, marcar: boolean) {
     if (!emissaoId) return
@@ -77,43 +78,51 @@ export function VisaoCronograma({
 
   return (
     <div className="space-y-4">
-      <Card className="flex flex-wrap items-center gap-4 p-4">
-        {emissaoId ? (
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2">
-              <p className="text-sm font-medium">
-                {feitas.toLocaleString('pt-BR')} de {total.toLocaleString('pt-BR')} metas concluídas
+      <Card className="p-4">
+        <div className="flex flex-row flex-wrap items-center gap-4">
+          {emissaoId ? (
+            <div className="min-w-0 flex-1">
+              <p className="text-sm">
+                <span className="font-semibold tabular-nums">{feitas.toLocaleString('pt-BR')}</span>
+                <span className="text-muted-foreground">
+                  {' '}de {total.toLocaleString('pt-BR')} metas concluídas
+                </span>
+                <span className="ml-2 font-medium tabular-nums text-primary">{pctRotulo}</span>
               </p>
-              <span className="text-xs text-muted-foreground">{pct}%</span>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  // Um fio de barra em vez de nada: com 2 de 581 o progresso existe e some se
+                  // a largura for só a porcentagem arredondada.
+                  style={{ width: feitas > 0 ? `max(3px, ${pct}%)` : '0%' }}
+                />
+              </div>
             </div>
-            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-            </div>
-          </div>
-        ) : (
-          <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-            Abra este cronograma em &quot;Meus cronogramas&quot; para marcar as metas concluídas.
-          </p>
-        )}
+          ) : (
+            <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+              Abra este cronograma em &quot;Meus cronogramas&quot; para marcar as metas concluídas.
+            </p>
+          )}
 
-        <div className="flex shrink-0 overflow-hidden rounded-lg border">
-          {(
-            [
-              ['lista', 'Lista', List],
-              ['calendario', 'Calendário', CalendarRange],
-            ] as const
-          ).map(([chave, rotulo, Icone]) => (
-            <button
-              key={chave}
-              onClick={() => setVisao(chave)}
-              className={`flex h-8 items-center gap-1.5 px-3 text-xs transition ${
-                visao === chave ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
-              }`}
-            >
-              <Icone className="h-3.5 w-3.5" />
-              {rotulo}
-            </button>
-          ))}
+          <div className="flex shrink-0 overflow-hidden rounded-lg border">
+            {(
+              [
+                ['lista', 'Lista', List],
+                ['calendario', 'Calendário', CalendarRange],
+              ] as const
+            ).map(([chave, rotulo, Icone]) => (
+              <button
+                key={chave}
+                onClick={() => setVisao(chave)}
+                className={`flex h-8 items-center gap-1.5 px-3 text-xs transition ${
+                  visao === chave ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+                }`}
+              >
+                <Icone className="h-3.5 w-3.5" />
+                {rotulo}
+              </button>
+            ))}
+          </div>
         </div>
       </Card>
 

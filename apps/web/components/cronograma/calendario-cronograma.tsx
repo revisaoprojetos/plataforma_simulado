@@ -161,9 +161,9 @@ export function CalendarioCronograma({
 
       {/* ── Cabeçalho dos dias. A 1ª coluna é a das semanas do cronograma. */}
       <div className="grid grid-cols-[3.25rem_repeat(7,minmax(0,1fr))] border-b bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        <div className="px-2 py-1.5">Sem</div>
+        <div className="px-2 py-1.5 text-center">Sem</div>
         {CABECALHO.map((d) => (
-          <div key={d} className="px-2 py-1.5 text-center">
+          <div key={d} className="px-2 py-1.5">
             {d}
           </div>
         ))}
@@ -212,7 +212,7 @@ export function CalendarioCronograma({
                 return (
                   <div
                     key={dia.data}
-                    className={`min-h-28 border-r p-1.5 last:border-r-0 ${
+                    className={`min-h-24 border-r p-1.5 last:border-r-0 ${
                       !dia.doMes ? 'bg-muted/30 opacity-55' : dia.marca === 'recesso' ? 'bg-muted/40' : ''
                     }`}
                   >

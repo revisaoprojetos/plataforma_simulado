@@ -1,4 +1,5 @@
-import { CalendarDays } from 'lucide-react'
+import Link from 'next/link'
+import { CalendarDays, ChevronRight } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { getTenantTheme } from '@/lib/tenant-theme'
@@ -6,7 +7,6 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { cronogramasDoAluno } from '@/lib/cronograma/acesso'
 import { Card } from '@/components/ui/card'
 import { CronogramaClient } from './cronograma-client'
-import { MinhasEmissoes } from './minhas-emissoes'
 import { listarMinhasEmissoes } from './emissoes-actions'
 
 export const dynamic = 'force-dynamic'
@@ -32,9 +32,6 @@ export default async function CronogramaAlunoPage() {
   const emissoes = await listarMinhasEmissoes()
   const { tenantNome } = await getTenantTheme()
   const salvos = (emissoes.itens ?? []).filter((e) => !e.arquivada).length
-  // A seção aparece enquanto EXISTIR registro, inclusive só arquivados — senão arquivar o último
-  // cronograma fazia a seção sumir, e com ela a única porta para restaurar.
-  const temHistorico = (emissoes.itens ?? []).length > 0
   // "Revisão / Ensino Jurídico" no meio da frase fica arrastado — a manchete usa só a primeira
   // parte do nome do tenant, que é como a marca é dita ("do Revisão").
   const marca = (tenantNome ?? '').split(/[/|–—-]/)[0].trim()
@@ -83,27 +80,20 @@ export default async function CronogramaAlunoPage() {
             {salvos > 0 ? ' e guardado na sua conta.' : ' e guardado na sua conta, para você voltar quando quiser.'}
           </p>
           {salvos > 0 && (
-            <p className="mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-white/85 ring-1 ring-inset ring-white/25">
+            <Link
+              href="/aluno/cronograma/meus"
+              className="mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-white/85 ring-1 ring-inset ring-white/25 transition hover:bg-white/10"
+            >
               <CalendarDays className="h-3.5 w-3.5" />
-              {salvos === 1 ? '1 cronograma salvo — logo abaixo' : `${salvos} cronogramas salvos — logo abaixo`}
-            </p>
+              {salvos === 1 ? 'Ver meu cronograma salvo' : `Ver meus ${salvos} cronogramas salvos`}
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
           )}
         </div>
       </section>
 
       {/* O cartão sobe sobre o herói, como no gerador antigo. */}
       <div className="relative z-10 -mt-20 space-y-6 sm:mx-4">
-        {/* Para quem JÁ gerou, o que ele tem vem antes do formulário de gerar mais um. Estava no
-            rodapé, depois da grade inteira — quem voltava para reabrir um cronograma tinha de
-            rolar a página toda para achá-lo. */}
-        {temHistorico && (
-          <div id="meus-cronogramas" className="scroll-mt-6">
-            {/* Só os 3 últimos: aqui a lista é atalho, não o assunto — uma lista longa
-                empurraria o formulário para fora da tela. O resto fica em /historico. */}
-            <MinhasEmissoes itens={emissoes.itens ?? []} limite={3} hrefTodos="/aluno/cronograma/historico" />
-          </div>
-        )}
-
         {!catalogo.length ? (
           <Card className="px-4 py-12 text-center">
             <CalendarDays className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />

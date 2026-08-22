@@ -36,45 +36,31 @@ function separarCarga(nome: string): { carga: string | null; nome: string } {
  *
  * É a resposta à maior dor do gerador legado — lá, fechar a página perdia o cronograma.
  *
- * Dois modos. Na tela do gerador entra COMPACTO (os últimos poucos + "ver todos"), porque ali
- * a lista é um atalho, não o assunto. Na página do histórico entra COMPLETO, com busca e a aba
- * de arquivados.
+ * Vive na tela "Meus cronogramas", irmã do gerador: gerar um plano novo e voltar a um que já
+ * existe são tarefas diferentes, e numa página só a lista competia com o formulário.
  *
  * A aba de arquivados não é enfeite: arquivar tira o cronograma da lista, e como a única porta
  * para "Restaurar" é a tela do próprio cronograma, que só se alcança por aqui, sem ela arquivar
  * seria um caminho sem volta.
  */
-export function MinhasEmissoes({
-  itens,
-  limite,
-  hrefTodos,
-}: {
-  itens: EmissaoResumo[]
-  /** Quantos mostrar. Ausente = todos, com busca e abas. */
-  limite?: number
-  /** Para onde o "ver todos" leva, no modo compacto. */
-  hrefTodos?: string
-}) {
-  const compacto = limite != null
+export function MinhasEmissoes({ itens }: { itens: EmissaoResumo[] }) {
   const ativas = useMemo(() => itens.filter((e) => !e.arquivada), [itens])
   const arquivadas = useMemo(() => itens.filter((e) => e.arquivada), [itens])
   const [aba, setAba] = useState<'ativas' | 'arquivadas'>(ativas.length ? 'ativas' : 'arquivadas')
   const [busca, setBusca] = useState('')
 
   const lista = useMemo(() => {
-    const base = compacto ? ativas : aba === 'ativas' ? ativas : arquivadas
+    const base = aba === 'ativas' ? ativas : arquivadas
     const t = busca.trim().toLowerCase()
     if (!t) return base
     return base.filter(
       (e) =>
         (e.titulo ?? '').toLowerCase().includes(t) || e.cronograma_nome.toLowerCase().includes(t),
     )
-  }, [compacto, aba, ativas, arquivadas, busca])
+  }, [aba, ativas, arquivadas, busca])
 
   if (!itens.length) return null
 
-  const visiveis = compacto ? lista.slice(0, limite) : lista
-  const ocultos = itens.length - visiveis.length
 
   return (
     <Card className="overflow-hidden" style={{ ['--card-spacing' as never]: '0px' }}>
@@ -83,15 +69,13 @@ export function MinhasEmissoes({
         <div className="min-w-0 flex-1">
           <p className="font-semibold leading-tight">Meus cronogramas</p>
           <p className="text-xs text-muted-foreground">
-            {compacto
-              ? `${ativas.length === 1 ? '1 cronograma salvo' : `${ativas.length} cronogramas salvos`} — clique para abrir`
-              : aba === 'ativas'
-                ? 'Clique para abrir, renomear ou arquivar'
-                : 'Arquivados continuam salvos — abra para restaurar'}
+            {aba === 'ativas'
+              ? `${ativas.length === 1 ? '1 cronograma salvo' : `${ativas.length} cronogramas salvos`} — clique para abrir, renomear ou arquivar`
+              : 'Arquivados continuam salvos — abra para restaurar'}
           </p>
         </div>
 
-        {!compacto && arquivadas.length > 0 && (
+        {arquivadas.length > 0 && (
           <div className="flex shrink-0 overflow-hidden rounded-lg border">
             {(
               [
@@ -113,17 +97,15 @@ export function MinhasEmissoes({
         )}
       </div>
 
-      {!compacto && (
-        <div className="relative border-b px-4 py-2.5">
-          <Search className="pointer-events-none absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar pelo nome que você deu ou pelo cronograma"
-            className="pl-7"
-          />
-        </div>
-      )}
+      <div className="relative border-b px-4 py-2.5">
+        <Search className="pointer-events-none absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          placeholder="Buscar pelo nome que você deu ou pelo cronograma"
+          className="pl-7"
+        />
+      </div>
 
       {lista.length === 0 ? (
         <p className="px-4 py-8 text-center text-sm text-muted-foreground">
@@ -135,7 +117,7 @@ export function MinhasEmissoes({
         </p>
       ) : (
         <div className="divide-y">
-          {visiveis.map((e) => {
+          {lista.map((e) => {
             const inicio = e.formulario?.inicio as string | undefined
             const { carga, nome } = separarCarga(e.cronograma_nome)
             const g = geradoEm(e.criado_em)
@@ -189,18 +171,6 @@ export function MinhasEmissoes({
         </div>
       )}
 
-      {/* No compacto o rodapé leva à página do histórico — inclusive quando só sobraram
-          arquivados, senão eles ficariam sem porta de entrada. */}
-      {compacto && hrefTodos && (ocultos > 0 || arquivadas.length > 0) && (
-        <Link
-          href={hrefTodos}
-          className="flex items-center justify-center gap-1 border-t px-4 py-2.5 text-sm font-medium text-primary transition hover:bg-muted/40"
-        >
-          Ver todos os {itens.length} cronogramas
-          {arquivadas.length > 0 && ` (${arquivadas.length} arquivado${arquivadas.length > 1 ? 's' : ''})`}
-          <ChevronRight className="h-4 w-4" />
-        </Link>
-      )}
     </Card>
   )
 }

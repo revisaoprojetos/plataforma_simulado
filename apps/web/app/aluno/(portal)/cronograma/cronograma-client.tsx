@@ -278,7 +278,7 @@ export function CronogramaClient({ catalogo }: { catalogo: CronogramaDoAluno[] }
           <VisaoCronograma grade={grade} paletaSlug={paletaSlug} emissaoId={emissaoId} />
 
           {naoSalvou && (
-            <Card className="flex flex-wrap items-start gap-3 border-destructive/40 bg-destructive/5 p-4">
+            <Card className="flex flex-row flex-wrap items-start gap-3 border-destructive/40 bg-destructive/5 p-4">
               <Info className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
               <p className="flex-1 text-sm">
                 <strong>Este cronograma não ficou salvo na sua conta.</strong>{' '}
@@ -291,7 +291,7 @@ export function CronogramaClient({ catalogo }: { catalogo: CronogramaDoAluno[] }
           )}
 
           {emissaoId && (
-            <Card className="flex flex-wrap items-center gap-3 p-4">
+            <Card className="flex flex-row flex-wrap items-center gap-3 p-4">
               <Save className="h-5 w-5 text-emerald-600" />
               <p className="flex-1 text-sm text-muted-foreground">
                 Este cronograma ficou salvo na sua conta — você pode fechar a página e voltar quando quiser.

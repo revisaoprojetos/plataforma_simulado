@@ -12,11 +12,10 @@ export const dynamic = 'force-dynamic'
 /**
  * Todos os cronogramas que o aluno já gerou.
  *
- * Existe porque a lista na tela do gerador mostra só os últimos: ali ela é um atalho, e uma
- * lista longa empurraria o formulário para fora da tela. Aqui a lista é o assunto — com busca
- * e a aba dos arquivados.
+ * Tela própria, irmã do gerador: são duas tarefas diferentes — montar um plano novo e voltar a
+ * um que já existe — e misturá-las numa página só fazia a lista competir com o formulário.
  *
- * O segmento é literal ('historico'), então ganha do [emissaoId] vizinho — o Next resolve rota
+ * O segmento é literal ('meus'), então ganha do [emissaoId] vizinho — o Next resolve rota
  * estática antes de dinâmica. Ainda assim `abrirEmissao` recusa id que não seja UUID, para a
  * ordem de resolução não ser a única coisa segurando isso.
  */
@@ -32,7 +31,7 @@ export default async function HistoricoCronogramasPage() {
       <div>
         <Link href="/aluno/cronograma" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
           <ArrowLeft className="mr-1 h-4 w-4" />
-          Voltar ao gerador
+          Gerar um novo cronograma
         </Link>
       </div>
 
