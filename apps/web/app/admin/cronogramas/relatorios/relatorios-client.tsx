@@ -25,13 +25,22 @@ function fmtQuando(iso: string): string {
 /** Barra de progresso enxuta — o número ao lado é o que se lê; a barra é o que se compara. */
 function Barra({ feitas, total }: { feitas: number; total: number }) {
   const p = pct(feitas, total)
+  // 3 de 634 arredonda para 0%, e "0%" ao lado de "(3/634)" se contradiz na mesma linha.
+  const rotulo = feitas > 0 && p === 0 ? '<1%' : `${p}%`
   return (
     <div className="flex items-center gap-2">
-      <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-primary" style={{ width: `${p}%` }} />
+      <div className="h-1.5 w-full min-w-16 overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-primary"
+          // Fio mínimo: com 3 de 634 o progresso existe e sumiria no arredondamento.
+          style={{ width: feitas > 0 ? `max(3px, ${p}%)` : '0%' }}
+        />
       </div>
       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-        {p}% <span className="opacity-70">({feitas.toLocaleString('pt-BR')}/{total.toLocaleString('pt-BR')})</span>
+        {rotulo}{' '}
+        <span className="opacity-70">
+          ({feitas.toLocaleString('pt-BR')}/{total.toLocaleString('pt-BR')})
+        </span>
       </span>
     </div>
   )
@@ -138,20 +147,21 @@ export function RelatoriosClient({ dados }: { dados: DadosRelatorio }) {
         ) : (
           <div className="divide-y">
             {dados.cronogramas.map((c) => (
-              <div key={c.cronograma_id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <Link href={`/admin/cronogramas/${c.cronograma_id}`} className="truncate font-medium hover:underline">
+              <div
+                key={c.cronograma_id}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 sm:grid sm:grid-cols-[minmax(0,1fr)_3.5rem_14rem]"
+              >
+                <div className="min-w-0">
+                  <Link href={`/admin/cronogramas/${c.cronograma_id}`} className="block truncate font-medium hover:underline">
                     {c.nome}
                   </Link>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="truncate text-xs text-muted-foreground">
                     {c.emissoes.toLocaleString('pt-BR')} emissão(ões) · {c.alunos.toLocaleString('pt-BR')} aluno(s)
                   </p>
                 </div>
-                {c.carga_horaria != null && (
-                  <Badge variant="outline" className="shrink-0">
-                    {c.carga_horaria}h
-                  </Badge>
-                )}
+                <span className="justify-self-start">
+                  {c.carga_horaria != null && <Badge variant="outline">{c.carga_horaria}h</Badge>}
+                </span>
                 <Barra feitas={c.concluidas} total={c.planejadas} />
               </div>
             ))}
@@ -193,8 +203,11 @@ export function RelatoriosClient({ dados }: { dados: DadosRelatorio }) {
         ) : (
           <div className="divide-y">
             {alunos.map((a) => (
-              <div key={a.estudante_id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
-                <div className="min-w-0 flex-1">
+              <div
+                key={a.estudante_id}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 sm:grid sm:grid-cols-[minmax(0,1fr)_14rem]"
+              >
+                <div className="min-w-0">
                   <p className="truncate font-medium">{a.nome}</p>
                   <p className="truncate text-xs text-muted-foreground">
                     {a.email ?? 'sem e-mail'} · {a.emissoes.toLocaleString('pt-BR')} emissão(ões) · última em{' '}
