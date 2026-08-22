@@ -75,8 +75,8 @@ export function GradeCronograma({ grade, paletaSlug, titulo }: { grade: Grade; p
       <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
         {titulo && <h2 className="mr-auto text-sm font-semibold">{titulo}</h2>}
         <Select value={filtroSemana} onValueChange={(v) => setFiltroSemana(v ?? 'todas')}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
+          <SelectTrigger className="w-44">
+            <SelectValue>{filtroSemana === 'todas' ? 'Todas as semanas' : `Semana ${filtroSemana}`}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todas">Todas as semanas</SelectItem>
@@ -90,7 +90,9 @@ export function GradeCronograma({ grade, paletaSlug, titulo }: { grade: Grade; p
 
         <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v ?? 'todos')}>
           <SelectTrigger className="w-52">
-            <SelectValue />
+            <SelectValue>
+              {filtroTipo === 'todos' ? 'Todos os tipos' : (tiposPresentes.find((t) => t.slug === filtroTipo)?.nome ?? 'Todos os tipos')}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos os tipos</SelectItem>
@@ -134,12 +136,20 @@ export function GradeCronograma({ grade, paletaSlug, titulo }: { grade: Grade; p
 
             {s.kind === 'conteudo' &&
               s.metas.map((m) => (
-                <div key={m.id} className="flex flex-wrap items-start gap-3 px-4 py-2.5" style={{ background: paleta.celula }}>
+                /* Colunas FIXAS. Em flex, a etiqueta do tipo mudava de largura com o texto
+                   ("Legproc" vs "PDFULL + Videoaula"), então o título de cada meta começava num x
+                   diferente a cada linha. As células dos links e da duração são sempre renderizadas
+                   (vazias quando não há), senão a coluna seguinte escorrega. */
+                <div
+                  key={m.id}
+                  className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 py-2.5 sm:grid sm:grid-cols-[6rem_10.5rem_minmax(0,1fr)_auto_5.5rem]"
+                  style={{ background: paleta.celula }}
+                >
                   <div className="w-24 shrink-0 text-xs">
                     <p className="font-medium">{fmtBr(m.data)}</p>
                     <p className="text-muted-foreground">{m.diaNome}</p>
                   </div>
-                  <Badge variant="outline" className="shrink-0">
+                  <Badge variant="outline" className="max-w-full shrink-0 justify-self-start truncate">
                     {m.tipoDef.nome}
                   </Badge>
                   <div className="min-w-0 flex-1">
@@ -151,23 +161,21 @@ export function GradeCronograma({ grade, paletaSlug, titulo }: { grade: Grade; p
                       </a>
                     )}
                   </div>
-                  {m.links && (
-                    <div className="flex shrink-0 flex-wrap gap-1.5">
-                      {m.links.urls.map((u) => (
-                        <a
-                          key={u.plataforma.id}
-                          href={u.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-md border bg-background/70 px-2 py-0.5 text-xs text-primary hover:bg-background"
-                        >
-                          {u.plataforma.nome}
-                        </a>
-                      ))}
-                      {m.links.ausente && <span className="text-xs italic text-muted-foreground">{m.links.ausente}</span>}
-                    </div>
-                  )}
-                  {m.duracao && <span className="shrink-0 text-xs text-muted-foreground">{m.duracao}</span>}
+                  <div className="flex shrink-0 flex-wrap gap-1.5">
+                    {m.links?.urls.map((u) => (
+                      <a
+                        key={u.plataforma.id}
+                        href={u.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-md border bg-background/70 px-2 py-0.5 text-xs text-primary hover:bg-background"
+                      >
+                        {u.plataforma.nome}
+                      </a>
+                    ))}
+                    {m.links?.ausente && <span className="text-xs italic text-muted-foreground">{m.links.ausente}</span>}
+                  </div>
+                  <span className="shrink-0 text-xs text-muted-foreground sm:text-right">{m.duracao ?? ''}</span>
                 </div>
               ))}
           </div>
