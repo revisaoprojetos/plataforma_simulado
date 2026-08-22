@@ -359,7 +359,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
         <Card>
           <CardContent className="pt-5">
             {questaoAtual.aviso && (
-              <div className="-mt-2 mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border px-3 py-2 text-xs font-semibold"
+              <div className="-mt-1.5 mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border px-3 py-2 text-xs font-semibold"
                 style={{ borderColor: `${questaoAtual.aviso.cor ?? '#ef4444'}66`, background: `${questaoAtual.aviso.cor ?? '#ef4444'}14`, color: questaoAtual.aviso.cor ?? '#ef4444' }}>
                 <AlertCircle className="h-4 w-4 shrink-0" /> {questaoAtual.aviso.nome}
                 <span className="font-normal opacity-80">
