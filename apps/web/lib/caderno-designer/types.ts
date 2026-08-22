@@ -204,7 +204,7 @@ export const HUD_CORES_PADRAO: HudCores = {
   timerFundo: '#eef1f5', selecionada: '#6d28d9', finalizar: '#6d28d9',
   respondida: '#6d28d9', revisar: '#f59e0b', card: '#ffffff', texto: '#1a1d24',
   textoSecundario: '#71767f', superficie: '#eceef2',
-  alerta: '#dc2626', aviso: '#f59e0b', borda: '#e5e7eb', anulada: '#6b7280', altTrocada: '#0891b2',
+  alerta: '#dc2626', aviso: '#f59e0b', borda: '#e5e7eb', anulada: '#2563eb', altTrocada: '#0891b2',
   altFundo: '#ffffff', altHover: '#f4f4f5',
   acerto: '#16a34a', erro: '#dc2626', branco: '#6b7280', media: '#6d28d9',
   loadingCor: '#6d28d9', loadingTipo: 'circulo', loadingLogoUrl: '', loadingLogoBg: '#ffffff', loadingLogoEstilo: 'arredondado', loadingLogoFiltro: 'none', loadingTexto: '#6b7280', loadingPct: '#6d28d9', bgImagemUrl: '', bgOpacidade: '100', bgDesfoque: '0', bgAjuste: 'cover', bgPosicao: 'center', loginInputBg: '#ffffff', tituloTexto: '#6d28d9', loginDestaque: '#6d28d9',

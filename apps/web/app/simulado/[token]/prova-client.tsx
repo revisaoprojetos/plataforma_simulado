@@ -466,6 +466,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
       questaoAtual={questaoAtual}
       respostaId={respostas[questaoAtual.id]}
       respondidas={respondidasArr}
+      bloqueadas={sessao.questoes.map((q) => !!q.bloqueada)}
       marcadas={sessao.questoes.map((q) => marcadas.has(q.id))}
       marcadaAtual={marcadas.has(questaoAtual.id)}
       numMarcadas={marcadas.size}

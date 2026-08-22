@@ -480,11 +480,12 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
                     atual
                       ? 'bg-primary text-primary-foreground'
                       : q.bloqueada
-                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                      ? 'text-white'
                       : respondida
                       ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
                   )}
+                  style={q.bloqueada && !atual ? { background: 'var(--prova-anulada, #2563eb)' } : undefined}
                   title={q.aviso ? `Questão ${i + 1} — ${q.aviso.nome}` : `Questão ${i + 1}`}
                 >
                   {i + 1}
@@ -542,11 +543,12 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
                     className={cn(
                       'flex h-9 w-9 items-center justify-center rounded-md text-xs font-medium',
                       q.bloqueada
-                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                        ? 'text-white'
                         : respondida
                         ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400'
                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
                     )}
+                    style={q.bloqueada ? { background: 'var(--prova-anulada, #2563eb)' } : undefined}
                   >
                     {q.bloqueada ? '★' : respondida ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
                   </button>

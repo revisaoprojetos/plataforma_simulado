@@ -69,6 +69,7 @@ export const GRUPOS: HudGrupo[] = [
   ] },
   { titulo: 'Navegador de questões', pages: ['prova'], campos: [
     { k: 'respondida', label: 'Marcadas (respondidas)', desc: 'Questões já respondidas (navegador e revisão do simulado)' },
+    { k: 'anulada', label: 'Anuladas (bloqueadas)', desc: 'Questões anuladas/desatualizadas no navegador — ponto garantido, não respondíveis. Padrão azul.' },
     { k: 'revisar', label: 'Revisar (marcar)', desc: 'Botão Revisar + flag no navegador' },
   ] },
   { titulo: 'Encerrada · barra e cards', pages: ['encerrada'], campos: [

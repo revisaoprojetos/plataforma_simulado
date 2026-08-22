@@ -16,6 +16,8 @@ const LETRA = ['A', 'B', 'C', 'D', 'E']
 const PRIM = 'var(--primary)'
 const MARCADA = 'var(--prova-marcada, var(--primary))'
 const REVISAR = 'var(--prova-revisar, #f59e0b)'
+// Questão anulada/bloqueada no navegador. Padrão AZUL; segue a personalização do HUD (cor "Anulada").
+const ANULADA = 'var(--prova-anulada, #2563eb)'
 const CARD = 'var(--card)'
 const TOPTX = 'var(--prova-topbar-texto, var(--foreground))'
 const TIMER = 'var(--prova-timer, var(--foreground))'
@@ -45,6 +47,8 @@ export interface ProvaHudProps {
   questaoAtual: ProvaHudQuestao
   respostaId?: string
   respondidas: boolean[]
+  /** questões anuladas/bloqueadas (não respondíveis) — colorem de azul no navegador. */
+  bloqueadas?: boolean[]
   onResponder: (altId: string) => void
   /** Slot da resposta DISCURSIVA (envio de foto) — renderizado no lugar das alternativas quando a questão é discursiva. */
   slotDiscursiva?: React.ReactNode
@@ -255,14 +259,16 @@ export function ProvaHud(p: ProvaHudProps) {
                   {p.respondidas.map((respondida, i) => {
                     const atual = i === p.questaoIndex
                     const marcada = !!p.marcadas?.[i]
+                    const bloqueada = !!p.bloqueadas?.[i]
                     let st: React.CSSProperties | undefined
                     let cls = 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    // Anulada/alterada só são analisadas depois da prova — aqui não colorem.
-                    if (respondida) { cls = 'text-white'; st = { background: MARCADA } }
+                    // Anulada/bloqueada: cor própria (azul, segue o HUD) — tem prioridade sobre "respondida".
+                    if (bloqueada) { cls = 'text-white'; st = { background: ANULADA } }
+                    else if (respondida) { cls = 'text-white'; st = { background: MARCADA } }
                     // atual = preenchimento sólido + halo com a cor do texto (destaca dos respondidos)
                     if (atual) { cls = 'bg-primary text-primary-foreground'; st = { boxShadow: '0 0 0 2px var(--background), 0 0 0 4px var(--foreground)' } }
                     return (
-                      <button key={i} data-campo={atual ? 'primaria' : respondida ? 'respondida' : undefined} onClick={() => p.onGoto(i)} title={`Questão ${i + 1}${marcada ? ' • marcada p/ revisar' : ''}`}
+                      <button key={i} data-campo={atual ? 'primaria' : bloqueada ? 'anulada' : respondida ? 'respondida' : undefined} onClick={() => p.onGoto(i)} title={`Questão ${i + 1}${bloqueada ? ' • anulada (ponto garantido)' : marcada ? ' • marcada p/ revisar' : ''}`}
                         className={cn('relative flex aspect-square items-center justify-center rounded-md text-xs font-bold transition-colors', cls)}
                         style={st}>
                         {i + 1}
@@ -274,6 +280,7 @@ export function ProvaHud(p: ProvaHudProps) {
                 <div className="mt-4 space-y-1.5 border-t pt-3 text-xs text-muted-foreground">
                   <div data-campo="primaria" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: PRIM, boxShadow: '0 0 0 1.5px var(--foreground)' }} /> Questão atual</div>
                   <div data-campo="respondida" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: MARCADA }} /> Marcadas ({p.totalRespondidas})</div>
+                  {(p.bloqueadas ?? []).some(Boolean) && <div data-campo="anulada" className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: ANULADA }} /> Anuladas ({(p.bloqueadas ?? []).filter(Boolean).length})</div>}
                   <div data-campo="superficie" className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-muted" /> Em branco ({branco})</div>
                   {podeMarcar && <div data-campo="revisar" className="flex items-center gap-2"><Flag className="h-3 w-3" style={{ color: REVISAR }} /> Para revisar ({p.numMarcadas ?? 0})</div>}
                 </div>
