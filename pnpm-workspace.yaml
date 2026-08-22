@@ -10,5 +10,5 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: true
   sharp: true
-  tesseract.js: set this to true or false
+  tesseract.js: true
   unrs-resolver: true
