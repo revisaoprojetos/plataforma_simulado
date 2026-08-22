@@ -23,7 +23,7 @@ async function guard() {
  * comportamento antigo (upsert na versão vigente).
  */
 async function salvarConteudo(tenantId: string, atorId: string | null, documentoId: string, htmlBruto: string) {
-  const { html, texto, artigos } = sanitizarDocumento(htmlBruto)
+  const { html, texto, artigos, dispositivos } = sanitizarDocumento(htmlBruto)
   if (!html.replace(/<[^>]+>/g, '').trim()) return { ok: false as const, error: 'O conteúdo ficou vazio após a limpeza. Verifique o HTML.' }
 
   const svc = createAdminClient()
@@ -54,6 +54,16 @@ async function salvarConteudo(tenantId: string, atorId: string | null, documento
     ;({ error } = await svc.from('simulado_documento_conteudos').upsert({ tenant_id: tenantId, documento_id: documentoId, versao: versaoAlvo, html, texto_hash, artigos }, { onConflict: 'documento_id,versao' }))
   }
   if (error) return { ok: false as const, error: error.message }
+
+  // Dispositivos estruturados (A3) — regrava para a versão alvo. Tolerante à migração ausente.
+  try {
+    await svc.from('simulado_lei_dispositivos').delete().eq('documento_id', documentoId).eq('versao', versaoAlvo)
+    if (dispositivos.length) await svc.from('simulado_lei_dispositivos').insert(dispositivos.map((d) => ({
+      tenant_id: tenantId, documento_id: documentoId, versao: versaoAlvo, id_estavel: d.id_estavel, tipo: d.tipo, rotulo: d.rotulo,
+      caminho: d.caminho, ordem: d.ordem, texto_normalizado: d.texto, hash: createHash('sha1').update(d.texto).digest('hex').slice(0, 16),
+    })))
+  } catch { /* migração A3 ausente */ }
+
   await svc.from('simulado_documentos').update({ atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', tenantId)
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_documento_conteudos', entidadeId: documentoId, depois: { versao: versaoAlvo, artigos, rascunho: temVers }, atorId, tenantId })
   revalidatePath(`/admin/leitura/${documentoId}`)

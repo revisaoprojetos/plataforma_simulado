@@ -30,7 +30,7 @@ const REMOVE_TAGS = new Set([
 const VOID_TAGS = new Set(['br', 'hr', 'img', 'col'])
 // Atributos permitidos por tag (o resto e descartado - inclusive todo on*).
 const ALLOW_ATTR: Record<string, Set<string>> = {
-  '*': new Set(['class', 'id', 'data-art', 'data-secao']),
+  '*': new Set(['class', 'id', 'data-art', 'data-secao', 'data-disp', 'data-disp-tipo', 'data-grifo', 'data-grifo-label', 'data-grifo-estrutural']),
   a: new Set(['href', 'title']),
   img: new Set(['src', 'alt', 'width', 'height']),
   td: new Set(['colspan', 'rowspan']),
@@ -105,18 +105,66 @@ function ancorarArtigos(root: any): number {
   return k
 }
 
-export interface HtmlSanitizado {
-  html: string     // HTML seguro + ancoras de artigo
-  texto: string    // espinha de texto (concatenacao dos text nodes) p/ hash de validacao
-  artigos: number  // numero de artigos/secoes ancorados
+export interface Dispositivo { id_estavel: string; tipo: string; rotulo: string; caminho: string; ordem: number; texto: string }
+
+// Slug curto de um texto (para id de titulo/capitulo/secao sem numero claro).
+function slugCurto(s: string): string {
+  return (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24) || 'sec'
 }
 
-// Sanitiza + ancora + extrai a espinha de texto. Entrada: HTML arbitrario.
+const BLOCOS_DISP = 'p,div,li,section,blockquote,h1,h2,h3,h4,h5,h6'
+const RE_ESTRUT = /^(t[íi]tulo|cap[íi]tulo|se[çc][ãa]o|livro|parte)\b/i
+
+/**
+ * Marca artigos/§/incisos/alíneas e títulos com id ESTÁVEL (derivado do rótulo, não
+ * da posição) em `data-disp` + `data-disp-tipo`. Retorna a lista de dispositivos.
+ */
+function indexarDispositivos(root: any): Dispositivo[] {
+  const disp: Dispositivo[] = []
+  const usados = new Map<string, number>()
+  const unico = (base: string) => { const n = (usados.get(base) ?? 0) + 1; usados.set(base, n); return n === 1 ? base : `${base}~${n}` }
+  const ctx = { artigo: '', paragrafo: '', inciso: '' }
+  let ordem = 0
+  for (const el of root.querySelectorAll(BLOCOS_DISP)) {
+    const tag = (el.tagName || '').toUpperCase()
+    const txt = (el.text || '').replace(/\s+/g, ' ').trim()
+    if (!txt || el.getAttribute('data-disp')) continue
+    let tipo = '', id = '', rotulo = ''
+    let m: RegExpMatchArray | null
+    if (TITULOS.has(tag) || RE_ESTRUT.test(txt)) {
+      tipo = 'secao'; rotulo = txt.slice(0, 60); id = unico('sec-' + slugCurto(txt)); ctx.artigo = ctx.paragrafo = ctx.inciso = ''
+    } else if ((m = txt.match(/^art(?:igo)?\.?\s*(\d+)/i))) {
+      tipo = 'artigo'; id = unico('art-' + m[1]); rotulo = 'Art. ' + m[1]; ctx.artigo = id; ctx.paragrafo = ''; ctx.inciso = ''
+    } else if (/^par[áa]grafo\s+[úu]nico/i.test(txt)) {
+      tipo = 'paragrafo'; id = unico((ctx.artigo || 'art') + '.par-unico'); rotulo = 'Parágrafo único'; ctx.paragrafo = id; ctx.inciso = ''
+    } else if ((m = txt.match(/^§\s*(\d+)/))) {
+      tipo = 'paragrafo'; id = unico((ctx.artigo || 'art') + '.par-' + m[1]); rotulo = '§ ' + m[1]; ctx.paragrafo = id; ctx.inciso = ''
+    } else if ((m = txt.match(/^([IVXLCDM]{1,6})\s*[-–]/))) {
+      tipo = 'inciso'; const parent = ctx.paragrafo || ctx.artigo || 'art'; id = unico(parent + '.inc-' + m[1].toLowerCase()); rotulo = m[1]; ctx.inciso = id
+    } else if ((m = txt.match(/^([a-z])\s*\)/i))) {
+      tipo = 'alinea'; const parent = ctx.inciso || ctx.paragrafo || ctx.artigo || 'art'; id = unico(parent + '.al-' + m[1].toLowerCase()); rotulo = m[1].toLowerCase() + ')'
+    } else continue
+    ordem += 1
+    el.setAttribute('data-disp', id)
+    el.setAttribute('data-disp-tipo', tipo)
+    disp.push({ id_estavel: id, tipo, rotulo, caminho: id, ordem, texto: txt.slice(0, 4000) })
+  }
+  return disp
+}
+
+export interface HtmlSanitizado {
+  html: string           // HTML seguro + ancoras de artigo + dispositivos
+  texto: string          // espinha de texto (concatenacao dos text nodes)
+  artigos: number        // numero de artigos/secoes ancorados (compat)
+  dispositivos: Dispositivo[]
+}
+
+// Sanitiza + ancora (data-art) + indexa dispositivos (data-disp) + extrai a espinha.
 export function sanitizarDocumento(htmlBruto: string): HtmlSanitizado {
   const root = parse(htmlBruto ?? '', { comment: false })
   const artigos = ancorarArtigos(root)
+  const dispositivos = indexarDispositivos(root)
   const html = root.childNodes.map(serialize).join('').trim()
-  // Espinha a partir do HTML JA sanitizado (mesma base que o cliente vai ler).
   const texto = parse(html).text.replace(/\s+/g, ' ').trim()
-  return { html, texto, artigos }
+  return { html, texto, artigos, dispositivos }
 }

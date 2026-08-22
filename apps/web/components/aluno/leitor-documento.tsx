@@ -15,7 +15,7 @@ import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
 
 type Modo = 'scroll' | 'flip'
 type Tema = 'claro' | 'sepia' | 'escuro'
-interface Secao { id: string; art: number; label: string }
+interface Secao { id: string; art: number; label: string; tipo: string; nivel: number }
 
 const TEMAS: Record<Tema, { bg: string; fg: string; muted: string }> = {
   claro: { bg: '#ffffff', fg: '#1f2937', muted: '#6b7280' },
@@ -69,14 +69,23 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   // No mobile, começa com o menu fechado (a barra de 256px cobriria a leitura).
   useEffect(() => { if (typeof window !== 'undefined' && window.innerWidth < 768) setMenuAberto(false) }, [])
 
-  // ── Sumário (TOC) a partir das âncoras de artigo/seção ──
+  // ── Sumário (TOC): prefere dispositivos ([data-disp], hierárquico); cai em [data-art]. ──
   useIsoLayout(() => {
     const root = contentRef.current
     if (!root) return
+    const disp = Array.from(root.querySelectorAll<HTMLElement>('[data-disp]'))
+    if (disp.length) {
+      setSecoes(disp.map((el) => {
+        const id = el.getAttribute('data-disp') || ''
+        const tipo = el.getAttribute('data-disp-tipo') || 'artigo'
+        const nivel = tipo === 'secao' ? 0 : Math.min(3, (id.match(/\./g) || []).length)
+        return { id, art: 0, tipo, nivel, label: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 70) || id }
+      }))
+      return
+    }
     const nós = Array.from(root.querySelectorAll<HTMLElement>('[data-art]'))
     setSecoes(nós.map((el) => ({
-      id: el.id || `art-${el.getAttribute('data-art')}`,
-      art: Number(el.getAttribute('data-art')) || 0,
+      id: el.id || `art-${el.getAttribute('data-art')}`, art: Number(el.getAttribute('data-art')) || 0, tipo: 'artigo', nivel: 0,
       label: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60) || `Seção ${el.getAttribute('data-art')}`,
     })))
   }, [doc.html])
@@ -224,7 +233,8 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
 
   // ── Pular para uma seção (sumário) ──
   function pular(s: Secao) {
-    const el = contentRef.current?.querySelector<HTMLElement>(`#${CSS.escape(s.id)}`) ?? contentRef.current?.querySelector<HTMLElement>(`[data-art="${s.art}"]`)
+    const root = contentRef.current
+    const el = root?.querySelector<HTMLElement>(`[data-disp="${CSS.escape(s.id)}"]`) ?? root?.querySelector<HTMLElement>(`#${CSS.escape(s.id)}`) ?? root?.querySelector<HTMLElement>(`[data-art="${s.art}"]`)
     if (!el) return
     if (modo === 'scroll') { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
     else { const alvo = Math.floor(el.offsetLeft / (colW + GAP)); irPara(alvo) }
@@ -336,8 +346,8 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
             <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide" style={{ color: cores.muted }}>Sumário</p>
             {secoes.length === 0 ? (
               <p className="px-1 text-xs" style={{ color: cores.muted }}>Sem seções detectadas.</p>
-            ) : secoes.map((s) => (
-              <button key={s.id} onClick={() => pular(s)} className="block w-full truncate rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-black/5" style={{ color: cores.fg }} title={s.label}>
+            ) : secoes.map((s, i) => (
+              <button key={`${s.id}-${i}`} onClick={() => pular(s)} className="block w-full truncate rounded py-1 pr-2 text-left text-xs transition-colors hover:bg-black/5" style={{ color: cores.fg, paddingLeft: 8 + s.nivel * 12, fontWeight: s.tipo === 'secao' || s.tipo === 'artigo' ? 600 : 400, opacity: s.nivel >= 2 ? 0.8 : 1 }} title={s.label}>
                 {s.label}
               </button>
             ))}
