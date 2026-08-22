@@ -19,7 +19,6 @@
  *    um cronograma". Esses viram vínculo individual em vez de perder o acesso.
  */
 
-import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
@@ -72,35 +71,22 @@ export async function listarPacotes(): Promise<{ ok: boolean; itens?: PacoteList
   const nGrupos = conta(grupos)
   const nEst = conta(estudantes)
 
-  // Alcance: membros dos grupos vinculados + alunos avulsos, sem duplicar.
-  const gruposUsados = [...new Set(grupos.map((x) => x.grupo_id))]
-  const membrosPorGrupo = new Map<string, string[]>()
-  if (gruposUsados.length) {
-    const membros = await fetchAllByIn<any>(gruposUsados, (chunk) =>
-      svc.from('simulado_grupo_membros').select('grupo_id, estudante_id').in('grupo_id', chunk).order('estudante_id') as any,
-    )
-    for (const m of membros) {
-      const l = membrosPorGrupo.get(m.grupo_id)
-      if (l) l.push(m.estudante_id)
-      else membrosPorGrupo.set(m.grupo_id, [m.estudante_id])
-    }
+  /* Alcance = alunos distintos por grupo vinculado OU vínculo individual. Antes isso baixava
+     TODOS os membros dos grupos usados (24.946 linhas = 25 idas ao PostgREST) para montar um
+     Set na aplicação. O UNION dentro da RPC faz a mesma dedução em uma consulta. */
+  const { data: alcances } = await svc.rpc('simulado_cronograma_pacotes_alcance', { p_tenant: g.tenantId })
+  const alcancePorPacote = new Map<string, number>()
+  for (const a of (alcances ?? []) as { pacote_id: string; alcance: number }[]) {
+    alcancePorPacote.set(a.pacote_id, Number(a.alcance))
   }
 
-  const itensLista = pacotes.map((p) => {
-    const alcancados = new Set<string>()
-    for (const vg of grupos) {
-      if (vg.pacote_id !== p.id) continue
-      for (const e of membrosPorGrupo.get(vg.grupo_id) ?? []) alcancados.add(e)
-    }
-    for (const ve of estudantes) if (ve.pacote_id === p.id) alcancados.add(ve.estudante_id)
-    return {
-      ...p,
-      cronogramas: nItens.get(p.id) ?? 0,
-      grupos: nGrupos.get(p.id) ?? 0,
-      estudantes: nEst.get(p.id) ?? 0,
-      alcance: alcancados.size,
-    }
-  })
+  const itensLista = pacotes.map((p) => ({
+    ...p,
+    cronogramas: nItens.get(p.id) ?? 0,
+    grupos: nGrupos.get(p.id) ?? 0,
+    estudantes: nEst.get(p.id) ?? 0,
+    alcance: alcancePorPacote.get(p.id) ?? 0,
+  }))
 
   return { ok: true, itens: itensLista as PacoteLista[] }
 }
@@ -130,7 +116,7 @@ export async function carregarPacote(id: string): Promise<{ ok: boolean; dados?:
     .maybeSingle()
   if (!pacote) return { ok: false, error: 'Pacote não encontrado.' }
 
-  const [itens, vgrupos, vest, catalogo, todosGrupos, metas] = await Promise.all([
+  const [itens, vgrupos, vest, catalogo, todosGrupos, metas, nMembros, alcanceRpc] = await Promise.all([
     fetchAll<any>(() => svc.from('simulado_cronograma_pacote_itens').select('cronograma_id').eq('tenant_id', g.tenantId).eq('pacote_id', id).order('id') as any),
     fetchAll<any>(() => svc.from('simulado_cronograma_pacote_grupos').select('grupo_id').eq('tenant_id', g.tenantId).eq('pacote_id', id).order('id') as any),
     fetchAll<any>(() => svc.from('simulado_cronograma_pacote_estudantes').select('estudante_id').eq('tenant_id', g.tenantId).eq('pacote_id', id).order('id') as any),
@@ -140,30 +126,27 @@ export async function carregarPacote(id: string): Promise<{ ok: boolean; dados?:
     fetchAll<any>(() =>
       svc.from('simulado_grupos').select('id, nome').eq('tenant_id', g.tenantId).eq('deletado', false).eq('arquivado', false).order('nome') as any,
     ),
-    fetchAll<any>(() => svc.from('simulado_cronograma_metas').select('cronograma_id').eq('tenant_id', g.tenantId).order('id') as any),
+    /* Contagem de metas AGREGADA. Um `select cronograma_id` aqui traria 16.697 linhas em 17
+       idas ao PostgREST, a cada abertura da tela, para produzir ~25 números. */
+    svc.rpc('simulado_cronograma_contar_metas', { p_tenant: g.tenantId }),
+    // Membros por grupo (o seletor mostra o tamanho): 24.946 linhas viravam 25 idas.
+    svc.rpc('simulado_cronograma_contar_membros_grupos', { p_tenant: g.tenantId }),
+    svc.rpc('simulado_cronograma_pacotes_alcance', { p_tenant: g.tenantId, p_pacote: id }),
   ])
 
   const metasPorCron = new Map<string, number>()
-  for (const m of metas) metasPorCron.set(m.cronograma_id, (metasPorCron.get(m.cronograma_id) ?? 0) + 1)
+  for (const m of ((metas as any).data ?? []) as { cronograma_id: string; total: number }[]) {
+    metasPorCron.set(m.cronograma_id, Number(m.total))
+  }
+  const membrosPorGrupo = new Map<string, number>()
+  for (const x of ((nMembros as any).data ?? []) as { grupo_id: string; total: number }[]) {
+    membrosPorGrupo.set(x.grupo_id, Number(x.total))
+  }
+  const alcance = Number((((alcanceRpc as any).data ?? [])[0]?.alcance as number | undefined) ?? 0)
 
   const idsCron = new Set(itens.map((i) => i.cronograma_id))
   const idsGrupo = new Set(vgrupos.map((x) => x.grupo_id))
   const idsEst = vest.map((x) => x.estudante_id)
-
-  // Contagem de membros de todos os grupos (o seletor precisa mostrar o tamanho).
-  const membrosPorGrupo = new Map<string, number>()
-  const alcancados = new Set<string>()
-  if (todosGrupos.length) {
-    const membros = await fetchAllByIn<any>(
-      todosGrupos.map((x) => x.id),
-      (chunk) => svc.from('simulado_grupo_membros').select('grupo_id, estudante_id').in('grupo_id', chunk).order('estudante_id') as any,
-    )
-    for (const m of membros) {
-      membrosPorGrupo.set(m.grupo_id, (membrosPorGrupo.get(m.grupo_id) ?? 0) + 1)
-      if (idsGrupo.has(m.grupo_id)) alcancados.add(m.estudante_id)
-    }
-  }
-  for (const e of idsEst) alcancados.add(e)
 
   const nomesEstudantes = idsEst.length
     ? await fetchAllByIn<any>(idsEst, (chunk) =>
@@ -182,7 +165,7 @@ export async function carregarPacote(id: string): Promise<{ ok: boolean; dados?:
       estudantes: nomesEstudantes.map((e) => ({ id: e.id, nome: e.nome, email: e.email ?? null })),
       cronogramasDisponiveis: catalogo.filter((c) => !idsCron.has(c.id)).map((c) => ({ ...c, metas: metasPorCron.get(c.id) ?? 0 })),
       gruposDisponiveis: todosGrupos.filter((x) => !idsGrupo.has(x.id)).map((x) => ({ ...x, membros: membrosPorGrupo.get(x.id) ?? 0 })),
-      alcance: alcancados.size,
+      alcance,
     },
   }
 }
@@ -205,7 +188,6 @@ export async function criarPacote(nome: string, descricao: string | null): Promi
     return { ok: false, error: /duplicate|unique/i.test(error.message) ? 'Já existe um pacote com esse nome.' : error.message }
   }
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_cronograma_pacotes', entidadeId: (data as any).id, depois: { nome: n }, atorId: g.atorId, tenantId: g.tenantId })
-  revalidatePath('/admin/cronogramas/pacotes')
   return { ok: true, id: (data as any).id }
 }
 
@@ -224,8 +206,6 @@ export async function atualizarPacote(id: string, nome: string, descricao: strin
     return { ok: false, error: /duplicate|unique/i.test(error.message) ? 'Já existe um pacote com esse nome.' : error.message }
   }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cronograma_pacotes', entidadeId: id, depois: { nome: n, ativo }, atorId: g.atorId, tenantId: g.tenantId })
-  revalidatePath('/admin/cronogramas/pacotes')
-  revalidatePath(`/admin/cronogramas/pacotes/${id}`)
   return { ok: true }
 }
 
@@ -237,7 +217,6 @@ export async function excluirPacote(id: string): Promise<{ ok: boolean; error?: 
   const { error } = await svc.from('simulado_cronograma_pacotes').delete().eq('id', id).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_cronograma_pacotes', entidadeId: id, atorId: g.atorId, tenantId: g.tenantId })
-  revalidatePath('/admin/cronogramas/pacotes')
   return { ok: true }
 }
 
@@ -272,7 +251,6 @@ export async function alternarCronogramaNoPacote(pacoteId: string, cronogramaId:
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath(`/admin/cronogramas/pacotes/${pacoteId}`)
   return { ok: true }
 }
 
@@ -306,7 +284,6 @@ export async function vincularGrupo(pacoteId: string, grupoId: string): Promise<
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath(`/admin/cronogramas/pacotes/${pacoteId}`)
   return { ok: true, alcance: membros.length }
 }
 
@@ -454,7 +431,6 @@ export async function desvincularGrupo(
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath(`/admin/cronogramas/pacotes/${pacoteId}`)
   return { ok: true, preservados }
 }
 
@@ -542,7 +518,6 @@ export async function alternarEstudanteNoPacote(pacoteId: string, estudanteId: s
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath(`/admin/cronogramas/pacotes/${pacoteId}`)
   return { ok: true }
 }
 
@@ -602,7 +577,6 @@ export async function adicionarCronogramas(pacoteId: string, cronogramaIds: stri
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath(`/admin/cronogramas/pacotes/${pacoteId}`)
   return { ok: true, adicionados: ids.length }
 }
 
@@ -634,7 +608,6 @@ export async function vincularGrupos(pacoteId: string, grupoIds: string[]): Prom
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath(`/admin/cronogramas/pacotes/${pacoteId}`)
   return { ok: true, vinculados: ids.length, alcance }
 }
 
@@ -660,7 +633,6 @@ export async function adicionarEstudantes(pacoteId: string, estudanteIds: string
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath(`/admin/cronogramas/pacotes/${pacoteId}`)
   return { ok: true, adicionados: ids.length }
 }
 
@@ -695,7 +667,5 @@ export async function alternarAcessoGratuitoPacote(pacoteId: string, gratuito: b
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas/pacotes')
-  revalidatePath(`/admin/cronogramas/pacotes/${pacoteId}`)
   return { ok: true }
 }

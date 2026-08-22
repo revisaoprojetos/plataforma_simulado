@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, CalendarDays, Check, ChevronDown, ChevronRight, Gift, Loader2, Plus, Search, Trash2, UserPlus, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { alternarLiberacao } from '../../actions'
+import { alternarLiberacao, alternarLiberacaoEmLote } from '../../actions'
 import {
   adicionarCronogramas,
   alternarAcessoGratuitoPacote,
@@ -42,7 +42,30 @@ const normalizar = (s: string) =>
 
 export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
   const [d, setD] = useState(dados)
-  const [pendente, iniciar] = useTransition()
+  /**
+   * "Ocupado" por CHAVE, não da página inteira.
+   *
+   * Com o `pendente` global do useTransition, clicar em remover uma linha desabilitava todos os
+   * botões da tela — a espera parecia ser da página. Agora cada linha (e cada seção) tem a sua
+   * chave, então o resto continua clicável enquanto uma ação corre.
+   */
+  const [ocupados, setOcupados] = useState<Record<string, boolean>>({})
+  const ocupado = (chave: string) => !!ocupados[chave]
+  function executar(chave: string, fn: () => Promise<void>) {
+    if (ocupados[chave]) return
+    setOcupados((o) => ({ ...o, [chave]: true }))
+    void (async () => {
+      try {
+        await fn()
+      } finally {
+        setOcupados((o) => {
+          const n = { ...o }
+          delete n[chave]
+          return n
+        })
+      }
+    })()
+  }
   const [modal, setModal] = useState<'cronogramas' | 'grupos' | 'alunos' | null>(null)
   const [busca, setBusca] = useState('')
   const [achados, setAchados] = useState<{ id: string; nome: string; email: string | null }[]>([])
@@ -87,7 +110,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
   function confirmarSelecao() {
     const ids = [...selecao]
     if (!ids.length) return
-    iniciar(async () => {
+    executar('modal', async () => {
       if (modal === 'cronogramas') {
         const r = await adicionarCronogramas(d.pacote.id, ids)
         if (!r.ok) { toast.error(r.error ?? 'Não foi possível adicionar.'); return }
@@ -123,7 +146,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
   }
 
   function addCronograma(c: { id: string; nome: string; status: string; metas: number }) {
-    iniciar(async () => {
+    executar(`add:${c.id}`, async () => {
       const r = await alternarCronogramaNoPacote(d.pacote.id, c.id, true)
       if (!r.ok) { toast.error(r.error ?? 'Não foi possível adicionar.'); return }
       setD((x) => ({
@@ -136,7 +159,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
   }
 
   function removeCronograma(c: { id: string; nome: string; status: string; metas: number }) {
-    iniciar(async () => {
+    executar(`cron:${c.id}`, async () => {
       const r = await alternarCronogramaNoPacote(d.pacote.id, c.id, false)
       if (!r.ok) { toast.error(r.error ?? 'Não foi possível remover.'); return }
       setD((x) => ({
@@ -148,7 +171,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
   }
 
   function addGrupo(g: { id: string; nome: string; membros: number }) {
-    iniciar(async () => {
+    executar(`add:${g.id}`, async () => {
       const r = await vincularGrupo(d.pacote.id, g.id)
       if (!r.ok) { toast.error(r.error ?? 'Não foi possível vincular.'); return }
       toast.success(`Grupo vinculado — ${(r.alcance ?? 0).toLocaleString('pt-BR')} aluno(s) alcançado(s)`)
@@ -166,7 +189,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
    * simulados. Quem já emitiu não perde acesso: vira vínculo individual.
    */
   function removeGrupo(g: { id: string; nome: string; membros: number }) {
-    iniciar(async () => {
+    executar(`grupo:${g.id}`, async () => {
       const p = await previaDesvincularGrupo(d.pacote.id, g.id)
       const previa = p.previa
       const detalhe = previa
@@ -203,7 +226,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
      MESMA ação do catálogo (mesma permissão `cronogramas:liberar`, mesma auditoria, mesma recusa
      quando o cronograma não tem metas). */
   function alternarStatusCronograma(c: { id: string; nome: string; status: string }) {
-    iniciar(async () => {
+    executar(`cron:${c.id}`, async () => {
       const liberar = c.status !== 'liberado'
       const r = await alternarLiberacao(c.id, liberar)
       if (!r.ok) { toast.error(r.error ?? 'Não foi possível alterar.'); return }
@@ -215,8 +238,31 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
     })
   }
 
+  /* Liberar em lote: um pacote recém-montado costuma ter vários rascunhos, e liberar de um em um
+     era uma ida por linha — em fila, porque o Next serializa as ações do cliente. */
+  function liberarRascunhos() {
+    const ids = d.cronogramas.filter((c) => c.status !== 'liberado').map((c) => c.id)
+    if (!ids.length) return
+    executar('lote', async () => {
+      const r = await alternarLiberacaoEmLote(ids, true)
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível liberar.'); return }
+      const liberados = new Set(ids)
+      setD((x) => ({
+        ...x,
+        cronogramas: x.cronogramas.map((y) =>
+          liberados.has(y.id) && y.metas > 0 ? { ...y, status: 'liberado' } : y,
+        ),
+      }))
+      toast.success(
+        r.semMetas
+          ? `${r.alterados} liberado(s) — ${r.semMetas} sem metas ficaram de fora`
+          : `${r.alterados} cronograma(s) liberado(s)`,
+      )
+    })
+  }
+
   function alternarGratuito() {
-    iniciar(async () => {
+    executar('gratuito', async () => {
       const alvo = !d.pacote.acesso_gratuito
       const r = await alternarAcessoGratuitoPacote(d.pacote.id, alvo)
       if (!r.ok) { toast.error(r.error ?? 'Não foi possível alterar.'); return }
@@ -230,7 +276,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
     setExpandido(grupoId)
     if (membros[grupoId]) return
     setMembros((m) => ({ ...m, [grupoId]: 'carregando' }))
-    iniciar(async () => {
+    executar(`membros:${grupoId}`, async () => {
       const r = await membrosDoGrupo(grupoId)
       if (!r.ok) {
         toast.error(r.error ?? 'Não foi possível carregar os alunos.')
@@ -279,7 +325,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
   )
 
   function addAluno(a: { id: string; nome: string; email: string | null }) {
-    iniciar(async () => {
+    executar(`add:${a.id}`, async () => {
       const r = await alternarEstudanteNoPacote(d.pacote.id, a.id, true)
       if (!r.ok) { toast.error(r.error ?? 'Não foi possível adicionar.'); return }
       toast.success(`${a.nome} recebeu acesso`)
@@ -289,7 +335,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
   }
 
   function removeAluno(a: { id: string; nome: string }) {
-    iniciar(async () => {
+    executar(`aluno:${a.id}`, async () => {
       const r = await alternarEstudanteNoPacote(d.pacote.id, a.id, false)
       if (!r.ok) { toast.error(r.error ?? 'Não foi possível remover.'); return }
       setD((x) => ({ ...x, estudantes: x.estudantes.filter((y) => y.id !== a.id), alcance: Math.max(x.alcance - 1, 0) }))
@@ -314,7 +360,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
           size="sm"
           variant={d.pacote.acesso_gratuito ? 'secondary' : 'outline'}
           onClick={alternarGratuito}
-          disabled={pendente}
+          disabled={ocupado('gratuito')}
         >
           {d.pacote.acesso_gratuito ? 'Desligar' : 'Liberar para todos'}
         </Button>
@@ -351,10 +397,18 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
           titulo="Cronogramas do pacote"
           subtitulo="O que os alunos vinculados vão receber"
           acao={
-            <Button size="sm" variant="outline" onClick={() => abrir('cronogramas')} disabled={pendente}>
-              <Plus className="mr-1 h-4 w-4" />
-              Adicionar
-            </Button>
+            <div className="flex items-center gap-2">
+              {semRascunho.length > 0 && (
+                <Button size="sm" onClick={liberarRascunhos} disabled={ocupado('lote')}>
+                  {ocupado('lote') && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                  Liberar {semRascunho.length} rascunho(s)
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => abrir('cronogramas')}>
+                <Plus className="mr-1 h-4 w-4" />
+                Adicionar
+              </Button>
+            </div>
           }
         />
         {d.cronogramas.length === 0 ? (
@@ -377,7 +431,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
                   variant={c.status === 'liberado' ? 'ghost' : 'outline'}
                   className="h-7 shrink-0 px-2 text-xs"
                   onClick={() => alternarStatusCronograma(c)}
-                  disabled={pendente}
+                  disabled={ocupado(`cron:${c.id}`)}
                   title={
                     c.status === 'liberado'
                       ? 'Volta a rascunho — os alunos do pacote deixam de receber'
@@ -386,8 +440,8 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
                 >
                   {c.status === 'liberado' ? 'Voltar a rascunho' : 'Liberar'}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => removeCronograma(c)} disabled={pendente}>
-                  <X className="h-4 w-4" />
+                <Button size="sm" variant="ghost" onClick={() => removeCronograma(c)} disabled={ocupado(`cron:${c.id}`)}>
+                  {ocupado(`cron:${c.id}`) ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
                 </Button>
               </div>
             ))}
@@ -402,7 +456,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
           titulo="Grupos de alunos"
           subtitulo="Vincular um grupo grava uma linha — o acesso é resolvido na leitura"
           acao={
-            <Button size="sm" variant="outline" onClick={() => abrir('grupos')} disabled={pendente}>
+            <Button size="sm" variant="outline" onClick={() => abrir('grupos')}>
               <Plus className="mr-1 h-4 w-4" />
               Vincular grupo
             </Button>
@@ -433,7 +487,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
                     <Badge variant="outline" className="shrink-0">
                       {g.membros.toLocaleString('pt-BR')} aluno(s)
                     </Badge>
-                    <Button size="sm" variant="ghost" onClick={() => removeGrupo(g)} disabled={pendente}>
+                    <Button size="sm" variant="ghost" onClick={() => removeGrupo(g)} disabled={ocupado(`grupo:${g.id}`)}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
@@ -479,7 +533,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
           titulo="Alunos avulsos"
           subtitulo="Para quem não está em grupo nenhum, ou para exceções"
           acao={
-            <Button size="sm" variant="outline" onClick={() => abrir('alunos')} disabled={pendente}>
+            <Button size="sm" variant="outline" onClick={() => abrir('alunos')}>
               <Plus className="mr-1 h-4 w-4" />
               Adicionar aluno
             </Button>
@@ -495,7 +549,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
                   <p className="truncate text-sm">{a.nome}</p>
                   {a.email && <p className="truncate text-xs text-muted-foreground">{a.email}</p>}
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => removeAluno(a)} disabled={pendente}>
+                <Button size="sm" variant="ghost" onClick={() => removeAluno(a)} disabled={ocupado(`aluno:${a.id}`)}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -594,11 +648,11 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
                 : `${selecao.size} selecionado(s)${modal === 'alunos' ? ' — a busca mantém a seleção' : ''}`}
             </span>
             <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setModal(null)} disabled={pendente}>
+              <Button variant="ghost" onClick={() => setModal(null)} disabled={ocupado('modal')}>
                 Cancelar
               </Button>
-              <Button onClick={confirmarSelecao} disabled={pendente || selecao.size === 0}>
-                {pendente ? 'Salvando…' : `Adicionar ${selecao.size || ''}`.trim()}
+              <Button onClick={confirmarSelecao} disabled={ocupado('modal') || selecao.size === 0}>
+                {ocupado('modal') ? 'Salvando…' : `Adicionar ${selecao.size || ''}`.trim()}
               </Button>
             </div>
           </DialogFooter>

@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
-import { CalendarDays, Clock, ListChecks, Package, Pencil, Plus, Tags, Trash2 } from 'lucide-react'
+import { CalendarDays, Check, Clock, ListChecks, Loader2, Package, Pencil, Plus, Tags, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { faixaSemanal } from '@/lib/cronograma/faixa'
 import { SecaoHeader } from '@/components/admin/secao-header'
 import { AlertBox } from '@/components/ui/alert-box'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -23,6 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   alternarLiberacao,
+  alternarLiberacaoEmLote,
   atualizarCategoria,
   atualizarCronograma,
   criarCategoria,
@@ -69,6 +71,26 @@ export function CronogramasClient({
   const [categoriasAberto, setCategoriasAberto] = useState(false)
   const [novaCategoria, setNovaCategoria] = useState('')
   const [pendente, iniciar] = useTransition()
+  // Ações de LINHA saem do `pendente` global: liberar um cronograma não deve desabilitar a lista
+  // inteira. O diálogo de cadastro continua no useTransition, onde travar tudo é o certo.
+  const [ocupados, setOcupados] = useState<Record<string, boolean>>({})
+  const ocupado = (chave: string) => !!ocupados[chave]
+  function executar(chave: string, fn: () => Promise<void>) {
+    if (ocupados[chave]) return
+    setOcupados((o) => ({ ...o, [chave]: true }))
+    void (async () => {
+      try {
+        await fn()
+      } finally {
+        setOcupados((o) => {
+          const n = { ...o }
+          delete n[chave]
+          return n
+        })
+      }
+    })()
+  }
+  const [selecao, setSelecao] = useState<Set<string>>(new Set())
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<string | null>(null)
   const [form, setForm] = useState<EntradaCronograma>(vazio())
@@ -166,17 +188,60 @@ export function CronogramasClient({
           ),
         )
       } else {
-        // Sem os campos derivados do servidor; a lista recarrega no próximo acesso.
         setItens((xs) => [
           ...xs,
-          { ...(form as any), id: (r as any).id, slug: '', status: 'rascunho', metas: 0, pacotes: 0, faixa: '' },
+          {
+            ...(form as any),
+            id: (r as any).id,
+            slug: '',
+            status: 'rascunho',
+            metas: 0,
+            pacotes: 0,
+            // `faixa` é derivação pura de dias_curso (R19) — dá para calcular aqui e a linha
+            // nasce completa, em vez de aparecer sem a faixa até a próxima carga da página.
+            faixa: faixaSemanal(form.dias_curso),
+            categoria_nome: categorias.find((k) => k.id === form.categoria_id)?.nome ?? null,
+          },
         ])
       }
     })
   }
 
+  /* Lote: liberar 20 cronogramas um a um eram 20 idas, em FILA (o Next serializa as ações de um
+     mesmo cliente). Aqui é uma ida só, e a recusa por falta de metas vale por cronograma — os que
+     podem são liberados, e o toast diz quantos ficaram de fora. */
+  function liberarSelecionados(alvo: boolean) {
+    const ids = [...selecao]
+    if (!ids.length) return
+    executar('lote', async () => {
+      const r = await alternarLiberacaoEmLote(ids, alvo)
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível alterar.'); return }
+      const set = new Set(ids)
+      setItens((xs) =>
+        xs.map((c) =>
+          set.has(c.id) && (!alvo || c.metas > 0) ? { ...c, status: alvo ? 'liberado' : 'rascunho' } : c,
+        ),
+      )
+      setSelecao(new Set())
+      toast.success(
+        r.semMetas
+          ? `${r.alterados} alterado(s) — ${r.semMetas} sem metas ficaram de fora`
+          : `${r.alterados} cronograma(s) ${alvo ? 'liberado(s)' : 'de volta a rascunho'}`,
+      )
+    })
+  }
+
+  function alternarSelecao(id: string) {
+    setSelecao((s) => {
+      const n = new Set(s)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
+  }
+
   function liberar(c: CronogramaLista) {
-    iniciar(async () => {
+    executar(`lib:${c.id}`, async () => {
       const alvo = c.status !== 'liberado'
       const r = await alternarLiberacao(c.id, alvo)
       if (!r.ok) {
@@ -332,6 +397,32 @@ export function CronogramasClient({
           <p className="px-4 py-10 text-center text-sm text-muted-foreground">Nenhum cronograma nesse filtro.</p>
         ) : (
           <div className="divide-y">
+            {selecao.size > 0 && (
+              <div className="flex flex-wrap items-center gap-2 border-b bg-primary/5 px-4 py-2.5">
+                <span className="text-sm font-medium">
+                  {selecao.size} selecionado{selecao.size > 1 ? 's' : ''}
+                </span>
+                <Button size="sm" onClick={() => liberarSelecionados(true)} disabled={ocupado('lote')}>
+                  {ocupado('lote') ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Check className="mr-1 h-4 w-4" />}
+                  Liberar
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => liberarSelecionados(false)} disabled={ocupado('lote')}>
+                  Voltar a rascunho
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto"
+                  onClick={() => setSelecao(new Set(filtrados.map((c) => c.id)))}
+                >
+                  Selecionar os {filtrados.length} do filtro
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setSelecao(new Set())}>
+                  <X className="mr-1 h-4 w-4" />
+                  Limpar
+                </Button>
+              </div>
+            )}
             {porCarga.map(([carga, lista]) => (
               <div key={carga}>
                 <div className="flex items-center gap-1.5 bg-muted/40 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -342,7 +433,19 @@ export function CronogramasClient({
                 {lista.map((c) => {
                   const invisivel = ehInvisivel(c)
                   return (
-                    <div key={c.id} className="flex flex-wrap items-start gap-3 px-4 py-3 transition hover:bg-muted/30">
+                    <div
+                      key={c.id}
+                      className={`flex flex-wrap items-start gap-3 px-4 py-3 transition hover:bg-muted/30 ${
+                        selecao.has(c.id) ? 'bg-primary/5' : ''
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selecao.has(c.id)}
+                        onChange={() => alternarSelecao(c.id)}
+                        className="mt-1 h-4 w-4 shrink-0 accent-[var(--primary)]"
+                        aria-label={`Selecionar ${c.nome}`}
+                      />
                       {/* Marca de status à esquerda: dá para varrer a coluna e achar o que falta. */}
                       <span
                         className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
@@ -392,7 +495,7 @@ export function CronogramasClient({
                           size="sm"
                           variant={c.status === 'liberado' ? 'secondary' : 'default'}
                           onClick={() => liberar(c)}
-                          disabled={pendente || (c.status !== 'liberado' && c.metas === 0)}
+                          disabled={ocupado(`lib:${c.id}`) || (c.status !== 'liberado' && c.metas === 0)}
                           title={c.status !== 'liberado' && c.metas === 0 ? 'Cadastre metas antes de liberar' : undefined}
                         >
                           {c.status === 'liberado' ? 'Voltar a rascunho' : 'Liberar'}

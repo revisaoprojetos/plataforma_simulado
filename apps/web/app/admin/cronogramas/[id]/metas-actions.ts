@@ -7,7 +7,6 @@
  * existe `atualizarMeta` além do importador.
  */
 
-import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
@@ -296,7 +295,6 @@ export async function criarMeta(cronogramaId: string, e: EntradaMeta): Promise<{
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath(`/admin/cronogramas/${cronogramaId}`)
   return { ok: true, id: (data as any).id }
 }
 
@@ -339,7 +337,6 @@ export async function atualizarMeta(cronogramaId: string, metaId: string, e: Ent
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath(`/admin/cronogramas/${cronogramaId}`)
   return { ok: true }
 }
 
@@ -361,7 +358,6 @@ export async function excluirMeta(cronogramaId: string, metaId: string): Promise
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath(`/admin/cronogramas/${cronogramaId}`)
   return { ok: true }
 }
 

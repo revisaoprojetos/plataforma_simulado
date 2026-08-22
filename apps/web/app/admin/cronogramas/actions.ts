@@ -8,7 +8,6 @@
  * filtra por `tenant_id` explicitamente, sem confiar no RLS.
  */
 
-import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
@@ -192,7 +191,6 @@ export async function criarCronograma(e: EntradaCronograma): Promise<{ ok: boole
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas')
   return { ok: true, id: (data as any).id }
 }
 
@@ -254,7 +252,6 @@ export async function atualizarCronograma(id: string, e: EntradaCronograma): Pro
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas')
   return { ok: true }
 }
 
@@ -293,8 +290,66 @@ export async function alternarLiberacao(id: string, liberar: boolean): Promise<{
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas')
   return { ok: true }
+}
+
+/**
+ * Libera (ou volta a rascunho) VÁRIOS cronogramas de uma vez.
+ *
+ * Existe porque liberar um por um custava uma ida por cronograma — e, como as ações do Next são
+ * serializadas por cliente, dez cliques viravam dez esperas em fila. Aqui a checagem de metas é
+ * uma consulta agregada e a gravação é um UPDATE ... IN, então dez ou cinquenta custam o mesmo.
+ *
+ * A regra é a MESMA da ação individual: cronograma sem meta não é liberado. A diferença é que o
+ * lote não falha inteiro por causa de um — ele libera os que podem e devolve quantos ficaram fora,
+ * porque recusar os 20 por causa de 1 seria pior do que dizer o que sobrou.
+ */
+export async function alternarLiberacaoEmLote(
+  ids: string[],
+  liberar: boolean,
+): Promise<{ ok: boolean; alterados?: number; semMetas?: number; error?: string }> {
+  const g = await guard('cronogramas:liberar')
+  if (!g.ok) return { ok: false, error: g.error }
+  if (!ids.length) return { ok: false, error: 'Nenhum cronograma selecionado.' }
+  const svc = createAdminClient()
+
+  let alvos = ids
+  let semMetas = 0
+  if (liberar) {
+    const { data: contagens } = await svc.rpc('simulado_cronograma_contar_metas', { p_tenant: g.tenantId })
+    const comMetas = new Set(
+      ((contagens ?? []) as { cronograma_id: string; total: number }[])
+        .filter((c) => Number(c.total) > 0)
+        .map((c) => c.cronograma_id),
+    )
+    alvos = ids.filter((id) => comMetas.has(id))
+    semMetas = ids.length - alvos.length
+    if (!alvos.length) {
+      return { ok: false, error: 'Nenhum dos cronogramas selecionados tem metas cadastradas.' }
+    }
+  }
+
+  const agora = new Date().toISOString()
+  const patch = liberar
+    ? { status: 'liberado', liberado_em: agora, liberado_por: g.atorId, atualizado_em: agora }
+    : { status: 'rascunho', liberado_em: null, liberado_por: null, atualizado_em: agora }
+
+  const { error } = await svc
+    .from('simulado_cronogramas')
+    .update(patch)
+    .in('id', alvos)
+    .eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+
+  await registrarAudit({
+    operacao: liberar ? 'LIBERAR' : 'BLOQUEAR',
+    entidade: 'simulado_cronogramas',
+    entidadeId: alvos[0],
+    depois: { status: patch.status, em_lote: alvos.length, ids: alvos },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  return { ok: true, alterados: alvos.length, semMetas }
 }
 
 /** Soft delete — as metas continuam no banco e voltam junto se o cronograma for restaurado. */
@@ -315,7 +370,6 @@ export async function excluirCronograma(id: string): Promise<{ ok: boolean; erro
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas')
   return { ok: true }
 }
 
@@ -384,7 +438,6 @@ export async function criarCategoria(nome: string, cor: string | null): Promise<
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas')
   return { ok: true, id: (data as any).id, slug: (data as any).slug }
 }
 
@@ -415,7 +468,6 @@ export async function atualizarCategoria(id: string, nome: string, cor: string |
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas')
   return { ok: true }
 }
 
@@ -436,6 +488,5 @@ export async function excluirCategoria(id: string): Promise<{ ok: boolean; error
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas')
   return { ok: true }
 }

@@ -325,11 +325,17 @@ export function MetasClient({
         ) : (
           <div className="divide-y">
             {daSemana.map((m) => (
-              <div key={m.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5 hover:bg-muted/30">
-                <Badge variant="outline" className="shrink-0">
+              /* Colunas FIXAS. Em flex, a largura das duas etiquetas variava com o texto
+                 ("Legproc" vs "PDFULL + Videoaula"), então disciplina e conteúdo começavam num
+                 x diferente em cada linha. No mobile continua embrulhando. */
+              <div
+                key={m.id}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 hover:bg-muted/30 sm:grid sm:grid-cols-[3.25rem_10.5rem_minmax(0,1fr)_5.5rem_auto]"
+              >
+                <Badge variant="outline" className="shrink-0 justify-self-start">
                   {c.dias_nome[m.dia] ?? `dia ${m.dia}`}
                 </Badge>
-                <Badge variant="secondary" className="shrink-0">
+                <Badge variant="secondary" className="max-w-full shrink-0 justify-self-start truncate">
                   {rotulo(m.tipo)}
                 </Badge>
                 <div className="min-w-0 flex-1">
@@ -339,7 +345,7 @@ export function MetasClient({
                   </p>
                   {m.conteudo && <p className="truncate text-xs text-muted-foreground">{m.conteudo}</p>}
                 </div>
-                {m.duracao && <span className="shrink-0 text-xs text-muted-foreground">{m.duracao}</span>}
+                <span className="shrink-0 text-xs text-muted-foreground sm:text-right">{m.duracao ?? ''}</span>
                 <div className="flex shrink-0 items-center gap-1">
                   <Button size="sm" variant="ghost" onClick={() => abrirEdicao(m)} disabled={pendente}>
                     <Pencil className="h-4 w-4" />

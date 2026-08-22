@@ -8,7 +8,6 @@
  * novo é responder seis perguntas — em vez de o motor reconhecer um slug conhecido.
  */
 
-import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
@@ -110,7 +109,6 @@ export async function criarTipo(e: EntradaTipo): Promise<{ ok: boolean; id?: str
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas')
   return { ok: true, id: (data as any).id, slug: (data as any).slug }
 }
 
@@ -150,7 +148,6 @@ export async function atualizarTipo(id: string, e: EntradaTipo): Promise<{ ok: b
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas')
   return { ok: true }
 }
 
@@ -166,7 +163,6 @@ export async function reordenarTipos(ids: string[]): Promise<{ ok: boolean; erro
       .eq('id', id)
       .eq('tenant_id', g.tenantId)
   }
-  revalidatePath('/admin/cronogramas')
   return { ok: true }
 }
 
@@ -194,7 +190,6 @@ export async function alternarAtivoTipo(id: string, ativo: boolean): Promise<{ o
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas')
   return { ok: true }
 }
 
@@ -230,6 +225,5 @@ export async function excluirTipo(id: string): Promise<{ ok: boolean; error?: st
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas')
   return { ok: true }
 }

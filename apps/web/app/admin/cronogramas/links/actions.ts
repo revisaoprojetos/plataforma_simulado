@@ -11,7 +11,6 @@
  * (QC e TEC), o que exigia migration para cada banco de questões novo.
  */
 
-import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
@@ -185,7 +184,6 @@ export async function criarPlataforma(nome: string, cor: string | null): Promise
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas/links')
   return { ok: true, id: (data as any).id }
 }
 
@@ -214,7 +212,6 @@ export async function atualizarPlataforma(id: string, nome: string, cor: string 
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas/links')
   return { ok: true }
 }
 
@@ -232,7 +229,6 @@ export async function excluirPlataforma(id: string): Promise<{ ok: boolean; erro
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas/links')
   return { ok: true }
 }
 
@@ -288,7 +284,6 @@ export async function criarLink(e: EntradaLink): Promise<{ ok: boolean; id?: str
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas/links')
   return { ok: true, id: (data as any).id }
 }
 
@@ -330,7 +325,6 @@ export async function atualizarLink(id: string, e: EntradaLink): Promise<{ ok: b
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas/links')
   return { ok: true }
 }
 
@@ -349,6 +343,5 @@ export async function excluirLink(id: string): Promise<{ ok: boolean; error?: st
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
-  revalidatePath('/admin/cronogramas/links')
   return { ok: true }
 }
