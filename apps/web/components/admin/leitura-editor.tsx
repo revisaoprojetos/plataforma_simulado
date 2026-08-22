@@ -211,15 +211,12 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
 
       {aba === 'acesso' && <LeituraAcesso documentoId={documento.id} />}
 
-      {/* CONTEÚDO: prévia (edição de grifos) + questões */}
-      {aba === 'conteudo' && (<>
+      {/* CONTEÚDO: prévia grande + painel de edição de grifos ao lado */}
+      {aba === 'conteudo' && (
         <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} />
-        {podeEditar && htmlAtual && (
-          <LeituraQuestoesAdmin documentoId={documento.id} versao={versaoAutoria} html={htmlAtual} />
-        )}
-      </>)}
+      )}
 
-      {/* CONFIGURAÇÃO: dados do card + importação + metadados + desafio */}
+      {/* CONFIGURAÇÃO: dados do card + importação + metadados + desafio + questões */}
       {aba === 'config' && (
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-5">
@@ -402,6 +399,11 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
               </div>
             </div>
           </details>
+
+          {/* Questões no meio da leitura (Fase 2) */}
+          {podeEditar && htmlAtual && (
+            <LeituraQuestoesAdmin documentoId={documento.id} versao={versaoAutoria} html={htmlAtual} />
+          )}
         </div>
       </div>
       )}

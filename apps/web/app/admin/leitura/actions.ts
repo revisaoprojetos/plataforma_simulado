@@ -337,6 +337,16 @@ export async function buscarEstudantesLeitura(query: string): Promise<{ ok: bool
   return { ok: true, itens: (data ?? []).map((e: any) => ({ id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null })) }
 }
 
+export type EstudanteLinha = { id: string; nome: string; email: string | null; cpf: string | null }
+
+/** Todos os alunos do tenant (para a tabela de acesso, estilo aba Estudantes do banco). */
+export async function listarEstudantesTenant(): Promise<{ ok: boolean; itens?: EstudanteLinha[]; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const data = await fetchAll<any>(() => svc.from('simulado_estudantes').select('id, nome, email, cpf').eq('tenant_id', g.tenantId).eq('deletado', false).order('nome', { ascending: true }))
+  return { ok: true, itens: data.map((e: any) => ({ id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null, cpf: e.cpf ?? null })) }
+}
+
 // ── Anotações BASE (pré-definidas do admin) — vêm no documento p/ todos os alunos ──
 
 export type AnotacaoBase = { id: string; inicio: number; fim: number; exact: string; prefix: string; suffix: string; cor: string; nota: string | null; tipoGrifo: string | null }
