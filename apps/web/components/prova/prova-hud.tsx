@@ -149,7 +149,7 @@ export function ProvaHud(p: ProvaHudProps) {
                   <span
                     data-campo="primaria"
                     title={q.disciplina}
-                    className="ml-2 mt-2 inline-flex max-w-[45%] items-center truncate rounded-full border px-3 py-0.5 text-xs font-medium"
+                    className="ml-2 mt-3 inline-flex max-w-[45%] items-center truncate rounded-full border px-3 py-0.5 text-xs font-medium"
                     style={{ background: 'color-mix(in srgb, var(--primary) 12%, var(--card))', color: 'var(--primary)', borderColor: 'color-mix(in srgb, var(--primary) 30%, var(--border))' }}
                   >
                     {q.disciplina}
