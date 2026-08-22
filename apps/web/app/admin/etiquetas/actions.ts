@@ -153,21 +153,61 @@ export async function etiquetasDaQuestao(questaoId: string): Promise<{ ok: boole
   }
 }
 
-export type QuestaoDaEtiqueta = { id: string; titulo: string; disciplina: string | null }
+export type SimuladoDaQuestao = { id: string; titulo: string; numero: number; publicado: boolean }
+export type QuestaoDaEtiqueta = { id: string; titulo: string; disciplina: string | null; simulados: SimuladoDaQuestao[] }
 
-/** Questões que têm a etiqueta (para expandir na lista e abrir o editor de cada uma). */
+/** Questões que têm a etiqueta + em QUAIS simulados cada uma está (com o número/posição dela). */
 export async function questoesDaEtiqueta(etiquetaId: string): Promise<{ ok: boolean; itens?: QuestaoDaEtiqueta[]; error?: string }> {
   const g = await guard('questoes:view'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const { data: links } = await svc.from('simulado_questao_etiquetas').select('questao_id').eq('tenant_id', g.tenantId).eq('etiqueta_id', etiquetaId)
   const ids = [...new Set(((links ?? []) as any[]).map((l) => l.questao_id).filter(Boolean))]
   if (!ids.length) return { ok: true, itens: [] }
+
   // Enunciado (rótulo) + disciplina (embed tolerante). Sem embed, cai só no enunciado.
   let res = await svc.from('simulado_questoes').select('id, enunciado, disciplinas:simulado_disciplinas(nome)').in('id', ids)
   if (res.error) res = await svc.from('simulado_questoes').select('id, enunciado').in('id', ids) as any
   const snippet = (s: unknown) => String(s ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140)
-  const itens = ((res.data ?? []) as any[]).map((q) => ({ id: q.id as string, titulo: snippet(q.enunciado) || 'Questão sem enunciado', disciplina: (q.disciplinas?.nome ?? null) as string | null }))
-    .sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'))
+
+  // Em quais simulados cada questão aparece (via simulado_prova_questoes) + o NÚMERO dela em cada.
+  // Número = posição 1-based por `ordem` dentro do simulado (calculada a partir de TODAS as questões dele).
+  const { data: pqTag } = await svc.from('simulado_prova_questoes').select('simulado_id, questao_id').in('questao_id', ids)
+  const simIds = [...new Set(((pqTag ?? []) as any[]).map((r) => r.simulado_id).filter(Boolean))]
+  const simInfo = new Map<string, { titulo: string; publicado: boolean }>()
+  const rankPorSim = new Map<string, Map<string, number>>() // simulado_id → (questao_id → nº)
+  if (simIds.length) {
+    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, status, deletado, owner_estudante_id').in('id', simIds)
+    for (const s of (sims ?? []) as any[]) {
+      if (s.deletado || s.owner_estudante_id) continue // fora: deletados e simulados pessoais do aluno
+      simInfo.set(s.id, { titulo: s.titulo ?? 'Simulado', publicado: s.status === 'publicado' })
+    }
+    const simVivos = [...simInfo.keys()]
+    if (simVivos.length) {
+      const { data: pqAll } = await svc.from('simulado_prova_questoes').select('simulado_id, questao_id, ordem').in('simulado_id', simVivos)
+      const bySim = new Map<string, any[]>()
+      for (const r of (pqAll ?? []) as any[]) { const a = bySim.get(r.simulado_id) ?? []; a.push(r); bySim.set(r.simulado_id, a) }
+      for (const [sid, arr] of bySim) {
+        arr.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
+        const m = new Map<string, number>(); arr.forEach((r, i) => m.set(r.questao_id, i + 1))
+        rankPorSim.set(sid, m)
+      }
+    }
+  }
+  const simsPorQ = new Map<string, SimuladoDaQuestao[]>()
+  for (const r of (pqTag ?? []) as any[]) {
+    const info = simInfo.get(r.simulado_id); if (!info) continue
+    const numero = rankPorSim.get(r.simulado_id)?.get(r.questao_id) ?? 0
+    const a = simsPorQ.get(r.questao_id) ?? []
+    a.push({ id: r.simulado_id, titulo: info.titulo, numero, publicado: info.publicado })
+    simsPorQ.set(r.questao_id, a)
+  }
+
+  const itens: QuestaoDaEtiqueta[] = ((res.data ?? []) as any[]).map((q) => ({
+    id: q.id as string,
+    titulo: snippet(q.enunciado) || 'Questão sem enunciado',
+    disciplina: (q.disciplinas?.nome ?? null) as string | null,
+    simulados: (simsPorQ.get(q.id) ?? []).sort((a, b) => a.numero - b.numero),
+  })).sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'))
   return { ok: true, itens }
 }
 
