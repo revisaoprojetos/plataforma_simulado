@@ -23,8 +23,9 @@ export default async function HistoricoCronogramasPage() {
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
 
-  const r = await listarMinhasEmissoes()
-  const itens = r.itens ?? []
+  // A primeira página vem do servidor; a busca e as seguintes ficam por conta do cliente.
+  const r = await listarMinhasEmissoes({ pagina: 0, porPagina: 20 })
+  const dados = r.dados
 
   return (
     <div className="animate-page space-y-6">
@@ -46,7 +47,7 @@ export default async function HistoricoCronogramasPage() {
         </p>
       </div>
 
-      {itens.length === 0 ? (
+      {!dados || dados.ativas + dados.arquivadas === 0 ? (
         <Card className="px-4 py-12 text-center">
           <CalendarCheck className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
           <p className="font-medium">Você ainda não gerou nenhum cronograma</p>
@@ -58,7 +59,7 @@ export default async function HistoricoCronogramasPage() {
           </Link>
         </Card>
       ) : (
-        <MinhasEmissoes itens={itens} />
+        <MinhasEmissoes inicial={dados} />
       )}
     </div>
   )

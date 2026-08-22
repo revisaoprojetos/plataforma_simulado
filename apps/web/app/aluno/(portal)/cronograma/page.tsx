@@ -29,9 +29,10 @@ export default async function CronogramaAlunoPage() {
 
   const ativo = !!(cfg as { ativo?: boolean } | null)?.ativo
   const catalogo = ativo ? await cronogramasDoAluno(svc, sessao.tenantId, sessao.estudanteId) : []
-  const emissoes = await listarMinhasEmissoes()
+  // Só o total: a pílula do herói mostra a contagem, a lista vive na outra tela.
+  const emissoes = await listarMinhasEmissoes({ porPagina: 1 })
   const { tenantNome } = await getTenantTheme()
-  const salvos = (emissoes.itens ?? []).filter((e) => !e.arquivada).length
+  const salvos = emissoes.dados?.ativas ?? 0
   // "Revisão / Ensino Jurídico" no meio da frase fica arrastado — a manchete usa só a primeira
   // parte do nome do tenant, que é como a marca é dita ("do Revisão").
   const marca = (tenantNome ?? '').split(/[/|–—-]/)[0].trim()

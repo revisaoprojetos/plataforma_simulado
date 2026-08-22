@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState, useTransition } from 'react'
-import { CalendarDays, Check, Clock, ListChecks, Loader2, Package, Pencil, Plus, Tags, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock, ListChecks, Loader2, Package, Pencil, Plus, Tags, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -59,6 +59,8 @@ const vazio = (): EntradaCronograma => ({
   subtitulo: null,
   ordem: 0,
 })
+
+const POR_PAGINA = 25
 
 export function CronogramasClient({
   inicial,
@@ -127,16 +129,27 @@ export function CronogramasClient({
     return xs.filter((c) => c.nome.toLowerCase().includes(t) || (c.categoria_nome ?? '').toLowerCase().includes(t))
   }, [itens, busca, filtro])
 
+  /* Paginação da LISTA. O filtro e a busca continuam valendo sobre o catálogo inteiro — o que
+     pagina é só o que se desenha. Com 25 cronogramas não faz diferença; com 300 o navegador
+     deixa de montar 300 linhas para mostrar as 25 primeiras. */
+  const [pagina, setPagina] = useState(0)
+  useEffect(() => setPagina(0), [busca, filtro])
+  const ultimaPagina = Math.max(0, Math.ceil(filtrados.length / POR_PAGINA) - 1)
+  const daPagina = useMemo(
+    () => filtrados.slice(pagina * POR_PAGINA, (pagina + 1) * POR_PAGINA),
+    [filtrados, pagina],
+  )
+
   // Agrupa por carga horária — é assim que o aluno escolhe (spec §4, passo 2).
   const porCarga = useMemo(() => {
     const mapa = new Map<number, CronogramaLista[]>()
-    for (const c of filtrados) {
+    for (const c of daPagina) {
       const lista = mapa.get(c.carga_horaria)
       if (lista) lista.push(c)
       else mapa.set(c.carga_horaria, [c])
     }
     return [...mapa.entries()].sort((a, b) => a[0] - b[0])
-  }, [filtrados])
+  }, [daPagina])
 
   function abrirNovo() {
     setEditando(null)
@@ -519,6 +532,24 @@ export function CronogramasClient({
                 })}
               </div>
             ))}
+          </div>
+        )}
+
+        {filtrados.length > POR_PAGINA && (
+          <div className="flex flex-wrap items-center gap-2 border-t px-4 py-2.5">
+            <span className="text-xs text-muted-foreground">
+              {(pagina * POR_PAGINA + 1).toLocaleString('pt-BR')}–
+              {Math.min((pagina + 1) * POR_PAGINA, filtrados.length).toLocaleString('pt-BR')} de{' '}
+              {filtrados.length.toLocaleString('pt-BR')}
+            </span>
+            <div className="ml-auto flex items-center gap-1">
+              <Button size="sm" variant="outline" onClick={() => setPagina((p) => Math.max(0, p - 1))} disabled={pagina === 0} aria-label="Página anterior">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setPagina((p) => Math.min(ultimaPagina, p + 1))} disabled={pagina >= ultimaPagina} aria-label="Próxima página">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         )}
       </Card>

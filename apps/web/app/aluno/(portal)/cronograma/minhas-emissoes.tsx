@@ -1,13 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
-import { Archive, CalendarCheck, ChevronRight, Search } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Archive, CalendarCheck, ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { fmtBr } from '@/lib/cronograma/datas'
-import type { EmissaoResumo } from './emissoes-actions'
+import { listarMinhasEmissoes, type EmissaoResumo, type PaginaEmissoes } from './emissoes-actions'
+
+const POR_PAGINA = 20
 
 /** Instante da geração — timestamptz, então vale o fuso do aluno (não é data civil do plano). */
 function geradoEm(iso: string): { data: string; hora: string } {
@@ -36,56 +40,87 @@ function separarCarga(nome: string): { carga: string | null; nome: string } {
  *
  * É a resposta à maior dor do gerador legado — lá, fechar a página perdia o cronograma.
  *
- * Vive na tela "Meus cronogramas", irmã do gerador: gerar um plano novo e voltar a um que já
- * existe são tarefas diferentes, e numa página só a lista competia com o formulário.
+ * Busca e paginação acontecem no BANCO. Antes a tela pedia as 100 mais recentes e filtrava em
+ * memória, o que dava duas mentiras: o 101º cronograma não existia para quem o gerou, e
+ * procurar por um antigo devolvia "nenhum encontrado" sobre um registro que está lá.
  *
  * A aba de arquivados não é enfeite: arquivar tira o cronograma da lista, e como a única porta
  * para "Restaurar" é a tela do próprio cronograma, que só se alcança por aqui, sem ela arquivar
  * seria um caminho sem volta.
  */
-export function MinhasEmissoes({ itens }: { itens: EmissaoResumo[] }) {
-  const ativas = useMemo(() => itens.filter((e) => !e.arquivada), [itens])
-  const arquivadas = useMemo(() => itens.filter((e) => e.arquivada), [itens])
-  const [aba, setAba] = useState<'ativas' | 'arquivadas'>(ativas.length ? 'ativas' : 'arquivadas')
+export function MinhasEmissoes({ inicial }: { inicial: PaginaEmissoes }) {
+  const [dados, setDados] = useState<PaginaEmissoes>(inicial)
+  const [aba, setAba] = useState<'ativas' | 'arquivadas'>(inicial.ativas > 0 ? 'ativas' : 'arquivadas')
   const [busca, setBusca] = useState('')
+  const [pagina, setPagina] = useState(0)
+  const [carregando, setCarregando] = useState(false)
+  const primeira = useRef(true)
 
-  const lista = useMemo(() => {
-    const base = aba === 'ativas' ? ativas : arquivadas
-    const t = busca.trim().toLowerCase()
-    if (!t) return base
-    return base.filter(
-      (e) =>
-        (e.titulo ?? '').toLowerCase().includes(t) || e.cronograma_nome.toLowerCase().includes(t),
-    )
-  }, [aba, ativas, arquivadas, busca])
+  // Espera entre teclas e descarte de resposta fora de ordem: a de "an" pode voltar depois da
+  // de "ana" e sobrescrever o resultado certo com um mais amplo.
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const requisicao = useRef(0)
 
-  if (!itens.length) return null
+  useEffect(() => {
+    // A primeira renderização já veio do servidor — refazer a consulta aqui seria uma ida à toa.
+    if (primeira.current) {
+      primeira.current = false
+      return
+    }
+    if (debounce.current) clearTimeout(debounce.current)
+    debounce.current = setTimeout(async () => {
+      const id = ++requisicao.current
+      setCarregando(true)
+      const r = await listarMinhasEmissoes({
+        busca,
+        pagina,
+        porPagina: POR_PAGINA,
+        arquivadas: aba === 'arquivadas',
+      })
+      if (id !== requisicao.current) return
+      setCarregando(false)
+      if (!r.ok || !r.dados) {
+        toast.error(r.error ?? 'Não foi possível carregar.')
+        return
+      }
+      setDados(r.dados)
+    }, 250)
+    return () => {
+      if (debounce.current) clearTimeout(debounce.current)
+    }
+  }, [busca, pagina, aba])
 
+  const ultimaPagina = Math.max(0, Math.ceil(dados.total / POR_PAGINA) - 1)
+
+  function trocarAba(nova: 'ativas' | 'arquivadas') {
+    setAba(nova)
+    setPagina(0)
+  }
 
   return (
     <Card className="overflow-hidden" style={{ ['--card-spacing' as never]: '0px' }}>
-      <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
+      <div className="flex flex-row flex-wrap items-center gap-3 border-b px-4 py-3">
         <CalendarCheck className="h-5 w-5 shrink-0 text-primary" />
         <div className="min-w-0 flex-1">
           <p className="font-semibold leading-tight">Meus cronogramas</p>
           <p className="text-xs text-muted-foreground">
             {aba === 'ativas'
-              ? `${ativas.length === 1 ? '1 cronograma salvo' : `${ativas.length} cronogramas salvos`} — clique para abrir, renomear ou arquivar`
+              ? `${dados.ativas === 1 ? '1 cronograma salvo' : `${dados.ativas.toLocaleString('pt-BR')} cronogramas salvos`} — clique para abrir, renomear ou arquivar`
               : 'Arquivados continuam salvos — abra para restaurar'}
           </p>
         </div>
 
-        {arquivadas.length > 0 && (
+        {dados.arquivadas > 0 && (
           <div className="flex shrink-0 overflow-hidden rounded-lg border">
             {(
               [
-                ['ativas', `Ativos (${ativas.length})`],
-                ['arquivadas', `Arquivados (${arquivadas.length})`],
+                ['ativas', `Ativos (${dados.ativas})`],
+                ['arquivadas', `Arquivados (${dados.arquivadas})`],
               ] as const
             ).map(([chave, rotulo]) => (
               <button
                 key={chave}
-                onClick={() => setAba(chave)}
+                onClick={() => trocarAba(chave)}
                 className={`h-8 px-3 text-xs transition ${
                   aba === chave ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
                 }`}
@@ -101,13 +136,19 @@ export function MinhasEmissoes({ itens }: { itens: EmissaoResumo[] }) {
         <Search className="pointer-events-none absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={busca}
-          onChange={(e) => setBusca(e.target.value)}
+          onChange={(e) => {
+            setBusca(e.target.value)
+            setPagina(0)
+          }}
           placeholder="Buscar pelo nome que você deu ou pelo cronograma"
           className="pl-7"
         />
+        {carregando && (
+          <Loader2 className="absolute right-6 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+        )}
       </div>
 
-      {lista.length === 0 ? (
+      {dados.itens.length === 0 ? (
         <p className="px-4 py-8 text-center text-sm text-muted-foreground">
           {busca.trim()
             ? 'Nenhum cronograma com esse nome.'
@@ -117,14 +158,12 @@ export function MinhasEmissoes({ itens }: { itens: EmissaoResumo[] }) {
         </p>
       ) : (
         <div className="divide-y">
-          {lista.map((e) => {
+          {dados.itens.map((e: EmissaoResumo) => {
             const inicio = e.formulario?.inicio as string | undefined
             const { carga, nome } = separarCarga(e.cronograma_nome)
             const g = geradoEm(e.criado_em)
             const semanas = e.resumo?.semanasConteudo ?? e.resumo?.totalSemanas
             const revisoes = e.resumo?.semanasRevisao ?? 0
-            // Três linhas de texto do mesmo peso viravam parede. Aqui a linha tem hierarquia:
-            // etiqueta da carga, título, uma linha de apoio, e o carimbo da geração à direita.
             const apoio = [
               e.titulo ? nome : null,
               inicio ? `começa ${fmtBr(inicio)}` : null,
@@ -171,6 +210,35 @@ export function MinhasEmissoes({ itens }: { itens: EmissaoResumo[] }) {
         </div>
       )}
 
+      {dados.total > POR_PAGINA && (
+        <div className="flex flex-wrap items-center gap-2 border-t px-4 py-2.5">
+          <span className="text-xs text-muted-foreground">
+            {(pagina * POR_PAGINA + 1).toLocaleString('pt-BR')}–
+            {Math.min((pagina + 1) * POR_PAGINA, dados.total).toLocaleString('pt-BR')} de{' '}
+            {dados.total.toLocaleString('pt-BR')}
+          </span>
+          <div className="ml-auto flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setPagina((p) => Math.max(0, p - 1))}
+              disabled={pagina === 0 || carregando}
+              aria-label="Página anterior"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setPagina((p) => Math.min(ultimaPagina, p + 1))}
+              disabled={pagina >= ultimaPagina || carregando}
+              aria-label="Próxima página"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }

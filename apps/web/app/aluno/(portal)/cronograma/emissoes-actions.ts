@@ -42,21 +42,83 @@ export type EmissaoResumo = {
   formulario: Record<string, unknown> | null
 }
 
-/** As emissões do aluno, mais recentes primeiro. */
-export async function listarMinhasEmissoes(): Promise<{ ok: boolean; itens?: EmissaoResumo[]; error?: string }> {
+const CAMPOS = 'id, cronograma_id, cronograma_nome, titulo, criado_em, arquivada, resumo, formulario'
+
+export type PaginaEmissoes = {
+  itens: EmissaoResumo[]
+  /** Quantos existem no filtro atual — é o que permite montar a paginação. */
+  total: number
+  /** Contagens das duas abas, independentes do filtro, para os rótulos não oscilarem. */
+  ativas: number
+  arquivadas: number
+}
+
+/**
+ * Uma página das emissões do aluno, com busca no BANCO.
+ *
+ * Antes a tela pedia as 100 mais recentes e filtrava em memória. Dois problemas: o 101º
+ * cronograma não existia para quem o gerou, e a busca só encontrava dentro dessas 100 — quem
+ * procurasse por um cronograma antigo receberia "nenhum encontrado" sobre um registro que
+ * está no banco. Filtrar e paginar no banco resolve os dois de uma vez.
+ *
+ * O `count: 'exact'` sai do PostgREST junto com a página, então saber o total não custa uma
+ * segunda consulta.
+ */
+export async function listarMinhasEmissoes(
+  opcoes: { busca?: string; pagina?: number; porPagina?: number; arquivadas?: boolean } = {},
+): Promise<{ ok: boolean; dados?: PaginaEmissoes; error?: string }> {
   const sessao = await getSessaoAluno()
   if (!sessao) return { ok: false, error: 'Sua sessão expirou.' }
   const svc = createAdminClient()
 
-  const { data, error } = await svc
-    .from('simulado_cronograma_emissoes')
-    .select('id, cronograma_id, cronograma_nome, titulo, criado_em, arquivada, resumo, formulario')
-    .eq('tenant_id', sessao.tenantId)
-    .eq('estudante_id', sessao.estudanteId)
-    .order('criado_em', { ascending: false })
-    .limit(100)
-  if (error) return { ok: false, error: error.message }
-  return { ok: true, itens: (data ?? []) as EmissaoResumo[] }
+  const porPagina = Math.min(Math.max(opcoes.porPagina ?? 20, 1), 100)
+  const pagina = Math.max(opcoes.pagina ?? 0, 0)
+  const de = pagina * porPagina
+  const busca = (opcoes.busca ?? '').trim()
+
+  const base = () =>
+    svc
+      .from('simulado_cronograma_emissoes')
+      .select(CAMPOS, { count: 'exact' })
+      .eq('tenant_id', sessao.tenantId)
+      .eq('estudante_id', sessao.estudanteId)
+
+  let q = base().eq('arquivada', !!opcoes.arquivadas)
+  if (busca) {
+    // Procura no rótulo que o aluno deu E no nome do cronograma: ele lembra de um ou do outro.
+    const alvo = `%${busca.replace(/[%_]/g, '')}%`
+    q = q.or(`titulo.ilike.${alvo},cronograma_nome.ilike.${alvo}`)
+  }
+
+  // As contagens das abas vêm sem o filtro de busca (head: só o total, sem trazer linhas):
+  // se oscilassem com a digitação, "Arquivados (2)" viraria "(0)" no meio da busca e pareceria
+  // que os arquivados sumiram.
+  const [pagina1, nAtivas, nArquivadas] = await Promise.all([
+    q.order('criado_em', { ascending: false }).range(de, de + porPagina - 1),
+    svc
+      .from('simulado_cronograma_emissoes')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', sessao.tenantId)
+      .eq('estudante_id', sessao.estudanteId)
+      .eq('arquivada', false),
+    svc
+      .from('simulado_cronograma_emissoes')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', sessao.tenantId)
+      .eq('estudante_id', sessao.estudanteId)
+      .eq('arquivada', true),
+  ])
+
+  if (pagina1.error) return { ok: false, error: pagina1.error.message }
+  return {
+    ok: true,
+    dados: {
+      itens: (pagina1.data ?? []) as unknown as EmissaoResumo[],
+      total: pagina1.count ?? 0,
+      ativas: nAtivas.count ?? 0,
+      arquivadas: nArquivadas.count ?? 0,
+    },
+  }
 }
 
 export type EmissaoAberta = {
