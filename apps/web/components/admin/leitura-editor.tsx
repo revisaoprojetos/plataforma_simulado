@@ -219,10 +219,10 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
       {/* CONFIGURAÇÃO: dados do card + importação + metadados + desafio + questões */}
       {aba === 'config' && (
       <div className="grid gap-5 lg:grid-cols-2">
-        <div className="space-y-5">
+        <div className="space-y-6">
           {/* Dados do card — com capa */}
-          <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
-            <p className="text-sm font-semibold">Dados do card</p>
+          <section className="space-y-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Dados do card</p>
             <div>
               <label className="mb-1.5 block text-xs text-muted-foreground">Capa do card</label>
               <input ref={capaRef} type="file" accept="image/*" className="hidden" onChange={(e) => { enviarCapa(e.target.files?.[0] ?? null); e.target.value = '' }} />
@@ -258,12 +258,12 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
                 ))}
               </div>
             </div>
-          </div>
+          </section>
 
           {/* Conteúdo — importar/editar */}
           {podeEditar && (
-            <div className="rounded-2xl border bg-card p-4 shadow-sm">
-              <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><FileText className="h-4 w-4 text-primary" /> Conteúdo da lei</p>
+            <section className="space-y-2 border-t pt-6">
+              <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><FileText className="h-3.5 w-3.5" /> Conteúdo da lei</p>
               <div className="mb-3 flex gap-1 rounded-lg border bg-muted/40 p-1 text-sm">
                 {([['colar', 'HTML', ClipboardPaste], ['word', 'Word', Upload], ['editor', 'Editor', PenLine]] as const).map(([m, label, Icon]) => (
                   <button key={m} onClick={() => setModo(m)} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 transition-colors', modo === m ? 'bg-card font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
@@ -318,20 +318,20 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
                   </button>
                 </div>
               )}
-            </div>
+            </section>
           )}
         </div>
 
         {/* Segunda coluna da configuração: metadados + desafio */}
-        <div className="space-y-5">
+        <div className="space-y-6">
           {/* Metadados da lei (A1) — recolhível */}
-          <details className="group rounded-2xl border bg-card shadow-sm">
-            <summary className="flex cursor-pointer list-none items-center gap-1.5 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-              <Scale className="h-4 w-4 text-primary" /> Metadados da lei
-              <span className="text-xs font-normal text-muted-foreground">(matéria, tipo, número…)</span>
-              <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
+              <Scale className="h-3.5 w-3.5" /> Metadados da lei
+              <span className="font-normal normal-case">(matéria, tipo…)</span>
+              <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" />
             </summary>
-            <div className="space-y-3 border-t px-4 py-4">
+            <div className="space-y-3 pt-3">
               <div className="grid grid-cols-2 gap-2">
                 <label className="col-span-2 text-xs text-muted-foreground">Matéria
                   <select value={materiaId} onChange={(e) => setMateriaId(e.target.value)} className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring">
@@ -377,13 +377,13 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
           </details>
 
           {/* Desafio — recolhível */}
-          <details className="group rounded-2xl border bg-card shadow-sm">
-            <summary className="flex cursor-pointer list-none items-center gap-1.5 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-              <Trophy className="h-4 w-4 text-amber-500" /> Desafio de leitura
-              {desafioAtivo && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">ativo</span>}
-              <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+          <details className="group border-t pt-4">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
+              <Trophy className="h-3.5 w-3.5 text-amber-500" /> Desafio de leitura
+              {desafioAtivo && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium normal-case text-amber-600 dark:text-amber-400">ativo</span>}
+              <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" />
             </summary>
-            <div className="space-y-3 border-t px-4 py-4">
+            <div className="space-y-3 pt-3">
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={desafioAtivo} onChange={(e) => setDesafioAtivo(e.target.checked)} className="h-4 w-4 rounded border" />
                 Rastrear conclusão (aparece no relatório e na gamificação)

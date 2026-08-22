@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Pencil, Save, Loader2, Bold, Eraser, X, Highlighter, Check } from 'lucide-react'
+import { Pencil, Save, Loader2, Bold, Eraser, X, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { salvarConteudoHtml } from '@/app/admin/leitura/upload-actions'
@@ -29,28 +29,28 @@ const CAIXAS = [
 ] as const
 
 const CONTENT_CLASS =
-  'leitura-prosa max-h-[calc(100vh-16.5rem)] min-h-[340px] overflow-auto px-5 py-4 text-sm leading-relaxed outline-none [&_a]:text-primary [&_a]:underline [&_h1]:mb-2 [&_h1]:mt-3 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:mb-1.5 [&_h2]:mt-3 [&_h2]:text-base [&_h2]:font-bold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_p]:mb-2 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1'
+  'leitura-prosa px-6 py-5 text-sm leading-relaxed outline-none [&_a]:text-primary [&_a]:underline [&_h1]:mb-2 [&_h1]:mt-3 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:mb-1.5 [&_h2]:mt-3 [&_h2]:text-base [&_h2]:font-bold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_p]:mb-2 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1'
+// Fundo pontilhado do "canvas" da prévia (igual ao construtor de caderno).
+const CANVAS_DOTS = 'bg-[radial-gradient(circle,theme(colors.slate.300)_1px,transparent_1px)] [background-size:18px_18px] dark:bg-[radial-gradient(circle,theme(colors.slate.700)_1px,transparent_1px)]'
 
 export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 0 }: {
   documentoId: string; html: string; podeEditar: boolean; artigos?: number
 }) {
   const router = useRouter()
   const boxRef = useRef<HTMLDivElement>(null)
-  const conteudoRef = useRef<HTMLDivElement | null>(null)
+  const canvasRef = useRef<HTMLDivElement>(null)
   const [editando, setEditando] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [maxH, setMaxH] = useState<number>()
 
-  // Adapta a altura da prévia à tela: mede o topo do conteúdo e ocupa até um
-  // pequeno espaço (16px) do fim da janela. Recalcula em resize/edição/conteúdo.
-  const refEditavel = useCallback((el: HTMLDivElement | null) => { boxRef.current = el; conteudoRef.current = el }, [])
+  // Adapta a altura do canvas à tela: mede o topo e ocupa até 16px do fim da janela.
   useEffect(() => {
     const medir = () => {
-      const el = conteudoRef.current
+      const el = canvasRef.current
       if (!el) return
       const top = el.getBoundingClientRect().top
-      setMaxH(Math.max(320, Math.round(window.innerHeight - top - 16)))
+      setMaxH(Math.max(360, Math.round(window.innerHeight - top - 16)))
     }
     medir()
     const t = setTimeout(medir, 120)
@@ -162,81 +162,78 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
   )
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-      {/* Prévia — visualização grande */}
-      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <div className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
-          <p className="flex items-center gap-1.5 text-sm font-semibold"><Highlighter className="h-4 w-4 text-primary" /> Prévia {editando && <span className="text-xs font-normal text-muted-foreground">— editando</span>}</p>
-          <span className="text-xs text-muted-foreground">{artigos} seções</span>
-        </div>
-        {editando ? (
-          <div ref={refEditavel} contentEditable suppressContentEditableWarning spellCheck={false} onInput={() => setDirty(true)}
-            style={{ maxHeight: maxH }} className={cn(CONTENT_CLASS, 'focus:ring-1 focus:ring-inset focus:ring-ring')} />
-        ) : html ? (
-          <div ref={conteudoRef} style={{ maxHeight: maxH }} className={CONTENT_CLASS} dangerouslySetInnerHTML={{ __html: html }} />
+    <div ref={canvasRef} style={{ height: maxH }} className="grid min-h-[460px] overflow-hidden rounded-2xl border bg-card shadow-sm lg:grid-cols-[280px_1fr]">
+      {/* ESQUERDA: painel de controles (flat, estilo construtor) */}
+      <div className="flex flex-col gap-3 overflow-y-auto border-b bg-muted/20 p-3 lg:border-b-0 lg:border-r">
+        {editando && (
+          <div className="flex items-center justify-end gap-1.5 border-b pb-3">
+            <button onClick={sair} title="Fechar edição" className="rounded-lg border bg-card p-1.5 text-muted-foreground transition hover:bg-muted"><X className="h-3.5 w-3.5" /></button>
+            <button onClick={salvar} disabled={salvando || !dirty} className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
+              {salvando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Salvar
+            </button>
+          </div>
+        )}
+
+        {!editando ? (
+          podeEditar ? (
+            <>
+              <p className="text-xs text-muted-foreground">Grife trechos por tipo (núcleo, prazo, exceção…) direto na prévia ao lado.</p>
+              <button onClick={() => setEditando(true)} disabled={!html} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border bg-card px-3 py-2 text-sm font-semibold transition hover:bg-muted disabled:opacity-50">
+                <Pencil className="h-4 w-4" /> Editar grifos
+              </button>
+            </>
+          ) : <p className="text-xs text-muted-foreground">Somente leitura.</p>
         ) : (
-          <p className="px-5 py-10 text-center text-sm text-muted-foreground">Sem conteúdo ainda. Importe na aba <span className="font-medium text-foreground">Configuração</span>.</p>
+          <>
+            <div className="space-y-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Grifo</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {GRIFOS_INLINE.map((g) => (
+                  <Btn key={g.id} title={`Grifar: ${g.label}`} onClick={() => aplicarGrifo(g.id)} className="justify-start bg-card">
+                    <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-black/10" style={{ background: g.cor }} />
+                    <span className="truncate" style={{ color: g.id === 'excecao' ? g.texto : undefined, fontWeight: g.id === 'excecao' ? 700 : undefined }}>{g.label}</span>
+                  </Btn>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <Btn title="Negrito (selecione o trecho)" onClick={negrito} className="justify-center bg-card"><Bold className="h-3.5 w-3.5" /> Negrito</Btn>
+                <Btn title="Remover grifo da seleção" onClick={removerGrifo} className="justify-center bg-card text-destructive hover:bg-destructive/10"><Eraser className="h-3.5 w-3.5" /> Remover</Btn>
+              </div>
+            </div>
+            <div className="space-y-1.5 border-t pt-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Caixa</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {CAIXAS.map((c) => (
+                  <Btn key={c.id} title={`Caixa: ${c.label} (clique de novo p/ desfazer)`} onClick={() => toggleCaixa(c.id)} className="justify-start bg-card">
+                    <span className="h-3.5 w-3.5 shrink-0 rounded border border-black/10" style={{ background: c.cor }} />
+                    <span className="truncate">{c.label}</span>
+                  </Btn>
+                ))}
+              </div>
+            </div>
+            <p className="mt-auto flex items-start gap-1.5 border-t pt-2 text-[11px] text-muted-foreground">
+              <Check className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" /> Selecione um trecho na prévia e clique num grifo. Clique em Salvar para gravar.
+            </p>
+          </>
         )}
       </div>
 
-      {/* Painel de edição — ao lado da prévia */}
-      <div className="lg:sticky lg:top-4 lg:self-start">
-        <div className="space-y-3 rounded-2xl border bg-card p-3 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="flex items-center gap-1.5 text-sm font-semibold"><Pencil className="h-4 w-4 text-primary" /> Edição</p>
-            {editando && (
-              <div className="flex items-center gap-1.5">
-                <button onClick={sair} title="Fechar edição" className="rounded-lg border p-1.5 text-muted-foreground transition hover:bg-muted"><X className="h-3.5 w-3.5" /></button>
-                <button onClick={salvar} disabled={salvando || !dirty} className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
-                  {salvando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Salvar
-                </button>
-              </div>
-            )}
+      {/* DIREITA: prévia grande sobre canvas pontilhado (igual ao construtor) */}
+      <div className={cn('overflow-auto p-5', CANVAS_DOTS)}>
+        {editando ? (
+          <div className="mx-auto max-w-3xl overflow-hidden rounded-lg border bg-card shadow-sm">
+            <div ref={boxRef} contentEditable suppressContentEditableWarning spellCheck={false} onInput={() => setDirty(true)}
+              className={cn(CONTENT_CLASS, 'focus:ring-1 focus:ring-inset focus:ring-ring')} />
           </div>
-
-          {!editando ? (
-            podeEditar ? (
-              <>
-                <p className="text-xs text-muted-foreground">Grife trechos por tipo (núcleo, prazo, exceção…) direto na prévia.</p>
-                <button onClick={() => setEditando(true)} disabled={!html} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold transition hover:bg-muted disabled:opacity-50">
-                  <Pencil className="h-4 w-4" /> Editar grifos
-                </button>
-              </>
-            ) : <p className="text-xs text-muted-foreground">Somente leitura.</p>
-          ) : (
-            <>
-              <div className="space-y-1.5">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Grifo</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {GRIFOS_INLINE.map((g) => (
-                    <Btn key={g.id} title={`Grifar: ${g.label}`} onClick={() => aplicarGrifo(g.id)} className="justify-start">
-                      <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-black/10" style={{ background: g.cor }} />
-                      <span className="truncate" style={{ color: g.id === 'excecao' ? g.texto : undefined, fontWeight: g.id === 'excecao' ? 700 : undefined }}>{g.label}</span>
-                    </Btn>
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <Btn title="Negrito (selecione o trecho)" onClick={negrito} className="justify-center"><Bold className="h-3.5 w-3.5" /> Negrito</Btn>
-                  <Btn title="Remover grifo da seleção" onClick={removerGrifo} className="justify-center text-destructive hover:bg-destructive/10"><Eraser className="h-3.5 w-3.5" /> Remover</Btn>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Caixa</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {CAIXAS.map((c) => (
-                    <Btn key={c.id} title={`Caixa: ${c.label} (clique de novo p/ desfazer)`} onClick={() => toggleCaixa(c.id)} className="justify-start">
-                      <span className="h-3.5 w-3.5 shrink-0 rounded border border-black/10" style={{ background: c.cor }} />
-                      <span className="truncate">{c.label}</span>
-                    </Btn>
-                  ))}
-                </div>
-              </div>
-              <p className="flex items-start gap-1.5 border-t pt-2 text-[11px] text-muted-foreground">
-                <Check className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" /> Selecione um trecho e clique num grifo. Mudanças aparecem na hora; clique em Salvar para gravar.
-              </p>
-            </>
-          )}
-        </div>
+        ) : html ? (
+          <div className="mx-auto max-w-3xl overflow-hidden rounded-lg border bg-card shadow-sm">
+            <div className={CONTENT_CLASS} dangerouslySetInnerHTML={{ __html: html }} />
+          </div>
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <p className="rounded-lg border bg-card px-5 py-10 text-center text-sm text-muted-foreground shadow-sm">Sem conteúdo ainda. Importe na aba <span className="font-medium text-foreground">Configuração</span>.</p>
+          </div>
+        )}
       </div>
     </div>
   )
