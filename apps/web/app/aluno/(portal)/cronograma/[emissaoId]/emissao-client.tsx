@@ -77,7 +77,9 @@ export function EmissaoClient({
           <p className="text-muted-foreground">
             {emissao.cronograma_nome}
             {inicio && ` · começa em ${fmtBr(inicio)}`}
-            {` · gerado em ${new Date(emissao.criado_em).toLocaleDateString('pt-BR')}`}
+            {` · gerado em ${new Date(emissao.criado_em).toLocaleDateString('pt-BR')} às ${new Date(
+              emissao.criado_em,
+            ).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
           </p>
         </div>
 

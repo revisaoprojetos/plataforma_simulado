@@ -98,7 +98,9 @@ export default async function CronogramaAlunoPage() {
             rolar a página toda para achá-lo. */}
         {temHistorico && (
           <div id="meus-cronogramas" className="scroll-mt-6">
-            <MinhasEmissoes itens={emissoes.itens ?? []} />
+            {/* Só os 3 últimos: aqui a lista é atalho, não o assunto — uma lista longa
+                empurraria o formulário para fora da tela. O resto fica em /historico. */}
+            <MinhasEmissoes itens={emissoes.itens ?? []} limite={3} hrefTodos="/aluno/cronograma/historico" />
           </div>
         )}
 
