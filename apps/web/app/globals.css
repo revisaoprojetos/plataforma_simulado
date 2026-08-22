@@ -676,3 +676,55 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .group:hover .ico-arw-ru { animation: arw-ru 2.4s cubic-bezier(.12,.9,.2,1) infinite; animation-delay: .6s; }
 .group:hover .ico-arw-ld { animation: arw-ld 2.4s cubic-bezier(.12,.9,.2,1) infinite; animation-delay: 1.2s; }
 .group:hover .ico-arw-rd { animation: arw-rd 2.4s cubic-bezier(.12,.9,.2,1) infinite; animation-delay: 1.8s; }
+
+/* ═══════════════════ Lei Seca — montagem editorial (padrão MAC) ═══════════════════
+   Estiliza o HTML "já montado" (grifos coloridos + caixas STJ/STF + tabelas) que o
+   importador normaliza para atributos canônicos (data-grifo / data-caixa / data-align /
+   data-cobranca). Também cobre o formato cru (classes hl- e box- ) de conteúdos
+   importados ANTES do mapeamento. Escopo: prévia do editor e leitor (.leitura-prosa). */
+
+/* Grifos inline (decorativos) — cores do padrão MAC */
+.leitura-prosa [data-grifo="nucleo"],      .leitura-prosa .hl-y { background:#fff35c; color:#111; padding:0 1px; border-radius:2px; }
+.leitura-prosa [data-grifo="complemento"], .leitura-prosa .hl-g { background:#a8d08d; color:#111; padding:0 1px; border-radius:2px; }
+.leitura-prosa [data-grifo="prazo"],       .leitura-prosa .hl-r { background:#cc99ff; color:#111; padding:0 1px; border-radius:2px; }
+.leitura-prosa [data-grifo="excecao"],     .leitura-prosa .exc  { color:#c00000; font-weight:700; }
+
+/* Caixas de destaque (estruturais — permanecem no "modo sem grifos") */
+.leitura-prosa [data-caixa],
+.leitura-prosa .box-stj, .leitura-prosa .box-stf, .leitura-prosa .box-cinza,
+.leitura-prosa .box-cinza-esc, .leitura-prosa .box-atencao {
+  color:#111; padding:10px 14px; margin:18px 0 24px; border:1px solid #999; border-radius:8px; font-size:.95em;
+}
+.leitura-prosa [data-caixa="stj"],        .leitura-prosa .box-stj      { background:#fff2cc; border-color:#c8a200; }
+.leitura-prosa [data-caixa="stf"],        .leitura-prosa .box-stf      { background:#bdd6ee; border-color:#2060a0; }
+.leitura-prosa [data-caixa="alerta"],     .leitura-prosa .box-atencao  { background:#fde9d9; border-color:#c06000; }
+.leitura-prosa [data-caixa="comentario"], .leitura-prosa .box-cinza,
+.leitura-prosa .box-cinza-esc { background:#d0cece; border-color:#999; }
+.leitura-prosa [data-caixa] > :first-child, .leitura-prosa [data-caixa] > :last-child,
+.leitura-prosa [class*="box-"] > :first-child, .leitura-prosa [class*="box-"] > :last-child { margin-top:0; margin-bottom:0; }
+
+/* "📌 Já cobrado em prova" — chip estrutural */
+.leitura-prosa [data-cobranca] {
+  display:inline-block; background:rgba(37,99,235,.08); border-left:3px solid #2563eb;
+  padding:2px 10px; margin:4px 0; border-radius:4px; font-size:.9em; color:inherit;
+}
+
+/* Tabelas do padrão MAC (cabeçalho marinho + zebra) */
+.leitura-prosa .mac-tbl { width:100%; border-collapse:collapse; font-size:.9em; margin:6px 0; }
+.leitura-prosa .mac-tbl th { background:#1a2744; color:#fff; padding:6px 9px; text-align:left; font-weight:700; border:1px solid #1a2744; }
+.leitura-prosa .mac-tbl td { padding:5px 9px; border:1px solid #bbb; vertical-align:top; color:#111; }
+.leitura-prosa .mac-tbl tr:nth-child(even) td { background:rgba(0,0,0,.04); }
+
+/* Alinhamento e recuos preservados do original */
+.leitura-prosa [data-align="center"] { text-align:center; }
+.leitura-prosa .ind1 { margin-left:32px; }
+.leitura-prosa .ind2 { margin-left:64px; }
+
+/* Modo sem grifos: some o decorativo (grifos inline); mantém caixas, tabelas e cobrança (§10.3) */
+.leitura-prosa.sem-grifos [data-grifo], .leitura-prosa.sem-grifos .hl-y,
+.leitura-prosa.sem-grifos .hl-g, .leitura-prosa.sem-grifos .hl-r {
+  background:transparent !important; padding:0 !important;
+}
+.leitura-prosa.sem-grifos [data-grifo="excecao"], .leitura-prosa.sem-grifos .exc {
+  color:inherit !important; font-weight:inherit !important;
+}

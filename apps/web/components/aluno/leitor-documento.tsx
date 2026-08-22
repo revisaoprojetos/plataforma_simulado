@@ -56,6 +56,9 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
 
   // Grifos editoriais (conteúdo compartilhado) + modo sem grifos
   const grifos = doc.grifos ?? []
+  // Grifos "assados" no HTML (importados no padrão MAC → data-grifo/data-caixa;
+  // ou o formato cru hl-*/box-* de importações antigas), além do overlay (doc.grifos).
+  const temGrifosBaked = /data-grifo=|data-caixa=|\bhl-[ygr]\b|\bbox-(stj|stf|cinza|atencao)/.test(doc.html)
   const [semGrifos, setSemGrifos] = useState(!!doc.prefs?.semGrifos)
   const [grifosRects, setGrifosRects] = useState<Record<string, { rects: RectRel[]; tipo: string }>>({})
 
@@ -431,7 +434,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
                 ))}
               </div>
             </div>
-            {grifos.length > 0 && (
+            {(grifos.length > 0 || temGrifosBaked) && (
               <label className="flex items-center justify-between text-xs" style={{ color: cores.muted }}>
                 <span className="inline-flex items-center gap-1"><Highlighter className="h-3.5 w-3.5" /> Modo sem grifos</span>
                 <input type="checkbox" checked={semGrifos} onChange={(e) => setSemGrifos(e.target.checked)} className="h-4 w-4 rounded border" />
@@ -517,7 +520,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
             >
               <div
                 ref={contentRef}
-                className="leitura-conteudo px-6 py-6 [&_a]:underline [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:text-lg [&_h3]:font-semibold [&_li]:ml-6 [&_li]:list-disc [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1"
+                className={cn('leitura-conteudo leitura-prosa px-6 py-6 [&_a]:underline [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:text-lg [&_h3]:font-semibold [&_li]:ml-6 [&_li]:list-disc [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1', semGrifos && 'sem-grifos')}
                 style={modo === 'flip'
                   ? { ...proseStyle, columnWidth: colW || undefined, columnGap: GAP, columnFill: 'auto', height: '100%' }
                   : proseStyle}

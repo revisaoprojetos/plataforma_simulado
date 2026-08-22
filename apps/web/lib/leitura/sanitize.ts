@@ -30,7 +30,7 @@ const REMOVE_TAGS = new Set([
 const VOID_TAGS = new Set(['br', 'hr', 'img', 'col'])
 // Atributos permitidos por tag (o resto e descartado - inclusive todo on*).
 const ALLOW_ATTR: Record<string, Set<string>> = {
-  '*': new Set(['class', 'id', 'data-art', 'data-secao', 'data-disp', 'data-disp-tipo', 'data-grifo', 'data-grifo-label', 'data-grifo-estrutural']),
+  '*': new Set(['class', 'id', 'data-art', 'data-secao', 'data-disp', 'data-disp-tipo', 'data-grifo', 'data-grifo-label', 'data-grifo-estrutural', 'data-caixa', 'data-align', 'data-cobranca']),
   a: new Set(['href', 'title']),
   img: new Set(['src', 'alt', 'width', 'height']),
   td: new Set(['colspan', 'rowspan']),
@@ -80,6 +80,43 @@ function serialize(node: any): string {
   if (!ALLOW_TAGS.has(tag)) return filhos // unwrap: mantem o conteudo, descarta a tag
   if (VOID_TAGS.has(tag)) return '<' + tag + attrsSeguros(tag, el) + '>'
   return '<' + tag + attrsSeguros(tag, el) + '>' + filhos + '</' + tag + '>'
+}
+
+// ── Montagem editorial (padrao MAC/Revisao) ─────────────────────────────────
+// O conteudo ja vem "montado": grifos por span de classe (hl-y/hl-g/hl-r/exc) e
+// caixas de destaque por div (box-stj/box-stf/box-cinza/box-atencao), alem de
+// tabelas .mac-tbl e alinhamento por style inline. Como o <style> e removido e o
+// style inline nao e permitido, essas pistas visuais se perderiam. Aqui elas sao
+// NORMALIZADAS para atributos canonicos que o CSS da leitura (.leitura-prosa)
+// estiliza e que o "modo sem grifos" entende:
+//   hl-y -> data-grifo="nucleo"  | hl-g -> complemento | hl-r -> prazo | exc -> excecao
+//   box-stj -> data-caixa="stj"  | box-stf -> stf | box-atencao -> alerta | box-cinza(-esc) -> comentario
+//   style:text-align:center      -> data-align="center"
+//   paragrafo iniciado por 📌     -> data-cobranca="1" (marcador "ja cobrado em prova")
+const MAP_HL: Record<string, string> = { 'hl-y': 'nucleo', 'hl-g': 'complemento', 'hl-r': 'prazo', 'exc': 'excecao' }
+const MAP_BOX: Record<string, string> = { 'box-stj': 'stj', 'box-stf': 'stf', 'box-atencao': 'alerta', 'box-cinza': 'comentario', 'box-cinza-esc': 'comentario' }
+
+function mapearMontagem(root: any): void {
+  for (const el of root.querySelectorAll('*')) {
+    if (!el.tagName) continue
+    // alinhamento central: o style inline sera descartado -> preserva como data-align
+    const style = (el.getAttribute('style') || '').toLowerCase()
+    if (/text-align\s*:\s*center/.test(style)) el.setAttribute('data-align', 'center')
+    // classes editoriais -> atributos canonicos (mantem classes desconhecidas, ex.: mac-tbl/ind1)
+    const classe = el.getAttribute('class')
+    if (classe) {
+      const resto: string[] = []
+      for (const t of classe.split(/\s+/).filter(Boolean)) {
+        if (MAP_HL[t]) el.setAttribute('data-grifo', MAP_HL[t])
+        else if (MAP_BOX[t]) el.setAttribute('data-caixa', MAP_BOX[t])
+        else resto.push(t)
+      }
+      if (resto.length) el.setAttribute('class', resto.join(' '))
+      else el.removeAttribute('class')
+    }
+    // "📌 Ja cobrado em prova" -> marcador estrutural (sobrevive ao modo sem grifos)
+    if (el.tagName === 'P' && /^\s*📌/.test(el.text || '')) el.setAttribute('data-cobranca', '1')
+  }
 }
 
 const RE_ARTIGO = /^\s*art(?:igo)?\.?\s*\d+/i
@@ -162,6 +199,7 @@ export interface HtmlSanitizado {
 // Sanitiza + ancora (data-art) + indexa dispositivos (data-disp) + extrai a espinha.
 export function sanitizarDocumento(htmlBruto: string): HtmlSanitizado {
   const root = parse(htmlBruto ?? '', { comment: false })
+  mapearMontagem(root)
   const artigos = ancorarArtigos(root)
   const dispositivos = indexarDispositivos(root)
   const html = root.childNodes.map(serialize).join('').trim()
