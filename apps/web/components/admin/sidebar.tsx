@@ -201,6 +201,7 @@ const navGroups: NavGroup[] = [
       { label: 'Pacotes e acesso', href: '/admin/cronogramas/pacotes', icon: Package, perm: 'cronogramas:view' },
       { label: 'Links de aula', href: '/admin/cronogramas/links', icon: LinkIcon, perm: 'cronogramas:view' },
       { label: 'Tipos de meta', href: '/admin/cronogramas/tipos', icon: Tag, perm: 'cronogramas:view' },
+      { label: 'Relatórios', href: '/admin/cronogramas/relatorios', icon: BarChart3, perm: 'cronogramas:view' },
       { label: 'Importar', href: '/admin/cronogramas/importar', icon: Upload, perm: 'cronogramas:update' },
     ],
   },
