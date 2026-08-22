@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
+import { faixaUuidDoCodigo } from '@/lib/codigo-questao'
 
 export type Documento = {
   id: string
@@ -167,6 +168,75 @@ export async function excluirAnotacaoBase(id: string): Promise<{ ok: boolean; er
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const { error } = await svc.from('simulado_documento_anotacoes_base').update({ deletado: true }).eq('id', id).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+// ── Questões no meio da leitura (Fase 2) ──
+
+export type QuestaoDoc = { id: string; questaoId: string; enunciado: string; aposArtigo: number; obrigatoria: boolean }
+export type QuestaoBuscaLeitura = { id: string; enunciado: string; codigo: string | null }
+
+const snippet = (s: unknown) => String(s ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)
+
+/** Questões já anexadas ao documento (versão vigente). */
+export async function listarQuestoesDocumento(documentoId: string, versao: number): Promise<{ ok: boolean; itens?: QuestaoDoc[]; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: dq, error } = await svc.from('simulado_documento_questoes')
+    .select('id, questao_id, apos_artigo, obrigatoria').eq('tenant_id', g.tenantId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false).order('apos_artigo').order('ordem')
+  if (error) return { ok: false, error: error.message }
+  const ids = [...new Set((dq ?? []).map((x: any) => x.questao_id))]
+  const enun = new Map<string, string>()
+  if (ids.length) {
+    const { data: qs } = await svc.from('simulado_questoes').select('id, enunciado').in('id', ids)
+    for (const q of (qs ?? []) as any[]) enun.set(q.id, snippet(q.enunciado))
+  }
+  return { ok: true, itens: (dq ?? []).map((x: any) => ({ id: x.id, questaoId: x.questao_id, enunciado: enun.get(x.questao_id) || 'Questão', aposArtigo: x.apos_artigo, obrigatoria: !!x.obrigatoria })) }
+}
+
+/** Busca questões objetivas do banco (por enunciado ou código) para anexar. */
+export async function buscarQuestoesLeitura(query: string): Promise<{ ok: boolean; itens?: QuestaoBuscaLeitura[]; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const q = (query ?? '').trim()
+  const faixa = q ? faixaUuidDoCodigo(q) : null
+  let sel = svc.from('simulado_questoes').select('id, enunciado, codigo').eq('tenant_id', g.tenantId).eq('deletado', false).eq('tipo', 'objetiva').limit(30)
+  if (faixa) sel = sel.gte('id', faixa.lo).lte('id', faixa.hi)
+  else if (q) sel = sel.ilike('enunciado', `%${q.replace(/[%,]/g, ' ')}%`)
+  let res = await sel
+  if (res.error && /codigo/i.test(res.error.message)) res = await svc.from('simulado_questoes').select('id, enunciado').eq('tenant_id', g.tenantId).eq('deletado', false).eq('tipo', 'objetiva').ilike('enunciado', `%${q}%`).limit(30) as any
+  if (res.error) return { ok: false, error: res.error.message }
+  return { ok: true, itens: (res.data ?? []).map((x: any) => ({ id: x.id, enunciado: snippet(x.enunciado) || 'Questão', codigo: x.codigo ?? null })) }
+}
+
+export async function adicionarQuestaoDocumento(documentoId: string, versao: number, questaoId: string, aposArtigo: number, obrigatoria: boolean): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data, error } = await svc.from('simulado_documento_questoes').upsert(
+    { tenant_id: g.tenantId, documento_id: documentoId, documento_versao: versao, questao_id: questaoId, apos_artigo: aposArtigo, obrigatoria, ordem: aposArtigo, deletado: false },
+    { onConflict: 'documento_id,documento_versao,questao_id' },
+  ).select('id').single()
+  if (error) return { ok: false, error: /duplicate|unique/i.test(error.message) ? 'Essa questão já está no documento.' : error.message }
+  revalidatePath(`/admin/leitura/${documentoId}`)
+  return { ok: true, id: (data as any).id }
+}
+
+export async function atualizarQuestaoDocumento(id: string, patch: { aposArtigo?: number; obrigatoria?: boolean }): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const dados: Record<string, unknown> = {}
+  if ('aposArtigo' in patch) { dados.apos_artigo = patch.aposArtigo; dados.ordem = patch.aposArtigo }
+  if ('obrigatoria' in patch) dados.obrigatoria = patch.obrigatoria
+  const { error } = await svc.from('simulado_documento_questoes').update(dados).eq('id', id).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+export async function removerQuestaoDocumento(id: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_documento_questoes').update({ deletado: true }).eq('id', id).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
   return { ok: true }
 }

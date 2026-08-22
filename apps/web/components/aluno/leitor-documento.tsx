@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
@@ -10,6 +11,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { DocumentoCarregado, AnotacaoAluno } from '@/lib/leitura/acesso'
 import { construirEspinha, rangeParaAncora, ancoraParaRange, rectsDoRange, type Espinha, type RectRel } from '@/lib/leitura/anotacoes-engine'
+import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
 
 type Modo = 'scroll' | 'flip'
 type Tema = 'claro' | 'sepia' | 'escuro'
@@ -39,6 +41,10 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   const [pagina, setPagina] = useState(0)
   const [totalPag, setTotalPag] = useState(1)
   const [colW, setColW] = useState(0)
+
+  // Questões inline (Fase 2)
+  const [respostas, setRespostas] = useState<Record<string, boolean>>(() => Object.fromEntries((doc.questoes ?? []).filter((q) => q.resposta).map((q) => [q.questaoId, true])))
+  const [slots, setSlots] = useState<{ q: DocumentoCarregado['questoes'][number]; el: HTMLElement }[]>([])
 
   // Anotações (grifos/notas)
   const [anotacoes, setAnotacoes] = useState<AnotacaoAluno[]>(doc.anotacoes ?? [])
@@ -75,6 +81,26 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     })))
   }, [doc.html])
 
+  // ── Injeta as questões inline logo após o artigo indicado (contêiner no DOM; o card é
+  //    renderizado por PORTAL). O texto delas é ignorado pela espinha das anotações. ──
+  useIsoLayout(() => {
+    const root = contentRef.current
+    if (!root) { setSlots([]); return }
+    root.querySelectorAll('[data-leitura-q]').forEach((n) => n.remove())
+    if (!doc.questoes?.length) { setSlots([]); return }
+    const arts = Array.from(root.querySelectorAll<HTMLElement>('[data-art]'))
+    const novos: { q: DocumentoCarregado['questoes'][number]; el: HTMLElement }[] = []
+    for (const q of doc.questoes) {
+      const container = document.createElement('div')
+      container.setAttribute('data-leitura-q', q.docQuestaoId)
+      const prox = arts.find((el) => Number(el.getAttribute('data-art')) > q.aposArtigo)
+      if (prox && prox.parentElement) prox.parentElement.insertBefore(container, prox)
+      else root.appendChild(container)
+      novos.push({ q, el: container })
+    }
+    setSlots(novos)
+  }, [doc.html, doc.questoes])
+
   // ── Medição do modo virar-página ──
   // 1) Largura da coluna = largura da viewport (muda em resize/modo). Ao mudar colW,
   //    o React aplica columnWidth no DOM; SÓ ENTÃO (efeito 2) medimos o total de páginas —
@@ -95,7 +121,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     const total = Math.max(1, Math.round(ct.scrollWidth / (colW + GAP)))
     setTotalPag(total)
     setPagina((p) => Math.min(p, total - 1))
-  }, [modo, colW, fonte, doc.html])
+  }, [modo, colW, fonte, doc.html, slots])
 
   // ── Grifos: (re)calcula os retângulos do overlay. Coords LOCAIS ao overlay → imunes ao
   // translateX (virar) e ao scroll (as diferenças cancelam a transformação); por isso só
@@ -112,7 +138,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     }
     setRectsPorId(map)
   }, [anotacoes])
-  useIsoLayout(() => { recomputarGrifos() }, [recomputarGrifos, modo, colW, fonte, doc.html])
+  useIsoLayout(() => { recomputarGrifos() }, [recomputarGrifos, modo, colW, fonte, doc.html, slots])
 
   // ── Cálculo de progresso (%, artigo alcançado) ──
   const atualizarProgresso = useCallback(() => {
@@ -249,7 +275,10 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     else irPara(Math.floor(el.offsetLeft / (colW + GAP)))
   }
 
+  const obrigatoriasPendentes = (doc.questoes ?? []).filter((q) => q.obrigatoria && !respostas[q.questaoId]).length
+
   async function concluir() {
+    if (obrigatoriasPendentes > 0) { toast.error(`Responda as ${obrigatoriasPendentes} pergunta(s) obrigatória(s) antes de concluir.`); return }
     if (doc.desafio.exigeFim && pctRef.current < 100) { toast.error('Leia até o fim para concluir.'); return }
     setConcluindo(true)
     try {
@@ -400,6 +429,12 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
           )}
         </div>
       </div>
+
+      {/* Questões inline: renderizadas DENTRO do conteúdo (portal p/ o contêiner injetado) */}
+      {slots.map((s) => createPortal(
+        <QuestaoLeitura key={s.q.docQuestaoId} documentoId={doc.id} q={s.q} corFg={cores.fg} corMuted={cores.muted} onRespondida={(qid) => setRespostas((p) => ({ ...p, [qid]: true }))} />,
+        s.el,
+      ))}
 
       {/* Barra direita: anotações (grifos + notas) */}
       {barraDir && (

@@ -13,11 +13,21 @@ export interface RectRel { left: number; top: number; width: number; height: num
 
 const CTX = 32 // tamanho do contexto (prefix/suffix) guardado p/ recuperação
 
-/** Constrói a espinha (S + posições de cada text node) do conteúdo. */
+/**
+ * Constrói a espinha (S + posições de cada text node) do conteúdo. IGNORA o texto de
+ * questões injetadas ([data-leitura-q]) — assim os offsets das anotações não mudam
+ * quando o leitor insere questões entre os artigos.
+ */
 export function construirEspinha(root: HTMLElement): Espinha {
   const nodes: EspinhaNode[] = []
   let S = ''
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(n) {
+      let el: Element | null = (n as Text).parentElement
+      while (el && el !== root) { if (el.hasAttribute('data-leitura-q')) return NodeFilter.FILTER_REJECT; el = el.parentElement }
+      return NodeFilter.FILTER_ACCEPT
+    },
+  })
   let n: Node | null
   while ((n = walker.nextNode())) {
     const t = n as Text
@@ -29,18 +39,31 @@ export function construirEspinha(root: HTMLElement): Espinha {
   return { S, nodes }
 }
 
-/** Posição global (em caracteres) de um boundary (container, offset) — via Range.toString(). */
-function posGlobal(root: HTMLElement, container: Node, offset: number): number {
-  const r = document.createRange()
-  r.setStart(root, 0)
-  try { r.setEnd(container, offset) } catch { return -1 }
-  return r.toString().length
+/** Posição na espinha de um boundary (container, offset). Consistente com construirEspinha
+ * (não conta o texto das questões injetadas). */
+function posNaEspinha(esp: Espinha, container: Node, offset: number): number {
+  if (container.nodeType === 3) {
+    const e = esp.nodes.find((x) => x.node === container)
+    return e ? e.start + offset : -1
+  }
+  const el = container as Element
+  const ref = el.childNodes[offset] ?? null
+  if (ref === null) {
+    let last = -1
+    for (const x of esp.nodes) if (el.contains(x.node)) last = x.end
+    return last >= 0 ? last : esp.S.length
+  }
+  for (const x of esp.nodes) {
+    if (ref === (x.node as Node) || (ref as Element).contains?.(x.node)) return x.start
+    if (ref.compareDocumentPosition(x.node) & Node.DOCUMENT_POSITION_FOLLOWING) return x.start
+  }
+  return esp.S.length
 }
 
 /** Converte uma seleção (Range) em âncora de texto. null se vazia/inválida. */
-export function rangeParaAncora(root: HTMLElement, esp: Espinha, range: Range): AncoraTexto | null {
-  const inicio = posGlobal(root, range.startContainer, range.startOffset)
-  const fim = posGlobal(root, range.endContainer, range.endOffset)
+export function rangeParaAncora(_root: HTMLElement, esp: Espinha, range: Range): AncoraTexto | null {
+  const inicio = posNaEspinha(esp, range.startContainer, range.startOffset)
+  const fim = posNaEspinha(esp, range.endContainer, range.endOffset)
   if (inicio < 0 || fim < 0 || fim <= inicio) return null
   return {
     inicio, fim,

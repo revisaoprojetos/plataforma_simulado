@@ -81,6 +81,18 @@ export interface AnotacaoAluno {
   origem: 'propria' | 'base'
 }
 
+export interface AltLeitura { id: string; texto: string }
+export interface QuestaoLeituraDados {
+  docQuestaoId: string
+  questaoId: string
+  aposArtigo: number
+  obrigatoria: boolean
+  enunciado: string
+  comentario: string | null
+  alternativas: AltLeitura[]
+  resposta?: { alternativaId: string; correta: boolean; corretaId: string | null }
+}
+
 export interface DocumentoCarregado {
   id: string
   titulo: string
@@ -91,6 +103,7 @@ export interface DocumentoCarregado {
   desafio: { ativo: boolean; exigeFim: boolean; tempoMin: number }
   progresso: { pct: number; artigoMax: number; tempoSeg: number; concluido: boolean }
   anotacoes: AnotacaoAluno[]
+  questoes: QuestaoLeituraDados[]
 }
 
 /**
@@ -154,6 +167,37 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     }))
   } catch { /* migração de anotações ausente */ }
 
+  // Questões inline (Fase 2) + respostas do aluno. Tolerante se a migração ainda não rodou.
+  let questoes: QuestaoLeituraDados[] = []
+  try {
+    const { data: dq } = await svc.from('simulado_documento_questoes')
+      .select('id, questao_id, apos_artigo, obrigatoria, ordem')
+      .eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
+      .order('apos_artigo').order('ordem')
+    if (dq?.length) {
+      const qids = [...new Set((dq as any[]).map((x) => x.questao_id))]
+      const [{ data: qs }, { data: alts }, { data: resp }] = await Promise.all([
+        svc.from('simulado_questoes').select('id, enunciado, comentario_professor').in('id', qids),
+        svc.from('simulado_alternativas').select('id, questao_id, texto, ordem').in('questao_id', qids).order('ordem'),
+        svc.from('simulado_leitura_respostas').select('questao_id, alternativa_id, correta, snapshot_gabarito').eq('estudante_id', estudanteId).eq('documento_id', documentoId).in('questao_id', qids),
+      ])
+      const qMap = new Map((qs ?? []).map((q: any) => [q.id, q]))
+      const altsPorQ = new Map<string, AltLeitura[]>()
+      for (const a of (alts ?? []) as any[]) (altsPorQ.get(a.questao_id) ?? altsPorQ.set(a.questao_id, []).get(a.questao_id)!).push({ id: a.id, texto: a.texto })
+      const respPorQ = new Map((resp ?? []).map((r: any) => [r.questao_id, r]))
+      questoes = (dq as any[]).map((x) => {
+        const q: any = qMap.get(x.questao_id)
+        const r: any = respPorQ.get(x.questao_id)
+        return {
+          docQuestaoId: x.id, questaoId: x.questao_id, aposArtigo: x.apos_artigo, obrigatoria: !!x.obrigatoria,
+          enunciado: q?.enunciado ?? '', comentario: q?.comentario_professor ?? null,
+          alternativas: altsPorQ.get(x.questao_id) ?? [],
+          resposta: r ? { alternativaId: r.alternativa_id, correta: !!r.correta, corretaId: (r.snapshot_gabarito?.correta_id ?? null) } : undefined,
+        }
+      }).filter((x) => x.alternativas.length > 0)
+    }
+  } catch { /* migração fase 2 ausente */ }
+
   return {
     id: documentoId,
     titulo: (doc as any).titulo,
@@ -169,5 +213,6 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
       concluido: !!(prog as any)?.concluido_em,
     },
     anotacoes,
+    questoes,
   }
 }

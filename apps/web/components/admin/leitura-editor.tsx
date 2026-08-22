@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { atualizarDocumento, type Documento } from '@/app/admin/leitura/actions'
 import { salvarConteudoHtml, importarDocx } from '@/app/admin/leitura/upload-actions'
 import { LeituraAutorAnotacoes } from '@/components/admin/leitura-autor-anotacoes'
+import { LeituraQuestoesAdmin } from '@/components/admin/leitura-questoes-admin'
 
 const CORES = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#64748b']
 type Modo = 'colar' | 'word' | 'editor'
@@ -217,6 +218,11 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar }: { documento:
           </div>
           <LeituraAutorAnotacoes documentoId={documento.id} versao={documento.versao} html={htmlAtual} />
         </div>
+      )}
+
+      {/* Questões no meio da leitura (Fase 2) */}
+      {podeEditar && htmlAtual && (
+        <LeituraQuestoesAdmin documentoId={documento.id} versao={documento.versao} html={htmlAtual} />
       )}
     </div>
   )
