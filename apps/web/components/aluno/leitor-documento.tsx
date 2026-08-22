@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   ArrowLeft, ScrollText, BookOpen, ChevronLeft, ChevronRight, Minus, Plus,
-  Sun, Moon, Coffee, CheckCircle2, Loader2, X, PanelLeft, Highlighter, Trash2, StickyNote, Crosshair, Search, ChevronUp, ChevronDown,
+  Sun, Moon, Coffee, CheckCircle2, Loader2, X, PanelLeft, Highlighter, Trash2, StickyNote, Crosshair, Search, ChevronUp, ChevronDown, Star,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { DocumentoCarregado, AnotacaoAluno } from '@/lib/leitura/acesso'
@@ -29,9 +29,10 @@ const CORES_GRIFO = ['#fde047', '#86efac', '#93c5fd', '#f9a8d4', '#fca5a5'] // a
 const useIsoLayout = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
 export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
-  const [modo, setModo] = useState<Modo>('scroll')
-  const [tema, setTema] = useState<Tema>('sepia')
-  const [fonte, setFonte] = useState(18)
+  const [modo, setModo] = useState<Modo>((doc.prefs?.modo as Modo) || 'scroll')
+  const [tema, setTema] = useState<Tema>((doc.prefs?.tema as Tema) || 'sepia')
+  const [fonte, setFonte] = useState(doc.prefs?.fonte || 18)
+  const [favorito, setFavorito] = useState(!!doc.favorito)
   const [menuAberto, setMenuAberto] = useState(true)
   const [pct, setPct] = useState(doc.progresso.pct)
   const [concluido, setConcluido] = useState(doc.progresso.concluido)
@@ -55,7 +56,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
 
   // Grifos editoriais (conteúdo compartilhado) + modo sem grifos
   const grifos = doc.grifos ?? []
-  const [semGrifos, setSemGrifos] = useState(false)
+  const [semGrifos, setSemGrifos] = useState(!!doc.prefs?.semGrifos)
   const [grifosRects, setGrifosRects] = useState<Record<string, { rects: RectRel[]; tipo: string }>>({})
 
   // Anotações (grifos/notas)
@@ -76,10 +77,38 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   const pctRef = useRef(doc.progresso.pct)
   const scrollRaf = useRef(0)
   const touchX = useRef<number | null>(null)
+  const dispTopRef = useRef<string | null>(doc.ultimoDisp)
+  const prefsRef = useRef(false)
   const cores = TEMAS[tema]
+
+  // Salva preferências (debounced) ao mudar tema/fonte/modo/sem-grifos.
+  useEffect(() => {
+    if (!prefsRef.current) { prefsRef.current = true; return }
+    const t = setTimeout(() => { fetch('/api/leitura/preferencias', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tema, fonte, modo, sem_grifos: semGrifos }) }).catch(() => {}) }, 800)
+    return () => clearTimeout(t)
+  }, [tema, fonte, modo, semGrifos])
+
+  // Favoritar a lei.
+  async function toggleFavorito() {
+    setFavorito((v) => !v)
+    try { const r = await fetch('/api/leitura/favorito', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ documento_id: doc.id }) }); const j = await r.json(); if (typeof j?.favorito === 'boolean') setFavorito(j.favorito) } catch { /* ok */ }
+  }
 
   // No mobile, começa com o menu fechado (a barra de 256px cobriria a leitura).
   useEffect(() => { if (typeof window !== 'undefined' && window.innerWidth < 768) setMenuAberto(false) }, [])
+
+  // Retomar o último ponto lido (uma vez, após o layout).
+  useEffect(() => {
+    if (!doc.ultimoDisp) return
+    const t = setTimeout(() => {
+      const el = contentRef.current?.querySelector<HTMLElement>(`[data-disp="${CSS.escape(doc.ultimoDisp!)}"]`)
+      if (!el) return
+      if (modo === 'scroll') el.scrollIntoView({ block: 'start' })
+      else if (colW) irPara(Math.floor(el.offsetLeft / (colW + GAP)))
+    }, 400)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Sumário (TOC): prefere dispositivos ([data-disp], hierárquico); cai em [data-art]. ──
   useIsoLayout(() => {
@@ -206,6 +235,14 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
         if (el.offsetLeft < limite) artigoMaxRef.current = Math.max(artigoMaxRef.current, Number(el.getAttribute('data-art')) || 0)
       }
     }
+    // Último ponto: dispositivo topo visível (para retomar depois).
+    const dispEls = ct.querySelectorAll<HTMLElement>('[data-disp]')
+    let topo: string | null = null
+    for (const el of dispEls) {
+      const passou = modo === 'scroll' ? el.offsetTop <= vp.scrollTop + 8 : el.offsetLeft <= pagina * (colW + GAP) + 8
+      if (passou) topo = el.getAttribute('data-disp')
+    }
+    if (topo) dispTopRef.current = topo
     p = Math.min(100, Math.max(0, p))
     if (p > pctRef.current) { pctRef.current = p; setPct(p) }
   }, [modo, pagina, totalPag, colW])
@@ -225,9 +262,17 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     return fetch('/api/leitura/progresso', { method: 'POST', headers: { 'content-type': 'application/json' }, body })
   }, [doc.id, doc.versao])
 
+  const pontoSalvoRef = useRef<string | null>(doc.ultimoDisp)
+  const salvarPonto = useCallback(() => {
+    const d = dispTopRef.current
+    if (!d || d === pontoSalvoRef.current) return
+    pontoSalvoRef.current = d
+    fetch('/api/leitura/ponto', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ documento_id: doc.id, versao: doc.versao, disp_id: d }) }).catch(() => {})
+  }, [doc.id, doc.versao])
+
   useEffect(() => {
     const tick = setInterval(() => { if (document.visibilityState === 'visible') tempoRef.current += 1 }, 1000)
-    const save = setInterval(() => { if (tempoRef.current > 0) flush().catch(() => {}) }, 20000)
+    const save = setInterval(() => { if (tempoRef.current > 0) flush().catch(() => {}); salvarPonto() }, 20000)
     // Ao esconder/fechar a aba: envia o tempo pendente via sendBeacon e ZERA (senão o próximo
     // flush contaria o mesmo tempo de novo). Listeners nomeados p/ remover no cleanup (sem leak).
     const onHide = () => {
@@ -243,9 +288,9 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
       clearInterval(tick); clearInterval(save)
       document.removeEventListener('visibilitychange', onVis)
       window.removeEventListener('pagehide', onHide)
-      flush().catch(() => {})
+      flush().catch(() => {}); salvarPonto()
     }
-  }, [flush, doc.id, doc.versao])
+  }, [flush, salvarPonto, doc.id, doc.versao])
 
   // ── Navegação virar-página (teclado) ──
   const irPara = useCallback((p: number) => setPagina((cur) => Math.min(Math.max(0, p), totalPag - 1)), [totalPag])
@@ -417,6 +462,9 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
           )}
           <span className="truncate text-sm font-semibold" style={{ color: cores.fg }}>{doc.titulo}</span>
           <div className="ml-auto flex items-center gap-3">
+            <button onClick={toggleFavorito} title={favorito ? 'Remover dos favoritos' : 'Favoritar'} className="rounded-lg border p-1.5 transition-colors" style={{ borderColor: '#0000001a', color: favorito ? '#f59e0b' : cores.fg }} aria-label="Favoritar">
+              <Star className={cn('h-4 w-4', favorito && 'fill-amber-400')} />
+            </button>
             <button onClick={() => setBuscaAberta((v) => !v)} title="Buscar na lei" className={cn('rounded-lg border p-1.5 transition-colors', buscaAberta && 'ring-2 ring-primary')} style={{ borderColor: '#0000001a', color: cores.fg }} aria-label="Buscar">
               <Search className="h-4 w-4" />
             </button>

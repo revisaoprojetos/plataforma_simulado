@@ -132,6 +132,9 @@ export interface DocumentoCarregado {
   anotacoes: AnotacaoAluno[]
   questoes: QuestaoLeituraDados[]
   grifos: GrifoLei[]
+  prefs: { tema: string | null; fonte: number | null; modo: string | null; semGrifos: boolean | null } | null
+  ultimoDisp: string | null
+  favorito: boolean
 }
 
 export interface GrifoLei { id: string; inicio: number; fim: number; exact: string; prefix: string; suffix: string; tipo: string; nota: string | null }
@@ -248,6 +251,21 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     grifos = ((gs ?? []) as any[]).map((g) => ({ id: g.id, inicio: g.inicio_char, fim: g.fim_char, exact: g.exact, prefix: g.prefix ?? '', suffix: g.suffix ?? '', tipo: g.tipo_grifo ?? 'nucleo', nota: g.nota ?? null }))
   } catch { /* migração A4 ausente */ }
 
+  // Estudo pessoal (A6): preferências (global) + último ponto (por lei) + favorito. Tolerante.
+  let prefs: DocumentoCarregado['prefs'] = null
+  let ultimoDisp: string | null = null
+  let favorito = false
+  try {
+    const [pf, up, fv] = await Promise.all([
+      svc.from('simulado_leitura_preferencias').select('tema, fonte, modo, sem_grifos').eq('estudante_id', estudanteId).maybeSingle(),
+      svc.from('simulado_leitura_ultimo_ponto').select('disp_id').eq('estudante_id', estudanteId).eq('documento_id', documentoId).maybeSingle(),
+      svc.from('simulado_lei_favoritos').select('id').eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('disp_id', '').maybeSingle(),
+    ])
+    if (pf.data) prefs = { tema: (pf.data as any).tema ?? null, fonte: (pf.data as any).fonte ?? null, modo: (pf.data as any).modo ?? null, semGrifos: (pf.data as any).sem_grifos ?? null }
+    ultimoDisp = (up.data as any)?.disp_id ?? null
+    favorito = !!fv.data
+  } catch { /* migração A6 ausente */ }
+
   return {
     id: documentoId,
     titulo: (doc as any).titulo,
@@ -265,5 +283,8 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     anotacoes,
     questoes,
     grifos,
+    prefs,
+    ultimoDisp,
+    favorito,
   }
 }
