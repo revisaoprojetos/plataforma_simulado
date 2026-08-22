@@ -149,14 +149,14 @@ export function ProvaHud(p: ProvaHudProps) {
                   <span
                     data-campo="primaria"
                     title={q.disciplina}
-                    className="ml-2 mt-3 inline-flex max-w-[45%] items-center truncate rounded-full border px-3 py-0.5 text-xs font-medium"
+                    className="ml-2 mt-0.5 inline-flex max-w-[45%] items-center truncate rounded-full border px-3 py-0.5 text-xs font-medium"
                     style={{ background: 'color-mix(in srgb, var(--primary) 12%, var(--card))', color: 'var(--primary)', borderColor: 'color-mix(in srgb, var(--primary) 30%, var(--border))' }}
                   >
                     {q.disciplina}
                   </span>
                 )}
               </div>
-              <CardContent className="pt-9">
+              <CardContent className="pt-6">
                 {q.aviso && (
                   <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border px-3 py-2 text-sm font-semibold"
                     style={{ borderColor: `${q.aviso.cor ?? '#ef4444'}66`, background: `${q.aviso.cor ?? '#ef4444'}14`, color: q.aviso.cor ?? '#ef4444' }}>
