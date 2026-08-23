@@ -98,12 +98,16 @@ function itensDaPagina(page: CadernoDoc['pages'][number], data: CadernoData, the
   })
 }
 
-/** Uma folha A4 de CONTEÚDO: fundo de página (letterhead) + área segura (reserva cabeçalho/rodapé). */
-function FolhaConteudo({ theme, folhaUrl, cabH, rodH, children }: { theme: CadernoTheme; folhaUrl?: string; cabH: number; rodH: number; children: ReactNode }) {
+/** Uma folha A4 de CONTEÚDO: fundo de página (letterhead) + faixas de cabeçalho/rodapé (imagens dos
+ *  ajustes) + área segura (o conteúdo fica ENTRE as faixas, via paddingTop=cabH / paddingBottom=rodH). */
+function FolhaConteudo({ theme, folhaUrl, cabecalhoUrl, rodapeUrl, cabH, rodH, children }: { theme: CadernoTheme; folhaUrl?: string; cabecalhoUrl?: string; rodapeUrl?: string; cabH: number; rodH: number; children: ReactNode }) {
   return (
     <div style={{ width: A4_W, minHeight: A4_H, position: 'relative', overflow: 'hidden', background: theme.cores.fundo, color: theme.cores.texto, boxShadow: '0 2px 20px rgba(0,0,0,.16)', fontFamily: theme.tipografia.familia }}>
       {folhaUrl && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${folhaUrl})`, backgroundSize: '210mm 297mm', backgroundRepeat: 'no-repeat', backgroundPosition: 'top center' }} />}
-      <div style={{ position: 'relative', paddingTop: cabH, paddingBottom: rodH, paddingLeft: PAD_H, paddingRight: PAD_H }}>
+      {/* Faixa de CABEÇALHO (topo) e RODAPÉ (base): ocupam exatamente a área reservada (cabH/rodH). */}
+      {cabecalhoUrl && <img src={cabecalhoUrl} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: cabH, objectFit: 'cover', zIndex: 1 }} />}
+      {rodapeUrl && <img src={rodapeUrl} alt="" style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: rodH, objectFit: 'cover', zIndex: 1 }} />}
+      <div style={{ position: 'relative', zIndex: 2, paddingTop: cabH, paddingBottom: rodH, paddingLeft: PAD_H, paddingRight: PAD_H }}>
         {children}
       </div>
     </div>
@@ -137,7 +141,7 @@ function FolhaCapa({ capaUrl, capa, theme, onPick, sel }: { capaUrl: string; cap
 }
 
 /** Prévia A4 de um modelo pronto (doc v1) com as questões do banco + variáveis do aluno. */
-export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl, ultimaUrl, folhaUrl, capa, onPickCapa, selCapa, docOverride, onPickBloco, selBlocoId, respostas, gabaritoLiberado, margemTopo, margemBase }: {
+export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl, ultimaUrl, folhaUrl, cabecalhoUrl, rodapeUrl, capa, onPickCapa, selCapa, docOverride, onPickBloco, selBlocoId, respostas, gabaritoLiberado, margemTopo, margemBase }: {
   presetId: string
   questoes: PreviewQuestao[]
   vars?: Record<string, string>
@@ -157,6 +161,10 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
   ultimaUrl?: string
   /** Fundo (letterhead) aplicado em cada folha de conteúdo. */
   folhaUrl?: string
+  /** Faixa de cabeçalho (imagem no topo de cada folha de conteúdo). */
+  cabecalhoUrl?: string
+  /** Faixa de rodapé (imagem na base de cada folha de conteúdo). */
+  rodapeUrl?: string
   /** Config do título da capa (sobrepõe o default do preset). */
   capa?: CapaConfig
   /** Clique no título da capa → abre o editor lateral. */
@@ -178,10 +186,10 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
   const data = useMemo(() => montarCadernoData(questoes, vars, titulo, { respostas, gabaritoLiberado }), [questoes, vars, titulo, respostasKey, gabaritoLiberado]) // eslint-disable-line react-hooks/exhaustive-deps
   const selectable = !!onPickBloco
   const running = doc?.running ?? RUNNING_PADRAO
-  // Reserva de área segura (cabeçalho/rodapé) — a arte do letterhead já traz cabeçalho/rodapé.
-  // `margemTopo`/`margemBase` (px, dos ajustes) sobrepõem o padrão do doc quando definidos (>0).
-  const cabH = margemTopo ? margemTopo : (running.cabecalhoAtivo ? (running.cabecalhoAltura || PAD_V) : PAD_V)
-  const rodH = margemBase ? margemBase : (running.rodapeAtivo ? (running.rodapeAltura || PAD_V) : PAD_V)
+  // Reserva de área segura (cabeçalho/rodapé). Prioridade: margem explícita (ajustes) > faixa-imagem
+  // (cabecalhoUrl/rodapeUrl, mesma altura do Previa) > cabeçalho/rodapé do doc (letterhead) > padrão.
+  const cabH = margemTopo ? margemTopo : cabecalhoUrl ? 96 : (running.cabecalhoAtivo ? (running.cabecalhoAltura || PAD_V) : PAD_V)
+  const rodH = margemBase ? margemBase : rodapeUrl ? 84 : (running.rodapeAtivo ? (running.rodapeAltura || PAD_V) : PAD_V)
   const contentW = A4_W - 2 * PAD_H
   const availH = A4_H - cabH - rodH - 8
 
@@ -241,7 +249,7 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
       </div>
       {capaPage && <FolhaCapa key="capa" capaUrl={capaUrl!} capa={capaEfetiva} theme={theme} onPick={onPickCapa} sel={selCapa} />}
       {pages.map((idxs, pi) => (
-        <FolhaConteudo key={pi} theme={theme} folhaUrl={folhaUrl} cabH={cabH} rodH={rodH}>
+        <FolhaConteudo key={pi} theme={theme} folhaUrl={folhaUrl} cabecalhoUrl={cabecalhoUrl} rodapeUrl={rodapeUrl} cabH={cabH} rodH={rodH}>
           {idxs.map((i, gi) => itens[i] && <div key={itens[i].key} style={{ marginTop: gi === 0 ? 0 : (itens[i].gapTop || 0) }}>{itens[i].node}</div>)}
         </FolhaConteudo>
       ))}

@@ -633,7 +633,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
             // evitando nós velhos (header do modelo anterior) presos por ids determinísticos.
             <div key={`${ativo.id}:${ativo.modalidade}:${ativo.modelo}`} className="mx-auto" style={{ zoom } as any}>
               {presetAtivo ? (
-                <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} ultimaUrl={a.ultimaUrl} folhaUrl={a.folhaUrl} margemTopo={a.margemTopo} margemBase={a.margemBase}
+                <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} ultimaUrl={a.ultimaUrl} folhaUrl={a.folhaUrl} cabecalhoUrl={a.cabecalhoUrl} rodapeUrl={a.rodapeUrl} margemTopo={a.margemTopo} margemBase={a.margemBase}
                   capa={ativo.capa} onPickCapa={() => { setEstruturaAberta(false); setPickerCapa(true); setPickerCor(null); setPickerBloco(null) }} selCapa={pickerCapa}
                   docOverride={ativo.docEdit} onPickBloco={(id) => { setEstruturaAberta(false); setPickerBloco(id); setPickerCapa(false); setPickerCor(null) }} selBlocoId={pickerBloco} />
               ) : (

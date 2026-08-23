@@ -42,7 +42,7 @@ export function PreviewCadernoTeste({ item, questoes, vars, discBanco, standalon
         </div>
       )}
       {preset
-        ? <PreviaBlocos presetId={preset} questoes={questoes} vars={vars} titulo={item.ajustes.titulo} capaUrl={item.ajustes.capaUrl} ultimaUrl={item.ajustes.ultimaUrl} folhaUrl={item.ajustes.folhaUrl} margemTopo={item.ajustes.margemTopo} margemBase={item.ajustes.margemBase} capa={item.capa} docOverride={item.docEdit} respostas={respostas} gabaritoLiberado={gabaritoLiberado} />
+        ? <PreviaBlocos presetId={preset} questoes={questoes} vars={vars} titulo={item.ajustes.titulo} capaUrl={item.ajustes.capaUrl} ultimaUrl={item.ajustes.ultimaUrl} folhaUrl={item.ajustes.folhaUrl} cabecalhoUrl={item.ajustes.cabecalhoUrl} rodapeUrl={item.ajustes.rodapeUrl} margemTopo={item.ajustes.margemTopo} margemBase={item.ajustes.margemBase} capa={item.capa} docOverride={item.docEdit} respostas={respostas} gabaritoLiberado={gabaritoLiberado} />
         : <Previa item={item} questoes={questoes} vars={vars} discBanco={discBanco} />}
     </div>
   )
