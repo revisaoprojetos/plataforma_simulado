@@ -278,12 +278,16 @@ export function htmlParaDiagnostico(html: string, caixas: string[] = []): { cont
     if (linhas[iTit + 1] && linhas[iTit + 1].p.length < 80 && !/acert|quest/.test(nP[iTit + 1])) { conteudo.subtitulo = linhas[iTit + 1].f; iniIntro = iTit + 2 }
   }
 
-  // Nota.
+  // Nota. O modelo (Word/PDF) traz "X acertos de N questões — X% de aproveitamento" com o "X" como
+  // PLACEHOLDER visual. Precisamos gravar os TOKENS ({acertos}/{total_questoes}/{percentual}) — senão
+  // o render mostra o "X" literal em vez do dado do aluno. Convertendo os placeholders p/ tokens:
   const iNota = nP.findIndex((t) => /acert/.test(t) && /quest/.test(t))
   if (iNota >= 0) {
     conteudo.notaTexto = linhas[iNota].f
-    const m = linhas[iNota].p.match(/de\s+(\d+)\s+quest/i) || linhas[iNota].p.match(/\/\s*(\d+)/) || linhas[iNota].p.match(/(\d+)\s+quest/i)
-    if (m) conteudo.notaTotal = m[1]
+      .replace(/\bX\s*%/gi, '{percentual}')              // "X%" → aproveitamento
+      .replace(/\bX\b/g, '{acertos}')                    // "X" (acertos) → acertos
+      .replace(/\b\d+(?=\s*quest)/i, '{total_questoes}') // "de 30 questões" → token (total real do banco)
+    conteudo.notaTotal = '{total_questoes}'
     iniIntro = Math.max(iniIntro, iNota + 1)
   }
 
