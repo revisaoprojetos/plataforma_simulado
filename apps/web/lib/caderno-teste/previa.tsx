@@ -521,8 +521,8 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
   const blocos = useMemo(() => {
     const sink: { entradas?: DiagEntrada[] } = {}
     const nodes = blocosDoItem(item, qs, vars, discBanco, { selParte, onPick: (p, n, cor, an) => onPickRef.current?.(p, n, cor, an) }, sink)
-    // `juntar` = sub-bloco colado (sem gap acima) → cards grandes quebram entre páginas.
-    return sink.entradas ? sink.entradas.map((e) => ({ node: e.node, juntar: !!e.juntar })) : nodes.map((n) => ({ node: n, juntar: false }))
+    // `juntar` = sub-bloco colado (sem gap acima); `secao` = faixa de título (não pode ficar órfã no rodapé).
+    return sink.entradas ? sink.entradas.map((e) => ({ node: e.node, juntar: !!e.juntar, secao: e.tipo === 'secao' })) : nodes.map((n) => ({ node: n, juntar: false, secao: false }))
   }, [item, qs, varsKey, discKey, selParte]) // eslint-disable-line react-hooks/exhaustive-deps
   const medRef = useRef<HTMLDivElement>(null)
   const [paginas, setPaginas] = useState<number[][] | null>(null)
@@ -544,17 +544,30 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
       const tops = kids.map((el) => el.getBoundingClientRect().top)
       const hs = kids.map((el, i) => (i < kids.length - 1 ? tops[i + 1] : el.getBoundingClientRect().bottom) - tops[i])
       const BUF = 26 // folga p/ sub-pixel/diferenças de render — evita card cortado/sliver colorido no fim da folha
+      // Quanto o bloco ÂNCORA em `idx` precisa caber p/ ficar na página: o CARD INTEIRO (âncora + todas as
+      // continuações coladas) quando ele cabe numa página em branco; senão (card gigante) só a âncora + a
+      // 1ª continuação (evita cabeçalho órfão do próprio card e deixa o resto quebrar).
+      const necessarioDe = (idx: number): number => {
+        let g = hs[idx]
+        for (let j = idx + 1; j < hs.length && blocos[j]?.juntar; j++) g += hs[j]
+        if (g <= availH - BUF) return g
+        const cont = (idx + 1 < hs.length && blocos[idx + 1]?.juntar) ? hs[idx + 1] : 0
+        return hs[idx] + cont
+      }
       const pages: number[][] = []; let cur: number[] = []; let h = 0
       for (let i = 0; i < hs.length; i++) {
         if (blocos[i]?.juntar) {
-          // Continuação (sub-bloco colado): quebra normal.
+          // Continuação (sub-bloco colado): normalmente já cabe (o card foi validado inteiro na âncora).
+          // Só chega a quebrar aqui quando o card é MAIOR que uma página inteira.
           if (cur.length && h + hs[i] > availH - BUF) { pages.push(cur); cur = [i]; h = hs[i] }
           else { cur.push(i); h += hs[i] }
         } else {
-          // ÂNCORA (cabeçalho do card): só fica nesta página se ELE + a 1ª continuação couberem juntos
-          // — senão desce inteiro, evitando cabeçalho órfão no rodapé com os assuntos na página seguinte.
-          const primeiroCont = (i + 1 < hs.length && blocos[i + 1]?.juntar) ? hs[i + 1] : 0
-          if (cur.length && h + hs[i] + primeiroCont > availH - BUF) { pages.push(cur); cur = []; h = 0 }
+          // ÂNCORA: tenta manter o card inteiro numa só página (não parte assuntos entre páginas).
+          let necessario = necessarioDe(i)
+          // Faixa de SEÇÃO não pode ficar órfã no fim da página: exige caber JUNTO com o próximo card
+          // (mede o card seguinte inteiro) — senão a seção desce com o conteúdo dela.
+          if (blocos[i]?.secao && i + 1 < hs.length && !blocos[i + 1]?.juntar) necessario = hs[i] + necessarioDe(i + 1)
+          if (cur.length && h + necessario > availH - BUF) { pages.push(cur); cur = []; h = 0 }
           cur.push(i); h += hs[i]
         }
       }
