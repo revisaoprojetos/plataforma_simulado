@@ -31,7 +31,8 @@ export function PreviewCadernoTeste({ item, questoes, vars, discBanco, standalon
         .caderno-pronto{gap:0!important}
         .caderno-pronto>[aria-hidden]{display:none!important}
         .caderno-pronto>div{box-shadow:none!important;break-after:page;page-break-after:always}
-        .caderno-pronto>div:last-child{break-after:avoid;page-break-after:avoid}
+        /* a ÚLTIMA folha (contracapa) começa SEMPRE numa página nova e não deixa página em branco depois */
+        .caderno-pronto>div:last-child{break-after:avoid;page-break-after:avoid;break-before:page;page-break-before:always;overflow:hidden}
       }`}</style>
       {standalone && (
         <div className="no-print fixed right-4 top-4 z-50">
