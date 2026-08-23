@@ -584,13 +584,23 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
           {ativo.modalidade === 'folha_respostas' && (
             <div className="col-span-1"><Segment label="Colunas" valor={a.colunas} opcoes={[2, 3, 4, 5]} onChange={(n) => setAjuste({ colunas: n })} /></div>
           )}
-          {/* Imagens do caderno (opcionais) — agrupadas 2×2 */}
-          <div className="col-span-2 mt-1"><p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><FileUp className="h-3.5 w-3.5" /> Imagens (opcionais)</p></div>
-          <div className="col-span-1"><CampoImagem label="Capa (página inteira)" valor={a.capaUrl} onChange={(url) => setAjuste({ capaUrl: url })} /></div>
+          {/* Imagens (opcionais) — capa/contracapa (página inteira) SEPARADAS do fundo e faixas */}
+          <div className="col-span-2 mt-1"><p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><FileUp className="h-3.5 w-3.5" /> Capa e contracapa (página inteira)</p></div>
+          <div className="col-span-1"><CampoImagem label="Capa (frente)" valor={a.capaUrl} onChange={(url) => setAjuste({ capaUrl: url })} /></div>
           <div className="col-span-1"><CampoImagem label="Última folha (capa de fundo)" valor={a.ultimaUrl} onChange={(url) => setAjuste({ ultimaUrl: url })} /></div>
+
+          <div className="col-span-2 mt-2"><p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><FileUp className="h-3.5 w-3.5" /> Fundo e faixas (por página)</p></div>
           <div className="col-span-1"><CampoImagem label="Folha (fundo da página)" valor={a.folhaUrl} onChange={(url) => setAjuste({ folhaUrl: url })} /></div>
           <div className="col-span-1"><CampoImagem label="Cabeçalho (faixa no topo)" valor={a.cabecalhoUrl} onChange={(url) => setAjuste({ cabecalhoUrl: url })} /></div>
           <div className="col-span-1"><CampoImagem label="Rodapé (faixa na base)" valor={a.rodapeUrl} onChange={(url) => setAjuste({ rodapeUrl: url })} /></div>
+
+          {/* Dimensões ideais p/ encaixe perfeito (A4 retrato = 794 × 1123 px) */}
+          <div className="col-span-2 rounded-md border border-dashed px-2.5 py-2 text-[10px] leading-relaxed text-muted-foreground">
+            <p className="mb-0.5 font-semibold text-foreground/80">📐 Dimensões ideais (encaixe perfeito · A4 retrato)</p>
+            <p>• <strong>Capa</strong> e <strong>última folha</strong>: <strong>794 × 1123 px</strong> (ou 1588 × 2246 p/ mais nitidez) — página inteira.</p>
+            <p>• <strong>Folha</strong> (fundo): <strong>794 × 1123 px</strong> (A4 inteiro).</p>
+            <p>• <strong>Cabeçalho</strong>: <strong>794 × 96 px</strong> &nbsp;·&nbsp; <strong>Rodapé</strong>: <strong>794 × 84 px</strong> (largura total × faixa).</p>
+          </div>
           {ativo.modalidade === 'diagnostico' && (
             <div className="col-span-2 rounded-md border border-dashed px-2.5 py-2 text-[11px] leading-snug text-muted-foreground">
               💡 Cor das disciplinas por pilar: <strong>clique no card de uma disciplina na prévia</strong> (à direita) e escolha a cor ao lado.
