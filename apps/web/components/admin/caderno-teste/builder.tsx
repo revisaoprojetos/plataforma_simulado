@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, BookOpenCheck, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown, Check, Undo2, Redo2, Trash2, Menu, ArrowUp, ArrowDown, GripVertical, Type, Heading, LayoutGrid } from 'lucide-react'
+import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, BookOpenCheck, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown, Check, Undo2, Redo2, Trash2, Menu, ArrowUp, ArrowDown, GripVertical, Type, Heading, LayoutGrid, MoveVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { HexColorField } from '@/components/admin/hex-color-field'
@@ -601,6 +601,15 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
             <p>• <strong>Folha</strong> (fundo): <strong>794 × 1123 px</strong> (A4 inteiro).</p>
             <p>• <strong>Cabeçalho</strong>: <strong>794 × 96 px</strong> &nbsp;·&nbsp; <strong>Rodapé</strong>: <strong>794 × 84 px</strong> (largura total × faixa).</p>
           </div>
+
+          {/* Margens de segurança do conteúdo: até onde os blocos vão no topo/base (mantém A4) —
+              evita que o conteúdo fique POR CIMA do cabeçalho/rodapé/imagem de fundo. */}
+          <div className="col-span-2 mt-2"><p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><MoveVertical className="h-3.5 w-3.5" /> Espaçamento do conteúdo (topo e base)</p></div>
+          <div className="col-span-1"><CampoAltura label="Espaço no topo (cabeçalho)" valor={a.margemTopo} onChange={(n) => setAjuste({ margemTopo: n })} /></div>
+          <div className="col-span-1"><CampoAltura label="Espaço na base (rodapé)" valor={a.margemBase} onChange={(n) => setAjuste({ margemBase: n })} /></div>
+          <div className="col-span-2 rounded-md border border-dashed px-2.5 py-2 text-[10px] leading-relaxed text-muted-foreground">
+            ↕️ Define até onde os blocos descem/sobem na página (A4 mantido). <strong>0 = automático</strong>. Aumente o valor até o conteúdo ficar <strong>entre</strong> o cabeçalho e o rodapé, sem cobrir a faixa/imagem de fundo.
+          </div>
           {ativo.modalidade === 'diagnostico' && (
             <div className="col-span-2 rounded-md border border-dashed px-2.5 py-2 text-[11px] leading-snug text-muted-foreground">
               💡 Cor das disciplinas por pilar: <strong>clique no card de uma disciplina na prévia</strong> (à direita) e escolha a cor ao lado.
@@ -624,7 +633,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
             // evitando nós velhos (header do modelo anterior) presos por ids determinísticos.
             <div key={`${ativo.id}:${ativo.modalidade}:${ativo.modelo}`} className="mx-auto" style={{ zoom } as any}>
               {presetAtivo ? (
-                <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} ultimaUrl={a.ultimaUrl} folhaUrl={a.folhaUrl}
+                <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} ultimaUrl={a.ultimaUrl} folhaUrl={a.folhaUrl} margemTopo={a.margemTopo} margemBase={a.margemBase}
                   capa={ativo.capa} onPickCapa={() => { setEstruturaAberta(false); setPickerCapa(true); setPickerCor(null); setPickerBloco(null) }} selCapa={pickerCapa}
                   docOverride={ativo.docEdit} onPickBloco={(id) => { setEstruturaAberta(false); setPickerBloco(id); setPickerCapa(false); setPickerCor(null) }} selBlocoId={pickerBloco} />
               ) : (
@@ -1230,6 +1239,26 @@ function CampoFormatavel({ campo, onChange }: { campo: CampoTexto; onChange: (v:
       {campo.multiline
         ? <textarea ref={ref as any} value={campo.valor} onChange={(e) => onChange(e.target.value)} rows={3} className="w-full resize-y rounded border bg-background px-2 py-1 text-xs leading-snug outline-none focus:border-primary" />
         : <input ref={ref as any} value={campo.valor} onChange={(e) => onChange(e.target.value)} className="w-full rounded border bg-background px-2 py-1 text-xs outline-none focus:border-primary" />}
+    </div>
+  )
+}
+
+/** Ajuste numérico de altura (px) — reserva de topo/base do conteúdo. Slider + número; 0 = automático. */
+function CampoAltura({ label, valor, onChange }: { label: string; valor: number; onChange: (n: number) => void }) {
+  const v = valor || 0
+  const clamp = (n: number) => Math.max(0, Math.min(400, Math.round(n) || 0))
+  return (
+    <div className="rounded-md border bg-background px-2 py-1.5">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-[11px] text-muted-foreground">{label}</span>
+        <div className="flex items-center gap-1">
+          <input type="number" min={0} max={400} value={v} onChange={(e) => onChange(clamp(Number(e.target.value)))}
+            className="w-14 rounded border bg-background px-1.5 py-0.5 text-right text-xs text-foreground" />
+          <span className="text-[10px] text-muted-foreground">px</span>
+        </div>
+      </div>
+      <input type="range" min={0} max={400} step={4} value={v} onChange={(e) => onChange(clamp(Number(e.target.value)))} className="w-full accent-primary" />
+      <div className="mt-0.5 text-[10px] text-muted-foreground">{v === 0 ? 'Automático' : `${v}px de reserva`}</div>
     </div>
   )
 }

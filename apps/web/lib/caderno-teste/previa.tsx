@@ -508,9 +508,10 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
   const pad = a.compacto ? 40 : 56
   const GAP = a.compacto ? 8 : 12 // espaço entre blocos (contado na paginação, fielmente)
   // Quando há imagem de FUNDO da página (folhaUrl), ela costuma trazer faixas de cabeçalho/rodapé
-  // embutidas — reserva margem p/ o conteúdo não ficar por cima delas.
-  const Ht = a.cabecalhoUrl ? 96 : a.folhaUrl ? 72 : pad + 16
-  const Hf = a.rodapeUrl ? 84 : a.folhaUrl ? 72 : 16
+  // embutidas — reserva margem p/ o conteúdo não ficar por cima delas. `margemTopo`/`margemBase`
+  // (px) permitem ajustar manualmente até onde os blocos vão (0 = automático).
+  const Ht = a.margemTopo ? a.margemTopo : (a.cabecalhoUrl ? 96 : a.folhaUrl ? 72 : pad + 16)
+  const Hf = a.margemBase ? a.margemBase : (a.rodapeUrl ? 84 : a.folhaUrl ? 72 : 16)
   const contentW = A4_W - 2 * pad
   const availH = A4_H - Ht - Hf - 16
 

@@ -99,6 +99,12 @@ export type BuilderAjustes = {
   folhaUrl: string        // imagem de fundo da folha (papel timbrado, por página)
   cabecalhoUrl: string    // imagem do cabeçalho (faixa no topo de cada página)
   rodapeUrl: string       // imagem do rodapé (faixa na base de cada página)
+  /** Reserva de espaço no TOPO de cada página (px) — até onde o conteúdo desce, p/ não invadir o
+   *  cabeçalho/imagem de fundo. 0 = automático (deduz do cabeçalho/folha). Mantém A4. */
+  margemTopo: number
+  /** Reserva de espaço na BASE de cada página (px) — até onde o conteúdo sobe, p/ não invadir o
+   *  rodapé/imagem de fundo. 0 = automático (deduz do rodapé/folha). Mantém A4. */
+  margemBase: number
   /** Cor por pilar (slug → hex) — cor PADRÃO da linha das disciplinas daquele pilar. */
   coresPilar: Record<string, string>
   /** Cor individual por disciplina (chave/slug → hex) — sobrepõe a cor do pilar quando definida. */
@@ -192,6 +198,8 @@ export const AJUSTES_BASE: BuilderAjustes = {
   folhaUrl: '',
   cabecalhoUrl: '',
   rodapeUrl: '',
+  margemTopo: 0,
+  margemBase: 0,
   coresPilar: { ...CORES_PILAR_PADRAO },
   coresDisc: {},
   coresParte: {},

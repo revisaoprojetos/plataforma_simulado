@@ -137,11 +137,15 @@ function FolhaCapa({ capaUrl, capa, theme, onPick, sel }: { capaUrl: string; cap
 }
 
 /** Prévia A4 de um modelo pronto (doc v1) com as questões do banco + variáveis do aluno. */
-export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl, ultimaUrl, folhaUrl, capa, onPickCapa, selCapa, docOverride, onPickBloco, selBlocoId, respostas, gabaritoLiberado }: {
+export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl, ultimaUrl, folhaUrl, capa, onPickCapa, selCapa, docOverride, onPickBloco, selBlocoId, respostas, gabaritoLiberado, margemTopo, margemBase }: {
   presetId: string
   questoes: PreviewQuestao[]
   vars?: Record<string, string>
   titulo: string
+  /** Reserva de topo (px) até onde os blocos descem — 0/indefinido = automático (do doc). */
+  margemTopo?: number
+  /** Reserva de base (px) até onde os blocos sobem — 0/indefinido = automático (do doc). */
+  margemBase?: number
   /** Respostas do aluno (questaoId → letra marcada) — pinta a folha "como fez"/correção. */
   respostas?: Record<string, string>
   /** Revela o gabarito oficial (false = só marcações do aluno). Default true (prévia do modelo). */
@@ -175,8 +179,9 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
   const selectable = !!onPickBloco
   const running = doc?.running ?? RUNNING_PADRAO
   // Reserva de área segura (cabeçalho/rodapé) — a arte do letterhead já traz cabeçalho/rodapé.
-  const cabH = running.cabecalhoAtivo ? (running.cabecalhoAltura || PAD_V) : PAD_V
-  const rodH = running.rodapeAtivo ? (running.rodapeAltura || PAD_V) : PAD_V
+  // `margemTopo`/`margemBase` (px, dos ajustes) sobrepõem o padrão do doc quando definidos (>0).
+  const cabH = margemTopo ? margemTopo : (running.cabecalhoAtivo ? (running.cabecalhoAltura || PAD_V) : PAD_V)
+  const rodH = margemBase ? margemBase : (running.rodapeAtivo ? (running.rodapeAltura || PAD_V) : PAD_V)
   const contentW = A4_W - 2 * PAD_H
   const availH = A4_H - cabH - rodH - 8
 
