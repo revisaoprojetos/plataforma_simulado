@@ -455,7 +455,7 @@ export function outlineDoItem(item: ItemCaderno, questoes: PreviewQuestao[], var
 }
 
 /** Uma folha A4 (fundo + cabeçalho + conteúdo + rodapé) ou a capa (página inteira). */
-function Folha({ item, num, total, pad, Ht, Hf, ehCapa, capaCfg, onPickCapa, selCapa, children }: { item: ItemCaderno; num: number; total: number; pad: number; Ht: number; Hf: number; ehCapa?: boolean; capaCfg?: CapaConfig; onPickCapa?: () => void; selCapa?: boolean; children?: ReactNode }) {
+function Folha({ item, num, total, pad, Ht, Hf, ehCapa, ehUltima, capaCfg, onPickCapa, selCapa, children }: { item: ItemCaderno; num: number; total: number; pad: number; Ht: number; Hf: number; ehCapa?: boolean; ehUltima?: boolean; capaCfg?: CapaConfig; onPickCapa?: () => void; selCapa?: boolean; children?: ReactNode }) {
   const a = item.ajustes
   const cfg = capaCfg ?? CAPA_PADRAO
   return (
@@ -483,6 +483,8 @@ function Folha({ item, num, total, pad, Ht, Hf, ehCapa, capaCfg, onPickCapa, sel
             />
           </>
         )
+      ) : ehUltima ? (
+        a.ultimaUrl && <img src={a.ultimaUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 1 }} />
       ) : (
         <div style={{ position: 'relative', zIndex: 1, minHeight: A4_H, display: 'flex', flexDirection: 'column' }}>
           <div style={{ height: Ht, flexShrink: 0, overflow: 'hidden' }}>
@@ -571,7 +573,8 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
   // "Cannot read properties of undefined (reading 'node')". Filtramos até o re-cálculo da paginação.
   const pages = pagesRaw.map((idxs) => idxs.filter((i) => i >= 0 && i < blocos.length))
   const temCapa = !!a.capaUrl
-  const total = (temCapa ? 1 : 0) + pages.length
+  const temUltima = !!a.ultimaUrl
+  const total = (temCapa ? 1 : 0) + pages.length + (temUltima ? 1 : 0)
 
   return (
     <div className={paginas != null ? 'caderno-pronto' : undefined} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
@@ -587,6 +590,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
           {idxs.map((i, gi) => <div key={i} style={{ marginTop: gi === 0 ? 0 : (blocos[i].juntar ? 0 : GAP) }}>{blocos[i].node}</div>)}
         </Folha>
       ))}
+      {temUltima && <Folha item={item} num={total} total={total} pad={pad} Ht={Ht} Hf={Hf} ehUltima />}
     </div>
   )
 }

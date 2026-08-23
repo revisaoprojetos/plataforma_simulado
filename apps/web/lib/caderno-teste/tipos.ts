@@ -95,6 +95,7 @@ export type BuilderAjustes = {
   colunas: number         // colunas da folha de respostas (2..5)
   compacto: boolean       // espaçamento/fonte menores
   capaUrl: string         // imagem de capa (página A4 inteira, no início)
+  ultimaUrl: string       // imagem da ÚLTIMA folha (capa de fundo / contracapa A4 inteira, no fim)
   folhaUrl: string        // imagem de fundo da folha (papel timbrado, por página)
   cabecalhoUrl: string    // imagem do cabeçalho (faixa no topo de cada página)
   rodapeUrl: string       // imagem do rodapé (faixa na base de cada página)
@@ -187,6 +188,7 @@ export const AJUSTES_BASE: BuilderAjustes = {
   colunas: 2,
   compacto: false,
   capaUrl: '',
+  ultimaUrl: '',
   folhaUrl: '',
   cabecalhoUrl: '',
   rodapeUrl: '',

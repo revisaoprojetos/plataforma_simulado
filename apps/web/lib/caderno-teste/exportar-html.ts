@@ -231,6 +231,7 @@ export function gerarHtmlItem(item: ItemCaderno, opts: { vars?: Record<string, s
       : htmlCaderno(item, opts.questoes ?? [])
   const titulo = esc(a.titulo || 'Caderno')
   const capa = a.capaUrl ? `<div style="margin-bottom:16px"><img src="${esc(a.capaUrl)}" style="width:100%;display:block" /></div>` : ''
+  const ultima = a.ultimaUrl ? `<div style="page-break-before:always"><img src="${esc(a.ultimaUrl)}" style="width:100%;display:block" /></div>` : ''
   const cab = a.cabecalhoUrl ? `<img src="${esc(a.cabecalhoUrl)}" style="width:100%;display:block;margin-bottom:12px" />` : ''
   const rod = a.rodapeUrl ? `<img src="${esc(a.rodapeUrl)}" style="width:100%;display:block;margin-top:16px" />` : ''
   const bg = a.folhaUrl ? `background-image:url('${esc(a.folhaUrl)}');background-size:cover;` : ''
@@ -239,5 +240,5 @@ export function gerarHtmlItem(item: ItemCaderno, opts: { vars?: Record<string, s
   return `<!doctype html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${titulo}</title>`
     + `<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->`
     + `<style>@page{size:A4;margin:1.4cm}body{font-family:Arial,Helvetica,sans-serif;color:#1a202c}img{max-width:100%}</style></head>`
-    + `<body>${bg ? `<div style="${bg}padding:1px">` : ''}<table role="presentation" align="center" width="720" cellpadding="0" cellspacing="0" style="width:720px;margin:0 auto;border-collapse:collapse"><tr><td>${cab}${capa}${corpo}${rod}</td></tr></table>${bg ? '</div>' : ''}</body></html>`
+    + `<body>${bg ? `<div style="${bg}padding:1px">` : ''}<table role="presentation" align="center" width="720" cellpadding="0" cellspacing="0" style="width:720px;margin:0 auto;border-collapse:collapse"><tr><td>${cab}${capa}${corpo}${rod}${ultima}</td></tr></table>${bg ? '</div>' : ''}</body></html>`
 }

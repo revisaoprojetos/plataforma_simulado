@@ -587,6 +587,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
           {/* Imagens do caderno (opcionais) — agrupadas 2×2 */}
           <div className="col-span-2 mt-1"><p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><FileUp className="h-3.5 w-3.5" /> Imagens (opcionais)</p></div>
           <div className="col-span-1"><CampoImagem label="Capa (página inteira)" valor={a.capaUrl} onChange={(url) => setAjuste({ capaUrl: url })} /></div>
+          <div className="col-span-1"><CampoImagem label="Última folha (capa de fundo)" valor={a.ultimaUrl} onChange={(url) => setAjuste({ ultimaUrl: url })} /></div>
           <div className="col-span-1"><CampoImagem label="Folha (fundo da página)" valor={a.folhaUrl} onChange={(url) => setAjuste({ folhaUrl: url })} /></div>
           <div className="col-span-1"><CampoImagem label="Cabeçalho (faixa no topo)" valor={a.cabecalhoUrl} onChange={(url) => setAjuste({ cabecalhoUrl: url })} /></div>
           <div className="col-span-1"><CampoImagem label="Rodapé (faixa na base)" valor={a.rodapeUrl} onChange={(url) => setAjuste({ rodapeUrl: url })} /></div>
@@ -613,7 +614,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
             // evitando nós velhos (header do modelo anterior) presos por ids determinísticos.
             <div key={`${ativo.id}:${ativo.modalidade}:${ativo.modelo}`} className="mx-auto" style={{ zoom } as any}>
               {presetAtivo ? (
-                <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} folhaUrl={a.folhaUrl}
+                <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} ultimaUrl={a.ultimaUrl} folhaUrl={a.folhaUrl}
                   capa={ativo.capa} onPickCapa={() => { setEstruturaAberta(false); setPickerCapa(true); setPickerCor(null); setPickerBloco(null) }} selCapa={pickerCapa}
                   docOverride={ativo.docEdit} onPickBloco={(id) => { setEstruturaAberta(false); setPickerBloco(id); setPickerCapa(false); setPickerCor(null) }} selBlocoId={pickerBloco} />
               ) : (

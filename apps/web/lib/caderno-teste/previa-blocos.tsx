@@ -137,7 +137,7 @@ function FolhaCapa({ capaUrl, capa, theme, onPick, sel }: { capaUrl: string; cap
 }
 
 /** Prévia A4 de um modelo pronto (doc v1) com as questões do banco + variáveis do aluno. */
-export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl, folhaUrl, capa, onPickCapa, selCapa, docOverride, onPickBloco, selBlocoId, respostas, gabaritoLiberado }: {
+export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl, ultimaUrl, folhaUrl, capa, onPickCapa, selCapa, docOverride, onPickBloco, selBlocoId, respostas, gabaritoLiberado }: {
   presetId: string
   questoes: PreviewQuestao[]
   vars?: Record<string, string>
@@ -149,6 +149,8 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
   cores?: Partial<CadernoTheme['cores']> | null
   /** Imagem de capa: quando vazia, a página de capa NÃO aparece; quando definida, entra como capa. */
   capaUrl?: string
+  /** Imagem da ÚLTIMA folha (capa de fundo/contracapa): página inteira no fim, quando definida. */
+  ultimaUrl?: string
   /** Fundo (letterhead) aplicado em cada folha de conteúdo. */
   folhaUrl?: string
   /** Config do título da capa (sobrepõe o default do preset). */
@@ -238,6 +240,11 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
           {idxs.map((i, gi) => itens[i] && <div key={itens[i].key} style={{ marginTop: gi === 0 ? 0 : (itens[i].gapTop || 0) }}>{itens[i].node}</div>)}
         </FolhaConteudo>
       ))}
+      {ultimaUrl && (
+        <div key="ultima" style={{ width: A4_W, minHeight: A4_H, position: 'relative', overflow: 'hidden', background: theme.cores.fundo, boxShadow: '0 2px 20px rgba(0,0,0,.16)' }}>
+          <img src={ultimaUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
+      )}
     </div>
   )
 }
