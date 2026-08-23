@@ -459,7 +459,7 @@ function Folha({ item, num, total, pad, Ht, Hf, ehCapa, ehUltima, capaCfg, onPic
   const a = item.ajustes
   const cfg = capaCfg ?? CAPA_PADRAO
   return (
-    <div style={{ width: A4_W, minHeight: A4_H, position: 'relative', overflow: 'visible', background: '#fff', color: '#1a202c', boxShadow: '0 2px 20px rgba(0,0,0,.16)', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ width: A4_W, minHeight: A4_H, position: 'relative', overflow: 'visible', background: '#fff', color: '#1a202c', boxShadow: '0 2px 20px rgba(0,0,0,.16)', fontFamily: 'var(--font-inter), system-ui, sans-serif' }}>
       {a.folhaUrl && <img src={a.folhaUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
       {ehCapa ? (
         a.capaUrl && (
@@ -473,7 +473,7 @@ function Folha({ item, num, total, pad, Ht, Hf, ehCapa, ehUltima, capaCfg, onPic
                 position: 'absolute', left: `${cfg.posH}%`, top: `${cfg.posV}%`, transform: 'translate(-50%, -50%)',
                 width: 'max-content', maxWidth: '84%', zIndex: 2,
                 cursor: onPickCapa ? 'pointer' : 'default', color: cfg.cor, fontSize: cfg.tamanho,
-                fontFamily: cssDaFonte(cfg.fonte) || 'Inter, system-ui, sans-serif',
+                fontFamily: cssDaFonte(cfg.fonte) || 'var(--font-inter), system-ui, sans-serif',
                 fontWeight: cfg.negrito ? 800 : 400, fontStyle: cfg.italico ? 'italic' : 'normal',
                 textDecoration: cfg.sublinhado ? 'underline' : 'none', textAlign: cfg.alinhamento,
                 lineHeight: 1.1, whiteSpace: 'pre-wrap', padding: '6px 10px',
@@ -595,7 +595,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
       {/* passe de medição (escondido) — ESPELHA a caixa de conteúdo da folha: mesma largura A4 +
           padding + border-box + fonte/cor. Assim o texto quebra no MESMO nº de linhas e as alturas
           batem (senão um bloco "cabe" na conta mas renderiza mais alto e é cortado). */}
-      <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: A4_W, padding: `8px ${pad}px`, boxSizing: 'border-box', fontFamily: 'Inter, system-ui, sans-serif', color: '#1a202c' }}>
+      <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: A4_W, padding: `8px ${pad}px`, boxSizing: 'border-box', fontFamily: 'var(--font-inter), system-ui, sans-serif', color: '#1a202c' }}>
         {blocos.map((b, i) => <div key={i} style={{ marginTop: i === 0 ? 0 : (b.juntar ? 0 : GAP) }}>{b.node}</div>)}
       </div>
       {temCapa && <Folha item={item} num={1} total={total} pad={pad} Ht={Ht} Hf={Hf} ehCapa capaCfg={item.capa ?? CAPA_PADRAO} onPickCapa={onPickCapa} selCapa={selCapa} />}
