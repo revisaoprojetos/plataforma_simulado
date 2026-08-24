@@ -1,6 +1,6 @@
 'use server'
 
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
 
 export async function aceitarConsentimento(
@@ -8,7 +8,7 @@ export async function aceitarConsentimento(
   versaoPolitica: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const supabase = await createServiceClient()
+    const supabase = createAdminClient()
     const headersList = await headers()
     const ip = headersList.get('x-forwarded-for') ?? headersList.get('x-real-ip') ?? 'unknown'
     const userAgent = headersList.get('user-agent') ?? ''

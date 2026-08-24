@@ -1,5 +1,5 @@
 import 'server-only'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 /** Substitui {{caminho.no.contexto}} pelos valores do contexto. */
 function interpolar(str: unknown, ctx: Record<string, any>): string {
@@ -38,7 +38,7 @@ function avaliaCondicao(config: any, ctx: Record<string, any>): boolean {
 export async function rodarAutomacoes(tenantId: string | null | undefined, evento: string, dados: Record<string, any>): Promise<void> {
   if (!tenantId) return
   try {
-    const svc = await createServiceClient()
+    const svc = createAdminClient()
     const { data: autos } = await svc
       .from('simulado_automacoes')
       .select('id, passos')
