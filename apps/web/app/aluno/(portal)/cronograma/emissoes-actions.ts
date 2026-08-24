@@ -127,6 +127,8 @@ export async function listarMinhasEmissoes(
 export type EmissaoAberta = {
   emissao: EmissaoResumo
   grade: Grade
+  /** Do CATÁLOGO, não do formulário salvo — a folha impressa usa na faixa "MARCA - 2H". */
+  cargaHoraria: number | null
   /** O cronograma saiu do ar (despublicado ou excluído) desde a emissão. */
   indisponivel: boolean
 }
@@ -179,7 +181,7 @@ async function montarEmissao(
     .maybeSingle()
 
   if (!cron || !acesso.permitido) {
-    return { ok: true, dados: { emissao: emissao as EmissaoResumo, grade: gradeVazia(), indisponivel: true } }
+    return { ok: true, dados: { emissao: emissao as EmissaoResumo, grade: gradeVazia(), cargaHoraria: null, indisponivel: true } }
   }
 
   const metas = await fetchAll<MetaFonte>(() =>
@@ -216,7 +218,15 @@ async function montarEmissao(
   )
   if (!r.ok) return { ok: false, error: r.erro }
 
-  return { ok: true, dados: { emissao: emissao as EmissaoResumo, grade: r.grade, indisponivel: false } }
+  return {
+    ok: true,
+    dados: {
+      emissao: emissao as EmissaoResumo,
+      grade: r.grade,
+      cargaHoraria: Number((cron as { carga_horaria: number }).carga_horaria),
+      indisponivel: false,
+    },
+  }
 }
 
 export async function abrirEmissao(emissaoId: string): Promise<{ ok: boolean; dados?: EmissaoAberta; error?: string }> {

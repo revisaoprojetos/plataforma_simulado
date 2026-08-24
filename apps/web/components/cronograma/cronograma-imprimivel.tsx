@@ -1,22 +1,30 @@
-import { fmtBr, fmtIntervalo } from '@/lib/cronograma/datas'
-import { fmtFaixa, somarDuracoes } from '@/lib/cronograma/duracao'
+import { dow, fmtIntervalo, offsetDesdeSegunda } from '@/lib/cronograma/datas'
 import { acharPaleta } from '@/lib/cronograma/paletas'
-import type { Grade } from '@/lib/cronograma/tipos'
+import type { Grade, MetaDatada, SemanaGrade, TipoMetaDef } from '@/lib/cronograma/tipos'
+
+/** As sete colunas, sempre — é assim no documento da equipe, mesmo quando o domingo é vazio. */
+const DIAS = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO', 'DOMINGO']
 
 /**
- * O cronograma em folha A4, para o aluno salvar como PDF.
+ * O cronograma em folha, no formato do documento que a equipe usa: **uma semana por página**,
+ * em grade de horário escolar — linhas são os TIPOS de meta, colunas são os dias da semana.
  *
- * É um componente de SERVIDOR e sem interatividade nenhuma — o que vai para o papel não tem
- * filtro, alternador nem botão. A tela e o PDF leem a MESMA grade, então não existe um segundo
- * cálculo que possa divergir do que o aluno viu.
+ * A primeira versão desta tela era uma lista corrida, e estava longe: o que o aluno pendura na
+ * parede é a semana inteira de relance, não uma lista para rolar. O layout aqui foi lido do
+ * `docs/cronograma/cronograma_teste_2h (2).docx`, tabela por tabela.
  *
- * Decisões que só fazem sentido no papel:
- * - `break-inside: avoid` por semana: uma semana partida entre páginas é exatamente a unidade
- *   que o aluno usa para se organizar.
- * - `print-color-adjust: exact` nas faixas: sem isso o navegador imprime as tarjas da paleta em
- *   branco e a distinção entre conteúdo e revisão desaparece.
- * - Coluna de caixas vazias: quem imprime marca à caneta. As já concluídas na plataforma saem
- *   marcadas, para o papel refletir o progresso real em vez de recomeçar do zero.
+ * Estrutura de cada página, igual à do documento:
+ *   SEMANA N - dd/mm/aaaa a dd/mm/aaaa      (faixa)
+ *   MARCA - 2H                              (faixa secundária)
+ *   TIPO DE META | SEGUNDA | … | DOMINGO    (cabeçalho)
+ *   PDFULL ou VIDEOAULA(1:30) | … metas …   (uma linha por tipo)
+ *
+ * Semanas de revisão têm página própria com o texto de orientação, também como no documento.
+ *
+ * Duas escolhas que separam a FOLHA da tela:
+ * - Sem caixas de marcação. Quem imprime marca à caneta do jeito que preferir; caixa impressa é
+ *   promessa de um estado que o papel não tem como guardar.
+ * - Uma área de anotações por semana. É o que o aluno faz com a folha na parede.
  */
 export function CronogramaImprimivel({
   grade,
@@ -25,6 +33,8 @@ export function CronogramaImprimivel({
   cronogramaNome,
   alunoNome,
   geradoEm,
+  marca,
+  cargaHoraria,
   checks,
 }: {
   grade: Grade
@@ -33,161 +43,220 @@ export function CronogramaImprimivel({
   cronogramaNome: string
   alunoNome: string | null
   geradoEm: string
+  /** Nome curto do tenant, para a faixa secundária ("REVISÃO - 2H"). */
+  marca?: string | null
+  cargaHoraria?: number | null
   checks?: Record<string, string>
 }) {
   const paleta = acharPaleta(paletaSlug)
-  const r = grade.resumo
-  const feitas = grade.semanas.reduce(
-    (n, s) => n + (s.kind === 'conteudo' ? s.metas.filter((m) => checks?.[m.id]).length : 0),
-    0,
-  )
+
+  /**
+   * Só entram os tipos que TÊM meta naquela semana.
+   *
+   * O `sempre_no_docx` do cadastro faria "Legproc" aparecer como linha vazia em toda semana que
+   * não usa esse tipo — linha em branco ocupando a altura de uma linha cheia. Numa folha em que
+   * o espaço é o recurso escasso, tipo sem meta é ruído, não informação.
+   */
+  function linhasDaSemana(s: Extract<SemanaGrade, { kind: 'conteudo' }>): TipoMetaDef[] {
+    const presentes = new Map<string, TipoMetaDef>()
+    for (const m of s.metas) presentes.set(m.tipo, m.tipoDef)
+    return [...presentes.values()].sort((a, b) => a.ordem - b.ordem)
+  }
+
+  /** Metas de um tipo num dia (coluna 0 = segunda), na ordem do cadastro. */
+  function celula(s: Extract<SemanaGrade, { kind: 'conteudo' }>, slug: string, coluna: number): MetaDatada[] {
+    return s.metas.filter((m) => m.tipo === slug && offsetDesdeSegunda(dow(m.data)) === coluna)
+  }
+
+  /**
+   * Duração no rótulo do tipo — "(1:30)" no documento. Sai da PRIMEIRA meta daquele tipo na
+   * semana, que é a mesma regra do DOCX legado (por isso a tela de metas avisa quando há
+   * durações divergentes: as outras não são impressas em lugar nenhum).
+   */
+  function duracaoDoTipo(s: Extract<SemanaGrade, { kind: 'conteudo' }>, slug: string): string | null {
+    return s.metas.find((m) => m.tipo === slug && m.duracao)?.duracao ?? null
+  }
+
+  /**
+   * O texto da célula, no formato do documento — que NÃO é o da tela.
+   *
+   * No papel: "Aula 01 - Direito Constitucional" e, embaixo, o conteúdo. Na tela:
+   * "Direito Constitucional: Aula 01 - conteúdo". São públicos diferentes lendo de jeitos
+   * diferentes, e o documento da equipe é o que o aluno já conhece.
+   *
+   * Metas de "Atividade" (R13) não ganham prefixo de aula — o conteúdo já se explica
+   * ("CONTINUAÇÃO AULA 01 DIREITO CONSTITUCIONAL").
+   */
+  function textoCelula(m: MetaDatada): { chapeu: string | null; corpo: string | null } {
+    const ehAtividade = m.disciplina.trim().toLowerCase() === 'atividade'
+    if (ehAtividade || !m.aula) return { chapeu: null, corpo: m.conteudo || m.titulo }
+    if (m.tipoDef.aula_no_titulo) return { chapeu: `${m.disciplina}: Aula ${m.aula}`, corpo: m.complemento }
+    return { chapeu: `Aula ${m.aula} - ${m.disciplina}`, corpo: m.conteudo }
+  }
+
+  const faixaSec = [marca?.trim() || null, cargaHoraria ? `${cargaHoraria}H` : null].filter(Boolean).join(' - ')
 
   return (
-    <div className="folha">
+    <div className="doc">
       <style>{`
-        /* A folha existe só aqui: o resto da plataforma não deve herdar regra de impressão. */
-        .folha { max-width: 190mm; margin: 0 auto; padding: 8mm; color: #18181b; background: #fff; font-size: 10.5pt; }
-        .folha table { width: 100%; border-collapse: collapse; }
-        .folha th, .folha td { padding: 3px 6px; text-align: left; vertical-align: top; }
-        .folha thead th { font-size: 8pt; text-transform: uppercase; letter-spacing: .04em; color: #52525b; border-bottom: 1px solid #d4d4d8; }
-        .folha tbody tr { border-bottom: 1px solid #ececef; }
-        .semana { break-inside: avoid; page-break-inside: avoid; margin-top: 10px; }
-        .faixa { color: #fff; padding: 4px 8px; font-weight: 600; font-size: 10pt; border-radius: 3px;
+        .doc { color: #18181b; background: #fff; font-size: 9pt; }
+        .pagina { max-width: 277mm; margin: 0 auto 14mm; padding: 8mm; }
+        /* Uma semana por página; break-inside nas linhas impede a última meta cair sozinha. */
+        .pagina + .pagina { border-top: 1px dashed #d4d4d8; }
+        .grade { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .grade td, .grade th { border: 1px solid #b9b9c0; padding: 4px 5px; vertical-align: top; }
+        .faixa1, .faixa2 { color: #fff; text-align: center; font-weight: 700; letter-spacing: .02em;
+                           -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .faixa1 { font-size: 11pt; padding: 6px; }
+        .faixa2 { font-size: 9.5pt; padding: 4px; }
+        .cabDia { font-size: 8pt; font-weight: 700; text-align: center; text-transform: uppercase;
+                  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .tipo { font-size: 8pt; font-weight: 700; text-transform: uppercase; width: 15%;
+                -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .chapeu { font-weight: 700; display: block; }
+        .corpo { display: block; color: #3f3f46; }
+        .meta + .meta { margin-top: 5px; padding-top: 5px; border-top: 1px dotted #d4d4d8; }
+        .feito { color: #a1a1aa; text-decoration: line-through; }
+        /* Área de anotação: a folha é para escrever em cima. Pauta leve, que imprime bem. */
+        .notas { margin-top: 4px; border: 1px solid #b9b9c0; }
+        .notasTit { font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+                    color: #52525b; padding: 3px 6px; border-bottom: 1px solid #d4d4d8; }
+        .pauta { height: 24mm; background-image: repeating-linear-gradient(
+                   to bottom, transparent 0, transparent 7.6mm, #dcdce1 7.6mm, #dcdce1 7.7mm);
                  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .caixa { display: inline-block; width: 9px; height: 9px; border: 1px solid #71717a; border-radius: 2px; }
-        .caixa.feita { background: #18181b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        /* A margem da folha vem do PADDING, não do @page. É o que faz os dois caminhos
-           coincidirem: o worker manda o Gotenberg renderizar com margem ZERO (para o HTML
-           mandar na paginação, decisão que já existia para o caderno), então um @page com
-           margem só valeria na impressão do navegador e o PDF sairia diferente da tela. */
+        .aviso { padding: 10px; font-size: 9.5pt; line-height: 1.5; }
+        .rodape { margin-top: 6px; font-size: 7.5pt; color: #a1a1aa; text-align: right; }
         @media print {
-          .folha { padding: 12mm 10mm; max-width: none; }
-          @page { margin: 0; }
+          /* Paisagem: sete colunas de conteúdo não cabem em retrato sem espremer o texto. */
+          @page { size: A4 landscape; margin: 0; }
+          .doc { font-size: 8.5pt; }
+          .pagina { max-width: none; padding: 10mm; page-break-after: always; break-after: page; }
+          .pagina:last-child { page-break-after: auto; break-after: auto; }
+          .pagina + .pagina { border-top: none; }
+          .grade tr { break-inside: avoid; page-break-inside: avoid; }
         }
       `}</style>
 
-      {/* ── Cabeçalho */}
-      <div style={{ borderBottom: `3px solid ${paleta.primaria}`, paddingBottom: 8, marginBottom: 10 }}>
-        <h1 style={{ margin: 0, fontSize: '16pt', fontWeight: 700, color: paleta.primaria }}>
-          {titulo || cronogramaNome}
-        </h1>
-        <p style={{ margin: '2px 0 0', fontSize: '9.5pt', color: '#52525b' }}>
-          {titulo && `${cronogramaNome} · `}
-          {alunoNome && `${alunoNome} · `}
-          gerado em {new Date(geradoEm).toLocaleDateString('pt-BR')}
-        </p>
-        <p style={{ margin: '2px 0 0', fontSize: '9.5pt', color: '#52525b' }}>{r.subtitulo}</p>
-      </div>
-
-      {/* ── Números do topo */}
-      <table style={{ marginBottom: 6 }}>
-        <tbody>
-          <tr style={{ border: 'none' }}>
-            {(
-              [
-                ['Semanas', String(r.totalSemanas)],
-                ['Dias por semana', String(r.diasPorSemana)],
-                ['Atividades', r.atividades.toLocaleString('pt-BR')],
-                ['Conclusão', r.conclusao ? fmtBr(r.conclusao) : '—'],
-                ...(checks ? ([['Concluídas', `${feitas.toLocaleString('pt-BR')} de ${r.atividades.toLocaleString('pt-BR')}`]] as [string, string][]) : []),
-              ] as [string, string][]
-            ).map(([rotulo, valor]) => (
-              <td key={rotulo} style={{ border: '1px solid #e4e4e7', borderRadius: 3, padding: '5px 8px' }}>
-                <div style={{ fontSize: '12pt', fontWeight: 700 }}>{valor}</div>
-                <div style={{ fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '.06em', color: '#71717a' }}>
-                  {rotulo}
-                </div>
-              </td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
-
-      {/* ── Semana a semana */}
-      {grade.semanas.map((s) => {
-        const total = s.kind === 'conteudo' ? somarDuracoes(s.metas.map((m) => m.duracao)) : null
-        return (
-          <div key={s.numero} className="semana">
-            <div
-              className="faixa"
-              style={{ background: s.kind === 'conteudo' ? paleta.primaria : paleta.revisao }}
-            >
-              Semana {s.numero} — {fmtIntervalo(s.inicio, s.fim)}
-              {s.kind === 'revisao' && ' · Revisão'}
-              {s.kind === 'recesso' && ' · Recesso'}
-              {s.kind === 'conteudo' && (
-                <span style={{ float: 'right', fontWeight: 400, opacity: 0.9 }}>
-                  {s.metas.length} tarefa{s.metas.length > 1 ? 's' : ''}
-                  {total && ` · ${fmtFaixa(total)}`}
-                </span>
+      {grade.semanas.map((s) => (
+        <section className="pagina" key={s.numero}>
+          <table className="grade">
+            <tbody>
+              <tr>
+                <td className="faixa1" colSpan={8} style={{ background: paleta.primaria }}>
+                  SEMANA {s.numero} - {fmtIntervalo(s.inicio, s.fim)}
+                </td>
+              </tr>
+              {faixaSec && (
+                <tr>
+                  <td className="faixa2" colSpan={8} style={{ background: paleta.cabecalho }}>
+                    {faixaSec.toUpperCase()}
+                  </td>
+                </tr>
               )}
-            </div>
 
-            {s.kind === 'recesso' && (
-              <p style={{ margin: '5px 2px', fontSize: '9.5pt', color: '#52525b' }}>
-                Sem metas programadas. O cronograma é retomado na próxima segunda-feira.
-              </p>
-            )}
-
-            {s.kind === 'revisao' &&
-              s.blocos.map((b) => (
-                <p key={b.titulo} style={{ margin: '5px 2px', fontSize: '9.5pt' }}>
-                  <strong>{b.titulo}</strong> — <span style={{ color: '#52525b' }}>{b.texto}</span>
-                </p>
-              ))}
-
-            {s.kind === 'conteudo' && (
-              <table>
-                <thead>
+              {s.kind === 'revisao' && (
+                <>
                   <tr>
-                    <th style={{ width: '5%' }} />
-                    <th style={{ width: '14%' }}>Data</th>
-                    <th style={{ width: '20%' }}>Tipo</th>
-                    <th>Conteúdo</th>
-                    <th style={{ width: '14%' }}>Duração</th>
+                    <td className="faixa2" colSpan={8} style={{ background: paleta.revisao }}>
+                      SEMANA DE REVISÃO
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {s.metas.map((m) => {
-                    const feita = !!checks?.[m.id]
+                  <tr>
+                    <td className="aviso" colSpan={8}>
+                      {s.blocos.map((b) => (
+                        <p key={b.titulo} style={{ margin: '0 0 6px' }}>
+                          {b.titulo && <strong>{b.titulo} </strong>}
+                          {b.texto}
+                        </p>
+                      ))}
+                    </td>
+                  </tr>
+                </>
+              )}
+
+              {s.kind === 'recesso' && (
+                <>
+                  <tr>
+                    <td className="faixa2" colSpan={8} style={{ background: '#71717a' }}>
+                      SEMANA DE RECESSO
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="aviso" colSpan={8}>
+                      Sem metas programadas nesta semana. O cronograma é retomado na próxima segunda-feira.
+                    </td>
+                  </tr>
+                </>
+              )}
+
+              {s.kind === 'conteudo' && (
+                <>
+                  <tr>
+                    <th className="cabDia tipo" style={{ background: paleta.celula }}>
+                      Tipo de meta
+                    </th>
+                    {DIAS.map((d) => (
+                      <th key={d} className="cabDia" style={{ background: paleta.celula }}>
+                        {d}
+                      </th>
+                    ))}
+                  </tr>
+
+                  {linhasDaSemana(s).map((t) => {
+                    const dur = duracaoDoTipo(s, t.slug)
                     return (
-                      <tr key={m.id} style={{ background: paleta.celula, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        <td>
-                          <span className={`caixa${feita ? ' feita' : ''}`} />
-                        </td>
-                        <td style={{ whiteSpace: 'nowrap' }}>
-                          {fmtBr(m.data)}
-                          <div style={{ fontSize: '8pt', color: '#71717a' }}>{m.diaNome}</div>
-                        </td>
-                        <td style={{ fontSize: '9pt' }}>{m.tipoDef.nome}</td>
-                        <td>
-                          <div style={feita ? { textDecoration: 'line-through', color: '#71717a' } : undefined}>
-                            {m.titulo}
-                          </div>
-                          {m.complemento && (
-                            <div style={{ fontSize: '8.5pt', color: '#52525b' }}>{m.complemento}</div>
-                          )}
-                          {/* Links viram texto: num papel, uma URL clicável não serve para nada. */}
-                          {m.links && m.links.urls.length > 0 && (
-                            <div style={{ fontSize: '8pt', color: '#71717a' }}>
-                              {m.links.urls.map((u) => u.plataforma.nome).join(' · ')}
-                            </div>
-                          )}
-                        </td>
-                        <td style={{ whiteSpace: 'nowrap', fontSize: '9pt' }}>{m.duracao ?? ''}</td>
+                      <tr key={t.slug}>
+                        <th className="tipo" style={{ background: paleta.celula }}>
+                          {t.rotulo_docx}
+                          {dur && <span style={{ fontWeight: 400 }}> ({dur})</span>}
+                        </th>
+                        {DIAS.map((_, i) => {
+                          const metas = celula(s, t.slug, i)
+                          return (
+                            <td key={i} style={t.destaque_docx ? { height: '22mm' } : undefined}>
+                              {metas.map((m) => {
+                                const { chapeu, corpo } = textoCelula(m)
+                                const feita = !!checks?.[m.id]
+                                return (
+                                  <div key={m.id} className={`meta${feita ? ' feito' : ''}`}>
+                                    {chapeu && <span className="chapeu">{chapeu}</span>}
+                                    {corpo && <span className="corpo">{corpo}</span>}
+                                    {/* No papel a URL não serve; o nome da plataforma sim. */}
+                                    {m.links && m.links.urls.length > 0 && (
+                                      <span className="corpo" style={{ fontSize: '7.5pt' }}>
+                                        {m.links.urls.map((u) => u.plataforma.nome).join(' · ')}
+                                      </span>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </td>
+                          )
+                        })}
                       </tr>
                     )
                   })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )
-      })}
+                </>
+              )}
+            </tbody>
+          </table>
 
-      <p style={{ marginTop: 14, fontSize: '8pt', color: '#a1a1aa', textAlign: 'center' }}>
-        {cronogramaNome} · {r.subtitulo} · impresso em {new Date().toLocaleDateString('pt-BR')}
-      </p>
+          {s.kind === 'conteudo' && (
+            <div className="notas">
+              <div className="notasTit">Anotações da semana</div>
+              <div className="pauta" />
+            </div>
+          )}
+
+          <p className="rodape">
+            {titulo || cronogramaNome}
+            {titulo && ` · ${cronogramaNome}`}
+            {alunoNome && ` · ${alunoNome}`}
+            {` · gerado em ${new Date(geradoEm).toLocaleDateString('pt-BR')}`}
+            {` · semana ${s.numero} de ${grade.resumo.totalSemanas}`}
+          </p>
+        </section>
+      ))}
     </div>
   )
 }

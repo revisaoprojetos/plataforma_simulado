@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { PrintButton } from '@/components/aluno/print-button'
 import { CronogramaImprimivel } from '@/components/cronograma/cronograma-imprimivel'
 import { getSessaoAluno } from '@/lib/aluno-session'
+import { getTenantTheme } from '@/lib/tenant-theme'
 import { verificarRenderToken } from '@/lib/pdf/render-token'
 import {
   abrirEmissao,
@@ -59,7 +60,7 @@ export default async function ImprimirCronogramaPage({
     )
   }
 
-  const { emissao, grade, indisponivel } = r.dados
+  const { emissao, grade, cargaHoraria, indisponivel } = r.dados
   if (indisponivel) {
     return (
       <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
@@ -71,6 +72,11 @@ export default async function ImprimirCronogramaPage({
   const checks = porToken
     ? await checksParaRender(emissaoId, tok!.t)
     : ((await listarChecks(emissaoId)).checks ?? {})
+
+  /* A faixa secundária do documento é "MARCA - 2H". A marca sai do tenant, só até a primeira
+     parte ("Revisão / Ensino Jurídico" → "Revisão"), como no herói. */
+  const { tenantNome } = await getTenantTheme()
+  const marca = (tenantNome ?? '').split(/[/|–—-]/)[0].trim()
 
   // Só o caminho do aluno registra: o do Gotenberg já foi registrado quando o PDF foi pedido,
   // e contar de novo aqui inflaria o número com o render interno.
@@ -89,6 +95,8 @@ export default async function ImprimirCronogramaPage({
         cronogramaNome={emissao.cronograma_nome}
         alunoNome={emissao.estudante_nome ?? sessao?.nome ?? null}
         geradoEm={emissao.criado_em}
+        marca={marca}
+        cargaHoraria={cargaHoraria}
         checks={checks}
       />
     </>

@@ -10,15 +10,17 @@ import { CaixaCheck } from '@/components/cronograma/caixa-check'
 import {
   addDias,
   domingoSeguinteOuIgual,
+  dow,
   hojeISO,
+  offsetDesdeSegunda,
   parseISO,
   segundaAnteriorOuIgual,
   type DataISO,
 } from '@/lib/cronograma/datas'
-import { fmtBr } from '@/lib/cronograma/datas'
+import { fmtBr, fmtIntervalo } from '@/lib/cronograma/datas'
 import { fmtFaixa, somarDuracoes } from '@/lib/cronograma/duracao'
 import { acharPaleta } from '@/lib/cronograma/paletas'
-import type { Grade, MetaDatada } from '@/lib/cronograma/tipos'
+import type { Grade, MetaDatada, SemanaGrade } from '@/lib/cronograma/tipos'
 
 const MESES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -71,6 +73,10 @@ export function CalendarioCronograma({
      não dizem o que é. Clicar no dia abre o detalhe, onde o texto cabe inteiro — a grade fica
      para a visão geral, o diálogo para a leitura. */
   const [diaAberto, setDiaAberto] = useState<DataISO | null>(null)
+  /* Mês x Semana. O mês responde "como setembro se compara com outubro"; a semana responde
+     "o que eu faço esta semana", que é a pergunta do dia a dia — e é a unidade em que o
+     cronograma é montado e impresso. Na semana o texto cabe inteiro, sem reticências. */
+  const [modo, setModo] = useState<'mes' | 'semana'>('mes')
 
   const { porDia, meses } = useMemo(() => {
     const mapa = new Map<DataISO, Dia>()
@@ -104,6 +110,12 @@ export function CalendarioCronograma({
     return i >= 0 ? i : 0
   })
 
+  // Mesma ideia na visão semanal: abre na semana que contém hoje, se houver.
+  const [semanaAtual, setSemanaAtual] = useState(() => {
+    const i = grade.semanas.findIndex((x) => parseISO(x.inicio) <= parseISO(hoje) && parseISO(hoje) <= parseISO(x.fim))
+    return i >= 0 ? i : 0
+  })
+
   const semanas = useMemo(() => {
     const ym = meses[mesAtual]
     if (!ym) return []
@@ -131,40 +143,100 @@ export function CalendarioCronograma({
 
   return (
     <Card className="overflow-hidden" style={{ ['--card-spacing' as never]: '0px' }}>
-      {/* ── Barra do mês */}
+      {/* ── Barra de navegação: muda com o modo, porque a unidade muda junto */}
       <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2.5">
         <Button
           size="sm"
           variant="ghost"
-          onClick={() => setMesAtual((i) => Math.max(0, i - 1))}
-          disabled={mesAtual === 0}
-          aria-label="Mês anterior"
+          onClick={() => (modo === 'mes' ? setMesAtual((i) => Math.max(0, i - 1)) : setSemanaAtual((i) => Math.max(0, i - 1)))}
+          disabled={modo === 'mes' ? mesAtual === 0 : semanaAtual === 0}
+          aria-label={modo === 'mes' ? 'Mês anterior' : 'Semana anterior'}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <p className="min-w-44 text-sm font-semibold">
-          {MESES[Number(ym.slice(5, 7)) - 1]} de {ym.slice(0, 4)}
+
+        <p className="min-w-52 text-sm font-semibold">
+          {modo === 'mes' ? (
+            <>
+              {MESES[Number(ym.slice(5, 7)) - 1]} de {ym.slice(0, 4)}
+            </>
+          ) : (
+            <>
+              Semana {grade.semanas[semanaAtual]?.numero}
+              <span className="ml-2 font-normal text-muted-foreground">
+                {grade.semanas[semanaAtual] &&
+                  fmtIntervalo(grade.semanas[semanaAtual].inicio, grade.semanas[semanaAtual].fim)}
+              </span>
+            </>
+          )}
         </p>
+
         <Button
           size="sm"
           variant="ghost"
-          onClick={() => setMesAtual((i) => Math.min(meses.length - 1, i + 1))}
-          disabled={mesAtual === meses.length - 1}
-          aria-label="Próximo mês"
+          onClick={() =>
+            modo === 'mes'
+              ? setMesAtual((i) => Math.min(meses.length - 1, i + 1))
+              : setSemanaAtual((i) => Math.min(grade.semanas.length - 1, i + 1))
+          }
+          disabled={modo === 'mes' ? mesAtual === meses.length - 1 : semanaAtual === grade.semanas.length - 1}
+          aria-label={modo === 'mes' ? 'Próximo mês' : 'Próxima semana'}
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
 
         {temHoje && (
-          <Button size="sm" variant="outline" onClick={() => setMesAtual(meses.indexOf(hoje.slice(0, 7)))}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              if (modo === 'mes') return setMesAtual(meses.indexOf(hoje.slice(0, 7)))
+              const i = grade.semanas.findIndex(
+                (x) => parseISO(x.inicio) <= parseISO(hoje) && parseISO(hoje) <= parseISO(x.fim),
+              )
+              if (i >= 0) setSemanaAtual(i)
+            }}
+          >
             Hoje
           </Button>
         )}
 
-        <span className="ml-auto text-xs text-muted-foreground">
-          mês {mesAtual + 1} de {meses.length}
+        <div className="ml-auto flex shrink-0 overflow-hidden rounded-lg border">
+          {(
+            [
+              ['mes', 'Mês'],
+              ['semana', 'Semana'],
+            ] as const
+          ).map(([chave, rotulo]) => (
+            <button
+              key={chave}
+              onClick={() => setModo(chave)}
+              className={`h-8 px-3 text-xs transition ${
+                modo === chave ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+              }`}
+            >
+              {rotulo}
+            </button>
+          ))}
+        </div>
+
+        <span className="text-xs text-muted-foreground">
+          {modo === 'mes'
+            ? `mês ${mesAtual + 1} de ${meses.length}`
+            : `de ${grade.semanas.length}`}
         </span>
       </div>
+
+      {modo === 'semana' ? (
+        <VisaoSemanal
+          semana={grade.semanas[semanaAtual]}
+          paleta={paleta}
+          hoje={hoje}
+          checks={checks}
+          aoAlternarCheck={aoAlternarCheck}
+        />
+      ) : (
+      <>
 
       {/* ── Cabeçalho dos dias. A 1ª coluna é a das semanas do cronograma. */}
       <div className="grid grid-cols-[3.25rem_repeat(7,minmax(0,1fr))] border-b bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -298,6 +370,9 @@ export function CalendarioCronograma({
         })}
       </div>
 
+      </>
+      )}
+
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-3 py-2 text-[11px] text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm" style={{ background: paleta.revisao }} />
@@ -413,5 +488,140 @@ export function CalendarioCronograma({
         </DialogContent>
       </Dialog>
     </Card>
+  )
+}
+
+/**
+ * A semana aberta: sete colunas, uma por dia, com o texto INTEIRO de cada meta.
+ *
+ * É a mesma leitura da folha impressa — dias como colunas — mas listando as metas do dia em vez
+ * de cruzar tipo x dia: na tela a coluna é estreita, e uma matriz com uma linha por tipo criaria
+ * muita célula vazia. O tipo vira etiqueta em cada meta, que dá a mesma informação sem o vazio.
+ */
+function VisaoSemanal({
+  semana,
+  paleta,
+  hoje,
+  checks,
+  aoAlternarCheck,
+}: {
+  semana: SemanaGrade | undefined
+  paleta: ReturnType<typeof acharPaleta>
+  hoje: DataISO
+  checks?: Record<string, string>
+  aoAlternarCheck?: (meta: MetaDatada, marcar: boolean) => void
+}) {
+  if (!semana) return null
+
+  if (semana.kind !== 'conteudo') {
+    return (
+      <div className="px-4 py-10 text-center">
+        <p className="text-sm font-medium" style={{ color: paleta.revisao }}>
+          {semana.kind === 'revisao' ? 'Semana de revisão' : 'Semana de recesso'}
+        </p>
+        {semana.kind === 'revisao' ? (
+          <div className="mx-auto mt-3 max-w-2xl space-y-2 text-left">
+            {semana.blocos.map((b) => (
+              <p key={b.titulo} className="text-sm">
+                {b.titulo && <strong>{b.titulo} </strong>}
+                <span className="text-muted-foreground">{b.texto}</span>
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Sem metas programadas. O cronograma é retomado na próxima segunda-feira.
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  const dias = Array.from({ length: 7 }, (_, i) => {
+    const data = addDias(semana.inicio, i)
+    return { data, metas: semana.metas.filter((m) => m.data === data) }
+  })
+
+  return (
+    <div className="grid grid-cols-2 divide-x sm:grid-cols-4 lg:grid-cols-7">
+      {dias.map((d) => {
+        const total = somarDuracoes(d.metas.map((m) => m.duracao))
+        return (
+          <div key={d.data} className={`min-h-40 border-b p-2 ${d.data === hoje ? 'bg-primary/5' : ''}`}>
+            <div className="mb-2 border-b pb-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {CABECALHO[offsetDesdeSegunda(dow(d.data))]}
+              </p>
+              <p className="flex items-baseline gap-1.5">
+                <span
+                  className={`text-lg font-bold leading-none ${d.data === hoje ? 'text-primary' : ''}`}
+                >
+                  {Number(d.data.slice(8))}
+                </span>
+                <span className="text-[10px] text-muted-foreground">{fmtBr(d.data).slice(3)}</span>
+                {total && <span className="ml-auto text-[10px] text-muted-foreground">{fmtFaixa(total)}</span>}
+              </p>
+            </div>
+
+            {d.metas.length === 0 ? (
+              <p className="text-[11px] italic text-muted-foreground/60">sem metas</p>
+            ) : (
+              <div className="space-y-2">
+                {d.metas.map((m) => {
+                  const feita = !!checks?.[m.id]
+                  return (
+                    <div
+                      key={m.id}
+                      className="rounded-md border-l-[3px] bg-muted/30 p-2"
+                      style={{ borderLeftColor: m.tipoDef.cor || paleta.primaria }}
+                    >
+                      <div className="flex items-start gap-2">
+                        {aoAlternarCheck && (
+                          <CaixaCheck
+                            marcada={feita}
+                            aoTrocar={(marcar) => aoAlternarCheck(m, marcar)}
+                            rotulo={`Marcar "${m.titulo}" como concluída`}
+                            className="mt-0.5"
+                          />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            {m.tipoDef.nome}
+                            {m.duracao && <span className="font-normal"> · {m.duracao}</span>}
+                          </p>
+                          {/* Sem truncar: é a vantagem desta visão sobre a do mês. */}
+                          <p className={`text-xs font-medium ${feita ? 'text-muted-foreground line-through' : ''}`}>
+                            {m.titulo}
+                          </p>
+                          {m.complemento && (
+                            <p className="text-[11px] text-muted-foreground">{m.complemento}</p>
+                          )}
+                          {m.links && m.links.urls.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {m.links.urls.map((u) => (
+                                <a
+                                  key={u.plataforma.id}
+                                  href={u.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-0.5 rounded border bg-background px-1.5 py-0.5 text-[10px] text-primary hover:bg-muted"
+                                >
+                                  {u.plataforma.nome}
+                                  <ExternalLink className="h-2.5 w-2.5" />
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
   )
 }
