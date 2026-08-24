@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 // GET /api/sessoes/tempo?st={sessao_id}
 // Endpoint LEVE: devolve o tempo limite ATUAL do simulado da sessão (em minutos).
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   const st = new URL(request.url).searchParams.get('st')
   if (!st) return NextResponse.json({ message: 'Sessão ausente.' }, { status: 400 })
 
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   const { data: sess } = await svc
     .from('simulado_sessoes_prova')
     .select('simulado_id, status')

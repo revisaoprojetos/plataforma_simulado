@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { rankearSimulado } from '@/lib/ranking'
 import { contextoNota, calcularNota } from '@/lib/simulado/nota'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Sessão ausente.' }, { status: 400 })
   }
 
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
 
   const { data: sessao } = await supabase
     .from('simulado_sessoes_prova')

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 
 // GET /api/aluno/discursiva?questao_id=X — resposta atual do aluno (texto + correção).
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const questaoId = new URL(request.url).searchParams.get('questao_id')
   if (!questaoId) return NextResponse.json({ resposta: null })
 
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   const { data } = await svc
     .from('simulado_respostas_discursivas')
     .select('id, texto, status, nota, feedback')
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
   const texto = body.texto?.trim()
   if (!body.questao_id || !texto) return NextResponse.json({ message: 'Escreva sua resposta.' }, { status: 400 })
 
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
 
   // Já existe uma resposta de prática? Se ainda pendente, atualiza; se corrigida, bloqueia reedição.
   const { data: existente } = await svc

@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { QuestaoCard } from '@/components/aluno/questao-card'
@@ -10,7 +10,7 @@ import { DiagnosticoCard } from '@/components/aluno/diagnostico-card'
 
 export default async function RecomendadoPage() {
   const sessao = await getSessaoAluno()
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
 
   // 1) Histórico de respostas objetivas do aluno (todas as sessões).
   const { data: sessoes } = await svc

@@ -1,5 +1,5 @@
 import { resolveTemaDark } from '@/lib/hud/resolve-dark'
-import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { EmbedLoginForm } from '@/components/embed/embed-login-form'
 import { EmbedProvaRunner } from '@/components/embed/embed-prova-runner'
 import { AlertCircle } from 'lucide-react'
@@ -119,7 +119,7 @@ async function fetchSimuladoPorToken(embedToken: string): Promise<{
   tempo_limite_min: number | null
 } | null> {
   try {
-    const supabase = await createServiceClient()
+    const supabase = createAdminClient()
     const { data } = await supabase
       .from('simulado_simulados')
       .select('id, titulo, embed_ativo, metodo_identificacao, tenant_id, status, data_inicio, data_fim, tempo_limite_min')

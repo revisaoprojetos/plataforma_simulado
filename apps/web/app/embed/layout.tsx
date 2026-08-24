@@ -1,5 +1,5 @@
 import { headers } from 'next/headers'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { getTenantTheme } from '@/lib/tenant-theme'
 
@@ -87,7 +87,7 @@ async function fetchEmbedConfig(): Promise<{
 
   try {
     const tenantId = await getCurrentTenantId()
-    const supabase = await createServiceClient()
+    const supabase = createAdminClient()
     const { data } = await supabase
       .from('simulado_embed_config')
       .select('ativo, origens_permitidas, metodo_identificacao, otp_email')

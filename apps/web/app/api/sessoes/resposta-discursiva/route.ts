@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 // POST /api/sessoes/resposta-discursiva — auto-save da resposta discursiva na prova.
 // Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   const { sessao_id, questao_id } = body
   if (!sessao_id || !questao_id) return NextResponse.json({ message: 'Dados ausentes.' }, { status: 400 })
 
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
 
   const { data: sessao } = await supabase
     .from('simulado_sessoes_prova')

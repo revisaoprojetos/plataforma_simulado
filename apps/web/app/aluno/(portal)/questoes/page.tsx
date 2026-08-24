@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { QuestaoCard } from '@/components/aluno/questao-card'
@@ -20,7 +20,7 @@ interface PageProps {
 export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
   const params = await searchParams
   const sessao = await getSessaoAluno()
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   const page = Math.max(1, Number(params.page ?? 1))
   const offset = (page - 1) * POR_PAGINA
   const tid = sessao!.tenantId

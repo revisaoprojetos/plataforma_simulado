@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
@@ -7,7 +7,7 @@ import { MeusSimuladosCatalogo } from '@/components/aluno/meus-simulados-catalog
 
 export default async function MeusSimuladosPage() {
   const sessao = await getSessaoAluno()
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   const estId = sessao!.estudanteId
 
   // Simulados atribuídos: matrícula (liberada) + acesso avulso. O passaporte NÃO enxerga

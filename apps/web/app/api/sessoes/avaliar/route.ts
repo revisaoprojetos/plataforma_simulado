@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   if (!body.sessao_id) return NextResponse.json({ error: 'Sessão ausente.' }, { status: 400 })
   if (!Number.isFinite(nps) || nps < 0 || nps > 10) return NextResponse.json({ error: 'Nota deve ser de 0 a 10.' }, { status: 400 })
 
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   const { data: sess } = await svc
     .from('simulado_sessoes_prova')
     .select('id, tenant_id, estudante_id, simulado_id, status, is_teste')

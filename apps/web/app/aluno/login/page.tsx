@@ -1,5 +1,5 @@
 import { resolveTemaDark } from '@/lib/hud/resolve-dark'
-import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { EmbedLoginForm } from '@/components/embed/embed-login-form'
 import { BookOpen } from 'lucide-react'
 import { resolverHudConfig } from '@/lib/hud/resolve-hud'
@@ -23,7 +23,7 @@ function Aviso({ titulo, msg, erro }: { titulo: string; msg: string; erro?: bool
 
 async function fetchSimulado(token: string) {
   try {
-    const svc = await createServiceClient()
+    const svc = createAdminClient()
     const { data } = await svc
       .from('simulado_simulados')
       .select('id, titulo, metodo_identificacao, tenant_id, status, data_inicio, data_fim, tempo_limite_min')

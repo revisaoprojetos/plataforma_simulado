@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 
 // GET /api/aluno/cadernos — lista os cadernos do aluno com contagem de questões.
@@ -10,7 +10,7 @@ export async function GET() {
   const sessao = await getSessaoAluno()
   if (!sessao) return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })
 
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   const { data: cadernos } = await svc
     .from('simulado_aluno_cadernos')
     .select('id, nome, criado_em')
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   const nome = body.nome?.trim()
   if (!nome) return NextResponse.json({ message: 'Informe um nome.' }, { status: 400 })
 
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   const { data, error } = await svc
     .from('simulado_aluno_cadernos')
     .insert({ tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, nome: nome.slice(0, 120) })

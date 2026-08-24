@@ -1,5 +1,5 @@
 import { resolveTemaDark } from '@/lib/hud/resolve-dark'
-import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { resolverHudConfig } from '@/lib/hud/resolve-hud'
 import { HUD_CORES_PADRAO, type HudCores, type HudPorPagina } from '@/lib/caderno-designer/types'
 import { EmbedLoginForm } from '@/components/embed/embed-login-form'
@@ -77,7 +77,7 @@ async function fetchSimulado(embedToken: string): Promise<{
   tempo_limite_min: number | null
 } | null> {
   try {
-    const svc = await createServiceClient()
+    const svc = createAdminClient()
     const { data } = await svc
       .from('simulado_simulados')
       .select('id, titulo, metodo_identificacao, tenant_id, status, data_inicio, data_fim, tempo_limite_min')

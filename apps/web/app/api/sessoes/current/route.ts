@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { type HudCores } from '@/lib/caderno-designer/types'
 import { resolverHudConfig } from '@/lib/hud/resolve-hud'
 import { funcaoEtiquetaPorQuestao, funcaoBloqueia } from '@/lib/simulado/etiqueta-funcao'
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: 'Sessão ausente.' }, { status: 400 })
   }
 
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
 
   const { data: sessao } = await supabase
     .from('simulado_sessoes_prova')

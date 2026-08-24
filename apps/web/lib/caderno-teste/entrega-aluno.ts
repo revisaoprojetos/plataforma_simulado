@@ -60,7 +60,7 @@ export function temEntregaV2(entrega: EntregaSlots | null | undefined): boolean 
 }
 
 /** Carrega o `caderno_entrega` do banco (tolerante à coluna ausente). `tenantId` opcional: com
- *  createAdminClient passe o tenant (filtra); com createServiceClient (RLS do aluno) passe null. */
+ *  createAdminClient passe o tenant (filtra); com createAdminClient (RLS do aluno) passe null. */
 export async function carregarEntregaBanco(svc: any, tenantId: string | null | undefined, bancoId: string | null | undefined): Promise<EntregaSlots | null> {
   if (!bancoId) return null
   try {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 
 /** Valida que o caderno pertence ao aluno logado. */
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   try { body = await request.json() } catch { return NextResponse.json({ message: 'Inválido.' }, { status: 400 }) }
   if (!body.caderno_id || !body.questao_id) return NextResponse.json({ message: 'Dados ausentes.' }, { status: 400 })
 
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   if (!(await donoDoCaderno(svc, body.caderno_id, sessao.estudanteId))) {
     return NextResponse.json({ message: 'Caderno não encontrado.' }, { status: 403 })
   }
@@ -43,7 +43,7 @@ export async function DELETE(request: NextRequest) {
   const questaoId = searchParams.get('questao_id')
   if (!cadernoId || !questaoId) return NextResponse.json({ message: 'Dados ausentes.' }, { status: 400 })
 
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   if (!(await donoDoCaderno(svc, cadernoId, sessao.estudanteId))) {
     return NextResponse.json({ message: 'Caderno não encontrado.' }, { status: 403 })
   }

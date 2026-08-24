@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { QuestaoCard } from '@/components/aluno/questao-card'
@@ -10,7 +10,7 @@ import { ArrowLeft, NotebookPen } from 'lucide-react'
 export default async function CadernoDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const sessao = await getSessaoAluno()
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
 
   const { data: caderno } = await svc
     .from('simulado_aluno_cadernos')

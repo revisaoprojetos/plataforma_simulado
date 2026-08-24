@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   const st = searchParams.get('st')
   if (!st) return NextResponse.json({ message: 'Sessão ausente.' }, { status: 400 })
 
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
   // Escopo por tenant do subdomínio: impede ver resultado de sessão de OUTRA plataforma
   // passando um st qualquer. O aluno acessa pelo próprio subdomínio, então não quebra.
   const tenantId = await getCurrentTenantId()

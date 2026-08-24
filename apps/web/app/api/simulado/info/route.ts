@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 // GET /api/simulado/info?token={embed_token}
 // Informações públicas mínimas do simulado para a tela de acesso do aluno.
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: 'Token ausente.' }, { status: 400 })
   }
 
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
   const { data } = await supabase
     .from('simulado_simulados')
     .select('titulo, status')

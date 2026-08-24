@@ -1,6 +1,6 @@
 import 'server-only'
 import crypto from 'crypto'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { rodarAutomacoes } from '@/lib/automacoes/run'
 
 export const EVENTOS_WEBHOOK = [
@@ -58,7 +58,7 @@ export async function dispararWebhook(tenantId: string | null | undefined, event
   // Além dos webhooks, roda as automações (aba n8n) do mesmo evento.
   await rodarAutomacoes(tenantId, evento, dados)
   try {
-    const svc = await createServiceClient()
+    const svc = createAdminClient()
     const { data: eps } = await svc
       .from('simulado_webhook_saida')
       .select('id, url, eventos, secret, filtro_simulados')

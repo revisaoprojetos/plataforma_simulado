@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 
 export interface TenantMensagem {
@@ -43,7 +43,7 @@ export async function getTenantMensagem(
 ): Promise<{ titulo: string; corpo: string }> {
   try {
     const tid = tenantId ?? (await getCurrentTenantId())
-    const supabase = await createServiceClient()
+    const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('simulado_tenant_mensagens')
       .select('titulo, corpo')
@@ -76,7 +76,7 @@ export async function getTenantMensagem(
 export async function getTenantContato(tenantId?: string): Promise<TenantContato> {
   try {
     const tid = tenantId ?? (await getCurrentTenantId())
-    const supabase = await createServiceClient()
+    const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('simulado_tenant_contatos')
       .select('*')
@@ -94,7 +94,7 @@ export async function getTenantContato(tenantId?: string): Promise<TenantContato
 export async function getAllTenantMensagens(tenantId?: string): Promise<TenantMensagem[]> {
   try {
     const tid = tenantId ?? (await getCurrentTenantId())
-    const supabase = await createServiceClient()
+    const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('simulado_tenant_mensagens')
       .select('*')

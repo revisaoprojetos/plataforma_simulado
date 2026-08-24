@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { rateLimit } from '@/lib/rate-limit'
 
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const questaoId = new URL(request.url).searchParams.get('questao_id')
   if (!questaoId) return NextResponse.json({ comentarios: [] })
 
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   const { data } = await svc
     .from('simulado_comentarios_questao')
     .select('id, autor_id, tipo, texto, aprovado, criado_em')
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Muitos comentários. Aguarde um pouco.' }, { status: 429 })
   }
 
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   const { error } = await svc.from('simulado_comentarios_questao').insert({
     tenant_id: sessao.tenantId,
     questao_id: body.questao_id,

@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
@@ -20,7 +20,7 @@ export interface GamRail { resumo: ResumoGamificacao; missoes: MissaoView[]; sem
 export async function carregarTrilhasAluno(): Promise<{ trilhas: Trilha[]; gamAtivo: boolean; nome: string; gam: GamRail | null }> {
   const sessao = await getSessaoAluno()
   if (!sessao) return { trilhas: [], gamAtivo: false, nome: 'Aluno', gam: null }
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   const estId = sessao.estudanteId
 
   const [{ data: mats }, { data: acs }, { data: sessAll }] = await Promise.all([

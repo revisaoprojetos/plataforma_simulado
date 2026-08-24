@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { QuestaoCard } from '@/components/aluno/questao-card'
@@ -7,7 +7,7 @@ import { Star } from 'lucide-react'
 
 export default async function AlunoFavoritosPage() {
   const sessao = await getSessaoAluno()
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
 
   const { data: favs } = await svc
     .from('simulado_favoritos')

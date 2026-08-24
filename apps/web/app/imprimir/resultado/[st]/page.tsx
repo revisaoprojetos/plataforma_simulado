@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { PrintButton } from '@/components/aluno/print-button'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -9,7 +9,7 @@ const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 export default async function ResultadoImprimirPage({ params, searchParams }: { params: Promise<{ st: string }>; searchParams: Promise<{ sem?: string; mod?: string }> }) {
   const { st } = await params
   const { sem, mod } = await searchParams
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   // Escopo por tenant do subdomínio (página de impressão client-side do aluno, sem pdftoken).
   const tenantId = await getCurrentTenantId()
 

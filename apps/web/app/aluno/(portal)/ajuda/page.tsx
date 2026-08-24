@@ -1,7 +1,7 @@
 import { LifeBuoy } from 'lucide-react'
 import { AjudaAluno } from '@/components/aluno/ajuda-aluno'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getGamConfig } from '@/lib/gamificacao'
 
 export const metadata = { title: 'Ajuda' }
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 export default async function AjudaAlunoPage() {
   // Gamificação ativa? → mostra também o guia "Trilha, Ligas e XP".
   let gamAtivo = false
-  try { const sessao = await getSessaoAluno(); if (sessao) { const cfg = await getGamConfig(await createServiceClient(), sessao.tenantId); gamAtivo = !!cfg?.ativo } } catch { /* ignore */ }
+  try { const sessao = await getSessaoAluno(); if (sessao) { const cfg = await getGamConfig(createAdminClient(), sessao.tenantId); gamAtivo = !!cfg?.ativo } } catch { /* ignore */ }
   return (
     <div className="flex flex-col gap-5 lg:h-full lg:min-h-0">
       <div className="flex shrink-0 items-center gap-3">

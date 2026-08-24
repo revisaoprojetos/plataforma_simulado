@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { onPraticaRespondida } from '@/lib/gamificacao'
 
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   const { questao_id, alternativa_id } = body
   if (!questao_id || !alternativa_id) return NextResponse.json({ message: 'Dados ausentes.' }, { status: 400 })
 
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   try {
     // Validação server-side: a alternativa pertence à questão; correta e disciplina vêm do banco (não do cliente).
     const { data: alt } = await svc.from('simulado_alternativas').select('id, questao_id, correta').eq('id', alternativa_id).maybeSingle()

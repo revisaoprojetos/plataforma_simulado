@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { getGamConfig } from '@/lib/gamificacao'
 import { ligaParaXp } from '@/lib/gamificacao/niveis'
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const escopo = req.nextUrl.searchParams.get('escopo') ?? 'total'
   const ambito = req.nextUrl.searchParams.get('ambito') // presença = modo Ligas
   try {
-    const svc = await createServiceClient()
+    const svc = createAdminClient()
     const config = await getGamConfig(svc, sessao.tenantId)
     if (!config?.ativo) return NextResponse.json({ ok: true, itens: [], liga: null, maxXp: 0 })
 

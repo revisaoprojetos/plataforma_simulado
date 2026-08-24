@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenant } from '@/lib/tenant'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { AlunoEntrarForm } from '@/components/aluno/aluno-entrar-form'
@@ -15,7 +15,7 @@ export default async function AlunoEntrarPage({ searchParams }: { searchParams: 
   const tenant = await getCurrentTenant()
   let metodo: 'email' | 'email_cpf' | 'email_telefone' = 'email'
   if (tenant) {
-    const svc = await createServiceClient()
+    const svc = createAdminClient()
     const { data } = await svc
       .from('simulado_embed_config')
       .select('metodo_identificacao')

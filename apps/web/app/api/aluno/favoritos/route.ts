@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 
 // POST /api/aluno/favoritos — alterna (toggle) o favorito da questão para o aluno logado.
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   const questaoId = body.questao_id
   if (!questaoId) return NextResponse.json({ message: 'Questão ausente.' }, { status: 400 })
 
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
 
   const { data: existente } = await svc
     .from('simulado_favoritos')

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/rate-limit'
 
 const TIPOS = ['erro_gabarito', 'enunciado_confuso', 'desatualizada', 'outro']
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Muitas solicitações. Tente novamente em instantes.' }, { status: 429 })
   }
 
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
 
   // Resolve a sessão para obter tenant + estudante (e validar que a questão pertence ao simulado).
   const { data: sessao } = await supabase

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { getGamConfig } from '@/lib/gamificacao'
 
@@ -13,7 +13,7 @@ export async function GET() {
   const sessao = await getSessaoAluno()
   if (!sessao) return NextResponse.json({ ok: false }, { status: 401 })
   try {
-    const svc = await createServiceClient()
+    const svc = createAdminClient()
     const config = await getGamConfig(svc, sessao.tenantId)
     if (!config?.ativo) return NextResponse.json({ ok: true, eventos: [], xpTotal: 0, curva: null })
 

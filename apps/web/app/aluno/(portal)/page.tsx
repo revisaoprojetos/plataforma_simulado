@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils'
 export default async function AlunoHome({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
   const { pasta } = await searchParams
   const sessao = await getSessaoAluno()
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   const estId = sessao!.estudanteId
 
   const [{ data: mats }, { data: acs }, { data: sessAll }, { data: banRows }, { data: tenantRow }, gratuitoIds] = await Promise.all([

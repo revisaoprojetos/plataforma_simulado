@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/rate-limit'
 
 // Report GERAL do simulado (não de uma questão específica) — grava em simulado_feedbacks_questao
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Muitas solicitações. Tente novamente em instantes.' }, { status: 429 })
   }
 
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
   const { data: sessao } = await supabase
     .from('simulado_sessoes_prova')
     .select('id, tenant_id, estudante_id, simulado_id')

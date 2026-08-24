@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { rateLimit } from '@/lib/rate-limit'
 
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Muitas solicitações. Tente novamente em instantes.' }, { status: 429 })
   }
 
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   try {
     // A questão precisa ser do tenant do aluno (evita reportar questão de outra plataforma).
     const { data: q } = await svc.from('simulado_questoes').select('tenant_id').eq('id', questao_id).maybeSingle()

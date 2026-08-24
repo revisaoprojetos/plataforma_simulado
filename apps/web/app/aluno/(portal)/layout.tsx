@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getTenantTheme } from '@/lib/tenant-theme'
 import { normalizarManutencao, emManutencaoAgora } from '@/lib/sistema/manutencao'
 import { Suspense } from 'react'
@@ -34,7 +34,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   // Tudo que o layout precisa roda em PARALELO (esta função executa a CADA navegação do portal):
   // tema + contagens da sidebar + progresso de gamificação + personalização. Antes eram 4
   // round-trips em série; agora 1 cliente reutilizado e um único Promise.all.
-  const svc = await createServiceClient()
+  const svc = createAdminClient()
   const [themeData, contadores, gamData, persData] = await Promise.all([
     getTenantTheme(),
     // Contagens da sidebar: "Meus Simulados" = oficiais distintos finalizados (badge da esquerda) +
