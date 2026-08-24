@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { criarSessaoAluno } from '@/lib/aluno-session'
 import { rateLimit } from '@/lib/rate-limit'
@@ -35,7 +35,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Muitas tentativas. Aguarde alguns minutos.' }, { status: 429 })
   }
 
-  const supabase = await createServiceClient()
+  // IMPORTANTE: service role REAL (bypassa RLS). NÃO usar createServiceClient aqui —
+  // ele herda o cookie de sessão: se houver um admin logado no mesmo navegador
+  // (comum ao testar links, e cross-subdomínio com COOKIE_DOMAIN), a leitura de
+  // simulado_tenants/estudantes roda sob RLS como aquele admin → 0 linhas →
+  // "Plataforma indisponível" falso. Login é pré-auth do aluno: sempre service role.
+  const supabase = createAdminClient()
 
   // Visibilidade da plataforma: só aluno entra em plataforma "Todos" (ativo=true).
   // "Só admin" (teste) e "Oculta" bloqueiam o acesso do aluno ao portal.

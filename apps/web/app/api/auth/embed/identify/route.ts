@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getTenantMensagem, getTenantContato, type TenantContato } from '@/lib/tenant-messages'
 import { rateLimit } from '@/lib/rate-limit'
 import { registrarAudit } from '@/lib/audit'
@@ -86,7 +86,10 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const supabase = await createServiceClient()
+  // Service role REAL (bypassa RLS). NÃO usar createServiceClient: ele herda o cookie
+  // de sessão — com um admin logado no mesmo navegador (ex.: staff testando o link),
+  // as leituras rodam sob RLS como aquele admin e o simulado/estudante "somem".
+  const supabase = createAdminClient()
 
   // 1. Buscar simulado por embed_token
   const { data: simulado, error: simError } = await supabase
@@ -308,7 +311,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function verificarAcesso(
-  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  supabase: ReturnType<typeof createAdminClient>,
   estudanteId: string,
   simuladoId: string
 ): Promise<boolean> {
@@ -328,7 +331,7 @@ async function verificarAcesso(
 
 /** O estudante tem "acesso de teste" neste simulado? (faz como is_teste, fora da janela). */
 async function isTestador(
-  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  supabase: ReturnType<typeof createAdminClient>,
   estudanteId: string,
   simuladoId: string,
 ): Promise<boolean> {
