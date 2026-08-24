@@ -21,7 +21,7 @@ export type QuestaoMeta = { numero: number; disciplinaChave: string; disciplinaN
  * disciplina + assunto. Usado no editor do card de disciplina p/ listar as questões daquela disciplina. */
 export async function questoesMetaBanco(bancoId: string): Promise<{ ok: boolean; questoes: QuestaoMeta[] }> {
   const access = await getCurrentAccess()
-  if (!access.tenantId || !bancoId) return { ok: true, questoes: [] }
+  if (!access.tenantId || !(await checkPermission('questoes:view')) || !bancoId) return { ok: true, questoes: [] }
   const svc = createAdminClient()
   const vinc = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', access.tenantId!).order('questao_id', { ascending: true }))
   let ordemBanco: string[] = []
@@ -62,7 +62,7 @@ export async function salvarBuilderTeste(id: string, builder: BuilderV3): Promis
 /** Questões de um banco (para a prévia). Limitado — é só preview. */
 export async function previewQuestoesBanco(bancoId: string): Promise<{ ok: boolean; questoes?: PreviewQuestao[] }> {
   const access = await getCurrentAccess()
-  if (!access.tenantId) return { ok: false }
+  if (!access.tenantId || !(await checkPermission('questoes:view'))) return { ok: false }
   const questoes = await carregarQuestoesBancoCore(createAdminClient(), access.tenantId, bancoId)
   return { ok: true, questoes }
 }
@@ -74,7 +74,7 @@ export async function previewQuestoesBanco(bancoId: string): Promise<{ ok: boole
  */
 export async function dadosBancoTeste(bancoId: string, filtro?: { aluno?: string; sessao?: string }): Promise<{ ok: boolean; registros: RegistroTeste[]; disciplinas: DiscBancoTeste[] }> {
   const access = await getCurrentAccess()
-  if (!access.tenantId || !bancoId) return { ok: true, registros: [], disciplinas: [] }
+  if (!access.tenantId || !(await checkPermission('questoes:view')) || !bancoId) return { ok: true, registros: [], disciplinas: [] }
   const { registros, disciplinas } = await carregarDadosBancoCore(createAdminClient(), access.tenantId, bancoId, filtro)
   return { ok: true, registros, disciplinas }
 }
@@ -85,7 +85,7 @@ export type CadernoTesteResumo = { id: string; nome: string; atualizadoEm: strin
 /** Lista os cadernos de TESTE vinculados a um banco (config.builderV3.bancoId === bancoId), com o material PDF. */
 export async function listarCadernosTesteDoBanco(bancoId: string): Promise<CadernoTesteResumo[]> {
   const access = await getCurrentAccess()
-  if (!access.tenantId || !bancoId) return []
+  if (!access.tenantId || !(await checkPermission('questoes:view')) || !bancoId) return []
   const svc = createAdminClient()
   const r = await svc.from(TABELA).select('id, nome, config, atualizado_em').eq('tenant_id', access.tenantId).eq('deletado', false).order('atualizado_em', { ascending: false })
   const rows = (r.data ?? []) as any[]
@@ -142,7 +142,7 @@ export type MontagemPdf = { url: string; nome: string; origem: string }
 /** Carrega a montagem salva do banco + grupos + PDFs já enviados nos cadernos do banco. */
 export async function carregarMontagem(bancoId: string): Promise<{ entrega: EntregaSlots; grupos: MontagemGrupo[]; pdfs: MontagemPdf[]; discursivo: boolean }> {
   const access = await getCurrentAccess()
-  if (!access.tenantId || !bancoId) return { entrega: {}, grupos: [], pdfs: [], discursivo: false }
+  if (!access.tenantId || !(await checkPermission('questoes:view')) || !bancoId) return { entrega: {}, grupos: [], pdfs: [], discursivo: false }
   const svc = createAdminClient()
   const r = await svc.from(TABELA).select('id, nome, config').eq('tenant_id', access.tenantId).eq('deletado', false)
   const grupos: MontagemGrupo[] = []

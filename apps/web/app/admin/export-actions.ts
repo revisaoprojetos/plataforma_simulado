@@ -2,6 +2,7 @@
 
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { checkPermission } from '@/lib/auth/permissions'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { codigoQuestao } from '@/lib/codigo-questao'
 
@@ -15,6 +16,7 @@ const STATUS_Q: Record<string, string> = { publicada: 'Publicada', rascunho: 'Ra
 export async function exportarQuestoes(f: {
   q?: string; status?: string; disciplina?: string; dificuldade?: string; tipo?: string
 }) {
+  if (!(await checkPermission('questoes:view'))) return []
   const svc = await createServiceClient()
   const tid = (await getCurrentTenantId()) ?? NADA
   const build = (comCodigo: boolean) => () => {
@@ -48,6 +50,7 @@ export async function exportarQuestoes(f: {
 
 /** Todas as matrículas do tenant que casam com os filtros da página (para exportação). */
 export async function exportarMatriculas(f: { liberado?: string; estudante_id?: string }) {
+  if (!(await checkPermission('matriculas:view'))) return []
   const svc = await createServiceClient()
   const tid = (await getCurrentTenantId()) ?? NADA
   const rows = await fetchAll<any>(() => {

@@ -25,6 +25,7 @@ export type EstudanteBase = {
  * (feitos/média) vêm de um mapa único calculado uma vez na página. Tenant vem da sessão.
  */
 export async function carregarLoteEstudantes(offset: number, limit: number, comContagem = true): Promise<{ rows: EstudanteBase[]; total: number }> {
+  if (!(await checkPermission('estudantes:view'))) return { rows: [], total: 0 }
   const svc = await createServiceClient()
   const tenantId = (await getCurrentTenantId()) ?? TENANT_VAZIO
   const lim = Math.min(Math.max(limit, 1), 1000) // teto do PostgREST

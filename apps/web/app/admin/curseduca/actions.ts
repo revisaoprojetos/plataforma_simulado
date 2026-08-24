@@ -123,7 +123,7 @@ export async function curseducaConfigurado(): Promise<boolean> {
  */
 export async function curseducaEstado(): Promise<{ configurado: boolean; inativo: boolean }> {
   const access = await getCurrentAccess()
-  if (!access.tenantId) return { configurado: false, inativo: false }
+  if (!access.tenantId || !(await checkPermission('estudantes:view'))) return { configurado: false, inativo: false }
   try {
     if (await resolverCfg(access.tenantId)) return { configurado: true, inativo: false }
     // Não resolveu: existe uma linha com credenciais completas porém desativada?
@@ -393,7 +393,7 @@ export async function criarRegraSync(grupos: number[], destino: DestinoImport, s
 /** Estado da "sincronização simples" (card do Importar): ativo + intervalo da regra global. */
 export async function getSyncSimples(): Promise<{ ok: boolean; ativo: boolean; intervaloMin: number }> {
   const access = await getCurrentAccess()
-  if (!access.tenantId) return { ok: false, ativo: false, intervaloMin: 30 }
+  if (!access.tenantId || !(await checkPermission('estudantes:view'))) return { ok: false, ativo: false, intervaloMin: 30 }
   const svc = createAdminClient()
   try {
     const { data } = await svc.from('simulado_curseduca_sync').select('ativo, intervalo_min').eq('tenant_id', access.tenantId).order('created_at', { ascending: true }).limit(1).maybeSingle()

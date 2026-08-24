@@ -250,7 +250,7 @@ export async function excluirCaderno(id: string): Promise<{ ok: boolean; error?:
 export async function getGruposBanco(bancoId: string): Promise<{ ok: boolean; grupos?: { id: string; nome: string; disciplinas: string[] }[] }> {
   if (!bancoId) return { ok: true, grupos: [] }
   const access = await getCurrentAccess()
-  if (!access.tenantId) return { ok: false }
+  if (!access.tenantId || !(await checkPermission('questoes:view'))) return { ok: false }
   const svc = createAdminClient()
   const { data } = await svc.from('simulado_pastas').select('grupos').eq('id', bancoId).eq('tenant_id', access.tenantId).maybeSingle()
   const grupos = Array.isArray((data as any)?.grupos) ? (data as any).grupos : []
@@ -261,7 +261,7 @@ export async function getGruposBanco(bancoId: string): Promise<{ ok: boolean; gr
 export async function getAssuntosBanco(bancoId: string): Promise<{ ok: boolean; porDisciplina?: Record<string, string[]> }> {
   if (!bancoId) return { ok: true, porDisciplina: {} }
   const access = await getCurrentAccess()
-  if (!access.tenantId) return { ok: false }
+  if (!access.tenantId || !(await checkPermission('questoes:view'))) return { ok: false }
   const svc = createAdminClient()
   const { data: vinc } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', access.tenantId)
   const ids = [...new Set((vinc ?? []).map((v: any) => v.questao_id).filter(Boolean))]
@@ -291,7 +291,7 @@ export async function getAssuntosBanco(bancoId: string): Promise<{ ok: boolean; 
  */
 export async function linkagemCaderno(cadernoId: string): Promise<{ ok: boolean; bancos: number; simulados: number }> {
   const access = await getCurrentAccess()
-  if (!access.tenantId) return { ok: false, bancos: 0, simulados: 0 }
+  if (!access.tenantId || !(await checkPermission('questoes:view'))) return { ok: false, bancos: 0, simulados: 0 }
   const svc = createAdminClient()
   let bancosIds: string[] = []
   try {

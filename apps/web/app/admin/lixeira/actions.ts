@@ -96,6 +96,13 @@ export async function listarLixeira(): Promise<LixeiraItem[]> {
 }
 
 export async function restaurarItem(tabela: SoftDeleteTabela, id: string) {
+  const access = await getCurrentAccess()
+  if (!access.userId || !access.tenantId) return { ok: false, error: 'Sem sessão.' }
+  if (!(SOFT_DELETE_TABELAS as readonly string[]).includes(tabela)) return { ok: false, error: 'Tabela não permitida.' }
+  // Confirma que o item é do tenant antes de restaurar (evita restore cross-tenant por id).
+  const svc = createAdminClient()
+  const { data: dono } = await svc.from(tabela).select('id').eq('id', id).eq('tenant_id', access.tenantId).maybeSingle()
+  if (!dono) return { ok: false, error: 'Item não encontrado.' }
   const { error } = await softRestore(tabela, id)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'LIBERAR', entidade: tabela, entidadeId: id, depois: { restaurado: true } })
