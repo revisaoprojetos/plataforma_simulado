@@ -17,10 +17,14 @@ ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ARG NEXT_PUBLIC_APP_URL
 # Domínio do cookie de sessão (login compartilhado entre subdomínios). Vazio = por-host.
 ARG NEXT_PUBLIC_COOKIE_DOMAIN
+# Módulo Cronograma de Estudos: 'true' liga o MENU (gate de build). Vazio = escondido.
+# O acesso real ainda é por tenant (coluna ativo de simulado_cronograma_config).
+ARG NEXT_PUBLIC_CRONOGRAMA_ATIVO
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
     NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY \
     NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
     NEXT_PUBLIC_COOKIE_DOMAIN=$NEXT_PUBLIC_COOKIE_DOMAIN \
+    NEXT_PUBLIC_CRONOGRAMA_ATIVO=$NEXT_PUBLIC_CRONOGRAMA_ATIVO \
     NEXT_TELEMETRY_DISABLED=1
 
 RUN pnpm --filter web build
