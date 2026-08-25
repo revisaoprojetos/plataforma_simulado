@@ -9,8 +9,9 @@
  */
 
 import { useMemo, useState } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { ChevronDown, Eye, EyeOff, ExternalLink } from 'lucide-react'
 import { CaixaCheck } from '@/components/cronograma/caixa-check'
+import { NotaMeta } from '@/components/cronograma/nota-meta'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -61,6 +62,13 @@ export function GradeCronograma({
   titulo,
   checks,
   aoAlternarCheck,
+  emissaoId,
+  notas,
+  aoSalvarNota,
+  colapsadas,
+  aoAlternarColapso,
+  ocultarContagem,
+  aoAlternarContagem,
 }: {
   grade: Grade
   paletaSlug: string
@@ -68,6 +76,15 @@ export function GradeCronograma({
   /** metaId → instante em que o aluno marcou. Ausente = a tela não tem marcação. */
   checks?: Record<string, string>
   aoAlternarCheck?: (meta: MetaDatada, marcar: boolean) => void
+  /** Sem emissão salva não há onde gravar anotação. */
+  emissaoId?: string | null
+  notas?: Record<string, string>
+  aoSalvarNota?: (metaId: string, texto: string) => void
+  /** Semanas fechadas pelo aluno — vem do banco e volta para lá ao mudar. */
+  colapsadas?: number[]
+  aoAlternarColapso?: (semana: number) => void
+  ocultarContagem?: boolean
+  aoAlternarContagem?: () => void
 }) {
   const comCheck = !!aoAlternarCheck
   const paleta = acharPaleta(paletaSlug)
@@ -104,6 +121,7 @@ export function GradeCronograma({
   // Filtrar uma semana específica ignora o teto: o aluno pediu aquela, não as primeiras N.
   const filtrando = filtroSemana !== 'todas' || filtroTipo !== 'todos'
   const paraMostrar = filtrando ? semanas : semanas.slice(0, visiveis)
+  const fechadas = new Set(colapsadas ?? [])
   const restantes = filtrando ? 0 : semanas.length - paraMostrar.length
 
   if (!grade.semanas.length) return null
@@ -142,21 +160,67 @@ export function GradeCronograma({
           </SelectContent>
         </Select>
 
+        {aoAlternarContagem && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={aoAlternarContagem}
+            title={ocultarContagem ? 'Mostrar a quantidade de metas' : 'Esconder a quantidade de metas'}
+            className="h-8 px-2"
+          >
+            {ocultarContagem ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+        )}
+
+        {aoAlternarColapso && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 px-2 text-xs"
+            onClick={() => {
+              // Fechar todas quando há alguma aberta; abrir todas quando estão todas fechadas.
+              const abertas = semanas.filter((x) => !fechadas.has(x.numero))
+              const alvo = abertas.length ? abertas : semanas
+              for (const x of alvo) aoAlternarColapso(x.numero)
+            }}
+          >
+            {semanas.every((x) => fechadas.has(x.numero)) ? 'Abrir todas' : 'Fechar todas'}
+          </Button>
+        )}
+
         <span className={`text-xs text-muted-foreground ${titulo ? 'w-full sm:w-auto' : 'ml-auto'}`}>Os filtros valem na hora — não é preciso gerar de novo.</span>
       </div>
 
       <div className="divide-y">
         {paraMostrar.map((s) => (
           <div key={s.numero}>
-            <div
-              className="flex flex-wrap items-center gap-2 px-4 py-2 text-sm font-semibold text-white"
+            {/* A faixa inteira é o botão de fechar. Com 77 semanas, ter de mirar uma setinha
+                para dobrar cada uma é pior do que não poder dobrar. */}
+            <button
+              type="button"
+              onClick={() => aoAlternarColapso?.(s.numero)}
+              disabled={!aoAlternarColapso}
+              className="flex w-full flex-wrap items-center gap-2 px-4 py-2 text-left text-sm font-semibold text-white disabled:cursor-default"
               style={{ background: s.kind === 'conteudo' ? paleta.primaria : paleta.revisao }}
             >
+              {aoAlternarColapso && (
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 transition-transform ${fechadas.has(s.numero) ? '-rotate-90' : ''}`}
+                />
+              )}
               <span>Semana {s.numero}</span>
               <span className="font-normal opacity-90">{fmtIntervalo(s.inicio, s.fim)}</span>
               {s.kind === 'revisao' && <Badge variant="secondary">Revisão</Badge>}
               {s.kind === 'recesso' && <Badge variant="secondary">Recesso</Badge>}
-            </div>
+              {!ocultarContagem && s.kind === 'conteudo' && (
+                <span className="ml-auto text-xs font-normal opacity-80">
+                  {s.metas.length} meta{s.metas.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </button>
+
+            {!fechadas.has(s.numero) && (
+            <>
 
             {s.kind === 'recesso' && (
               <p className="px-4 py-3 text-sm text-muted-foreground">
@@ -229,9 +293,20 @@ export function GradeCronograma({
                     ))}
                     {m.links?.ausente && <span className="text-xs italic text-muted-foreground">{m.links.ausente}</span>}
                   </div>
+                      {emissaoId && aoSalvarNota && (
+                    <NotaMeta
+                      meta={m}
+                      emissaoId={emissaoId}
+                      nota={notas?.[m.id]}
+                      aoSalvar={aoSalvarNota}
+                      compacto
+                    />
+                  )}
                   <span className="shrink-0 text-xs text-muted-foreground sm:text-right">{m.duracao ?? ''}</span>
                 </div>
               ))}
+            </>
+            )}
           </div>
         ))}
       </div>

@@ -1,12 +1,15 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarRange, List } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card } from '@/components/ui/card'
 import { GradeCronograma } from '@/components/cronograma/grade-cronograma'
 import { CalendarioCronograma } from '@/components/cronograma/calendario-cronograma'
 import { alternarCheckMeta, type ChecksDaEmissao } from '@/app/aluno/(portal)/cronograma/checks-actions'
+import type { NotasDaEmissao } from '@/app/aluno/(portal)/cronograma/notas-actions'
+import { salvarPreferencias } from '@/app/aluno/(portal)/cronograma/preferencias-actions'
+import { PREFERENCIAS_PADRAO, type PreferenciasEmissao } from '@/lib/cronograma/preferencias'
 import type { Grade, MetaDatada } from '@/lib/cronograma/tipos'
 
 /**
@@ -24,15 +27,67 @@ export function VisaoCronograma({
   paletaSlug,
   emissaoId,
   checksIniciais,
+  notasIniciais,
+  preferenciasIniciais,
 }: {
   grade: Grade
   paletaSlug: string
   /** Sem emissão salva não há onde gravar — a tela mostra o plano sem as caixas. */
   emissaoId: string | null
   checksIniciais?: ChecksDaEmissao
+  notasIniciais?: NotasDaEmissao
+  preferenciasIniciais?: PreferenciasEmissao
 }) {
   const [visao, setVisao] = useState<'lista' | 'calendario'>('lista')
+
+  /**
+   * Preferências de leitura — que semanas estão fechadas e se a contagem aparece.
+   *
+   * Gravadas com ATRASO: fechar dez semanas seguidas são dez cliques, e uma ida ao servidor
+   * por clique só serviria para engasgar a tela. O estado responde na hora; a gravação vai
+   * meio segundo depois da última mudança.
+   */
+  const [prefs, setPrefs] = useState<PreferenciasEmissao>(preferenciasIniciais ?? PREFERENCIAS_PADRAO)
+  const gravacao = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const primeira = useRef(true)
+
+  useEffect(() => {
+    if (primeira.current) {
+      primeira.current = false
+      return
+    }
+    if (!emissaoId) return
+    if (gravacao.current) clearTimeout(gravacao.current)
+    gravacao.current = setTimeout(() => {
+      // Falhar aqui não atrapalha a leitura: a tela segue como o aluno deixou nesta sessão.
+      void salvarPreferencias(emissaoId, prefs)
+    }, 600)
+    return () => {
+      if (gravacao.current) clearTimeout(gravacao.current)
+    }
+  }, [prefs, emissaoId])
+
+  function alternarColapso(semana: number) {
+    setPrefs((p) => {
+      const set = new Set(p.semanasColapsadas)
+      if (set.has(semana)) set.delete(semana)
+      else set.add(semana)
+      return { ...p, semanasColapsadas: [...set].sort((a, b) => a - b) }
+    })
+  }
   const [checks, setChecks] = useState<ChecksDaEmissao>(checksIniciais ?? {})
+  const [notas, setNotas] = useState<NotasDaEmissao>(notasIniciais ?? {})
+
+  /* A nota vive aqui em cima, junto dos checks, pelo mesmo motivo: lista e calendário leem o
+     MESMO estado, então escrever numa aparece na outra sem recarregar. */
+  function guardarNota(metaId: string, texto: string) {
+    setNotas((n) => {
+      const novo = { ...n }
+      if (texto) novo[metaId] = texto
+      else delete novo[metaId]
+      return novo
+    })
+  }
 
   const total = useMemo(
     () => grade.semanas.reduce((n, s) => n + (s.kind === 'conteudo' ? s.metas.length : 0), 0),
@@ -133,9 +188,26 @@ export function VisaoCronograma({
           titulo="Seu plano semana a semana"
           checks={checks}
           aoAlternarCheck={aoAlternar}
+          emissaoId={emissaoId}
+          notas={notas}
+          aoSalvarNota={guardarNota}
+          colapsadas={prefs.semanasColapsadas}
+          aoAlternarColapso={emissaoId ? alternarColapso : undefined}
+          ocultarContagem={prefs.ocultarContagem}
+          aoAlternarContagem={
+            emissaoId ? () => setPrefs((p) => ({ ...p, ocultarContagem: !p.ocultarContagem })) : undefined
+          }
         />
       ) : (
-        <CalendarioCronograma grade={grade} paletaSlug={paletaSlug} checks={checks} aoAlternarCheck={aoAlternar} />
+        <CalendarioCronograma
+          grade={grade}
+          paletaSlug={paletaSlug}
+          checks={checks}
+          aoAlternarCheck={aoAlternar}
+          emissaoId={emissaoId}
+          notas={notas}
+          aoSalvarNota={guardarNota}
+        />
       )}
     </div>
   )

@@ -11,6 +11,8 @@ import { BotaoPdfCronograma } from '@/components/cronograma/botao-pdf'
 import { ResumoGrade } from '@/components/cronograma/grade-cronograma'
 import { VisaoCronograma } from '@/components/cronograma/visao-cronograma'
 import type { ChecksDaEmissao } from '../checks-actions'
+import type { NotasDaEmissao } from '../notas-actions'
+import type { PreferenciasEmissao } from '@/lib/cronograma/preferencias'
 import { fmtBr } from '@/lib/cronograma/datas'
 import type { Grade } from '@/lib/cronograma/tipos'
 import { arquivarEmissao, renomearEmissao, type EmissaoResumo } from '../emissoes-actions'
@@ -20,11 +22,15 @@ export function EmissaoClient({
   grade,
   indisponivel,
   checks,
+  notas,
+  preferencias,
 }: {
   emissao: EmissaoResumo
   grade: Grade
   indisponivel: boolean
   checks: ChecksDaEmissao
+  notas: NotasDaEmissao
+  preferencias: PreferenciasEmissao
 }) {
   const [titulo, setTitulo] = useState(emissao.titulo ?? '')
   const [editando, setEditando] = useState(false)
@@ -106,7 +112,14 @@ export function EmissaoClient({
         <>
           <ResumoGrade grade={grade} />
           <p className="text-sm text-muted-foreground">{grade.resumo.subtitulo}</p>
-          <VisaoCronograma grade={grade} paletaSlug={paleta} emissaoId={emissao.id} checksIniciais={checks} />
+          <VisaoCronograma
+            grade={grade}
+            paletaSlug={paleta}
+            emissaoId={emissao.id}
+            checksIniciais={checks}
+            notasIniciais={notas}
+            preferenciasIniciais={preferencias}
+          />
         </>
       )}
     </div>

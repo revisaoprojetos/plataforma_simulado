@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CaixaCheck } from '@/components/cronograma/caixa-check'
+import { NotaMeta } from '@/components/cronograma/nota-meta'
 import {
   addDias,
   domingoSeguinteOuIgual,
@@ -61,11 +62,17 @@ export function CalendarioCronograma({
   paletaSlug,
   checks,
   aoAlternarCheck,
+  emissaoId,
+  notas,
+  aoSalvarNota,
 }: {
   grade: Grade
   paletaSlug: string
   checks?: Record<string, string>
   aoAlternarCheck?: (meta: MetaDatada, marcar: boolean) => void
+  emissaoId?: string | null
+  notas?: Record<string, string>
+  aoSalvarNota?: (metaId: string, texto: string) => void
 }) {
   const paleta = acharPaleta(paletaSlug)
   const hoje = hojeISO()
@@ -234,6 +241,9 @@ export function CalendarioCronograma({
           hoje={hoje}
           checks={checks}
           aoAlternarCheck={aoAlternarCheck}
+          emissaoId={emissaoId}
+          notas={notas}
+          aoSalvarNota={aoSalvarNota}
         />
       ) : (
       <>
@@ -466,6 +476,24 @@ export function CalendarioCronograma({
                             </div>
                           )}
 
+                          {emissaoId && aoSalvarNota && (
+                            <div className="mt-2">
+                              <NotaMeta
+                                meta={m}
+                                emissaoId={emissaoId}
+                                nota={notas?.[m.id]}
+                                aoSalvar={aoSalvarNota}
+                              />
+                              {/* O texto aparece aqui, não só no diálogo: anotação que só se vê
+                                  clicando é anotação que se esquece. */}
+                              {notas?.[m.id] && (
+                                <p className="mt-1 whitespace-pre-wrap rounded-md border-l-2 border-primary/40 bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+                                  {notas[m.id]}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
                           {m.tipo === 'simulado' && m.simulado_externo_url && (
                             <a
                               href={m.simulado_externo_url}
@@ -504,12 +532,18 @@ function VisaoSemanal({
   hoje,
   checks,
   aoAlternarCheck,
+  emissaoId,
+  notas,
+  aoSalvarNota,
 }: {
   semana: SemanaGrade | undefined
   paleta: ReturnType<typeof acharPaleta>
   hoje: DataISO
   checks?: Record<string, string>
   aoAlternarCheck?: (meta: MetaDatada, marcar: boolean) => void
+  emissaoId?: string | null
+  notas?: Record<string, string>
+  aoSalvarNota?: (metaId: string, texto: string) => void
 }) {
   if (!semana) return null
 
@@ -596,6 +630,23 @@ function VisaoSemanal({
                           {m.complemento && (
                             <p className="text-[11px] text-muted-foreground">{m.complemento}</p>
                           )}
+                          {emissaoId && aoSalvarNota && (
+                            <div className="mt-1.5">
+                              <NotaMeta
+                                meta={m}
+                                emissaoId={emissaoId}
+                                nota={notas?.[m.id]}
+                                aoSalvar={aoSalvarNota}
+                                compacto
+                              />
+                              {notas?.[m.id] && (
+                                <p className="mt-1 line-clamp-3 whitespace-pre-wrap rounded border-l-2 border-primary/40 bg-background/70 px-1.5 py-1 text-[10px] text-muted-foreground">
+                                  {notas[m.id]}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
                           {m.links && m.links.urls.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {m.links.urls.map((u) => (

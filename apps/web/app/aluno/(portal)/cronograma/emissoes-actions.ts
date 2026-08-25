@@ -34,6 +34,8 @@ export type EmissaoResumo = {
   /** Só vem no caminho de renderização (PDF); a lista do aluno não precisa. */
   estudante_id?: string
   estudante_nome?: string | null
+  /** Estado de leitura do aluno: semanas fechadas, contagem escondida. */
+  preferencias?: unknown
   resumo: {
     totalSemanas?: number
     semanasConteudo?: number
@@ -161,7 +163,7 @@ async function montarEmissao(
 
   let q = svc
     .from('simulado_cronograma_emissoes')
-    .select('id, cronograma_id, cronograma_nome, titulo, criado_em, arquivada, resumo, formulario, estudante_id, estudante_nome')
+    .select('id, cronograma_id, cronograma_nome, titulo, criado_em, arquivada, resumo, formulario, estudante_id, estudante_nome, preferencias')
     .eq('id', emissaoId)
     .eq('tenant_id', tenantId)
   if (estudanteIdEsperado) q = q.eq('estudante_id', estudanteIdEsperado) // só as próprias
