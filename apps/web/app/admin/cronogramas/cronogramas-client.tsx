@@ -619,8 +619,12 @@ export function CronogramasClient({
                       {/* Divisória antes das ações: sem ela, os ícones flutuavam entre linhas e
                           ficava fácil clicar na lixeira do cronograma de cima. */}
                       <div className="flex shrink-0 items-center gap-1 border-l pl-3">
+                        {/* Largura FIXA: "Voltar a rascunho" é o dobro de "Liberar", e sem isso
+                            a divisória e os três ícones dançavam alguns pixels a cada linha,
+                            conforme o estado do cronograma. */}
                         <Button
                           size="sm"
+                          className="w-36 shrink-0"
                           variant={c.status === 'liberado' ? 'secondary' : 'default'}
                           onClick={() => liberar(c)}
                           disabled={ocupado(`lib:${c.id}`) || (c.status !== 'liberado' && c.metas === 0)}
