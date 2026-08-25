@@ -532,6 +532,12 @@ export function CronogramasClient({
                   {carga}h por dia
                   <span className="font-normal normal-case">· {lista.length} cronograma(s)</span>
                 </div>
+                {/* Divisória LEVE entre os cronogramas do grupo. O `divide-y` de fora separa só
+                    os grupos de carga, então dentro deles as linhas corriam juntas — com
+                    nome, etiquetas e ações em alturas parecidas, uma acabava lendo como
+                    continuação da outra. Mais fraca que a borda do grupo, de propósito: separa
+                    sem competir com a hierarquia. */}
+                <div className="divide-y divide-border/40">
                 {lista.map((c) => {
                   const invisivel = ehInvisivel(c)
                   return (
@@ -639,6 +645,7 @@ export function CronogramasClient({
                     </div>
                   )
                 })}
+                </div>
               </div>
             ))}
           </div>
