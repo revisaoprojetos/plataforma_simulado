@@ -12,6 +12,7 @@ import { useMemo, useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 import { CaixaCheck } from '@/components/cronograma/caixa-check'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { fmtBr, fmtIntervalo } from '@/lib/cronograma/datas'
@@ -51,6 +52,9 @@ export function ResumoGrade({ grade }: { grade: Grade | null }) {
   )
 }
 
+/** Semanas montadas por vez, e a cada "mostrar mais". */
+const PASSO_SEMANAS = 6
+
 export function GradeCronograma({
   grade,
   paletaSlug,
@@ -67,6 +71,11 @@ export function GradeCronograma({
 }) {
   const comCheck = !!aoAlternarCheck
   const paleta = acharPaleta(paletaSlug)
+  /* Quantas semanas o navegador monta de uma vez.
+     A grade de "12 Matérias (2 horas)" tem 634 metas em 77 semanas. Renderizar tudo de uma vez
+     produzia 1.955 KB de HTML e 10,6 s de espera — MEDIDO, não estimado. O aluno lê a semana
+     atual e talvez as próximas; as 70 seguintes ele rola até, se rolar. */
+  const [visiveis, setVisiveis] = useState(PASSO_SEMANAS)
   const [filtroSemana, setFiltroSemana] = useState('todas')
   const [filtroTipo, setFiltroTipo] = useState('todos')
 
@@ -91,6 +100,11 @@ export function GradeCronograma({
     }
     return [...vistos.values()].sort((a, b) => a.ordem - b.ordem)
   }, [grade])
+
+  // Filtrar uma semana específica ignora o teto: o aluno pediu aquela, não as primeiras N.
+  const filtrando = filtroSemana !== 'todas' || filtroTipo !== 'todos'
+  const paraMostrar = filtrando ? semanas : semanas.slice(0, visiveis)
+  const restantes = filtrando ? 0 : semanas.length - paraMostrar.length
 
   if (!grade.semanas.length) return null
 
@@ -132,7 +146,7 @@ export function GradeCronograma({
       </div>
 
       <div className="divide-y">
-        {semanas.map((s) => (
+        {paraMostrar.map((s) => (
           <div key={s.numero}>
             <div
               className="flex flex-wrap items-center gap-2 px-4 py-2 text-sm font-semibold text-white"
@@ -221,6 +235,22 @@ export function GradeCronograma({
           </div>
         ))}
       </div>
+
+      {restantes > 0 && (
+        <div className="flex flex-wrap items-center justify-center gap-2 border-t px-4 py-3">
+          <span className="text-xs text-muted-foreground">
+            mostrando {paraMostrar.length} de {semanas.length} semanas
+          </span>
+          <Button size="sm" variant="outline" onClick={() => setVisiveis((n) => n + PASSO_SEMANAS)}>
+            Mostrar mais {Math.min(PASSO_SEMANAS, restantes)}
+          </Button>
+          {restantes > PASSO_SEMANAS && (
+            <Button size="sm" variant="ghost" onClick={() => setVisiveis(semanas.length)}>
+              Mostrar todas ({restantes} restantes)
+            </Button>
+          )}
+        </div>
+      )}
     </Card>
   )
 }

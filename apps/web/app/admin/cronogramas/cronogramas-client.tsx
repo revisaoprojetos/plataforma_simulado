@@ -535,10 +535,15 @@ export function CronogramasClient({
                 {lista.map((c) => {
                   const invisivel = ehInvisivel(c)
                   return (
+                    /* `group` + borda à esquerda no hover: com 26 linhas de altura parecida,
+                       o que faltava era saber QUAL linha o cursor está pegando antes de
+                       clicar em Liberar ou na lixeira. */
                     <div
                       key={c.id}
-                      className={`flex flex-wrap items-start gap-3 px-4 py-3 transition hover:bg-muted/30 ${
-                        selecao.has(c.id) ? 'bg-primary/5' : ''
+                      className={`group/linha flex flex-wrap items-center gap-3 border-l-[3px] px-4 py-3 transition ${
+                        selecao.has(c.id)
+                          ? 'border-l-primary bg-primary/5'
+                          : 'border-l-transparent hover:border-l-primary/40 hover:bg-muted/50'
                       }`}
                     >
                       <CaixaCheck
@@ -556,11 +561,16 @@ export function CronogramasClient({
                       />
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Link href={`/admin/cronogramas/${c.id}`} className="truncate font-medium hover:underline">
+                        <div className="flex flex-wrap items-baseline gap-2">
+                          <Link
+                            href={`/admin/cronogramas/${c.id}`}
+                            className="truncate font-medium decoration-primary/40 underline-offset-4 group-hover/linha:underline"
+                          >
                             {c.nome}
                           </Link>
-                          {c.categoria_nome && <Badge variant="outline">{c.categoria_nome}</Badge>}
+                          {c.categoria_nome && (
+                            <span className="shrink-0 text-xs text-muted-foreground">{c.categoria_nome}</span>
+                          )}
                         </div>
 
                         {/* Quatro dados encadeados por "·" viravam uma frase que não se lê.
@@ -600,7 +610,9 @@ export function CronogramasClient({
                         </div>
                       </div>
 
-                      <div className="flex shrink-0 items-center gap-1">
+                      {/* Divisória antes das ações: sem ela, os ícones flutuavam entre linhas e
+                          ficava fácil clicar na lixeira do cronograma de cima. */}
+                      <div className="flex shrink-0 items-center gap-1 border-l pl-3">
                         <Button
                           size="sm"
                           variant={c.status === 'liberado' ? 'secondary' : 'default'}
