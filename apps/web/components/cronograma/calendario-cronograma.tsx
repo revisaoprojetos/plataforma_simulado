@@ -244,6 +244,7 @@ export function CalendarioCronograma({
           emissaoId={emissaoId}
           notas={notas}
           aoSalvarNota={aoSalvarNota}
+          aoAbrirDia={setDiaAberto}
         />
       ) : (
       <>
@@ -392,7 +393,11 @@ export function CalendarioCronograma({
           <CalendarOff className="h-3 w-3" />
           recesso
         </span>
-        <span>clique num dia para ver as metas por inteiro</span>
+        <span>
+          {modo === 'mes'
+            ? 'clique num dia para ver as metas por inteiro'
+            : 'clique no cabeçalho do dia para ver tudo num só lugar'}
+        </span>
         <span className="ml-auto">as horas vêm da duração cadastrada em cada meta</span>
       </div>
 
@@ -535,6 +540,7 @@ function VisaoSemanal({
   emissaoId,
   notas,
   aoSalvarNota,
+  aoAbrirDia,
 }: {
   semana: SemanaGrade | undefined
   paleta: ReturnType<typeof acharPaleta>
@@ -544,6 +550,7 @@ function VisaoSemanal({
   emissaoId?: string | null
   notas?: Record<string, string>
   aoSalvarNota?: (metaId: string, texto: string) => void
+  aoAbrirDia: (data: DataISO) => void
 }) {
   if (!semana) return null
 
@@ -582,7 +589,15 @@ function VisaoSemanal({
         const total = somarDuracoes(d.metas.map((m) => m.duracao))
         return (
           <div key={d.data} className={`min-h-40 border-b p-2 ${d.data === hoje ? 'bg-primary/5' : ''}`}>
-            <div className="mb-2 border-b pb-1.5">
+            {/* O cabeçalho do dia abre o mesmo detalhe do modo Mês. A legenda promete "clique
+                num dia" e antes só o Mês cumpria — no modo Semana o clique não fazia nada. */}
+            <button
+              type="button"
+              onClick={() => d.metas.length && aoAbrirDia(d.data)}
+              disabled={!d.metas.length}
+              className="mb-2 w-full border-b pb-1.5 text-left transition disabled:cursor-default enabled:hover:bg-muted/50"
+              title={d.metas.length ? `Ver as ${d.metas.length} metas de ${fmtBr(d.data)}` : undefined}
+            >
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {CABECALHO[offsetDesdeSegunda(dow(d.data))]}
               </p>
@@ -595,7 +610,7 @@ function VisaoSemanal({
                 <span className="text-[10px] text-muted-foreground">{fmtBr(d.data).slice(3)}</span>
                 {total && <span className="ml-auto text-[10px] text-muted-foreground">{fmtFaixa(total)}</span>}
               </p>
-            </div>
+            </button>
 
             {d.metas.length === 0 ? (
               <p className="text-[11px] italic text-muted-foreground/60">sem metas</p>

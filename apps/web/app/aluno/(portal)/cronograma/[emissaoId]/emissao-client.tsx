@@ -13,6 +13,7 @@ import { VisaoCronograma } from '@/components/cronograma/visao-cronograma'
 import type { ChecksDaEmissao } from '../checks-actions'
 import type { NotasDaEmissao } from '../notas-actions'
 import type { PreferenciasEmissao } from '@/lib/cronograma/preferencias'
+import { usarPreferencias } from '@/lib/cronograma/usar-preferencias'
 import { fmtBr } from '@/lib/cronograma/datas'
 import type { Grade } from '@/lib/cronograma/tipos'
 import { arquivarEmissao, renomearEmissao, type EmissaoResumo } from '../emissoes-actions'
@@ -32,6 +33,13 @@ export function EmissaoClient({
   notas: NotasDaEmissao
   preferencias: PreferenciasEmissao
 }) {
+  /* As preferências ficam AQUI, e não dentro da visão: os quatro números do topo e a lista de
+     semanas são irmãos na tela. Se cada um guardasse o seu estado, esconder um número numa
+     parte não apareceria na outra — e as duas gravações disputariam entre si. */
+  const { prefs, alternarSemana, definirSemanas, alternarContagem, alternarResumo } = usarPreferencias(
+    emissao.id,
+    preferencias,
+  )
   const [titulo, setTitulo] = useState(emissao.titulo ?? '')
   const [editando, setEditando] = useState(false)
   const [arquivada, setArquivada] = useState(emissao.arquivada)
@@ -110,7 +118,7 @@ export function EmissaoClient({
         </AlertBox>
       ) : (
         <>
-          <ResumoGrade grade={grade} />
+          <ResumoGrade grade={grade} ocultos={prefs.resumoOculto} aoAlternar={alternarResumo} />
           <p className="text-sm text-muted-foreground">{grade.resumo.subtitulo}</p>
           <VisaoCronograma
             grade={grade}
@@ -118,7 +126,10 @@ export function EmissaoClient({
             emissaoId={emissao.id}
             checksIniciais={checks}
             notasIniciais={notas}
-            preferenciasIniciais={preferencias}
+            prefs={prefs}
+            aoAlternarSemana={alternarSemana}
+            aoDefinirSemanas={definirSemanas}
+            aoAlternarContagem={alternarContagem}
           />
         </>
       )}

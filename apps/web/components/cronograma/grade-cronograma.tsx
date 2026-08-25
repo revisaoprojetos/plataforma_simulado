@@ -34,21 +34,76 @@ function fmtDataHora(iso: string): string {
   return `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-export function ResumoGrade({ grade }: { grade: Grade | null }) {
-  const numeros: [string, string | number][] = [
-    ['Semanas', grade?.resumo.totalSemanas ?? '—'],
-    ['Dias por semana', grade?.resumo.diasPorSemana ?? '—'],
-    ['Atividades', grade?.resumo.atividades ?? '—'],
-    ['Conclusão', grade?.resumo.conclusao ? fmtBr(grade.resumo.conclusao) : '—'],
+export function ResumoGrade({
+  grade,
+  ocultos,
+  aoAlternar,
+}: {
+  grade: Grade | null
+  /** Chaves escondidas pelo aluno. Ausente = a tela não oferece esconder. */
+  ocultos?: string[]
+  aoAlternar?: (chave: string) => void
+}) {
+  const numeros: [string, string, string | number][] = [
+    ['semanas', 'Semanas', grade?.resumo.totalSemanas ?? '—'],
+    ['dias', 'Dias por semana', grade?.resumo.diasPorSemana ?? '—'],
+    ['atividades', 'Atividades', grade?.resumo.atividades ?? '—'],
+    ['conclusao', 'Conclusão', grade?.resumo.conclusao ? fmtBr(grade.resumo.conclusao) : '—'],
   ]
+  const escondidos = new Set(ocultos ?? [])
+  const visiveis = numeros.filter(([chave]) => !escondidos.has(chave))
+  const podeEsconder = !!aoAlternar
+
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      {numeros.map(([rotulo, valor]) => (
-        <Card key={rotulo} className="p-4">
-          <p className={`text-3xl font-bold tabular-nums ${grade ? '' : 'text-muted-foreground/40'}`}>{valor}</p>
-          <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{rotulo}</p>
-        </Card>
-      ))}
+    <div className="space-y-2">
+      {visiveis.length > 0 && (
+        <div
+          className={`grid gap-3 ${
+            visiveis.length === 1 ? '' : visiveis.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'
+          }`}
+        >
+          {visiveis.map(([chave, rotulo, valor]) => (
+            /* `group` no cartão: o botão de esconder só aparece no hover. Um × permanente em
+               cada número transformaria quatro cartões de leitura em quatro controles. */
+            <Card key={chave} className="group/num relative p-4">
+              {podeEsconder && (
+                <button
+                  onClick={() => aoAlternar(chave)}
+                  title={`Esconder ${rotulo.toLowerCase()}`}
+                  aria-label={`Esconder ${rotulo}`}
+                  className="absolute right-2 top-2 rounded p-1 text-muted-foreground/40 opacity-0 transition hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/num:opacity-100"
+                >
+                  <EyeOff className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <p className={`text-3xl font-bold tabular-nums ${grade ? '' : 'text-muted-foreground/40'}`}>{valor}</p>
+              <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                {rotulo}
+              </p>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* O que está escondido continua ao alcance: esconder sem caminho de volta vira perda. */}
+      {podeEsconder && escondidos.size > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          <Eye className="h-3.5 w-3.5" />
+          <span>escondidos:</span>
+          {numeros
+            .filter(([chave]) => escondidos.has(chave))
+            .map(([chave, rotulo]) => (
+              <button
+                key={chave}
+                onClick={() => aoAlternar(chave)}
+                className="rounded-full border px-2 py-0.5 transition hover:bg-muted hover:text-foreground"
+                title={`Mostrar ${rotulo.toLowerCase()} de novo`}
+              >
+                {rotulo}
+              </button>
+            ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -67,6 +122,7 @@ export function GradeCronograma({
   aoSalvarNota,
   colapsadas,
   aoAlternarColapso,
+  aoDefinirColapsadas,
   ocultarContagem,
   aoAlternarContagem,
 }: {
@@ -83,6 +139,7 @@ export function GradeCronograma({
   /** Semanas fechadas pelo aluno — vem do banco e volta para lá ao mudar. */
   colapsadas?: number[]
   aoAlternarColapso?: (semana: number) => void
+  aoDefinirColapsadas?: (semanas: number[]) => void
   ocultarContagem?: boolean
   aoAlternarContagem?: () => void
 }) {
@@ -172,16 +229,16 @@ export function GradeCronograma({
           </Button>
         )}
 
-        {aoAlternarColapso && (
+        {aoDefinirColapsadas && (
           <Button
             size="sm"
             variant="ghost"
             className="h-8 px-2 text-xs"
             onClick={() => {
-              // Fechar todas quando há alguma aberta; abrir todas quando estão todas fechadas.
-              const abertas = semanas.filter((x) => !fechadas.has(x.numero))
-              const alvo = abertas.length ? abertas : semanas
-              for (const x of alvo) aoAlternarColapso(x.numero)
+              /* Um setter só, e não N alternâncias em sequência: cada alternância dispara
+                 uma gravação, e fechar 77 semanas viraria 77 idas ao servidor. */
+              const todasFechadas = semanas.every((x) => fechadas.has(x.numero))
+              aoDefinirColapsadas(todasFechadas ? [] : semanas.map((x) => x.numero))
             }}
           >
             {semanas.every((x) => fechadas.has(x.numero)) ? 'Abrir todas' : 'Fechar todas'}
