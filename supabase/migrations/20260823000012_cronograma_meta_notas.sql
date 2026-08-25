@@ -1,6 +1,11 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- CRONOGRAMA — anotações pessoais do aluno em cada meta
 --
+-- Renumerada de 20260823000003 para 20260823000012. A main trouxe 20260823000003_lei_dispositivos.sql, e o Supabase
+-- identifica a migração pelo PREFIXO numérico: dois arquivos com o mesmo número fazem um
+-- dos dois ser considerado já aplicado e nunca rodar. O número novo mantém a ordem relativa
+-- às demais migrações do cronograma.
+--
 -- Mesma modelagem dos checks, e pelas mesmas razões:
 --
 -- A nota pertence à EMISSÃO, não à meta do catálogo. Dois alunos com o mesmo cronograma

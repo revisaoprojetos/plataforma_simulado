@@ -1,6 +1,11 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- CRONOGRAMA — preferências de visualização da emissão
 --
+-- Renumerada de 20260823000004 para 20260823000013. A main trouxe 20260823000004_grifos.sql, e o Supabase
+-- identifica a migração pelo PREFIXO numérico: dois arquivos com o mesmo número fazem um
+-- dos dois ser considerado já aplicado e nunca rodar. O número novo mantém a ordem relativa
+-- às demais migrações do cronograma.
+--
 -- Que semanas o aluno colapsou e se ele escolheu esconder a contagem de metas. É estado de
 -- LEITURA, não de dado: não muda o cronograma, muda como aquele aluno olha para ele.
 --

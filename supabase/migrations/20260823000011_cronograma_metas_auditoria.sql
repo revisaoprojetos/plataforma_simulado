@@ -1,6 +1,11 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- CRONOGRAMA — auditoria de metas: repetidas entre cronogramas e formato de aula
 --
+-- Renumerada de 20260823000002 para 20260823000011. A main trouxe 20260823000002_lei_versionamento.sql, e o Supabase
+-- identifica a migração pelo PREFIXO numérico: dois arquivos com o mesmo número fazem um
+-- dos dois ser considerado já aplicado e nunca rodar. O número novo mantém a ordem relativa
+-- às demais migrações do cronograma.
+--
 -- Até aqui a equipe só via metas DENTRO de um cronograma. A pergunta que faltava é a
 -- transversal: "esta meta está em quantos cronogramas?" e "a mesma aula está gravada como
 -- '01' aqui e '1' ali?". Sem responder isso, corrigir uma grafia significa abrir 26 telas.

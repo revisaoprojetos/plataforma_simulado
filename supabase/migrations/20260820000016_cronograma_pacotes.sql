@@ -1,6 +1,11 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- CRONOGRAMA — pacotes (grupos de cronogramas) e liberação por vínculo
 --
+-- Renumerada de 20260821000001 para 20260820000016. A main trouxe 20260821000001_etiqueta_funcao.sql, e o Supabase
+-- identifica a migração pelo PREFIXO numérico: dois arquivos com o mesmo número fazem um
+-- dos dois ser considerado já aplicado e nunca rodar. O número novo mantém a ordem relativa
+-- às demais migrações do cronograma.
+--
 -- A equipe agrupa cronogramas num PACOTE e libera o pacote para alunos ou para
 -- grupos de alunos. É o mesmo raciocínio do "banco" dos simulados, com uma
 -- diferença deliberada no mecanismo:
