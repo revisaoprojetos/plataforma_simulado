@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Check,
@@ -25,7 +25,7 @@ import {
   buscarGrupos,
   excluirMetaAvulsa,
   padronizarDuracao,
-  padronizarFormatoAula,
+  padronizarFormatoDisciplina,
   type DuracaoDivergente,
   type GrupoMeta,
   type VarianteAula,
@@ -74,8 +74,8 @@ export function MetasAuditoriaClient({
         <Cartao
           ativo={aba === 'aula'}
           aoClicar={() => setAba('aula')}
-          n={variantes.length}
-          rotulo="Aulas em dois formatos"
+          n={new Set(variantes.map((v) => v.disciplina)).size}
+          rotulo="Disciplinas com aula em dois formatos"
           nota={
             variantes.length
               ? 'Risco latente: uma meta de questões nova no formato errado perde o link em silêncio.'
@@ -123,9 +123,7 @@ export function MetasAuditoriaClient({
           variantes={variantes}
           ocupado={ocupado}
           setOcupado={setOcupado}
-          aoResolver={(v) =>
-            setVariantes((xs) => xs.filter((x) => !(x.disciplina === v.disciplina && x.aula_chave === v.aula_chave)))
-          }
+          aoResolverDisciplina={(disciplina) => setVariantes((xs) => xs.filter((x) => x.disciplina !== disciplina))}
         />
       )}
 
@@ -188,29 +186,63 @@ function AbaFormatoAula({
   variantes,
   ocupado,
   setOcupado,
-  aoResolver,
+  aoResolverDisciplina,
 }: {
   variantes: VarianteAula[]
   ocupado: string | null
   setOcupado: (v: string | null) => void
-  aoResolver: (v: VarianteAula) => void
+  aoResolverDisciplina: (disciplina: string) => void
 }) {
   const [aberto, setAberto] = useState<string | null>(null)
 
-  async function padronizar(v: VarianteAula, alvo: string) {
-    const chave = `aula:${v.disciplina}:${v.aula_chave}`
+  /**
+   * Uma linha por DISCIPLINA, não por disciplina+aula.
+   *
+   * A RPC devolve 110 combinações, mas elas são 16 disciplinas: "Direito Administrativo"
+   * aparece 8 vezes, uma por aula. Ninguém quer arrumar a aula 1 e deixar a 2 quebrada — a
+   * decisão real é uma por disciplina, e a tela precisa fazer a mesma pergunta que a pessoa
+   * está se fazendo.
+   */
+  const porDisciplina = useMemo(() => {
+    const mapa = new Map<
+      string,
+      { disciplina: string; aulas: string[]; metas: number; cronogramas: Set<string>; comZero: number; semZero: number }
+    >()
+    for (const v of variantes) {
+      let d = mapa.get(v.disciplina)
+      if (!d) {
+        d = { disciplina: v.disciplina, aulas: [], metas: 0, cronogramas: new Set(), comZero: 0, semZero: 0 }
+        mapa.set(v.disciplina, d)
+      }
+      d.aulas.push(v.aula_chave)
+      d.metas += v.total
+      // Set de IDs: um cronograma que usa OS DOIS formatos vem em duas linhas da RPC, e
+      // somar linhas dava "37 cronogramas" num catálogo que tem 26.
+      for (const c of v.cronogramas) d.cronogramas.add(c.id)
+      for (const f of v.formas) {
+        if (/^0\d/.test(f.aula)) d.comZero += f.n
+        else d.semZero += f.n
+      }
+    }
+    return [...mapa.values()]
+      .map((d) => ({ ...d, aulas: d.aulas.sort((a, b) => Number(a) - Number(b)) }))
+      .sort((a, b) => b.metas - a.metas)
+  }, [variantes])
+
+  async function padronizar(disciplina: string, comZero: boolean, metas: number) {
     if (ocupado) return
+    const exemplo = comZero ? '01' : '1'
     const sim = await confirmar({
-      titulo: `Padronizar para "${alvo}"`,
-      mensagem: `As ${v.total} metas de "${v.disciplina}" na aula ${v.aula_chave} passam a usar "${alvo}", em ${v.cronogramas.length} cronograma(s).`,
+      titulo: `Padronizar "${disciplina}"`,
+      mensagem: `Todas as aulas desta disciplina passam a usar o formato ${exemplo} — ${metas.toLocaleString('pt-BR')} metas, em todos os cronogramas. Aulas como "1.1" não são tocadas.`,
     })
     if (!sim) return
-    setOcupado(chave)
-    const r = await padronizarFormatoAula(v.disciplina, v.aula_chave, alvo)
+    setOcupado(disciplina)
+    const r = await padronizarFormatoDisciplina(disciplina, comZero)
     setOcupado(null)
     if (!r.ok) return toast.error(r.error ?? 'Não foi possível padronizar.')
-    toast.success(`${r.alterados} meta(s) agora usam "${alvo}"`)
-    aoResolver(v)
+    toast.success(`${r.alterados?.toLocaleString('pt-BR')} meta(s) de ${disciplina} no formato ${exemplo}`)
+    aoResolverDisciplina(disciplina)
   }
 
   if (!variantes.length) return null
@@ -219,74 +251,95 @@ function AbaFormatoAula({
     <Card className="overflow-hidden" style={{ ['--card-spacing' as never]: '0px' }}>
       <div className="border-b bg-amber-50 px-4 py-3 text-sm dark:bg-amber-500/10">
         <p className="font-medium text-amber-900 dark:text-amber-200">Por que isto importa</p>
-        <p className="mt-0.5 text-xs text-amber-900/80 dark:text-amber-200/80">
-          O link da aula casa por texto <strong>exato</strong>. Uma meta com &quot;01&quot; não encontra o link
-          cadastrado como &quot;1&quot;, e desaparece sem erro nenhum. Hoje nenhuma meta de questões está
-          perdendo link — todas usam o formato sem zero, igual aos links. O risco é a próxima nascer errada.
+        <p className="mt-0.5 text-xs leading-relaxed text-amber-900/80 dark:text-amber-200/80">
+          O link da aula casa por texto <strong>exato</strong>: uma meta com &quot;01&quot; não encontra o link
+          cadastrado como &quot;1&quot;, e some sem erro nenhum. Hoje os links usam o formato{' '}
+          <strong>sem zero</strong>, e nenhuma meta de questões está perdendo link — o risco é a próxima
+          nascer no formato errado.
         </p>
       </div>
 
       <div className="divide-y">
-        {variantes.map((v) => {
-          const chave = `aula:${v.disciplina}:${v.aula_chave}`
-          const expandido = aberto === chave
-          const trabalhando = ocupado === chave
+        {porDisciplina.map((d) => {
+          const trabalhando = ocupado === d.disciplina
+          const expandido = aberto === d.disciplina
           return (
-            <div key={chave}>
+            <div key={d.disciplina}>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {v.disciplina}
-                    <span className="text-muted-foreground"> · aula {v.aula_chave}</span>
+                  <p className="truncate font-medium">{d.disciplina}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {d.aulas.length} aula{d.aulas.length > 1 ? 's' : ''} em dois formatos ·{' '}
+                    {d.metas.toLocaleString('pt-BR')} metas · {d.cronogramas.size} cronogramas
                   </p>
-                  <button
-                    onClick={() => setAberto(expandido ? null : chave)}
-                    className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    <ChevronDown className={`h-3.5 w-3.5 transition ${expandido ? '' : '-rotate-90'}`} />
-                    {v.total} metas em {v.cronogramas.length} cronogramas
-                  </button>
+                  {/* A proporção diz qual formato é o "de fato" da disciplina — é o dado que
+                      decide para que lado padronizar. */}
+                  <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs">
+                    <span className="text-muted-foreground">
+                      <span className="font-mono font-medium text-foreground">01</span> em{' '}
+                      {d.comZero.toLocaleString('pt-BR')}
+                    </span>
+                    <span className="text-muted-foreground">
+                      <span className="font-mono font-medium text-foreground">1</span> em{' '}
+                      {d.semZero.toLocaleString('pt-BR')}
+                    </span>
+                    <button
+                      onClick={() => setAberto(expandido ? null : d.disciplina)}
+                      className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronDown className={`h-3.5 w-3.5 transition ${expandido ? '' : '-rotate-90'}`} />
+                      {expandido ? 'esconder' : 'quais aulas'}
+                    </button>
+                  </p>
                 </div>
 
-                {/* A escolha É a ação: cada botão mostra o formato e quantas metas o usam hoje. */}
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                   <span className="text-xs text-muted-foreground">padronizar tudo para</span>
-                  {v.formas.map((f) => (
-                    <Button
-                      key={f.aula}
-                      size="sm"
-                      variant="outline"
-                      className="h-8"
-                      disabled={trabalhando}
-                      onClick={() => padronizar(v, f.aula)}
-                    >
-                      {trabalhando ? (
-                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Wand2 className="mr-1 h-3.5 w-3.5" />
-                      )}
-                      <span className="font-mono">{f.aula}</span>
-                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">{f.n} hoje</span>
-                    </Button>
-                  ))}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    disabled={trabalhando}
+                    onClick={() => padronizar(d.disciplina, true, d.metas)}
+                  >
+                    {trabalhando ? (
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Wand2 className="mr-1 h-3.5 w-3.5" />
+                    )}
+                    <span className="font-mono">01</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    disabled={trabalhando}
+                    onClick={() => padronizar(d.disciplina, false, d.metas)}
+                    title="Igual aos links cadastrados"
+                  >
+                    {trabalhando ? (
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Wand2 className="mr-1 h-3.5 w-3.5" />
+                    )}
+                    <span className="font-mono">1</span>
+                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">como os links</span>
+                  </Button>
                 </div>
               </div>
 
               {expandido && (
-                <div className="border-t bg-muted/20 px-4 py-2">
-                  <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
-                    {v.cronogramas.map((c, i) => (
-                      <p key={`${c.id}-${c.aula}-${i}`} className="truncate text-xs">
-                        <Link href={`/admin/cronogramas/${c.id}`} className="hover:underline">
-                          {c.nome}
-                        </Link>
-                        <span className="text-muted-foreground">
-                          {' '}
-                          — <span className="font-mono">{c.aula}</span> ({c.n})
-                        </span>
-                      </p>
-                    ))}
-                  </div>
+                <div className="border-t bg-muted/20 px-4 py-2.5">
+                  <p className="text-xs text-muted-foreground">
+                    Aulas afetadas:{' '}
+                    <span className="font-mono text-foreground">{d.aulas.join(', ')}</span>
+                  </p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Cronogramas:{' '}
+                    {[...new Set(variantes.filter((v) => v.disciplina === d.disciplina).flatMap((v) => v.cronogramas.map((c) => c.nome)))]
+                      .sort()
+                      .join(' · ')}
+                  </p>
                 </div>
               )}
             </div>

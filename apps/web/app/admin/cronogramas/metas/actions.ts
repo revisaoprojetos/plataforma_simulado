@@ -206,6 +206,87 @@ export async function padronizarFormatoAula(
   return { ok: true, alterados }
 }
 
+/**
+ * Padroniza o formato da aula de uma DISCIPLINA inteira.
+ *
+ * A correção por (disciplina + aula) era granular demais para ser útil: "Direito
+ * Administrativo" tem 8 aulas gravadas nos dois formatos, e ninguém quer arrumar a aula 1 e
+ * deixar a 2 quebrada. A decisão real é uma por disciplina — "aqui é tudo com zero" — e é
+ * essa que a tela precisa oferecer.
+ *
+ * `comZero` = true → 1 vira 01, 9 vira 09; números de 2+ dígitos ficam como estão.
+ * `comZero` = false → 01 vira 1, 09 vira 9.
+ * Aulas que não são inteiro ("1.1") nunca são tocadas: não há formato canônico para elas.
+ */
+export async function padronizarFormatoDisciplina(
+  disciplina: string,
+  comZero: boolean,
+): Promise<{ ok: boolean; alterados?: number; error?: string }> {
+  const g = await guard('cronogramas:update')
+  if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+
+  // fetchAll obrigatório: "Direito Administrativo" tem 1.503 metas com aula, e um select cru
+  // pararia em 1.000 dizendo "pronto" com 503 para trás.
+  const candidatas = await fetchAll<{ id: string; aula: string | null }>(() =>
+    svc
+      .from('simulado_cronograma_metas')
+      .select('id, aula')
+      .eq('tenant_id', g.tenantId)
+      .eq('disciplina', disciplina)
+      .not('aula', 'is', null)
+      .order('id') as never,
+  )
+
+  /** O formato de destino de uma aula. Devolve null quando não há o que mudar. */
+  const destino = (bruto: string | null): string | null => {
+    const t = (bruto ?? '').trim()
+    if (!/^\d+$/.test(t)) return null // '1.1' e afins ficam
+    const n = Number(t)
+    const alvo = comZero ? String(n).padStart(2, '0') : String(n)
+    return alvo === t ? null : alvo
+  }
+
+  const mudancas = candidatas
+    .map((m) => ({ id: m.id, para: destino(m.aula) }))
+    .filter((x): x is { id: string; para: string } => x.para !== null)
+
+  if (!mudancas.length) return { ok: true, alterados: 0 }
+
+  /* Agrupa por valor de destino para o UPDATE ser um por formato, e não um por meta: 1.503
+     metas viram ~40 idas em vez de 1.503. */
+  const porValor = new Map<string, string[]>()
+  for (const m of mudancas) {
+    const l = porValor.get(m.para)
+    if (l) l.push(m.id)
+    else porValor.set(m.para, [m.id])
+  }
+
+  let alterados = 0
+  for (const [valor, ids] of porValor) {
+    for (let i = 0; i < ids.length; i += 300) {
+      const lote = ids.slice(i, i + 300)
+      const { error } = await svc
+        .from('simulado_cronograma_metas')
+        .update({ aula: valor })
+        .in('id', lote)
+        .eq('tenant_id', g.tenantId)
+      if (error) return { ok: false, error: error.message }
+      alterados += lote.length
+    }
+  }
+
+  await registrarAudit({
+    operacao: 'UPDATE',
+    entidade: 'simulado_cronograma_metas',
+    entidadeId: mudancas[0].id,
+    depois: { padronizacao: 'aula_disciplina', disciplina, com_zero: comZero, metas: alterados },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  return { ok: true, alterados }
+}
+
 /** Uniformiza a duração de uma semana+tipo — no papel só a primeira é impressa. */
 export async function padronizarDuracao(
   cronogramaId: string,
