@@ -7,8 +7,8 @@ import { registrarAudit } from '@/lib/audit'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { slugDiag } from '@/lib/caderno-teste/diagnostico'
 import { materialDoConfig, materialEnunciadoDoConfig, type MaterialCaderno } from '@/lib/caderno-designer/material'
-import { metaDaModalidade } from '@/lib/caderno-teste/tipos'
-import type { BuilderV3, PreviewQuestao } from '@/lib/caderno-teste/tipos'
+import { metaDaModalidade, novoItem } from '@/lib/caderno-teste/tipos'
+import type { BuilderV3, Modalidade, PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { carregarQuestoesBancoCore, carregarDadosBancoCore } from '@/lib/caderno-teste/dados-banco'
 
 // Tipos declarados aqui (não re-exportados de uma lib) — em arquivo 'use server' o Next trata todo
@@ -130,6 +130,40 @@ export async function criarCadernoTesteNoBanco(bancoId: string, nome?: string): 
   await registrarAudit({ operacao: 'INSERT', entidade: TABELA, entidadeId: (ins.data as any).id, depois: { nome: titulo, bancoId } })
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return { ok: true, id: (ins.data as any).id }
+}
+
+// Modalidade + rótulo de cada SLOT da entrega (para criar o caderno certo direto do card).
+const SLOT_MODALIDADE: Record<'diagnostico' | 'folha' | 'enunciado' | 'gabarito', Modalidade> = {
+  diagnostico: 'diagnostico', folha: 'folha_respostas', enunciado: 'caderno_questoes', gabarito: 'caderno_questoes',
+}
+const SLOT_ROTULO: Record<'diagnostico' | 'folha' | 'enunciado' | 'gabarito', string> = {
+  diagnostico: 'Diagnóstico', folha: 'Folha de Resposta', enunciado: 'Caderno de Enunciado', gabarito: 'Gabarito Comentado',
+}
+
+/** Cria um caderno da modalidade do SLOT já ASSOCIADO à entrega do banco (caderno_entrega[slot]) e
+ *  devolve o id p/ abrir o editor. Fluxo do card da Entrega: clicar vazio → cria + edita, sem selecionar. */
+export async function criarCadernoParaSlot(bancoId: string, slot: 'diagnostico' | 'folha' | 'enunciado' | 'gabarito'): Promise<{ ok: boolean; cadernoId?: string; itemId?: string; error?: string }> {
+  if (!(await checkPermission('questoes:create')) && !(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess()
+  if (!access.tenantId || !bancoId) return { ok: false, error: 'Tenant/banco não resolvido.' }
+  const svc = createAdminClient()
+  const modalidade = SLOT_MODALIDADE[slot]
+  const rotulo = SLOT_ROTULO[slot]
+  const modeloId = metaDaModalidade(modalidade).modelos[0]?.id ?? ''
+  const item = novoItem(modalidade, modeloId)
+  item.ajustes.titulo = rotulo
+  const builder: BuilderV3 = { v: 3, bancoId, itens: [item], ativo: item.id }
+  const { data: pasta } = await svc.from('simulado_pastas').select('nome, caderno_entrega').eq('id', bancoId).eq('tenant_id', access.tenantId).maybeSingle()
+  const titulo = `${rotulo} — ${(pasta as any)?.nome ?? 'Simulado'}`
+  const ins = await svc.from(TABELA).insert({ tenant_id: access.tenantId, nome: titulo, config: { bancoId, builderV3: builder } }).select('id').single()
+  if (ins.error || !ins.data) return { ok: false, error: ins.error?.message ?? 'Erro ao criar' }
+  const cadernoId = (ins.data as any).id as string
+  const entrega = { ...(((pasta as any)?.caderno_entrega ?? {}) as Record<string, unknown>), [slot]: { cadernoId, itemId: item.id } }
+  const up = await svc.from('simulado_pastas').update({ caderno_entrega: entrega }).eq('id', bancoId).eq('tenant_id', access.tenantId)
+  if (up.error) return { ok: false, error: /column .*caderno_entrega/i.test(up.error.message) ? 'Rode o SQL scripts/sql/banco-caderno-entrega.sql (coluna caderno_entrega ausente).' : up.error.message }
+  await registrarAudit({ operacao: 'INSERT', entidade: TABELA, entidadeId: cadernoId, depois: { nome: titulo, bancoId, slot } })
+  revalidatePath(`/admin/banco-questoes/${bancoId}`)
+  return { ok: true, cadernoId, itemId: item.id }
 }
 
 // ===== Montagem / entrega do Caderno (teste) por banco (slots) =====

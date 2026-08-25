@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, BookOpenCheck, LayoutTemplate, Pencil, Plus, X, Layers, FileUp, ChevronDown, Check, Undo2, Redo2, Trash2, Menu, ArrowUp, ArrowDown, GripVertical, Type, Heading, LayoutGrid, MoveVertical } from 'lucide-react'
+import { ChevronLeft, Save, Loader2, Database, FileText, ClipboardList, BarChart3, BookOpenCheck, LayoutTemplate, Pencil, Plus, X, FileUp, ChevronDown, Undo2, Redo2, Trash2, Menu, ArrowUp, ArrowDown, GripVertical, Type, Heading, LayoutGrid, MoveVertical, StickyNote } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { HexColorField } from '@/components/admin/hex-color-field'
@@ -15,13 +15,14 @@ import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
 import { metaDaModalidade, itemAtivo, novoItem, novoItemVazio, presetDoItem, CAPA_PADRAO, CORES_PILAR_PADRAO, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PreviewQuestao, type ItemCaderno } from '@/lib/caderno-teste/tipos'
 import { camposDoBloco, aplicarCampoBloco, podeRemoverParte, removerParteDiag, type CampoTexto } from '@/lib/caderno-teste/edicao'
-import { acharBloco, atualizarBlocoAttrs, removerBloco, camposDoBlocoDoc, NOME_BLOCO, type CampoBlocoDoc } from '@/lib/caderno-teste/edicao-doc'
+import { acharBloco, atualizarBlocoAttrs, removerBloco, adicionarBlocoDoc, adicionarBlocoEmContainer, moverBlocoDoc, listarBlocosDoc, camposDoBlocoDoc, NOME_BLOCO, type CampoBlocoDoc } from '@/lib/caderno-teste/edicao-doc'
+import { BLOCKS, createBlock, getBlockMeta } from '@/lib/caderno-designer/blocks'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
 import { totalTxtDe, DIAG_PADRAO, type DiagConteudo } from '@/lib/caderno-teste/diagnostico'
 import { salvarBuilderTeste, previewQuestoesBanco, dadosBancoTeste, questoesMetaBanco, type RegistroTeste, type DiscBancoTeste, type QuestaoMeta } from '@/app/admin/cadernos-teste/actions'
 import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
 import { FONTES_CADERNO } from '@/lib/caderno-designer/theme'
-import { Users, ChevronRight, Download } from 'lucide-react'
+import { Users, ChevronRight, Download, AlignLeft, AlignCenter, AlignRight, AlignJustify } from 'lucide-react'
 
 const ICONE_MOD: Record<Modalidade, any> = { caderno_questoes: FileText, caderno_completo: BookOpenCheck, folha_respostas: ClipboardList, diagnostico: BarChart3 }
 // Blocos que o painel "Estrutura" pode adicionar a um diagnóstico (inclui o canvas em branco).
@@ -35,6 +36,7 @@ const BLOCOS_ADD: { tipo: string; label: string; icon: any; contavel?: boolean; 
   { tipo: 'texto', label: 'Texto / parágrafo', icon: Type },
   { tipo: 'card', label: 'Faixa de seção', icon: Heading },
   { tipo: 'fita', label: 'Card com fita', icon: LayoutGrid },
+  { tipo: 'card_texto', label: 'Card com texto', icon: StickyNote },
   { tipo: 'disc_individual', label: 'Disciplina individual', icon: LayoutGrid },
   { tipo: 'sug_individual', label: 'Sugestão individual', icon: ClipboardList },
   // Compostos: trazem a faixa de seção + o conteúdo. (pilares 1º da coluna 1 → row-span-2 c/ 2 ao lado.)
@@ -124,8 +126,6 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
   const [pickerOpen, setPickerOpen] = useState(abrirPickerInicial)
   const [pickerMode, setPickerMode] = useState<'add' | 'trocar'>('trocar')
   const [bancoPickerOpen, setBancoPickerOpen] = useState(false)
-  const [editandoGrupos, setEditandoGrupos] = useState(false)
-  const [gruposAberto, setGruposAberto] = useState(false)
   const [importando, setImportando] = useState(false)
   const [baixarAberto, setBaixarAberto] = useState(false)
   const [pickerCor, setPickerCor] = useState<{ parte: string; label: string; cor: string } | null>(null)
@@ -238,6 +238,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
           case 'texto': return { ...it, conteudo: { ...c, intro: [...c.intro, 'Novo parágrafo — clique na prévia para editar.'] } }
           case 'card': return { ...it, conteudo: { ...c, cards: [...(c.cards ?? []), { texto: 'NOVA SEÇÃO' }] } }
           case 'fita': return { ...it, conteudo: { ...c, fitas: [...(c.fitas ?? []), { texto: 'Observação 1 — clique na prévia para editar.\nObservação 2\nObservação 3' }] } }
+          case 'card_texto': return { ...it, conteudo: { ...c, cardsTexto: [...(c.cardsTexto ?? []), { textos: ['Novo texto — clique na prévia para editar.'] }] } }
           case 'fechamento': return { ...it, conteudo: { ...c, fechamento: [...(c.fechamento ?? []), 'Novo parágrafo de fechamento — clique na prévia para editar.'] } }
           case 'pilares': {
             // Sub-opções 1–4: cada clique cria um GRUPO de pilar SEPARADO (não junta no mesmo bloco).
@@ -285,17 +286,27 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
     }) }))
     setPickerBloco(null)
   }
-
-  function adicionarGrupo() { setPickerMode('add'); setPickerOpen(true) }
-  function trocarModelo() { setPickerMode('trocar'); setPickerOpen(true) }
-  function selecionarGrupo(id: string) { setBuilder((b) => ({ ...b, ativo: id })) }
-  function removerGrupo(id: string) {
-    setBuilder((b) => {
-      if (b.itens.length <= 1) return b
-      const itens = b.itens.filter((it) => it.id !== id)
-      return { ...b, itens, ativo: b.ativo === id ? itens[0].id : b.ativo }
-    })
+  // Aplica uma transformação no doc do item ativo (adicionar/mover blocos dos modelos prontos).
+  const mutarDoc = (fn: (doc: CadernoDoc) => CadernoDoc) => setBuilder((b) => ({ ...b, itens: b.itens.map((it) => {
+    if (it.id !== b.ativo) return it
+    const preset = presetDoItem(it)
+    const raw = it.docEdit ?? (preset ? docDoPreset(preset) : null)
+    if (!raw) return it
+    return { ...it, docEdit: fn(idsDeterministicos(raw)) }
+  }) }))
+  // "Card com texto" = card container já nascendo com um bloco de texto dentro (o usuário adiciona mais).
+  const criarCardComTexto = () => {
+    const card = createBlock('card')
+    card.innerBlocks = [createBlock('texto-livre')]
+    return card
   }
+  const adicionarBlocoDocAtivo = (type: string) => mutarDoc((doc) => adicionarBlocoDoc(doc, type === 'card' ? criarCardComTexto() : createBlock(type)))
+  const moverBlocoDocAtivo = (id: string, dir: -1 | 1) => mutarDoc((doc) => moverBlocoDoc(doc, id, dir))
+  // Adiciona/remove um bloco de texto DENTRO de um card (sem fechar o painel do card).
+  const adicionarTextoNoCard = (cardId: string) => mutarDoc((doc) => adicionarBlocoEmContainer(doc, cardId, createBlock('texto-livre')))
+  const removerBlocoInterno = (id: string) => mutarDoc((doc) => removerBloco(doc, id))
+
+  function trocarModelo() { setPickerMode('trocar'); setPickerOpen(true) }
   // Cria um grupo "em branco total" (canvas do zero). Respeita o modo do picker: adiciona um grupo
   // novo (ou é o 1º do caderno) ou substitui o grupo ativo (aberto por "Trocar").
   function criarEmBranco() {
@@ -385,7 +396,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
     if (sujo && !(await confirmar({ titulo: 'Sair sem salvar?', mensagem: 'Há alterações não salvas neste caderno. Se sair agora, elas serão perdidas.', confirmar: 'Sair sem salvar', destrutivo: true }))) return
     router.push(voltarHref)
   }
-  /** Importa um caderno (Word/HTML) → cria um novo grupo de Diagnóstico já mapeado. */
+  /** Importa um caderno (Word/HTML) → SUBSTITUI o grupo atual pelo Diagnóstico mapeado (não cria avulso). */
   async function importar(file: File) {
     setImportando(true)
     try {
@@ -400,9 +411,12 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
         ? { ...it.ajustes, ...r.ajustes }
         : { ...it.ajustes, corPrimaria: '#2d254f', corSecundaria: '#f6b420', titulo: 'Diagnóstico de Desempenho' }
       if (r.capa && typeof r.capa === 'object') it.capa = r.capa
-      setBuilder((b) => ({ ...b, itens: [...b.itens, it], ativo: it.id }))
+      // SUBSTITUI o grupo atual (mesmo id/posição) em vez de anexar — evita cadernos avulsos.
+      setBuilder((b) => b.itens.length === 0
+        ? { ...b, itens: [it], ativo: it.id }
+        : { ...b, itens: b.itens.map((x) => x.id === b.ativo ? { ...it, id: x.id } : x), ativo: b.ativo })
       if (Array.isArray(r.avisos) && r.avisos.length) toast.warning(`Importado com ${r.avisos.length} aviso(s) — revise a prévia.`)
-      toast.success('Caderno importado como novo grupo de Diagnóstico. Revise e salve.')
+      toast.success('Caderno importado (substituiu o grupo atual). Revise e salve.')
     } catch (e) { toast.error('Erro ao enviar o arquivo.'); console.error(e) }
     finally { setImportando(false) }
   }
@@ -429,7 +443,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
           <button type="button" onClick={sair} title="Voltar" className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-5 w-5" /></button>
           <div>
             <h1 className="text-lg font-bold leading-tight">Construtor de caderno (teste)</h1>
-            <p className="text-xs text-muted-foreground">Vários grupos (modalidades) num caderno. Escolha o modelo e o banco nos pop-ups e ajuste à esquerda.</p>
+            <p className="text-xs text-muted-foreground">Escolha o modelo e o banco nos pop-ups e ajuste à esquerda. Importar substitui o caderno atual.</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -476,57 +490,13 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
       <div className="grid min-h-0 flex-1 grid-cols-[380px_1fr]">
         {/* Esquerda: 2 colunas */}
         <div className="scroll-claro grid min-h-0 grid-cols-2 content-start gap-x-2.5 gap-y-4 overflow-y-auto border-r bg-muted/20 p-3">
-          {/* Grupos: barra de seleção (dropdown) — abre embaixo com as descrições + Editar */}
-          <div className="col-span-2">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Layers className="h-3.5 w-3.5" /> Grupos deste caderno</p>
-              <button type="button" onClick={() => setEditandoGrupos((e) => !e)} className={cn('flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium', editandoGrupos ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground')}>
-                <Pencil className="h-3 w-3" /> {editandoGrupos ? 'Concluir' : 'Editar'}
-              </button>
-            </div>
-            <div className="relative">
-              {/* Barra: grupo atual + seta */}
-              <button type="button" onClick={() => setGruposAberto((o) => !o)} className={cn('flex w-full items-center gap-2 rounded-lg border bg-background px-2.5 py-2 text-left shadow-sm transition-colors hover:border-primary/50', gruposAberto && 'border-primary')}>
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"><IconeMod className="h-4 w-4" /></span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold leading-tight">{ativo.ajustes.titulo || meta.nome}</span>
-                  <span className="block truncate text-[11px] text-muted-foreground">{meta.nome} · {modeloNome}</span>
-                </span>
-                <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', gruposAberto && 'rotate-180')} />
-              </button>
-              {/* Menu flutuante (estilo select): divisórias + nome + descrição + check */}
-              {gruposAberto && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setGruposAberto(false)} />
-                  <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-lg border bg-background shadow-lg">
-                    <div className="divide-y">
-                      {builder.itens.map((it) => {
-                        const m = metaDaModalidade(it.modalidade)
-                        const Icon = ICONE_MOD[it.modalidade]
-                        const on = it.id === builder.ativo
-                        return (
-                          <div key={it.id} className={cn('group flex items-center gap-2 px-3 py-2 transition-colors', on ? 'bg-primary/5' : 'hover:bg-muted/60')}>
-                            <button type="button" onClick={() => { selecionarGrupo(it.id); setGruposAberto(false) }} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
-                              <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-md', on ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary')}><Icon className="h-4 w-4" /></span>
-                              <span className="min-w-0">
-                                <span className="block truncate text-sm font-medium leading-tight">{it.ajustes.titulo || m.nome}</span>
-                                <span className="block truncate text-[11px] text-muted-foreground">{m.nome} · {m.modelos.find((x) => x.id === it.modelo)?.nome}</span>
-                              </span>
-                            </button>
-                            {editandoGrupos && builder.itens.length > 1
-                              ? <button type="button" onClick={() => removerGrupo(it.id)} title="Remover grupo" className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"><X className="h-4 w-4" /></button>
-                              : on && <Check className="h-4 w-4 shrink-0 text-primary" />}
-                          </div>
-                        )
-                      })}
-                      <button type="button" onClick={() => { adicionarGrupo(); setGruposAberto(false) }} className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5">
-                        <Plus className="h-4 w-4" /> Adicionar grupo
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+          {/* Cabeçalho do caderno (1 grupo por caderno — sem seletor/adicionar/remover grupos). */}
+          <div className="col-span-2 flex items-center gap-2 rounded-lg border bg-background px-2.5 py-2 shadow-sm">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"><IconeMod className="h-4 w-4" /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold leading-tight">{ativo.ajustes.titulo || meta.nome}</span>
+              <span className="block truncate text-[11px] text-muted-foreground">{meta.nome} · {modeloNome}</span>
+            </span>
           </div>
 
           {/* Modelo do grupo */}
@@ -567,13 +537,8 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
             <span className="mb-1 block">Título</span>
             <input value={a.titulo} onChange={(e) => setAjuste({ titulo: e.target.value })} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm text-foreground" />
           </label>
-          {/* Diagnóstico: cores são POR BLOCO (clique na prévia). As demais modalidades mantêm o global. */}
-          {ativo.modalidade !== 'diagnostico' ? (<>
-            <div className="col-span-1 rounded-md border bg-background px-2 py-1.5"><div className="mb-1 text-[11px] text-muted-foreground">Cor primária</div><HexColorField value={a.corPrimaria} onChange={(v) => setAjuste({ corPrimaria: v })} /></div>
-            <div className="col-span-1 rounded-md border bg-background px-2 py-1.5"><div className="mb-1 text-[11px] text-muted-foreground">Cor secundária</div><HexColorField value={a.corSecundaria} onChange={(v) => setAjuste({ corSecundaria: v })} /></div>
-          </>) : (
-            <div className="col-span-2 rounded-md border border-dashed px-2.5 py-2 text-[11px] leading-snug text-muted-foreground">🎨 As cores são <strong>por bloco</strong>: clique em qualquer bloco na prévia para mudar a cor dele individualmente.</div>
-          )}
+          {/* Cores são POR BLOCO (clique no bloco na prévia) — sem cor primária/secundária global. */}
+          <div className="col-span-2 rounded-md border border-dashed px-2.5 py-2 text-[11px] leading-snug text-muted-foreground">🎨 As cores são <strong>por bloco</strong>: clique em qualquer bloco na prévia para mudar a cor dele individualmente.</div>
           {(ativo.modalidade === 'caderno_questoes' || ativo.modalidade === 'caderno_completo') && <>
             <div className="col-span-1"><Tog campo="mostrarGabarito" label="Gabarito" /></div>
             <div className="col-span-1"><Tog campo="mostrarComentarios" label="Comentários" /></div>
@@ -620,9 +585,9 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
 
         {/* Direita: prévia A4 do grupo ativo (padding lateral menor) */}
         <div ref={ref} className="scroll-claro relative min-h-0 overflow-auto bg-[radial-gradient(circle,theme(colors.slate.300)_1px,transparent_1px)] [background-size:18px_18px] px-3 py-5 dark:bg-[radial-gradient(circle,theme(colors.slate.700)_1px,transparent_1px)]">
-          {ativo.modalidade === 'diagnostico' && builder.bancoId && (
+          {(ativo.modalidade === 'diagnostico' || presetAtivo) && builder.bancoId && (
             <div className="pointer-events-none sticky top-0 z-20 -mt-2 mb-1 flex justify-end pr-1">
-              <button type="button" onClick={() => { setPickerCor(null); setPickerCapa(false); setPickerBloco(null); setEstruturaAberta(true) }} title="Estrutura do diagnóstico (ordenar/editar/adicionar blocos)"
+              <button type="button" onClick={() => { setPickerCor(null); setPickerCapa(false); setPickerBloco(null); setEstruturaAberta(true) }} title="Estrutura (ordenar, editar e adicionar blocos)"
                 className="pointer-events-auto flex items-center gap-1.5 rounded-lg border bg-background/95 px-2.5 py-1.5 text-xs font-medium shadow-sm backdrop-blur transition-colors hover:border-primary/50">
                 <Menu className="h-4 w-4" /> Estrutura
               </button>
@@ -635,7 +600,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
               {presetAtivo ? (
                 <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} ultimaUrl={a.ultimaUrl} folhaUrl={a.folhaUrl} cabecalhoUrl={a.cabecalhoUrl} rodapeUrl={a.rodapeUrl} margemTopo={a.margemTopo} margemBase={a.margemBase}
                   capa={ativo.capa} onPickCapa={() => { setEstruturaAberta(false); setPickerCapa(true); setPickerCor(null); setPickerBloco(null) }} selCapa={pickerCapa}
-                  docOverride={ativo.docEdit} onPickBloco={(id) => { setEstruturaAberta(false); setPickerBloco(id); setPickerCapa(false); setPickerCor(null) }} selBlocoId={pickerBloco} />
+                  docOverride={ativo.docEdit} onPickBloco={(id) => { setEstruturaAberta(false); setOrigemEstrutura(false); setPickerBloco(id); setPickerCapa(false); setPickerCor(null) }} selBlocoId={pickerBloco} />
               ) : (
                 <Previa item={ativo} questoes={questoes} vars={varsPrevia} discBanco={disciplinasBanco} selParte={pickerCor?.parte}
                   onPick={(parte, label, cor) => { setEstruturaAberta(false); setOrigemEstrutura(false); setPickerCapa(false); setPickerBloco(null); setPickerCor({ parte, label, cor }) }}
@@ -654,7 +619,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
         </div>
       </div>
 
-      <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: ativo.modalidade, modelo: ativo.modelo }} onSelecionar={onPicker} onEmBranco={criarEmBranco} />
+      <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: ativo.modalidade, modelo: ativo.modelo }} onSelecionar={onPicker} onEmBranco={criarEmBranco} travarModalidade />
       <BancoPicker open={bancoPickerOpen} onClose={() => setBancoPickerOpen(false)} bancos={bancos} atual={builder.bancoId} onSelecionar={trocarBanco} />
       {pickerCor && (() => {
         const campos = camposDoBloco(ativo, pickerCor.parte, pickerCor.label)
@@ -839,6 +804,28 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
                   <p className="text-[10px] leading-snug text-muted-foreground">Selecione um trecho e use <b>B</b> / <i>I</i> / <u>U</u>, ou escreva <code>**negrito**</code>, <code>*itálico*</code>, <code>&lt;u&gt;sublinhado&lt;/u&gt;</code>.</p>
                 </div>
               )}
+              {pickerCor.parte.startsWith('cardTx:') && (() => {
+                const cf = (ativo.conteudo ?? {}) as DiagConteudo
+                const i = Number(pickerCor.parte.slice('cardTx:'.length))
+                const raioAtual = cf.cardsTexto?.[i]?.raio ?? 0
+                return (
+                  <div className="mt-3 space-y-2.5">
+                    <div>
+                      <div className="mb-1 text-[11px] text-muted-foreground">Bordas</div>
+                      <div className="flex overflow-hidden rounded-md border">
+                        {([['Quadrada', 0], ['Arredondada', 8], ['Redonda', 16]] as const).map(([lbl, r]) => (
+                          <button key={r} type="button" onClick={() => setConteudo({ ...cf, cardsTexto: (cf.cardsTexto ?? []).map((cd, j) => j === i ? { ...cd, raio: r } : cd) })}
+                            className={cn('flex-1 py-1 text-[11px]', raioAtual === r ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-muted')}>{lbl}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => setConteudo({ ...cf, cardsTexto: (cf.cardsTexto ?? []).map((cd, j) => j === i ? { ...cd, textos: [...(cd.textos ?? []), 'Novo texto'] } : cd) })} className="flex w-full items-center justify-center gap-1.5 rounded-md border border-primary/40 px-2 py-1.5 text-[12px] font-medium text-primary hover:bg-primary/10">
+                      <Plus className="h-3.5 w-3.5" /> Adicionar parágrafo
+                    </button>
+                    <p className="text-[10px] leading-snug text-muted-foreground">Cada parágrafo é um bloco de texto dentro do card. Edite cada um no campo "Parágrafo" acima. Para <b>negrito</b>/itálico/sublinhado use os botões de Estilo (B/I/U).</p>
+                  </div>
+                )
+              })()}
               {pickerCor.parte.startsWith('disc:') && (() => {
                 const chave = pickerCor.parte.slice('disc:'.length)
                 const cf = (ativo.conteudo ?? {}) as DiagConteudo
@@ -1058,16 +1045,68 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
           <div className="pointer-events-none fixed inset-0 z-40 bg-black/5" />
           <aside className="fixed inset-y-0 right-0 z-50 flex w-80 max-w-[85vw] flex-col border-l bg-background shadow-2xl duration-200 animate-in slide-in-from-right">
             <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
-              <div className="min-w-0">
-                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Editar bloco</div>
-                <div className="truncate text-sm font-semibold">{NOME_BLOCO[blocoSel.type] ?? blocoSel.type}</div>
+              <div className="flex min-w-0 items-center gap-1">
+                {origemEstrutura && <button onClick={() => { setPickerBloco(null); setOrigemEstrutura(false); setEstruturaAberta(true) }} title="Voltar para a estrutura" className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft className="h-4 w-4" /></button>}
+                <div className="min-w-0">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Editar bloco</div>
+                  <div className="truncate text-sm font-semibold">{NOME_BLOCO[blocoSel.type] ?? blocoSel.type}</div>
+                </div>
               </div>
-              <button onClick={() => setPickerBloco(null)} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+              <button onClick={() => { setPickerBloco(null); setOrigemEstrutura(false) }} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
             <div className="scroll-claro min-h-0 flex-1 space-y-3.5 overflow-y-auto px-4 py-4">
               {camposDoBlocoDoc(blocoSel).map((campo) => (
                 <CampoBlocoEditor key={campo.id} campo={campo} onChange={(v) => setBlocoAttr(pickerBloco!, { [campo.id]: v })} />
               ))}
+
+              {/* Card com texto: bordas (quadrada/redonda) + textos internos editáveis com negrito/itálico/
+                  sublinhado por texto. Dá pra ADICIONAR mais textos e remover individualmente. */}
+              {blocoSel.type === 'card' && (() => {
+                const textos = (blocoSel!.innerBlocks ?? []).filter((b) => b.type === 'texto-livre')
+                const at = (b: any, k: string, d: any = '') => (b?.attributes as any)?.[k] ?? d
+                const setTextos = (patch: Record<string, unknown>) => textos.forEach((b) => setBlocoAttr(b.id, patch))
+                const raioAtual = (blocoSel!.attributes as any).bordaRaio ?? 0
+                return (
+                  <div className="space-y-2.5 border-t pt-3">
+                    <div>
+                      <div className="mb-1 text-[11px] text-muted-foreground">Bordas</div>
+                      <div className="flex overflow-hidden rounded-md border">
+                        {([['Quadrada', 0], ['Arredondada', 8], ['Redonda', 16]] as const).map(([lbl, r]) => (
+                          <button key={r} type="button" onClick={() => setBlocoAttr(pickerBloco!, { bordaRaio: r })}
+                            className={cn('flex-1 py-1 text-[11px]', raioAtual === r ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-muted')}>{lbl}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Textos dentro do card</div>
+                    {textos.map((b, i) => (
+                      <div key={b.id} className="space-y-1 rounded-md border border-dashed p-1.5">
+                        <div className="flex items-start gap-1.5">
+                          <textarea value={at(b, 'texto')} onChange={(e) => setBlocoAttr(b.id, { texto: e.target.value })} rows={2} placeholder={`Texto ${i + 1}`} className="min-w-0 flex-1 rounded border bg-background px-2 py-1 text-xs outline-none focus:border-primary" />
+                          <button type="button" onClick={() => removerBlocoInterno(b.id)} title="Remover texto" className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {([['bold', <b key="b">B</b>], ['italico', <i key="i">I</i>], ['sublinhado', <u key="u">U</u>]] as const).map(([k, ic]) => (
+                            <button key={k} type="button" onClick={() => setBlocoAttr(b.id, { [k]: !at(b, k) })}
+                              className={cn('flex h-6 w-6 items-center justify-center rounded border text-[12px]', at(b, k) ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted')}>{ic}</button>
+                          ))}
+                          <div className="mx-0.5 h-5 w-px bg-border" />
+                          {([['left', AlignLeft], ['center', AlignCenter], ['right', AlignRight], ['justify', AlignJustify]] as const).map(([v, Ic]) => (
+                            <button key={v} type="button" title={`Alinhar: ${v}`} onClick={() => setBlocoAttr(b.id, { align: v })}
+                              className={cn('flex h-6 w-6 items-center justify-center rounded border', (at(b, 'align', 'left')) === v ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted')}><Ic className="h-3.5 w-3.5" /></button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => adicionarTextoNoCard(pickerBloco!)} className="flex w-full items-center justify-center gap-1.5 rounded-md border border-primary/40 px-2 py-1.5 text-[12px] font-medium text-primary hover:bg-primary/10">
+                      <Plus className="h-3.5 w-3.5" /> Adicionar texto dentro
+                    </button>
+                    {textos.length > 0 && (<>
+                      <CampoBlocoEditor campo={{ id: 'cor-texto', label: 'Cor do texto', tipo: 'cor', valor: at(textos[0], 'color', '#ffffff') }} onChange={(v) => setTextos({ color: v })} />
+                      <CampoBlocoEditor campo={{ id: 'fonte-texto', label: 'Fonte', tipo: 'fonte', valor: at(textos[0], 'fonte') }} onChange={(v) => setTextos({ fonte: v })} />
+                    </>)}
+                  </div>
+                )
+              })()}
 
               {/* Card de dados/desempenho: editar os rótulos e valores das linhas */}
               {blocoSel.type === 'identificacao' && (['destaque', 'campos', 'desempenho'] as const).map((chave) => {
@@ -1108,11 +1147,15 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
             <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
               <div className="min-w-0">
                 <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Estrutura</div>
-                <div className="truncate text-sm font-semibold">Blocos do diagnóstico</div>
+                <div className="truncate text-sm font-semibold">{presetAtivo ? 'Blocos do caderno' : 'Blocos do diagnóstico'}</div>
               </div>
               <button onClick={() => setEstruturaAberta(false)} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
             <div className="scroll-claro min-h-0 flex-1 overflow-y-auto px-3 py-3">
+              {presetAtivo && docEfetivo ? (
+                <DocEstruturaPanel doc={docEfetivo} onAdd={adicionarBlocoDocAtivo} onMover={moverBlocoDocAtivo}
+                  onRemover={removerBlocoDoc} onEditar={(id) => { setEstruturaAberta(false); setOrigemEstrutura(true); setPickerBloco(id) }} />
+              ) : (<>
               <p className="mb-2 px-1 text-[11px] leading-snug text-muted-foreground">Arraste pelo <GripVertical className="inline h-3 w-3" /> ou use as setas para reordenar. Clique no lápis para editar o bloco.</p>
               <div className="space-y-1">
                 {outline.map((e, i) => {
@@ -1178,11 +1221,88 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
                 ))}
                 <p className="mt-2 px-1 text-[10px] leading-snug text-muted-foreground">O bloco entra no fim; arraste/usa as setas acima para reordenar e clique nele na prévia para editar.</p>
               </div>
+              </>)}
             </div>
           </aside>
         </>
       )}
     </div>
+  )
+}
+
+const CAT_LABEL: Record<string, string> = { conteudo: 'Conteúdo', avaliacao: 'Avaliação', identificacao: 'Identificação', estrutura: 'Estrutura' }
+// Paleta de "Adicionar bloco" dos cadernos doc (folha/caderno). Recomeço do zero: entram só os blocos
+// aprovados. 1ª leva = os MESMOS blocos individuais do diagnóstico (equivalentes no sistema doc):
+//   Cabeçalho → cabecalho (NOVO) · Nome do aluno → nome-aluno (NOVO, substitui o antigo Identificação)
+//   Faixa de seção → titulo-secao · Texto → texto-livre · Card com fita → card
+//   Nota → diag-nota · Disciplina → diag-disciplina · Sugestão → diag-sugestoes
+const BLOCOS_NOVOS = new Set<string>([
+  'cabecalho', 'nome-aluno', 'titulo-secao', 'texto-livre', 'card', 'diag-nota', 'diag-disciplina', 'diag-sugestoes',
+])
+
+/** Painel Estrutura (outline) dos MODELOS PRONTOS (doc-backed): listar/reordenar/editar/remover
+ *  os blocos top-level + adicionar da paleta completa (BLOCKS), igual ao painel do diagnóstico. */
+function DocEstruturaPanel({ doc, onAdd, onMover, onRemover, onEditar }: {
+  doc: CadernoDoc
+  onAdd: (type: string) => void
+  onMover: (id: string, dir: -1 | 1) => void
+  onRemover: (id: string) => void
+  onEditar: (id: string) => void
+}) {
+  const itens = listarBlocosDoc(doc)
+  // Paleta ZERADA: só os blocos NOVOS (allowlist BLOCOS_NOVOS). Começa vazia — os antigos saíram.
+  const paleta = BLOCKS.filter((b) => BLOCOS_NOVOS.has(b.type))
+  const cats = ['conteudo', 'avaliacao', 'identificacao', 'estrutura'] as const
+  return (
+    <>
+      <p className="mb-2 px-1 text-[11px] leading-snug text-muted-foreground">Use as setas para reordenar. Clique no lápis (ou no bloco na prévia) para editar. Adicione novos blocos abaixo.</p>
+      <div className="space-y-1">
+        {itens.map((e) => {
+          const Icon = getBlockMeta(e.type)?.icon ?? Type
+          return (
+            <div key={e.id} className="group flex items-center gap-1.5 rounded-md border bg-background px-1.5 py-1.5">
+              <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+              <span className="min-w-0 flex-1 truncate text-[12px]" title={e.nome}>{e.nome}</span>
+              <div className="flex shrink-0 items-center">
+                <button type="button" onClick={() => onMover(e.id, -1)} disabled={e.indice === 0} title="Subir" className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
+                <button type="button" onClick={() => onMover(e.id, 1)} disabled={e.indice === e.total - 1} title="Descer" className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
+                <button type="button" onClick={() => onEditar(e.id)} title="Editar bloco" className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                <button type="button" onClick={() => onRemover(e.id)} title="Apagar bloco" className="rounded p-1 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
+          )
+        })}
+        {itens.length === 0 && <p className="px-1 py-4 text-center text-xs text-muted-foreground">Sem blocos ainda — adicione abaixo.</p>}
+      </div>
+      <div className="mt-4 border-t pt-3">
+        <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Plus className="mr-1 inline h-3.5 w-3.5" /> Adicionar bloco</p>
+        {paleta.length === 0 ? (
+          <p className="rounded-md border border-dashed px-3 py-4 text-center text-[11px] leading-snug text-muted-foreground">Paleta zerada — recomeço do zero. Os blocos novos (redesenhados) vão aparecer aqui conforme forem criados. Os cadernos que já existem continuam intactos.</p>
+        ) : (<>
+        {cats.map((cat) => {
+          const blocos = paleta.filter((b) => b.category === cat)
+          if (!blocos.length) return null
+          return (
+            <div key={cat} className="mt-3 first:mt-0">
+              <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/80">{CAT_LABEL[cat]}</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {blocos.map((b) => {
+                  const Icon = b.icon
+                  return (
+                    <button key={b.type} type="button" onClick={() => onAdd(b.type)} title={b.description ?? b.title}
+                      className="flex items-center gap-1.5 rounded-md border bg-background px-2 py-1.5 text-left text-[12px] font-medium transition-colors hover:border-primary/50 hover:bg-primary/5">
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-primary" /> <span className="min-w-0 truncate">{b.title}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+        <p className="mt-2 px-1 text-[10px] leading-snug text-muted-foreground">O bloco entra no fim; use as setas para reordenar e clique nele na prévia (ou no lápis) para editar.</p>
+        </>)}
+      </div>
+    </>
   )
 }
 
@@ -1209,8 +1329,36 @@ function CampoBlocoEditor({ campo, onChange }: { campo: CampoBlocoDoc; onChange:
       <input type="checkbox" checked={!!campo.valor} onChange={(e) => onChange(e.target.checked)} />
     </label>
   )
+  if (campo.tipo === 'align') {
+    const cur = campo.valor || 'left'
+    return (
+      <div>
+        <div className="mb-1 text-[11px] text-muted-foreground">{campo.label}</div>
+        <div className="flex overflow-hidden rounded-md border">
+          {([['left', 'Esq.'], ['center', 'Centro'], ['right', 'Dir.'], ['justify', 'Justif.']] as const).map(([v, lbl]) => (
+            <button key={v} type="button" onClick={() => onChange(v)}
+              className={cn('flex-1 py-1 text-[11px]', cur === v ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-muted')}>{lbl}</button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+  if (campo.tipo === 'select') {
+    const cur = campo.valor
+    return (
+      <div>
+        <div className="mb-1 text-[11px] text-muted-foreground">{campo.label}</div>
+        <div className="flex overflow-hidden rounded-md border">
+          {(campo.opcoes ?? []).map((o) => (
+            <button key={o.value} type="button" onClick={() => onChange(o.value)}
+              className={cn('flex-1 px-1 py-1 text-[11px]', cur === o.value ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-muted')}>{o.label}</button>
+          ))}
+        </div>
+      </div>
+    )
+  }
   // Texto: usa o campo com barra B/I/U (mesma sintaxe do diagnóstico) — renderiza no preview.
-  return <CampoFormatavel campo={{ id: campo.id, label: campo.label, valor: String(campo.valor ?? ''), multiline: true }} onChange={onChange} />
+  return <CampoFormatavel campo={{ id: campo.id, label: campo.label, valor: String(campo.valor ?? ''), multiline: true, placeholder: campo.placeholder }} onChange={onChange} />
 }
 
 /** Campo de texto com barra de formatação (negrito/itálico/sublinhado) que envolve a seleção. */
@@ -1237,8 +1385,8 @@ function CampoFormatavel({ campo, onChange }: { campo: CampoTexto; onChange: (v:
         </div>
       </div>
       {campo.multiline
-        ? <textarea ref={ref as any} value={campo.valor} onChange={(e) => onChange(e.target.value)} rows={3} className="w-full resize-y rounded border bg-background px-2 py-1 text-xs leading-snug outline-none focus:border-primary" />
-        : <input ref={ref as any} value={campo.valor} onChange={(e) => onChange(e.target.value)} className="w-full rounded border bg-background px-2 py-1 text-xs outline-none focus:border-primary" />}
+        ? <textarea ref={ref as any} value={campo.valor} placeholder={campo.placeholder} onChange={(e) => onChange(e.target.value)} rows={3} className="w-full resize-y rounded border bg-background px-2 py-1 text-xs leading-snug outline-none focus:border-primary" />
+        : <input ref={ref as any} value={campo.valor} placeholder={campo.placeholder} onChange={(e) => onChange(e.target.value)} className="w-full rounded border bg-background px-2 py-1 text-xs outline-none focus:border-primary" />}
     </div>
   )
 }

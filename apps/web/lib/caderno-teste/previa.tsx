@@ -300,6 +300,12 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
       {(ft.texto || '').split('\n').map((linha, j) => <div key={j} style={{ fontSize: fs(`fita:${i}`, corpo), color: '#5a5570', lineHeight: 1.5, textAlign: alignP(`fita:${i}`, 'left') }}>{V(linha)}</div>)}
     </div>
   ), `Card com fita ${i + 1}`, 'card', `fita:${i}`, true) })
+  // Card com texto: caixa com borda + N parágrafos (cada um adicionado/editado no painel do bloco).
+  ;(c.cardsTexto ?? []).forEach((cd, i) => { const cor = corP(`cardTx:${i}`, prim); add(`cardTx:${i}`, (
+    <div key={`cardTx${i}`} {...atr(`cardTx:${i}`, `Card com texto ${i + 1}`, cor, { background: '#ffffff', border: `1px solid ${cor}`, borderRadius: cd.raio ?? 0, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 5 })}>
+      {(cd.textos ?? []).map((t, j) => <div key={j} style={{ fontSize: fs(`cardTx:${i}`, corpo), color: '#333', lineHeight: 1.5, textAlign: alignP(`cardTx:${i}`, 'left') }}>{V(t)}</div>)}
+    </div>
+  ), `Card com texto ${i + 1}`, 'card', `cardTx:${i}`, true) })
   if (c.linguaPortuguesa && !ocultasP.has('lingua')) {
     const lp = c.linguaPortuguesa
     add('sec_lingua', <Sec parte="sec_lingua" t={lp.secTitulo || 'Desempenho em Língua Portuguesa'} />, `Seção: ${lp.secTitulo || 'Língua Portuguesa'}`, 'secao', 'sec_lingua', true)

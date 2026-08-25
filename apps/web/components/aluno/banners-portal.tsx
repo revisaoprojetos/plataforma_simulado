@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { X, Megaphone, ChevronLeft, ChevronRight, Play, BookOpen, Clock, ArrowRight } from 'lucide-react'
+import { X, Megaphone, Play, BookOpen, Clock, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { SetaDegrade } from '@/components/seta-degrade'
 
 /** Link do banner: se for URL externa (http/https), abre em NOVA aba (mantém o simulado aberto);
  *  se for rota interna, navega no app normalmente. */
@@ -178,14 +179,8 @@ function Carrossel({ slides, stats }: { slides: Slide[]; stats?: BannerStats | n
 
       {n > 1 && (
         <>
-          <button type="button" onClick={() => ir(i - 1)} aria-label="Anterior"
-            className="absolute left-3 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white opacity-0 backdrop-blur transition hover:bg-black/55 group-hover:opacity-100">
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <button type="button" onClick={() => ir(i + 1)} aria-label="Próximo"
-            className="absolute right-3 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white opacity-0 backdrop-blur transition hover:bg-black/55 group-hover:opacity-100">
-            <ChevronRight className="h-5 w-5" />
-          </button>
+          <SetaDegrade dir="left" onClick={() => ir(i - 1)} />
+          <SetaDegrade dir="right" onClick={() => ir(i + 1)} />
           <div className="absolute inset-x-0 bottom-3 z-20 flex items-center justify-center gap-1.5">
             {slides.map((s, idx) => (
               <button key={s.id} type="button" onClick={() => ir(idx)} aria-label={`Ir para ${idx + 1}`}

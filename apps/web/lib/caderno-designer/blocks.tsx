@@ -55,9 +55,13 @@ export const BLOCKS: BlockMeta[] = [
     defaults: { campos: [{ rotulo: 'Banca', valor: '' }, { rotulo: 'Órgão', valor: '' }, { rotulo: 'Cargo', valor: '' }, { rotulo: 'Ano', valor: '' }], colunas: 2 } },
   { type: 'assinatura', title: 'Assinatura', icon: Signature, category: 'identificacao', supportsVars: true,
     defaults: { assinaturas: ['Assinatura do candidato'], align: 'left', larguraLinha: 220 } },
+  { type: 'cabecalho', title: 'Cabeçalho', icon: Heading1, category: 'identificacao', supportsVars: true,
+    defaults: { titulo: 'Título do Cabeçalho', subtitulo: '', corFundo: '', corTexto: '#ffffff', tamTitulo: 20, tamSub: 11, align: 'left', fonte: '', padding: 14, bordaRaio: 0, largura: 100, alinhamentoBloco: 'left' } },
+  { type: 'nome-aluno', title: 'Nome do aluno', icon: IdCard, category: 'identificacao', dynamic: true, supportsVars: true,
+    defaults: { rotulo: 'NOME:', corRotulo: '', corValor: '', corTextoRotulo: '#ffffff', corTextoValor: '#3b2f00', fonte: '', bordaRaio: 0 } },
   // Estrutura
   { type: 'card', title: 'Card', icon: Square, category: 'estrutura', container: true, supportsVars: true,
-    defaults: { corFundo: '#f8fafc', bordaCor: '', bordaLargura: 1, bordaRaio: 8, padding: 8, largura: 100, alinhamento: 'center', fitaCor: '', fitaAltura: 0 } },
+    defaults: { corFundo: '#f8fafc', bordaCor: '', bordaLargura: 1, bordaRaio: 0, padding: 8, largura: 100, alinhamento: 'center', fitaCor: '', fitaAltura: 0 } },
   { type: 'colunas', title: 'Colunas (lado a lado)', icon: Columns2, category: 'estrutura', container: true,
     defaults: { gap: 16, divisoria: false, divisoriaEspessura: 1, divisoriaEstilo: 'solido', divisoriaCor: '' } },
   { type: 'imagem', title: 'Imagem', icon: ImageIcon, category: 'estrutura',
@@ -628,6 +632,24 @@ function BlockRenderBody({ block, theme, data, full, editor, selectable, selecte
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(block.innerBlocks ?? []).map((ib) => <BlockRender key={ib.id} block={ib} theme={theme} data={data} full selectable={selectable} selectedId={selectedId} />)}
+        </div>
+      )
+    }
+    case 'cabecalho': {
+      const alinC = (ALIN[a.align as keyof typeof ALIN] ?? 'left') as CSSProperties['textAlign']
+      return comLargura(a.largura, a.alinhamentoBloco, (
+        <div style={{ background: a.corFundo || c.primaria, color: a.corTexto || '#ffffff', padding: a.padding ?? 14, borderRadius: a.bordaRaio ?? 0, textAlign: alinC, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
+          <div style={{ fontSize: a.tamTitulo ?? 20, fontWeight: 800, lineHeight: 1.2 }}>{renderInline(applyVars(a.titulo ?? '', data.vars))}</div>
+          {a.subtitulo ? <div style={{ fontSize: a.tamSub ?? 11, opacity: 0.85, marginTop: 2 }}>{renderInline(applyVars(a.subtitulo, data.vars))}</div> : null}
+        </div>
+      ))
+    }
+    case 'nome-aluno': {
+      const nomeVal = applyVars('{{nome}}', data.vars)
+      return (
+        <div style={{ display: 'flex', overflow: 'hidden', borderRadius: a.bordaRaio ?? 0, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
+          <div style={{ background: a.corRotulo || c.primaria, color: a.corTextoRotulo || '#ffffff', fontWeight: 800, fontSize: 14, padding: '8px 14px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>{applyVars(a.rotulo ?? 'NOME:', data.vars)}</div>
+          <div style={{ background: a.corValor || c.acento, color: a.corTextoValor || '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '8px 14px', fontSize: 13, fontWeight: 600 }}>{nomeVal && !/\{/.test(nomeVal) ? nomeVal : ' '}</div>
         </div>
       )
     }

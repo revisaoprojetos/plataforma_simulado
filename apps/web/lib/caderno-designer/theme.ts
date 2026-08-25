@@ -6,6 +6,8 @@ export type CadernoTheme = {
 }
 
 export const FONTES_CADERNO: { id: string; nome: string; css: string }[] = [
+  // Padrão do sistema — MESMA fonte do diagnóstico e do app (Inter embutida). É a base dos cadernos.
+  { id: 'inter', nome: 'Inter (padrão do sistema)', css: 'var(--font-inter), system-ui, sans-serif' },
   // Serifadas
   { id: 'serif', nome: 'Serifada (Georgia)', css: 'Georgia, "Times New Roman", serif' },
   { id: 'times', nome: 'Times New Roman', css: '"Times New Roman", Times, serif' },

@@ -140,7 +140,7 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
   const contar = (gid: string) => itens.filter((s) => s.grupoId === gid).length
   const recent = recentes ?? []
   const basis = full ? FILEIRA_BASIS_FULL : FILEIRA_BASIS
-  // 1º recente que tem caderno de questões → recebe o balão de dica do botão de download.
+  // 1º recente que tem caderno de questões → recebe o lembrete de baixar o caderno.
   const dicaId = recent.find((s) => s.enunciadoUrl)?.id
 
   return (

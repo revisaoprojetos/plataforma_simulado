@@ -255,7 +255,8 @@ export const MODALIDADES: ModalidadeMeta[] = [
       { id: 'base_4', nome: 'Base — 4 disciplinas', descricao: 'Estrutura completa pronta (intro, pilar separado, 3 pilares, 4 disciplinas, sugestões e gabarito) com textos genéricos.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_BASE_4 },
       { id: 'agu_2023', nome: 'Completo (AGU 2023)', descricao: 'Pré-preenchido com o diagnóstico da AGU 2023.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_AGU_2023 },
       { id: 'pge_rs', nome: 'Completo (PGE/RS)', descricao: 'Estrutura base para o diagnóstico da PGE/RS — ajuste os textos/disciplinas.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_PGE_RS },
-      { id: 'agu_diagnostico', nome: 'AGU · Diagnóstico (modelo pronto)', descricao: 'Modelo pronto (v1): diagnóstico por blocos, migrado do editor antigo.', ajustes: {}, docPreset: 'diagnostico' },
+      // 'agu_diagnostico' (v1 doc-backed, blocos antigos) REMOVIDO — usava o render legado (PreviaBlocos)
+      // em vez do atual (conteudo/Previa com os fixes). 0 cadernos usavam. Use 'agu_2023' (mesmo AGU, atual).
     ],
   },
 ]

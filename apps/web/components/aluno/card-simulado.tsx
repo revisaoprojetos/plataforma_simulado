@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Radio, Play, RotateCcw, Clock, CalendarClock, Hourglass, CircleCheck, Infinity as InfinityIcon } from 'lucide-react'
+import { Radio, Play, RotateCcw, Clock, CalendarClock, Hourglass, CircleCheck, Infinity as InfinityIcon, FileDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CapaCard } from '@/components/aluno/capa-card'
 import { EnunciadoDownloadBotao } from '@/components/aluno/enunciado-download-menu'
@@ -23,7 +23,7 @@ function FitaNovo() {
 }
 
 /** Card (pôster) de um simulado disponível — usado na home e na página "Simulados".
- *  `dica` = mostra um balão apontando o botão de baixar o caderno de questões (usado no 1º recente). */
+ *  `dica` = mostra um lembrete discreto (acima do título, sobre a arte) p/ baixar o caderno de questões. */
 export function CardSimulado({ s, dica = false }: { s: ItemSimulado; dica?: boolean }) {
   const StatusIcon = ICON[s.tom] ?? Radio
   const cor = s.vis?.cor ?? '#6d28d9'
@@ -39,35 +39,43 @@ export function CardSimulado({ s, dica = false }: { s: ItemSimulado; dica?: bool
       {s.novo && <FitaNovo />}
       {(s.podeFazer || s.podeAguardar) && <Link href={`/simulado/${s.embed_token}`} className="absolute inset-0 z-10" aria-label={s.titulo} />}
 
-      <span className={cn('pointer-events-none absolute right-3 z-20 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-[11px]', s.novo ? 'top-11' : 'top-3')}>
-        <StatusIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-        {s.statusLabel}
-      </span>
+      {/* Selo de status no topo-direito. Aberto → "Sempre disponível" (relógio); demais → status (Ao vivo/Agendado/Em manutenção…). */}
+      {(() => {
+        const label = s.tom === 'sky' ? s.quando : s.statusLabel
+        if (!label) return null
+        const Icon = s.tom === 'sky' ? Clock : StatusIcon
+        return (
+          <span className={cn('pointer-events-none absolute right-3 z-20 inline-flex items-center gap-1 rounded-full text-[10px] font-semibold text-white sm:gap-1.5 sm:text-[11px]', s.tom === 'sky' ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]' : 'bg-black/55 px-2 py-0.5 sm:px-2.5 sm:py-1', s.novo ? 'top-11' : 'top-3')}>
+            <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            {label}
+          </span>
+        )
+      })()}
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-3 sm:p-4">
         {s.emAndamento && <span className="mb-1 inline-block rounded-md bg-amber-500 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white sm:text-[10px]">Em andamento</span>}
         <h3 className="line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm sm:text-base">{s.titulo}</h3>
-        {s.quando && <p className="mt-0.5 flex items-start gap-1 text-[11px] leading-snug text-white/80 sm:mt-1 sm:text-xs"><Clock className="mt-0.5 h-3 w-3 shrink-0" /> <span>{s.quando}</span></p>}
+        {/* "Sempre disponível" (aberto/sky) é redundante e polui o card — esconde. Prazo/data/manutenção continuam aparecendo. */}
+        {s.quando && s.tom !== 'sky' && <p className="mt-0.5 flex items-start gap-1 text-[11px] leading-snug text-white/80 sm:mt-1 sm:text-xs"><Clock className="mt-0.5 h-3 w-3 shrink-0" /> <span>{s.quando}</span></p>}
         {s.refazer && !s.emAndamento && <p className="text-[10px] text-white/70 sm:text-[11px]">Já feito {s.finalizadas}x{Number.isFinite(s.restantes) ? ` · ${s.restantes} restante(s)` : ''}</p>}
         <div className="relative mt-2 flex items-stretch gap-1.5 sm:mt-2.5">
-          {/* Balão de dica apontando o botão de baixar o caderno de questões. */}
+          {/* Balão "Baixe o caderno" como CAMADA por cima, logo acima do botão (o texto do card fica atrás). */}
           {dica && s.enunciadoUrl && (
-            <div className="pointer-events-none absolute -top-9 right-0 z-30 animate-bounce">
-              <span className="relative block whitespace-nowrap rounded-lg bg-white px-2.5 py-1 text-[11px] font-bold text-slate-900 shadow-lg ring-1 ring-black/5">
-                Baixe o caderno de questões
-                <span className="absolute -bottom-1 right-4 h-2.5 w-2.5 rotate-45 bg-white" />
-              </span>
-            </div>
+            <span className="pointer-events-none absolute bottom-full right-0 z-30 mb-1.5 inline-flex animate-bounce items-center gap-1 rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-bold text-slate-900 shadow-md backdrop-blur-sm sm:text-[11px]">
+              <FileDown className="h-3 w-3 shrink-0" /> Baixe o caderno
+              {/* ponta do balão apontando para baixo, na direção do botão de download */}
+              <span className="absolute -bottom-1 right-4 h-2.5 w-2.5 rotate-45 bg-white/85" />
+            </span>
           )}
           {s.podeFazer ? (
-            <Link href={`/simulado/${s.embed_token}`} className="group/btn pointer-events-auto relative inline-flex flex-1 items-center justify-center overflow-hidden rounded-lg border-[1.5px] px-2.5 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-lg sm:px-3 sm:py-2 sm:text-sm" style={{ borderColor: cor }}>
+            <Link href={`/simulado/${s.embed_token}`} className="group/btn pointer-events-auto relative inline-flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-lg border-[1.5px] px-2.5 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-lg sm:px-3 sm:py-2 sm:text-sm" style={{ borderColor: cor }}>
               <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }} />
-              <span className="relative z-10 inline-flex items-center gap-1.5">{s.emAndamento ? <><RotateCcw className="h-4 w-4" /> Continuar</> : s.refazer ? <><RotateCcw className="h-4 w-4" /> Refazer</> : <><Play className="h-4 w-4" /> Fazer agora</>}</span>
+              <span className="relative z-10 inline-flex min-w-0 max-w-full items-center gap-1.5">{s.emAndamento ? <><RotateCcw className="h-4 w-4 shrink-0" /> <span className="truncate">Continuar</span></> : s.refazer ? <><RotateCcw className="h-4 w-4 shrink-0" /> <span className="truncate">Refazer</span></> : <><Play className="h-4 w-4 shrink-0" /> <span className="truncate">Fazer agora</span></>}</span>
             </Link>
           ) : s.podeAguardar ? (
-            <Link href={`/simulado/${s.embed_token}`} className="group/btn pointer-events-auto relative inline-flex flex-1 items-center justify-center overflow-hidden rounded-lg border-[1.5px] px-2.5 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-lg sm:px-3 sm:py-2 sm:text-sm" style={{ borderColor: cor }}>
+            <Link href={`/simulado/${s.embed_token}`} className="group/btn pointer-events-auto relative inline-flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-lg border-[1.5px] px-2.5 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-lg sm:px-3 sm:py-2 sm:text-sm" style={{ borderColor: cor }}>
               <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }} />
-              <span className="relative z-10 inline-flex items-center gap-1.5"><Clock className="h-4 w-4" /> Entrar e aguardar início</span>
+              <span className="relative z-10 inline-flex min-w-0 max-w-full items-center gap-1.5"><Clock className="h-4 w-4 shrink-0" /> <span className="truncate">Entrar e aguardar início</span></span>
             </Link>
           ) : (
             <span className="flex flex-1 items-center justify-center rounded-lg bg-black/55 px-2.5 py-1.5 text-center text-[11px] text-white/80 sm:px-3 sm:py-2 sm:text-xs">{s.statusLabel === 'Agendado' ? 'Ainda não abriu' : s.statusLabel === 'Em manutenção' ? '🔧 Em manutenção' : 'Indisponível'}</span>

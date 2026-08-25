@@ -7,8 +7,9 @@ import { previewQuestoesBanco, dadosBancoTeste } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CadernoTesteEditorPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CadernoTesteEditorPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ grupo?: string }> }) {
   const { id } = await params
+  const { grupo } = await searchParams
   const access = await getCurrentAccess()
   const tid = access.tenantId ?? '00000000-0000-0000-0000-000000000000'
   const svc = createAdminClient()
@@ -31,6 +32,9 @@ export default async function CadernoTesteEditorPage({ params }: { params: Promi
   const builder = ehNovo
     ? { v: 3 as const, bancoId: (cfg?.builderV3?.bancoId ?? cfg?.bancoId ?? null) as string | null, itens: [], ativo: '' }
     : normalizarBuilder(cfg, (caderno as any).nome)
+  // Link da Entrega (?grupo=<itemId>): abre DIRETO no grupo pedido — evita cair no grupo ativo salvo,
+  // que pode ser de outra modalidade (ex.: clicar "Editar" no Diagnóstico e abrir o Caderno de Questões).
+  if (grupo && builder.itens.some((i) => i.id === grupo)) builder.ativo = grupo
   let questoes: PreviewQuestao[] = []
   let registros: any[] = []
   let disciplinas: any[] = []

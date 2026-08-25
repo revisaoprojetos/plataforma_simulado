@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type React from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { SetaDegrade } from '@/components/seta-degrade'
 
 /**
  * Fileira horizontal estilo Netflix (reutilizável admin + aluno): rola exatamente UM card por
@@ -47,24 +47,16 @@ export function FileiraHorizontal({ titulo, count, children }: {
           {titulo}{count != null && <span className="text-xs font-normal text-muted-foreground">({count})</span>}
         </h3>
       )}
-      <div className="relative">
-        {canL && (
-          <button type="button" aria-label="Ver anteriores" onClick={() => rolar(-1)}
-            className="absolute left-0 top-1/2 z-20 hidden h-28 w-14 sm:flex origin-left -translate-y-1/2 items-center justify-start rounded-r-xl bg-gradient-to-r from-neutral-700/95 via-neutral-700/75 to-transparent pl-2 text-white shadow-lg transition duration-200 ease-out hover:scale-x-125 hover:scale-y-110 hover:from-neutral-600 hover:via-neutral-600/80">
-            <ChevronLeft className="h-7 w-7" />
-          </button>
-        )}
+      <div className="group relative">
         {/* py-2 dá folga vertical: overflow-x-auto também recorta na vertical, então sem isso o
             card cortaria no topo ao subir no hover (-translate-y). O -my-2 mantém o alinhamento. */}
         <div ref={ref} className="-my-2 flex gap-4 overflow-x-auto px-0.5 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {children}
         </div>
-        {canR && (
-          <button type="button" aria-label="Ver próximos" onClick={() => rolar(1)}
-            className="absolute right-0 top-1/2 z-20 hidden h-28 w-14 sm:flex origin-right -translate-y-1/2 items-center justify-end rounded-l-xl bg-gradient-to-l from-neutral-700/95 via-neutral-700/75 to-transparent pr-2 text-white shadow-lg transition duration-200 ease-out hover:scale-x-125 hover:scale-y-110 hover:from-neutral-600 hover:via-neutral-600/80">
-            <ChevronRight className="h-7 w-7" />
-          </button>
-        )}
+        {/* Setas DEPOIS dos cards no DOM → a cascata de entrada dá índice ALTO (entram junto/depois dos
+            cards, não antes). insetY inset-y-2 casa o degradê com a altura real dos cards (desconta o py-2). */}
+        {canL && <SetaDegrade dir="left" onClick={() => rolar(-1)} label="Ver anteriores" insetY="inset-y-2" />}
+        {canR && <SetaDegrade dir="right" onClick={() => rolar(1)} label="Ver próximos" insetY="inset-y-2" />}
       </div>
     </section>
   )

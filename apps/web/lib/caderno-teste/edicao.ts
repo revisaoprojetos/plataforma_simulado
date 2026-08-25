@@ -5,7 +5,7 @@ import type { ItemCaderno } from './tipos'
 import { DIAG_PADRAO, slugDiag, topicosParaTexto, type DiagConteudo } from './diagnostico'
 
 /** alvo 'titulo' edita ajustes.titulo; os demais editam item.conteudo. */
-export type CampoTexto = { id: string; label: string; valor: string; multiline?: boolean; alvo?: 'conteudo' | 'titulo' }
+export type CampoTexto = { id: string; label: string; valor: string; multiline?: boolean; alvo?: 'conteudo' | 'titulo'; placeholder?: string }
 
 /** Índice da disciplina (por slug) em conteudo. */
 function idxDisc(c: DiagConteudo, chave: string): number {
@@ -29,6 +29,7 @@ export function camposDoBloco(item: ItemCaderno, parte: string, nomeFallback?: s
   if (parte.startsWith('gabIntro:')) { const i = Number(parte.slice('gabIntro:'.length)); if (c.gabaritoIntro[i] == null) return []; return [{ id: 'texto', label: 'Parágrafo', valor: c.gabaritoIntro[i], multiline: true }] }
   if (parte.startsWith('card:')) { const i = Number(parte.slice('card:'.length)); if (c.cards?.[i] == null) return []; return [{ id: 'texto', label: 'Título da seção', valor: c.cards[i].texto }] }
   if (parte.startsWith('fita:')) { const i = Number(parte.slice('fita:'.length)); if (c.fitas?.[i] == null) return []; return [{ id: 'texto', label: 'Texto (uma linha por observação)', valor: c.fitas[i].texto, multiline: true }] }
+  if (parte.startsWith('cardTx:')) { const i = Number(parte.slice('cardTx:'.length)); const cd = c.cardsTexto?.[i]; if (cd == null) return []; return (cd.textos ?? []).map((t, j) => ({ id: `texto:${j}`, label: `Parágrafo ${j + 1}`, valor: t, multiline: true })) }
   if (parte === 'gab_obs') return [{ id: 'obs', label: 'Observações (uma por linha)', valor: c.gabaritoObs.join('\n'), multiline: true }]
   if (parte === 'disc_intro') return [{ id: 'disciplinasIntro', label: 'Introdução das disciplinas', valor: c.disciplinasIntro, multiline: true }]
   if (parte.startsWith('pilar:') || parte.startsWith('pilarG:')) {
@@ -93,7 +94,7 @@ export function chaveOcultavel(parte: string): string | null { return OCULTAVEIS
 
 /** Partes do diagnóstico que podem ser REMOVIDAS: itens de lista OU blocos estruturais (ocultar). */
 export function podeRemoverParte(parte: string): boolean {
-  return parte.startsWith('intro:') || parte.startsWith('fechamento:') || parte.startsWith('pilar:') || parte.startsWith('sug:') || parte.startsWith('sugInd:') || parte.startsWith('pilaresG:') || parte.startsWith('disc:') || parte.startsWith('discInd:') || parte.startsWith('card:') || parte.startsWith('fita:') || parte.startsWith('gabIntro:') || parte === 'gab_obs' || parte === 'dados_card' || parte === 'diag_cab' || parte === 'diag_cab_titulo' || parte === 'diag_cab_sub' || chaveOcultavel(parte) !== null
+  return parte.startsWith('intro:') || parte.startsWith('fechamento:') || parte.startsWith('pilar:') || parte.startsWith('sug:') || parte.startsWith('sugInd:') || parte.startsWith('pilaresG:') || parte.startsWith('disc:') || parte.startsWith('discInd:') || parte.startsWith('card:') || parte.startsWith('fita:') || parte.startsWith('cardTx:') || parte.startsWith('gabIntro:') || parte === 'gab_obs' || parte === 'dados_card' || parte === 'diag_cab' || parte === 'diag_cab_titulo' || parte === 'diag_cab_sub' || chaveOcultavel(parte) !== null
 }
 
 /** Remove (retorna novo conteúdo): itens de lista somem; blocos estruturais entram em partesOcultas. */
@@ -107,6 +108,7 @@ export function removerParteDiag(conteudo: DiagConteudo | undefined, parte: stri
   else if (parte === 'disc_intro') { c.disciplinasIntro = '' }
   else if (parte === 'lingua_intro') { if (c.linguaPortuguesa) c.linguaPortuguesa.secIntro = '' }
   else if (parte.startsWith('gabIntro:')) { const i = Number(parte.slice('gabIntro:'.length)); if (c.gabaritoIntro[i] != null) c.gabaritoIntro.splice(i, 1) }
+  else if (parte.startsWith('cardTx:')) { const i = Number(parte.slice('cardTx:'.length)); if (c.cardsTexto?.[i] != null) c.cardsTexto.splice(i, 1) }
   else if (parte.startsWith('card:')) { const i = Number(parte.slice('card:'.length)); if (c.cards?.[i] != null) c.cards.splice(i, 1) }
   else if (parte.startsWith('fita:')) { const i = Number(parte.slice('fita:'.length)); if (c.fitas?.[i] != null) c.fitas.splice(i, 1) }
   else if (parte.startsWith('discInd:')) { const i = Number(parte.slice('discInd:'.length)); if (c.discsIndividuais?.[i] != null) c.discsIndividuais.splice(i, 1) }
@@ -131,6 +133,7 @@ export function aplicarCampoBloco(conteudo: DiagConteudo | undefined, parte: str
   else if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] != null) c.intro[i] = valor }
   else if (parte.startsWith('fechamento:')) { const i = Number(parte.slice('fechamento:'.length)); if (c.fechamento?.[i] != null) c.fechamento[i] = valor }
   else if (parte.startsWith('gabIntro:')) { const i = Number(parte.slice('gabIntro:'.length)); if (c.gabaritoIntro[i] != null) c.gabaritoIntro[i] = valor }
+  else if (parte.startsWith('cardTx:')) { const i = Number(parte.slice('cardTx:'.length)); const cd = c.cardsTexto?.[i]; if (cd && campoId.startsWith('texto:')) { const j = Number(campoId.slice('texto:'.length)); if (cd.textos[j] != null) cd.textos[j] = valor } }
   else if (parte.startsWith('card:')) { const i = Number(parte.slice('card:'.length)); if (c.cards?.[i] != null) c.cards[i].texto = valor }
   else if (parte.startsWith('fita:')) { const i = Number(parte.slice('fita:'.length)); if (c.fitas?.[i] != null) c.fitas[i].texto = valor }
   else if (parte === 'gab_obs') { if (campoId === 'obs') c.gabaritoObs = valor.split('\n').filter((l) => l.trim().length > 0) }

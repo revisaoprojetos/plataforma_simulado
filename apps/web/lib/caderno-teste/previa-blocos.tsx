@@ -241,8 +241,9 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
   return (
     <div className={paginasOk ? 'caderno-pronto' : undefined} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }} onClick={onClick}>
       {/* destaque do bloco selecionado (CSS, sem rebake dos nós) */}
-      {selectable && selBlocoId && <style>{`[data-block-id="${selBlocoId}"] > *{outline:2px solid #6d28d9!important;outline-offset:2px;border-radius:2px}`}</style>}
-      {selectable && <style>{`[data-block-id]{cursor:pointer}[data-block-id]:hover > *{outline:1.5px dashed #6d28d966;outline-offset:2px}`}</style>}
+      {/* Seleção POR DENTRO do card (outline-offset negativo) — igual ao diagnóstico, sem borda vazando. */}
+      {selectable && selBlocoId && <style>{`[data-block-id="${selBlocoId}"] > *{outline:2px solid #6d28d9!important;outline-offset:-2px;border-radius:2px}`}</style>}
+      {selectable && <style>{`[data-block-id]{cursor:pointer}[data-block-id]:hover > *{outline:1.5px dashed #6d28d966;outline-offset:-2px}`}</style>}
       {/* passe de medição (escondido) */}
       <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: contentW, display: 'flex', flexDirection: 'column' }}>
         {itens.map((it, i) => <div key={it.key} style={{ marginTop: i === 0 ? 0 : (it.gapTop || 0) }}>{it.node}</div>)}

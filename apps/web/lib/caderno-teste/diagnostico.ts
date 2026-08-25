@@ -74,6 +74,8 @@ export type DiagConteudo = {
   cards?: { texto: string }[]
   /** Cards com fita (fundo claro + faixa colorida à esquerda OU no topo + linhas de texto). */
   fitas?: { texto: string; pos?: 'left' | 'top' }[]
+  /** Card com texto: caixa com borda + N parágrafos de texto (adicionáveis um a um). `raio` = borda quadrada(0)/redonda. */
+  cardsTexto?: { textos: string[]; raio?: number }[]
   /** Cards de disciplina INDIVIDUAIS (só o card com a fita, sem faixa/introdução): chave + posição da fita. */
   discsIndividuais?: { chave: string; pos?: 'top' | 'left' }[]
   /** Ordem dos blocos na prévia (chaves das entradas). Ausentes ficam na ordem natural, ao final. */
