@@ -102,6 +102,7 @@ export function CronogramasClient({
      visual: para ver "os de 6 horas" era preciso rolar até o bloco certo. */
   const [carga, setCarga] = useState<number | 'todas'>('todas')
   const [ordem, setOrdem] = useState<'padrao' | 'metas' | 'semanas'>('padrao')
+  const [categoria, setCategoria] = useState<string>('todas')
   const [porPagina, setPorPagina] = useState(25)
 
   /**
@@ -138,8 +139,17 @@ export function CronogramasClient({
     else if (filtro === 'sem_pacote') xs = xs.filter((c) => c.pacotes === 0)
     else if (filtro === 'sem_metas') xs = xs.filter((c) => c.metas === 0)
     if (carga !== 'todas') xs = xs.filter((c) => c.carga_horaria === carga)
+    if (categoria !== 'todas') {
+      xs = xs.filter((c) => (categoria === 'sem' ? !c.categoria_id : c.categoria_id === categoria))
+    }
     if (t) {
-      xs = xs.filter((c) => c.nome.toLowerCase().includes(t) || (c.categoria_nome ?? '').toLowerCase().includes(t))
+      /* Busca por TERMOS, não por frase: "12 6h" acha "12 Matérias (6 horas)". Procurar a
+         frase inteira obrigava a lembrar a ordem exata das palavras no nome. */
+      const termos = t.split(/\s+/).filter(Boolean)
+      xs = xs.filter((c) => {
+        const alvo = `${c.nome} ${c.categoria_nome ?? ''} ${c.faixa} ${c.carga_horaria}h`.toLowerCase()
+        return termos.every((termo) => alvo.includes(termo))
+      })
     }
     // A ordenação vale DENTRO de cada carga: reordenar por cima do agrupamento embaralharia
     // os blocos e tiraria justamente a leitura que o agrupamento dá.
@@ -148,20 +158,48 @@ export function CronogramasClient({
       xs = [...xs].sort((a, b) => a.carga_horaria - b.carga_horaria || chave(b) - chave(a))
     }
     return xs
-  }, [itens, busca, filtro, carga, ordem])
+  }, [itens, busca, filtro, carga, categoria, ordem])
 
-  const filtrando = filtro !== 'todos' || carga !== 'todas' || busca.trim().length > 0
+  const filtrando =
+    filtro !== 'todos' || carga !== 'todas' || categoria !== 'todas' || busca.trim().length > 0
+
   function limparFiltros() {
     setFiltro('todos')
     setCarga('todas')
+    setCategoria('todas')
     setBusca('')
   }
+
+  /* O que está filtrando AGORA, em palavras. Com quatro filtros em pílulas espalhadas, era
+     fácil esquecer um ligado e concluir que o catálogo tinha menos cronogramas do que tem. */
+  const ativos: { rotulo: string; limpar: () => void }[] = [
+    ...(busca.trim() ? [{ rotulo: `"${busca.trim()}"`, limpar: () => setBusca('') }] : []),
+    ...(filtro !== 'todos'
+      ? [
+          {
+            rotulo: { liberados: 'Liberados', rascunhos: 'Rascunhos', sem_pacote: 'Sem pacote', sem_metas: 'Sem metas' }[
+              filtro
+            ] as string,
+            limpar: () => setFiltro('todos'),
+          },
+        ]
+      : []),
+    ...(carga !== 'todas' ? [{ rotulo: `${carga}h por dia`, limpar: () => setCarga('todas') }] : []),
+    ...(categoria !== 'todas'
+      ? [
+          {
+            rotulo: categoria === 'sem' ? 'Sem categoria' : (categorias.find((k) => k.id === categoria)?.nome ?? 'Categoria'),
+            limpar: () => setCategoria('todas'),
+          },
+        ]
+      : []),
+  ]
 
   /* Paginação da LISTA. O filtro e a busca continuam valendo sobre o catálogo inteiro — o que
      pagina é só o que se desenha. Com 25 cronogramas não faz diferença; com 300 o navegador
      deixa de montar 300 linhas para mostrar as 25 primeiras. */
   const [pagina, setPagina] = useState(0)
-  useEffect(() => setPagina(0), [busca, filtro, carga, ordem, porPagina])
+  useEffect(() => setPagina(0), [busca, filtro, carga, categoria, ordem, porPagina])
   const ultimaPagina = Math.max(0, Math.ceil(filtrados.length / porPagina) - 1)
   const daPagina = useMemo(
     () => filtrados.slice(pagina * porPagina, (pagina + 1) * porPagina),
@@ -355,10 +393,67 @@ export function CronogramasClient({
 
   return (
     <>
-      {/* Duas réguas de filtro, cada uma respondendo a uma pergunta diferente: "o que precisa
-          de ação?" (situação) e "qual rotina?" (carga). Sem rótulo, viravam uma fileira só de
-          pílulas em que ninguém sabia o que era o quê. */}
-      <div className="space-y-2">
+      {/* TUDO que filtra mora aqui: busca, categoria, situação e carga. Antes a busca ficava no
+          cabeçalho do cartão e as pílulas acima dele — dois lugares para a mesma tarefa, e
+          nenhum deles mostrando o que estava ligado. */}
+      <Card className="space-y-3 p-4">
+      <div className="flex flex-row flex-wrap items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por nome, categoria, dias ou carga — ex.: 12 6h"
+            className="h-9 pl-8 pr-8"
+          />
+          {busca && (
+            <button
+              onClick={() => setBusca('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted"
+              aria-label="Limpar a busca"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {categorias.length > 0 && (
+          <Select value={categoria} onValueChange={(v) => setCategoria(v ?? 'todas')}>
+            <SelectTrigger className="h-9 w-48">
+              <SelectValue>
+                {categoria === 'todas'
+                  ? 'Todas as categorias'
+                  : categoria === 'sem'
+                    ? 'Sem categoria'
+                    : (categorias.find((k) => k.id === categoria)?.nome ?? 'Categoria')}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas as categorias</SelectItem>
+              <SelectItem value="sem">Sem categoria</SelectItem>
+              {categorias.map((k) => (
+                <SelectItem key={k.id} value={k.id}>
+                  {k.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        <Select value={ordem} onValueChange={(v) => setOrdem((v ?? 'padrao') as typeof ordem)}>
+          <SelectTrigger className="h-9 w-44">
+            <SelectValue>
+              {ordem === 'padrao' ? 'Ordem do cadastro' : ordem === 'metas' ? 'Mais metas' : 'Mais semanas'}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="padrao">Ordem do cadastro</SelectItem>
+            <SelectItem value="metas">Mais metas</SelectItem>
+            <SelectItem value="semanas">Mais semanas</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <span className="w-16 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Situação
@@ -412,7 +507,29 @@ export function CronogramasClient({
           ))}
         </div>
       )}
-      </div>
+
+      {ativos.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-t pt-3 text-xs">
+          <span className="text-muted-foreground">
+            {filtrados.length.toLocaleString('pt-BR')} de {itens.length.toLocaleString('pt-BR')} cronogramas
+          </span>
+          {ativos.map((a) => (
+            <button
+              key={a.rotulo}
+              onClick={a.limpar}
+              className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 font-medium text-primary transition hover:bg-primary/20"
+              title="Remover este filtro"
+            >
+              {a.rotulo}
+              <X className="h-3 w-3" />
+            </button>
+          ))}
+          <button onClick={limparFiltros} className="ml-auto text-muted-foreground underline hover:text-foreground">
+            limpar tudo
+          </button>
+        </div>
+      )}
+      </Card>
 
       {contagens.invisiveis > 0 && filtro !== 'sem_pacote' && (
         <AlertBox variante="aviso" titulo={`${contagens.invisiveis} cronograma(s) liberado(s) que ninguém recebe`}>
@@ -438,28 +555,6 @@ export function CronogramasClient({
           }
           acao={
             <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  placeholder="Buscar por nome ou categoria"
-                  className="h-8 w-56 pl-7"
-                />
-              </div>
-
-              <Select value={ordem} onValueChange={(v) => setOrdem((v ?? 'padrao') as typeof ordem)}>
-                <SelectTrigger className="h-8 w-40">
-                  <SelectValue>
-                    {ordem === 'padrao' ? 'Ordem do cadastro' : ordem === 'metas' ? 'Mais metas' : 'Mais semanas'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="padrao">Ordem do cadastro</SelectItem>
-                  <SelectItem value="metas">Mais metas</SelectItem>
-                  <SelectItem value="semanas">Mais semanas</SelectItem>
-                </SelectContent>
-              </Select>
               <Button size="sm" variant="outline" onClick={() => setCategoriasAberto(true)}>
                 <Tags className="mr-1 h-4 w-4" />
                 Categorias
