@@ -13,7 +13,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Card, CardContent } from '@/components/ui/card'
-import { Pencil, BookOpen } from 'lucide-react'
+import { Pencil, BookOpen, Merge } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { QuestoesFilters } from '@/components/admin/questoes-filters'
 import { PaginationControls } from '@/components/admin/pagination-controls'
 import { CopiarCodigo } from '@/components/admin/copiar-codigo'
@@ -21,8 +22,11 @@ import { codigoQuestao, faixaUuidDoCodigo } from '@/lib/codigo-questao'
 import { NovaQuestaoDialog } from '@/components/admin/nova-questao-dialog'
 import { ExportQuestoesButton } from '@/components/admin/export-questoes-button'
 import { SecaoHeader } from '@/components/admin/secao-header'
+import { DisciplinasUnificacao } from '@/components/admin/disciplinas-unificacao'
+import { listarDisciplinasContagem } from './disciplinas-actions'
 
 const ITEMS_PER_PAGE = 20
+const NADA = '00000000-0000-0000-0000-000000000000'
 
 interface PageProps {
   searchParams: Promise<{
@@ -32,6 +36,7 @@ interface PageProps {
     dificuldade?: string
     tipo?: string
     status?: string
+    tab?: string
   }>
 }
 
@@ -58,60 +63,80 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
   const dificuldade = params.dificuldade ?? ''
   const tipo = params.tipo ?? ''
 
+  const tab = params.tab === 'disciplinas' ? 'disciplinas' : 'questoes'
+
   const supabase = await createServiceClient()
   const tenantId = await getCurrentTenantId()
 
-  // Disciplinas do tenant para o filtro (dropdown).
-  const { data: disciplinas } = await supabase
-    .from('simulado_disciplinas')
-    .select('id, nome')
-    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
-    .order('nome')
+  // ── Aba QUESTÕES: filtro (disciplinas) + lista paginada (só busca aqui) ──
+  let disciplinas: { id: string; nome: string }[] = []
+  let questoes: any[] = []
+  let count: number | null = 0
+  let totalPages = 1
+  if (tab === 'questoes') {
+    const { data: disc } = await supabase
+      .from('simulado_disciplinas').select('id, nome')
+      .eq('tenant_id', tenantId ?? NADA).order('nome')
+    disciplinas = (disc ?? []) as { id: string; nome: string }[]
 
-  // Busca por código OU enunciado. Tolerante: se a coluna `codigo` ainda não
-  // existe (migration pendente), refaz sem ela e busca só por enunciado.
-  function montarQuery(comCodigo: boolean) {
-    const sel: string = comCodigo
-      ? 'id, codigo, enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)'
-      : 'id, enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)'
-    let query = supabase
-      .from('simulado_questoes')
-      .select(sel, { count: 'exact' })
-      .eq('deletado', false)
-      .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
-      .order('created_at', { ascending: false })
-      .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)
-
-    if (faixaCodigo) query = query.gte('id', faixaCodigo.lo).lte('id', faixaCodigo.hi)
-    else if (q) query = comCodigo ? query.or(`enunciado.ilike.%${q}%,codigo.ilike.%${q}%`) : query.ilike('enunciado', `%${q}%`)
-    if (status) query = query.eq('status', status)
-    if (disciplina) query = query.eq('disciplina_id', disciplina)
-    if (dificuldade) query = query.eq('nivel_dificuldade', dificuldade)
-    if (tipo) query = query.eq('tipo', tipo)
-    return query
+    // Busca por código OU enunciado. Tolerante: se `codigo` não existir, refaz sem ela.
+    const montarQuery = (comCodigo: boolean) => {
+      const sel: string = comCodigo
+        ? 'id, codigo, enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)'
+        : 'id, enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)'
+      let query = supabase
+        .from('simulado_questoes')
+        .select(sel, { count: 'exact' })
+        .eq('deletado', false)
+        .eq('tenant_id', tenantId ?? NADA)
+        .order('created_at', { ascending: false })
+        .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)
+      if (faixaCodigo) query = query.gte('id', faixaCodigo.lo).lte('id', faixaCodigo.hi)
+      else if (q) query = comCodigo ? query.or(`enunciado.ilike.%${q}%,codigo.ilike.%${q}%`) : query.ilike('enunciado', `%${q}%`)
+      if (status) query = query.eq('status', status)
+      if (disciplina) query = query.eq('disciplina_id', disciplina)
+      if (dificuldade) query = query.eq('nivel_dificuldade', dificuldade)
+      if (tipo) query = query.eq('tipo', tipo)
+      return query
+    }
+    let res = await montarQuery(true)
+    if (res.error && /codigo/i.test(res.error.message)) res = await montarQuery(false)
+    questoes = (res.data ?? []) as any[]
+    count = res.count
+    totalPages = Math.ceil((count ?? 0) / ITEMS_PER_PAGE)
   }
 
-  let res = await montarQuery(true)
-  if (res.error && /codigo/i.test(res.error.message)) res = await montarQuery(false)
-  const questoes = (res.data ?? []) as any[]
-  const count = res.count
-  const totalPages = Math.ceil((count ?? 0) / ITEMS_PER_PAGE)
+  // ── Aba UNIFICAÇÃO: disciplinas + contagens de questões/assuntos ──
+  const discUnif = tab === 'disciplinas' ? ((await listarDisciplinasContagem()).itens ?? []) : []
+
+  const tabCls = (ativo: boolean) => cn('flex items-center gap-1.5 border-b-2 px-1 pb-2 font-medium transition-colors', ativo ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Questões</h1>
           <p className="text-muted-foreground">
-            {count ?? 0} questões cadastradas
+            {tab === 'questoes' ? `${count ?? 0} questões cadastradas` : `${discUnif.length} disciplinas — mescle as duplicadas`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <ExportQuestoesButton filtros={{ q, status, disciplina, dificuldade, tipo }} />
-          <NovaQuestaoDialog />
-        </div>
+        {tab === 'questoes' && (
+          <div className="flex items-center gap-2">
+            <ExportQuestoesButton filtros={{ q, status, disciplina, dificuldade, tipo }} />
+            <NovaQuestaoDialog />
+          </div>
+        )}
       </div>
 
+      {/* Abas: Questões · Unificação de disciplinas */}
+      <div className="flex gap-4 border-b text-sm">
+        <Link href="/admin/questoes" className={tabCls(tab === 'questoes')}><BookOpen className="h-4 w-4" /> Questões</Link>
+        <Link href="/admin/questoes?tab=disciplinas" className={tabCls(tab === 'disciplinas')}><Merge className="h-4 w-4" /> Unificação de disciplinas</Link>
+      </div>
+
+      {tab === 'disciplinas' ? (
+        <DisciplinasUnificacao disciplinas={discUnif} />
+      ) : (<>
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
         <SecaoHeader
           icon={BookOpen}
@@ -192,6 +217,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       </Card>
 
       <PaginationControls page={page} totalPages={totalPages} />
+      </>)}
     </div>
   )
 }
