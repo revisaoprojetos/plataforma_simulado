@@ -46,6 +46,7 @@ const AREA_PERM: { prefix: string; perm: string; ou?: string }[] = [
   { prefix: '/admin/configuracoes', perm: 'configuracoes:view' },
   { prefix: '/admin/transcricao', perm: 'configuracoes:view' },
   { prefix: '/admin/sistema', perm: 'configuracoes:view' },
+  { prefix: '/admin/cronogramas', perm: 'cronogramas:view' },
 ]
 
 export default async function AdminLayout({

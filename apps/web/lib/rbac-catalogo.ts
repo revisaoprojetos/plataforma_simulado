@@ -19,6 +19,10 @@ export const RBAC_CATALOGO: { resource: string; action: string }[] = [
   { resource: 'api_keys', action: 'manage' },
   { resource: 'rbac', action: 'view' }, { resource: 'rbac', action: 'manage' },
   { resource: 'console', action: 'view' },
+  // Cronogramas de estudo. `liberar` é separado de `update` porque decide se o ALUNO enxerga;
+  // `emitir` permite gerar um cronograma em nome de um aluno (atendimento/suporte).
+  { resource: 'cronogramas', action: 'view' }, { resource: 'cronogramas', action: 'create' }, { resource: 'cronogramas', action: 'update' },
+  { resource: 'cronogramas', action: 'delete' }, { resource: 'cronogramas', action: 'liberar' }, { resource: 'cronogramas', action: 'emitir' },
 ]
 
 // Rótulos amigáveis (a matriz usa quando disponíveis; senão cai no valor cru).
@@ -39,6 +43,7 @@ export const RBAC_RECURSO_LABEL: Record<string, string> = {
   relatorios: 'Relatórios',
   gamificacao: 'Gamificação',
   tenants: 'Plataformas',
+  cronogramas: 'Cronogramas de estudo',
 }
 
 export const RBAC_ACAO_LABEL: Record<string, string> = {
@@ -49,4 +54,6 @@ export const RBAC_ACAO_LABEL: Record<string, string> = {
   manage: 'Gerenciar (tudo)',
   export: 'Exportar',
   corrigir: 'Corrigir',
+  liberar: 'Liberar para alunos',
+  emitir: 'Emitir em nome de aluno',
 }

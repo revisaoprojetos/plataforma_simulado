@@ -11,6 +11,7 @@ import {
   Users,
   UsersRound,
   BarChart3,
+  ListChecks,
   Database,
   ClipboardCheck,
   CreditCard,
@@ -42,6 +43,10 @@ import {
   Building2,
   Tag,
   Library,
+  CalendarDays,
+  Upload,
+  Package,
+  Link2 as LinkIcon,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -65,6 +70,7 @@ import {
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { OCULTAR_CRONOGRAMA } from '@/lib/flags'
 import { useCan } from '@/components/auth/can-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { NotificationBell } from '@/components/admin/notification-bell'
@@ -191,9 +197,23 @@ const navGroups: NavGroup[] = [
       { label: 'Ajuda', href: '/admin/ajuda', icon: HelpCircle },
     ],
   },
+  {
+    label: 'Cronograma',
+    icon: CalendarDays,
+    items: [
+      { label: 'Catálogo', href: '/admin/cronogramas', icon: CalendarDays, perm: 'cronogramas:view' },
+      { label: 'Pacotes e acesso', href: '/admin/cronogramas/pacotes', icon: Package, perm: 'cronogramas:view' },
+      { label: 'Links de aula', href: '/admin/cronogramas/links', icon: LinkIcon, perm: 'cronogramas:view' },
+      { label: 'Tipos de meta', href: '/admin/cronogramas/tipos', icon: Tag, perm: 'cronogramas:view' },
+      { label: 'Auditoria de metas', href: '/admin/cronogramas/metas', icon: ListChecks, perm: 'cronogramas:view' },
+      { label: 'Relatórios', href: '/admin/cronogramas/relatorios', icon: BarChart3, perm: 'cronogramas:view' },
+      { label: 'Importar', href: '/admin/cronogramas/importar', icon: Upload, perm: 'cronogramas:update' },
+    ],
+  },
 ]
 
-function itemAtivo(item: NavItem, pathname: string, search: URLSearchParams) {
+/** O item casa com a rota atual? (pode casar mais de um — ver `itemAtivo`) */
+function itemCasa(item: NavItem, pathname: string, search: URLSearchParams) {
   const [path, qs] = item.href.split('?')
   if (item.exact) return pathname === path
   if (qs) {
@@ -203,7 +223,25 @@ function itemAtivo(item: NavItem, pathname: string, search: URLSearchParams) {
     for (const [k, v] of want) if (search.get(k) !== v) return false
     return true
   }
-  return pathname.startsWith(path)
+  return pathname === path || pathname.startsWith(path + '/')
+}
+
+/** Todos os itens navegáveis, para decidir qual é o mais específico. */
+const TODOS_ITENS: NavItem[] = [dashboard, ...navGroups.flatMap((g) => g.items)]
+
+/**
+ * Qual item fica aceso — o MAIS ESPECÍFICO entre os que casam.
+ *
+ * Com `startsWith` puro, uma sub-rota acendia dois itens ao mesmo tempo:
+ * /admin/cronogramas/pacotes casa com "Catálogo" (/admin/cronogramas) e com
+ * "Pacotes e acesso". Ganha o href mais longo — assim o detalhe de um cronograma
+ * (/admin/cronogramas/<id>) continua acendendo o Catálogo, que é o que se espera.
+ */
+function itemAtivo(item: NavItem, pathname: string, search: URLSearchParams) {
+  if (!itemCasa(item, pathname, search)) return false
+  const candidatos = TODOS_ITENS.filter((i) => itemCasa(i, pathname, search))
+  const maisEspecifico = candidatos.reduce((a, b) => (b.href.length > a.href.length ? b : a))
+  return maisEspecifico.href === item.href
 }
 
 function frameLogo(estilo?: string): string {
@@ -234,7 +272,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
   // `areasBloqueadas` já inclui /admin/correcao quando a discursiva está oculta (env ou manutenção).
   const emManutencao = (href: string) => areasBloqueadas.some((h) => href === h || href.startsWith(h + '/'))
   const gruposVisiveis = navGroups
-    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !i.oculto && !(i.superOnly && !isSuperAdmin) && !emManutencao(i.href)) }))
+    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !i.oculto && !(i.superOnly && !isSuperAdmin) && !emManutencao(i.href) && !(OCULTAR_CRONOGRAMA && i.href.startsWith('/admin/cronogramas'))) }))
     .filter((g) => g.items.length > 0)
 
   const grupoAtivo = (group: NavGroup) => group.items.some((i) => itemAtivo(i, pathname, search))

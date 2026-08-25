@@ -5,13 +5,14 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { type LoginConfig } from '@/lib/login-config'
-import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy, Flame, Zap, Route, Library } from 'lucide-react'
+import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy, Flame, Zap, Route, Library, CalendarDays, ChevronRight } from 'lucide-react'
 import {
   Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupContent,
-  SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, useSidebar,
+  SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuSub, SidebarMenuSubItem,
+  SidebarMenuSubButton, SidebarFooter, useSidebar,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
-import { OCULTAR_ALUNO_EXTRAS, ROTAS_ALUNO_OCULTAS, LEITURA_ATIVA } from '@/lib/flags'
+import { OCULTAR_ALUNO_EXTRAS, OCULTAR_CRONOGRAMA, ROTAS_ALUNO_OCULTAS, LEITURA_ATIVA } from '@/lib/flags'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { NotificacaoBellAluno } from '@/components/aluno/notificacao-bell-aluno'
 import { AjudaDrawer } from '@/components/aluno/ajuda-drawer'
@@ -23,7 +24,16 @@ const NAV_STATES =
   // Badge de contagem: acompanha a cor do texto quando ativo/hover (some no estado normal, visível quando selecionado).
   '[&:hover_.nav-badge]:text-[color:var(--sidebar-text-active)] [&[data-active]_.nav-badge]:text-[color:var(--sidebar-text-active)]'
 
-const NAV = [
+type ItemNav = {
+  href: string
+  label: string
+  icon: typeof Home
+  exact?: boolean
+  tour?: string
+  filhos?: { href: string; label: string; exact?: boolean }[]
+}
+
+const NAV: ItemNav[] = [
   { href: '/aluno', label: 'Início', icon: Home, exact: true, tour: 'nav-inicio' },
   { href: '/aluno/simulados', label: 'Meus Simulados', icon: ClipboardList, tour: 'nav-simulados' },
   { href: '/aluno/trilha', label: 'Trilha', icon: Route, tour: 'nav-trilha' },
@@ -33,6 +43,18 @@ const NAV = [
   { href: '/aluno/leitura', label: 'Leitura', icon: Library, tour: 'nav-leitura' },
   { href: '/aluno/favoritos', label: 'Favoritos', icon: Star, tour: 'nav-favoritos' },
   { href: '/aluno/cadernos', label: 'Cadernos', icon: NotebookPen, tour: 'nav-cadernos' },
+  {
+    href: '/aluno/cronograma',
+    label: 'Cronograma',
+    icon: CalendarDays,
+    tour: 'nav-cronograma',
+    // Gerar um plano novo e voltar a um que já existe são tarefas diferentes; o item vira
+    // grupo para as duas terem entrada própria, em vez de uma esconder a outra.
+    filhos: [
+      { href: '/aluno/cronograma', label: 'Gerar cronograma', exact: true },
+      { href: '/aluno/cronograma/meus', label: 'Meus cronogramas' },
+    ],
+  },
 ]
 
 function filtroLogo(f?: string): string | undefined {
@@ -64,12 +86,18 @@ export function AlunoSidebar({
   const [saindo, setSaindo] = useState(false)
   // Ao navegar (ex.: tocar num item pelo "Mais" no mobile), fecha o menu lateral (Sheet).
   useEffect(() => { setOpenMobile(false) }, [pathname, setOpenMobile])
-  const ativo = (n: (typeof NAV)[number]) => (n.exact ? pathname === n.href : pathname.startsWith(n.href))
+  const ativo = (n: { href: string; exact?: boolean }) => (n.exact ? pathname === n.href : pathname.startsWith(n.href))
+  // O grupo abre sozinho quando se está dentro dele — e continua aberto se o aluno abrir na mão.
+  const [abertos, setAbertos] = useState<Record<string, boolean>>({})
+  const expandido = (n: ItemNav) => abertos[n.href] ?? ativo(n)
   // Trilha e Ligas (gamificação) só aparecem quando ativa; + oculta os extras configurados.
   const nav = NAV.filter((n) =>
     (gamAtivo || (n.href !== '/aluno/trilha' && n.href !== '/aluno/ligas')) &&
     (LEITURA_ATIVA || n.href !== '/aluno/leitura') &&
-    !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(n.href)),
+    !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(n.href)) &&
+    // Cronograma tem DOIS gates: esta flag (enquanto o módulo está em construção) e a coluna
+    // `ativo` de simulado_cronograma_config, que liga por tenant — respeitada dentro da página.
+    !(OCULTAR_CRONOGRAMA && n.href === '/aluno/cronograma'),
   )
 
   async function sair() {
@@ -113,6 +141,38 @@ export function AlunoSidebar({
             <SidebarMenu className="gap-1">
               {nav.map((n) => {
                 const c = counts?.[n.href]
+                if (n.filhos) {
+                  const aberto = expandido(n)
+                  return (
+                    <SidebarMenuItem key={n.href} data-tour={n.tour}>
+                      {/* Botão, não link: abrir o grupo não deve navegar — o primeiro filho já é
+                          a tela principal, e navegar ao expandir tira o aluno do lugar sem querer. */}
+                      <SidebarMenuButton
+                        className={NAV_STATES}
+                        onClick={() => setAbertos((a) => ({ ...a, [n.href]: !aberto }))}
+                        isActive={ativo(n)}
+                        tooltip={n.label}
+                      >
+                        <n.icon className="h-4 w-4" />
+                        <span>{n.label}</span>
+                        <ChevronRight
+                          className={`ml-auto h-4 w-4 transition-transform group-data-[collapsible=icon]:hidden ${aberto ? 'rotate-90' : ''}`}
+                        />
+                      </SidebarMenuButton>
+                      {aberto && (
+                        <SidebarMenuSub>
+                          {n.filhos.map((f) => (
+                            <SidebarMenuSubItem key={f.href}>
+                              <SidebarMenuSubButton render={<Link href={f.href} />} isActive={ativo(f)}>
+                                <span>{f.label}</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      )}
+                    </SidebarMenuItem>
+                  )
+                }
                 return (
                   <SidebarMenuItem key={n.href} data-tour={n.tour}>
                     <SidebarMenuButton className={NAV_STATES} render={<Link href={n.href} />} isActive={ativo(n)} tooltip={n.label}>

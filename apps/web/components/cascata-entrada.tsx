@@ -10,7 +10,7 @@ const useIsoEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 // Passo por card (sensação "normal") e JANELA máxima de escalonamento. TODOS os cards entram na
 // sequência (mais simulados/cadernos/banco → mais cards animando, sem teto). O passo em ms se
 // AUTO-AJUSTA: fica em PASSO_MS para páginas típicas e comprime só quando há muitos cards, para o
-// total nunca passar de ~JANELA_MS (evita arrastar). O passo é publicado em `--cascata-step`.
+// total nunca passar de ~JANELA_MS (evita arrastar). O passo entra no animation-delay de cada regra.
 const PASSO_MS = 75
 const JANELA_MS = 1800
 
@@ -113,22 +113,53 @@ export function CascataEntrada({ children, ativa = true }: { children: React.Rea
     obsLoader.observe(root, { childList: true, subtree: true })
     requestAnimationFrame(() => { if (carregando()) revelar() })
 
+    // Folha de estilo PRÓPRIA, pendurada no <head> — fora da árvore do React.
+    //
+    // Antes a cascata marcava cada card com `data-cascata` + `--cascata-i`. Mexer nos atributos de um
+    // nó que o React ainda está HIDRATANDO faz ele acusar "server rendered HTML didn't match": o HTML
+    // do servidor não traz essas marcas. O adiamento para o idle reduzia a chance, mas era corrida —
+    // em página pesada a hidratação passa dos 500ms do timeout e o aviso volta.
+    //
+    // Escrevendo REGRAS em vez de tocar nos elementos, não existe o que divergir: os cards continuam
+    // exatamente como o servidor mandou, e o atraso de cada um chega pelo CSS. O aviso deixa de ser
+    // possível, não importa quando a cascata rodar.
+    const estilo = document.createElement('style')
+    estilo.setAttribute('data-cascata-regras', '')
+    document.head.appendChild(estilo)
+
+    // Caminho `:nth-child` do card até a raiz — vira o "endereço" que o atributo dava antes.
+    const caminho = (el: HTMLElement): string | null => {
+      const partes: string[] = []
+      let n: HTMLElement | null = el
+      while (n && n !== root) {
+        const pai: HTMLElement | null = n.parentElement
+        if (!pai) return null
+        partes.unshift(`>*:nth-child(${Array.prototype.indexOf.call(pai.children, n) + 1})`)
+        n = pai
+      }
+      return n === root ? partes.join('') : null
+    }
+
     const aplicar = (): boolean => {
       if (carregando()) return false // espera o conteúdo REAL substituir o loader
       const cards = coletarCards(root)
       if (!cards.length) return false
-      // data-cascata (atributo) + --cascata-i (custom property): NÃO são gerenciados pelo React,
-      // então não brigam com o className/style dos cards (evita erro de hidratação/reconciliação).
-      cards.forEach((el) => { el.removeAttribute('data-cascata'); el.style.removeProperty('--cascata-i') })
-      void root.offsetWidth // reflow: garante que remover+readicionar REINICIE a animação
+      const alvos = cards.map(caminho).filter((c): c is string => c !== null)
+      if (!alvos.length) return false
       // Passo auto-ajustável: normal (PASSO_MS) até caber em JANELA_MS; comprime se houver muitos
       // cards. Assim a cascata SEMPRE percorre todos os cards, sem arrastar quando há muitos.
       const passo = cards.length > 1 ? Math.min(PASSO_MS, Math.round(JANELA_MS / (cards.length - 1))) : PASSO_MS
-      root.style.setProperty('--cascata-step', `${passo}ms`)
-      cards.forEach((el, i) => {
-        el.style.setProperty('--cascata-i', String(i))
-        el.setAttribute('data-cascata', '')
-      })
+      estilo.textContent = ''
+      void root.offsetWidth // reflow: limpar + reescrever REINICIA a animação a cada navegação
+      // `!important` é preciso para vencer o `.cascata-root > * { animation: none !important }` do
+      // globals.css (que existe para a RAIZ não animar em bloco); `:nth-child` já dá especificidade maior.
+      const sel = (c: string) => `.cascata-root${c}`
+      estilo.textContent =
+        alvos
+          .map((c, i) => `${sel(c)}{animation:riseIn .55s cubic-bezier(.2,.8,.2,1) both!important;animation-delay:${i * passo}ms!important}`)
+          .join('') +
+        // Congela a cascata enquanto o splash está na tela (o globals fazia isso via [data-cascata]).
+        `html.splash-ativo :is(${alvos.map(sel).join(',')}){animation-play-state:paused!important}`
       return true
     }
 
@@ -143,7 +174,7 @@ export function CascataEntrada({ children, ativa = true }: { children: React.Rea
       if (carregando()) revelar()
       // Ou o loader de rota está na tela (o CSS já o exibe via :has), ou o conteúdo async/streaming
       // ainda vai chegar. Observa até o loader SAIR e o conteúdo real aparecer → então a cascata roda
-      // (data-cascata é aplicado na MESMA callback do observer, antes do paint → sem "flash").
+      // (as regras entram na MESMA callback do observer, antes do paint → sem "flash").
       obs = new MutationObserver(() => {
         if (carregando()) { revelar(); return } // loader (ainda) na tela → mantém VISÍVEL e espera o conteúdo real
         if (aplicar()) { obs?.disconnect(); clearTimeout(seguranca); revelar() }
@@ -173,6 +204,7 @@ export function CascataEntrada({ children, ativa = true }: { children: React.Rea
 
     return () => {
       cancelado = true
+      estilo.remove()
       obs?.disconnect()
       obsLoader.disconnect()
       clearTimeout(seguranca)

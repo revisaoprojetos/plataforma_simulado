@@ -28,6 +28,8 @@ const CATALOGO = [
   ['configuracoes', 'view'], ['configuracoes', 'manage'],
   ['api_keys', 'manage'],
   ['rbac', 'view'], ['rbac', 'manage'], ['console', 'view'],
+  ['cronogramas', 'view'], ['cronogramas', 'create'], ['cronogramas', 'update'],
+  ['cronogramas', 'delete'], ['cronogramas', 'liberar'], ['cronogramas', 'emitir'],
 ].map(([resource, action]) => ({ resource, action }))
 
 const alvo = process.argv[2] || null
