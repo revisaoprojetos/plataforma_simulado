@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Clock, ListChecks, Package, Pencil, Plus, Search, Trash2, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -23,6 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DisciplinaPicker } from '@/components/cronograma/disciplina-picker'
+import { MontarSemana } from './montar-semana'
 import { SimuladoPicker, type SimuladoOpcao } from '@/components/cronograma/simulado-picker'
 import { alternarCronogramaNoPacote } from '../pacotes/actions'
 import type { MetaFonte, TipoMeta, TipoMetaDef } from '@/lib/cronograma/tipos'
@@ -75,6 +77,7 @@ export function MetasClient({
   const corTipo = (slug: string) => porSlug.get(slug)?.cor || null
   const ordemDoTipo = (slug: string) => porSlug.get(slug)?.ordem ?? 999
   const [metas, setMetas] = useState(metasIniciais)
+  const router = useRouter()
   const [pendente, iniciar] = useTransition()
   const [semanaAtiva, setSemanaAtiva] = useState<number>(1)
   const [aberto, setAberto] = useState(false)
@@ -300,10 +303,21 @@ export function MetasClient({
               : `Semana ${semanaAtiva} de ${c.total_semanas}${revisao.has(semanaAtiva) ? ' · marcada como revisão' : ''} · ${daSemana.length} meta(s)`
           }
           acao={
-            <Button size="sm" onClick={abrirNova} disabled={pendente}>
-              <Plus className="mr-1 h-4 w-4" />
-              Nova meta
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <MontarSemana
+                cronogramaId={c.id}
+                semana={semanaAtiva}
+                totalSemanas={c.total_semanas}
+                diasNome={c.dias_nome}
+                tipos={tipos}
+                disciplinas={disciplinas}
+                aoCriar={() => router.refresh()}
+              />
+              <Button size="sm" variant="ghost" onClick={abrirNova} disabled={pendente} title="Diálogo completo — use para meta que aponta simulado">
+                <Plus className="mr-1 h-4 w-4" />
+                Nova meta
+              </Button>
+            </div>
           }
         />
 

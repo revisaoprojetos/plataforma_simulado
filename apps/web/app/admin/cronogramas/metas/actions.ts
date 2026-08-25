@@ -15,6 +15,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
+import { chaveAula } from '@/lib/cronograma/aula'
 
 async function guard(perm = 'cronogramas:view') {
   if (!(await checkPermission(perm))) return { ok: false as const, error: 'Sem permissão.' }
@@ -175,12 +176,8 @@ export async function padronizarFormatoAula(
       .order('id') as never,
   )
 
-  const chave = (a: string | null) => {
-    const t = (a ?? '').trim()
-    return /^\d+$/.test(t) ? String(Number(t)) : t.toLowerCase()
-  }
   const ids = candidatas
-    .filter((m) => chave(m.aula) === aulaChave && (m.aula ?? '').trim() !== alvo)
+    .filter((m) => chaveAula(m.aula) === aulaChave && (m.aula ?? '').trim() !== alvo)
     .map((m) => m.id)
 
   if (!ids.length) return { ok: true, alterados: 0 }

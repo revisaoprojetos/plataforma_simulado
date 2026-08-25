@@ -10,6 +10,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { somarAula } from '@/lib/cronograma/aula'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { chaveLink } from '@/lib/cronograma/formato-meta'
 import { listarTiposMeta } from '@/lib/cronograma/carregar-tipos'
@@ -296,6 +297,188 @@ export async function criarMeta(cronogramaId: string, e: EntradaMeta): Promise<{
     tenantId: g.tenantId,
   })
   return { ok: true, id: (data as any).id }
+}
+
+/**
+ * Cria VÁRIAS metas numa ida só.
+ *
+ * Montar uma semana pela tela eram 12 idas ao servidor, uma por meta, cada uma com sua
+ * validação de tipo e seu round-trip. Aqui a validação roda uma vez para o lote e o INSERT
+ * é único — é o que separa "adicionar uma linha" de "montar uma semana".
+ */
+export async function criarMetasEmLote(
+  cronogramaId: string,
+  metas: EntradaMeta[],
+): Promise<{ ok: boolean; criadas?: number; error?: string }> {
+  const g = await guard('cronogramas:update')
+  if (!g.ok) return { ok: false, error: g.error }
+  if (!metas.length) return { ok: false, error: 'Nenhuma meta para criar.' }
+
+  const svc = createAdminClient()
+  const c = await cronogramaDoTenant(svc, g.tenantId, cronogramaId)
+  if (!c) return { ok: false, error: 'Cronograma não encontrado.' }
+
+  // Valida o lote inteiro ANTES de gravar: meio lote gravado é pior que lote nenhum, porque
+  // o usuário não sabe onde parou.
+  const tiposUsados = [...new Set(metas.map((m) => m.tipo))]
+  for (const t of tiposUsados) {
+    const erroTipo = await validarTipo(svc, g.tenantId, t)
+    if (erroTipo) return { ok: false, error: erroTipo }
+  }
+  for (const [i, m] of metas.entries()) {
+    const erro = validarMeta(m, c)
+    if (erro) return { ok: false, error: `Meta ${i + 1}: ${erro}` }
+    const erroDestino = validarDestinoSimulado(m, m.tipo === 'simulado')
+    if (erroDestino) return { ok: false, error: `Meta ${i + 1}: ${erroDestino}` }
+  }
+
+  const linhas = metas.map((m) => ({ tenant_id: g.tenantId, cronograma_id: cronogramaId, ...normalizar(m) }))
+  const { error } = await svc.from('simulado_cronograma_metas').insert(linhas)
+  if (error) return { ok: false, error: error.message }
+
+  await registrarAudit({
+    operacao: 'INSERT',
+    entidade: 'simulado_cronograma_metas',
+    entidadeId: cronogramaId,
+    depois: { cronograma_nome: c.nome, em_lote: linhas.length, semanas: [...new Set(metas.map((m) => m.semana))] },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  return { ok: true, criadas: linhas.length }
+}
+
+export type OpcoesRepetir = {
+  /** Quanto somar à aula a cada semana repetida. 0 mantém a aula igual. */
+  incrementoAula: number
+  /** Semanas que já têm metas: substituir o conteúdo ou deixar como está. */
+  substituir: boolean
+}
+
+/**
+ * Repete as metas de UMA semana para um intervalo de semanas.
+ *
+ * É o que transforma 77 semanas em uma decisão. Quem monta um cronograma não toma 900
+ * decisões independentes: define o padrão de uma semana — que disciplina em cada dia, que
+ * tipos — e as semanas seguintes são a mesma forma com as aulas avançando.
+ *
+ * Semanas de revisão do cadastro ficam de fora sozinhas: elas não têm metas de propósito, e
+ * preenchê-las faria o gerador ignorá-las e a tela acusar "semana marcada como revisão mas
+ * com metas".
+ */
+export async function repetirSemana(
+  cronogramaId: string,
+  origem: number,
+  de: number,
+  ate: number,
+  opcoes: OpcoesRepetir,
+): Promise<{ ok: boolean; criadas?: number; semanas?: number; puladas?: number[]; error?: string }> {
+  const g = await guard('cronogramas:update')
+  if (!g.ok) return { ok: false, error: g.error }
+
+  const svc = createAdminClient()
+  const { data: cron } = await svc
+    .from('simulado_cronogramas')
+    .select('id, nome, total_semanas, dias_curso, semanas_revisao')
+    .eq('id', cronogramaId)
+    .eq('tenant_id', g.tenantId)
+    .eq('deletado', false)
+    .maybeSingle()
+  if (!cron) return { ok: false, error: 'Cronograma não encontrado.' }
+  const c = cron as { nome: string; total_semanas: number; dias_curso: number[]; semanas_revisao: number[] }
+
+  if (de < 1 || ate > c.total_semanas || de > ate) {
+    return { ok: false, error: `O intervalo precisa estar entre 1 e ${c.total_semanas}.` }
+  }
+
+  const { data: modelo } = await svc
+    .from('simulado_cronograma_metas')
+    .select('dia, tipo, disciplina, disciplina_id, aula, conteudo, duracao, ordem, simulado_id, simulado_externo_nome, simulado_externo_url')
+    .eq('tenant_id', g.tenantId)
+    .eq('cronograma_id', cronogramaId)
+    .eq('semana', origem)
+    .order('dia')
+    .order('ordem')
+  const base = (modelo ?? []) as Omit<EntradaMeta, 'semana'>[]
+  if (!base.length) return { ok: false, error: `A semana ${origem} não tem metas para repetir.` }
+
+  const revisao = new Set(c.semanas_revisao ?? [])
+  const alvos: number[] = []
+  const puladas: number[] = []
+  for (let s = de; s <= ate; s++) {
+    if (s === origem) continue
+    if (revisao.has(s)) {
+      puladas.push(s)
+      continue
+    }
+    alvos.push(s)
+  }
+  if (!alvos.length) return { ok: false, error: 'Nenhuma semana no intervalo para preencher.' }
+
+  // Quais alvos já têm metas — decide entre substituir e pular.
+  const { data: existentes } = await svc
+    .from('simulado_cronograma_metas')
+    .select('semana')
+    .eq('tenant_id', g.tenantId)
+    .eq('cronograma_id', cronogramaId)
+    .in('semana', alvos)
+  const comMetas = new Set((existentes ?? []).map((x: { semana: number }) => x.semana))
+
+  const paraGravar: number[] = []
+  for (const s of alvos) {
+    if (comMetas.has(s) && !opcoes.substituir) {
+      puladas.push(s)
+      continue
+    }
+    paraGravar.push(s)
+  }
+  if (!paraGravar.length) {
+    return { ok: false, error: 'Todas as semanas do intervalo já têm metas. Marque "substituir" para sobrescrever.' }
+  }
+
+  if (opcoes.substituir) {
+    const cheias = paraGravar.filter((s) => comMetas.has(s))
+    if (cheias.length) {
+      const { error } = await svc
+        .from('simulado_cronograma_metas')
+        .delete()
+        .eq('tenant_id', g.tenantId)
+        .eq('cronograma_id', cronogramaId)
+        .in('semana', cheias)
+      if (error) return { ok: false, error: error.message }
+    }
+  }
+
+  const linhas = paraGravar.flatMap((s) => {
+    // O incremento acompanha a DISTÂNCIA até a origem, não a posição no intervalo: repetir a
+    // semana 3 para 4..10 dá +1 na 4, +2 na 5, e assim por diante.
+    const passos = s - origem
+    return base.map((m) => ({
+      tenant_id: g.tenantId,
+      cronograma_id: cronogramaId,
+      ...normalizar({ ...m, semana: s, aula: somarAula(m.aula, passos * opcoes.incrementoAula) } as EntradaMeta),
+    }))
+  })
+
+  const { error } = await svc.from('simulado_cronograma_metas').insert(linhas)
+  if (error) return { ok: false, error: error.message }
+
+  await registrarAudit({
+    operacao: 'INSERT',
+    entidade: 'simulado_cronograma_metas',
+    entidadeId: cronogramaId,
+    depois: {
+      cronograma_nome: c.nome,
+      repetiu_semana: origem,
+      para: paraGravar,
+      metas: linhas.length,
+      incremento_aula: opcoes.incrementoAula,
+      substituiu: opcoes.substituir,
+    },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+
+  return { ok: true, criadas: linhas.length, semanas: paraGravar.length, puladas }
 }
 
 export async function atualizarMeta(cronogramaId: string, metaId: string, e: EntradaMeta): Promise<{ ok: boolean; error?: string }> {

@@ -6,6 +6,7 @@ import { addDias, dow, offsetDesdeSegunda, proximaSegunda } from '../apps/web/li
 import { compactarSemanas, gerarGrade, montarPauta } from '../apps/web/lib/cronograma/gerador'
 import { faixaSemanal } from '../apps/web/lib/cronograma/faixa'
 import { duracaoEmMinutos, fmtFaixa, somarDuracoes } from '../apps/web/lib/cronograma/duracao'
+import { chaveAula, somarAula } from '../apps/web/lib/cronograma/aula'
 import { rotuloConteudo } from '../apps/web/lib/cronograma/formato-meta'
 import type { CronogramaFonte, MapaTipos, MetaFonte, TipoMeta, TipoMetaDef } from '../apps/web/lib/cronograma/tipos'
 
@@ -176,6 +177,22 @@ for (const [entrada, esperado] of DURACOES) {
 eq('soma de um dia (3-4h + 30min-1h)', fmtFaixa(somarDuracoes(['3 - 4h', '30 min - 1h'])!), '3h30 – 5h')
 ok('texto irreconhecível NÃO vira total parcial', somarDuracoes(['1h', 'até acabar']) === null)
 eq('meta sem duração não impede a soma', fmtFaixa(somarDuracoes(['1h', null, '30m'])!), '1h30')
+
+console.log('=== Aula — repetir semana preserva o formato (R11) ===')
+/* "01" e "1" são aulas DIFERENTES para o banco, e o link casa por texto exato. Somar errado
+   ao repetir uma semana quebraria o link de todas as semanas geradas, em silêncio. */
+eq('01 + 1 mantém o zero', somarAula('01', 1), '02')
+eq('09 + 1 cede a largura', somarAula('09', 1), '10')
+eq('1 + 1 continua sem zero', somarAula('1', 1), '2')
+eq('9 + 1', somarAula('9', 1), '10')
+eq('01 + 0 não mexe', somarAula('01', 0), '01')
+eq('007 + 1', somarAula('007', 1), '008')
+eq('1.1 não é incrementável', somarAula('1.1', 1), '1.1')
+eq('nulo continua nulo', somarAula(null, 1), null)
+eq('não desce abaixo de zero', somarAula('01', -5), '01')
+eq('chave junta 01 e 1', chaveAula('01'), chaveAula('1'))
+eq('chave preserva 1.1', chaveAula('1.1'), '1.1')
+eq('chave de vazio', chaveAula(null), '')
 
 console.log(`\n${'='.repeat(50)}\nPASSOU: ${passou}   FALHOU: ${falhou}\n${'='.repeat(50)}`)
 process.exit(falhou ? 1 : 0)
