@@ -14,14 +14,23 @@ export const dynamic = 'force-dynamic'
  * meta está em quantos cronogramas?", "a mesma aula está gravada de dois jeitos?", "que semanas
  * têm durações que se contradizem?". Antes, responder isso significava abrir 26 telas.
  *
- * As três seções não são um relatório: cada uma traz a correção junto, porque um diagnóstico
- * que obriga a corrigir em outro lugar costuma não ser corrigido.
+ * A tela separa duas coisas que a primeira versão misturava:
+ *
+ *   - O que PRECISA de decisão — formato de aula divergente, durações que se contradizem. São
+ *     poucos, têm consequência conhecida, e cada um traz a correção junto: diagnóstico que
+ *     obriga a corrigir noutro lugar costuma não ser corrigido.
+ *   - O que serve para CONSULTAR — onde uma meta aparece. A mesma aula de Constitucional está
+ *     em 18 cronogramas porque DEVE estar; listar isso como achado alarmava sobre o que está
+ *     certo e escondia o que não está.
  */
 export default async function AuditoriaMetasPage() {
+  /* A busca de metas começa VAZIA — é ferramenta de consulta, não relatório. Só o total vem
+     do servidor, para o cartão poder dizer "1.543 metas em mais de um cronograma, e isto é o
+     normal". Deixou de baixar 25 grupos que ninguém pediu. */
   const [variantes, duracoes, grupos] = await Promise.all([
     carregarVariantesAula(),
     carregarDuracoes(),
-    buscarGrupos('', 2, null, 0, 25),
+    buscarGrupos('', 2, null, 0, 1),
   ])
 
   if (!variantes.ok || !grupos.ok) {
@@ -43,15 +52,13 @@ export default async function AuditoriaMetasPage() {
           Auditoria de metas
         </h1>
         <p className="text-muted-foreground">
-          A mesma meta vista por todos os cronogramas: onde ela está, onde está gravada de formas
-          diferentes, e o que dá para padronizar de uma vez.
+          Onde as metas se contradizem entre cronogramas — e onde uma meta específica aparece.
         </p>
       </div>
 
       <MetasAuditoriaClient
         variantesIniciais={variantes.itens ?? []}
         duracoesIniciais={duracoes.itens ?? []}
-        gruposIniciais={grupos.itens ?? []}
         totalGrupos={grupos.total ?? 0}
         tipos={tipos.map((t) => ({ slug: t.slug, nome: t.nome }))}
       />
