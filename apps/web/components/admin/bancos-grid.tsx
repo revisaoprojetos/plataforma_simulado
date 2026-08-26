@@ -60,13 +60,15 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null, 
           className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted">
           <FolderPlus className="h-4 w-4" /> {atual ? 'Nova subpasta' : 'Nova pasta'}
         </button>
-        {atual && trilha.length > 0 && (
+        {atual && (
           <div className="flex flex-wrap items-center gap-1">
+            {/* Caminho completo: Início › pasta pai › … › pasta atual */}
+            <Link href="/admin/banco-questoes" className="rounded-lg px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Início</Link>
             {trilha.map((t, i) => {
               const ultimo = i === trilha.length - 1
               return (
                 <span key={t.id} className="inline-flex items-center gap-1">
-                  {i > 0 && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                   {ultimo ? (
                     <span className="max-w-[180px] truncate rounded-lg px-2 py-1 text-sm font-semibold text-foreground">{t.nome}</span>
                   ) : (
