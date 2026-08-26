@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { funcaoEtiquetaPorQuestao } from './etiqueta-funcao'
 
 const strip = (x: unknown) => String(x ?? '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
 
@@ -34,9 +35,14 @@ export async function montarRevisao(svc: SupabaseClient, simuladoId: string, ses
     respPorQ.set(r.questao_id, { escolhida: r.alternativa_id ?? r.snapshot_gabarito?.alternativa_id ?? null, correta: !!r.correta })
   }
 
+  // Anulação: boolean per-simulado OU etiqueta funcional (anular = ponto garantido; desconsiderar = fora do total).
+  const funcMap = await funcaoEtiquetaPorQuestao(svc, ((pq ?? []) as any[]).map((r) => r.questao_id))
+
   return ((pq ?? []) as any[]).map((r) => {
     const q = r.questoes ?? {}
-    const anulada = r.anulada === true
+    const ef = funcMap.get(r.questao_id)?.funcao
+    const desconsiderada = ef === 'desconsiderar'
+    const anulada = !desconsiderada && (ef === 'anular' || r.anulada === true)
     const info = respPorQ.get(q.id)
     const alts = [...(q.alternativas ?? [])].sort((a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0)).map((a: any, i: number) => ({
       letra: String.fromCharCode(65 + i),
@@ -50,9 +56,9 @@ export async function montarRevisao(svc: SupabaseClient, simuladoId: string, ses
       disciplina: q.disciplinas?.nome ?? null,
       comentario: revelar ? (q.comentario_professor ? strip(q.comentario_professor) : null) : null,
       respondida: !!info,
-      // Anulada = ponto garantido a todos.
-      acertou: anulada ? true : (revelar ? (info ? info.correta : null) : null),
-      anulada,
+      // Anulada = ponto garantido a todos; desconsiderada = fora do total (não pontua nem erra).
+      acertou: anulada ? true : (desconsiderada ? null : (revelar ? (info ? info.correta : null) : null)),
+      anulada: anulada || desconsiderada,
       alternativas: alts,
     }
   })

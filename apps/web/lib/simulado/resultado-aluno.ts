@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { funcaoEtiquetaPorQuestao } from './etiqueta-funcao'
 
 const strip = (x: unknown) => String(x ?? '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
 
@@ -58,9 +59,18 @@ export async function montarResultadoAluno(
     .select('ordem, anulada, questao_id, questoes:simulado_questoes(id, enunciado, comentario_professor, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, correta))')
     .eq('simulado_id', simuladoId).order('ordem')
   const questoesRaw = (pq ?? []) as any[]
-  const totalQuestoes = questoesRaw.length
-  // Anuladas continuam no total e valem ponto para TODOS (não contam como erro/branco).
-  const anuladaSet = new Set<string>(questoesRaw.filter((r) => r.anulada === true).map((r) => r.questao_id))
+  // Anulação: boolean per-simulado OU etiqueta funcional (anular/desconsiderar).
+  //  - anular → ponto garantido a todos (continua no total).
+  //  - desconsiderar → sai do total (não conta pra ninguém).
+  const funcMap = await funcaoEtiquetaPorQuestao(svc, questoesRaw.map((r) => r.questao_id))
+  const anuladaSet = new Set<string>()      // ponto garantido (anular OU boolean)
+  const desconsideraSet = new Set<string>() // fora do total
+  for (const r of questoesRaw) {
+    const ef = funcMap.get(r.questao_id)?.funcao
+    if (ef === 'desconsiderar') desconsideraSet.add(r.questao_id)
+    else if (ef === 'anular' || r.anulada === true) anuladaSet.add(r.questao_id)
+  }
+  const totalQuestoes = questoesRaw.length - desconsideraSet.size
   const discDeQ = new Map<string, string>()
   for (const r of questoesRaw) discDeQ.set(r.questao_id, r.questoes?.disciplinas?.nome ?? 'Sem disciplina')
 
@@ -84,7 +94,7 @@ export async function montarResultadoAluno(
     let acertos = 0
     const disc = new Map<string, { ac: number; tt: number }>()
     for (const [qid, r] of respMap) {
-      if (anuladaSet.has(qid)) continue // anuladas tratadas abaixo (ponto pra todos)
+      if (anuladaSet.has(qid) || desconsideraSet.has(qid)) continue // anuladas creditadas abaixo; desconsideradas fora do total
       const dn = discDeQ.get(qid) ?? 'Sem disciplina'
       const d = disc.get(dn) ?? { ac: 0, tt: 0 }
       d.tt++; if (r.correta) { d.ac++; acertos++ }
@@ -110,7 +120,8 @@ export async function montarResultadoAluno(
   // Questões agregadas entre todas as tentativas.
   const questoes: QuestaoAgregada[] = questoesRaw.map((r) => {
     const q = r.questoes ?? {}
-    const anulada = r.anulada === true
+    const anulada = anuladaSet.has(r.questao_id)           // ponto garantido a todos (anular OU boolean)
+    const desconsiderada = desconsideraSet.has(r.questao_id) // fora do total
     const alts = [...(q.alternativas ?? [])].sort((a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0))
     const letraDe = new Map<string, string>()
     const altsOut: AltAgregada[] = alts.map((a: any, i: number) => {
@@ -122,7 +133,7 @@ export async function montarResultadoAluno(
     if (anulada) {
       // Ponto garantido: conta como acerto em todas as tentativas, sem erro/branco.
       acertou = sessoes.length
-    } else {
+    } else if (!desconsiderada) {
       for (const s of sessoes) {
         const resp = (bySessao.get(s.id) ?? new Map<string, any>()).get(q.id)
         const escolhida = resp?.alternativa_id ?? resp?.snapshot_gabarito?.alternativa_id ?? null
@@ -132,12 +143,13 @@ export async function montarResultadoAluno(
         if (resp.correta) acertou++; else errou++
       }
     }
+    // desconsiderada: fica 0/0/0 (fora do total) — badge de anulada só sinaliza que está fora de jogo.
     return {
       ordem: (r.ordem ?? 0) + 1,
       enunciado: strip(q.enunciado) || '(sem enunciado)',
       disciplina: q.disciplinas?.nome ?? null,
       comentario: revelarGabarito ? (q.comentario_professor ? strip(q.comentario_professor) : null) : null,
-      alternativas: altsOut, acertou, errou, branco, anulada,
+      alternativas: altsOut, acertou, errou, branco, anulada: anulada || desconsiderada,
     }
   })
 

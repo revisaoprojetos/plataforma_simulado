@@ -8,6 +8,7 @@ import { PaginationControls } from '@/components/admin/pagination-controls'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { etiquetasPorQuestao } from '@/lib/aluno/etiquetas-questao'
 import { provasPorQuestao } from '@/lib/aluno/provas-questao'
+import { questoesForaDeJogoTenant } from '@/lib/simulado/questoes-anuladas'
 import { Target, CheckCircle2, Percent } from 'lucide-react'
 
 const POR_PAGINA = 10
@@ -31,7 +32,7 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
     svc.from('simulado_disciplinas').select('id, nome').eq('tenant_id', tid).order('nome'),
     svc.from('simulado_bancas').select('id, nome').eq('tenant_id', tid).order('nome'),
     svc.from('simulado_assuntos').select('id, nome, disciplina_id').eq('tenant_id', tid).order('nome'),
-    svc.from('simulado_questoes').select('ano, disciplina_id').eq('tenant_id', tid).eq('status', 'publicada').eq('deletado', false).neq('tipo', 'discursiva').limit(3000),
+    svc.from('simulado_questoes').select('ano, disciplina_id').eq('tenant_id', tid).eq('status', 'publicada').eq('deletado', false).eq('anulada', false).neq('tipo', 'discursiva').limit(3000),
     svc.from('simulado_respostas_avulsas').select('*', { count: 'exact', head: true }).eq('estudante_id', estId).then((r) => r.count ?? 0, () => 0),
     svc.from('simulado_respostas_avulsas').select('*', { count: 'exact', head: true }).eq('estudante_id', estId).eq('correta', true).then((r) => r.count ?? 0, () => 0),
   ])
@@ -41,9 +42,16 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
   const disciplinas = (disciplinasAll ?? []).filter((d: any) => discUsadas.has(d.id))
   const pct = praticaTotal > 0 ? Math.round((praticaAcertos / praticaTotal) * 100) : 0
 
+  // Questões ANULADAS (etiqueta funcional anular/desconsiderar OU boolean) não podem ser praticadas:
+  // some da lista (o runner já as bloqueia). Conjunto do tenant (normalmente pequeno) excluído via not-in.
+  const foraDeJogo = await questoesForaDeJogoTenant(svc, tid)
+  const foraIds = [...foraDeJogo]
+
   // Aplica os filtros de taxonomia/busca a QUALQUER query builder de questões (reusado nos 2 caminhos).
   const aplicarFiltros = (qb: any) => {
-    qb = qb.eq('tenant_id', tid).eq('status', 'publicada').eq('deletado', false).neq('tipo', 'discursiva')
+    // .eq('anulada', false) + not-in(foraDeJogo): remove as anuladas (por boolean e por etiqueta).
+    qb = qb.eq('tenant_id', tid).eq('status', 'publicada').eq('deletado', false).eq('anulada', false).neq('tipo', 'discursiva')
+    if (foraIds.length) qb = qb.not('id', 'in', `(${foraIds.join(',')})`)
     if (params.disciplina) qb = qb.eq('disciplina_id', params.disciplina)
     if (params.assunto) qb = qb.eq('assunto_id', params.assunto)
     if (params.banca) qb = qb.eq('banca_id', params.banca)

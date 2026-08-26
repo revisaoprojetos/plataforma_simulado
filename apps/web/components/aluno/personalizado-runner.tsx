@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Check, X, Eye, EyeOff, Loader2, Flag, GraduationCap, Timer, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, FileText, Scissors, Bold, Italic, Underline, List, Baseline, Highlighter, Download, Maximize2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, X, Eye, EyeOff, Loader2, Flag, GraduationCap, Timer, Lightbulb, Bookmark, ChevronDown, StickyNote, PanelRightClose, PanelRightOpen, FileText, Scissors, Bold, Italic, Underline, List, Baseline, Highlighter, Download, Maximize2, AlertCircle, Ban } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -73,7 +73,8 @@ export function PersonalizadoRunner({ sessao, onSair }: { sessao: SessaoPessoal;
   const fecharExpandido = () => { setExpandido(null); setExpandKey((k) => k + 1) }
 
   const q = sessao.questoes[idx]
-  const respondidas = useMemo(() => Object.keys(respostas).length, [respostas])
+  // Questão anulada (bloqueada) não é respondível → conta como "concluída" p/ o progresso.
+  const respondidas = useMemo(() => sessao.questoes.filter((qq) => qq.bloqueada || respostas[qq.id] != null).length, [respostas, sessao.questoes])
   const secaoPorQ = useMemo(() => secaoMap(sessao.secoes), [sessao.secoes])
 
   // ── Auto-save (reusa /api/sessoes/resposta, idempotente) ──────────────────
@@ -88,6 +89,7 @@ export function PersonalizadoRunner({ sessao, onSair }: { sessao: SessaoPessoal;
   }, [sessao.sessaoId])
 
   const marcar = (questaoId: string, alternativaId: string) => {
+    if (sessao.questoes.find((x) => x.id === questaoId)?.bloqueada) return // anulada: marcação travada
     if (modo === 'estudo' && revelados.has(questaoId)) return // travado após revelar
     setRespostas((r) => ({ ...r, [questaoId]: alternativaId }))
     if (modo === 'estudo') setRevelados((s) => new Set(s).add(questaoId))
@@ -134,7 +136,8 @@ export function PersonalizadoRunner({ sessao, onSair }: { sessao: SessaoPessoal;
   if (!q) return null
 
   const { Icon } = MODO_INFO[modo]
-  const revelado = modo === 'estudo' ? revelados.has(q.id) : modo === 'revisao' ? revelados.has(q.id) : false
+  const bloqueada = q.bloqueada === true // questão anulada: marcação travada, ponto garantido a todos
+  const revelado = !bloqueada && (modo === 'estudo' ? revelados.has(q.id) : modo === 'revisao' ? revelados.has(q.id) : false)
   const escolhida = respostas[q.id] ?? null
   const acertou = revelado && q.alternativas.find((a) => a.id === escolhida)?.correta === true
 
@@ -143,13 +146,14 @@ export function PersonalizadoRunner({ sessao, onSair }: { sessao: SessaoPessoal;
     const feito = respostas[qq.id] != null
     const marcada = marcadas.has(qq.id)
     return (
-      <button key={qq.id} type="button" onClick={() => setIdx(i)}
-        className={cn('relative h-8 w-8 rounded-md border text-xs font-semibold tabular-nums transition-colors',
+      <button key={qq.id} type="button" onClick={() => setIdx(i)} title={qq.bloqueada ? `Questão ${i + 1} — anulada` : `Questão ${i + 1}`}
+        className={cn('relative flex h-8 w-8 items-center justify-center rounded-md border text-xs font-semibold tabular-nums transition-colors',
           i === idx ? 'border-primary bg-primary text-primary-foreground'
-            : marcada ? 'border-amber-500/50 bg-amber-500/15 text-amber-600 dark:text-amber-400'
-              : feito ? 'border-primary/30 bg-primary/15 text-primary'
-                : 'text-muted-foreground hover:border-foreground/30')}>
-        {i + 1}
+            : qq.bloqueada ? 'border-border bg-muted text-muted-foreground'
+              : marcada ? 'border-amber-500/50 bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                : feito ? 'border-primary/30 bg-primary/15 text-primary'
+                  : 'text-muted-foreground hover:border-foreground/30')}>
+        {qq.bloqueada ? <Ban className="h-3.5 w-3.5" /> : i + 1}
         {marcada && i === idx && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-card" />}
       </button>
     )
@@ -330,18 +334,26 @@ export function PersonalizadoRunner({ sessao, onSair }: { sessao: SessaoPessoal;
         </div>
       </div>
 
+      {/* Aviso de questão anulada — ponto garantido a todos, marcação travada */}
+      {bloqueada && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-sm font-semibold text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0" /> Questão anulada
+          <span className="font-normal text-destructive/80">· ponto garantido a todos — não precisa responder</span>
+        </div>
+      )}
+
       {/* Alternativas — cards com bolinha da letra + tesoura (eliminar) à esquerda */}
       <div className="space-y-2.5">
         {q.alternativas.map((alt, i) => {
           const sel = escolhida === alt.id
           const mostrarCerta = revelado && alt.correta
           const mostrarErrada = revelado && sel && !alt.correta
-          const travado = revelado && modo === 'estudo'
-          const cortada = eliminadas.has(alt.id) && !revelado
+          const travado = bloqueada || (revelado && modo === 'estudo')
+          const cortada = eliminadas.has(alt.id) && !revelado && !bloqueada
           return (
             <div key={alt.id} className="flex items-stretch gap-2">
-              {/* Tesoura — elimina/restaura a alternativa (só antes de revelar) */}
-              {!revelado && (
+              {/* Tesoura — elimina/restaura a alternativa (só antes de revelar; anulada não tem) */}
+              {!revelado && !bloqueada && (
                 <button type="button" onClick={() => eliminar(alt.id)} title={cortada ? 'Restaurar alternativa' : 'Eliminar (tesoura)'} aria-label={cortada ? 'Restaurar alternativa' : 'Eliminar alternativa'}
                   className={cn('flex h-9 w-9 shrink-0 self-center items-center justify-center rounded-full border transition-colors sm:h-10 sm:w-10',
                     cortada ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground')}>
@@ -350,16 +362,17 @@ export function PersonalizadoRunner({ sessao, onSair }: { sessao: SessaoPessoal;
               )}
               <button type="button" onClick={() => marcar(q.id, alt.id)} disabled={travado || cortada}
                 className={cn('group flex flex-1 items-center gap-3 rounded-xl border bg-card p-3.5 text-left text-sm shadow-sm transition-all sm:p-4',
-                  mostrarCerta ? 'border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/40'
-                    : mostrarErrada ? 'border-destructive bg-destructive/5 ring-1 ring-destructive/40'
-                      : sel ? 'border-primary bg-primary/5 ring-1 ring-primary/40'
-                        : !cortada ? 'hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md' : '',
+                  bloqueada ? 'cursor-not-allowed border-border bg-muted/30 opacity-60'
+                    : mostrarCerta ? 'border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/40'
+                      : mostrarErrada ? 'border-destructive bg-destructive/5 ring-1 ring-destructive/40'
+                        : sel ? 'border-primary bg-primary/5 ring-1 ring-primary/40'
+                          : !cortada ? 'hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md' : '',
                   cortada && 'opacity-45',
-                  travado && 'cursor-default hover:translate-y-0 hover:shadow-sm')}>
+                  travado && !bloqueada && 'cursor-default hover:translate-y-0 hover:shadow-sm')}>
                 <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-bold transition-colors',
                   mostrarCerta ? 'border-emerald-500 bg-emerald-500 text-white'
                     : mostrarErrada ? 'border-destructive bg-destructive text-white'
-                      : sel ? 'border-primary bg-primary text-primary-foreground'
+                      : sel && !bloqueada ? 'border-primary bg-primary text-primary-foreground'
                         : 'border-muted-foreground/30 text-muted-foreground group-hover:border-primary/50 group-hover:text-primary')}>
                   {mostrarCerta ? <Check className="h-4 w-4" /> : mostrarErrada ? <X className="h-4 w-4" /> : LETRA[i]}
                 </span>
@@ -404,7 +417,7 @@ export function PersonalizadoRunner({ sessao, onSair }: { sessao: SessaoPessoal;
         </button>
 
         <div className="flex flex-1 items-center justify-end gap-2">
-          {modo === 'revisao' && !revelados.has(q.id) && (
+          {modo === 'revisao' && !revelados.has(q.id) && !bloqueada && (
             <button type="button" onClick={() => setRevelados((s) => new Set(s).add(q.id))}
               className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted">
               <Eye className="h-4 w-4" /> <span className="hidden sm:inline">Ver gabarito</span>

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { funcaoEtiquetaPorQuestao } from '@/lib/simulado/etiqueta-funcao'
 import { PrintButton } from '@/components/aluno/print-button'
 import { MarkdownContent } from '@/components/markdown-content'
 
@@ -36,8 +37,18 @@ export default async function ResultadoImprimirPage({ params, searchParams }: { 
   const totalParticipantes = new Set((partRows ?? []).map((p: any) => p.estudante_id)).size
   const respMap = new Map((respostas ?? []).map((r: any) => [r.questao_id, r]))
   const discMap = new Map((discResp ?? []).map((d: any) => [d.questao_id, d]))
-  // Anuladas: continuam no total e valem ponto pra todos (não contam como erro/branco).
-  const anuladaSet = new Set<string>((sq ?? []).filter((r: any) => r.anulada === true).map((r: any) => r.questoes?.id).filter(Boolean))
+  // Anulação: boolean per-simulado OU etiqueta funcional. anular → ponto pra todos (fica no total);
+  // desconsiderar → sai do total.
+  const funcImpr = await funcaoEtiquetaPorQuestao(svc, (sq ?? []).map((r: any) => r.questoes?.id).filter(Boolean))
+  const anuladaSet = new Set<string>()
+  const desconsideraSet = new Set<string>()
+  for (const r of sq ?? []) {
+    const qid = (r as any).questoes?.id
+    if (!qid) continue
+    const ef = funcImpr.get(qid)?.funcao
+    if (ef === 'desconsiderar') desconsideraSet.add(qid)
+    else if (ef === 'anular' || (r as any).anulada === true) anuladaSet.add(qid)
+  }
 
   const regras = (simulado?.regras as { liberar_gabarito?: string }) ?? {}
   const liberar = regras.liberar_gabarito ?? 'apos_janela'
@@ -49,17 +60,18 @@ export default async function ResultadoImprimirPage({ params, searchParams }: { 
   // ?mod=completo → caderno completo (com comentário do professor, quando há gabarito).
   const completo = mod === 'completo'
 
-  const total = (sq ?? []).length
-  const acertos = (respostas ?? []).filter((r: any) => r.correta && !anuladaSet.has(r.questao_id)).length + anuladaSet.size
+  const total = ((sq ?? []).length) - desconsideraSet.size
+  const acertos = (respostas ?? []).filter((r: any) => r.correta && !anuladaSet.has(r.questao_id) && !desconsideraSet.has(r.questao_id)).length + anuladaSet.size
 
   // Desempenho por matéria.
   const agg = new Map<string, { acertos: number; total: number }>()
   for (const row of sq ?? []) {
     const q = (row as any).questoes
+    if (desconsideraSet.has(q?.id)) continue // fora do total
     const disc = q?.disciplinas?.nome ?? 'Sem matéria'
     const cur = agg.get(disc) ?? { acertos: 0, total: 0 }
     cur.total += 1
-    if ((row as any).anulada === true || respMap.get(q?.id)?.correta) cur.acertos += 1
+    if (anuladaSet.has(q?.id) || respMap.get(q?.id)?.correta) cur.acertos += 1
     agg.set(disc, cur)
   }
 
@@ -107,13 +119,14 @@ export default async function ResultadoImprimirPage({ params, searchParams }: { 
         <div className="space-y-4">
           {(sq ?? []).map((row: any, idx: number) => {
             const q = row.questoes
-            const anulada = row.anulada === true
+            const anulada = anuladaSet.has(q?.id)
+            const desconsiderada = desconsideraSet.has(q?.id)
             const resp = respMap.get(q?.id)
             const alts = (q?.alternativas ?? []).slice().sort((a: any, b: any) => a.ordem - b.ordem)
             const d = q?.tipo === 'discursiva' ? discMap.get(q?.id) : null
             return (
               <div key={q?.id} className="qa text-[15px] leading-relaxed">
-                <p className="mb-1"><strong>{idx + 1}.</strong> <MarkdownContent inline>{q?.enunciado}</MarkdownContent>{anulada && <span className="ml-1 text-xs italic text-black/60">— anulada (ponto garantido)</span>}</p>
+                <p className="mb-1"><strong>{idx + 1}.</strong> <MarkdownContent inline>{q?.enunciado}</MarkdownContent>{anulada && <span className="ml-1 text-xs italic text-black/60">— anulada (ponto garantido)</span>}{desconsiderada && <span className="ml-1 text-xs italic text-black/60">— desconsiderada (fora do total)</span>}</p>
                 {q?.tipo === 'discursiva' ? (
                   <div className="ml-4 space-y-1">
                     <p className="text-xs uppercase tracking-wide text-black/50">Resposta discursiva</p>

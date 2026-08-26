@@ -7,6 +7,7 @@
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { estadoAnulacaoPorQuestao } from '@/lib/simulado/questoes-anuladas'
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -33,8 +34,8 @@ function saneVisual(cor?: string | null, icone?: string | null): { cor: string; 
 }
 const visualDe = (regras: any) => saneVisual(regras?.visual?.cor, regras?.visual?.icone)
 
-/** IDs das questões que o aluno pode ESCOLHER = questões dos simulados a que ele tem acesso. */
-async function questaoIdsAcessiveis(svc: SupabaseClient, estudanteId: string): Promise<string[]> {
+/** IDs das questões que o aluno pode ESCOLHER = questões (NÃO anuladas) dos simulados a que tem acesso. */
+async function questaoIdsAcessiveis(svc: SupabaseClient, estudanteId: string, tenantId: string): Promise<string[]> {
   const [{ data: mats }, { data: acs }] = await Promise.all([
     svc.from('simulado_matriculas').select('simulado_id, liberado').eq('estudante_id', estudanteId),
     svc.from('simulado_acessos').select('simulado_id').eq('estudante_id', estudanteId),
@@ -45,7 +46,12 @@ async function questaoIdsAcessiveis(svc: SupabaseClient, estudanteId: string): P
   ].filter(Boolean))]
   if (!simIds.length) return []
   const pqs = await fetchAllByIn<any>(simIds, (chunk) => svc.from('simulado_prova_questoes').select('questao_id').in('simulado_id', chunk))
-  return [...new Set(pqs.map((p) => p.questao_id).filter(Boolean))] as string[]
+  const qids = [...new Set(pqs.map((p) => p.questao_id).filter(Boolean))] as string[]
+  if (!qids.length) return []
+  // Exclui questões ANULADAS (etiqueta funcional anular/desconsiderar OU boolean): não podem ser
+  // escolhidas nem adicionadas ao simulado pessoal.
+  const anuladas = await estadoAnulacaoPorQuestao(svc, tenantId, qids)
+  return qids.filter((id) => !anuladas.has(id))
 }
 
 export async function criarMeuSimulado(nome: string): Promise<{ id?: string; error?: string }> {
@@ -268,7 +274,10 @@ export async function questoesAcessiveis(): Promise<{ questoes: QuestaoDisponive
   const truncado = qidsAll.length > CAP_ACESSIVEIS
   const qids = truncado ? qidsAll.slice(0, CAP_ACESSIVEIS) : qidsAll
 
-  const rows = await fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questoes').select('id, enunciado, disciplina_id, assunto_id, banca_id, ano, tipo, nivel_dificuldade').eq('tenant_id', tenantId).in('id', chunk))
+  // Remove questões ANULADAS (etiqueta funcional anular/desconsiderar OU boolean) — não podem ser selecionadas.
+  const anuladas = await estadoAnulacaoPorQuestao(svc, tenantId, qids)
+  const rows = (await fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questoes').select('id, enunciado, disciplina_id, assunto_id, banca_id, ano, tipo, nivel_dificuldade').eq('tenant_id', tenantId).eq('anulada', false).in('id', chunk)))
+    .filter((m) => !anuladas.has(m.id))
 
   // Resolve nomes (disciplina/assunto/banca) + títulos dos simulados usados, em lote.
   const idsDe = (campo: string) => [...new Set(rows.map((r) => r[campo]).filter(Boolean))] as string[]
@@ -319,7 +328,7 @@ export async function adicionarQuestao(simuladoId: string, questaoId: string): P
   const { svc, estudanteId, tenantId } = await ctx()
   const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)
   if (!sim) return { error: 'Simulado não encontrado.' }
-  const acess = new Set(await questaoIdsAcessiveis(svc, estudanteId))
+  const acess = new Set(await questaoIdsAcessiveis(svc, estudanteId, tenantId))
   if (!acess.has(questaoId)) return { error: 'Você não tem acesso a essa questão.' }
   const { data: ja } = await svc.from('simulado_prova_questoes').select('id').eq('simulado_id', simuladoId).eq('questao_id', questaoId).maybeSingle()
   if (ja) return { ok: true }
@@ -347,7 +356,7 @@ export async function criarMeuSimuladoCompleto(input: { nome: string; modo?: str
   }).select('id').single()
   if (error || !data) return { error: error?.message ?? 'Não foi possível criar.' }
   const simuladoId = (data as any).id as string
-  const acess = new Set(await questaoIdsAcessiveis(svc, estudanteId))
+  const acess = new Set(await questaoIdsAcessiveis(svc, estudanteId, tenantId))
   const validos = [...new Set(input.questaoIds ?? [])].filter((id) => acess.has(id))
   let adicionadas = 0
   if (validos.length) {
@@ -364,7 +373,7 @@ export async function adicionarQuestoes(simuladoId: string, questaoIds: string[]
   const { svc, estudanteId, tenantId } = await ctx()
   const sim = await meuSimulado(svc, tenantId, estudanteId, simuladoId)
   if (!sim) return { error: 'Simulado não encontrado.' }
-  const acess = new Set(await questaoIdsAcessiveis(svc, estudanteId))
+  const acess = new Set(await questaoIdsAcessiveis(svc, estudanteId, tenantId))
   const { data: jaData } = await svc.from('simulado_prova_questoes').select('questao_id, ordem').eq('simulado_id', simuladoId)
   const ja = new Set((jaData ?? []).map((r: any) => r.questao_id))
   let ordem = Math.max(-1, ...((jaData ?? []).map((r: any) => Number(r.ordem) || 0)))

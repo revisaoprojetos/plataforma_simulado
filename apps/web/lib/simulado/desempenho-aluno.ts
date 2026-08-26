@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { funcaoEtiquetaPorQuestao } from './etiqueta-funcao'
 import { resolverLiberacoes } from './liberacao'
 
 export type DesempenhoTentativa = { n: number; nota: number | null; finalizado: string | null }
@@ -39,14 +40,27 @@ export async function montarDesempenhoAluno(svc: SupabaseClient, estId: string):
   const [sims, pq] = await Promise.all([
     // owner_estudante_id IS NULL: estatísticas oficiais NÃO contam simulados pessoais do aluno.
     fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_simulados').select('id, titulo, regras, status, data_fim').in('id', chunk).eq('deletado', false).is('owner_estudante_id', null).order('id', { ascending: true })),
-    fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_prova_questoes').select('simulado_id, questao_id, questoes:simulado_questoes(disciplinas:simulado_disciplinas(nome))').in('simulado_id', chunk).eq('anulada', false).order('questao_id', { ascending: true })),
+    // Inclui anuladas (não filtra): pontua_todos — anulada entra no total e vira acerto garantido.
+    fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_prova_questoes').select('simulado_id, questao_id, anulada, questoes:simulado_questoes(disciplinas:simulado_disciplinas(nome))').in('simulado_id', chunk).order('questao_id', { ascending: true })),
   ])
+
+  // Etiqueta funcional (global por questão): anular → pontua_todos; desconsiderar → sai do total.
+  const allQids = [...new Set((pq as any[]).map((r) => r.questao_id).filter(Boolean))]
+  const funcMap = await funcaoEtiquetaPorQuestao(svc, allQids)
 
   const totalPorSim = new Map<string, number>()
   const discDeQ = new Map<string, string>()
+  const anularPorSim = new Map<string, Set<string>>()        // acerto garantido (etiqueta anular OU boolean per-simulado)
+  const desconsideraPorSim = new Map<string, Set<string>>()  // fora do total (etiqueta desconsiderar)
   for (const r of pq as any[]) {
-    totalPorSim.set(r.simulado_id, (totalPorSim.get(r.simulado_id) ?? 0) + 1)
     discDeQ.set(r.questao_id, r.questoes?.disciplinas?.nome ?? 'Sem disciplina')
+    const ef = funcMap.get(r.questao_id)?.funcao
+    if (ef === 'desconsiderar') {
+      const s = desconsideraPorSim.get(r.simulado_id) ?? new Set<string>(); s.add(r.questao_id); desconsideraPorSim.set(r.simulado_id, s)
+      continue // não entra no total
+    }
+    totalPorSim.set(r.simulado_id, (totalPorSim.get(r.simulado_id) ?? 0) + 1)
+    if (ef === 'anular' || r.anulada) { const s = anularPorSim.get(r.simulado_id) ?? new Set<string>(); s.add(r.questao_id); anularPorSim.set(r.simulado_id, s) }
   }
 
   // Melhor tentativa por simulado + todas as tentativas (cronológico) para o gráfico de progresso.
@@ -84,9 +98,13 @@ export async function montarDesempenhoAluno(svc: SupabaseClient, estId: string):
     if (!resolverLiberacoes(sim.regras, sim).notaLiberada) continue   // só notas liberadas
     const total = totalPorSim.get(sim.id) ?? 0
     const resp = respPorSim.get(sim.id) ?? []
-    const acertos = resp.filter((r) => r.correta).length
+    const anul = anularPorSim.get(sim.id) ?? new Set<string>()
+    const desc = desconsideraPorSim.get(sim.id) ?? new Set<string>()
+    // pontua_todos: acertos reais (não-anuladas/desconsideradas) + todas as anular do simulado.
+    const acertos = resp.filter((r) => r.correta && !anul.has(r.questao_id) && !desc.has(r.questao_id)).length + anul.size
     const disc = new Map<string, { ac: number; tt: number }>()
-    for (const r of resp) { const dn = discDeQ.get(r.questao_id) ?? 'Sem disciplina'; const d = disc.get(dn) ?? { ac: 0, tt: 0 }; d.tt++; if (r.correta) d.ac++; disc.set(dn, d) }
+    for (const r of resp) { if (anul.has(r.questao_id) || desc.has(r.questao_id)) continue; const dn = discDeQ.get(r.questao_id) ?? 'Sem disciplina'; const d = disc.get(dn) ?? { ac: 0, tt: 0 }; d.tt++; if (r.correta) d.ac++; disc.set(dn, d) }
+    for (const qid of anul) { const dn = discDeQ.get(qid) ?? 'Sem disciplina'; const d = disc.get(dn) ?? { ac: 0, tt: 0 }; d.tt++; d.ac++; disc.set(dn, d) }
     out.push({
       id: sim.id, titulo: sim.titulo, nota: b.nota >= 0 ? b.nota : null,
       acertos, total, pct: total ? Math.round((acertos / total) * 100) : 0,

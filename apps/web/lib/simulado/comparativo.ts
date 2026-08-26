@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { funcaoEtiquetaPorQuestao, funcaoBloqueia } from './etiqueta-funcao'
 
 export type Comparativo = {
   participantes: number
@@ -17,9 +18,13 @@ export async function montarComparativo(svc: SupabaseClient, simuladoId: string,
     .from('simulado_prova_questoes')
     .select('questao_id, questoes:simulado_questoes(disciplinas:simulado_disciplinas(nome))')
     .eq('simulado_id', simuladoId).eq('anulada', false)
-  const totalQ = (pq ?? []).length
+  // Anuladas (etiqueta anular/desconsiderar) dão ponto a todos → não diferenciam a turma: FORA da comparação.
+  const funcMap = await funcaoEtiquetaPorQuestao(svc, ((pq ?? []) as any[]).map((r) => r.questao_id))
+  const fora = new Set<string>(((pq ?? []) as any[]).filter((r) => funcaoBloqueia(funcMap.get(r.questao_id)?.funcao)).map((r) => r.questao_id))
+  const validas = ((pq ?? []) as any[]).filter((r) => !fora.has(r.questao_id))
+  const totalQ = validas.length
   const discDeQ = new Map<string, string>()
-  for (const r of (pq ?? []) as any[]) discDeQ.set(r.questao_id, r.questoes?.disciplinas?.nome ?? 'Sem disciplina')
+  for (const r of validas) discDeQ.set(r.questao_id, r.questoes?.disciplinas?.nome ?? 'Sem disciplina')
 
   // fetchAll: um simulado com >1000 sessões truncava → participantes/média da turma errados.
   const sess = await fetchAll<{ id: string; estudante_id: string; nota: number | null }>(() =>
@@ -49,6 +54,7 @@ export async function montarComparativo(svc: SupabaseClient, simuladoId: string,
     const resp = await fetchAllByIn<{ sessao_id: string; questao_id: string; correta: boolean }>(repIds, (chunk) =>
       svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).order('id', { ascending: true }))
     for (const r of resp as any[]) {
+      if (fora.has(r.questao_id)) continue // anulada não entra na comparação
       if (r.correta) totAc++
       const d = discDeQ.get(r.questao_id) ?? 'Sem disciplina'
       const v = acPorDisc.get(d) ?? { ac: 0, tt: 0 }; v.tt++; if (r.correta) v.ac++; acPorDisc.set(d, v)
@@ -59,7 +65,7 @@ export async function montarComparativo(svc: SupabaseClient, simuladoId: string,
   const minhaDisc = new Map<string, { ac: number; tt: number }>()
   if (opts.minhaSessaoId) {
     const { data: mr } = await svc.from('simulado_respostas_objetivas').select('questao_id, correta').eq('sessao_id', opts.minhaSessaoId)
-    for (const r of (mr ?? []) as any[]) { const d = discDeQ.get(r.questao_id) ?? 'Sem disciplina'; const v = minhaDisc.get(d) ?? { ac: 0, tt: 0 }; v.tt++; if (r.correta) v.ac++; minhaDisc.set(d, v) }
+    for (const r of (mr ?? []) as any[]) { if (fora.has(r.questao_id)) continue; const d = discDeQ.get(r.questao_id) ?? 'Sem disciplina'; const v = minhaDisc.get(d) ?? { ac: 0, tt: 0 }; v.tt++; if (r.correta) v.ac++; minhaDisc.set(d, v) }
   }
 
   const porDisciplina = [...acPorDisc.entries()].map(([nome, v]) => {

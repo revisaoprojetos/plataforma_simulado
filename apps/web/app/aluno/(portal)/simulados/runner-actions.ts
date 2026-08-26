@@ -8,6 +8,7 @@
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { estadoAnulacaoPorQuestao } from '@/lib/simulado/questoes-anuladas'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 async function ctx() {
@@ -23,6 +24,7 @@ export type QuestaoRunner = {
   imagemUrl: string | null; disciplina: string | null; comentario: string | null
   origemSimulado: string | null; origemNumero: number | null
   alternativas: AltRunner[]
+  bloqueada: boolean // anulada no banco → não responde (ponto garantido a todos na correção)
 }
 export type SecaoRunner = { id: string; nome: string; questaoIds: string[] }
 export type SessaoPessoal = {
@@ -59,6 +61,8 @@ export async function abrirSessaoPessoal(simuladoId: string, reiniciar = false):
   let qrows: any[]
   try { qrows = await fetchAllByIn<any>(qids, (c) => svc.from('simulado_questoes').select('id, enunciado, tipo, comentario_professor, disciplina_id, imagem_url').in('id', c)) }
   catch { qrows = await fetchAllByIn<any>(qids, (c) => svc.from('simulado_questoes').select('id, enunciado, tipo, comentario_professor, disciplina_id').in('id', c)) }
+  // Anulação (etiqueta funcional anular/desconsiderar OU boolean) → trava a questão no runner.
+  const anuladasQ = await estadoAnulacaoPorQuestao(svc, tenantId, qids)
   const qmap = new Map(qrows.map((q) => [q.id, q]))
 
   // Tolerante à coluna `comentario` da alternativa (comentário do gabarito por alternativa).
@@ -117,6 +121,7 @@ export async function abrirSessaoPessoal(simuladoId: string, reiniciar = false):
       comentario: resolverComentario(p.questao_id, (q.comentario_professor as string | null) ?? null),
       origemSimulado: o?.titulo ?? null, origemNumero: o?.numero ?? null,
       alternativas: (altsByQ.get(p.questao_id) ?? []).sort((a, b) => a.ordem - b.ordem),
+      bloqueada: anuladasQ.has(p.questao_id),
     }
   })
 

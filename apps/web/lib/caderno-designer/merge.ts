@@ -3,6 +3,7 @@
 // Usado pelo editor (preview por aluno) e pela impressão (?aluno / ?todos).
 
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { estadoAnulacaoPorQuestao } from '@/lib/simulado/questoes-anuladas'
 
 export type Registro = { id: string; nome: string; vars: Record<string, string>; respostas: Record<string, string> }
 
@@ -24,6 +25,15 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
   const qids = vinc.map((v: any) => v.questao_id)
   const totalQ = qids.length
 
+  // Anulação NO BANCO (etiqueta funcional anular/desconsiderar OU boolean simulado_questoes.anulada):
+  //  - anular        → acerto garantido a todos (pontua_todos), CONTINUA no total.
+  //  - desconsiderar → SAI do total (não conta em disciplina/pilar/acerto pra ninguém).
+  const estado = qids.length ? await estadoAnulacaoPorQuestao(svc, tenantId, qids) : new Map<string, 'anular' | 'desconsiderar'>()
+  const anularSet = new Set<string>()
+  const desconsideraSet = new Set<string>()
+  for (const [qid, e] of estado) (e === 'desconsiderar' ? desconsideraSet : anularSet).add(qid)
+  const totalPontuavel = totalQ - desconsideraSet.size
+
   const discDaQuestao = new Map<string, string>()
   const discTotais = new Map<string, number>()
   const assuntoDaQuestao = new Map<string, string>()       // questao_id -> assunto principal (simulado_assuntos.nome)
@@ -35,6 +45,7 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
     // `pilar_1/pilar_2` é opcional (fallback) para bases que usem esse formato.
     const qs = await fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questoes').select('id, categoria, pilar_1, pilar_2, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)').in('id', chunk).order('id'))
     for (const q of qs) {
+      if (desconsideraSet.has(q.id)) continue // fora do total — não conta em nada
       const d = (q as any).disciplinas?.nome ?? 'Geral'
       discDaQuestao.set(q.id, d)
       discTotais.set(d, (discTotais.get(d) ?? 0) + 1)
@@ -154,15 +165,18 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
         termino: hhmm(fim),
         tempo_total: tempoMin != null ? `${tempoMin}min` : '',
         respondidas: String(respondidas),
-        em_branco: String(Math.max(0, totalQ - respondidas)),
+        em_branco: String(Math.max(0, totalPontuavel - respondidas)),
       })
     }
   }
 
   return (alunos ?? []).map((a: any) => {
-    const m = respPorAluno.get(a.id) ?? new Map<string, boolean>()
+    const base = respPorAluno.get(a.id) ?? new Map<string, boolean>()
+    const m = new Map(base)
+    for (const qid of desconsideraSet) m.delete(qid) // fora do total — não conta acerto nem erro
+    for (const qid of anularSet) m.set(qid, true)     // pontua_todos: acerto garantido a todos
     const acertos = [...m.values()].filter(Boolean).length
-    const nota = totalQ ? Math.round((acertos / totalQ) * 100 * 10) / 10 : 0 // escala 0–100 (percentual)
+    const nota = totalPontuavel ? Math.round((acertos / totalPontuavel) * 100 * 10) / 10 : 0 // escala 0–100 (percentual)
     const porDisc = new Map<string, number>()
     const porPilar = new Map<string, number>() // acertos por pilar
     for (const [qid, ok] of m) if (ok) {
@@ -179,12 +193,12 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
     }
 
     const info = infoPorAluno.get(a.id) ?? { data: '', inicio: '', termino: '', tempo_total: '', respondidas: '', em_branco: '' }
-    const respN = Number(info.respondidas || 0)
-    const erros = Math.max(0, respN - acertos) // respondidas incorretamente (em branco fica em em_branco)
+    // Erros = respondidas incorretamente, EXCETO anuladas (anular vira acerto; desconsiderar sai do total).
+    const erros = [...base].filter(([qid, ok]) => !ok && !anularSet.has(qid) && !desconsideraSet.has(qid)).length
     const vars: Record<string, string> = {
       nome: a.nome ?? '', email: a.email ?? '', telefone: a.telefone ?? '', cpf: a.cpf ?? '', classificacao: a.classificacao ?? '',
-      simulado: bancoNome, acertos: String(acertos), erros: String(erros), total_questoes: String(totalQ),
-      nota: nota.toFixed(1).replace('.', ','), percentual: totalQ ? `${Math.round((acertos / totalQ) * 100)}%` : '0%',
+      simulado: bancoNome, acertos: String(acertos), erros: String(erros), total_questoes: String(totalPontuavel),
+      nota: nota.toFixed(1).replace('.', ','), percentual: totalPontuavel ? `${Math.round((acertos / totalPontuavel) * 100)}%` : '0%',
       ...info,
     }
     for (const [d, tot] of discTotais) {

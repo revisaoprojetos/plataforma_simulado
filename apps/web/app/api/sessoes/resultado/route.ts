@@ -5,6 +5,7 @@ import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
+import { funcaoEtiquetaPorQuestao } from '@/lib/simulado/etiqueta-funcao'
 import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
 import { getStorage } from '@/lib/storage'
@@ -164,12 +165,20 @@ export async function GET(request: NextRequest) {
   const cadernoId: string | null = null
 
   const respMap = new Map((respostas ?? []).map((r) => [r.questao_id as string, r]))
-  // Questões anuladas continuam no total e valem ponto para TODOS (não contam como erro/branco).
-  const anuladaSet = new Set<string>(
-    (sq ?? []).filter((row: any) => row.anulada === true).map((row: any) => row.questoes?.id).filter(Boolean),
-  )
-  const total = (sq ?? []).length
-  const acertos = (respostas ?? []).filter((r) => r.correta && !anuladaSet.has(r.questao_id as string)).length + anuladaSet.size
+  // Anulação: boolean per-simulado OU etiqueta funcional. anular → ponto pra todos (fica no total);
+  // desconsiderar → sai do total. Consistente com o cálculo da nota (contextoNota).
+  const funcResultado = await funcaoEtiquetaPorQuestao(admin, (sq ?? []).map((row: any) => row.questoes?.id).filter(Boolean))
+  const anuladaSet = new Set<string>()      // ponto garantido
+  const desconsideraSet = new Set<string>() // fora do total
+  for (const row of sq ?? []) {
+    const qid = (row as any).questoes?.id
+    if (!qid) continue
+    const ef = funcResultado.get(qid)?.funcao
+    if (ef === 'desconsiderar') desconsideraSet.add(qid)
+    else if (ef === 'anular' || (row as any).anulada === true) anuladaSet.add(qid)
+  }
+  const total = ((sq ?? []).length) - desconsideraSet.size
+  const acertos = (respostas ?? []).filter((r) => r.correta && !anuladaSet.has(r.questao_id as string) && !desconsideraSet.has(r.questao_id as string)).length + anuladaSet.size
 
   // Estatística por matéria/disciplina (só quando o gabarito está liberado).
   let statsPorDisciplina: Array<{ disciplina: string; acertos: number; total: number; percentual: number }> = []
@@ -177,12 +186,13 @@ export async function GET(request: NextRequest) {
     const agg = new Map<string, { acertos: number; total: number }>()
     for (const row of sq ?? []) {
       const q = (row as any).questoes
+      if (desconsideraSet.has(q?.id)) continue // fora do total — não entra em disciplina
       const disc = q?.disciplinas?.nome ?? 'Sem matéria'
       const resp = respMap.get(q?.id)
       const cur = agg.get(disc) ?? { acertos: 0, total: 0 }
       cur.total += 1
       // Anulada = acerto garantido para todos naquela disciplina.
-      if ((row as any).anulada === true || resp?.correta) cur.acertos += 1
+      if (anuladaSet.has(q?.id) || resp?.correta) cur.acertos += 1
       agg.set(disc, cur)
     }
     statsPorDisciplina = [...agg.entries()]
@@ -197,7 +207,8 @@ export async function GET(request: NextRequest) {
 
   const questoes = (sq ?? []).map((row: any, idx: number) => {
     const q = row.questoes
-    const anulada = row.anulada === true
+    const anulada = anuladaSet.has(q?.id)           // ponto garantido (anular OU boolean)
+    const desconsiderada = desconsideraSet.has(q?.id) // fora do total
     const resp = respMap.get(q?.id)
     const correta_id = corretasMap.get(q?.id) ?? null
     const d = discMap.get(q?.id)
@@ -205,11 +216,11 @@ export async function GET(request: NextRequest) {
       numero: idx + 1,
       id: q?.id,
       tipo: q?.tipo ?? 'objetiva',
-      anulada,
+      anulada: anulada || desconsiderada,
       enunciado: q?.enunciado ?? '',
       resposta_aluno: resp?.alternativa_id ?? null,
-      // Anulada = ponto garantido (independe do gabarito estar liberado).
-      acertou: anulada ? true : (gabaritoLiberado ? resp?.correta ?? false : null),
+      // Anulada = ponto garantido (independe do gabarito); desconsiderada não pontua nem erra.
+      acertou: anulada ? true : (desconsiderada ? null : (gabaritoLiberado ? resp?.correta ?? false : null)),
       // Justificativa (comentário do professor) — só revelada com o gabarito. No simulado pessoal,
       // cai para o comentário das ALTERNATIVAS (formato do import) quando não há comentario_professor.
       justificativa: gabaritoLiberado ? (q?.comentario_professor ?? (pessoal ? comentarioDasAlternativas(q?.alternativas, correta_id) : null)) : null,

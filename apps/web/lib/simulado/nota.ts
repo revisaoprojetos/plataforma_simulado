@@ -43,6 +43,13 @@ export async function contextoNota(svc: AnyClient, simuladoId: string): Promise<
     else if (ef.funcao === 'desconsiderar') anuladas.set(qid, 'desconsidera')
     // 'avisar' não afeta a nota
   }
+  // Anulação GLOBAL no banco (simulado_questoes.anulada) — vale para QUALQUER simulado (oficiais
+  // e pessoais). pontua_todos; NÃO sobrescreve a política já definida por recorreção/etiqueta.
+  const qids = (pq ?? []).map((q: any) => q.questao_id).filter(Boolean)
+  if (qids.length) {
+    const { data: banco } = await svc.from('simulado_questoes').select('id').in('id', qids).eq('anulada', true)
+    for (const b of (banco ?? []) as any[]) if (!anuladas.has(b.id)) anuladas.set(b.id, 'pontua_todos')
+  }
   return { totalQuestoes: (pq ?? []).length, anuladas }
 }
 
