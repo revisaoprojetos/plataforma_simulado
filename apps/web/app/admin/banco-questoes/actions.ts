@@ -463,7 +463,7 @@ function mapHeader(h: string): string | null {
   if (['etiqueta', 'etiquetas', 'tag', 'tags'].includes(n)) return 'etiquetas'
   const lei = n.match(/^lei([a-e])$/); if (lei) return 'lei_' + lei[1]
   const com = n.match(/^comentario([a-e])$/); if (com) return 'com_' + com[1]
-  if (['comentario', 'comentarioprofessor', 'resolucao', 'comentarios'].includes(n)) return 'comentario'
+  if (['comentario', 'comentariocompleto', 'comentarioprofessor', 'comentariodoprofessor', 'comentariogeral', 'gabaritocomentado', 'resolucao', 'comentarios'].includes(n)) return 'comentario'
   const m = n.match(/^(?:alternativa|alt)?([a-e])$/)
   if (m) return 'alt_' + m[1]
   return null

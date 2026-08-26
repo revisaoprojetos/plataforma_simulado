@@ -16,6 +16,7 @@ const COLUNAS = [
   'Alternativa Correta', 'Alternativas Incorretas', 'Grupo', 'Disciplina', 'Categoria', 'Assunto Principal',
   'Assunto Detalhe', 'Nível', 'Tipo', 'Pilar 1', 'Pilar 2',
   'Lei A', 'Comentário A', 'Lei B', 'Comentário B', 'Lei C', 'Comentário C', 'Lei D', 'Comentário D', 'Lei E', 'Comentário E',
+  'Comentário completo',
   'Ano', 'Banca', 'Órgão', 'Cargo', 'Etiquetas',
 ] as const
 
@@ -27,6 +28,7 @@ const EXEMPLO: Record<string, string> = {
   'Assunto Principal': 'Capitais', 'Assunto Detalhe': 'Capital federal', 'Nível': 'facil', 'Tipo': 'objetiva',
   'Pilar 1': 'Território', 'Pilar 2': 'Federação',
   'Lei C': 'CF, art. 18', 'Comentário C': 'Brasília é a capital federal.',
+  'Comentário completo': 'Brasília é a capital federal do Brasil desde 1960 (CF, art. 18, §1º). As demais são capitais estaduais.',
   'Ano': '2024', 'Banca': 'CESPE', 'Órgão': 'INSS', 'Cargo': 'Analista',
   'Etiquetas': 'Alta recorrência, Desatualizada',
 }
@@ -47,6 +49,7 @@ const INSTRUCOES: [string, string][] = [
   ['Questões Certo/Errado', 'Ponha Tipo = Certo/Errado. Opção (a): A = Certo, B = Errado e marque a correta. Opção (b): deixe A–E em branco e informe só a Alternativa Correta como "Certo" ou "Errado" — o sistema cria as 2 opções.'],
   ['Ano', 'Ano da prova/questão (ex.: 2024). Usado nos filtros e relatórios.'],
   ['Lei A–E · Comentário A–E', 'Fundamentação legal e comentário de cada alternativa (opcional).'],
+  ['Comentário completo', 'Comentário/gabarito GERAL da questão (vira o "comentário do professor"). É a explicação completa mostrada ao aluno; quando preenchido, tem prioridade sobre os comentários por alternativa.'],
 ]
 
 const COR_HEADER = 'FF5B21B6'
