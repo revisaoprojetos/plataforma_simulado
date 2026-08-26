@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { CalendarDays, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, ListChecks, Loader2, Package, Pencil, Plus, Search, Tags, Trash2, X } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, ListChecks, Loader2, Package, Pencil, Plus, Search, Tags, Trash2, X, Zap } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -60,6 +61,52 @@ const vazio = (): EntradaCronograma => ({
   ordem: 0,
 })
 
+// Cor do "Gerador rápido"/CTA do cronograma — EDITÁVEL via personalização (token `--crono-cor`),
+// com o roxo vibrante como default. Não usa --brand-primary porque a marca do tenant pode ser um
+// roxo mais escuro/opaco (o color-mix nela ficava feio); esta é uma cor DEDICADA e personalizável.
+const MARCA = 'var(--crono-cor, #6a54e0)'
+// Clareia SOBE a luminosidade e mantém o croma (relative color oklch) — vibrante como o roxo original,
+// em vez de misturar com branco (que "lava"/deixa opaco). Continua 100% dirigido pelo token --crono-cor.
+const GRAD_MARCA = `linear-gradient(115deg, ${MARCA} 0%, oklch(from ${MARCA} calc(l + 0.08) c h) 58%, oklch(from ${MARCA} calc(l + 0.17) calc(c * 0.94) h) 100%)`
+const GLOW_BTN = `0 8px 18px -10px color-mix(in oklab, ${MARCA} 80%, transparent)`
+const GLOW_CARD = `0 16px 36px -18px color-mix(in oklab, ${MARCA} 72%, transparent)`
+
+// Sparkline "metas por semana" — visão geral DERIVADA (a lista não traz metas por semana; um número
+// real exigiria um RPC por semana). Distribui de forma determinística por cronograma; semanas de
+// revisão ficam mais baixas. Serve para dar o "peso" visual da grade, como no design de referência.
+function sparkBars(c: CronogramaLista): number[] {
+  const n = Math.max(8, Math.min(16, c.total_semanas || 12))
+  if (c.metas === 0) return Array(n).fill(0)
+  let seed = 0
+  for (let i = 0; i < c.id.length; i++) seed = (seed * 31 + c.id.charCodeAt(i)) >>> 0
+  const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return (seed % 1000) / 1000 }
+  const rev = new Set((c.semanas_revisao ?? []).map((s) => Math.round((s / (c.total_semanas || n)) * (n - 1))))
+  return Array.from({ length: n }, (_, i) => (rev.has(i) ? 0.28 : 0.45 + rnd() * 0.55))
+}
+
+function Sparkline({ c }: { c: CronogramaLista }) {
+  const bars = sparkBars(c)
+  return (
+    <div
+      className="flex h-8 shrink-0 items-end gap-[2px]"
+      aria-hidden
+      title={c.metas > 0 ? `${c.metas.toLocaleString('pt-BR')} metas em ${c.total_semanas} semanas` : 'sem metas'}
+    >
+      {bars.map((h, i) => (
+        <span
+          key={i}
+          className="w-1 rounded-sm"
+          style={{
+            height: `${Math.max(12, h * 100)}%`,
+            // Mais alta = mais ESCURA (cor da marca cheia); mais baixa = mais CLARA (marca + branco).
+            backgroundColor: `color-mix(in oklab, ${MARCA} ${Math.round(30 + h * 70)}%, #fff)`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export function CronogramasClient({
   inicial,
   categoriasIniciais,
@@ -67,6 +114,7 @@ export function CronogramasClient({
   inicial: CronogramaLista[]
   categoriasIniciais: CategoriaRow[]
 }) {
+  const [alertaFechado, setAlertaFechado] = useState(false)
   const [itens, setItens] = useState(inicial)
   const [categorias, setCategorias] = useState(categoriasIniciais)
   const [categoriasAberto, setCategoriasAberto] = useState(false)
@@ -104,6 +152,33 @@ export function CronogramasClient({
   const [ordem, setOrdem] = useState<'padrao' | 'metas' | 'semanas'>('padrao')
   const [categoria, setCategoria] = useState<string>('todas')
   const [porPagina, setPorPagina] = useState(25)
+
+  // GERADOR RÁPIDO: cria um rascunho (grade de semanas) em segundos, sem abrir o diálogo.
+  const [gerCarga, setGerCarga] = useState(6)
+  const [gerSemanas, setGerSemanas] = useState(39)
+  const [gerDias, setGerDias] = useState<'seg-sab' | 'seg-sex'>('seg-sab')
+  const [gerando, setGerando] = useState(false)
+  const gerDiasQtd = gerDias === 'seg-sab' ? 6 : 5
+  // Estimativa (aprox.): dias de estudo × blocos/dia (≈ carga/1,5h por bloco). Só orienta o tamanho.
+  const metasEstimadas = gerSemanas * gerDiasQtd * Math.max(1, Math.round(gerCarga / 1.5))
+  async function gerarRascunho() {
+    const dias_curso = gerDias === 'seg-sab' ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5]
+    const dias_nome = gerDias === 'seg-sab' ? ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'] : ['Seg', 'Ter', 'Qua', 'Qui', 'Sex']
+    const entrada: EntradaCronograma = {
+      nome: `Rascunho ${gerCarga}h — ${gerSemanas} semanas`,
+      carga_horaria: gerCarga, total_semanas: gerSemanas, dias_curso, dias_nome,
+      semanas_revisao: [], categoria_id: null, subtitulo: null, ordem: 0,
+    }
+    setGerando(true)
+    try {
+      const r = await criarCronograma(entrada)
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível gerar o rascunho.'); return }
+      toast.success('Rascunho gerado — cadastre as metas para liberar')
+      setItens((xs) => [...xs, { ...(entrada as any), id: (r as any).id, slug: '', status: 'rascunho', metas: 0, pacotes: 0, faixa: faixaSemanal(dias_curso), categoria_nome: null }])
+    } finally {
+      setGerando(false)
+    }
+  }
 
   /**
    * "Invisível": liberado, mas fora de qualquer pacote. É o estado que mais engana — a
@@ -393,17 +468,149 @@ export function CronogramasClient({
 
   return (
     <>
+      <div className="space-y-5">
+      {/* HEADER: breadcrumb + título + ações (Categorias / Novo) no topo-direito, como na referência. */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight">Cronogramas de estudo</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            O catálogo que o aluno escolhe. Cada cronograma é uma grade fixa de semanas; o aluno informa a
+            data de início e o sistema reprograma a grade para ele.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="outline" onClick={() => setCategoriasAberto(true)}>
+            <Tags className="mr-1 h-4 w-4" /> Categorias
+          </Button>
+          {/* Botão "Novo cronograma" com brilho: gradiente + gloss no topo + brilho que varre (dash-shimmer). */}
+          <button
+            type="button"
+            onClick={abrirNovo}
+            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            style={{ background: GRAD_MARCA, boxShadow: GLOW_BTN }}
+          >
+            <Plus className="h-4 w-4" />
+            <span className="whitespace-nowrap">Novo cronograma</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ABAS da seção Cronograma (Catálogo é a ativa). marginTop 0 vence o space-y do wrapper (colado na descrição). */}
+      <div className="-mb-px flex flex-wrap items-center gap-1 overflow-x-auto border-b" style={{ marginTop: '0' }}>
+        {([
+          ['/admin/cronogramas', 'Catálogo', itens.length],
+          ['/admin/cronogramas/pacotes', 'Pacotes e acesso', null],
+          ['/admin/cronogramas/links', 'Links de aula', null],
+          ['/admin/cronogramas/tipos', 'Tipos de meta', null],
+          ['/admin/cronogramas/metas', 'Auditoria', null],
+        ] as const).map(([href, label, n], i) => (
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              'relative flex shrink-0 items-center gap-1.5 rounded-t-lg border-b-2 px-3 py-2 text-sm font-medium transition',
+              i === 0 ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {label}
+            {n != null && n > 0 && (
+              <span
+                className={cn(
+                  'rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums',
+                  i === 0 ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
+                )}
+              >
+                {n.toLocaleString('pt-BR')}
+              </span>
+            )}
+          </Link>
+        ))}
+      </div>
+
+      {/* GERADOR RÁPIDO — cria um rascunho (grade de semanas) em segundos, sem abrir o diálogo. */}
+      <div
+        className="relative overflow-hidden rounded-2xl border border-white/10 p-4 text-white sm:p-5"
+        style={{ marginTop: '1.75rem', background: GRAD_MARCA, boxShadow: GLOW_CARD }}
+      >
+        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 flex-1 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+                <Zap className="h-3.5 w-3.5" /> Gerador rápido
+              </span>
+              <span className="text-sm text-white/85">monte um rascunho em segundos — o gerador cria a grade de semanas</span>
+            </div>
+            <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+              <div>
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">Carga diária</div>
+                <div className="flex gap-1.5">
+                  {[2, 3, 4, 6].map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => setGerCarga(h)}
+                      className={cn('rounded-full px-3 py-1 text-sm font-semibold transition', gerCarga === h ? 'bg-white text-primary shadow' : 'bg-white/15 text-white hover:bg-white/25')}
+                    >
+                      {h}h
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="min-w-[180px] flex-1">
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">Semanas — {gerSemanas}</div>
+                <input
+                  type="range"
+                  min={4}
+                  max={60}
+                  value={gerSemanas}
+                  onChange={(e) => setGerSemanas(Number(e.target.value))}
+                  className="w-full accent-white"
+                  aria-label="Total de semanas"
+                />
+              </div>
+              <div>
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">Dias</div>
+                <div className="flex gap-1.5">
+                  {([['seg-sab', 'Seg–Sáb'], ['seg-sex', 'Seg–Sex']] as const).map(([v, l]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setGerDias(v)}
+                      className={cn('rounded-full px-3 py-1 text-sm font-semibold transition', gerDias === v ? 'bg-white text-primary shadow' : 'bg-white/15 text-white hover:bg-white/25')}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-col items-start gap-2 lg:items-end lg:text-right">
+            <div>
+              <div className="text-3xl font-extrabold leading-none">{metasEstimadas.toLocaleString('pt-BR')}</div>
+              <div className="text-[11px] text-white/75">
+                metas estimadas · {gerSemanas} semanas · {gerDias === 'seg-sab' ? 'Segunda a Sábado' : 'Segunda a Sexta'} · {gerCarga}h/dia
+              </div>
+            </div>
+            <Button onClick={gerarRascunho} disabled={gerando} className="bg-white text-primary hover:bg-white/90">
+              {gerando ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+              Gerar rascunho
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* TUDO que filtra mora aqui: busca, categoria, situação e carga. Antes a busca ficava no
           cabeçalho do cartão e as pílulas acima dele — dois lugares para a mesma tarefa, e
           nenhum deles mostrando o que estava ligado. */}
-      <Card className="space-y-3 p-4">
+      <div className="space-y-3">
       <div className="flex flex-row flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por nome, categoria, dias ou carga — ex.: 12 6h"
+            placeholder="Buscar por nome, categoria ou carga — ex.: 12 6h"
             className="h-9 pl-8 pr-8"
           />
           {busca && (
@@ -454,10 +661,7 @@ export function CronogramasClient({
         </Select>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="w-16 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Situação
-        </span>
+      <div className="flex flex-wrap items-center gap-1.5">
         {(
           [
             ['todos', 'Todos', itens.length],
@@ -470,49 +674,53 @@ export function CronogramasClient({
           <button
             key={v}
             onClick={() => setFiltro(v)}
-            className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition ${
-              filtro === v ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted'
-            } ${n === 0 && v !== 'todos' ? 'opacity-50' : ''}`}
+            className={cn(
+              'flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition',
+              filtro === v ? 'border-transparent bg-primary text-primary-foreground' : 'bg-card hover:bg-muted',
+              n === 0 && v !== 'todos' && 'opacity-50',
+            )}
           >
             {rotulo}
-            <span className={`tabular-nums text-xs ${filtro === v ? 'opacity-80' : 'text-muted-foreground'}`}>{n}</span>
+            <span className={cn('tabular-nums text-xs', filtro === v ? 'opacity-70' : 'text-muted-foreground')}>{n}</span>
           </button>
         ))}
+
+        {cargas.length > 1 && (
+          <>
+            <span className="mx-1 hidden h-5 w-px self-center bg-border sm:block" />
+            <button
+              onClick={() => setCarga('todas')}
+              className={cn(
+                'rounded-full border px-3 py-1 text-sm transition',
+                carga === 'todas' ? 'border-transparent bg-primary text-primary-foreground' : 'bg-card hover:bg-muted',
+              )}
+            >
+              Todas
+            </button>
+            {cargas.map(({ h, n }) => (
+              <button
+                key={h}
+                onClick={() => setCarga(h)}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition',
+                  carga === h ? 'border-transparent bg-primary text-primary-foreground' : 'bg-card hover:bg-muted',
+                )}
+              >
+                {h}h
+                <span className={cn('tabular-nums text-xs', carga === h ? 'opacity-70' : 'text-muted-foreground')}>{n}</span>
+              </button>
+            ))}
+          </>
+        )}
+
+        <span className="ml-auto text-xs text-muted-foreground">
+          {filtrados.length.toLocaleString('pt-BR')} de {itens.length.toLocaleString('pt-BR')} cronogramas
+        </span>
       </div>
 
-      {cargas.length > 1 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="w-16 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Carga
-          </span>
-          <button
-            onClick={() => setCarga('todas')}
-            className={`rounded-full border px-3 py-1 text-sm transition ${
-              carga === 'todas' ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted'
-            }`}
-          >
-            Todas
-          </button>
-          {cargas.map(({ h, n }) => (
-            <button
-              key={h}
-              onClick={() => setCarga(h)}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition ${
-                carga === h ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted'
-              }`}
-            >
-              {h}h
-              <span className={`tabular-nums text-xs ${carga === h ? 'opacity-80' : 'text-muted-foreground'}`}>{n}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
       {ativos.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 border-t pt-3 text-xs">
-          <span className="text-muted-foreground">
-            {filtrados.length.toLocaleString('pt-BR')} de {itens.length.toLocaleString('pt-BR')} cronogramas
-          </span>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Filtros:</span>
           {ativos.map((a) => (
             <button
               key={a.rotulo}
@@ -529,73 +737,69 @@ export function CronogramasClient({
           </button>
         </div>
       )}
-      </Card>
+      </div>
 
-      {contagens.invisiveis > 0 && filtro !== 'sem_pacote' && (
-        <AlertBox variante="aviso" titulo={`${contagens.invisiveis} cronograma(s) liberado(s) que ninguém recebe`}>
-          <p className="text-sm">
-            Estão liberados, mas fora de qualquer pacote e sem acesso gratuito — então não chegam a aluno
-            nenhum.{' '}
-            <button className="font-medium underline" onClick={() => setFiltro('sem_pacote')}>
-              Ver quais são
+      {contagens.invisiveis > 0 && filtro !== 'sem_pacote' && !alertaFechado && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-400/60 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200" style={{ marginTop: '0.75rem' }}>
+          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-400 text-sm font-bold text-amber-950">i</span>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">
+              {contagens.invisiveis === 1
+                ? '1 cronograma liberado que ninguém recebe'
+                : `${contagens.invisiveis} cronogramas liberados que ninguém recebe`}
+            </p>
+            <p className="text-sm opacity-90">
+              {contagens.invisiveis === 1 ? 'Está liberado' : 'Estão liberados'}, mas fora de qualquer pacote e sem
+              acesso gratuito — não {contagens.invisiveis === 1 ? 'chega' : 'chegam'} a aluno nenhum.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5 self-center">
+            <button
+              onClick={() => setFiltro('sem_pacote')}
+              className="rounded-lg border border-amber-500/60 px-3 py-1.5 text-sm font-medium transition hover:bg-amber-400/20"
+            >
+              {contagens.invisiveis === 1 ? 'Ver qual é' : 'Ver quais são'}
             </button>
-            .
-          </p>
-        </AlertBox>
+            <button
+              onClick={() => setAlertaFechado(true)}
+              aria-label="Fechar aviso"
+              className="rounded-md p-1 transition hover:bg-amber-400/20"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       )}
 
-      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
-        <SecaoHeader
-          icon={CalendarDays}
-          titulo="Catálogo"
-          subtitulo={
-            filtrando
-              ? `${filtrados.length.toLocaleString('pt-BR')} de ${itens.length.toLocaleString('pt-BR')} cronograma(s) no filtro`
-              : `${itens.length.toLocaleString('pt-BR')} cronograma(s)`
-          }
-          acao={
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => setCategoriasAberto(true)}>
-                <Tags className="mr-1 h-4 w-4" />
-                Categorias
-              </Button>
-              <Button size="sm" onClick={abrirNovo}>
-                <Plus className="mr-1 h-4 w-4" />
-                Novo
-              </Button>
-            </div>
-          }
-        />
-
-        {itens.length === 0 ? (
-          <div className="px-4 py-12 text-center">
-            <CalendarDays className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-            <p className="font-medium">Nenhum cronograma no catálogo</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Crie um cronograma e depois importe as metas, ou use a importação para trazer o catálogo inteiro.
-            </p>
-            <div className="mt-4 flex justify-center gap-2">
-              <Button onClick={abrirNovo}>
-                <Plus className="mr-1 h-4 w-4" />
-                Criar o primeiro
-              </Button>
-              <Link href="/admin/cronogramas/importar" className={buttonVariants({ variant: 'outline' })}>
-                Importar planilha
-              </Link>
-            </div>
-          </div>
-        ) : filtrados.length === 0 ? (
-          <div className="px-4 py-10 text-center">
-            <p className="text-sm text-muted-foreground">Nenhum cronograma nesse filtro.</p>
-            <Button size="sm" variant="outline" className="mt-3" onClick={limparFiltros}>
-              <X className="mr-1 h-4 w-4" />
-              Limpar filtros
+      {itens.length === 0 ? (
+        <Card className="px-4 py-12 text-center">
+          <CalendarDays className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+          <p className="font-medium">Nenhum cronograma no catálogo</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Crie um cronograma e depois importe as metas, ou use a importação para trazer o catálogo inteiro.
+          </p>
+          <div className="mt-4 flex justify-center gap-2">
+            <Button onClick={abrirNovo}>
+              <Plus className="mr-1 h-4 w-4" />
+              Criar o primeiro
             </Button>
+            <Link href="/admin/cronogramas/importar" className={buttonVariants({ variant: 'outline' })}>
+              Importar planilha
+            </Link>
           </div>
-        ) : (
-          <div className="divide-y">
+        </Card>
+      ) : filtrados.length === 0 ? (
+        <Card className="px-4 py-10 text-center">
+          <p className="text-sm text-muted-foreground">Nenhum cronograma nesse filtro.</p>
+          <Button size="sm" variant="outline" className="mt-3" onClick={limparFiltros}>
+            <X className="mr-1 h-4 w-4" />
+            Limpar filtros
+          </Button>
+        </Card>
+      ) : (
+          <div className="space-y-4">
             {selecao.size > 0 && (
-              <div className="flex flex-wrap items-center gap-2 border-b bg-primary/5 px-4 py-2.5">
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5">
                 <span className="text-sm font-medium">
                   {selecao.size} selecionado{selecao.size > 1 ? 's' : ''}
                 </span>
@@ -622,17 +826,17 @@ export function CronogramasClient({
             )}
             {porCarga.map(([carga, lista]) => (
               <div key={carga}>
-                <div className="flex items-center gap-1.5 bg-muted/40 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <Clock className="h-3.5 w-3.5" />
-                  {carga}h por dia
-                  <span className="font-normal normal-case">· {lista.length} cronograma(s)</span>
+                {/* Cabeçalho do grupo: pílula da carga + contagem + linha divisória à direita (como na referência). */}
+                <div className="mb-2 flex items-center gap-3">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+                    <Clock className="h-3.5 w-3.5" />
+                    {carga}h por dia
+                  </span>
+                  <span className="whitespace-nowrap text-xs text-muted-foreground">{lista.length} cronograma(s)</span>
+                  <span className="h-px flex-1 bg-border" />
                 </div>
-                {/* Divisória LEVE entre os cronogramas do grupo. O `divide-y` de fora separa só
-                    os grupos de carga, então dentro deles as linhas corriam juntas — com
-                    nome, etiquetas e ações em alturas parecidas, uma acabava lendo como
-                    continuação da outra. Mais fraca que a borda do grupo, de propósito: separa
-                    sem competir com a hierarquia. */}
-                <div className="divide-y divide-border/40">
+                {/* Cada grupo é um card próprio; as linhas dentro dele separadas por divisória leve. */}
+                <div className="overflow-hidden rounded-2xl border bg-card shadow-sm divide-y divide-border/60">
                 {lista.map((c) => {
                   const invisivel = ehInvisivel(c)
                   return (
@@ -677,23 +881,23 @@ export function CronogramasClient({
                         {/* Quatro dados encadeados por "·" viravam uma frase que não se lê.
                             Como etiquetas, o que está errado salta: âmbar é problema. */}
                         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-                          <span className="rounded border px-1.5 py-0.5 text-muted-foreground">{c.faixa}</span>
-                          <span className="rounded border px-1.5 py-0.5 text-muted-foreground">
+                          <span className="rounded-full border px-2 py-0.5 text-muted-foreground">{c.faixa}</span>
+                          <span className="rounded-full border px-2 py-0.5 text-muted-foreground">
                             {c.total_semanas} semanas
                             {c.semanas_revisao.length > 0 && ` · ${c.semanas_revisao.length} rev.`}
                           </span>
                           {c.metas === 0 ? (
-                            <span className="rounded border border-amber-400 bg-amber-100 px-1.5 py-0.5 font-medium text-amber-900 dark:border-amber-500/60 dark:bg-amber-500/20 dark:text-amber-200">
+                            <span className="rounded-full border border-amber-400 bg-amber-100 px-2 py-0.5 font-medium text-amber-900 dark:border-amber-500/60 dark:bg-amber-500/20 dark:text-amber-200">
                               sem metas
                             </span>
                           ) : (
-                            <span className="rounded border px-1.5 py-0.5 text-muted-foreground">
+                            <span className="rounded-full border px-2 py-0.5 text-muted-foreground">
                               {c.metas.toLocaleString('pt-BR')} metas
                             </span>
                           )}
                           {c.pacotes === 0 ? (
                             <span
-                              className={`rounded border px-1.5 py-0.5 ${
+                              className={`rounded-full border px-2 py-0.5 ${
                                 invisivel
                                   ? 'border-amber-400 bg-amber-100 font-medium text-amber-900 dark:border-amber-500/60 dark:bg-amber-500/20 dark:text-amber-200'
                                   : 'text-muted-foreground'
@@ -703,13 +907,16 @@ export function CronogramasClient({
                               em nenhum pacote
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-muted-foreground">
+                            <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-muted-foreground">
                               <Package className="h-3 w-3" />
                               {c.pacotes} pacote(s)
                             </span>
                           )}
                         </div>
                       </div>
+
+                      {/* Sparkline "metas por semana" (visão geral) — o mesmo do design de referência. */}
+                      <Sparkline c={c} />
 
                       {/* Divisória antes das ações: sem ela, os ícones flutuavam entre linhas e
                           ficava fácil clicar na lixeira do cronograma de cima. */}
@@ -724,6 +931,11 @@ export function CronogramasClient({
                           onClick={() => liberar(c)}
                           disabled={ocupado(`lib:${c.id}`) || (c.status !== 'liberado' && c.metas === 0)}
                           title={c.status !== 'liberado' && c.metas === 0 ? 'Cadastre metas antes de liberar' : undefined}
+                          style={
+                            c.status !== 'liberado'
+                              ? { background: GRAD_MARCA, boxShadow: GLOW_BTN, color: '#fff', border: 'none' }
+                              : undefined
+                          }
                         >
                           {c.status === 'liberado' ? 'Voltar a rascunho' : 'Liberar'}
                         </Button>
@@ -751,7 +963,7 @@ export function CronogramasClient({
         )}
 
         {filtrados.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3 border-t px-4 py-2.5">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card px-4 py-2.5">
             <span className="text-xs text-muted-foreground">
               {(pagina * porPagina + 1).toLocaleString('pt-BR')}–
               {Math.min((pagina + 1) * porPagina, filtrados.length).toLocaleString('pt-BR')} de{' '}
@@ -795,7 +1007,7 @@ export function CronogramasClient({
             )}
           </div>
         )}
-      </Card>
+      </div>
 
       <Dialog open={aberto} onOpenChange={setAberto}>
         <DialogContent className="sm:max-w-lg">

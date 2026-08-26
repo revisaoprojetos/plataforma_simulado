@@ -43,7 +43,7 @@ function contraste(hex: string): string {
 
 interface Cores {
   sidebar: string; sidetext: string; sidetextHover: string; sidetextActive: string; icon: string; iconHover: string; iconAtivo: string; active: string; topbar: string; sborder: string
-  bg: string; text: string; titulo: string; card: string; cborder: string; inputBg: string; btn: string; accent: string
+  bg: string; text: string; titulo: string; card: string; cborder: string; inputBg: string; btn: string; accent: string; cronograma?: string
   tabBg: string; tabAtivo: string; tabTexto: string  // fundo das tabs, tab selecionada, texto (hover/ativo)
 }
 
@@ -53,6 +53,7 @@ function cssVarsFromCores(c: Cores): string {
   const fg = (hex: string) => contraste(hex)
   return [
     `--primary:${c.btn}`, `--primary-foreground:${fg(c.btn)}`, `--ring:${c.btn}`, `--brand-primary:${c.btn}`, `--brand-accent:${c.accent}`,
+    ...(c.cronograma ? [`--crono-cor:${c.cronograma}`] : []),
     `--sidebar-primary:${c.active}`, `--sidebar-primary-foreground:${fg(c.active)}`, `--sidebar-accent:${c.active}`, `--sidebar-accent-foreground:${fg(c.active)}`,
     `--sidebar-icon-hover:${c.iconHover}`, `--sidebar-icon-active:${c.iconAtivo}`, `--sidebar-text-hover:${c.sidetextHover}`, `--sidebar-text-active:${c.sidetextActive}`,
     `--sidebar:${c.sidebar}`, `--sidebar-foreground:${c.sidetext}`, `--sidebar-icon:${c.icon}`, `--sidebar-border:${c.sborder}`, `--sidebar-ring:${c.active}`,
@@ -516,7 +517,7 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
           {/* Barra lateral & topo */}
           <Secao titulo="Barra lateral & topo" desc="Fundo, texto, ícones e item ativo" icon={PanelLeft}>
             <div className="space-y-2.5">
-              {SIDEBAR_CAMPOS.map(([k, label]) => (<Field key={k} label={label}><ColorControl value={c[k]} onChange={(v) => setCor(k, v)} /></Field>))}
+              {SIDEBAR_CAMPOS.map(([k, label]) => (<Field key={k} label={label}><ColorControl value={c[k] ?? ''} onChange={(v) => setCor(k, v)} /></Field>))}
             </div>
             <div className="space-y-1.5 border-t pt-3"><span className="text-xs text-muted-foreground">Gama da logo no sistema (sidebar/topo)</span>
               <div className="flex gap-1.5">{(([['none', 'Normal'], ['branco', 'Branca'], ['preto', 'Preta']]) as [LogoFiltro, string][]).map(([id, nome]) => (<button key={id} type="button" onClick={() => setT((p) => ({ ...p, logo_filtro_sistema: id }))} className={`flex-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${t.logo_filtro_sistema === id ? 'border-primary bg-primary/10 text-foreground' : 'text-muted-foreground hover:border-primary/50'}`}>{nome}</button>))}</div>
@@ -527,7 +528,9 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
           {/* Conteúdo & páginas */}
           <Secao titulo="Conteúdo & páginas" desc="Fundo, títulos, cards e botões" icon={LayoutGrid}>
             <div className="space-y-2.5">
-              {CONTEUDO_CAMPOS.map(([k, label]) => (<Field key={k} label={label}><ColorControl value={c[k]} onChange={(v) => setCor(k, v)} /></Field>))}
+              {CONTEUDO_CAMPOS.map(([k, label]) => (<Field key={k} label={label}><ColorControl value={c[k] ?? ''} onChange={(v) => setCor(k, v)} /></Field>))}
+              {/* Cor DEDICADA do módulo Cronograma (gerador rápido + CTAs) → --crono-cor. */}
+              <Field label="Cronograma (gerador/CTAs)"><ColorControl value={c.cronograma ?? '#6a54e0'} onChange={(v) => setCor('cronograma', v)} /></Field>
             </div>
           </Secao>
         </div>

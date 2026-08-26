@@ -127,6 +127,19 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'Cronograma',
+    icon: CalendarDays,
+    items: [
+      { label: 'Catálogo', href: '/admin/cronogramas', icon: CalendarDays, perm: 'cronogramas:view' },
+      { label: 'Pacotes e acesso', href: '/admin/cronogramas/pacotes', icon: Package, perm: 'cronogramas:view' },
+      { label: 'Links de aula', href: '/admin/cronogramas/links', icon: LinkIcon, perm: 'cronogramas:view' },
+      { label: 'Tipos de meta', href: '/admin/cronogramas/tipos', icon: Tag, perm: 'cronogramas:view' },
+      { label: 'Auditoria de metas', href: '/admin/cronogramas/metas', icon: ListChecks, perm: 'cronogramas:view' },
+      { label: 'Relatórios', href: '/admin/cronogramas/relatorios', icon: BarChart3, perm: 'cronogramas:view' },
+      { label: 'Importar', href: '/admin/cronogramas/importar', icon: Upload, perm: 'cronogramas:update' },
+    ],
+  },
+  {
     label: 'Alunos',
     icon: GraduationCap,
     items: [
@@ -195,19 +208,6 @@ const navGroups: NavGroup[] = [
       { label: 'LGPD', href: '/admin/lgpd', icon: ShieldCheck, perm: 'estudantes:view' },
       { label: 'Lixeira', href: '/admin/lixeira', icon: Trash2, perm: 'questoes:view' },
       { label: 'Ajuda', href: '/admin/ajuda', icon: HelpCircle },
-    ],
-  },
-  {
-    label: 'Cronograma',
-    icon: CalendarDays,
-    items: [
-      { label: 'Catálogo', href: '/admin/cronogramas', icon: CalendarDays, perm: 'cronogramas:view' },
-      { label: 'Pacotes e acesso', href: '/admin/cronogramas/pacotes', icon: Package, perm: 'cronogramas:view' },
-      { label: 'Links de aula', href: '/admin/cronogramas/links', icon: LinkIcon, perm: 'cronogramas:view' },
-      { label: 'Tipos de meta', href: '/admin/cronogramas/tipos', icon: Tag, perm: 'cronogramas:view' },
-      { label: 'Auditoria de metas', href: '/admin/cronogramas/metas', icon: ListChecks, perm: 'cronogramas:view' },
-      { label: 'Relatórios', href: '/admin/cronogramas/relatorios', icon: BarChart3, perm: 'cronogramas:view' },
-      { label: 'Importar', href: '/admin/cronogramas/importar', icon: Upload, perm: 'cronogramas:update' },
     ],
   },
 ]

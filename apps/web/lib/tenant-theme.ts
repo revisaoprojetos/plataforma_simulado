@@ -126,6 +126,7 @@ function varsDaPaleta(cores: Record<string, unknown>): { marca: string[]; surf: 
   const mix = (a: string, pct: number, b: string) => `color-mix(in oklab, ${ok(a)} ${pct}%, ${ok(b)})`
 
   const btn = v(cores.btn), accent = v(cores.accent), active = v(cores.active)
+  const cronograma = v(cores.cronograma) // cor dedicada do módulo Cronograma (gerador/CTAs) → --crono-cor
   const sidebar = v(cores.sidebar), sidetext = v(cores.sidetext), topbar = v(cores.topbar)
   const sborder = v(cores.sborder), icon = v(cores.icon), iconAtivo = v(cores.iconAtivo), iconHover = v(cores.iconHover)
   const sidetextHover = v(cores.sidetextHover), sidetextActive = v(cores.sidetextActive)
@@ -139,6 +140,7 @@ function varsDaPaleta(cores: Record<string, unknown>): { marca: string[]; surf: 
   // ── Marca / destaques ──
   if (btn) marca.push(`  --primary: ${ok(btn)};`, `  --primary-foreground: ${fg(btn)};`, `  --ring: ${ok(btn)};`, `  --brand-primary: ${ok(btn)};`)
   if (accent) marca.push(`  --brand-accent: ${ok(accent)};`)
+  if (cronograma) marca.push(`  --crono-cor: ${ok(cronograma)};`)
   if (activeC) marca.push(`  --sidebar-primary: ${ok(activeC)};`, `  --sidebar-primary-foreground: ${fg(activeC)};`, `  --sidebar-accent: ${ok(activeC)};`, `  --sidebar-accent-foreground: ${fg(activeC)};`)
   if (iconHover) marca.push(`  --sidebar-icon-hover: ${ok(iconHover)};`); else if (activeC) marca.push(`  --sidebar-icon-hover: ${fg(activeC)};`)
   if (iconAtivo) marca.push(`  --sidebar-icon-active: ${ok(iconAtivo)};`); else if (activeC) marca.push(`  --sidebar-icon-active: ${fg(activeC)};`)
@@ -238,6 +240,7 @@ export const getTenantTheme = cache(async (): Promise<TenantThemeResult> => {
     const corPrimaria = safeColor(tema.cor_primaria)
     const corSecundaria = safeColor(tema.cor_secundaria)
     const corAccent = safeColor(tema.cor_accent)
+    const corCronograma = safeColor((tema as any).cor_cronograma)
     const fonte = safeFont(tema.fonte)
 
     const lines: string[] = []
@@ -264,6 +267,10 @@ export const getTenantTheme = cache(async (): Promise<TenantThemeResult> => {
       const accentFg = deriveForeground(accent)
       lines.push(`  --accent: ${accent};`)
       lines.push(`  --accent-foreground: ${accentFg};`)
+    }
+
+    if (corCronograma) {
+      lines.push(`  --crono-cor: ${hexToOklch(corCronograma)};`)
     }
 
     if (fonte) {
