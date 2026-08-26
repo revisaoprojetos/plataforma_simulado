@@ -1,31 +1,10 @@
--- Unificação de disciplinas duplicadas — ATÔMICA e REVERSÍVEL.
--- A aba /admin/questoes?tab=disciplinas mescla disciplinas com nomes diferentes
--- que são a mesma coisa. Fazer isso em várias chamadas PostgREST separadas não é
--- transacional: uma falha no meio deixa estado parcial. Aqui tudo roda dentro de
--- UMA função (= 1 transação): ou aplica tudo, ou faz rollback. E gravamos um LOG
--- com o mapa (questões afetadas por disciplina) para permitir DESFAZER sem perder
--- dados (as questões nunca são apagadas — só têm o disciplina_id repontado).
+-- Correção das funções de unificação de disciplinas (a 20260826000001 já rodou).
+-- 1) simulado_desfazer_unificacao: trocado ON CONFLICT (tenant_id, nome) por
+--    SELECT-then-INSERT — bases migradas (twdr) NÃO têm o UNIQUE(tenant_id, nome),
+--    então o ON CONFLICT estourava 42P10. Agora funciona com ou sem o constraint.
+-- 2) simulado_unificar_disciplinas: passa a gravar também os `assunto_ids` no mapa,
+--    e o desfazer restaura os assuntos além das questões (undo 100%).
 
--- ── Log de reversão ──────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.simulado_disciplina_unificacoes (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id     uuid NOT NULL REFERENCES public.simulado_tenants(id) ON DELETE CASCADE,
-  canonica_id   uuid,                         -- disciplina mantida (pode ter sido apagada depois)
-  canonica_nome text,
-  mapa          jsonb NOT NULL DEFAULT '[]',  -- [{disciplina_id, nome, questao_ids:[...]}]
-  desfeita      boolean NOT NULL DEFAULT false,
-  criado_por    uuid,
-  criado_em     timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS idx_disc_unif_tenant ON public.simulado_disciplina_unificacoes (tenant_id, criado_em DESC);
-
-ALTER TABLE public.simulado_disciplina_unificacoes ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS disc_unif_isolation ON public.simulado_disciplina_unificacoes;
-CREATE POLICY disc_unif_isolation ON public.simulado_disciplina_unificacoes
-  USING (tenant_id IN (SELECT public.user_tenant_ids()))
-  WITH CHECK (tenant_id IN (SELECT public.user_tenant_ids()));
-
--- ── Merge atômico ────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.simulado_unificar_disciplinas(
   p_tenant   uuid,
   p_canonica uuid,
@@ -49,7 +28,6 @@ BEGIN
     RAISE EXCEPTION 'a disciplina a manter nao pode estar entre as duplicadas';
   END IF;
 
-  -- Todas (canônica + duplicadas) devem existir no tenant (evita merge cross-tenant).
   v_esperado := array_length(array_append(p_dups, p_canonica), 1);
   SELECT count(*) INTO v_valid FROM public.simulado_disciplinas
     WHERE tenant_id = p_tenant AND id = ANY(array_append(p_dups, p_canonica));
@@ -59,8 +37,6 @@ BEGIN
 
   SELECT nome INTO v_nome FROM public.simulado_disciplinas WHERE id = p_canonica AND tenant_id = p_tenant;
 
-  -- Mapa para reversão: por disciplina duplicada, TODOS os ids de questão movidos
-  -- (inclusive deletadas — para não orfanar o FK e permitir undo completo).
   SELECT jsonb_agg(jsonb_build_object(
            'disciplina_id', d.id,
            'nome',          d.nome,
@@ -73,13 +49,11 @@ BEGIN
     FROM public.simulado_disciplinas d
     WHERE d.tenant_id = p_tenant AND d.id = ANY(p_dups);
 
-  -- Contagens de impacto (para exibição).
   SELECT count(*) INTO v_q FROM public.simulado_questoes
     WHERE tenant_id = p_tenant AND deletado = false AND disciplina_id = ANY(p_dups);
   SELECT count(*) INTO v_a FROM public.simulado_assuntos
     WHERE tenant_id = p_tenant AND disciplina_id = ANY(p_dups);
 
-  -- Repoint (antes de apagar): questões (todas), assuntos, cronograma.
   UPDATE public.simulado_questoes SET disciplina_id = p_canonica
     WHERE tenant_id = p_tenant AND disciplina_id = ANY(p_dups);
   UPDATE public.simulado_assuntos SET disciplina_id = p_canonica
@@ -93,11 +67,9 @@ BEGIN
       WHERE tenant_id = p_tenant AND disciplina_id = ANY(p_dups);
   EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END;
 
-  -- Log ANTES de apagar (fonte do undo).
   INSERT INTO public.simulado_disciplina_unificacoes (tenant_id, canonica_id, canonica_nome, mapa, criado_por)
     VALUES (p_tenant, p_canonica, v_nome, COALESCE(v_mapa, '[]'::jsonb), p_ator);
 
-  -- Apaga as duplicadas (já sem referências).
   DELETE FROM public.simulado_disciplinas WHERE tenant_id = p_tenant AND id = ANY(p_dups);
 
   RETURN jsonb_build_object('ok', true, 'questoes', v_q, 'assuntos', v_a,
@@ -105,9 +77,6 @@ BEGIN
 END;
 $$;
 
--- ── Desfazer (undo) ──────────────────────────────────────────────────────────
--- Recria as disciplinas apagadas pelo NOME original e repointa as questões
--- logadas de volta. As questões nunca foram perdidas, então o desfazer é seguro.
 CREATE OR REPLACE FUNCTION public.simulado_desfazer_unificacao(
   p_tenant     uuid,
   p_unificacao uuid
@@ -128,8 +97,6 @@ BEGIN
   IF v_row.desfeita THEN RAISE EXCEPTION 'unificacao ja desfeita'; END IF;
 
   FOR v_item IN SELECT * FROM jsonb_array_elements(v_row.mapa) LOOP
-    -- Recria a disciplina pelo nome (novo id). Se já existir, reusa.
-    -- SELECT-then-INSERT (não usa ON CONFLICT: nem toda base tem o UNIQUE(tenant,nome)).
     v_new := NULL;
     SELECT id INTO v_new FROM public.simulado_disciplinas
       WHERE tenant_id = p_tenant AND nome = (v_item->>'nome') LIMIT 1;
