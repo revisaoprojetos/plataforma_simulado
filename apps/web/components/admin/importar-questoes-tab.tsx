@@ -10,9 +10,15 @@ import { MarkdownContent } from '@/components/markdown-content'
 import { analisarQuestoesImport, confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 
-// Colunas do modelo de importação (a ordem é a do modelo baixado).
-const COLUNAS = [
-  'Número', 'Tipo', 'Enunciado', 'Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D', 'Alternativa E',
+// ── DOIS modelos de importação, com colunas próprias por formato ─────────────
+// Múltipla escolha (A–E) e Certo/Errado (julgamento) têm colunas bem diferentes,
+// então cada um baixa um modelo enxuto — e o parser monta a base já no formato.
+
+type ModeloImport = 'multipla' | 'certo_errado'
+
+// Múltipla escolha: alternativas A–E + lei/comentário por alternativa.
+const COLUNAS_ME = [
+  'Número', 'Enunciado', 'Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D', 'Alternativa E',
   'Alternativa Correta', 'Alternativas Incorretas', 'Grupo', 'Disciplina', 'Categoria', 'Assunto Principal',
   'Assunto Detalhe', 'Nível', 'Pilar 1', 'Pilar 2',
   'Lei A', 'Comentário A', 'Lei B', 'Comentário B', 'Lei C', 'Comentário C', 'Lei D', 'Comentário D', 'Lei E', 'Comentário E',
@@ -20,48 +26,73 @@ const COLUNAS = [
   'Ano', 'Banca', 'Órgão', 'Cargo', 'Etiquetas',
 ] as const
 
-const EXEMPLO: Record<string, string> = {
-  'Número': '1', 'Enunciado': 'Qual é a capital do Brasil?',
-  'Alternativa A': 'São Paulo', 'Alternativa B': 'Rio de Janeiro', 'Alternativa C': 'Brasília', 'Alternativa D': 'Salvador', 'Alternativa E': 'Recife',
-  'Alternativa Correta': 'C', 'Alternativas Incorretas': 'A, B, D, E',
-  'Grupo': 'Conhecimentos Gerais', 'Disciplina': 'Geografia', 'Categoria': 'Geografia do Brasil',
-  'Assunto Principal': 'Capitais', 'Assunto Detalhe': 'Capital federal', 'Nível': 'facil', 'Tipo': 'Múltipla escolha',
-  'Pilar 1': 'Território', 'Pilar 2': 'Federação',
-  'Lei C': 'CF, art. 18', 'Comentário C': 'Brasília é a capital federal.',
-  'Comentário completo': 'Brasília é a capital federal do Brasil desde 1960 (CF, art. 18, §1º). As demais são capitais estaduais.',
-  'Ano': '2024', 'Banca': 'CESPE', 'Órgão': 'INSS', 'Cargo': 'Analista',
-  'Etiquetas': 'Alta recorrência, Desatualizada',
-}
+// Certo/Errado: sem A–E nem lei/comentário por alternativa; a resposta é Certo/Errado
+// e a explicação vai no "Comentário completo".
+const COLUNAS_CE = [
+  'Número', 'Enunciado', 'Alternativa Correta', 'Grupo', 'Disciplina', 'Categoria', 'Assunto Principal',
+  'Assunto Detalhe', 'Nível', 'Pilar 1', 'Pilar 2',
+  'Comentário completo',
+  'Ano', 'Banca', 'Órgão', 'Cargo', 'Etiquetas',
+] as const
 
-// 2º exemplo: questão CERTO/ERRADO — deixe A–E em branco e informe só a Alternativa Correta
-// como "Certo" ou "Errado" (o sistema cria as 2 opções).
-const EXEMPLO_CE: Record<string, string> = {
-  'Número': '2', 'Tipo': 'Certo/Errado',
-  'Enunciado': 'A capital do Brasil é Brasília.',
-  'Alternativa Correta': 'Certo',
-  'Disciplina': 'Geografia', 'Assunto Principal': 'Capitais', 'Nível': 'facil',
-  'Comentário completo': 'Correto. Brasília é a capital federal desde 1960.',
-  'Ano': '2024', 'Banca': 'CESPE',
-}
+const EXEMPLOS_ME: Record<string, string>[] = [
+  {
+    'Número': '1', 'Enunciado': 'Qual é a capital do Brasil?',
+    'Alternativa A': 'São Paulo', 'Alternativa B': 'Rio de Janeiro', 'Alternativa C': 'Brasília', 'Alternativa D': 'Salvador', 'Alternativa E': 'Recife',
+    'Alternativa Correta': 'C', 'Alternativas Incorretas': 'A, B, D, E',
+    'Grupo': 'Conhecimentos Gerais', 'Disciplina': 'Geografia', 'Categoria': 'Geografia do Brasil',
+    'Assunto Principal': 'Capitais', 'Assunto Detalhe': 'Capital federal', 'Nível': 'facil',
+    'Pilar 1': 'Território', 'Pilar 2': 'Federação',
+    'Lei C': 'CF, art. 18', 'Comentário C': 'Brasília é a capital federal.',
+    'Comentário completo': 'Brasília é a capital federal do Brasil desde 1960 (CF, art. 18, §1º). As demais são capitais estaduais.',
+    'Ano': '2024', 'Banca': 'CESPE', 'Órgão': 'INSS', 'Cargo': 'Analista', 'Etiquetas': 'Alta recorrência',
+  },
+]
 
-// Breve explicação de cada coluna (aba "Instruções" do modelo).
-const INSTRUCOES: [string, string][] = [
+const EXEMPLOS_CE: Record<string, string>[] = [
+  {
+    'Número': '1', 'Enunciado': 'A capital do Brasil é Brasília.', 'Alternativa Correta': 'Certo',
+    'Disciplina': 'Geografia', 'Categoria': 'Geografia do Brasil', 'Assunto Principal': 'Capitais', 'Assunto Detalhe': 'Capital federal', 'Nível': 'facil',
+    'Comentário completo': 'Correto. Brasília é a capital federal desde 1960 (CF, art. 18, §1º).',
+    'Ano': '2024', 'Banca': 'CESPE', 'Etiquetas': 'Alta recorrência',
+  },
+  {
+    'Número': '2', 'Enunciado': 'São Paulo é a capital do Brasil.', 'Alternativa Correta': 'Errado',
+    'Disciplina': 'Geografia', 'Assunto Principal': 'Capitais', 'Nível': 'facil',
+    'Comentário completo': 'Errado. São Paulo é a capital do estado de São Paulo; a capital federal é Brasília.',
+    'Ano': '2024', 'Banca': 'CESPE',
+  },
+]
+
+const INSTR_COMUNS: [string, string][] = [
   ['Número', 'Número/ordem da questão (opcional).'],
-  ['Enunciado', 'O texto da pergunta. Obrigatório.'],
-  ['Alternativa A–E', 'As opções de resposta. Deixe em branco as que não usar.'],
-  ['Alternativa Correta', 'A letra da resposta certa (A, B, C, D ou E) — ou "Certo"/"Errado" nas questões Certo/Errado — ou "ANULADA".'],
-  ['ANULADA (na coluna Alternativa Correta)', 'Marca a questão como anulada: o ponto é garantido a TODOS que fizerem o simulado e a questão aparece na prova com as alternativas, porém bloqueada para resposta. Reimportar com "ANULADA" também anula uma questão já existente.'],
-  ['Alternativas Incorretas', 'Letras das erradas (opcional; apenas informativo — a correta já define as demais).'],
+  ['Enunciado', 'O texto da questão. Obrigatório.'],
   ['Grupo · Categoria · Assunto Detalhe · Pilar 1 · Pilar 2', 'Classificações livres da questão.'],
   ['Disciplina · Assunto Principal · Banca · Órgão · Cargo', 'São criados automaticamente no sistema se ainda não existirem.'],
   ['Nível', 'facil, medio ou dificil.'],
-  ['Etiquetas', 'Uma ou mais etiquetas (tags) separadas por vírgula. Reusa as existentes e cria as novas. Aplicar uma etiqueta funcional (ex.: "Anulada", "Desatualizada") ANULA a questão — ponto garantido a todos e bloqueada na prova.'],
-  ['Tipo', 'O formato da questão: "Múltipla escolha" (alternativas A–E), "Certo/Errado" (julgamento) ou "Discursiva". Também aceita "objetiva" = múltipla escolha. Vazio = Múltipla escolha.'],
-  ['Questões Certo/Errado', 'Ponha Tipo = Certo/Errado. Opção (a): A = Certo, B = Errado e marque a correta. Opção (b): deixe A–E em branco e informe só a Alternativa Correta como "Certo" ou "Errado" — o sistema cria as 2 opções.'],
-  ['Ano', 'Ano da prova/questão (ex.: 2024). Usado nos filtros e relatórios.'],
-  ['Lei A–E · Comentário A–E', 'Fundamentação legal e comentário de cada alternativa (opcional).'],
-  ['Comentário completo', 'Comentário/gabarito GERAL da questão (vira o "comentário do professor"). É a explicação completa mostrada ao aluno; quando preenchido, tem prioridade sobre os comentários por alternativa.'],
+  ['Ano', 'Ano da prova/questão (ex.: 2024).'],
+  ['Comentário completo', 'Comentário/gabarito GERAL da questão (vira o "comentário do professor") — a explicação completa mostrada ao aluno.'],
+  ['Etiquetas', 'Uma ou mais etiquetas (tags) separadas por vírgula. Reusa as existentes e cria as novas. Etiqueta funcional (ex.: "Anulada", "Desatualizada") ANULA a questão — ponto garantido a todos e bloqueada na prova.'],
+  ['ANULADA (na coluna Alternativa Correta)', 'Marca a questão como anulada: ponto garantido a TODOS e bloqueada para resposta na prova. Reimportar com "ANULADA" também anula uma questão já existente.'],
 ]
+
+const INSTRUCOES_ME: [string, string][] = [
+  ...INSTR_COMUNS,
+  ['Alternativa A–E', 'As opções de resposta. Deixe em branco as que não usar.'],
+  ['Alternativa Correta', 'A letra da resposta certa (A, B, C, D ou E) — ou "ANULADA".'],
+  ['Alternativas Incorretas', 'Letras das erradas (opcional; apenas informativo).'],
+  ['Lei A–E · Comentário A–E', 'Fundamentação legal e comentário de CADA alternativa (opcional).'],
+]
+
+const INSTRUCOES_CE: [string, string][] = [
+  ...INSTR_COMUNS,
+  ['Alternativa Correta', 'A resposta do julgamento: "Certo" ou "Errado" — ou "ANULADA". O sistema cria as 2 opções (Certo/Errado) automaticamente; não use as colunas A–E aqui.'],
+]
+
+const MODELOS: Record<ModeloImport, { colunas: readonly string[]; exemplos: Record<string, string>[]; instrucoes: [string, string][]; corretaOpts: string; arquivo: string; aba: string }> = {
+  multipla: { colunas: COLUNAS_ME, exemplos: EXEMPLOS_ME, instrucoes: INSTRUCOES_ME, corretaOpts: 'A,B,C,D,E,ANULADA', arquivo: 'modelo-questoes-multipla-escolha.xlsx', aba: 'Múltipla escolha' },
+  certo_errado: { colunas: COLUNAS_CE, exemplos: EXEMPLOS_CE, instrucoes: INSTRUCOES_CE, corretaOpts: 'Certo,Errado,ANULADA', arquivo: 'modelo-questoes-certo-errado.xlsx', aba: 'Certo-Errado' },
+}
 
 const COR_HEADER = 'FF5B21B6'
 const BORDA = { style: 'thin' as const, color: { argb: 'FFE5E7EB' } }
@@ -74,16 +105,17 @@ function baixarBlob(blob: Blob, nome: string) {
   URL.revokeObjectURL(a.href)
 }
 
-/** Gera um .xlsx formatado (cabeçalho estilizado, larguras, filtro, listas e aba de instruções). */
-async function baixarModelo() {
+/** Gera um .xlsx formatado do modelo escolhido (múltipla escolha OU certo/errado). */
+async function baixarModelo(formato: ModeloImport) {
   try {
+    const cfg = MODELOS[formato]
+    const COLS = cfg.colunas
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
 
-    const ws = wb.addWorksheet('Questões', { views: [{ state: 'frozen', ySplit: 1 }] })
-    ws.addRow([...COLUNAS])
-    ws.addRow(COLUNAS.map((c) => EXEMPLO[c] ?? ''))       // exemplo 1: múltipla escolha
-    ws.addRow(COLUNAS.map((c) => EXEMPLO_CE[c] ?? ''))    // exemplo 2: certo/errado
+    const ws = wb.addWorksheet(cfg.aba, { views: [{ state: 'frozen', ySplit: 1 }] })
+    ws.addRow([...COLS])
+    for (const ex of cfg.exemplos) ws.addRow(COLS.map((c) => ex[c] ?? ''))
 
     const head = ws.getRow(1)
     head.height = 30
@@ -91,7 +123,7 @@ async function baixarModelo() {
     head.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
     head.eachCell((c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_HEADER } }; c.border = bordas })
 
-    for (const r of [2, 3]) {
+    for (let r = 2; r <= cfg.exemplos.length + 1; r++) {
       const ex = ws.getRow(r)
       ex.font = { italic: true, color: { argb: 'FF6B7280' } }
       ex.alignment = { vertical: 'top', wrapText: true }
@@ -99,21 +131,20 @@ async function baixarModelo() {
     }
 
     ws.columns.forEach((col, i) => {
-      const c = COLUNAS[i]
-      const exLen = (EXEMPLO[c] ?? '').length
+      const c = COLS[i]
+      const exLen = Math.max(0, ...cfg.exemplos.map((ex) => (ex[c] ?? '').length))
       col.width = c === 'Enunciado' ? 42 : Math.min(Math.max(c.length + 3, exLen + 2, 12), 30)
     })
-    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: COLUNAS.length } }
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: COLS.length } }
 
     // Listas suspensas úteis (linhas 2–300).
-    const idx = (n: string) => COLUNAS.indexOf(n as (typeof COLUNAS)[number]) + 1
+    const idx = (n: string) => COLS.indexOf(n) + 1
     const lista = (nome: string, opcoes: string) => {
       const ci = idx(nome); if (ci < 1) return
       for (let r = 2; r <= 300; r++) ws.getCell(r, ci).dataValidation = { type: 'list', allowBlank: true, formulae: [`"${opcoes}"`] }
     }
     lista('Nível', 'facil,medio,dificil')
-    lista('Alternativa Correta', 'A,B,C,D,E,Certo,Errado,ANULADA')
-    lista('Tipo', 'Múltipla escolha,Certo/Errado,Discursiva')
+    lista('Alternativa Correta', cfg.corretaOpts)
 
     // Aba de instruções.
     const wi = wb.addWorksheet('Instruções')
@@ -121,7 +152,7 @@ async function baixarModelo() {
     const h = wi.addRow(['Coluna', 'O que preencher'])
     h.font = { bold: true, color: { argb: 'FFFFFFFF' } }
     h.eachCell((c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_HEADER } }; c.border = bordas })
-    for (const [a, b] of INSTRUCOES) {
+    for (const [a, b] of cfg.instrucoes) {
       const row = wi.addRow([a, b])
       row.getCell(1).font = { bold: true }
       row.alignment = { vertical: 'top', wrapText: true }
@@ -129,7 +160,7 @@ async function baixarModelo() {
     }
 
     const buf = await wb.xlsx.writeBuffer()
-    baixarBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'modelo-importacao-questoes.xlsx')
+    baixarBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), cfg.arquivo)
   } catch (e) {
     console.error(e)
     toast.error('Não foi possível gerar o modelo.')
@@ -145,13 +176,13 @@ export function ImportarQuestoesTab({ bancoId = null, onDone }: { bancoId?: stri
   const [resumo, setResumo] = useState<Resumo | null>(null)
   const [analisando, startAnalise] = useTransition()
   const [salvando, startSalvar] = useTransition()
-  const [baixandoModelo, setBaixandoModelo] = useState(false)
+  const [baixandoModelo, setBaixandoModelo] = useState<ModeloImport | null>(null)
   const router = useRouter()
 
-  async function onBaixarModelo() {
+  async function onBaixarModelo(formato: ModeloImport) {
     if (baixandoModelo) return
-    setBaixandoModelo(true)
-    try { await baixarModelo() } finally { setBaixandoModelo(false) }
+    setBaixandoModelo(formato)
+    try { await baixarModelo(formato) } finally { setBaixandoModelo(null) }
   }
 
   function onFile(f: File | null) {
@@ -207,9 +238,19 @@ export function ImportarQuestoesTab({ bancoId = null, onDone }: { bancoId?: stri
             <span className="text-sm font-medium">{analisando ? 'Lendo arquivo…' : nomeArquivo || 'Selecionar arquivo (.csv, .txt, .xlsx)'}</span>
             <span className="text-xs">Uma questão por linha, com cabeçalho na 1ª linha.</span>
           </button>
-          <button type="button" onClick={onBaixarModelo} disabled={baixandoModelo} className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline disabled:opacity-60">
-            {baixandoModelo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Baixar modelo (.xlsx)
-          </button>
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-xs text-muted-foreground">Baixe o modelo do formato que vai importar:</span>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button type="button" onClick={() => onBaixarModelo('multipla')} disabled={!!baixandoModelo}
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5 disabled:opacity-60">
+                {baixandoModelo === 'multipla' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Múltipla escolha
+              </button>
+              <button type="button" onClick={() => onBaixarModelo('certo_errado')} disabled={!!baixandoModelo}
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5 disabled:opacity-60">
+                {baixandoModelo === 'certo_errado' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Certo / Errado
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
         <>

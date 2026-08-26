@@ -548,6 +548,9 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
   if (linhas.length < 2) return []
   const header = linhas[0].map(mapHeader)
   const letras = ['a', 'b', 'c', 'd', 'e']
+  // Modelo Certo/Errado: o arquivo não tem NENHUMA coluna de alternativa (A–E) → todas as
+  // questões são julgamento (o sistema cria Certo/Errado), inclusive as anuladas.
+  const modeloCertoErrado = !letras.some((L) => header.includes('alt_' + L))
   const out: QuestaoImport[] = []
   for (let r = 1; r < linhas.length; r++) {
     const row = linhas[r]
@@ -577,9 +580,10 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
       alternativas.push({ texto: converterMarcacao(t), correta, ordem: i, lei: converterMarcacao(get('lei_' + L)) || null, comentario: converterMarcacao(get('com_' + L)) || null })
     })
 
-    // Formato: explícito (Tipo = Certo/Errado) ou deduzido (2 alternativas Certo/Errado).
+    // Formato: explícito (Tipo = Certo/Errado), OU a resposta é Certo/Errado (modelo C/E, sem coluna
+    // Tipo nem A–E), OU deduzido (2 alternativas Certo/Errado).
     let formato: 'multipla' | 'certo_errado' = 'multipla'
-    if (tipo === 'objetiva' && (ehCE || alternativasSaoCertoErrado(alternativas.map((a) => a.texto)))) formato = 'certo_errado'
+    if (tipo === 'objetiva' && (ehCE || corretaCE || modeloCertoErrado || alternativasSaoCertoErrado(alternativas.map((a) => a.texto)))) formato = 'certo_errado'
 
     // Atalho: Tipo = Certo/Errado sem A/B preenchidos → cria as 2 alternativas automaticamente.
     if (formato === 'certo_errado' && alternativas.length === 0) {
