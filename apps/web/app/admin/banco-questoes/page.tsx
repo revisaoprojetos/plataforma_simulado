@@ -87,19 +87,19 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            {current && (
-              <Link href="/admin/banco-questoes" aria-label="Todas as pastas" title="Todas as pastas"
-                className="inline-flex items-center justify-center rounded-lg border bg-card p-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted">
-                <ChevronLeft className="h-4 w-4" />
-              </Link>
-            )}
+        <div className="flex items-center gap-2.5">
+          {current && (
+            <Link href="/admin/banco-questoes" aria-label="Todas as pastas" title="Todas as pastas"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg border bg-card p-2 text-sm font-medium shadow-sm transition-colors hover:bg-muted">
+              <ChevronLeft className="h-4 w-4" />
+            </Link>
+          )}
+          <div>
             <h1 className="text-2xl font-bold tracking-tight">Banco de Simulado</h1>
+            <p className="text-muted-foreground">
+              Monte e organize seus simulados: disciplinas/conteúdo, questões, estudantes e cadernos. Depois é só selecionar o banco pronto na Aplicação de Simulado.
+            </p>
           </div>
-          <p className="text-muted-foreground">
-            Monte e organize seus simulados: disciplinas/conteúdo, questões, estudantes e cadernos. Depois é só selecionar o banco pronto na Aplicação de Simulado.
-          </p>
         </div>
         <NovoBancoForm pastaId={current?.id ?? null} />
       </div>
