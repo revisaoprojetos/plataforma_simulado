@@ -90,8 +90,9 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
         <div>
           <div className="flex flex-wrap items-center gap-2">
             {current && (
-              <Link href="/admin/banco-questoes" className="inline-flex items-center gap-1 rounded-lg border bg-card px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted">
-                <ChevronLeft className="h-4 w-4" /> Todas as pastas
+              <Link href="/admin/banco-questoes" aria-label="Todas as pastas" title="Todas as pastas"
+                className="inline-flex items-center justify-center rounded-lg border bg-card p-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted">
+                <ChevronLeft className="h-4 w-4" />
               </Link>
             )}
             <h1 className="text-2xl font-bold tracking-tight">Banco de Simulado</h1>
