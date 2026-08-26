@@ -13,14 +13,15 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { moverBancoParaPasta, excluirPastaFolder, duplicarPastaFolder } from '@/app/admin/banco-questoes/actions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { Database, Search, FolderPlus, Folder, FolderOpen, ChevronLeft, MoreVertical, Trash2, X, Check, Loader2, FolderInput, Palette, Copy } from 'lucide-react'
+import { Database, Search, FolderPlus, Folder, FolderOpen, ChevronLeft, ChevronRight, MoreVertical, Trash2, X, Check, Loader2, FolderInput, Palette, Copy } from 'lucide-react'
 
 type Banco = { id: string; nome: string; total: number; estudantes?: number; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null }
-type Pasta = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; capaLarga?: string | null; count: number }
+type Pasta = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; capaLarga?: string | null; count: number; subpastas?: number }
 type Destino = { id: string; nome: string }
+type Trilha = { id: string; nome: string }
 
-export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }: {
-  bancos: Banco[]; folders?: Pasta[]; destinos?: Destino[]; atual?: { id: string; nome: string } | null
+export function BancosGrid({ bancos, folders = [], destinos = [], atual = null, trilha = [] }: {
+  bancos: Banco[]; folders?: Pasta[]; destinos?: Destino[]; atual?: { id: string; nome: string } | null; trilha?: Trilha[]
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -35,7 +36,7 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
 
   // O diálogo de confirmação abre FORA da transition (senão o setState do pop-up é adiado).
   async function excluirPasta(f: Pasta) {
-    if (!(await confirmar({ mensagem: `Excluir a pasta "${f.nome}"? Os bancos dentro dela voltam para a raiz (não são apagados).`, destrutivo: true }))) return
+    if (!(await confirmar({ mensagem: `Excluir a pasta "${f.nome}"? Os bancos e subpastas dentro dela voltam para a raiz (não são apagados).`, destrutivo: true }))) return
     start(async () => {
       const r = await excluirPastaFolder(f.id)
       if (r.ok) { toast.success('Pasta excluída'); router.refresh() } else toast.error(r.error ?? 'Erro')
@@ -55,16 +56,30 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
     <div className="space-y-4">
       {/* Breadcrumb / ações + busca */}
       <div className="flex flex-wrap items-center gap-2">
-        {atual ? (
-          <Link href="/admin/banco-questoes" className="inline-flex items-center gap-1 rounded-lg border bg-card px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-muted">
-            <ChevronLeft className="h-4 w-4" /> Todas as pastas
-          </Link>
-        ) : (
-          <button type="button" onClick={() => setCriandoPasta(true)}
-            className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted">
-            <FolderPlus className="h-4 w-4" /> Nova pasta
-          </button>
+        {atual && (
+          <div className="flex flex-wrap items-center gap-1">
+            <Link href="/admin/banco-questoes" className="inline-flex items-center gap-1 rounded-lg border bg-card px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-muted">
+              <ChevronLeft className="h-4 w-4" /> Todas as pastas
+            </Link>
+            {trilha.map((t, i) => {
+              const ultimo = i === trilha.length - 1
+              return (
+                <span key={t.id} className="inline-flex items-center gap-1">
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  {ultimo ? (
+                    <span className="max-w-[180px] truncate rounded-lg px-2 py-1 text-sm font-semibold text-foreground">{t.nome}</span>
+                  ) : (
+                    <Link href={`/admin/banco-questoes?pasta=${t.id}`} className="max-w-[180px] truncate rounded-lg px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">{t.nome}</Link>
+                  )}
+                </span>
+              )
+            })}
+          </div>
         )}
+        <button type="button" onClick={() => setCriandoPasta(true)}
+          className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted">
+          <FolderPlus className="h-4 w-4" /> {atual ? 'Nova subpasta' : 'Nova pasta'}
+        </button>
         <div className="relative min-w-[200px] flex-1 sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={atual ? `Buscar em “${atual.nome}”…` : 'Buscar banco ou pasta…'} className="pl-9" />
@@ -73,14 +88,15 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
 
       {atual && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <FolderOpen className="h-4 w-4" /> <span className="font-medium text-foreground">{atual.nome}</span> — {bancos.length} banco(s)
+          <FolderOpen className="h-4 w-4" /> <span className="font-medium text-foreground">{atual.nome}</span>
+          {' — '}{folders.length > 0 && <>{folders.length} subpasta(s) · </>}{bancos.length} banco(s)
         </div>
       )}
 
       {vazio ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
           <Database className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
-          <p className="text-muted-foreground">{atual ? 'Pasta vazia. Mova bancos para cá pelo menu “Mover para pasta”.' : 'Nenhum banco ainda. Crie o primeiro em “Criar banco”.'}</p>
+          <p className="text-muted-foreground">{atual ? 'Pasta vazia. Crie uma subpasta ou mova bancos para cá pelo menu “Mover para pasta”.' : 'Nenhum banco ainda. Crie o primeiro em “Criar banco”.'}</p>
         </div>
       ) : bancosF.length === 0 && foldersF.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
@@ -88,10 +104,10 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
         </div>
       ) : (
         <div className="space-y-5">
-          {/* Pastas (só na raiz) + divisória entre pastas e bancos */}
-          {!atual && foldersF.length > 0 && (
+          {/* Pastas (raiz) ou Subpastas (dentro de uma pasta) */}
+          {foldersF.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2"><Folder className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">Pastas</h2><span className="text-sm text-muted-foreground">({foldersF.length})</span></div>
+              <div className="flex items-center gap-2"><Folder className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">{atual ? 'Subpastas' : 'Pastas'}</h2><span className="text-sm text-muted-foreground">({foldersF.length})</span></div>
               <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {foldersF.map((f) => <FolderCard key={f.id} f={f} onExcluir={() => excluirPasta(f)} onPersonalizar={() => setEditandoPasta(f)} onDuplicar={() => duplicarPasta(f)} />)}
               </div>
@@ -100,7 +116,7 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
           {/* Bancos */}
           {bancosF.length > 0 && (
             <div className="space-y-3">
-              {!atual && <div className="flex items-center gap-2"><Database className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">Bancos</h2><span className="text-sm text-muted-foreground">({bancosF.length})</span></div>}
+              {(!atual || foldersF.length > 0) && <div className="flex items-center gap-2"><Database className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">Bancos</h2><span className="text-sm text-muted-foreground">({bancosF.length})</span></div>}
               <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {bancosF.map((b) => <BancoCard key={b.id} {...b} onMover={podeMover ? () => setMovendo(b) : undefined} />)}
               </div>
@@ -118,7 +134,7 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null }
         />
       )}
       {criandoPasta && (
-        <EditarPastaDialog area="banco" onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
+        <EditarPastaDialog area="banco" paiId={atual?.id ?? null} onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
       )}
     </div>
   )
@@ -154,7 +170,8 @@ function FolderCard({ f, onExcluir, onPersonalizar, onDuplicar }: { f: Pasta; on
         <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">Pasta</p>
         <h3 className="mt-0.5 line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm">{f.nome}</h3>
         <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">
-          <Folder className="h-3 w-3" /> {f.count} banco(s)
+          <Folder className="h-3 w-3" />
+          {[(f.subpastas ?? 0) > 0 ? `${f.subpastas} pasta(s)` : null, `${f.count} banco(s)`].filter(Boolean).join(' · ')}
         </span>
       </div>
     </div>

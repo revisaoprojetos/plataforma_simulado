@@ -29,10 +29,12 @@ export type PastaPatch = { nome: string; cor: string | null; capa: string | null
 
 /** Personaliza uma PASTA (folder) de bancos: nome, cor e DUAS imagens — a CAPA (imagem inteira,
  * usada no card = capa_card_url) e a IMAGEM LARGA (banner usado em áreas como a trilha = capa_url). */
-export function EditarPastaDialog({ pasta, area, onClose, onSaved }: {
+export function EditarPastaDialog({ pasta, area, paiId = null, onClose, onSaved }: {
   pasta?: { id?: string; nome?: string; cor?: string | null; capa?: string | null; capaLarga?: string | null } | null
   /** Presente = modo CRIAR: cria a pasta nesta área e já aplica a personalização. */
   area?: 'banco' | 'simulado' | 'caderno'
+  /** Pasta-pai — quando definido, cria uma SUBPASTA dentro dela. */
+  paiId?: string | null
   onClose: () => void
   onSaved: (patch?: PastaPatch) => void
 }) {
@@ -73,11 +75,11 @@ export function EditarPastaDialog({ pasta, area, onClose, onSaved }: {
     if (!nome.trim()) { toast.error('Informe um nome.'); return }
     setSalvando(true)
     if (criar) {
-      const r = await criarPastaFolder(nome.trim(), null, area)
+      const r = await criarPastaFolder(nome.trim(), paiId, area)
       if (!r.ok || !r.id) { setSalvando(false); toast.error(r.error ?? 'Erro ao criar'); return }
       await atualizarBanco(r.id, nome.trim(), cor, null, capaLarga, capaCard)
       setSalvando(false)
-      toast.success('Pasta criada'); onSaved(); onClose()
+      toast.success(paiId ? 'Subpasta criada' : 'Pasta criada'); onSaved(); onClose()
     } else {
       const r = await atualizarBanco(pasta!.id!, nome.trim(), cor, null, capaLarga, capaCard)
       setSalvando(false)
@@ -93,7 +95,7 @@ export function EditarPastaDialog({ pasta, area, onClose, onSaved }: {
         {/* Form */}
         <div className="min-w-0 overflow-auto">
           <div className="flex items-center justify-between border-b px-5 py-3">
-            <h3 className="flex items-center gap-2 text-sm font-semibold"><Palette className="h-4 w-4" /> {criar ? 'Nova pasta' : 'Personalizar pasta'}</h3>
+            <h3 className="flex items-center gap-2 text-sm font-semibold"><Palette className="h-4 w-4" /> {criar ? (paiId ? 'Nova subpasta' : 'Nova pasta') : 'Personalizar pasta'}</h3>
             <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"><X className="h-4 w-4" /></button>
           </div>
           <div className="space-y-5 p-5">
@@ -166,7 +168,7 @@ export function EditarPastaDialog({ pasta, area, onClose, onSaved }: {
             <div className="flex justify-end gap-2">
               <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
               <button type="button" onClick={salvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
-                {salvando && <Loader2 className="h-4 w-4 animate-spin" />} {criar ? 'Criar pasta' : 'Salvar'}
+                {salvando && <Loader2 className="h-4 w-4 animate-spin" />} {criar ? (paiId ? 'Criar subpasta' : 'Criar pasta') : 'Salvar'}
               </button>
             </div>
           </div>

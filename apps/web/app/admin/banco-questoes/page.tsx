@@ -32,11 +32,28 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
   const bancosAll = pastas.filter((p) => !p.is_folder)
   const bancosPorPasta = new Map<string, number>()
   for (const b of bancosAll) if (b.pai_id) bancosPorPasta.set(b.pai_id, (bancosPorPasta.get(b.pai_id) ?? 0) + 1)
+  // Subpastas por pasta (para o card mostrar "X pasta(s)").
+  const subpastasPorPasta = new Map<string, number>()
+  for (const f of folders) if (f.pai_id) subpastasPorPasta.set(f.pai_id, (subpastasPorPasta.get(f.pai_id) ?? 0) + 1)
 
-  // Nível atual: dentro de uma pasta (?pasta=id) ou na raiz. Pastas são de nível único (raiz).
+  // Nível atual: dentro de uma pasta (?pasta=id) ou na raiz. Pastas ANINHAM (subpastas via pai_id):
+  // no nível de uma pasta mostramos os bancos E as subpastas cujo pai é ela.
   const current = pastaParam ? folders.find((f) => f.id === pastaParam) ?? null : null
   const bancosNivel = current ? bancosAll.filter((b) => b.pai_id === current.id) : bancosAll.filter((b) => !b.pai_id)
-  const foldersNivel = current ? [] : folders.filter((f) => !f.pai_id)
+  const foldersNivel = current ? folders.filter((f) => f.pai_id === current.id) : folders.filter((f) => !f.pai_id)
+
+  // Trilha (breadcrumb) da raiz até a pasta atual, subindo por pai_id (com trava anti-ciclo).
+  const folderById = new Map<string, any>(folders.map((f) => [f.id, f]))
+  const trilha: { id: string; nome: string }[] = []
+  {
+    let node: any = current
+    const visto = new Set<string>()
+    while (node && !visto.has(node.id)) {
+      visto.add(node.id)
+      trilha.unshift({ id: node.id, nome: node.nome })
+      node = node.pai_id ? folderById.get(node.pai_id) ?? null : null
+    }
+  }
 
   // Contagem de questões E de estudantes SÓ dos bancos deste nível (count exato por banco, em
   // paralelo). Evita paginar `simulado_pasta_estudantes` inteiro — pode ter centenas de milhares de
@@ -61,8 +78,9 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
 
   const capa = (b: any) => (b.capa_card_url ?? b.capa_url) ?? null
   const bancosOut = bancosNivel.map((b) => ({ id: b.id, nome: b.nome, total: contagem.get(b.id) ?? 0, estudantes: contEstudantes.get(b.id) ?? 0, cor: b.cor ?? null, icone: b.icone ?? null, capa: capa(b), tipo: b.tipo ?? null }))
-  const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), capaLarga: f.capa_url ?? null, count: bancosPorPasta.get(f.id) ?? 0 }))
-  const destinos = folders.map((f) => ({ id: f.id, nome: f.nome }))
+  const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), capaLarga: f.capa_url ?? null, count: bancosPorPasta.get(f.id) ?? 0, subpastas: subpastasPorPasta.get(f.id) ?? 0 }))
+  // Destinos de "mover banco": todas as pastas, exceto a atual (não faz sentido mover p/ onde já está).
+  const destinos = folders.filter((f) => f.id !== current?.id).map((f) => ({ id: f.id, nome: f.nome }))
 
   return (
     <div className="space-y-6">
@@ -76,7 +94,7 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
         <NovoBancoForm pastaId={current?.id ?? null} />
       </div>
 
-      <BancosGrid bancos={bancosOut} folders={foldersOut} destinos={destinos} atual={current ? { id: current.id, nome: current.nome } : null} />
+      <BancosGrid bancos={bancosOut} folders={foldersOut} destinos={destinos} atual={current ? { id: current.id, nome: current.nome } : null} trilha={trilha} />
     </div>
   )
 }
