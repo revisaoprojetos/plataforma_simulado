@@ -33,6 +33,17 @@ const EXEMPLO: Record<string, string> = {
   'Etiquetas': 'Alta recorrência, Desatualizada',
 }
 
+// 2º exemplo: questão CERTO/ERRADO — deixe A–E em branco e informe só a Alternativa Correta
+// como "Certo" ou "Errado" (o sistema cria as 2 opções).
+const EXEMPLO_CE: Record<string, string> = {
+  'Número': '2', 'Tipo': 'Certo/Errado',
+  'Enunciado': 'A capital do Brasil é Brasília.',
+  'Alternativa Correta': 'Certo',
+  'Disciplina': 'Geografia', 'Assunto Principal': 'Capitais', 'Nível': 'facil',
+  'Comentário completo': 'Correto. Brasília é a capital federal desde 1960.',
+  'Ano': '2024', 'Banca': 'CESPE',
+}
+
 // Breve explicação de cada coluna (aba "Instruções" do modelo).
 const INSTRUCOES: [string, string][] = [
   ['Número', 'Número/ordem da questão (opcional).'],
@@ -71,7 +82,8 @@ async function baixarModelo() {
 
     const ws = wb.addWorksheet('Questões', { views: [{ state: 'frozen', ySplit: 1 }] })
     ws.addRow([...COLUNAS])
-    ws.addRow(COLUNAS.map((c) => EXEMPLO[c] ?? ''))
+    ws.addRow(COLUNAS.map((c) => EXEMPLO[c] ?? ''))       // exemplo 1: múltipla escolha
+    ws.addRow(COLUNAS.map((c) => EXEMPLO_CE[c] ?? ''))    // exemplo 2: certo/errado
 
     const head = ws.getRow(1)
     head.height = 30
@@ -79,10 +91,12 @@ async function baixarModelo() {
     head.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
     head.eachCell((c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_HEADER } }; c.border = bordas })
 
-    const ex = ws.getRow(2)
-    ex.font = { italic: true, color: { argb: 'FF6B7280' } }
-    ex.alignment = { vertical: 'top', wrapText: true }
-    ex.eachCell((c) => { c.border = bordas })
+    for (const r of [2, 3]) {
+      const ex = ws.getRow(r)
+      ex.font = { italic: true, color: { argb: 'FF6B7280' } }
+      ex.alignment = { vertical: 'top', wrapText: true }
+      ex.eachCell((c) => { c.border = bordas })
+    }
 
     ws.columns.forEach((col, i) => {
       const c = COLUNAS[i]
