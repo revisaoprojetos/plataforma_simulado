@@ -13,8 +13,8 @@ import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 // Colunas do modelo de importação (a ordem é a do modelo baixado).
 const COLUNAS = [
   'Número', 'Enunciado', 'Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D', 'Alternativa E',
-  'Alternativa Correta', 'Alternativas Incorretas', 'Grupo', 'Disciplina', 'Categoria', 'Assunto Principal',
-  'Assunto Detalhe', 'Nível', 'Tipo', 'Pilar 1', 'Pilar 2',
+  'Alternativa Correta', 'Tipo', 'Alternativas Incorretas', 'Grupo', 'Disciplina', 'Categoria', 'Assunto Principal',
+  'Assunto Detalhe', 'Nível', 'Pilar 1', 'Pilar 2',
   'Lei A', 'Comentário A', 'Lei B', 'Comentário B', 'Lei C', 'Comentário C', 'Lei D', 'Comentário D', 'Lei E', 'Comentário E',
   'Comentário completo',
   'Ano', 'Banca', 'Órgão', 'Cargo', 'Etiquetas',
@@ -25,7 +25,7 @@ const EXEMPLO: Record<string, string> = {
   'Alternativa A': 'São Paulo', 'Alternativa B': 'Rio de Janeiro', 'Alternativa C': 'Brasília', 'Alternativa D': 'Salvador', 'Alternativa E': 'Recife',
   'Alternativa Correta': 'C', 'Alternativas Incorretas': 'A, B, D, E',
   'Grupo': 'Conhecimentos Gerais', 'Disciplina': 'Geografia', 'Categoria': 'Geografia do Brasil',
-  'Assunto Principal': 'Capitais', 'Assunto Detalhe': 'Capital federal', 'Nível': 'facil', 'Tipo': 'objetiva',
+  'Assunto Principal': 'Capitais', 'Assunto Detalhe': 'Capital federal', 'Nível': 'facil', 'Tipo': 'Múltipla escolha',
   'Pilar 1': 'Território', 'Pilar 2': 'Federação',
   'Lei C': 'CF, art. 18', 'Comentário C': 'Brasília é a capital federal.',
   'Comentário completo': 'Brasília é a capital federal do Brasil desde 1960 (CF, art. 18, §1º). As demais são capitais estaduais.',
@@ -45,7 +45,7 @@ const INSTRUCOES: [string, string][] = [
   ['Disciplina · Assunto Principal · Banca · Órgão · Cargo', 'São criados automaticamente no sistema se ainda não existirem.'],
   ['Nível', 'facil, medio ou dificil.'],
   ['Etiquetas', 'Uma ou mais etiquetas (tags) separadas por vírgula. Reusa as existentes e cria as novas. Aplicar uma etiqueta funcional (ex.: "Anulada", "Desatualizada") ANULA a questão — ponto garantido a todos e bloqueada na prova.'],
-  ['Tipo', 'objetiva (múltipla escolha) ou Certo/Errado.'],
+  ['Tipo', 'O formato da questão: "Múltipla escolha" (alternativas A–E), "Certo/Errado" (julgamento) ou "Discursiva". Também aceita "objetiva" = múltipla escolha. Vazio = Múltipla escolha.'],
   ['Questões Certo/Errado', 'Ponha Tipo = Certo/Errado. Opção (a): A = Certo, B = Errado e marque a correta. Opção (b): deixe A–E em branco e informe só a Alternativa Correta como "Certo" ou "Errado" — o sistema cria as 2 opções.'],
   ['Ano', 'Ano da prova/questão (ex.: 2024). Usado nos filtros e relatórios.'],
   ['Lei A–E · Comentário A–E', 'Fundamentação legal e comentário de cada alternativa (opcional).'],
@@ -99,7 +99,7 @@ async function baixarModelo() {
     }
     lista('Nível', 'facil,medio,dificil')
     lista('Alternativa Correta', 'A,B,C,D,E,Certo,Errado,ANULADA')
-    lista('Tipo', 'objetiva,Certo/Errado')
+    lista('Tipo', 'Múltipla escolha,Certo/Errado,Discursiva')
 
     // Aba de instruções.
     const wi = wb.addWorksheet('Instruções')
