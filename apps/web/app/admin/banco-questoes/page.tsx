@@ -1,3 +1,5 @@
+import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { NovoBancoForm } from '@/components/admin/novo-banco-form'
@@ -86,7 +88,14 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Banco de Simulado</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            {current && (
+              <Link href="/admin/banco-questoes" className="inline-flex items-center gap-1 rounded-lg border bg-card px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted">
+                <ChevronLeft className="h-4 w-4" /> Todas as pastas
+              </Link>
+            )}
+            <h1 className="text-2xl font-bold tracking-tight">Banco de Simulado</h1>
+          </div>
           <p className="text-muted-foreground">
             Monte e organize seus simulados: disciplinas/conteúdo, questões, estudantes e cadernos. Depois é só selecionar o banco pronto na Aplicação de Simulado.
           </p>

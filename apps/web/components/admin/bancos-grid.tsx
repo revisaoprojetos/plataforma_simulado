@@ -13,7 +13,7 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { moverBancoParaPasta, excluirPastaFolder, duplicarPastaFolder } from '@/app/admin/banco-questoes/actions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { Database, Search, FolderPlus, Folder, FolderOpen, ChevronLeft, ChevronRight, MoreVertical, Trash2, X, Check, Loader2, FolderInput, Palette, Copy } from 'lucide-react'
+import { Database, Search, FolderPlus, Folder, FolderOpen, ChevronRight, MoreVertical, Trash2, X, Check, Loader2, FolderInput, Palette, Copy } from 'lucide-react'
 
 type Banco = { id: string; nome: string; total: number; estudantes?: number; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null }
 type Pasta = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; capaLarga?: string | null; count: number; subpastas?: number }
@@ -54,18 +54,19 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null, 
 
   return (
     <div className="space-y-4">
-      {/* Breadcrumb / ações + busca */}
+      {/* Ações (Nova pasta/subpasta) + breadcrumb do caminho + busca */}
       <div className="flex flex-wrap items-center gap-2">
-        {atual && (
+        <button type="button" onClick={() => setCriandoPasta(true)}
+          className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted">
+          <FolderPlus className="h-4 w-4" /> {atual ? 'Nova subpasta' : 'Nova pasta'}
+        </button>
+        {atual && trilha.length > 0 && (
           <div className="flex flex-wrap items-center gap-1">
-            <Link href="/admin/banco-questoes" className="inline-flex items-center gap-1 rounded-lg border bg-card px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-muted">
-              <ChevronLeft className="h-4 w-4" /> Todas as pastas
-            </Link>
             {trilha.map((t, i) => {
               const ultimo = i === trilha.length - 1
               return (
                 <span key={t.id} className="inline-flex items-center gap-1">
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  {i > 0 && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
                   {ultimo ? (
                     <span className="max-w-[180px] truncate rounded-lg px-2 py-1 text-sm font-semibold text-foreground">{t.nome}</span>
                   ) : (
@@ -76,10 +77,6 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null, 
             })}
           </div>
         )}
-        <button type="button" onClick={() => setCriandoPasta(true)}
-          className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted">
-          <FolderPlus className="h-4 w-4" /> {atual ? 'Nova subpasta' : 'Nova pasta'}
-        </button>
         <div className="relative min-w-[200px] flex-1 sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={atual ? `Buscar em “${atual.nome}”…` : 'Buscar banco ou pasta…'} className="pl-9" />
