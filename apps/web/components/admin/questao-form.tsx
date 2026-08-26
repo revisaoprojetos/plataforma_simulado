@@ -4,6 +4,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,7 +18,8 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, Plus, Trash2, ImagePlus, RefreshCw } from 'lucide-react'
+import { Loader2, Plus, Trash2, ImagePlus, RefreshCw, Database, Search, Check, X, ChevronRight } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useOcultarDiscursiva } from '@/components/auth/can-provider'
 import { hospedarImagemQuestaoAction } from '@/app/admin/questoes/actions'
@@ -104,6 +106,7 @@ const LETRA = ['A', 'B', 'C', 'D', 'E']
 export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSugestoes = [], assuntosSugestoes = [], bancos = [], onSubmit }: QuestaoFormProps) {
   const ocultarDiscursiva = useOcultarDiscursiva()
   const [isLoading, setIsLoading] = useState(false)
+  const [bancoModal, setBancoModal] = useState(false)
 
   const {
     register,
@@ -410,43 +413,52 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
         </CardContent>
       </Card>
 
-      {bancos.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Banco(s) de destino</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Armazene esta questão diretamente em um ou mais bancos. Pode ficar em vários.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {bancos.map((banco) => {
-                const selecionados = (watch('bancoIds') ?? []) as string[]
-                const ativo = selecionados.includes(banco.id)
-                return (
-                  <button
-                    key={banco.id}
-                    type="button"
-                    onClick={() =>
-                      setValue(
-                        'bancoIds',
-                        ativo ? selecionados.filter((b) => b !== banco.id) : [...selecionados, banco.id],
-                        { shouldDirty: true },
-                      )
-                    }
-                    className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                      ativo
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border text-muted-foreground hover:border-primary'
-                    }`}
-                  >
-                    {banco.nome}
-                  </button>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
+      {bancos.length > 0 && (() => {
+        const selecionados = (watch('bancoIds') ?? []) as string[]
+        const sel = bancos.filter((b) => selecionados.includes(b.id))
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Banco(s) de destino</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Armazene esta questão diretamente em um ou mais bancos. Pode ficar em vários.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {/* Card clicável → abre o pop-up de seleção. */}
+              <button
+                type="button"
+                onClick={() => setBancoModal(true)}
+                className="flex w-full items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 text-left transition-colors hover:border-primary hover:bg-muted/40"
+              >
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  {sel.length === 0 ? (
+                    <span className="text-sm text-muted-foreground">Nenhum banco selecionado — clique para escolher</span>
+                  ) : (
+                    sel.map((b) => (
+                      <span key={b.id} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                        <Database className="h-3 w-3" /> {b.nome}
+                      </span>
+                    ))
+                  )}
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                  {sel.length > 0 && <span className="tabular-nums">{sel.length}</span>}
+                  <ChevronRight className="h-4 w-4" />
+                </span>
+              </button>
+            </CardContent>
+          </Card>
+        )
+      })()}
+
+      {bancoModal && (
+        <SelecionarBancosModal
+          bancos={bancos}
+          selecionadosIniciais={(watch('bancoIds') ?? []) as string[]}
+          onClose={() => setBancoModal(false)}
+          onSalvar={(ids) => { setValue('bancoIds', ids, { shouldDirty: true }); setBancoModal(false) }}
+        />
       )}
 
       {tipo === 'objetiva' && (
@@ -602,5 +614,68 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
         </Button>
       </div>
     </form>
+  )
+}
+
+/** Pop-up de seleção dos bancos de destino: busca + lista com marcação, confirma no "Salvar". */
+function SelecionarBancosModal({ bancos, selecionadosIniciais, onClose, onSalvar }: {
+  bancos: { id: string; nome: string }[]
+  selecionadosIniciais: string[]
+  onClose: () => void
+  onSalvar: (ids: string[]) => void
+}) {
+  const [sel, setSel] = useState<Set<string>>(() => new Set(selecionadosIniciais))
+  const [q, setQ] = useState('')
+  const termo = q.trim().toLowerCase()
+  const lista = termo ? bancos.filter((b) => b.nome.toLowerCase().includes(termo)) : bancos
+  const toggle = (id: string) => setSel((prev) => {
+    const n = new Set(prev)
+    if (n.has(id)) n.delete(id); else n.add(id)
+    return n
+  })
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+      <div role="dialog" aria-modal="true" className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b px-5 py-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold"><Database className="h-4 w-4" /> Banco(s) de destino</h3>
+          <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="border-b p-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar banco…" className="pl-9" autoFocus />
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 space-y-1.5 overflow-auto p-3">
+          {lista.length === 0 ? (
+            <p className="px-1 py-6 text-center text-sm text-muted-foreground">Nenhum banco encontrado.</p>
+          ) : (
+            lista.map((b) => {
+              const ativo = sel.has(b.id)
+              return (
+                <button key={b.id} type="button" onClick={() => toggle(b.id)}
+                  className={cn('flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', ativo ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
+                  <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-md border', ativo ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
+                    {ativo && <Check className="h-3.5 w-3.5" />}
+                  </span>
+                  <Database className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{b.nome}</span>
+                </button>
+              )
+            })
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-2 border-t px-5 py-3">
+          <span className="text-xs text-muted-foreground">{sel.size} selecionado(s)</span>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
+            <button type="button" onClick={() => onSalvar([...sel])} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90">Salvar</button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
