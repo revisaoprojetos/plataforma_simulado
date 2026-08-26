@@ -16,7 +16,7 @@ const COLUNAS = [
   'Alternativa Correta', 'Alternativas Incorretas', 'Grupo', 'Disciplina', 'Categoria', 'Assunto Principal',
   'Assunto Detalhe', 'Nível', 'Tipo', 'Pilar 1', 'Pilar 2',
   'Lei A', 'Comentário A', 'Lei B', 'Comentário B', 'Lei C', 'Comentário C', 'Lei D', 'Comentário D', 'Lei E', 'Comentário E',
-  'Ano', 'Banca', 'Órgão', 'Cargo',
+  'Ano', 'Banca', 'Órgão', 'Cargo', 'Etiquetas',
 ] as const
 
 const EXEMPLO: Record<string, string> = {
@@ -28,6 +28,7 @@ const EXEMPLO: Record<string, string> = {
   'Pilar 1': 'Território', 'Pilar 2': 'Federação',
   'Lei C': 'CF, art. 18', 'Comentário C': 'Brasília é a capital federal.',
   'Ano': '2024', 'Banca': 'CESPE', 'Órgão': 'INSS', 'Cargo': 'Analista',
+  'Etiquetas': 'Alta recorrência, Desatualizada',
 }
 
 // Breve explicação de cada coluna (aba "Instruções" do modelo).
@@ -41,6 +42,7 @@ const INSTRUCOES: [string, string][] = [
   ['Grupo · Categoria · Assunto Detalhe · Pilar 1 · Pilar 2', 'Classificações livres da questão.'],
   ['Disciplina · Assunto Principal · Banca · Órgão · Cargo', 'São criados automaticamente no sistema se ainda não existirem.'],
   ['Nível', 'facil, medio ou dificil.'],
+  ['Etiquetas', 'Uma ou mais etiquetas (tags) separadas por vírgula. Reusa as existentes e cria as novas. Aplicar uma etiqueta funcional (ex.: "Anulada", "Desatualizada") ANULA a questão — ponto garantido a todos e bloqueada na prova.'],
   ['Tipo', 'objetiva (múltipla escolha) ou Certo/Errado.'],
   ['Questões Certo/Errado', 'Ponha Tipo = Certo/Errado. Opção (a): A = Certo, B = Errado e marque a correta. Opção (b): deixe A–E em branco e informe só a Alternativa Correta como "Certo" ou "Errado" — o sistema cria as 2 opções.'],
   ['Ano', 'Ano da prova/questão (ex.: 2024). Usado nos filtros e relatórios.'],
@@ -226,6 +228,7 @@ export function ImportarQuestoesTab({ bancoId = null, onDone }: { bancoId?: stri
                   <th className="px-3 py-2 font-medium">Ano</th>
                   <th className="px-3 py-2 font-medium">Pilar 1</th>
                   <th className="px-3 py-2 font-medium">Pilar 2</th>
+                  <th className="px-3 py-2 font-medium">Etiquetas</th>
                 </tr>
               </thead>
               <tbody>
@@ -276,10 +279,17 @@ export function ImportarQuestoesTab({ bancoId = null, onDone }: { bancoId?: stri
                         <td className="whitespace-nowrap px-3 py-2 text-xs">{q.ano ?? traco}</td>
                         <td className="whitespace-nowrap px-3 py-2 text-xs">{q.pilar_1 || traco}</td>
                         <td className="whitespace-nowrap px-3 py-2 text-xs">{q.pilar_2 || traco}</td>
+                        <td className="px-3 py-2 text-xs">
+                          {q.etiquetas && q.etiquetas.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {q.etiquetas.map((e, k) => <span key={k} className="rounded-full bg-primary/10 px-1.5 py-0.5 font-medium text-primary">{e}</span>)}
+                            </div>
+                          ) : traco}
+                        </td>
                       </tr>
                       {open && (
                         <tr className="border-b bg-muted/20">
-                          <td colSpan={19} className="p-0">
+                          <td colSpan={20} className="p-0">
                             {/* Fica preso à esquerda para permanecer visível ao rolar as colunas. */}
                             <div className="sticky left-0 max-w-[760px] space-y-2 px-6 py-3 text-xs">
                               <p className="font-semibold">

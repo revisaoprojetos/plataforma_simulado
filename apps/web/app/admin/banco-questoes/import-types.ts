@@ -28,6 +28,7 @@ export interface QuestaoImport {
   nivel_dificuldade?: string | null
   comentario_professor?: string | null
   anulada?: boolean // gabarito veio como "ANULADA" → ponto garantido a todos + bloqueada na prova
+  etiquetas?: string[] // nomes de etiquetas (tags) a vincular; reusa as existentes (inclusive funcionais)
   alternativas: AltImport[]
   // Preenchidos na análise:
   jaExiste?: boolean

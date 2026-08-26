@@ -460,6 +460,7 @@ function mapHeader(h: string): string | null {
   if (['dificuldade', 'nivel', 'niveldificuldade'].includes(n)) return 'dificuldade'
   if (['correta', 'gabarito', 'resposta', 'alternativacorreta', 'alternativascorretas'].includes(n)) return 'correta'
   if (['alternativasincorretas', 'incorretas', 'incorreta'].includes(n)) return 'incorretas'
+  if (['etiqueta', 'etiquetas', 'tag', 'tags'].includes(n)) return 'etiquetas'
   const lei = n.match(/^lei([a-e])$/); if (lei) return 'lei_' + lei[1]
   const com = n.match(/^comentario([a-e])$/); if (com) return 'com_' + com[1]
   if (['comentario', 'comentarioprofessor', 'resolucao', 'comentarios'].includes(n)) return 'comentario'
@@ -597,6 +598,9 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
       else if (!anulada && !alternativas.some((a) => a.correta)) erro = 'Alternativa correta não indicada'
     }
 
+    // Etiquetas: nomes separados por vírgula ou ponto-e-vírgula (reusa as existentes, inclusive funcionais).
+    const etiquetas = get('etiquetas').split(/[,;]/).map((s) => s.trim()).filter(Boolean)
+
     out.push({
       linha: r + 1, numero: get('numero') || null, enunciado, tipo, formato,
       disciplina: get('disciplina') || null, categoria: get('categoria') || null,
@@ -604,7 +608,7 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
       pilar_1: get('pilar_1') || null, pilar_2: get('pilar_2') || null,
       banca: get('banca') || null, orgao: get('orgao') || null, cargo: get('cargo') || null,
       ano: Number.isFinite(anoNum) ? anoNum : null, nivel_dificuldade: dif,
-      comentario_professor: converterMarcacao(get('comentario')) || null, anulada, alternativas, erro,
+      comentario_professor: converterMarcacao(get('comentario')) || null, anulada, etiquetas, alternativas, erro,
     })
   }
   return out
@@ -629,6 +633,17 @@ async function resolveAssunto(svc: ReturnType<typeof createAdminClient>, tenantI
   if (ex) return (ex as any).id
   const { data: cr, error } = await svc.from('simulado_assuntos').insert({ nome: n, tenant_id: tenantId, disciplina_id: disciplinaId ?? null }).select('id').single()
   if (error) { const { data: again } = await svc.from('simulado_assuntos').select('id').eq('tenant_id', tenantId).ilike('nome', n).maybeSingle(); return (again as any)?.id ?? null }
+  return (cr as any).id
+}
+
+/** Resolve/cria uma etiqueta por nome (case-insensitive). Reusa as existentes — inclusive as
+ *  funcionais (Anulada/Desatualizada/…), então importar com esse nome ANULA a questão pela etiqueta. */
+async function resolveEtiqueta(svc: ReturnType<typeof createAdminClient>, tenantId: string, nome?: string | null): Promise<string | null> {
+  const n = nome?.trim(); if (!n) return null
+  const { data: ex } = await svc.from('simulado_etiquetas').select('id').eq('tenant_id', tenantId).ilike('nome', n).maybeSingle()
+  if (ex) return (ex as any).id
+  const { data: cr, error } = await svc.from('simulado_etiquetas').insert({ tenant_id: tenantId, nome: n, cor: '#64748b' }).select('id').single()
+  if (error) { const { data: again } = await svc.from('simulado_etiquetas').select('id').eq('tenant_id', tenantId).ilike('nome', n).maybeSingle(); return (again as any)?.id ?? null }
   return (cr as any).id
 }
 
@@ -676,6 +691,22 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
   const ordenados: { n: number; seq: number; id: string }[] = []
   let criadas = 0, jaExistiam = 0
   let seq = 0
+
+  // Etiquetas: resolve por nome UMA vez (cache) e vincula (upsert idempotente por questao+etiqueta).
+  const etiquetaCache = new Map<string, string | null>()
+  const resolverEtiquetaId = async (nome: string): Promise<string | null> => {
+    const key = norm(nome); if (!key) return null
+    if (etiquetaCache.has(key)) return etiquetaCache.get(key)!
+    const id = await resolveEtiqueta(svc, g.tenantId, nome)
+    etiquetaCache.set(key, id)
+    return id
+  }
+  const vincularEtiquetas = async (questaoId: string, nomes?: string[]) => {
+    for (const nome of nomes ?? []) {
+      const etId = await resolverEtiquetaId(nome)
+      if (etId) await svc.from('simulado_questao_etiquetas').upsert({ tenant_id: g.tenantId, questao_id: questaoId, etiqueta_id: etId }, { onConflict: 'questao_id,etiqueta_id', ignoreDuplicates: true })
+    }
+  }
   const registrarOrdem = (id: string, numero?: string | null) => {
     const n = numero != null && numero !== '' && !Number.isNaN(Number(numero)) ? Number(numero) : Number.MAX_SAFE_INTEGER
     ordenados.push({ n, seq: seq++, id })
@@ -687,6 +718,7 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
       idsParaVincular.push(q.questaoIdExistente); registrarOrdem(q.questaoIdExistente, q.numero); jaExistiam++
       // Re-import marcando ANULADA atualiza a questão existente no banco (para propagar depois).
       if (q.anulada) { anuladaIds.add(q.questaoIdExistente); await svc.from('simulado_questoes').update({ anulada: true }).eq('id', q.questaoIdExistente).eq('tenant_id', g.tenantId) }
+      await vincularEtiquetas(q.questaoIdExistente, q.etiquetas) // aplica as etiquetas na questão já existente também
       continue
     }
 
@@ -731,6 +763,7 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
         break
       }
     }
+    await vincularEtiquetas(novaId, q.etiquetas) // vincula as etiquetas (tags) informadas no CSV
     idsParaVincular.push(novaId); registrarOrdem(novaId, q.numero); criadas++
     if (q.anulada) anuladaIds.add(novaId)
   }
