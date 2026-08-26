@@ -12,8 +12,8 @@ import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 
 // Colunas do modelo de importação (a ordem é a do modelo baixado).
 const COLUNAS = [
-  'Número', 'Enunciado', 'Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D', 'Alternativa E',
-  'Alternativa Correta', 'Tipo', 'Alternativas Incorretas', 'Grupo', 'Disciplina', 'Categoria', 'Assunto Principal',
+  'Número', 'Tipo', 'Enunciado', 'Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D', 'Alternativa E',
+  'Alternativa Correta', 'Alternativas Incorretas', 'Grupo', 'Disciplina', 'Categoria', 'Assunto Principal',
   'Assunto Detalhe', 'Nível', 'Pilar 1', 'Pilar 2',
   'Lei A', 'Comentário A', 'Lei B', 'Comentário B', 'Lei C', 'Comentário C', 'Lei D', 'Comentário D', 'Lei E', 'Comentário E',
   'Comentário completo',
