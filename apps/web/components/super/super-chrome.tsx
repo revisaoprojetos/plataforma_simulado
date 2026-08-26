@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Building2, LogIn, Share2, ServerCog, LogOut, ArrowLeft, ShieldCheck, Menu, X, Loader2 } from 'lucide-react'
+import { LayoutDashboard, Building2, LogIn, Share2, ServerCog, HardDrive, LogOut, ArrowLeft, ShieldCheck, Menu, X, Loader2 } from 'lucide-react'
 
 type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; exact?: boolean; desc: string }
 
@@ -14,6 +14,7 @@ const NAV: Item[] = [
   { href: '/super/plataformas', label: 'Plataformas', icon: Building2, desc: 'Criar e gerenciar tenants' },
   { href: '/super/entrada', label: 'Entrada', icon: LogIn, desc: 'Tela de login neutra' },
   { href: '/super/compartilhar', label: 'Compartilhar', icon: Share2, desc: 'Copiar dados entre plataformas' },
+  { href: '/super/armazenamento', label: 'Armazenamento', icon: HardDrive, desc: 'Uso, organização e limpeza do storage' },
   { href: '/super/sistema', label: 'Sistema', icon: ServerCog, desc: 'Saúde e prontidão' },
 ]
 

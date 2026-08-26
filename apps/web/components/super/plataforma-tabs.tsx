@@ -1,16 +1,18 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Settings2, ShieldCheck, Palette, Megaphone, Code2, LogIn } from 'lucide-react'
+import { Settings2, ShieldCheck, Palette, Megaphone, Code2, LogIn, HardDrive } from 'lucide-react'
 import { PlataformaGerenciar } from '@/components/super/plataforma-gerenciar'
 import { PlataformaAcessos } from '@/components/super/plataforma-acessos'
 import { PlataformaEmbed } from '@/components/super/plataforma-embed'
 import { PlataformaLoginConfig } from '@/components/super/plataforma-login-config'
+import { PlataformaArmazenamento } from '@/components/super/plataforma-armazenamento'
 import { ConfiguracoesTabs } from '@/app/admin/configuracoes/configuracoes-tabs'
 import { BannersManager, type Banner, type DestinoBanner } from '@/components/admin/banners-manager'
 import { resolverLoginConfig } from '@/lib/login-config'
 import type { AdminMembro, CargoOpcao } from '@/app/admin/administradores/actions'
 import type { EmbedConfigInput } from '@/app/admin/tenants/actions'
+import type { UsoSnapshot } from '@/lib/storage/uso'
 
 type GeralProps = {
   id: string; nome: string; slug: string; plano: string; ativo: boolean; somenteAdmin: boolean; somenteSuper: boolean; dominio: string | null
@@ -23,7 +25,7 @@ type GeralProps = {
  *  - Acessos (RBAC) → equipe da plataforma (membros + cargos), gerida pelo super-admin
  *    direto do console (escopo por tenant-alvo via `tenantId`).
  */
-export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTema, banners, destinosBanner, embedConfig, salvarEmbed, rbacErro, capasSistema }: {
+export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTema, banners, destinosBanner, embedConfig, salvarEmbed, rbacErro, capasSistema, usoTenant }: {
   geral: GeralProps
   membros: AdminMembro[]
   cargos: CargoOpcao[]
@@ -35,6 +37,7 @@ export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTem
   salvarEmbed: (dados: EmbedConfigInput) => Promise<{ ok: boolean; error?: string }>
   rbacErro?: string | null
   capasSistema?: string[]
+  usoTenant?: UsoSnapshot | null
 }) {
   return (
     <Tabs defaultValue="geral" className="space-y-4">
@@ -44,6 +47,7 @@ export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTem
         <TabsTrigger value="login"><LogIn className="mr-1.5 h-4 w-4" /> Login</TabsTrigger>
         <TabsTrigger value="avisos"><Megaphone className="mr-1.5 h-4 w-4" /> Avisos</TabsTrigger>
         <TabsTrigger value="embed"><Code2 className="mr-1.5 h-4 w-4" /> Embed</TabsTrigger>
+        <TabsTrigger value="armazenamento"><HardDrive className="mr-1.5 h-4 w-4" /> Armazenamento</TabsTrigger>
         <TabsTrigger value="acessos"><ShieldCheck className="mr-1.5 h-4 w-4" /> Acessos (RBAC)</TabsTrigger>
       </TabsList>
 
@@ -78,6 +82,12 @@ export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTem
 
       <TabsContent value="embed">
         <PlataformaEmbed config={embedConfig} salvar={salvarEmbed} />
+      </TabsContent>
+
+      <TabsContent value="armazenamento">
+        {usoTenant ? <PlataformaArmazenamento uso={usoTenant} /> : (
+          <div className="rounded-2xl border bg-muted/30 p-8 text-center text-sm text-muted-foreground">Uso de storage indisponível.</div>
+        )}
       </TabsContent>
 
       <TabsContent value="acessos" className="space-y-4">

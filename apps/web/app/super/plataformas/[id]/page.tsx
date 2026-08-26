@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { PlataformaTabs } from '@/components/super/plataforma-tabs'
 import { listarAdministradores } from '@/app/admin/administradores/actions'
 import { salvarTemaSuperAction, salvarEmbedConfigAction } from '@/app/admin/tenants/actions'
+import { usoPorTenant } from '@/lib/storage/uso'
 import { dedupePorLabel } from '@/lib/banner-destinos'
 import { ArrowLeft, Building2 } from 'lucide-react'
 
@@ -53,6 +54,9 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
     // Capas largas já existentes (bancos/pastas) — modelos de fundo para a personalização do aluno.
     svc.from('simulado_pastas').select('capa_url, capa_card_url').eq('tenant_id', id).eq('deletado', false).limit(80).then((r: any) => r.data ?? [], () => []),
   ])
+
+  // Uso de storage desta plataforma (derivado do catálogo por tenant_id). Tolerante.
+  const usoTenant = await usoPorTenant(svc, id).catch(() => null)
 
   const embedConfig = {
     ativo: (embedRow as any)?.ativo ?? true,
@@ -119,6 +123,7 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
         salvarEmbed={salvarEmbed}
         rbacErro={rbac.ok ? null : (rbac.error ?? 'Não foi possível carregar os acessos.')}
         capasSistema={capasSistema}
+        usoTenant={usoTenant}
       />
     </div>
   )

@@ -19,6 +19,7 @@ export const RBAC_CATALOGO: { resource: string; action: string }[] = [
   { resource: 'api_keys', action: 'manage' },
   { resource: 'rbac', action: 'view' }, { resource: 'rbac', action: 'manage' },
   { resource: 'console', action: 'view' },
+  { resource: 'armazenamento', action: 'view' }, { resource: 'armazenamento', action: 'manage' },
   // Cronogramas de estudo. `liberar` é separado de `update` porque decide se o ALUNO enxerga;
   // `emitir` permite gerar um cronograma em nome de um aluno (atendimento/suporte).
   { resource: 'cronogramas', action: 'view' }, { resource: 'cronogramas', action: 'create' }, { resource: 'cronogramas', action: 'update' },
@@ -39,6 +40,7 @@ export const RBAC_RECURSO_LABEL: Record<string, string> = {
   api_keys: 'Chaves de API',
   rbac: 'Administração (RBAC)',
   console: 'Console (administração global)',
+  armazenamento: 'Armazenamento',
   auditoria: 'Auditoria',
   relatorios: 'Relatórios',
   gamificacao: 'Gamificação',

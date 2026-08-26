@@ -75,7 +75,10 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   setInterval(() => { void chamarCron('/api/cron/guru-reconcile', 'cron guru-reconcile', (j) => !!(j.resultados?.length)) }, 21_600_000)
   // Gamificação: zera a sequência (streak) de quem não teve atividade ontem. De hora em hora (idempotente).
   setInterval(() => { void chamarCron('/api/cron/gamificacao-streak', 'cron gamificacao-streak', (j) => !!j.zerados) }, 3_600_000)
-  console.log('[cron] agendado: encerramento + import + sync Curseduca + eventos Integrações (60s); sync grupos→bancos (180s); warm-cache (300s); guru-reconcile (6h, incremental 48h); gamificacao-streak (1h)')
+  // Armazenamento: recalcula o uso E sincroniza o catálogo simulado_arquivos (auto-cura o que os
+  // uploads não registrarem). A cada 6h (idempotente); o console também dispara sob demanda.
+  setInterval(() => { void chamarCron('/api/cron/storage-reconcile', 'cron storage', (j) => !!(j.inseridos || j.removidos)) }, 21_600_000)
+  console.log('[cron] agendado: encerramento + import + sync Curseduca + eventos Integrações (60s); sync grupos→bancos (180s); warm-cache (300s); guru-reconcile (6h, incremental 48h); gamificacao-streak (1h); storage-reconcile (6h)')
 } else {
   console.warn('[cron] DESATIVADO — defina WEB_INTERNAL_URL e CRON_SECRET')
 }

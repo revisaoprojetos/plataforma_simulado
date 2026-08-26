@@ -107,7 +107,9 @@ export async function POST(request: NextRequest) {
     const ext = EXT[mime] ?? 'jpg'
     const up = await uploadArquivo({
       tenantId: sessao.tenant_id, bucket: BUCKET,
-      path: `discursivas/${sessao.tenant_id}/${respostaId}/${crypto.randomUUID()}.${ext}`,
+      // Path canônico {tenant}/{resposta}/{uuid} — SEM repetir 'discursivas/' (o bucket já é
+      // 'discursivas'). O leitor assina o path armazenado, então novos e antigos convivem.
+      path: `${sessao.tenant_id}/${respostaId}/${crypto.randomUUID()}.${ext}`,
       data: buf, contentType: mime, nome: file.name || `pagina.${ext}`,
       publico: false, criadoPor: sessao.estudante_id,
     })
