@@ -17,8 +17,9 @@ import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 type ModeloImport = 'multipla' | 'certo_errado'
 
 // Múltipla escolha: alternativas A–E + lei/comentário por alternativa.
+// 2ª coluna "Tipo" = identifica o formato (já preenchida).
 const COLUNAS_ME = [
-  'Número', 'Enunciado', 'Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D', 'Alternativa E',
+  'Número', 'Tipo', 'Enunciado', 'Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D', 'Alternativa E',
   'Alternativa Correta', 'Alternativas Incorretas', 'Grupo', 'Disciplina', 'Categoria', 'Assunto Principal',
   'Assunto Detalhe', 'Nível', 'Pilar 1', 'Pilar 2',
   'Lei A', 'Comentário A', 'Lei B', 'Comentário B', 'Lei C', 'Comentário C', 'Lei D', 'Comentário D', 'Lei E', 'Comentário E',
@@ -27,9 +28,9 @@ const COLUNAS_ME = [
 ] as const
 
 // Certo/Errado: sem A–E nem lei/comentário por alternativa; a resposta é Certo/Errado
-// e a explicação vai no "Comentário completo".
+// e a explicação vai no "Comentário completo". 2ª coluna "Tipo" identifica o formato.
 const COLUNAS_CE = [
-  'Número', 'Enunciado', 'Alternativa Correta', 'Grupo', 'Disciplina', 'Categoria', 'Assunto Principal',
+  'Número', 'Tipo', 'Enunciado', 'Alternativa Correta', 'Grupo', 'Disciplina', 'Categoria', 'Assunto Principal',
   'Assunto Detalhe', 'Nível', 'Pilar 1', 'Pilar 2',
   'Comentário completo',
   'Ano', 'Banca', 'Órgão', 'Cargo', 'Etiquetas',
@@ -37,7 +38,7 @@ const COLUNAS_CE = [
 
 const EXEMPLOS_ME: Record<string, string>[] = [
   {
-    'Número': '1', 'Enunciado': 'Qual é a capital do Brasil?',
+    'Número': '1', 'Tipo': 'Múltipla escolha', 'Enunciado': 'Qual é a capital do Brasil?',
     'Alternativa A': 'São Paulo', 'Alternativa B': 'Rio de Janeiro', 'Alternativa C': 'Brasília', 'Alternativa D': 'Salvador', 'Alternativa E': 'Recife',
     'Alternativa Correta': 'C', 'Alternativas Incorretas': 'A, B, D, E',
     'Grupo': 'Conhecimentos Gerais', 'Disciplina': 'Geografia', 'Categoria': 'Geografia do Brasil',
@@ -51,13 +52,13 @@ const EXEMPLOS_ME: Record<string, string>[] = [
 
 const EXEMPLOS_CE: Record<string, string>[] = [
   {
-    'Número': '1', 'Enunciado': 'A capital do Brasil é Brasília.', 'Alternativa Correta': 'Certo',
+    'Número': '1', 'Tipo': 'Certo/Errado', 'Enunciado': 'A capital do Brasil é Brasília.', 'Alternativa Correta': 'Certo',
     'Disciplina': 'Geografia', 'Categoria': 'Geografia do Brasil', 'Assunto Principal': 'Capitais', 'Assunto Detalhe': 'Capital federal', 'Nível': 'facil',
     'Comentário completo': 'Correto. Brasília é a capital federal desde 1960 (CF, art. 18, §1º).',
     'Ano': '2024', 'Banca': 'CESPE', 'Etiquetas': 'Alta recorrência',
   },
   {
-    'Número': '2', 'Enunciado': 'São Paulo é a capital do Brasil.', 'Alternativa Correta': 'Errado',
+    'Número': '2', 'Tipo': 'Certo/Errado', 'Enunciado': 'São Paulo é a capital do Brasil.', 'Alternativa Correta': 'Errado',
     'Disciplina': 'Geografia', 'Assunto Principal': 'Capitais', 'Nível': 'facil',
     'Comentário completo': 'Errado. São Paulo é a capital do estado de São Paulo; a capital federal é Brasília.',
     'Ano': '2024', 'Banca': 'CESPE',
@@ -66,6 +67,7 @@ const EXEMPLOS_CE: Record<string, string>[] = [
 
 const INSTR_COMUNS: [string, string][] = [
   ['Número', 'Número/ordem da questão (opcional).'],
+  ['Tipo', 'Identifica o formato do modelo (já vem preenchido): "Múltipla escolha" ou "Certo/Errado". Não misture formatos no mesmo arquivo — use o modelo correspondente.'],
   ['Enunciado', 'O texto da questão. Obrigatório.'],
   ['Grupo · Categoria · Assunto Detalhe · Pilar 1 · Pilar 2', 'Classificações livres da questão.'],
   ['Disciplina · Assunto Principal · Banca · Órgão · Cargo', 'São criados automaticamente no sistema se ainda não existirem.'],
@@ -89,9 +91,9 @@ const INSTRUCOES_CE: [string, string][] = [
   ['Alternativa Correta', 'A resposta do julgamento: "Certo" ou "Errado" — ou "ANULADA". O sistema cria as 2 opções (Certo/Errado) automaticamente; não use as colunas A–E aqui.'],
 ]
 
-const MODELOS: Record<ModeloImport, { colunas: readonly string[]; exemplos: Record<string, string>[]; instrucoes: [string, string][]; corretaOpts: string; arquivo: string; aba: string }> = {
-  multipla: { colunas: COLUNAS_ME, exemplos: EXEMPLOS_ME, instrucoes: INSTRUCOES_ME, corretaOpts: 'A,B,C,D,E,ANULADA', arquivo: 'modelo-questoes-multipla-escolha.xlsx', aba: 'Múltipla escolha' },
-  certo_errado: { colunas: COLUNAS_CE, exemplos: EXEMPLOS_CE, instrucoes: INSTRUCOES_CE, corretaOpts: 'Certo,Errado,ANULADA', arquivo: 'modelo-questoes-certo-errado.xlsx', aba: 'Certo-Errado' },
+const MODELOS: Record<ModeloImport, { colunas: readonly string[]; exemplos: Record<string, string>[]; instrucoes: [string, string][]; corretaOpts: string; tipoValor: string; arquivo: string; aba: string }> = {
+  multipla: { colunas: COLUNAS_ME, exemplos: EXEMPLOS_ME, instrucoes: INSTRUCOES_ME, corretaOpts: 'A,B,C,D,E,ANULADA', tipoValor: 'Múltipla escolha', arquivo: 'modelo-questoes-multipla-escolha.xlsx', aba: 'Múltipla escolha' },
+  certo_errado: { colunas: COLUNAS_CE, exemplos: EXEMPLOS_CE, instrucoes: INSTRUCOES_CE, corretaOpts: 'Certo,Errado,ANULADA', tipoValor: 'Certo/Errado', arquivo: 'modelo-questoes-certo-errado.xlsx', aba: 'Certo-Errado' },
 }
 
 const COR_HEADER = 'FF5B21B6'
@@ -145,6 +147,7 @@ async function baixarModelo(formato: ModeloImport) {
     }
     lista('Nível', 'facil,medio,dificil')
     lista('Alternativa Correta', cfg.corretaOpts)
+    lista('Tipo', cfg.tipoValor)
 
     // Aba de instruções.
     const wi = wb.addWorksheet('Instruções')
