@@ -217,7 +217,9 @@ async function buildQuestaoFields(supabase: SupabaseClient, tenantId: string, da
   const banca_id = await resolveByName(supabase, 'simulado_bancas', tenantId, data.banca)
   const orgao_id = await resolveByName(supabase, 'simulado_orgaos', tenantId, data.orgao)
   const disciplina_id = await resolveByName(supabase, 'simulado_disciplinas', tenantId, data.disciplina)
-  const assunto_id = await resolveAssunto(supabase, tenantId, data.assunto, disciplina_id)
+  // Assunto via service role: a taxonomia `simulado_assuntos` tem RLS que pode barrar o SELECT/INSERT
+  // sob a sessão do admin logado (embed do assunto vinha nulo por isso). Escopado por tenant no resolve.
+  const assunto_id = await resolveAssunto(createAdminClient(), tenantId, data.assunto, disciplina_id)
 
   return {
     tenant_id: tenantId,

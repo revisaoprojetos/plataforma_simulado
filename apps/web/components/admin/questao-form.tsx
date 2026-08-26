@@ -475,6 +475,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                     placeholder={`Alternativa ${LETRA[index] ?? index + 1}`}
                     rows={2}
                     className="flex-1"
+                    defaultValue={(field as { texto?: string }).texto ?? ''}
                     {...register(`alternativas.${index}.texto`)}
                   />
                   {fields.length > 2 && (
@@ -496,6 +497,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                     previewInline
                     placeholder="Por que esta alternativa está correta/incorreta (opcional)"
                     rows={2}
+                    defaultValue={(field as { comentario?: string }).comentario ?? ''}
                     {...register(`alternativas.${index}.comentario`)}
                   />
                 </div>

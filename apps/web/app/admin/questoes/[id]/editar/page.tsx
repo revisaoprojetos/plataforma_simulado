@@ -1,4 +1,4 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { QuestaoForm } from '@/components/admin/questao-form'
 import { EtiquetaPicker } from '@/components/admin/etiqueta-picker'
@@ -14,9 +14,11 @@ interface PageProps {
 
 export default async function EditarQuestaoPage({ params }: PageProps) {
   const { id } = await params
-  const supabase = await createClient()
   const tenantId = await getCurrentTenantId()
+  // Leituras via service role (admin): a taxonomia (assuntos) tem RLS que barra o embed sob a
+  // sessão RLS do admin logado — como no resto do painel, lemos com createAdminClient (escopado por tenant).
   const admin = createAdminClient()
+  const NADA = '00000000-0000-0000-0000-000000000000'
 
   const [
     { data: questao },
@@ -27,23 +29,23 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
     { data: bancosDestino },
     { data: vinculos },
   ] = await Promise.all([
-    supabase
+    admin
       .from('simulado_questoes')
       .select('*, bancas:simulado_bancas(nome), disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
       .eq('id', id)
-      .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+      .eq('tenant_id', tenantId ?? NADA)
       .maybeSingle(),
-    supabase.from('simulado_bancas').select('nome').order('nome'),
-    supabase.from('simulado_disciplinas').select('nome').order('nome'),
-    supabase.from('simulado_assuntos').select('nome').order('nome'),
-    supabase
+    admin.from('simulado_bancas').select('nome').eq('tenant_id', tenantId ?? NADA).order('nome'),
+    admin.from('simulado_disciplinas').select('nome').eq('tenant_id', tenantId ?? NADA).order('nome'),
+    admin.from('simulado_assuntos').select('nome').eq('tenant_id', tenantId ?? NADA).order('nome'),
+    admin
       .from('simulado_alternativas')
       .select('*')
       .eq('questao_id', id)
-      .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+      .eq('tenant_id', tenantId ?? NADA)
       .order('ordem'),
-    admin.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('nome'),
-    admin.from('simulado_questao_pasta').select('pasta_id').eq('questao_id', id).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000'),
+    admin.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? NADA).order('nome'),
+    admin.from('simulado_questao_pasta').select('pasta_id').eq('questao_id', id).eq('tenant_id', tenantId ?? NADA),
   ])
 
   if (!questao) {
