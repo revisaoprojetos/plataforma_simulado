@@ -205,7 +205,7 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
               <div className="overflow-hidden rounded-md border bg-muted/40">
                 <button type="button" onClick={() => setComentAberto((v) => !v)} aria-expanded={comentAberto}
                   className="flex w-full items-center justify-between gap-2 p-3 text-left transition-colors hover:bg-muted/60">
-                  <span className="text-xs font-semibold text-muted-foreground">Comentário do professor</span>
+                  <span className="text-xs font-semibold text-muted-foreground">Gabarito comentado</span>
                   {comentAberto ? <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
                 </button>
                 <div className={cn('grid transition-[grid-template-rows] duration-300 ease-out', comentAberto ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>

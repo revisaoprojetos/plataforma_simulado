@@ -9,6 +9,7 @@ import { fetchAll } from '@/lib/supabase/fetch-all'
 import { etiquetasPorQuestao } from '@/lib/aluno/etiquetas-questao'
 import { provasPorQuestao } from '@/lib/aluno/provas-questao'
 import { questoesForaDeJogoTenant } from '@/lib/simulado/questoes-anuladas'
+import { resolverComentarioGabarito } from '@/lib/simulado/comentario-gabarito'
 import { Target, CheckCircle2, Percent } from 'lucide-react'
 
 const POR_PAGINA = 10
@@ -111,7 +112,7 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
   const assuntoIds = (questoes ?? []).map((x: any) => x.assunto_id).filter(Boolean)
 
   const [{ data: alts }, { data: discNomes }, { data: bancaNomes }, { data: assuntoNomes }, { data: favs }] = await Promise.all([
-    ids.length ? svc.from('simulado_alternativas').select('id, questao_id, texto, ordem, correta').in('questao_id', ids) : Promise.resolve({ data: [] as any[] }),
+    ids.length ? svc.from('simulado_alternativas').select('id, questao_id, texto, ordem, correta, comentario').in('questao_id', ids) : Promise.resolve({ data: [] as any[] }),
     discIds.length ? svc.from('simulado_disciplinas').select('id, nome').in('id', discIds) : Promise.resolve({ data: [] as any[] }),
     bancaIds.length ? svc.from('simulado_bancas').select('id, nome').in('id', bancaIds) : Promise.resolve({ data: [] as any[] }),
     assuntoIds.length ? svc.from('simulado_assuntos').select('id, nome').in('id', assuntoIds) : Promise.resolve({ data: [] as any[] }),
@@ -139,7 +140,8 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
     assunto: assuntoMap.get(x.assunto_id) ?? null,
     banca: bancaMap.get(x.banca_id) ?? null,
     ano: x.ano ?? null,
-    comentario_professor: x.comentario_professor ?? null,
+    // Comentário do gabarito: professor OU comentário das alternativas (formato PGE/AGU) — ver helper.
+    comentario_professor: resolverComentarioGabarito(x.comentario_professor, altMap.get(x.id) ?? []),
     favorito: favSet.has(x.id),
     etiquetas: etiquetasMap.get(x.id) ?? [],
     provas: provasMap.get(x.id) ?? [],
