@@ -647,6 +647,37 @@ async function resolveEtiqueta(svc: ReturnType<typeof createAdminClient>, tenant
   return (cr as any).id
 }
 
+/**
+ * Reimport de uma questão que JÁ EXISTE: atualiza os comentários vindos da planilha
+ * (Comentário completo → comentario_professor; Comentário/Lei A–E → alternativas por ordem).
+ * Só grava o que veio PREENCHIDO — célula vazia não apaga o que já existe.
+ */
+async function atualizarComentariosExistente(
+  svc: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  questaoId: string,
+  q: QuestaoImport,
+) {
+  const tem = (s?: string | null) => typeof s === 'string' && s.trim().length > 0
+  if (tem(q.comentario_professor)) {
+    await svc.from('simulado_questoes').update({ comentario_professor: q.comentario_professor }).eq('id', questaoId).eq('tenant_id', tenantId)
+  }
+  for (const a of q.alternativas ?? []) {
+    const patch: Record<string, unknown> = {}
+    if (tem(a.comentario)) patch.comentario = a.comentario
+    if (tem(a.lei)) patch.lei = a.lei
+    if (!Object.keys(patch).length) continue
+    // Casa por ordem (A–E). Tolerante às colunas comentario/lei que podem não existir.
+    const r = await svc.from('simulado_alternativas').update(patch).eq('questao_id', questaoId).eq('tenant_id', tenantId).eq('ordem', a.ordem)
+    if (r.error) {
+      const p2 = { ...patch }
+      if (/comentario/i.test(r.error.message)) delete p2.comentario
+      if (/lei/i.test(r.error.message)) delete p2.lei
+      if (Object.keys(p2).length) await svc.from('simulado_alternativas').update(p2).eq('questao_id', questaoId).eq('tenant_id', tenantId).eq('ordem', a.ordem)
+    }
+  }
+}
+
 /** Lê o arquivo enviado e devolve a relação de questões, marcando as que já existem. */
 export async function analisarQuestoesImport(formData: FormData): Promise<AnaliseImport> {
   const g = await guard(); if (!g.ok) return { ok: false, error: g.error }
@@ -719,6 +750,8 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
       // Re-import marcando ANULADA atualiza a questão existente no banco (para propagar depois).
       if (q.anulada) { anuladaIds.add(q.questaoIdExistente); await svc.from('simulado_questoes').update({ anulada: true }).eq('id', q.questaoIdExistente).eq('tenant_id', g.tenantId) }
       await vincularEtiquetas(q.questaoIdExistente, q.etiquetas) // aplica as etiquetas na questão já existente também
+      // Enriquecer comentários (completo + por alternativa) da questão já existente com o que veio na planilha.
+      await atualizarComentariosExistente(svc, g.tenantId, q.questaoIdExistente, q)
       continue
     }
 
