@@ -3,22 +3,23 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Merge, Search, Check, Loader2, Info, Sparkles, X } from 'lucide-react'
+import { Merge, Search, Check, Loader2, Info, Sparkles, X, Undo2, History } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { unificarDisciplinas, type DisciplinaContagem } from '@/app/admin/questoes/disciplinas-actions'
+import { unificarDisciplinas, previewUnificacao, desfazerUnificacao, type DisciplinaContagem, type UnificacaoRecente } from '@/app/admin/questoes/disciplinas-actions'
 
 // Normaliza p/ detectar duplicatas: sem acento, minúsculo, sem pontuação, espaços colapsados.
 const norm = (s: string) => (s ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 // Escolhe a "melhor" p/ manter: mais questões, depois mais assuntos, depois nome mais curto.
 const melhor = (g: DisciplinaContagem[]) => [...g].sort((a, b) => b.questoes - a.questoes || b.assuntos - a.assuntos || a.nome.length - b.nome.length)[0]
 
-export function DisciplinasUnificacao({ disciplinas }: { disciplinas: DisciplinaContagem[] }) {
+export function DisciplinasUnificacao({ disciplinas, recentes = [] }: { disciplinas: DisciplinaContagem[]; recentes?: UnificacaoRecente[] }) {
   const router = useRouter()
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [manter, setManter] = useState('')
   const [salvando, setSalvando] = useState(false)
+  const [desfazendo, setDesfazendo] = useState('')
 
   // Clusters de possíveis duplicatas (mesmo nome normalizado, 2+ variações).
   const clusters = useMemo(() => {
@@ -35,18 +36,31 @@ export function DisciplinasUnificacao({ disciplinas }: { disciplinas: Disciplina
   async function unificar(canonicaId: string, dups: string[]) {
     const alvo = disciplinas.find((d) => d.id === canonicaId)
     if (!alvo || !dups.length) return
-    const totalQ = disciplinas.filter((d) => dups.includes(d.id)).reduce((s, d) => s + d.questoes, 0)
+    setSalvando(true)
+    // Impacto EXATO do servidor (não confia no snapshot do cliente).
+    const pv = await previewUnificacao(dups)
+    const nQ = pv.ok ? (pv.questoes ?? 0) : disciplinas.filter((d) => dups.includes(d.id)).reduce((s, d) => s + d.questoes, 0)
+    const nA = pv.ok ? (pv.assuntos ?? 0) : 0
     const ok = await confirmar({
       titulo: 'Unificar disciplinas?',
-      mensagem: `${dups.length} disciplina(s) serão mescladas em «${alvo.nome}»: ~${totalQ} questão(ões) e os assuntos passam para ela, e as ${dups.length} duplicadas são removidas do filtro. As questões não são apagadas.`,
+      mensagem: `${dups.length} disciplina(s) serão mescladas em «${alvo.nome}»: ${nQ} questão(ões) e ${nA} assunto(s) passam para ela, e as ${dups.length} duplicadas são removidas do filtro. As questões não são apagadas — e dá para desfazer depois.`,
       confirmar: 'Unificar',
     })
-    if (!ok) return
-    setSalvando(true)
+    if (!ok) { setSalvando(false); return }
     const r = await unificarDisciplinas(canonicaId, dups)
     setSalvando(false)
     if (r.ok) { toast.success(`Unificado em «${r.mantida}» — ${r.questoes} questão(ões) movidas, ${r.removidas} removida(s)`); setSel(new Set()); setManter(''); router.refresh() }
     else toast.error(r.error ?? 'Erro ao unificar.')
+  }
+
+  async function desfazer(u: UnificacaoRecente) {
+    const ok = await confirmar({ titulo: 'Desfazer unificação?', mensagem: `Recria ${u.duplicadas.length} disciplina(s) (${u.duplicadas.join(', ') || '—'}) e devolve ~${u.questoes} questão(ões) para elas.`, confirmar: 'Desfazer' })
+    if (!ok) return
+    setDesfazendo(u.id)
+    const r = await desfazerUnificacao(u.id)
+    setDesfazendo('')
+    if (r.ok) { toast.success(`Desfeito — ${r.questoes} questão(ões) restauradas`); router.refresh() }
+    else toast.error(r.error ?? 'Erro ao desfazer.')
   }
 
   function toggle(id: string) { setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }) }
@@ -126,6 +140,27 @@ export function DisciplinasUnificacao({ disciplinas }: { disciplinas: Disciplina
           </div>
         )}
       </div>
+
+      {/* Unificações recentes — desfazer (rede de segurança) */}
+      {recentes.length > 0 && (
+        <div className="space-y-2 rounded-2xl border bg-card p-4 shadow-sm">
+          <p className="flex items-center gap-1.5 text-sm font-semibold"><History className="h-4 w-4 text-primary" /> Unificações recentes</p>
+          <p className="text-xs text-muted-foreground">Errou na mesclagem? Desfaça — recria as disciplinas e devolve as questões.</p>
+          <div className="divide-y">
+            {recentes.map((u) => (
+              <div key={u.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="font-medium">«{u.mantida}»</span> <span className="text-muted-foreground">← {u.duplicadas.length} disciplina(s) · {u.questoes} questão(ões)</span>
+                </span>
+                <button onClick={() => desfazer(u)} disabled={desfazendo === u.id}
+                  className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted disabled:opacity-50">
+                  {desfazendo === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />} Desfazer
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

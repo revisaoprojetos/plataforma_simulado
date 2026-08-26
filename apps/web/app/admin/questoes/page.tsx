@@ -23,7 +23,7 @@ import { NovaQuestaoDialog } from '@/components/admin/nova-questao-dialog'
 import { ExportQuestoesButton } from '@/components/admin/export-questoes-button'
 import { SecaoHeader } from '@/components/admin/secao-header'
 import { DisciplinasUnificacao } from '@/components/admin/disciplinas-unificacao'
-import { listarDisciplinasContagem } from './disciplinas-actions'
+import { listarDisciplinasContagem, listarUnificacoesRecentes } from './disciplinas-actions'
 
 const ITEMS_PER_PAGE = 20
 const NADA = '00000000-0000-0000-0000-000000000000'
@@ -106,8 +106,13 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
     totalPages = Math.ceil((count ?? 0) / ITEMS_PER_PAGE)
   }
 
-  // ── Aba UNIFICAÇÃO: disciplinas + contagens de questões/assuntos ──
-  const discUnif = tab === 'disciplinas' ? ((await listarDisciplinasContagem()).itens ?? []) : []
+  // ── Aba UNIFICAÇÃO: disciplinas + contagens + unificações recentes (desfazer) ──
+  const [discUnif, recentesUnif] = tab === 'disciplinas'
+    ? await Promise.all([
+        listarDisciplinasContagem().then((r) => r.itens ?? []),
+        listarUnificacoesRecentes().then((r) => r.itens ?? []),
+      ])
+    : [[], []]
 
   const tabCls = (ativo: boolean) => cn('flex items-center gap-1.5 border-b-2 px-1 pb-2 font-medium transition-colors', ativo ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')
 
@@ -135,7 +140,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       </div>
 
       {tab === 'disciplinas' ? (
-        <DisciplinasUnificacao disciplinas={discUnif} />
+        <DisciplinasUnificacao disciplinas={discUnif} recentes={recentesUnif} />
       ) : (<>
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
         <SecaoHeader
