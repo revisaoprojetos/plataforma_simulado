@@ -77,7 +77,7 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null, 
             })}
           </div>
         )}
-        <div className="relative min-w-[200px] flex-1 sm:max-w-sm">
+        <div className="relative ml-auto w-full min-w-[200px] sm:w-72">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={atual ? `Buscar em “${atual.nome}”…` : 'Buscar banco ou pasta…'} className="pl-9" />
         </div>
