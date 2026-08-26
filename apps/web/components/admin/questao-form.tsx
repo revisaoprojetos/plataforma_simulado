@@ -40,6 +40,7 @@ const alternativaSchema = z.object({
   texto: z.string(),
   correta: z.boolean(),
   ordem: z.number(),
+  comentario: z.string().optional(),
 })
 
 const competenciaSchema = z.object({
@@ -57,6 +58,7 @@ const questaoSchema = z
     ano: z.coerce.number().optional(),
     disciplina: z.string().optional(),
     assunto: z.string().optional(),
+    assunto_detalhe: z.string().optional(),
     nivel_dificuldade: z.enum(['facil', 'medio', 'dificil']).optional(),
     gabarito_tipo: z.enum(['oficial', 'extraoficial']).optional(),
     comentario_professor: z.string().optional(),
@@ -91,6 +93,7 @@ interface QuestaoFormProps {
   /** Sugestões (nomes já cadastrados) para autocomplete — não são uma base fixa. */
   bancasSugestoes?: string[]
   disciplinasSugestoes?: string[]
+  assuntosSugestoes?: string[]
   /** Bancos (pastas) disponíveis para armazenar a questão diretamente. */
   bancos?: { id: string; nome: string }[]
   onSubmit: (data: QuestaoFormData) => Promise<{ error?: string } | void>
@@ -98,7 +101,7 @@ interface QuestaoFormProps {
 
 const LETRA = ['A', 'B', 'C', 'D', 'E']
 
-export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSugestoes = [], bancos = [], onSubmit }: QuestaoFormProps) {
+export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSugestoes = [], assuntosSugestoes = [], bancos = [], onSubmit }: QuestaoFormProps) {
   const ocultarDiscursiva = useOcultarDiscursiva()
   const [isLoading, setIsLoading] = useState(false)
 
@@ -349,6 +352,30 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="assunto">Assunto</Label>
+            <Input
+              id="assunto"
+              list="assuntos-sugestoes"
+              placeholder="Digite ou selecione"
+              {...register('assunto')}
+            />
+            <datalist id="assuntos-sugestoes">
+              {assuntosSugestoes.map((nome) => (
+                <option key={nome} value={nome} />
+              ))}
+            </datalist>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="assunto_detalhe">Assunto específico</Label>
+            <Input
+              id="assunto_detalhe"
+              placeholder="Detalhe do assunto (ex.: importado)"
+              {...register('assunto_detalhe')}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label>Dificuldade</Label>
             <Select
               defaultValue={initialData?.nivel_dificuldade ?? ''}
@@ -429,37 +456,49 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
           </CardHeader>
           <CardContent className="space-y-3">
             {fields.map((field, index) => (
-              <div key={field.id} className="flex items-start gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCorreta(index)}
-                  className={`mt-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors ${
-                    alternativas?.[index]?.correta
-                      ? 'border-green-600 bg-green-600 text-white'
-                      : 'border-border text-muted-foreground hover:border-primary'
-                  }`}
-                  title="Marcar como correta"
-                >
-                  {LETRA[index] ?? index + 1}
-                </button>
-                <MarkdownTextarea
-                  previewInline
-                  placeholder={`Alternativa ${LETRA[index] ?? index + 1}`}
-                  rows={2}
-                  className="flex-1"
-                  {...register(`alternativas.${index}.texto`)}
-                />
-                {fields.length > 2 && (
-                  <Button
+              <div key={field.id} className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                <div className="flex items-start gap-3">
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="mt-2 text-destructive hover:text-destructive"
-                    onClick={() => remove(index)}
+                    onClick={() => setCorreta(index)}
+                    className={`mt-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors ${
+                      alternativas?.[index]?.correta
+                        ? 'border-green-600 bg-green-600 text-white'
+                        : 'border-border text-muted-foreground hover:border-primary'
+                    }`}
+                    title="Marcar como correta"
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
+                    {LETRA[index] ?? index + 1}
+                  </button>
+                  <MarkdownTextarea
+                    previewInline
+                    placeholder={`Alternativa ${LETRA[index] ?? index + 1}`}
+                    rows={2}
+                    className="flex-1"
+                    {...register(`alternativas.${index}.texto`)}
+                  />
+                  {fields.length > 2 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="mt-2 text-destructive hover:text-destructive"
+                      onClick={() => remove(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                {/* Comentário/gabarito da alternativa — abaixo do texto (formato do gabarito comentado). */}
+                <div className="pl-10">
+                  <Label className="mb-1 block text-xs text-muted-foreground">Comentário desta alternativa (gabarito)</Label>
+                  <MarkdownTextarea
+                    previewInline
+                    placeholder="Por que esta alternativa está correta/incorreta (opcional)"
+                    rows={2}
+                    {...register(`alternativas.${index}.comentario`)}
+                  />
+                </div>
               </div>
             ))}
 
@@ -469,7 +508,7 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                 variant="outline"
                 size="sm"
                 onClick={() =>
-                  append({ texto: '', correta: false, ordem: fields.length })
+                  append({ texto: '', correta: false, ordem: fields.length, comentario: '' })
                 }
               >
                 <Plus className="mr-2 h-4 w-4" />

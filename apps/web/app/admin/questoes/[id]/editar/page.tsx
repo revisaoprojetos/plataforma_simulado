@@ -22,18 +22,20 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
     { data: questao },
     { data: bancas },
     { data: disciplinas },
+    { data: assuntosLista },
     { data: alternativas },
     { data: bancosDestino },
     { data: vinculos },
   ] = await Promise.all([
     supabase
       .from('simulado_questoes')
-      .select('*, bancas:simulado_bancas(nome), disciplinas:simulado_disciplinas(nome)')
+      .select('*, bancas:simulado_bancas(nome), disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
       .eq('id', id)
       .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
       .maybeSingle(),
     supabase.from('simulado_bancas').select('nome').order('nome'),
     supabase.from('simulado_disciplinas').select('nome').order('nome'),
+    supabase.from('simulado_assuntos').select('nome').order('nome'),
     supabase
       .from('simulado_alternativas')
       .select('*')
@@ -50,6 +52,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
 
   const bancasSugestoes = (bancas ?? []).map((b) => b.nome)
   const disciplinasSugestoes = (disciplinas ?? []).map((d) => d.nome)
+  const assuntosSugestoes = [...new Set((assuntosLista ?? []).map((a: { nome: string }) => a.nome).filter(Boolean))]
   const bancoIds = (vinculos ?? []).map((v: { pasta_id: string }) => v.pasta_id)
   const et = await etiquetasDaQuestao(id)
 
@@ -58,6 +61,8 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
     enunciado: questao.enunciado,
     banca: (questao.bancas as { nome?: string } | null)?.nome ?? undefined,
     disciplina: (questao.disciplinas as { nome?: string } | null)?.nome ?? undefined,
+    assunto: (questao.assuntos as { nome?: string } | null)?.nome ?? undefined,
+    assunto_detalhe: (questao.assunto_detalhe as string | null) ?? undefined,
     ano: questao.ano ?? undefined,
     nivel_dificuldade: (questao.nivel_dificuldade ?? undefined) as 'facil' | 'medio' | 'dificil' | undefined,
     gabarito_tipo: (questao.gabarito_tipo ?? undefined) as 'oficial' | 'extraoficial' | undefined,
@@ -71,6 +76,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
       texto: a.texto,
       correta: a.correta,
       ordem: a.ordem,
+      comentario: (a.comentario as string | null) ?? '',
     })),
     bancoIds,
   }
@@ -95,6 +101,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
         initialData={initialData}
         bancasSugestoes={bancasSugestoes}
         disciplinasSugestoes={disciplinasSugestoes}
+        assuntosSugestoes={assuntosSugestoes}
         bancos={bancosDestino ?? []}
         onSubmit={updateQuestaoAction.bind(null, id)}
       />

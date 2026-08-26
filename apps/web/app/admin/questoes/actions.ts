@@ -15,6 +15,8 @@ interface AlternativaData {
   texto: string
   correta: boolean
   ordem: number
+  /** Comentário/gabarito da alternativa (formato PGE/AGU) — exibido no gabarito comentado. */
+  comentario?: string | null
 }
 
 interface QuestaoData {
@@ -25,6 +27,8 @@ interface QuestaoData {
   ano?: number
   disciplina?: string
   assunto?: string
+  /** Assunto específico / detalhe (texto livre importado — coluna simulado_questoes.assunto_detalhe). */
+  assunto_detalhe?: string
   nivel_dificuldade?: string
   gabarito_tipo?: string
   comentario_professor?: string
@@ -104,10 +108,13 @@ async function sincronizarAlternativas(
     if (daOrdem.length) {
       const keep = daOrdem[0]
       primeiraMantida = primeiraMantida ?? keep
-      await admin
-        .from('simulado_alternativas')
-        .update({ texto: alt.texto, correta: alt.correta, ordem: i })
-        .eq('id', keep)
+      const upd = { texto: alt.texto, correta: alt.correta, ordem: i, comentario: alt.comentario ?? null }
+      let r = await admin.from('simulado_alternativas').update(upd).eq('id', keep)
+      // Tolerante: se a coluna `comentario` não existir, atualiza sem ela.
+      if (r.error && /comentario|column/i.test(r.error.message)) {
+        const { comentario: _c, ...semComent } = upd
+        r = await admin.from('simulado_alternativas').update(semComent).eq('id', keep)
+      }
       // Duplicadas dessa ordem: re-aponta as respostas p/ a que fica e agenda remoção.
       for (const extra of daOrdem.slice(1)) {
         await admin.from('simulado_respostas_objetivas').update({ alternativa_id: keep }).eq('alternativa_id', extra)
@@ -115,12 +122,13 @@ async function sincronizarAlternativas(
       }
       porOrdem.delete(i)
     } else {
-      const { data: ins } = await admin
-        .from('simulado_alternativas')
-        .insert({ tenant_id: tenantId, questao_id: questaoId, texto: alt.texto, correta: alt.correta, ordem: i })
-        .select('id')
-        .single()
-      if (ins?.id) primeiraMantida = primeiraMantida ?? (ins.id as string)
+      const novaAlt = { tenant_id: tenantId, questao_id: questaoId, texto: alt.texto, correta: alt.correta, ordem: i, comentario: alt.comentario ?? null }
+      let r = await admin.from('simulado_alternativas').insert(novaAlt).select('id').single()
+      if (r.error && /comentario|column/i.test(r.error.message)) {
+        const { comentario: _c, ...semComent } = novaAlt
+        r = await admin.from('simulado_alternativas').insert(semComent).select('id').single()
+      }
+      if (r.data?.id) primeiraMantida = primeiraMantida ?? (r.data.id as string)
     }
   }
 
@@ -220,6 +228,7 @@ async function buildQuestaoFields(supabase: SupabaseClient, tenantId: string, da
     ano: data.ano || null,
     disciplina_id,
     assunto_id,
+    assunto_detalhe: data.assunto_detalhe?.trim() || null,
     nivel_dificuldade: data.nivel_dificuldade || null,
     gabarito_tipo: data.gabarito_tipo || 'oficial',
     comentario_professor: data.comentario_professor || null,
@@ -236,7 +245,7 @@ async function buildQuestaoFields(supabase: SupabaseClient, tenantId: string, da
 
 // Remove colunas que podem não estar migradas (fallback tolerante em insert/update).
 function semColunasNovas<T extends Record<string, any>>(fields: T) {
-  const { imagem_url: _i, pontuacao_total: _p, linhas: _l, categoria_discursiva: _c, ...resto } = fields
+  const { imagem_url: _i, pontuacao_total: _p, linhas: _l, categoria_discursiva: _c, assunto_detalhe: _ad, ...resto } = fields
   return resto
 }
 
@@ -280,7 +289,7 @@ export async function createQuestaoAction(data: QuestaoData) {
     .single()
 
   // Tolerante: se alguma coluna nova (imagem_url/pontuacao_total/linhas/categoria_discursiva) ainda não foi migrada, reinsere sem elas.
-  if (error && /imagem_url|pontuacao_total|linhas|categoria_discursiva|column/i.test(error.message)) {
+  if (error && /imagem_url|pontuacao_total|linhas|categoria_discursiva|assunto_detalhe|column/i.test(error.message)) {
     ;({ data: questao, error } = await supabase.from('simulado_questoes').insert(semColunasNovas(fields)).select().single())
   }
 
@@ -289,15 +298,14 @@ export async function createQuestaoAction(data: QuestaoData) {
   }
 
   if (data.tipo === 'objetiva' && data.alternativas?.length) {
-    const { error: altError } = await supabase.from('simulado_alternativas').insert(
-      data.alternativas.map((alt) => ({
-        tenant_id: tenantId,
-        questao_id: questao.id,
-        texto: alt.texto,
-        correta: alt.correta,
-        ordem: alt.ordem,
-      }))
-    )
+    const rows = data.alternativas.map((alt) => ({
+      tenant_id: tenantId, questao_id: questao.id, texto: alt.texto, correta: alt.correta, ordem: alt.ordem, comentario: alt.comentario ?? null,
+    }))
+    let { error: altError } = await supabase.from('simulado_alternativas').insert(rows)
+    // Tolerante: coluna `comentario` ausente → reinsere sem ela.
+    if (altError && /comentario|column/i.test(altError.message)) {
+      ;({ error: altError } = await supabase.from('simulado_alternativas').insert(rows.map(({ comentario: _c, ...r }) => r)))
+    }
     if (altError) {
       return { error: altError.message }
     }
@@ -342,7 +350,7 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
     .eq('id', id)
 
   // Tolerante: colunas novas (imagem_url/pontuacao_total/linhas/categoria_discursiva) ainda não migradas → atualiza sem elas.
-  if (error && /imagem_url|pontuacao_total|linhas|categoria_discursiva|column/i.test(error.message)) {
+  if (error && /imagem_url|pontuacao_total|linhas|categoria_discursiva|assunto_detalhe|column/i.test(error.message)) {
     ;({ error } = await supabase.from('simulado_questoes').update(semColunasNovas(fields)).eq('id', id))
   }
 
