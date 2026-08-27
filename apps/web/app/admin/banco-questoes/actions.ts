@@ -682,6 +682,15 @@ async function atualizarComentariosExistente(
   }
 }
 
+/** Nomes das etiquetas do tenant (leve, sem seed/contagem) — exemplo real no modelo de import. */
+export async function etiquetasDoSistema(): Promise<string[]> {
+  const g = await guard(); if (!g.ok) return []
+  const svc = createAdminClient()
+  let res = await svc.from('simulado_etiquetas').select('nome').eq('tenant_id', g.tenantId).eq('deletado', false).order('nome')
+  if (res.error) res = await svc.from('simulado_etiquetas').select('nome').eq('tenant_id', g.tenantId).order('nome')
+  return [...new Set(((res.data ?? []) as any[]).map((e) => e.nome).filter(Boolean))] as string[]
+}
+
 /** Lê o arquivo enviado e devolve a relação de questões, marcando as que já existem. */
 export async function analisarQuestoesImport(formData: FormData): Promise<AnaliseImport> {
   const g = await guard(); if (!g.ok) return { ok: false, error: g.error }

@@ -7,8 +7,7 @@ import { Button } from '@/components/ui/button'
 import { FileUp, Download, Loader2, Check, AlertTriangle, RefreshCw, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
-import { analisarQuestoesImport, confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
-import { listarEtiquetas } from '@/app/admin/etiquetas/actions'
+import { analisarQuestoesImport, confirmarImportQuestoes, etiquetasDoSistema } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 
 // ── DOIS modelos de importação, com colunas próprias por formato ─────────────
@@ -194,15 +193,18 @@ export function ImportarQuestoesTab({ bancoId = null, onDone }: { bancoId?: stri
 
   // Etiquetas do tenant → viram exemplo real na coluna Etiquetas do modelo baixado.
   useEffect(() => {
-    listarEtiquetas().then((r) => {
-      if (r.ok && r.itens) setEtiquetasSistema(r.itens.map((e) => e.nome).filter(Boolean))
-    }).catch(() => {})
+    etiquetasDoSistema().then((n) => setEtiquetasSistema(n)).catch(() => {})
   }, [])
 
   async function onBaixarModelo(formato: ModeloImport) {
     if (baixandoModelo) return
     setBaixandoModelo(formato)
-    try { await baixarModelo(formato, etiquetasSistema) } finally { setBaixandoModelo(null) }
+    try {
+      // Busca as etiquetas NA HORA (await) — evita gerar o modelo antes do fetch do mount terminar.
+      let etq = etiquetasSistema
+      if (!etq.length) { try { etq = await etiquetasDoSistema() } catch { etq = [] }; if (etq.length) setEtiquetasSistema(etq) }
+      await baixarModelo(formato, etq)
+    } finally { setBaixandoModelo(null) }
   }
 
   function onFile(f: File | null) {
