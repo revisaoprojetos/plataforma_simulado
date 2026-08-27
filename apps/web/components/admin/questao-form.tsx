@@ -1,18 +1,19 @@
 'use client'
 
-import { useForm, useFieldArray } from 'react-hook-form'
+import { useForm, useFieldArray, type UseFormRegisterReturn } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useReducer, useRef, useState, type ReactNode, type FocusEvent } from 'react'
+import { useEffect, useReducer, useRef, useState, type ReactNode, type FocusEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Loader2, Plus, Trash2, RefreshCw, ArrowLeft, Undo2, Check, ChevronDown,
-  Bold, Italic, List, Link2, Code, Image as ImageIcon, MessageSquare, Database,
+  Bold, Italic, List, Link2, Code, Image as ImageIcon, MessageSquare, Database, Eye, Pencil,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
+import { MarkdownContent } from '@/components/markdown-content'
 import { useOcultarDiscursiva } from '@/components/auth/can-provider'
 import { hospedarImagemQuestaoAction } from '@/app/admin/questoes/actions'
 
@@ -55,7 +56,7 @@ function aplicarMarkdown(ta: HTMLTextAreaElement | null, tipo: MdTipo) {
   requestAnimationFrame(() => ta.setSelectionRange(ini, fim))
 }
 
-function BarraMD({ onAplicar }: { onAplicar: (t: MdTipo) => void }) {
+function BarraMD({ onAplicar, preview, onTogglePreview }: { onAplicar: (t: MdTipo) => void; preview?: boolean; onTogglePreview?: () => void }) {
   const btns: [MdTipo, ReactNode, string][] = [
     ['bold', <Bold key="b" className="h-3.5 w-3.5" />, 'Negrito'],
     ['italic', <Italic key="i" className="h-3.5 w-3.5" />, 'Itálico'],
@@ -65,13 +66,57 @@ function BarraMD({ onAplicar }: { onAplicar: (t: MdTipo) => void }) {
   ]
   return (
     <div className="flex items-center gap-0.5">
-      {btns.map(([t, icon, title]) => (
+      {!preview && btns.map(([t, icon, title]) => (
         <button key={t} type="button" title={title} onMouseDown={(e) => e.preventDefault()} onClick={() => onAplicar(t)}
           className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
           {icon}
         </button>
       ))}
-      <span className="ml-1 hidden text-[11px] font-medium text-muted-foreground sm:inline">Markdown</span>
+      <span className="mx-1 hidden text-[11px] font-medium text-muted-foreground sm:inline">Markdown</span>
+      {onTogglePreview && (
+        <button type="button" onClick={onTogglePreview}
+          className={cn('inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors', preview ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>
+          {preview ? <><Pencil className="h-3.5 w-3.5" /> Editar</> : <><Eye className="h-3.5 w-3.5" /> Prévia</>}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Textarea que cresce com o conteúdo (sem barra de rolagem nem alça de resize). */
+function AutoTextarea({ reg, defaultValue, placeholder, className, onFocus, ariaInvalid }: {
+  reg: UseFormRegisterReturn
+  defaultValue?: string
+  placeholder?: string
+  className?: string
+  onFocus?: (e: FocusEvent<HTMLTextAreaElement>) => void
+  ariaInvalid?: boolean
+}) {
+  const localRef = useRef<HTMLTextAreaElement | null>(null)
+  const ajustar = () => { const el = localRef.current; if (!el) return; el.style.height = 'auto'; el.style.height = `${el.scrollHeight + 2}px` }
+  useEffect(() => { ajustar() }, [])
+  const { ref, onChange, ...rest } = reg
+  return (
+    <textarea
+      ref={(el) => { ref(el); localRef.current = el }}
+      defaultValue={defaultValue}
+      placeholder={placeholder}
+      aria-invalid={ariaInvalid}
+      rows={1}
+      onChange={(e) => { onChange(e); ajustar() }}
+      onFocus={onFocus}
+      className={cn('block w-full resize-none overflow-hidden rounded-lg border bg-background/50 px-3 py-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/60 focus:ring-1 focus:ring-primary/30', className)}
+      {...rest}
+    />
+  )
+}
+
+/** Prévia do markdown renderizado (usada quando o toggle Prévia está ligado). */
+function PreviaMD({ children, className }: { children?: string; className?: string }) {
+  const txt = (children ?? '').trim()
+  return (
+    <div className={cn('rounded-lg border bg-muted/20 px-3 py-2.5 text-sm', className)}>
+      {txt ? <MarkdownContent>{txt}</MarkdownContent> : <span className="text-muted-foreground">Nada para pré-visualizar.</span>}
     </div>
   )
 }
@@ -141,7 +186,6 @@ interface QuestaoFormProps {
 }
 
 const LETRA = ['A', 'B', 'C', 'D', 'E']
-const TA_CLS = 'w-full resize-y rounded-lg border bg-background/50 px-3 py-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/60 focus:ring-1 focus:ring-primary/30'
 
 /** Seção padrão da área (rótulo em maiúsculas + ação opcional à direita). */
 function Secao({ titulo, acao, children, className }: { titulo: string; acao?: ReactNode; children: ReactNode; className?: string }) {
@@ -194,6 +238,13 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
   const [, forcar] = useReducer((x: number) => x + 1, 0) // força re-render (reverte o <select> Tipo ao cancelar)
   const activeTa = useRef<HTMLTextAreaElement | null>(null)
   const focar = (e: FocusEvent<HTMLTextAreaElement>) => { activeTa.current = e.currentTarget }
+  const formRef = useRef<HTMLFormElement>(null)
+  // Prévia (markdown renderizado) por seção.
+  const [prevEnun, setPrevEnun] = useState(false)
+  const [prevAlts, setPrevAlts] = useState(false)
+  const [prevProf, setPrevProf] = useState(false)
+  // Reajusta a altura de todas as caixas (ex.: depois de Desfazer, quando os valores mudam sem digitar).
+  const reajustarCaixas = () => requestAnimationFrame(() => formRef.current?.querySelectorAll('textarea').forEach((t) => { t.style.height = 'auto'; t.style.height = `${t.scrollHeight + 2}px` }))
 
   const {
     register, handleSubmit, watch, setValue, control, reset,
@@ -303,7 +354,7 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
     }
   }
 
-  function desfazer() { reset(); toast.success('Alterações desfeitas.') }
+  function desfazer() { reset(); setPrevEnun(false); setPrevAlts(false); setPrevProf(false); reajustarCaixas(); toast.success('Alterações desfeitas.') }
 
   async function handleFormSubmit(data: QuestaoFormData) {
     setIsLoading(true)
@@ -319,7 +370,7 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
   return (
     // -m-6 cancela o p-6 do <main> → a top bar cola RENTE ao topo (sem margem negativa no
     // elemento sticky, que causava vão) e alinha com o cabeçalho da sidebar (h-14).
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="-m-6">
+    <form ref={formRef} onSubmit={handleSubmit(handleFormSubmit)} className="-m-6">
       <div className="sticky -top-6 z-30 flex h-14 items-center justify-between gap-3 border-b bg-background px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={() => history.back()} aria-label="Voltar" className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
@@ -349,15 +400,18 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
       <div className="grid gap-5 p-4 pt-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-5">
           {/* ENUNCIADO */}
-          <Secao titulo="Enunciado" acao={<BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} />}>
-            <textarea
-              rows={5}
-              className={cn(TA_CLS, 'min-h-[7rem]')}
-              placeholder="Digite o enunciado da questão… (selecione um trecho e use a barra para negrito, itálico, etc.)"
-              onFocus={focar}
-              {...register('enunciado')}
-              aria-invalid={!!errors.enunciado}
-            />
+          <Secao titulo="Enunciado" acao={<BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} preview={prevEnun} onTogglePreview={() => setPrevEnun((v) => !v)} />}>
+            {prevEnun ? (
+              <PreviaMD className="min-h-[7rem]">{watch('enunciado')}</PreviaMD>
+            ) : (
+              <AutoTextarea
+                reg={register('enunciado')}
+                className="min-h-[7rem]"
+                placeholder="Digite o enunciado da questão… (selecione um trecho e use a barra para negrito, itálico, etc.)"
+                onFocus={focar}
+                ariaInvalid={!!errors.enunciado}
+              />
+            )}
             {errors.enunciado && <p className="mt-1.5 text-sm text-destructive">{errors.enunciado.message}</p>}
 
             {/* Imagem de apoio */}
@@ -396,7 +450,7 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
 
           {/* ALTERNATIVAS (múltipla) ou GABARITO (certo/errado) */}
           {ehCE ? (
-            <Secao titulo="Gabarito — Certo / Errado" acao={<BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} />}>
+            <Secao titulo="Gabarito — Certo / Errado" acao={<BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} preview={prevAlts} onTogglePreview={() => setPrevAlts((v) => !v)} />}>
               <div className="space-y-3">
                 {fields.slice(0, 2).map((field, index) => {
                   const isCerto = index === 0
@@ -416,8 +470,12 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
                       </button>
                       <div className="flex items-start gap-2">
                         <MessageSquare className="mt-2.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                        <textarea rows={2} className={cn(TA_CLS, 'flex-1 text-[13px]')} placeholder="Comentário desta opção — por que a resposta é essa…" onFocus={focar}
-                          defaultValue={(field as { comentario?: string }).comentario ?? ''} {...register(`alternativas.${index}.comentario`)} />
+                        {prevAlts ? (
+                          <PreviaMD className="flex-1">{alternativas?.[index]?.comentario}</PreviaMD>
+                        ) : (
+                          <AutoTextarea reg={register(`alternativas.${index}.comentario`)} className="flex-1 text-[13px]" placeholder="Comentário desta opção — por que a resposta é essa…" onFocus={focar}
+                            defaultValue={(field as { comentario?: string }).comentario ?? ''} />
+                        )}
                       </div>
                     </div>
                   )
@@ -428,7 +486,7 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
             <Secao titulo="Alternativas" acao={
               <div className="flex items-center gap-3">
                 <span className="hidden text-xs text-muted-foreground sm:inline">clique na letra para marcar a correta</span>
-                <BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} />
+                <BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} preview={prevAlts} onTogglePreview={() => setPrevAlts((v) => !v)} />
               </div>
             }>
               <div className="space-y-3">
@@ -442,9 +500,13 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
                             correta ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:border-primary')}>
                           {LETRA[index] ?? index + 1}
                         </button>
-                        <textarea rows={2} className={cn(TA_CLS, 'flex-1')} placeholder={`Alternativa ${LETRA[index] ?? index + 1}`} onFocus={focar}
-                          defaultValue={(field as { texto?: string }).texto ?? ''} {...register(`alternativas.${index}.texto`)} />
-                        {fields.length > 2 && (
+                        {prevAlts ? (
+                          <PreviaMD className="flex-1">{alternativas?.[index]?.texto}</PreviaMD>
+                        ) : (
+                          <AutoTextarea reg={register(`alternativas.${index}.texto`)} className="flex-1" placeholder={`Alternativa ${LETRA[index] ?? index + 1}`} onFocus={focar}
+                            defaultValue={(field as { texto?: string }).texto ?? ''} />
+                        )}
+                        {fields.length > 2 && !prevAlts && (
                           <Button type="button" variant="ghost" size="icon-sm" className="mt-1 text-destructive hover:text-destructive" onClick={() => remove(index)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -452,8 +514,12 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
                       </div>
                       <div className="flex items-start gap-2 pl-11">
                         <MessageSquare className="mt-2.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                        <textarea rows={2} className={cn(TA_CLS, 'flex-1 text-[13px]')} placeholder="Comentário da alternativa — por que está certa/errada…" onFocus={focar}
-                          defaultValue={(field as { comentario?: string }).comentario ?? ''} {...register(`alternativas.${index}.comentario`)} />
+                        {prevAlts ? (
+                          <PreviaMD className="flex-1">{alternativas?.[index]?.comentario}</PreviaMD>
+                        ) : (
+                          <AutoTextarea reg={register(`alternativas.${index}.comentario`)} className="flex-1 text-[13px]" placeholder="Comentário da alternativa — por que está certa/errada…" onFocus={focar}
+                            defaultValue={(field as { comentario?: string }).comentario ?? ''} />
+                        )}
                       </div>
                       {correta && <p className="flex items-center gap-1.5 pl-11 text-xs font-medium text-emerald-600 dark:text-emerald-400"><Check className="h-3.5 w-3.5" /> Alternativa correta</p>}
                     </div>
@@ -487,8 +553,12 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
           )}
 
           {/* COMENTÁRIO DO PROFESSOR */}
-          <Secao titulo="Comentário do professor" acao={<BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} />}>
-            <textarea rows={4} className={TA_CLS} placeholder="Explicação geral da questão (gabarito comentado)…" onFocus={focar} {...register('comentario_professor')} />
+          <Secao titulo="Comentário do professor" acao={<BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} preview={prevProf} onTogglePreview={() => setPrevProf((v) => !v)} />}>
+            {prevProf ? (
+              <PreviaMD className="min-h-[5rem]">{watch('comentario_professor')}</PreviaMD>
+            ) : (
+              <AutoTextarea reg={register('comentario_professor')} className="min-h-[5rem]" placeholder="Explicação geral da questão (gabarito comentado)…" onFocus={focar} />
+            )}
             <p className="mt-2 text-xs text-muted-foreground">Exibido ao aluno depois de responder, junto com os comentários por alternativa.</p>
           </Secao>
         </div>
