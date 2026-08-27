@@ -3,21 +3,13 @@
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useState, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { useReducer, useRef, useState, type ReactNode, type FocusEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { MarkdownTextarea } from '@/components/admin/markdown-textarea'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, Plus, Trash2, ImagePlus, RefreshCw, Database, Search, Check, X, ChevronRight, Undo2, Save, ListChecks, CircleDot, ClipboardList } from 'lucide-react'
+  Loader2, Plus, Trash2, RefreshCw, ArrowLeft, Undo2, Check, ChevronDown,
+  Bold, Italic, List, Link2, Code, Image as ImageIcon, MessageSquare, Database,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
@@ -36,6 +28,52 @@ async function redimensionarImagem(file: File, max = 1600): Promise<string> {
   if (!ctx) throw new Error('canvas')
   ctx.drawImage(bitmap, 0, 0, w, h)
   return canvas.toDataURL('image/jpeg', 0.9)
+}
+
+// ── Markdown: barra única no cabeçalho que aplica no textarea EM FOCO ──────────
+type MdTipo = 'bold' | 'italic' | 'ul' | 'link' | 'code'
+function aplicarMarkdown(ta: HTMLTextAreaElement | null, tipo: MdTipo) {
+  if (!ta) return
+  const start = ta.selectionStart ?? 0, end = ta.selectionEnd ?? 0
+  const val = ta.value
+  const sel = val.slice(start, end)
+  let novo = val, ini = start, fim = end
+  const envolver = (mark: string, ph: string) => {
+    const txt = sel || ph
+    novo = val.slice(0, start) + mark + txt + mark + val.slice(end)
+    ini = start + mark.length; fim = ini + txt.length
+  }
+  if (tipo === 'bold') envolver('**', 'negrito')
+  else if (tipo === 'italic') envolver('*', 'itálico')
+  else if (tipo === 'code') envolver('`', 'código')
+  else if (tipo === 'link') { const txt = sel || 'texto'; novo = val.slice(0, start) + `[${txt}](https://)` + val.slice(end); ini = start + 1; fim = ini + txt.length }
+  else { const bloco = (sel || 'item').split('\n').map((l) => '- ' + l).join('\n'); novo = val.slice(0, start) + bloco + val.slice(end); ini = start; fim = start + bloco.length }
+  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+  setter?.call(ta, novo)
+  ta.dispatchEvent(new Event('input', { bubbles: true }))
+  ta.focus()
+  requestAnimationFrame(() => ta.setSelectionRange(ini, fim))
+}
+
+function BarraMD({ onAplicar }: { onAplicar: (t: MdTipo) => void }) {
+  const btns: [MdTipo, ReactNode, string][] = [
+    ['bold', <Bold key="b" className="h-3.5 w-3.5" />, 'Negrito'],
+    ['italic', <Italic key="i" className="h-3.5 w-3.5" />, 'Itálico'],
+    ['ul', <List key="l" className="h-3.5 w-3.5" />, 'Lista'],
+    ['link', <Link2 key="k" className="h-3.5 w-3.5" />, 'Link'],
+    ['code', <Code key="c" className="h-3.5 w-3.5" />, 'Código'],
+  ]
+  return (
+    <div className="flex items-center gap-0.5">
+      {btns.map(([t, icon, title]) => (
+        <button key={t} type="button" title={title} onMouseDown={(e) => e.preventDefault()} onClick={() => onAplicar(t)}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+          {icon}
+        </button>
+      ))}
+      <span className="ml-1 hidden text-[11px] font-medium text-muted-foreground sm:inline">Markdown</span>
+    </div>
+  )
 }
 
 const alternativaSchema = z.object({
@@ -67,7 +105,6 @@ const questaoSchema = z
     comentario_professor: z.string().optional(),
     status: z.enum(['rascunho', 'publicada', 'arquivada']),
     imagem_url: z.string().optional(),
-    // Discursiva — informativos ao aluno (não afetam a correção).
     pontuacao_total: z.coerce.number().min(0).optional(),
     linhas: z.coerce.number().int().min(0).optional(),
     categoria_discursiva: z.string().optional(),
@@ -85,37 +122,81 @@ const questaoSchema = z
         ctx.addIssue({ code: 'custom', path: ['alternativas'], message: 'Marque a alternativa correta.' })
       }
     }
-    // Discursiva: competências são OPCIONAIS. Sem elas, o backend cria uma "Nota"
-    // com a pontuação total da questão (a correção continua sendo por competência).
   })
 
 export type QuestaoFormData = z.infer<typeof questaoSchema>
 
 interface QuestaoFormProps {
   initialData?: Partial<QuestaoFormData>
-  /** Sugestões (nomes já cadastrados) para autocomplete — não são uma base fixa. */
+  /** Código da questão (ex.: Q-4.812) — mostrado na barra do topo (só na edição). */
+  codigo?: string
   bancasSugestoes?: string[]
   disciplinasSugestoes?: string[]
   assuntosSugestoes?: string[]
-  /** Bancos (pastas) disponíveis para armazenar a questão diretamente. */
-  bancos?: { id: string; nome: string }[]
+  /** Bancos (pastas) de destino + contagem de questões. */
+  bancos?: { id: string; nome: string; total?: number }[]
+  /** Conteúdo extra da barra lateral (ex.: seletor de etiquetas). */
+  sidebarExtra?: ReactNode
   onSubmit: (data: QuestaoFormData) => Promise<{ error?: string } | void>
 }
 
 const LETRA = ['A', 'B', 'C', 'D', 'E']
+const TA_CLS = 'w-full resize-y rounded-lg border bg-background/50 px-3 py-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/60 focus:ring-1 focus:ring-primary/30'
 
-export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSugestoes = [], assuntosSugestoes = [], bancos = [], onSubmit }: QuestaoFormProps) {
+/** Seção padrão da área (rótulo em maiúsculas + ação opcional à direita). */
+function Secao({ titulo, acao, children, className }: { titulo: string; acao?: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <section className={cn('rounded-2xl border bg-card p-4 shadow-sm sm:p-5', className)}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{titulo}</h2>
+        {acao}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+/** Rótulo curto de campo da sidebar. */
+function Campo({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+/** <select> nativo estilizado (chevron custom) — mesmo visual do mockup. */
+function SelectBox({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: ReactNode }) {
+  return (
+    <div className="relative">
+      <select value={value} onChange={(e) => onChange(e.target.value)}
+        className="h-10 w-full appearance-none rounded-lg border bg-background/50 px-3 pr-8 text-sm text-foreground outline-none transition-colors focus:border-primary/60 focus:ring-1 focus:ring-primary/30">
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    </div>
+  )
+}
+
+function StatusBadge({ status }: { status?: string }) {
+  const cfg = status === 'publicada'
+    ? { label: 'Ativa', cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' }
+    : status === 'arquivada'
+      ? { label: 'Arquivada', cls: 'bg-muted text-muted-foreground' }
+      : { label: 'Rascunho', cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' }
+  return <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', cfg.cls)}>{cfg.label}</span>
+}
+
+export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], disciplinasSugestoes = [], assuntosSugestoes = [], bancos = [], sidebarExtra, onSubmit }: QuestaoFormProps) {
   const ocultarDiscursiva = useOcultarDiscursiva()
   const [isLoading, setIsLoading] = useState(false)
-  const [bancoModal, setBancoModal] = useState(false)
+  const [, forcar] = useReducer((x: number) => x + 1, 0) // força re-render (reverte o <select> Tipo ao cancelar)
+  const activeTa = useRef<HTMLTextAreaElement | null>(null)
+  const focar = (e: FocusEvent<HTMLTextAreaElement>) => { activeTa.current = e.currentTarget }
 
   const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    control,
-    reset,
+    register, handleSubmit, watch, setValue, control, reset,
     formState: { errors, isDirty },
   } = useForm<QuestaoFormData>({
     resolver: zodResolver(questaoSchema),
@@ -136,40 +217,52 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
     },
   })
 
-  const { fields, append, remove, replace } = useFieldArray({
-    control,
-    name: 'alternativas',
-  })
-
-  const { fields: compFields, append: appendComp, remove: removeComp } = useFieldArray({
-    control,
-    name: 'competencias',
-  })
+  const { fields, append, remove, replace } = useFieldArray({ control, name: 'alternativas' })
+  const { fields: compFields, append: appendComp, remove: removeComp } = useFieldArray({ control, name: 'competencias' })
 
   const tipo = watch('tipo')
   const formato = watch('formato')
   const alternativas = watch('alternativas')
+  const status = watch('status')
+  const dificuldade = watch('nivel_dificuldade')
   const imagemUrl = watch('imagem_url')
+  const bancoSel = (watch('bancoIds') ?? [])[0] ?? ''
   const imgInputRef = useRef<HTMLInputElement>(null)
   const [uploadingImg, setUploadingImg] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
 
-  // Tipo unificado exibido no seletor: Múltipla escolha · Certo/Errado · Discursiva.
   const tipoUi: 'multipla' | 'certo_errado' | 'discursiva' =
     tipo === 'discursiva' ? 'discursiva' : formato === 'certo_errado' ? 'certo_errado' : 'multipla'
   const ehCE = tipo === 'objetiva' && formato === 'certo_errado'
 
-  const TIPO_LABEL: Record<'multipla' | 'certo_errado' | 'discursiva', string> = {
-    multipla: 'Múltipla escolha', certo_errado: 'Certo / Errado', discursiva: 'Discursiva',
+  const anoAtual = new Date().getFullYear()
+  const anos = Array.from({ length: anoAtual + 2 - 1999 }, (_, i) => anoAtual + 1 - i)
+  const bancasOpts = [...new Set([watch('banca'), ...bancasSugestoes].filter(Boolean) as string[])]
+  const discOpts = [...new Set([watch('disciplina'), ...disciplinasSugestoes].filter(Boolean) as string[])]
+  const bancoAtual = bancos.find((b) => b.id === bancoSel)
+
+  async function onImagemFile(file: File | null) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
+    setUploadingImg(true)
+    try {
+      const dataUri = await redimensionarImagem(file)
+      const r = await hospedarImagemQuestaoAction(dataUri)
+      if (!r.ok || !r.url) { toast.error(r.error ?? 'Falha ao enviar a imagem.'); return }
+      setValue('imagem_url', r.url, { shouldDirty: true })
+    } catch { toast.error('Falha ao processar a imagem.') } finally { setUploadingImg(false) }
   }
 
-  /** A questão já tem conteúdo (enunciado ou alguma alternativa preenchida)? */
+  function setCorreta(index: number) {
+    fields.forEach((_, i) => setValue(`alternativas.${i}.correta`, i === index, { shouldDirty: true }))
+  }
+
   function temConteudo(): boolean {
     const enun = (watch('enunciado') ?? '').trim()
     const alts = watch('alternativas') ?? []
     return enun.length > 0 || alts.some((a) => (a.texto ?? '').trim().length > 0 || (a.comentario ?? '').trim().length > 0)
   }
 
-  /** Troca o tipo — com pop-up de confirmação quando a questão já está montada. */
   async function mudarTipo(novo: 'multipla' | 'certo_errado' | 'discursiva') {
     if (novo === tipoUi) return
     if (temConteudo()) {
@@ -180,28 +273,23 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
           : 'As alternativas serão reorganizadas para o novo formato. Os comentários das duas primeiras são mantidos. Deseja continuar?',
         confirmar: 'Trocar tipo',
       })
-      if (!ok) return
+      if (!ok) { forcar(); return } // reverte o <select> ao valor atual
     }
     aplicarTipo(novo)
   }
 
   function aplicarTipo(novo: 'multipla' | 'certo_errado' | 'discursiva') {
-    if (novo === 'discursiva') {
-      setValue('tipo', 'discursiva', { shouldDirty: true })
-      return
-    }
+    if (novo === 'discursiva') { setValue('tipo', 'discursiva', { shouldDirty: true }); return }
     setValue('tipo', 'objetiva', { shouldDirty: true })
     setValue('formato', novo, { shouldDirty: true })
     const cur = watch('alternativas') ?? []
     if (novo === 'certo_errado') {
-      // 2 opções fixas Certo/Errado — mantém os comentários das 2 primeiras alternativas.
       const corretaIdx = cur.findIndex((a) => a.correta)
       replace([
         { texto: 'Certo', correta: corretaIdx <= 0, ordem: 0, comentario: cur[0]?.comentario ?? '' },
         { texto: 'Errado', correta: corretaIdx === 1, ordem: 1, comentario: cur[1]?.comentario ?? '' },
       ])
     } else {
-      // Múltipla escolha: se vinha de C/E (Certo/Errado), volta às 5 alternativas em branco.
       const eraCE = cur.length === 2 && /^certo$/i.test((cur[0]?.texto ?? '').trim()) && /^errado$/i.test((cur[1]?.texto ?? '').trim())
       if (eraCE) {
         replace([
@@ -215,164 +303,68 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
     }
   }
 
-  function desfazer() {
-    reset()
-    toast.success('Alterações desfeitas.')
-  }
-
-  async function onImagemFile(file: File | null) {
-    if (!file) return
-    if (!file.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
-    setUploadingImg(true)
-    try {
-      const dataUri = await redimensionarImagem(file)
-      const r = await hospedarImagemQuestaoAction(dataUri)
-      if (!r.ok || !r.url) { toast.error(r.error ?? 'Falha ao enviar a imagem.'); return }
-      setValue('imagem_url', r.url, { shouldDirty: true })
-    } catch {
-      toast.error('Falha ao processar a imagem.')
-    } finally {
-      setUploadingImg(false)
-    }
-  }
-
-  function setCorreta(index: number) {
-    fields.forEach((_, i) => {
-      setValue(`alternativas.${i}.correta`, i === index)
-    })
-  }
+  function desfazer() { reset(); toast.success('Alterações desfeitas.') }
 
   async function handleFormSubmit(data: QuestaoFormData) {
     setIsLoading(true)
     try {
       const result = await onSubmit(data)
-      if (result?.error) {
-        toast.error(result.error)
-      }
+      if (result?.error) toast.error(result.error)
     } catch (e) {
-      // redirect() em server action lança NEXT_REDIRECT — deixar o Next navegar.
-      if (e && typeof e === 'object' && 'digest' in e && String((e as { digest?: string }).digest).startsWith('NEXT_REDIRECT')) {
-        throw e
-      }
+      if (e && typeof e === 'object' && 'digest' in e && String((e as { digest?: string }).digest).startsWith('NEXT_REDIRECT')) throw e
       toast.error('Erro ao salvar questão')
-    } finally {
-      setIsLoading(false)
-    }
+    } finally { setIsLoading(false) }
   }
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
-      {/* Barra de ações — fica fixa no topo ao rolar (Desfazer · Cancelar · Salvar). */}
-      <div className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card/90 px-3 py-2.5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/70 sm:px-4">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-          {tipoUi === 'discursiva' ? <ClipboardList className="h-3.5 w-3.5" /> : tipoUi === 'certo_errado' ? <CircleDot className="h-3.5 w-3.5" /> : <ListChecks className="h-3.5 w-3.5" />}
-          {TIPO_LABEL[tipoUi]}
-          {isDirty && <span className="ml-1 rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">não salvo</span>}
-        </span>
+    <form onSubmit={handleSubmit(handleFormSubmit)}>
+      {/* Barra do topo — full-bleed (contra o p-6 do layout) e fixa ao rolar. */}
+      <div className="sticky top-0 z-30 -mx-6 -mt-6 mb-5 flex flex-wrap items-center justify-between gap-3 border-b bg-background/85 px-4 py-2.5 backdrop-blur sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <button type="button" onClick={() => history.back()} aria-label="Voltar" className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-base font-semibold leading-tight">{codigo ? 'Editar questão' : 'Nova questão'}</h1>
+              {codigo && <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">{codigo}</span>}
+              <StatusBadge status={status} />
+            </div>
+            <p className="text-xs text-muted-foreground">{isDirty ? 'Alterações não salvas' : 'Tudo salvo'}</p>
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={desfazer} disabled={!isDirty} title="Desfazer todas as alterações">
             <Undo2 className="mr-1.5 h-4 w-4" /> Desfazer
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => history.back()}>Cancelar</Button>
           <Button type="submit" size="sm" disabled={isLoading}>
-            {isLoading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />} Salvar
+            {isLoading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />} Salvar questão
           </Button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Informações da Questão</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-            <div key="tipo" className="space-y-2">
-              <Label>Tipo da questão</Label>
-              <Select value={tipoUi} onValueChange={(v) => mudarTipo(v as 'multipla' | 'certo_errado' | 'discursiva')}>
-                <SelectTrigger className="min-w-52">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="multipla">Múltipla escolha</SelectItem>
-                  <SelectItem value="certo_errado">Certo / Errado</SelectItem>
-                  {!ocultarDiscursiva && <SelectItem value="discursiva">Discursiva</SelectItem>}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Discursiva — categoria à direita do Tipo (mesma linha), mais larga p/ caber o texto. */}
-            {tipo === 'discursiva' && (
-              <div key="categoria" className="space-y-2 sm:shrink-0">
-                <Label>Categoria</Label>
-                <Select defaultValue={initialData?.categoria_discursiva ?? 'Questão discursiva'} onValueChange={(v) => setValue('categoria_discursiva', v as string)}>
-                  <SelectTrigger className="w-64 *:data-[slot=select-value]:line-clamp-none *:data-[slot=select-value]:whitespace-nowrap"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Questão discursiva">Questão discursiva</SelectItem>
-                    <SelectItem value="Peça judicial">Peça judicial</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div key="status" className="space-y-2 sm:ml-auto">
-              <Label>Status</Label>
-              <Select
-                defaultValue={initialData?.status ?? 'rascunho'}
-                onValueChange={(v) => setValue('status', v as QuestaoFormData['status'])}
-              >
-                <SelectTrigger className="min-w-44 capitalize">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="rascunho">Rascunho</SelectItem>
-                  <SelectItem value="publicada">Publicada</SelectItem>
-                  <SelectItem value="arquivada">Arquivada</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Discursiva — informativos ao aluno (nota + nº de linhas), inline. Não afetam a correção. */}
-          {tipo === 'discursiva' && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-muted/30 px-3 py-2.5 text-sm">
-              <div className="flex items-center gap-1.5">
-                <span className="font-medium">Nota:</span>
-                <Input type="number" step="0.5" min="0" placeholder="10" className="h-8 w-16 text-center" {...register('pontuacao_total')} />
-                <span className="text-muted-foreground">pontos</span>
-              </div>
-              <span className="text-muted-foreground/40">|</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-medium">Linhas:</span>
-                <span className="text-muted-foreground">máximo</span>
-                <Input type="number" step="1" min="0" placeholder="15" className="h-8 w-16 text-center" {...register('linhas')} />
-                <span className="text-muted-foreground">linhas</span>
-              </div>
-              <span className="ml-auto text-xs text-muted-foreground">só informativo — mostrado ao aluno</span>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="enunciado">Enunciado *</Label>
-            <MarkdownTextarea
-              id="enunciado"
-              placeholder="Digite o enunciado da questão... (selecione um trecho e use a barra para negrito, itálico, etc.)"
+      {/* Corpo — conteúdo à esquerda, edição/banco à direita. */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-5">
+          {/* ENUNCIADO */}
+          <Secao titulo="Enunciado" acao={<BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} />}>
+            <textarea
               rows={5}
+              className={cn(TA_CLS, 'min-h-[7rem]')}
+              placeholder="Digite o enunciado da questão… (selecione um trecho e use a barra para negrito, itálico, etc.)"
+              onFocus={focar}
               {...register('enunciado')}
               aria-invalid={!!errors.enunciado}
             />
-            {errors.enunciado && (
-              <p className="text-sm text-destructive">{errors.enunciado.message}</p>
-            )}
-          </div>
+            {errors.enunciado && <p className="mt-1.5 text-sm text-destructive">{errors.enunciado.message}</p>}
 
-          {/* Imagem da questão (opcional) — exibida na prova entre o enunciado e as alternativas. */}
-          <div className="space-y-2">
-            <Label>Imagem (opcional)</Label>
-            <p className="text-xs text-muted-foreground">Aparece na prova <strong>entre o enunciado e as alternativas</strong>. Só é exibida nas questões que têm imagem.</p>
+            {/* Imagem de apoio */}
+            <p className="mb-2 mt-4 text-xs text-muted-foreground">Imagem de apoio (opcional) — arraste ou clique para importar</p>
             <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onImagemFile(e.target.files?.[0] ?? null)} />
             {imagemUrl ? (
               <div className="space-y-2">
-                <div className="overflow-hidden rounded-lg border bg-muted/30 p-2">
+                <div className="overflow-hidden rounded-xl border bg-muted/30 p-2">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={imagemUrl} alt="Imagem da questão" className="mx-auto max-h-80 w-auto object-contain" />
                 </div>
@@ -386,404 +378,228 @@ export function QuestaoForm({ initialData, bancasSugestoes = [], disciplinasSuge
                 </div>
               </div>
             ) : (
-              <button type="button" onClick={() => imgInputRef.current?.click()} disabled={uploadingImg}
-                className="flex h-36 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:opacity-60">
-                {uploadingImg ? <Loader2 className="h-6 w-6 animate-spin" /> : <ImagePlus className="h-6 w-6" />}
-                <span className="text-sm font-medium">{uploadingImg ? 'Enviando…' : 'Adicionar imagem'}</span>
-              </button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Metadados</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="banca">Banca</Label>
-            <Input
-              id="banca"
-              list="bancas-sugestoes"
-              placeholder="Digite ou selecione"
-              {...register('banca')}
-            />
-            <datalist id="bancas-sugestoes">
-              {bancasSugestoes.map((nome) => (
-                <option key={nome} value={nome} />
-              ))}
-            </datalist>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="ano">Ano</Label>
-            <Input
-              id="ano"
-              type="number"
-              placeholder="Ex: 2024"
-              {...register('ano')}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="disciplina">Disciplina</Label>
-            <Input
-              id="disciplina"
-              list="disciplinas-sugestoes"
-              placeholder="Digite ou selecione"
-              {...register('disciplina')}
-            />
-            <datalist id="disciplinas-sugestoes">
-              {disciplinasSugestoes.map((nome) => (
-                <option key={nome} value={nome} />
-              ))}
-            </datalist>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="assunto">Assunto</Label>
-            <Input
-              id="assunto"
-              list="assuntos-sugestoes"
-              placeholder="Digite ou selecione"
-              {...register('assunto')}
-            />
-            <datalist id="assuntos-sugestoes">
-              {assuntosSugestoes.map((nome) => (
-                <option key={nome} value={nome} />
-              ))}
-            </datalist>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="assunto_detalhe">Assunto específico</Label>
-            <Input
-              id="assunto_detalhe"
-              placeholder="Detalhe do assunto (ex.: importado)"
-              {...register('assunto_detalhe')}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Dificuldade</Label>
-            <Select
-              defaultValue={initialData?.nivel_dificuldade ?? ''}
-              onValueChange={(v) => setValue('nivel_dificuldade', v as QuestaoFormData['nivel_dificuldade'])}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="facil">Fácil</SelectItem>
-                <SelectItem value="medio">Médio</SelectItem>
-                <SelectItem value="dificil">Difícil</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Tipo de Gabarito</Label>
-            <Select
-              defaultValue={initialData?.gabarito_tipo ?? 'oficial'}
-              onValueChange={(v) => setValue('gabarito_tipo', v as QuestaoFormData['gabarito_tipo'])}
-            >
-              <SelectTrigger className="capitalize">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="oficial">Oficial</SelectItem>
-                <SelectItem value="extraoficial">Extraoficial</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {bancos.length > 0 && (() => {
-        const selecionados = (watch('bancoIds') ?? []) as string[]
-        const sel = bancos.filter((b) => selecionados.includes(b.id))
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle>Banco(s) de destino</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Armazene esta questão diretamente em um ou mais bancos. Pode ficar em vários.
-              </p>
-            </CardHeader>
-            <CardContent>
-              {/* Card clicável → abre o pop-up de seleção. */}
-              <button
-                type="button"
-                onClick={() => setBancoModal(true)}
-                className="flex w-full items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 text-left transition-colors hover:border-primary hover:bg-muted/40"
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => { e.preventDefault(); setDragOver(false); onImagemFile(e.dataTransfer.files?.[0] ?? null) }}
+                onClick={() => imgInputRef.current?.click()}
+                className={cn('flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed py-10 text-center transition-colors',
+                  dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50')}
               >
-                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                  {sel.length === 0 ? (
-                    <span className="text-sm text-muted-foreground">Nenhum banco selecionado — clique para escolher</span>
-                  ) : (
-                    sel.map((b) => (
-                      <span key={b.id} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                        <Database className="h-3 w-3" /> {b.nome}
-                      </span>
-                    ))
-                  )}
-                </div>
-                <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-muted-foreground">
-                  {sel.length > 0 && <span className="tabular-nums">{sel.length}</span>}
-                  <ChevronRight className="h-4 w-4" />
-                </span>
-              </button>
-            </CardContent>
-          </Card>
-        )
-      })()}
-
-      {bancoModal && (
-        <SelecionarBancosModal
-          bancos={bancos}
-          selecionadosIniciais={(watch('bancoIds') ?? []) as string[]}
-          onClose={() => setBancoModal(false)}
-          onSalvar={(ids) => { setValue('bancoIds', ids, { shouldDirty: true }); setBancoModal(false) }}
-        />
-      )}
-
-      {/* CERTO / ERRADO — 2 opções fixas (Certo, Errado), marca a correta + comentário por opção. */}
-      {ehCE && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Gabarito — Certo / Errado</CardTitle>
-            <p className="text-sm text-muted-foreground">Marque a resposta correta. O comentário de cada opção entra no gabarito comentado.</p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {fields.slice(0, 2).map((field, index) => {
-              const isCerto = index === 0
-              const correta = !!alternativas?.[index]?.correta
-              return (
-                <div key={field.id} className="space-y-2 rounded-xl border bg-muted/20 p-3">
-                  {/* texto fixo (Certo/Errado) via input oculto — garante o valor no submit */}
-                  <input type="hidden" defaultValue={isCerto ? 'Certo' : 'Errado'} {...register(`alternativas.${index}.texto`)} />
-                  <button
-                    type="button"
-                    onClick={() => setCorreta(index)}
-                    className={cn('flex w-full items-center gap-3 rounded-lg border-2 px-3 py-2.5 text-left transition-colors',
-                      correta
-                        ? isCerto ? 'border-emerald-500 bg-emerald-500/10' : 'border-rose-500 bg-rose-500/10'
-                        : 'border-border hover:border-primary')}
-                  >
-                    <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors',
-                      correta
-                        ? isCerto ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-rose-600 bg-rose-600 text-white'
-                        : 'border-muted-foreground/40 text-muted-foreground')}>
-                      {correta ? <Check className="h-4 w-4" /> : isCerto ? 'C' : 'E'}
-                    </span>
-                    <span className="text-sm font-semibold">{isCerto ? 'Certo' : 'Errado'}</span>
-                    {correta && <span className="ml-auto text-xs font-medium text-muted-foreground">resposta correta</span>}
-                  </button>
-                  <div className="pl-9">
-                    <Label className="mb-1 block text-xs text-muted-foreground">Comentário desta opção (gabarito)</Label>
-                    <MarkdownTextarea
-                      previewInline
-                      placeholder="Por que a resposta é essa (opcional)"
-                      rows={2}
-                      defaultValue={(field as { comentario?: string }).comentario ?? ''}
-                      {...register(`alternativas.${index}.comentario`)}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* MÚLTIPLA ESCOLHA — alternativas A–E editáveis + comentário por alternativa. */}
-      {tipo === 'objetiva' && !ehCE && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Alternativas</CardTitle>
-            <p className="text-sm text-muted-foreground">Escreva as opções, marque a correta pela letra e, se quiser, comente cada uma.</p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {fields.map((field, index) => (
-              <div key={field.id} className="space-y-2 rounded-xl border bg-muted/20 p-3">
-                <div className="flex items-start gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setCorreta(index)}
-                    className={cn('mt-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors',
-                      alternativas?.[index]?.correta
-                        ? 'border-emerald-600 bg-emerald-600 text-white'
-                        : 'border-border text-muted-foreground hover:border-primary')}
-                    title="Marcar como correta"
-                  >
-                    {LETRA[index] ?? index + 1}
-                  </button>
-                  <MarkdownTextarea
-                    previewInline
-                    placeholder={`Alternativa ${LETRA[index] ?? index + 1}`}
-                    rows={2}
-                    className="flex-1"
-                    defaultValue={(field as { texto?: string }).texto ?? ''}
-                    {...register(`alternativas.${index}.texto`)}
-                  />
-                  {fields.length > 2 && (
-                    <Button type="button" variant="ghost" size="icon-sm" className="mt-2 text-destructive hover:text-destructive" onClick={() => remove(index)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-                <div className="pl-10">
-                  <Label className="mb-1 block text-xs text-muted-foreground">Comentário desta alternativa (gabarito)</Label>
-                  <MarkdownTextarea
-                    previewInline
-                    placeholder="Por que esta alternativa está correta/incorreta (opcional)"
-                    rows={2}
-                    defaultValue={(field as { comentario?: string }).comentario ?? ''}
-                    {...register(`alternativas.${index}.comentario`)}
-                  />
-                </div>
+                {uploadingImg ? <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /> : <ImageIcon className="h-8 w-8 text-muted-foreground" />}
+                <p className="text-sm text-muted-foreground">{uploadingImg ? 'Enviando…' : 'Solte a imagem da questão aqui'}</p>
+                {!uploadingImg && <p className="text-xs text-muted-foreground">ou <span className="font-medium text-primary underline">selecionar arquivo</span></p>}
               </div>
-            ))}
-
-            {fields.length < 5 && (
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ texto: '', correta: false, ordem: fields.length, comentario: '' })}>
-                <Plus className="mr-2 h-4 w-4" /> Adicionar alternativa
-              </Button>
             )}
-          </CardContent>
-        </Card>
-      )}
+          </Secao>
 
-      {tipo === 'discursiva' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Competências (critérios de correção) — opcional</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Opcional: detalhe os critérios e a pontuação máxima de cada um (o corretor dá nota por competência).
-              Se deixar em branco, a questão usa uma única nota igual à <strong>pontuação total</strong> acima.
-            </p>
-            {compFields.map((field, index) => (
-              <div key={field.id} className="flex items-start gap-3">
-                <Input
-                  placeholder={`Critério ${index + 1} (ex.: Domínio do tema)`}
-                  className="flex-1"
-                  {...register(`competencias.${index}.nome`)}
-                />
-                <div className="w-28 shrink-0">
-                  <Input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    placeholder="Pontos"
-                    {...register(`competencias.${index}.pontos`)}
-                  />
-                </div>
-                {compFields.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => removeComp(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
+          {/* ALTERNATIVAS (múltipla) ou GABARITO (certo/errado) */}
+          {ehCE ? (
+            <Secao titulo="Gabarito — Certo / Errado" acao={<BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} />}>
+              <div className="space-y-3">
+                {fields.slice(0, 2).map((field, index) => {
+                  const isCerto = index === 0
+                  const correta = !!alternativas?.[index]?.correta
+                  return (
+                    <div key={field.id} className={cn('space-y-2 rounded-xl border p-3 transition-colors', correta ? 'border-primary bg-primary/[0.04]' : 'bg-muted/20')}>
+                      <input type="hidden" defaultValue={isCerto ? 'Certo' : 'Errado'} {...register(`alternativas.${index}.texto`)} />
+                      <button type="button" onClick={() => setCorreta(index)}
+                        className={cn('flex w-full items-center gap-3 rounded-lg border-2 px-3 py-2.5 text-left transition-colors',
+                          correta ? isCerto ? 'border-emerald-500 bg-emerald-500/10' : 'border-rose-500 bg-rose-500/10' : 'border-border hover:border-primary')}>
+                        <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold',
+                          correta ? isCerto ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-rose-600 bg-rose-600 text-white' : 'border-muted-foreground/40 text-muted-foreground')}>
+                          {correta ? <Check className="h-4 w-4" /> : isCerto ? 'C' : 'E'}
+                        </span>
+                        <span className="text-sm font-semibold">{isCerto ? 'Certo' : 'Errado'}</span>
+                        {correta && <span className="ml-auto text-xs font-medium text-muted-foreground">resposta correta</span>}
+                      </button>
+                      <div className="flex items-start gap-2">
+                        <MessageSquare className="mt-2.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                        <textarea rows={2} className={cn(TA_CLS, 'flex-1 text-[13px]')} placeholder="Comentário desta opção — por que a resposta é essa…" onFocus={focar}
+                          defaultValue={(field as { comentario?: string }).comentario ?? ''} {...register(`alternativas.${index}.comentario`)} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </Secao>
+          ) : tipo === 'objetiva' ? (
+            <Secao titulo="Alternativas" acao={
+              <div className="flex items-center gap-3">
+                <span className="hidden text-xs text-muted-foreground sm:inline">clique na letra para marcar a correta</span>
+                <BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} />
+              </div>
+            }>
+              <div className="space-y-3">
+                {fields.map((field, index) => {
+                  const correta = !!alternativas?.[index]?.correta
+                  return (
+                    <div key={field.id} className={cn('space-y-2 rounded-xl border p-3 transition-colors', correta ? 'border-primary bg-primary/[0.04]' : 'bg-muted/20')}>
+                      <div className="flex items-start gap-3">
+                        <button type="button" onClick={() => setCorreta(index)} title="Marcar como correta"
+                          className={cn('mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition-colors',
+                            correta ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:border-primary')}>
+                          {LETRA[index] ?? index + 1}
+                        </button>
+                        <textarea rows={2} className={cn(TA_CLS, 'flex-1')} placeholder={`Alternativa ${LETRA[index] ?? index + 1}`} onFocus={focar}
+                          defaultValue={(field as { texto?: string }).texto ?? ''} {...register(`alternativas.${index}.texto`)} />
+                        {fields.length > 2 && (
+                          <Button type="button" variant="ghost" size="icon-sm" className="mt-1 text-destructive hover:text-destructive" onClick={() => remove(index)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="flex items-start gap-2 pl-11">
+                        <MessageSquare className="mt-2.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                        <textarea rows={2} className={cn(TA_CLS, 'flex-1 text-[13px]')} placeholder="Comentário da alternativa — por que está certa/errada…" onFocus={focar}
+                          defaultValue={(field as { comentario?: string }).comentario ?? ''} {...register(`alternativas.${index}.comentario`)} />
+                      </div>
+                      {correta && <p className="flex items-center gap-1.5 pl-11 text-xs font-medium text-emerald-600 dark:text-emerald-400"><Check className="h-3.5 w-3.5" /> Alternativa correta</p>}
+                    </div>
+                  )
+                })}
+                {fields.length < 5 && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => append({ texto: '', correta: false, ordem: fields.length, comentario: '' })}>
+                    <Plus className="mr-2 h-4 w-4" /> Adicionar alternativa
                   </Button>
                 )}
               </div>
-            ))}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => appendComp({ nome: '', pontos: 1, ordem: compFields.length })}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Adicionar competência
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Comentário do Professor</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <MarkdownTextarea
-            placeholder="Adicione um comentário ou resolução para esta questão..."
-            rows={4}
-            {...register('comentario_professor')}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Ações ficam na barra fixa do topo (Desfazer · Cancelar · Salvar). */}
-    </form>
-  )
-}
-
-/** Pop-up de seleção dos bancos de destino: busca + lista com marcação, confirma no "Salvar". */
-function SelecionarBancosModal({ bancos, selecionadosIniciais, onClose, onSalvar }: {
-  bancos: { id: string; nome: string }[]
-  selecionadosIniciais: string[]
-  onClose: () => void
-  onSalvar: (ids: string[]) => void
-}) {
-  const [sel, setSel] = useState<Set<string>>(() => new Set(selecionadosIniciais))
-  const [q, setQ] = useState('')
-  const termo = q.trim().toLowerCase()
-  const lista = termo ? bancos.filter((b) => b.nome.toLowerCase().includes(termo)) : bancos
-  const toggle = (id: string) => setSel((prev) => {
-    const n = new Set(prev)
-    if (n.has(id)) n.delete(id); else n.add(id)
-    return n
-  })
-
-  return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
-      <div role="dialog" aria-modal="true" className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
-        <div className="flex items-center justify-between border-b px-5 py-3">
-          <h3 className="flex items-center gap-2 text-sm font-semibold"><Database className="h-4 w-4" /> Banco(s) de destino</h3>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="border-b p-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar banco…" className="pl-9" autoFocus />
-          </div>
-        </div>
-        <div className="min-h-0 flex-1 space-y-1.5 overflow-auto p-3">
-          {lista.length === 0 ? (
-            <p className="px-1 py-6 text-center text-sm text-muted-foreground">Nenhum banco encontrado.</p>
+            </Secao>
           ) : (
-            lista.map((b) => {
-              const ativo = sel.has(b.id)
-              return (
-                <button key={b.id} type="button" onClick={() => toggle(b.id)}
-                  className={cn('flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', ativo ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
-                  <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-md border', ativo ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
-                    {ativo && <Check className="h-3.5 w-3.5" />}
-                  </span>
-                  <Database className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{b.nome}</span>
-                </button>
-              )
-            })
+            <Secao titulo="Competências (critérios de correção) — opcional">
+              <p className="mb-3 text-sm text-muted-foreground">Detalhe os critérios e a pontuação máxima de cada um. Em branco = uma única nota igual à pontuação total.</p>
+              <div className="space-y-3">
+                {compFields.map((field, index) => (
+                  <div key={field.id} className="flex items-start gap-3">
+                    <Input placeholder={`Critério ${index + 1} (ex.: Domínio do tema)`} className="flex-1" {...register(`competencias.${index}.nome`)} />
+                    <div className="w-28 shrink-0"><Input type="number" step="0.5" min="0" placeholder="Pontos" {...register(`competencias.${index}.pontos`)} /></div>
+                    {compFields.length > 1 && (
+                      <Button type="button" variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive" onClick={() => removeComp(index)}><Trash2 className="h-4 w-4" /></Button>
+                    )}
+                  </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={() => appendComp({ nome: '', pontos: 1, ordem: compFields.length })}>
+                  <Plus className="mr-2 h-4 w-4" /> Adicionar competência
+                </Button>
+              </div>
+            </Secao>
           )}
+
+          {/* COMENTÁRIO DO PROFESSOR */}
+          <Secao titulo="Comentário do professor" acao={<BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} />}>
+            <textarea rows={4} className={TA_CLS} placeholder="Explicação geral da questão (gabarito comentado)…" onFocus={focar} {...register('comentario_professor')} />
+            <p className="mt-2 text-xs text-muted-foreground">Exibido ao aluno depois de responder, junto com os comentários por alternativa.</p>
+          </Secao>
         </div>
-        <div className="flex items-center justify-between gap-2 border-t px-5 py-3">
-          <span className="text-xs text-muted-foreground">{sel.size} selecionado(s)</span>
-          <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
-            <button type="button" onClick={() => onSalvar([...sel])} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90">Salvar</button>
-          </div>
-        </div>
+
+        {/* SIDEBAR — Edição + Banco + extra (etiquetas) */}
+        <aside className="space-y-5 lg:sticky lg:top-20 lg:self-start">
+          <Secao titulo="Edição">
+            <div className="space-y-3.5">
+              <Campo label="Tipo">
+                <SelectBox value={tipoUi} onChange={(v) => mudarTipo(v as 'multipla' | 'certo_errado' | 'discursiva')}>
+                  <option value="multipla">Múltipla escolha</option>
+                  <option value="certo_errado">Certo / Errado</option>
+                  {!ocultarDiscursiva && <option value="discursiva">Discursiva</option>}
+                </SelectBox>
+              </Campo>
+
+              {tipo === 'discursiva' && (
+                <>
+                  <Campo label="Categoria">
+                    <SelectBox value={watch('categoria_discursiva') ?? 'Questão discursiva'} onChange={(v) => setValue('categoria_discursiva', v, { shouldDirty: true })}>
+                      <option value="Questão discursiva">Questão discursiva</option>
+                      <option value="Peça judicial">Peça judicial</option>
+                    </SelectBox>
+                  </Campo>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Campo label="Nota (pontos)"><Input type="number" step="0.5" min="0" placeholder="10" {...register('pontuacao_total')} /></Campo>
+                    <Campo label="Linhas (máx.)"><Input type="number" step="1" min="0" placeholder="15" {...register('linhas')} /></Campo>
+                  </div>
+                </>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <Campo label="Banca">
+                  <SelectBox value={watch('banca') ?? ''} onChange={(v) => setValue('banca', v, { shouldDirty: true })}>
+                    <option value="">—</option>
+                    {bancasOpts.map((n) => <option key={n} value={n}>{n}</option>)}
+                  </SelectBox>
+                </Campo>
+                <Campo label="Ano">
+                  <SelectBox value={String(watch('ano') ?? '')} onChange={(v) => setValue('ano', v ? Number(v) : undefined, { shouldDirty: true })}>
+                    <option value="">—</option>
+                    {anos.map((y) => <option key={y} value={y}>{y}</option>)}
+                  </SelectBox>
+                </Campo>
+              </div>
+
+              <Campo label="Disciplina">
+                <SelectBox value={watch('disciplina') ?? ''} onChange={(v) => setValue('disciplina', v, { shouldDirty: true })}>
+                  <option value="">—</option>
+                  {discOpts.map((n) => <option key={n} value={n}>{n}</option>)}
+                </SelectBox>
+              </Campo>
+
+              <Campo label="Assunto">
+                <Input list="assuntos-sugestoes" placeholder="Digite ou selecione" {...register('assunto')} />
+                <datalist id="assuntos-sugestoes">{assuntosSugestoes.map((n) => <option key={n} value={n} />)}</datalist>
+              </Campo>
+
+              <Campo label="Assunto específico">
+                <Input placeholder="Detalhe do assunto (ex.: importado)" {...register('assunto_detalhe')} />
+              </Campo>
+
+              <Campo label="Dificuldade">
+                <div className="flex gap-2">
+                  {([['facil', 'Fácil'], ['medio', 'Média'], ['dificil', 'Difícil']] as const).map(([v, label]) => (
+                    <button key={v} type="button" onClick={() => setValue('nivel_dificuldade', v, { shouldDirty: true })}
+                      className={cn('flex-1 rounded-lg border px-2 py-1.5 text-sm font-medium transition-colors',
+                        dificuldade === v ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:border-primary/50')}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </Campo>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Campo label="Gabarito">
+                  <SelectBox value={watch('gabarito_tipo') ?? 'oficial'} onChange={(v) => setValue('gabarito_tipo', v as 'oficial' | 'extraoficial', { shouldDirty: true })}>
+                    <option value="oficial">Oficial</option>
+                    <option value="extraoficial">Extraoficial</option>
+                  </SelectBox>
+                </Campo>
+                <Campo label="Status">
+                  <SelectBox value={status ?? 'rascunho'} onChange={(v) => setValue('status', v as QuestaoFormData['status'], { shouldDirty: true })}>
+                    <option value="rascunho">Rascunho</option>
+                    <option value="publicada">Publicada</option>
+                    <option value="arquivada">Arquivada</option>
+                  </SelectBox>
+                </Campo>
+              </div>
+            </div>
+          </Secao>
+
+          {bancos.length > 0 && (
+            <Secao titulo="Banco">
+              <Campo label="Banco selecionado">
+                <SelectBox value={bancoSel} onChange={(v) => setValue('bancoIds', v ? [v] : [], { shouldDirty: true })}>
+                  <option value="">Nenhum</option>
+                  {bancos.map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}
+                </SelectBox>
+              </Campo>
+              {bancoAtual && typeof bancoAtual.total === 'number' && (
+                <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Database className="h-3.5 w-3.5" />
+                  {bancoAtual.total.toLocaleString('pt-BR')} questões neste banco
+                </p>
+              )}
+            </Secao>
+          )}
+
+          {sidebarExtra}
+        </aside>
       </div>
-    </div>,
-    document.body,
+    </form>
   )
 }

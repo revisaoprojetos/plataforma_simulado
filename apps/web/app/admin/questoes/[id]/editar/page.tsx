@@ -1,12 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { QuestaoForm } from '@/components/admin/questao-form'
 import { EtiquetaPicker } from '@/components/admin/etiqueta-picker'
 import { etiquetasDaQuestao } from '@/app/admin/etiquetas/actions'
+import { codigoQuestao } from '@/lib/codigo-questao'
 import { updateQuestaoAction } from '../../actions'
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -28,6 +28,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
     { data: alternativas },
     { data: bancosDestino },
     { data: vinculos },
+    vincAll,
   ] = await Promise.all([
     admin
       .from('simulado_questoes')
@@ -46,6 +47,8 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
       .order('ordem'),
     admin.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? NADA).order('nome'),
     admin.from('simulado_questao_pasta').select('pasta_id').eq('questao_id', id).eq('tenant_id', tenantId ?? NADA),
+    // Contagem de questões por banco (para o "X questões neste banco" da sidebar).
+    fetchAll<{ pasta_id: string }>(() => admin.from('simulado_questao_pasta').select('pasta_id').eq('tenant_id', tenantId ?? NADA)),
   ])
 
   if (!questao) {
@@ -57,6 +60,12 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
   const assuntosSugestoes = [...new Set((assuntosLista ?? []).map((a: { nome: string }) => a.nome).filter(Boolean))]
   const bancoIds = (vinculos ?? []).map((v: { pasta_id: string }) => v.pasta_id)
   const et = await etiquetasDaQuestao(id)
+
+  const countPorBanco = new Map<string, number>()
+  for (const v of vincAll) countPorBanco.set(v.pasta_id, (countPorBanco.get(v.pasta_id) ?? 0) + 1)
+  const bancos = (bancosDestino ?? []).map((b: { id: string; nome: string }) => ({ id: b.id, nome: b.nome, total: countPorBanco.get(b.id) ?? 0 }))
+
+  const statusAtual = (questao.status ?? 'rascunho') as 'rascunho' | 'publicada' | 'arquivada'
 
   const initialData = {
     tipo: questao.tipo as 'objetiva' | 'discursiva',
@@ -70,7 +79,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
     nivel_dificuldade: (questao.nivel_dificuldade ?? undefined) as 'facil' | 'medio' | 'dificil' | undefined,
     gabarito_tipo: (questao.gabarito_tipo ?? undefined) as 'oficial' | 'extraoficial' | undefined,
     comentario_professor: questao.comentario_professor ?? undefined,
-    status: (questao.status ?? 'rascunho') as 'rascunho' | 'publicada' | 'arquivada',
+    status: statusAtual,
     imagem_url: (questao.imagem_url as string | null) ?? undefined,
     pontuacao_total: (questao.pontuacao_total as number | null) ?? undefined,
     linhas: (questao.linhas as number | null) ?? undefined,
@@ -85,29 +94,15 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          href="/admin/questoes"
-          className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Voltar para Questões
-        </Link>
-        <h1 className="text-2xl font-bold tracking-tight">Editar Questão</h1>
-        <p className="text-sm text-muted-foreground font-mono">{id}</p>
-      </div>
-
-      <EtiquetaPicker questaoId={id} todas={et.todas ?? []} ativasIniciais={et.ativas ?? []} />
-
-      <QuestaoForm
-        initialData={initialData}
-        bancasSugestoes={bancasSugestoes}
-        disciplinasSugestoes={disciplinasSugestoes}
-        assuntosSugestoes={assuntosSugestoes}
-        bancos={bancosDestino ?? []}
-        onSubmit={updateQuestaoAction.bind(null, id)}
-      />
-    </div>
+    <QuestaoForm
+      initialData={initialData}
+      codigo={codigoQuestao(id, (questao as { codigo?: string | null }).codigo)}
+      bancasSugestoes={bancasSugestoes}
+      disciplinasSugestoes={disciplinasSugestoes}
+      assuntosSugestoes={assuntosSugestoes}
+      bancos={bancos}
+      onSubmit={updateQuestaoAction.bind(null, id)}
+      sidebarExtra={<EtiquetaPicker questaoId={id} todas={et.todas ?? []} ativasIniciais={et.ativas ?? []} />}
+    />
   )
 }
