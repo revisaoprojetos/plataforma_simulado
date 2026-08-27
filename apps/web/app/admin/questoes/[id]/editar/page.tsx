@@ -45,7 +45,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
       .eq('questao_id', id)
       .eq('tenant_id', tenantId ?? NADA)
       .order('ordem'),
-    admin.from('simulado_pastas').select('id, nome').eq('deletado', false).eq('tenant_id', tenantId ?? NADA).order('nome'),
+    admin.from('simulado_pastas').select('id, nome, cor, icone, capa_url, capa_card_url').eq('deletado', false).eq('tenant_id', tenantId ?? NADA).order('nome'),
     admin.from('simulado_questao_pasta').select('pasta_id').eq('questao_id', id).eq('tenant_id', tenantId ?? NADA),
     // Contagem de questões por banco (para o "X questões neste banco" da sidebar).
     fetchAll<{ pasta_id: string }>(() => admin.from('simulado_questao_pasta').select('pasta_id').eq('tenant_id', tenantId ?? NADA)),
@@ -63,7 +63,14 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
 
   const countPorBanco = new Map<string, number>()
   for (const v of vincAll) countPorBanco.set(v.pasta_id, (countPorBanco.get(v.pasta_id) ?? 0) + 1)
-  const bancos = (bancosDestino ?? []).map((b: { id: string; nome: string }) => ({ id: b.id, nome: b.nome, total: countPorBanco.get(b.id) ?? 0 }))
+  const bancos = (bancosDestino ?? []).map((b: { id: string; nome: string; cor?: string | null; icone?: string | null; capa_url?: string | null; capa_card_url?: string | null }) => ({
+    id: b.id,
+    nome: b.nome,
+    total: countPorBanco.get(b.id) ?? 0,
+    cor: b.cor ?? null,
+    icone: b.icone ?? null,
+    capa: (b.capa_card_url ?? b.capa_url) ?? null,
+  }))
 
   const statusAtual = (questao.status ?? 'rascunho') as 'rascunho' | 'publicada' | 'arquivada'
 

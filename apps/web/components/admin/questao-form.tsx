@@ -4,16 +4,18 @@ import { useForm, useFieldArray, type UseFormRegisterReturn } from 'react-hook-f
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useEffect, useReducer, useRef, useState, type ReactNode, type FocusEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Loader2, Plus, Trash2, RefreshCw, ArrowLeft, Undo2, Check, ChevronDown,
-  Bold, Italic, List, Link2, Code, Image as ImageIcon, MessageSquare, Database, Eye, Pencil,
+  Bold, Italic, List, Link2, Code, Image as ImageIcon, MessageSquare, Database, Eye, Pencil, X, Search,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { MarkdownContent } from '@/components/markdown-content'
+import { useUnsavedGuard, confirmarDescartarAlteracoes } from '@/components/admin/use-unsaved-guard'
 import { useOcultarDiscursiva } from '@/components/auth/can-provider'
 import { hospedarImagemQuestaoAction } from '@/app/admin/questoes/actions'
 
@@ -181,8 +183,8 @@ interface QuestaoFormProps {
   bancasSugestoes?: string[]
   disciplinasSugestoes?: string[]
   assuntosSugestoes?: string[]
-  /** Bancos (pastas) de destino + contagem de questões. */
-  bancos?: { id: string; nome: string; total?: number }[]
+  /** Bancos (pastas) de destino + contagem de questões + capa/cor para os pôsteres. */
+  bancos?: BancoOpt[]
   /** Conteúdo extra da barra lateral (ex.: seletor de etiquetas). */
   sidebarExtra?: ReactNode
   onSubmit: (data: QuestaoFormData) => Promise<{ error?: string } | void>
@@ -213,16 +215,149 @@ function Campo({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-/** <select> nativo estilizado (chevron custom) — mesmo visual do mockup. */
-function SelectBox({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: ReactNode }) {
+type Opt = { value: string; label: string; disabled?: boolean }
+
+/**
+ * Dropdown custom (substitui o <select> nativo) — menu estilizado com os tokens do tema,
+ * check na opção ativa, fecha ao clicar fora / Esc. Mesmo visual do gatilho do mockup.
+ */
+function SelectMenu({ value, onChange, options, placeholder, ariaLabel }: {
+  value: string
+  onChange: (v: string) => void
+  options: Opt[]
+  placeholder?: string
+  ariaLabel?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const atual = options.find((o) => o.value === value)
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('pointerdown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('pointerdown', onDoc); document.removeEventListener('keydown', onKey) }
+  }, [open])
   return (
-    <div className="relative">
-      <select value={value} onChange={(e) => onChange(e.target.value)}
-        className="h-10 w-full appearance-none rounded-lg border bg-background/50 px-3 pr-8 text-sm text-foreground outline-none transition-colors focus:border-primary/60 focus:ring-1 focus:ring-primary/30">
-        {children}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="listbox" aria-expanded={open} aria-label={ariaLabel}
+        className={cn('flex h-10 w-full items-center justify-between gap-2 rounded-lg border bg-background/50 px-3 text-left text-sm outline-none transition-colors hover:border-primary/40 focus-visible:border-primary/60 focus-visible:ring-1 focus-visible:ring-primary/30',
+          open && 'border-primary/60 ring-1 ring-primary/30')}>
+        <span className={cn('truncate', atual?.value ? 'text-foreground' : 'text-muted-foreground')}>{atual?.label ?? placeholder ?? '—'}</span>
+        <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div role="listbox" className="absolute left-0 right-0 top-[calc(100%+4px)] z-40 max-h-60 overflow-auto rounded-xl border bg-popover p-1 shadow-lg">
+          {options.map((o) => {
+            const sel = o.value === value
+            return (
+              <button key={o.value || '__vazio'} type="button" role="option" aria-selected={sel} disabled={o.disabled}
+                onClick={() => { onChange(o.value); setOpen(false) }}
+                className={cn('flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors disabled:pointer-events-none disabled:opacity-40',
+                  sel ? 'bg-primary/10 font-medium text-primary' : 'text-foreground hover:bg-muted')}>
+                <span className="truncate">{o.label}</span>
+                {sel && <Check className="h-4 w-4 shrink-0" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
+  )
+}
+
+type BancoOpt = { id: string; nome: string; total?: number; cor?: string | null; icone?: string | null; capa?: string | null }
+
+/** Miniatura pôster do banco (capa ou degradê da cor) — usada no gatilho da sidebar. */
+function PosterMini({ banco }: { banco: BancoOpt }) {
+  const c = banco.cor ?? '#6d28d9'
+  return (
+    <span className="relative h-12 w-10 shrink-0 overflow-hidden rounded-lg border">
+      {banco.capa ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={banco.capa} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      ) : (
+        <span className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
+      )}
+    </span>
+  )
+}
+
+/** Card pôster selecionável dentro do modal de escolha do banco. */
+function PosterEscolha({ banco, ativo, onClick, nenhum }: { banco?: BancoOpt; ativo: boolean; onClick: () => void; nenhum?: boolean }) {
+  const c = banco?.cor ?? '#6d28d9'
+  return (
+    <button type="button" onClick={onClick}
+      className={cn('group relative aspect-[4/5] overflow-hidden rounded-xl border text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md',
+        ativo && 'ring-2 ring-primary ring-offset-2 ring-offset-card')}>
+      {nenhum ? (
+        <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-muted/40 text-muted-foreground">
+          <Database className="h-6 w-6" /><span className="text-xs font-medium">Nenhum</span>
+        </span>
+      ) : banco?.capa ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={banco.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+      ) : (
+        <span className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
+      )}
+      {!nenhum && (
+        <>
+          <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+          <span className="absolute inset-x-0 bottom-0 p-2">
+            <span className="line-clamp-2 text-xs font-bold leading-tight text-white drop-shadow-sm">{banco!.nome}</span>
+            {typeof banco!.total === 'number' && <span className="mt-1 block text-[10px] text-white/80">{banco!.total.toLocaleString('pt-BR')} questões</span>}
+          </span>
+        </>
+      )}
+      {ativo && <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow"><Check className="h-3 w-3" /></span>}
+    </button>
+  )
+}
+
+/** Modal de seleção do banco (grade de pôsteres com capa + nome + botão Salvar). */
+function BancoModal({ bancos, selecionadoId, onSalvar, onClose }: {
+  bancos: BancoOpt[]
+  selecionadoId: string
+  onSalvar: (id: string) => void
+  onClose: () => void
+}) {
+  const [sel, setSel] = useState(selecionadoId)
+  const [busca, setBusca] = useState('')
+  const q = busca.trim().toLowerCase()
+  const filtrados = q ? bancos.filter((b) => b.nome.toLowerCase().includes(q)) : bancos
+  const nomeSel = bancos.find((b) => b.id === sel)?.nome
+  return createPortal(
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div role="dialog" aria-modal="true" className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+        <div className="flex items-center justify-between gap-3 border-b px-5 py-3.5">
+          <h3 className="flex items-center gap-2 text-sm font-semibold"><Database className="h-4 w-4" /> Selecionar banco</h3>
+          <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="border-b px-5 py-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar banco…" className="pl-8" />
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            <PosterEscolha nenhum ativo={sel === ''} onClick={() => setSel('')} />
+            {filtrados.map((b) => <PosterEscolha key={b.id} banco={b} ativo={sel === b.id} onClick={() => setSel(b.id)} />)}
+          </div>
+          {filtrados.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Nenhum banco encontrado.</p>}
+        </div>
+        <div className="flex items-center justify-between gap-2 border-t px-5 py-3.5">
+          <p className="truncate text-xs text-muted-foreground">{sel ? nomeSel : 'Nenhum banco'}</p>
+          <div className="flex shrink-0 gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
+            <Button type="button" size="sm" onClick={() => onSalvar(sel)}><Check className="mr-1.5 h-4 w-4" /> Salvar</Button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -248,6 +383,8 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
   const [prevProf, setPrevProf] = useState(false)
   // Reajusta a altura de todas as caixas (ex.: depois de Desfazer, quando os valores mudam sem digitar).
   const reajustarCaixas = () => requestAnimationFrame(() => formRef.current?.querySelectorAll('textarea').forEach((t) => { t.style.height = 'auto'; t.style.height = `${t.scrollHeight + 2}px` }))
+
+  const [bancoModal, setBancoModal] = useState(false)
 
   const {
     register, handleSubmit, watch, setValue, control, reset,
@@ -359,6 +496,11 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
 
   function desfazer() { reset(); setPrevEnun(false); setPrevAlts(false); setPrevProf(false); reajustarCaixas(); toast.success('Alterações desfeitas.') }
 
+  // Guarda edições não salvas (F5/fechar aba + navegação por link do menu → pop-up de confirmação).
+  useUnsavedGuard(isDirty)
+  // Saídas que não passam por um <a> (voltar/cancelar): confirma descartar antes de sair.
+  async function sair() { if (await confirmarDescartarAlteracoes()) history.back() }
+
   async function handleFormSubmit(data: QuestaoFormData) {
     setIsLoading(true)
     try {
@@ -376,23 +518,25 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
     <form ref={formRef} onSubmit={handleSubmit(handleFormSubmit)} className="-m-6">
       <div className="sticky -top-6 z-30 flex h-14 items-center justify-between gap-3 border-b bg-background px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <button type="button" onClick={() => history.back()} aria-label="Voltar" className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+          <button type="button" onClick={sair} aria-label="Voltar" className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-base font-semibold leading-tight">{codigo ? 'Editar questão' : 'Nova questão'}</h1>
-              {codigo && <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">{codigo}</span>}
-              <StatusBadge status={status} />
-            </div>
-            <p className="text-xs text-muted-foreground">{isDirty ? 'Alterações não salvas' : 'Tudo salvo'}</p>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h1 className="text-base font-semibold leading-tight">{codigo ? 'Editar questão' : 'Nova questão'}</h1>
+            {codigo && <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">{codigo}</span>}
+            <StatusBadge status={status} />
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Status de salvamento — mesmo padrão da área de gamificação (ponto + rótulo). */}
+          <span className={cn('mr-0.5 hidden items-center gap-1.5 text-xs font-medium sm:inline-flex', isDirty ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400')}>
+            <span className={cn('h-1.5 w-1.5 rounded-full', isDirty ? 'bg-amber-500' : 'bg-emerald-500')} />
+            {isDirty ? 'Não salvo' : 'Salvo'}
+          </span>
           <Button type="button" variant="ghost" size="sm" onClick={desfazer} disabled={!isDirty} title="Desfazer todas as alterações">
             <Undo2 className="mr-1.5 h-4 w-4" /> Desfazer
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => history.back()}>Cancelar</Button>
+          <Button type="button" variant="outline" size="sm" onClick={sair}>Cancelar</Button>
           <Button type="submit" size="sm" disabled={isLoading}>
             {isLoading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />} Salvar questão
           </Button>
@@ -566,20 +710,20 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
           <Secao titulo="Edição">
             <div className="space-y-3.5">
               <Campo label="Tipo">
-                <SelectBox value={tipoUi} onChange={(v) => mudarTipo(v as 'multipla' | 'certo_errado' | 'discursiva')}>
-                  <option value="multipla">Múltipla escolha</option>
-                  <option value="certo_errado">Certo / Errado</option>
-                  {!ocultarDiscursiva && <option value="discursiva">Discursiva</option>}
-                </SelectBox>
+                <SelectMenu value={tipoUi} ariaLabel="Tipo" onChange={(v) => mudarTipo(v as 'multipla' | 'certo_errado' | 'discursiva')}
+                  options={[
+                    { value: 'multipla', label: 'Múltipla escolha' },
+                    { value: 'certo_errado', label: 'Certo / Errado' },
+                    ...(ocultarDiscursiva ? [] : [{ value: 'discursiva', label: 'Discursiva' }]),
+                  ]} />
               </Campo>
 
               {tipo === 'discursiva' && (
                 <>
                   <Campo label="Categoria">
-                    <SelectBox value={watch('categoria_discursiva') ?? 'Questão discursiva'} onChange={(v) => setValue('categoria_discursiva', v, { shouldDirty: true })}>
-                      <option value="Questão discursiva">Questão discursiva</option>
-                      <option value="Peça judicial">Peça judicial</option>
-                    </SelectBox>
+                    <SelectMenu value={watch('categoria_discursiva') ?? 'Questão discursiva'} ariaLabel="Categoria"
+                      onChange={(v) => setValue('categoria_discursiva', v, { shouldDirty: true })}
+                      options={[{ value: 'Questão discursiva', label: 'Questão discursiva' }, { value: 'Peça judicial', label: 'Peça judicial' }]} />
                   </Campo>
                   <div className="grid grid-cols-2 gap-3">
                     <Campo label="Nota (pontos)"><Input type="number" step="0.5" min="0" placeholder="10" {...register('pontuacao_total')} /></Campo>
@@ -590,24 +734,21 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
 
               <div className="grid grid-cols-2 gap-3">
                 <Campo label="Banca">
-                  <SelectBox value={watch('banca') ?? ''} onChange={(v) => setValue('banca', v, { shouldDirty: true })}>
-                    <option value="">—</option>
-                    {bancasOpts.map((n) => <option key={n} value={n}>{n}</option>)}
-                  </SelectBox>
+                  <SelectMenu value={watch('banca') ?? ''} ariaLabel="Banca" placeholder="—"
+                    onChange={(v) => setValue('banca', v, { shouldDirty: true })}
+                    options={[{ value: '', label: '—' }, ...bancasOpts.map((n) => ({ value: n, label: n }))]} />
                 </Campo>
                 <Campo label="Ano">
-                  <SelectBox value={String(watch('ano') ?? '')} onChange={(v) => setValue('ano', v ? Number(v) : undefined, { shouldDirty: true })}>
-                    <option value="">—</option>
-                    {anos.map((y) => <option key={y} value={y}>{y}</option>)}
-                  </SelectBox>
+                  <SelectMenu value={String(watch('ano') ?? '')} ariaLabel="Ano" placeholder="—"
+                    onChange={(v) => setValue('ano', v ? Number(v) : undefined, { shouldDirty: true })}
+                    options={[{ value: '', label: '—' }, ...anos.map((y) => ({ value: String(y), label: String(y) }))]} />
                 </Campo>
               </div>
 
               <Campo label="Disciplina">
-                <SelectBox value={watch('disciplina') ?? ''} onChange={(v) => setValue('disciplina', v, { shouldDirty: true })}>
-                  <option value="">—</option>
-                  {discOpts.map((n) => <option key={n} value={n}>{n}</option>)}
-                </SelectBox>
+                <SelectMenu value={watch('disciplina') ?? ''} ariaLabel="Disciplina" placeholder="—"
+                  onChange={(v) => setValue('disciplina', v, { shouldDirty: true })}
+                  options={[{ value: '', label: '—' }, ...discOpts.map((n) => ({ value: n, label: n }))]} />
               </Campo>
 
               <Campo label="Assunto">
@@ -633,17 +774,14 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
 
               <div className="grid grid-cols-2 gap-3">
                 <Campo label="Gabarito">
-                  <SelectBox value={watch('gabarito_tipo') ?? 'oficial'} onChange={(v) => setValue('gabarito_tipo', v as 'oficial' | 'extraoficial', { shouldDirty: true })}>
-                    <option value="oficial">Oficial</option>
-                    <option value="extraoficial">Extraoficial</option>
-                  </SelectBox>
+                  <SelectMenu value={watch('gabarito_tipo') ?? 'oficial'} ariaLabel="Gabarito"
+                    onChange={(v) => setValue('gabarito_tipo', v as 'oficial' | 'extraoficial', { shouldDirty: true })}
+                    options={[{ value: 'oficial', label: 'Oficial' }, { value: 'extraoficial', label: 'Extraoficial' }]} />
                 </Campo>
                 <Campo label="Status">
-                  <SelectBox value={status ?? 'rascunho'} onChange={(v) => setValue('status', v as QuestaoFormData['status'], { shouldDirty: true })}>
-                    <option value="rascunho">Rascunho</option>
-                    <option value="publicada">Publicada</option>
-                    <option value="arquivada">Arquivada</option>
-                  </SelectBox>
+                  <SelectMenu value={status ?? 'rascunho'} ariaLabel="Status"
+                    onChange={(v) => setValue('status', v as QuestaoFormData['status'], { shouldDirty: true })}
+                    options={[{ value: 'rascunho', label: 'Rascunho' }, { value: 'publicada', label: 'Publicada' }, { value: 'arquivada', label: 'Arquivada' }]} />
                 </Campo>
               </div>
             </div>
@@ -651,24 +789,44 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
 
           {bancos.length > 0 && (
             <Secao titulo="Banco">
-              <Campo label="Banco selecionado">
-                <SelectBox value={bancoSel} onChange={(v) => setValue('bancoIds', v ? [v] : [], { shouldDirty: true })}>
-                  <option value="">Nenhum</option>
-                  {bancos.map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}
-                </SelectBox>
-              </Campo>
-              {bancoAtual && typeof bancoAtual.total === 'number' && (
-                <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Database className="h-3.5 w-3.5" />
-                  {bancoAtual.total.toLocaleString('pt-BR')} questões neste banco
-                </p>
-              )}
+              <button type="button" onClick={() => setBancoModal(true)}
+                className="flex w-full items-center gap-3 rounded-xl border p-2 text-left transition-colors hover:border-primary/50">
+                {bancoAtual ? (
+                  <>
+                    <PosterMini banco={bancoAtual} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{bancoAtual.nome}</p>
+                      {typeof bancoAtual.total === 'number' && (
+                        <p className="flex items-center gap-1 text-xs text-muted-foreground"><Database className="h-3 w-3" /> {bancoAtual.total.toLocaleString('pt-BR')} questões</p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="flex h-12 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed text-muted-foreground"><Database className="h-4 w-4" /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-muted-foreground">Nenhum banco selecionado</p>
+                      <p className="text-xs text-muted-foreground">Clique para escolher</p>
+                    </div>
+                  </>
+                )}
+                <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-muted-foreground" />
+              </button>
             </Secao>
           )}
 
           {sidebarExtra}
         </aside>
       </div>
+
+      {bancoModal && (
+        <BancoModal
+          bancos={bancos}
+          selecionadoId={bancoSel}
+          onSalvar={(id) => { setValue('bancoIds', id ? [id] : [], { shouldDirty: true }); setBancoModal(false) }}
+          onClose={() => setBancoModal(false)}
+        />
+      )}
     </form>
   )
 }
