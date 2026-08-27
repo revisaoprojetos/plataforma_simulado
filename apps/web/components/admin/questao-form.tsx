@@ -435,6 +435,7 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
   const anos = Array.from({ length: anoAtual + 2 - 1999 }, (_, i) => anoAtual + 1 - i)
   const bancasOpts = [...new Set([watch('banca'), ...bancasSugestoes].filter(Boolean) as string[])]
   const discOpts = [...new Set([watch('disciplina'), ...disciplinasSugestoes].filter(Boolean) as string[])]
+  const assuntoOpts = [...new Set([watch('assunto'), ...assuntosSugestoes].filter(Boolean) as string[])]
 
   async function onImagemFile(file: File | null) {
     if (!file) return
@@ -760,8 +761,9 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
               </Campo>
 
               <Campo label="Assunto">
-                <Input list="assuntos-sugestoes" placeholder="Digite ou selecione" {...register('assunto')} />
-                <datalist id="assuntos-sugestoes">{assuntosSugestoes.map((n) => <option key={n} value={n} />)}</datalist>
+                <SelectMenu value={watch('assunto') ?? ''} ariaLabel="Assunto" placeholder="—"
+                  onChange={(v) => setValue('assunto', v, { shouldDirty: true })}
+                  options={[{ value: '', label: '—' }, ...assuntoOpts.map((n) => ({ value: n, label: n }))]} />
               </Campo>
 
               <Campo label="Assunto específico">
