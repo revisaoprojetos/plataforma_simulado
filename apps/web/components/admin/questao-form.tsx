@@ -221,19 +221,28 @@ type Opt = { value: string; label: string; disabled?: boolean }
 
 /**
  * Dropdown custom (substitui o <select> nativo) — menu estilizado com os tokens do tema,
- * check na opção ativa, fecha ao clicar fora / Esc. Mesmo visual do gatilho do mockup.
+ * check na opção ativa, fecha ao clicar fora / Esc.
+ * Com `buscavel`, o gatilho vira um campo de texto ao abrir: dá pra digitar e filtrar as opções.
+ * O texto digitado é só filtro — só vira valor quando uma opção é escolhida; ao fechar sem
+ * escolher, mantém o que já estava selecionado.
  */
-function SelectMenu({ value, onChange, options, placeholder, ariaLabel }: {
+function SelectMenu({ value, onChange, options, placeholder, ariaLabel, buscavel }: {
   value: string
   onChange: (v: string) => void
   options: Opt[]
   placeholder?: string
   ariaLabel?: string
+  buscavel?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const { montado, aberto } = useAbreFecha(open, 140)
   const ref = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const atual = options.find((o) => o.value === value)
+  const q = query.trim().toLowerCase()
+  const filtradas = buscavel && q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options
+
   useEffect(() => {
     if (!open) return
     const onDoc = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
@@ -242,22 +251,49 @@ function SelectMenu({ value, onChange, options, placeholder, ariaLabel }: {
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('pointerdown', onDoc); document.removeEventListener('keydown', onKey) }
   }, [open])
+  // Ao abrir com busca: zera o filtro e foca o campo (fechar sem escolher preserva o valor atual).
+  useEffect(() => { if (open && buscavel) { setQuery(''); requestAnimationFrame(() => inputRef.current?.focus()) } }, [open, buscavel])
+
+  function escolher(v: string) { onChange(v); setOpen(false) }
+
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="listbox" aria-expanded={open} aria-label={ariaLabel}
-        className={cn('flex h-10 w-full items-center justify-between gap-2 rounded-lg border bg-background/50 px-3 text-left text-sm outline-none transition-colors hover:border-primary/40 focus-visible:border-primary/60 focus-visible:ring-1 focus-visible:ring-primary/30',
-          open && 'border-primary/60 ring-1 ring-primary/30')}>
-        <span className={cn('truncate', atual?.value ? 'text-foreground' : 'text-muted-foreground')}>{atual?.label ?? placeholder ?? '—'}</span>
-        <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200', open && 'rotate-180')} />
-      </button>
+      <div className={cn('flex h-10 w-full items-center gap-1.5 rounded-lg border bg-background/50 pl-3 pr-2 text-sm transition-colors',
+        open ? 'border-primary/60 ring-1 ring-primary/30' : 'hover:border-primary/40')}>
+        {open && buscavel ? (
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter dentro do form NÃO deve submeter: seleciona a 1ª opção filtrada.
+              if (e.key === 'Enter') { e.preventDefault(); const f = filtradas.find((o) => !o.disabled); if (f) escolher(f.value) }
+            }}
+            placeholder={atual?.label || placeholder || 'Buscar…'}
+            aria-label={ariaLabel}
+            className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground"
+          />
+        ) : (
+          <button type="button" onClick={() => setOpen(true)} aria-haspopup="listbox" aria-expanded={open} aria-label={ariaLabel}
+            className="min-w-0 flex-1 truncate text-left outline-none">
+            <span className={cn(atual?.value ? 'text-foreground' : 'text-muted-foreground')}>{atual?.label ?? placeholder ?? '—'}</span>
+          </button>
+        )}
+        <button type="button" tabIndex={-1} aria-label="Abrir opções" onMouseDown={(e) => e.preventDefault()} onClick={() => setOpen((v) => !v)}
+          className="shrink-0 rounded p-0.5 text-muted-foreground">
+          <ChevronDown className={cn('h-4 w-4 transition-transform duration-200', open && 'rotate-180')} />
+        </button>
+      </div>
       {montado && (
         <div role="listbox" className={cn('absolute left-0 right-0 top-[calc(100%+4px)] z-40 max-h-60 origin-top overflow-auto rounded-xl border bg-popover p-1 shadow-lg transition duration-150 ease-out',
           aberto ? 'scale-100 opacity-100 translate-y-0' : 'pointer-events-none -translate-y-1 scale-95 opacity-0')}>
-          {options.map((o) => {
+          {filtradas.length === 0 ? (
+            <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">Nada encontrado.</p>
+          ) : filtradas.map((o) => {
             const sel = o.value === value
             return (
               <button key={o.value || '__vazio'} type="button" role="option" aria-selected={sel} disabled={o.disabled}
-                onClick={() => { onChange(o.value); setOpen(false) }}
+                onClick={() => escolher(o.value)}
                 className={cn('flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors disabled:pointer-events-none disabled:opacity-40',
                   sel ? 'bg-primary/10 font-medium text-primary' : 'text-foreground hover:bg-muted')}>
                 <span className="truncate">{o.label}</span>
@@ -746,31 +782,31 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
 
               <div className="grid grid-cols-2 gap-3">
                 <Campo label="Banca">
-                  <SelectMenu value={watch('banca') ?? ''} ariaLabel="Banca" placeholder="—"
+                  <SelectMenu value={watch('banca') ?? ''} ariaLabel="Banca" placeholder="—" buscavel
                     onChange={(v) => setValue('banca', v, { shouldDirty: true })}
                     options={[{ value: '', label: '—' }, ...bancasOpts.map((n) => ({ value: n, label: n }))]} />
                 </Campo>
                 <Campo label="Ano">
-                  <SelectMenu value={String(watch('ano') ?? '')} ariaLabel="Ano" placeholder="—"
+                  <SelectMenu value={String(watch('ano') ?? '')} ariaLabel="Ano" placeholder="—" buscavel
                     onChange={(v) => setValue('ano', v ? Number(v) : undefined, { shouldDirty: true })}
                     options={[{ value: '', label: '—' }, ...anos.map((y) => ({ value: String(y), label: String(y) }))]} />
                 </Campo>
               </div>
 
               <Campo label="Disciplina">
-                <SelectMenu value={watch('disciplina') ?? ''} ariaLabel="Disciplina" placeholder="—"
+                <SelectMenu value={watch('disciplina') ?? ''} ariaLabel="Disciplina" placeholder="—" buscavel
                   onChange={(v) => setValue('disciplina', v, { shouldDirty: true })}
                   options={[{ value: '', label: '—' }, ...discOpts.map((n) => ({ value: n, label: n }))]} />
               </Campo>
 
               <Campo label="Assunto">
-                <SelectMenu value={watch('assunto') ?? ''} ariaLabel="Assunto" placeholder="—"
+                <SelectMenu value={watch('assunto') ?? ''} ariaLabel="Assunto" placeholder="—" buscavel
                   onChange={(v) => setValue('assunto', v, { shouldDirty: true })}
                   options={[{ value: '', label: '—' }, ...assuntoOpts.map((n) => ({ value: n, label: n }))]} />
               </Campo>
 
               <Campo label="Assunto específico">
-                <SelectMenu value={watch('assunto_detalhe') ?? ''} ariaLabel="Assunto específico" placeholder="—"
+                <SelectMenu value={watch('assunto_detalhe') ?? ''} ariaLabel="Assunto específico" placeholder="—" buscavel
                   onChange={(v) => setValue('assunto_detalhe', v, { shouldDirty: true })}
                   options={[{ value: '', label: '—' }, ...assuntoDetalheOpts.map((n) => ({ value: n, label: n }))]} />
               </Campo>
