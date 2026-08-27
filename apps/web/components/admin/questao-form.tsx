@@ -562,7 +562,7 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
         </div>
 
         {/* SIDEBAR — Edição + Banco + extra (etiquetas) */}
-        <aside className="space-y-5 lg:sticky lg:top-[4.5rem] lg:self-start">
+        <aside className="space-y-5 lg:sticky lg:top-14 lg:self-start">
           <Secao titulo="Edição">
             <div className="space-y-3.5">
               <Campo label="Tipo">
