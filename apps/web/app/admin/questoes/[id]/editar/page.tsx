@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { fetchAll } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { QuestaoForm } from '@/components/admin/questao-form'
 import { EtiquetaPicker } from '@/components/admin/etiqueta-picker'
 import { etiquetasDaQuestao } from '@/app/admin/etiquetas/actions'
@@ -47,8 +47,8 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
       .order('ordem'),
     admin.from('simulado_pastas').select('id, nome, cor, icone, capa_url, capa_card_url').eq('deletado', false).eq('tenant_id', tenantId ?? NADA).order('nome'),
     admin.from('simulado_questao_pasta').select('pasta_id').eq('questao_id', id).eq('tenant_id', tenantId ?? NADA),
-    // Contagem de questões por banco (para o "X questões neste banco" da sidebar).
-    fetchAll<{ pasta_id: string }>(() => admin.from('simulado_questao_pasta').select('pasta_id').eq('tenant_id', tenantId ?? NADA)),
+    // Todos os vínculos questão↔banco do tenant (para contagem + composição da ordem de cada banco).
+    fetchAll<{ pasta_id: string; questao_id: string }>(() => admin.from('simulado_questao_pasta').select('pasta_id, questao_id').eq('tenant_id', tenantId ?? NADA)),
   ])
 
   if (!questao) {
@@ -58,19 +58,49 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
   const bancasSugestoes = (bancas ?? []).map((b) => b.nome)
   const disciplinasSugestoes = (disciplinas ?? []).map((d) => d.nome)
   const assuntosSugestoes = [...new Set((assuntosLista ?? []).map((a: { nome: string }) => a.nome).filter(Boolean))]
-  const bancoIds = (vinculos ?? []).map((v: { pasta_id: string }) => v.pasta_id)
+  const meusBancoIds = (vinculos ?? []).map((v: { pasta_id: string }) => v.pasta_id)
   const et = await etiquetasDaQuestao(id)
 
-  const countPorBanco = new Map<string, number>()
-  for (const v of vincAll) countPorBanco.set(v.pasta_id, (countPorBanco.get(v.pasta_id) ?? 0) + 1)
-  const bancos = (bancosDestino ?? []).map((b: { id: string; nome: string; cor?: string | null; icone?: string | null; capa_url?: string | null; capa_card_url?: string | null }) => ({
-    id: b.id,
-    nome: b.nome,
-    total: countPorBanco.get(b.id) ?? 0,
-    cor: b.cor ?? null,
-    icone: b.icone ?? null,
-    capa: (b.capa_card_url ?? b.capa_url) ?? null,
-  }))
+  // Info (nome/capa/cor) de cada banco.
+  const bancoInfo = new Map((bancosDestino ?? []).map((b: { id: string; nome: string; cor?: string | null; icone?: string | null; capa_url?: string | null; capa_card_url?: string | null }) => [
+    b.id,
+    { id: b.id, nome: b.nome, cor: b.cor ?? null, icone: b.icone ?? null, capa: (b.capa_card_url ?? b.capa_url) ?? null },
+  ]))
+
+  // questao_ids por banco (para total + ordenação) + created_at (fallback da ordem, igual ao detalhe do banco).
+  const qidsPorBanco = new Map<string, string[]>()
+  for (const v of vincAll) {
+    if (!meusBancoIds.includes(v.pasta_id)) continue
+    const arr = qidsPorBanco.get(v.pasta_id) ?? []
+    arr.push(v.questao_id)
+    qidsPorBanco.set(v.pasta_id, arr)
+  }
+
+  // Posição da questão em cada banco (replica a ordem do detalhe: created_at asc + ordem_questoes manual).
+  let bancosDaQuestao: { id: string; nome: string; cor: string | null; capa: string | null; total: number; posicao: number | null }[] = []
+  if (meusBancoIds.length) {
+    const allQids = [...new Set([...qidsPorBanco.values()].flat())]
+    const [ordensRes, createdRows] = await Promise.all([
+      admin.from('simulado_pastas').select('id, ordem_questoes').in('id', meusBancoIds).eq('tenant_id', tenantId ?? NADA),
+      fetchAllByIn<{ id: string; created_at: string }>(allQids, (chunk) => admin.from('simulado_questoes').select('id, created_at').in('id', chunk).eq('tenant_id', tenantId ?? NADA)),
+    ])
+    const createdMap = new Map(createdRows.map((r) => [r.id, r.created_at ?? '']))
+    const ordemMap = new Map((ordensRes.data ?? []).map((r: { id: string; ordem_questoes?: unknown }) => [r.id, Array.isArray(r.ordem_questoes) ? (r.ordem_questoes as string[]) : []]))
+    bancosDaQuestao = meusBancoIds.map((bid) => {
+      // Só questões que existem (ignora vínculos órfãos) — casa com a listagem do detalhe do banco.
+      const qids = (qidsPorBanco.get(bid) ?? []).filter((q) => createdMap.has(q))
+      const ordenadas = [...qids].sort((a, b) => (createdMap.get(a) ?? '').localeCompare(createdMap.get(b) ?? ''))
+      const ordem = ordemMap.get(bid) ?? []
+      if (ordem.length) {
+        const pos = new Map(ordem.map((qid, i) => [qid, i]))
+        const FIM = Number.MAX_SAFE_INTEGER
+        ordenadas.sort((a, b) => (pos.has(a) ? pos.get(a)! : FIM) - (pos.has(b) ? pos.get(b)! : FIM))
+      }
+      const idx = ordenadas.indexOf(id)
+      const info = bancoInfo.get(bid)
+      return { id: bid, nome: info?.nome ?? 'Banco', cor: info?.cor ?? null, capa: info?.capa ?? null, total: ordenadas.length, posicao: idx >= 0 ? idx + 1 : null }
+    })
+  }
 
   const statusAtual = (questao.status ?? 'rascunho') as 'rascunho' | 'publicada' | 'arquivada'
 
@@ -97,7 +127,8 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
       ordem: a.ordem,
       comentario: (a.comentario as string | null) ?? '',
     })),
-    bancoIds,
+    // Sem bancoIds: o editor não altera mais o vínculo com bancos (só exibe). A membership
+    // é gerida no Banco de Questões; salvar aqui NÃO mexe em simulado_questao_pasta.
   }
 
   return (
@@ -107,7 +138,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
       bancasSugestoes={bancasSugestoes}
       disciplinasSugestoes={disciplinasSugestoes}
       assuntosSugestoes={assuntosSugestoes}
-      bancos={bancos}
+      bancosDaQuestao={bancosDaQuestao}
       onSubmit={updateQuestaoAction.bind(null, id)}
       sidebarExtra={<EtiquetaPicker questaoId={id} todas={et.todas ?? []} ativasIniciais={et.ativas ?? []} />}
     />

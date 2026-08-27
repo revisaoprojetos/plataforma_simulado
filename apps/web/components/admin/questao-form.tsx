@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Loader2, Plus, Trash2, RefreshCw, ArrowLeft, Undo2, Check, ChevronDown,
-  Bold, Italic, List, Link2, Code, Image as ImageIcon, MessageSquare, Database, Eye, Pencil, X, Search,
+  Bold, Italic, List, Link2, Code, Image as ImageIcon, MessageSquare, Eye, Pencil, Database, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -161,7 +161,6 @@ const questaoSchema = z
     categoria_discursiva: z.string().optional(),
     alternativas: z.array(alternativaSchema).optional(),
     competencias: z.array(competenciaSchema).optional(),
-    bancoIds: z.array(z.string()).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.tipo === 'objetiva') {
@@ -184,8 +183,8 @@ interface QuestaoFormProps {
   bancasSugestoes?: string[]
   disciplinasSugestoes?: string[]
   assuntosSugestoes?: string[]
-  /** Bancos (pastas) de destino + contagem de questões + capa/cor para os pôsteres. */
-  bancos?: BancoOpt[]
+  /** Bancos em que a questão está sincronizada + posição de ordenação (somente leitura). */
+  bancosDaQuestao?: BancoSync[]
   /** Conteúdo extra da barra lateral (ex.: seletor de etiquetas). */
   sidebarExtra?: ReactNode
   onSubmit: (data: QuestaoFormData) => Promise<{ error?: string } | void>
@@ -271,6 +270,8 @@ function SelectMenu({ value, onChange, options, placeholder, ariaLabel }: {
 }
 
 type BancoOpt = { id: string; nome: string; total?: number; cor?: string | null; icone?: string | null; capa?: string | null }
+/** Banco em que a questão está + sua posição na ordenação daquele banco. */
+type BancoSync = { id: string; nome: string; cor: string | null; capa: string | null; total: number; posicao: number | null }
 
 /** Miniatura pôster do banco (capa ou degradê da cor) — usada no gatilho da sidebar. */
 function PosterMini({ banco }: { banco: BancoOpt }) {
@@ -287,49 +288,29 @@ function PosterMini({ banco }: { banco: BancoOpt }) {
   )
 }
 
-/** Card pôster selecionável dentro do modal de escolha do banco. */
-function PosterEscolha({ banco, ativo, onClick, nenhum }: { banco?: BancoOpt; ativo: boolean; onClick: () => void; nenhum?: boolean }) {
-  const c = banco?.cor ?? '#6d28d9'
+/** Resumo (nº de bancos vinculados) + pop-up com a lista completa e a numeração da questão. */
+function BancosSincronizados({ bancos }: { bancos: BancoSync[] }) {
+  const [open, setOpen] = useState(false)
+  const n = bancos.length
   return (
-    <button type="button" onClick={onClick}
-      className={cn('group relative aspect-[4/5] overflow-hidden rounded-xl border text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md',
-        ativo && 'ring-2 ring-primary ring-offset-2 ring-offset-card')}>
-      {nenhum ? (
-        <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-muted/40 text-muted-foreground">
-          <Database className="h-6 w-6" /><span className="text-xs font-medium">Nenhum</span>
-        </span>
-      ) : banco?.capa ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={banco.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-      ) : (
-        <span className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
-      )}
-      {!nenhum && (
-        <>
-          <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-          <span className="absolute inset-x-0 bottom-0 p-2">
-            <span className="line-clamp-2 text-xs font-bold leading-tight text-white drop-shadow-sm">{banco!.nome}</span>
-            {typeof banco!.total === 'number' && <span className="mt-1 block text-[10px] text-white/80">{banco!.total.toLocaleString('pt-BR')} questões</span>}
-          </span>
-        </>
-      )}
-      {ativo && <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow"><Check className="h-3 w-3" /></span>}
-    </button>
+    <>
+      <button type="button" onClick={() => n > 0 && setOpen(true)} disabled={n === 0}
+        className="flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition-colors enabled:hover:border-primary/50 enabled:hover:bg-muted/30 disabled:cursor-default">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Database className="h-5 w-5" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">{n === 0 ? 'Nenhum banco' : `${n.toLocaleString('pt-BR')} ${n === 1 ? 'banco vinculado' : 'bancos vinculados'}`}</p>
+          <p className="text-xs text-muted-foreground">{n === 0 ? 'Não está sincronizada' : 'Clique para ver a numeração'}</p>
+        </div>
+        {n > 0 && <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-muted-foreground" />}
+      </button>
+      <BancosSincModal open={open} bancos={bancos} onClose={() => setOpen(false)} />
+    </>
   )
 }
 
-/** Modal de seleção do banco (grade de pôsteres com capa + nome + botão Salvar). */
-function BancoModal({ open, bancos, selecionadoId, onSalvar, onClose }: {
-  open: boolean
-  bancos: BancoOpt[]
-  selecionadoId: string
-  onSalvar: (id: string) => void
-  onClose: () => void
-}) {
+/** Pop-up (somente leitura): todos os bancos da questão + a posição dela na ordenação de cada um. */
+function BancosSincModal({ open, bancos, onClose }: { open: boolean; bancos: BancoSync[]; onClose: () => void }) {
   const { montado, aberto } = useAbreFecha(open, 200)
-  const [sel, setSel] = useState(selecionadoId)
-  const [busca, setBusca] = useState('')
-  useEffect(() => { if (open) { setSel(selecionadoId); setBusca('') } }, [open, selecionadoId])
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -337,37 +318,36 @@ function BancoModal({ open, bancos, selecionadoId, onSalvar, onClose }: {
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
   if (!montado) return null
-  const q = busca.trim().toLowerCase()
-  const filtrados = q ? bancos.filter((b) => b.nome.toLowerCase().includes(q)) : bancos
-  const nomeSel = bancos.find((b) => b.id === sel)?.nome
   return createPortal(
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
       <div className={cn('absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-200', aberto ? 'opacity-100' : 'opacity-0')} onClick={onClose} />
-      <div role="dialog" aria-modal="true" className={cn('relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl transition-all duration-200 ease-out',
+      <div role="dialog" aria-modal="true" className={cn('relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl transition-all duration-200 ease-out',
         aberto ? 'scale-100 opacity-100 translate-y-0' : 'translate-y-2 scale-95 opacity-0')}>
-        <div className="flex items-center justify-between gap-3 border-b px-5 py-3.5">
-          <h3 className="flex items-center gap-2 text-sm font-semibold"><Database className="h-4 w-4" /> Selecionar banco</h3>
+        <div className="flex items-center justify-between border-b px-5 py-3.5">
+          <h3 className="flex items-center gap-2 text-sm font-semibold"><Database className="h-4 w-4" /> Bancos vinculados</h3>
           <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
         </div>
-        <div className="border-b px-5 py-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar banco…" className="pl-8" />
-          </div>
+        <div className="min-h-0 flex-1 space-y-2 overflow-auto p-4">
+          {bancos.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Esta questão ainda não está em nenhum banco.</p>
+          ) : bancos.map((b) => (
+            <a key={b.id} href={`/admin/banco-questoes/${b.id}`}
+              className="flex items-center gap-3 rounded-xl border p-2 transition-colors hover:border-primary/50 hover:bg-muted/30">
+              <PosterMini banco={b} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">{b.nome}</p>
+                <p className="text-xs text-muted-foreground">
+                  {b.posicao != null
+                    ? <>Questão <span className="font-semibold text-foreground">Nº {b.posicao.toLocaleString('pt-BR')}</span> de {b.total.toLocaleString('pt-BR')}</>
+                    : <>{b.total.toLocaleString('pt-BR')} questões</>}
+                </p>
+              </div>
+              <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-muted-foreground" />
+            </a>
+          ))}
         </div>
-        <div className="min-h-0 flex-1 overflow-auto p-5">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            <PosterEscolha nenhum ativo={sel === ''} onClick={() => setSel('')} />
-            {filtrados.map((b) => <PosterEscolha key={b.id} banco={b} ativo={sel === b.id} onClick={() => setSel(b.id)} />)}
-          </div>
-          {filtrados.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Nenhum banco encontrado.</p>}
-        </div>
-        <div className="flex items-center justify-between gap-2 border-t px-5 py-3.5">
-          <p className="truncate text-xs text-muted-foreground">{sel ? nomeSel : 'Nenhum banco'}</p>
-          <div className="flex shrink-0 gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
-            <Button type="button" size="sm" onClick={() => onSalvar(sel)}><Check className="mr-1.5 h-4 w-4" /> Salvar</Button>
-          </div>
+        <div className="flex justify-end border-t px-5 py-3.5">
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>Fechar</Button>
         </div>
       </div>
     </div>,
@@ -384,7 +364,7 @@ function StatusBadge({ status }: { status?: string }) {
   return <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', cfg.cls)}>{cfg.label}</span>
 }
 
-export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], disciplinasSugestoes = [], assuntosSugestoes = [], bancos = [], sidebarExtra, onSubmit }: QuestaoFormProps) {
+export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], disciplinasSugestoes = [], assuntosSugestoes = [], bancosDaQuestao = [], sidebarExtra, onSubmit }: QuestaoFormProps) {
   const ocultarDiscursiva = useOcultarDiscursiva()
   const [isLoading, setIsLoading] = useState(false)
   const [, forcar] = useReducer((x: number) => x + 1, 0) // força re-render (reverte o <select> Tipo ao cancelar)
@@ -397,8 +377,6 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
   const [prevProf, setPrevProf] = useState(false)
   // Reajusta a altura de todas as caixas (ex.: depois de Desfazer, quando os valores mudam sem digitar).
   const reajustarCaixas = () => requestAnimationFrame(() => formRef.current?.querySelectorAll('textarea').forEach((t) => { t.style.height = 'auto'; t.style.height = `${t.scrollHeight + 2}px` }))
-
-  const [bancoModal, setBancoModal] = useState(false)
 
   const {
     register, handleSubmit, watch, setValue, control, reset,
@@ -431,7 +409,6 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
   const status = watch('status')
   const dificuldade = watch('nivel_dificuldade')
   const imagemUrl = watch('imagem_url')
-  const bancoSel = (watch('bancoIds') ?? [])[0] ?? ''
   const imgInputRef = useRef<HTMLInputElement>(null)
   const [uploadingImg, setUploadingImg] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -444,7 +421,6 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
   const anos = Array.from({ length: anoAtual + 2 - 1999 }, (_, i) => anoAtual + 1 - i)
   const bancasOpts = [...new Set([watch('banca'), ...bancasSugestoes].filter(Boolean) as string[])]
   const discOpts = [...new Set([watch('disciplina'), ...disciplinasSugestoes].filter(Boolean) as string[])]
-  const bancoAtual = bancos.find((b) => b.id === bancoSel)
 
   async function onImagemFile(file: File | null) {
     if (!file) return
@@ -801,45 +777,16 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
             </div>
           </Secao>
 
-          {bancos.length > 0 && (
-            <Secao titulo="Banco">
-              <button type="button" onClick={() => setBancoModal(true)}
-                className="flex w-full items-center gap-3 rounded-xl border p-2 text-left transition-colors hover:border-primary/50">
-                {bancoAtual ? (
-                  <>
-                    <PosterMini banco={bancoAtual} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">{bancoAtual.nome}</p>
-                      {typeof bancoAtual.total === 'number' && (
-                        <p className="flex items-center gap-1 text-xs text-muted-foreground"><Database className="h-3 w-3" /> {bancoAtual.total.toLocaleString('pt-BR')} questões</p>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <span className="flex h-12 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed text-muted-foreground"><Database className="h-4 w-4" /></span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-muted-foreground">Nenhum banco selecionado</p>
-                      <p className="text-xs text-muted-foreground">Clique para escolher</p>
-                    </div>
-                  </>
-                )}
-                <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-muted-foreground" />
-              </button>
+          {codigo && (
+            <Secao titulo="Sincronização">
+              <p className="mb-2.5 text-xs text-muted-foreground">Bancos em que esta questão está e a posição dela na ordenação de cada banco.</p>
+              <BancosSincronizados bancos={bancosDaQuestao} />
             </Secao>
           )}
 
           {sidebarExtra}
         </aside>
       </div>
-
-      <BancoModal
-        open={bancoModal}
-        bancos={bancos}
-        selecionadoId={bancoSel}
-        onSalvar={(id) => { setValue('bancoIds', id ? [id] : [], { shouldDirty: true }); setBancoModal(false) }}
-        onClose={() => setBancoModal(false)}
-      />
     </form>
   )
 }
