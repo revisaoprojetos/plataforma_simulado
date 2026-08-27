@@ -320,7 +320,7 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
     // -m-6 cancela o p-6 do <main> → a top bar cola RENTE ao topo (sem margem negativa no
     // elemento sticky, que causava vão) e alinha com o cabeçalho da sidebar (h-14).
     <form onSubmit={handleSubmit(handleFormSubmit)} className="-m-6">
-      <div className="sticky top-0 z-30 flex min-h-[3.5rem] flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b bg-background px-4 py-2 sm:px-6">
+      <div className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b bg-background px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={() => history.back()} aria-label="Voltar" className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
             <ArrowLeft className="h-5 w-5" />
