@@ -417,13 +417,19 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
     tipo === 'discursiva' ? 'discursiva' : formato === 'certo_errado' ? 'certo_errado' : 'multipla'
   const ehCE = tipo === 'objetiva' && formato === 'certo_errado'
 
-  // "Sujo" robusto: compara os valores atuais com um baseline (JSON). Evita o falso "não salvo"
-  // do isDirty do RHF e serve de gate ao guard de saída. Rebaseia ao carregar / salvar / desfazer.
-  const valoresAtuais = watch()
+  // "Sujo" robusto: compara os valores atuais com um baseline (JSON de getValues), sem depender
+  // do isDirty do RHF (que acusava falso "não salvo" ao abrir). O baseline é capturado APÓS a
+  // montagem assentar (o useFieldArray re-normaliza os valores num re-render pós-mount; capturar
+  // cedo desalinhava o baseline). Baseline e comparação usam getValues() → serialização idêntica.
+  watch() // assina as mudanças do formulário (re-render a cada alteração real)
   const baselineRef = useRef<string | null>(null)
-  if (baselineRef.current === null) baselineRef.current = JSON.stringify(valoresAtuais)
-  const sujo = JSON.stringify(valoresAtuais) !== baselineRef.current
-  const marcarSalvo = () => { baselineRef.current = JSON.stringify(getValues()) }
+  const marcarSalvo = () => { baselineRef.current = JSON.stringify(getValues()); forcar() }
+  useEffect(() => {
+    const id = requestAnimationFrame(() => requestAnimationFrame(marcarSalvo))
+    return () => cancelAnimationFrame(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const sujo = baselineRef.current !== null && JSON.stringify(getValues()) !== baselineRef.current
 
   const anoAtual = new Date().getFullYear()
   const anos = Array.from({ length: anoAtual + 2 - 1999 }, (_, i) => anoAtual + 1 - i)
