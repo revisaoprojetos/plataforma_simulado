@@ -317,9 +317,10 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
   }
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)}>
-      {/* Barra do topo — full-bleed (contra o p-6 do layout) e fixa ao rolar. */}
-      <div className="sticky -top-6 z-30 -mx-6 -mt-6 mb-5 flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 pb-3.5 pt-7 sm:px-6">
+    // -m-6 cancela o p-6 do <main> → a top bar cola RENTE ao topo (sem margem negativa no
+    // elemento sticky, que causava vão) e alinha com o cabeçalho da sidebar (h-14).
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="-m-6">
+      <div className="sticky top-0 z-30 flex min-h-[3.5rem] flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b bg-background px-4 py-2 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={() => history.back()} aria-label="Voltar" className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
             <ArrowLeft className="h-5 w-5" />
@@ -344,8 +345,8 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
         </div>
       </div>
 
-      {/* Corpo — conteúdo à esquerda, edição/banco à direita. */}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+      {/* Corpo — conteúdo à esquerda, edição/banco à direita. Padding restaurado aqui (form tem -m-6). */}
+      <div className="grid gap-5 p-4 pt-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-5">
           {/* ENUNCIADO */}
           <Secao titulo="Enunciado" acao={<BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} />}>
@@ -493,7 +494,7 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
         </div>
 
         {/* SIDEBAR — Edição + Banco + extra (etiquetas) */}
-        <aside className="space-y-5 lg:sticky lg:top-20 lg:self-start">
+        <aside className="space-y-5 lg:sticky lg:top-[4.5rem] lg:self-start">
           <Secao titulo="Edição">
             <div className="space-y-3.5">
               <Campo label="Tipo">
