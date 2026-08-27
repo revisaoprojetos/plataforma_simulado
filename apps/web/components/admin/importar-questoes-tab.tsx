@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useRef, useState, useTransition } from 'react'
+import { Fragment, useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { FileUp, Download, Loader2, Check, AlertTriangle, RefreshCw, ChevronRigh
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
 import { analisarQuestoesImport, confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
+import { listarEtiquetas } from '@/app/admin/etiquetas/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 
 // ── DOIS modelos de importação, com colunas próprias por formato ─────────────
@@ -21,7 +22,7 @@ type ModeloImport = 'multipla' | 'certo_errado'
 const COLUNAS_ME = [
   'Número', 'Tipo', 'Enunciado', 'Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D', 'Alternativa E',
   'Alternativa Correta', 'Alternativas Incorretas', 'Grupo', 'Disciplina', 'Categoria', 'Assunto Principal',
-  'Assunto Detalhe', 'Nível', 'Pilar 1', 'Pilar 2',
+  'Assunto específico', 'Nível', 'Pilar 1', 'Pilar 2',
   'Lei A', 'Comentário A', 'Lei B', 'Comentário B', 'Lei C', 'Comentário C', 'Lei D', 'Comentário D', 'Lei E', 'Comentário E',
   'Comentário completo',
   'Ano', 'Banca', 'Órgão', 'Cargo', 'Etiquetas',
@@ -31,7 +32,7 @@ const COLUNAS_ME = [
 // e a explicação vai no "Comentário completo". 2ª coluna "Tipo" identifica o formato.
 const COLUNAS_CE = [
   'Número', 'Tipo', 'Enunciado', 'Alternativa Correta', 'Grupo', 'Disciplina', 'Categoria', 'Assunto Principal',
-  'Assunto Detalhe', 'Nível', 'Pilar 1', 'Pilar 2',
+  'Assunto específico', 'Nível', 'Pilar 1', 'Pilar 2',
   'Comentário completo',
   'Ano', 'Banca', 'Órgão', 'Cargo', 'Etiquetas',
 ] as const
@@ -42,7 +43,7 @@ const EXEMPLOS_ME: Record<string, string>[] = [
     'Alternativa A': 'São Paulo', 'Alternativa B': 'Rio de Janeiro', 'Alternativa C': 'Brasília', 'Alternativa D': 'Salvador', 'Alternativa E': 'Recife',
     'Alternativa Correta': 'C', 'Alternativas Incorretas': 'A, B, D, E',
     'Grupo': 'Conhecimentos Gerais', 'Disciplina': 'Geografia', 'Categoria': 'Geografia do Brasil',
-    'Assunto Principal': 'Capitais', 'Assunto Detalhe': 'Capital federal', 'Nível': 'facil',
+    'Assunto Principal': 'Capitais', 'Assunto específico': 'Capital federal', 'Nível': 'facil',
     'Pilar 1': 'Território', 'Pilar 2': 'Federação',
     'Lei C': 'CF, art. 18', 'Comentário C': 'Brasília é a capital federal.',
     'Comentário completo': 'Brasília é a capital federal do Brasil desde 1960 (CF, art. 18, §1º). As demais são capitais estaduais.',
@@ -53,7 +54,7 @@ const EXEMPLOS_ME: Record<string, string>[] = [
 const EXEMPLOS_CE: Record<string, string>[] = [
   {
     'Número': '1', 'Tipo': 'Certo/Errado', 'Enunciado': 'A capital do Brasil é Brasília.', 'Alternativa Correta': 'Certo',
-    'Disciplina': 'Geografia', 'Categoria': 'Geografia do Brasil', 'Assunto Principal': 'Capitais', 'Assunto Detalhe': 'Capital federal', 'Nível': 'facil',
+    'Disciplina': 'Geografia', 'Categoria': 'Geografia do Brasil', 'Assunto Principal': 'Capitais', 'Assunto específico': 'Capital federal', 'Nível': 'facil',
     'Comentário completo': 'Correto. Brasília é a capital federal desde 1960 (CF, art. 18, §1º).',
     'Ano': '2024', 'Banca': 'CESPE', 'Etiquetas': 'Alta recorrência',
   },
@@ -69,7 +70,7 @@ const INSTR_COMUNS: [string, string][] = [
   ['Número', 'Número/ordem da questão (opcional).'],
   ['Tipo', 'Identifica o formato do modelo (já vem preenchido): "Múltipla escolha" ou "Certo/Errado". Não misture formatos no mesmo arquivo — use o modelo correspondente.'],
   ['Enunciado', 'O texto da questão. Obrigatório.'],
-  ['Grupo · Categoria · Assunto Detalhe · Pilar 1 · Pilar 2', 'Classificações livres da questão.'],
+  ['Grupo · Categoria · Assunto específico · Pilar 1 · Pilar 2', 'Classificações livres da questão.'],
   ['Disciplina · Assunto Principal · Banca · Órgão · Cargo', 'São criados automaticamente no sistema se ainda não existirem.'],
   ['Nível', 'facil, medio ou dificil.'],
   ['Ano', 'Ano da prova/questão (ex.: 2024).'],
@@ -107,17 +108,22 @@ function baixarBlob(blob: Blob, nome: string) {
   URL.revokeObjectURL(a.href)
 }
 
-/** Gera um .xlsx formatado do modelo escolhido (múltipla escolha OU certo/errado). */
-async function baixarModelo(formato: ModeloImport) {
+/** Gera um .xlsx formatado do modelo escolhido (múltipla escolha OU certo/errado).
+ *  `etiquetasSistema`: nomes das etiquetas do tenant — usados como exemplo real na coluna Etiquetas. */
+async function baixarModelo(formato: ModeloImport, etiquetasSistema: string[] = []) {
   try {
     const cfg = MODELOS[formato]
     const COLS = cfg.colunas
+    // Exemplo da coluna Etiquetas: usa as etiquetas REAIS do sistema (as 3 primeiras) quando houver.
+    const etqExemplo = etiquetasSistema.slice(0, 3).join(', ')
+    const valorCelula = (ex: Record<string, string>, c: string) =>
+      c === 'Etiquetas' && etqExemplo ? etqExemplo : (ex[c] ?? '')
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
 
     const ws = wb.addWorksheet(cfg.aba, { views: [{ state: 'frozen', ySplit: 1 }] })
     ws.addRow([...COLS])
-    for (const ex of cfg.exemplos) ws.addRow(COLS.map((c) => ex[c] ?? ''))
+    for (const ex of cfg.exemplos) ws.addRow(COLS.map((c) => valorCelula(ex, c)))
 
     const head = ws.getRow(1)
     head.height = 30
@@ -134,7 +140,7 @@ async function baixarModelo(formato: ModeloImport) {
 
     ws.columns.forEach((col, i) => {
       const c = COLS[i]
-      const exLen = Math.max(0, ...cfg.exemplos.map((ex) => (ex[c] ?? '').length))
+      const exLen = Math.max(0, ...cfg.exemplos.map((ex) => valorCelula(ex, c).length))
       col.width = c === 'Enunciado' ? 42 : Math.min(Math.max(c.length + 3, exLen + 2, 12), 30)
     })
     ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: COLS.length } }
@@ -155,7 +161,10 @@ async function baixarModelo(formato: ModeloImport) {
     const h = wi.addRow(['Coluna', 'O que preencher'])
     h.font = { bold: true, color: { argb: 'FFFFFFFF' } }
     h.eachCell((c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_HEADER } }; c.border = bordas })
-    for (const [a, b] of cfg.instrucoes) {
+    const instrucoes = etiquetasSistema.length
+      ? [...cfg.instrucoes, ['Etiquetas já cadastradas no sistema', etiquetasSistema.join(' · ')] as [string, string]]
+      : cfg.instrucoes
+    for (const [a, b] of instrucoes) {
       const row = wi.addRow([a, b])
       row.getCell(1).font = { bold: true }
       row.alignment = { vertical: 'top', wrapText: true }
@@ -180,12 +189,20 @@ export function ImportarQuestoesTab({ bancoId = null, onDone }: { bancoId?: stri
   const [analisando, startAnalise] = useTransition()
   const [salvando, startSalvar] = useTransition()
   const [baixandoModelo, setBaixandoModelo] = useState<ModeloImport | null>(null)
+  const [etiquetasSistema, setEtiquetasSistema] = useState<string[]>([])
   const router = useRouter()
+
+  // Etiquetas do tenant → viram exemplo real na coluna Etiquetas do modelo baixado.
+  useEffect(() => {
+    listarEtiquetas().then((r) => {
+      if (r.ok && r.itens) setEtiquetasSistema(r.itens.map((e) => e.nome).filter(Boolean))
+    }).catch(() => {})
+  }, [])
 
   async function onBaixarModelo(formato: ModeloImport) {
     if (baixandoModelo) return
     setBaixandoModelo(formato)
-    try { await baixarModelo(formato) } finally { setBaixandoModelo(null) }
+    try { await baixarModelo(formato, etiquetasSistema) } finally { setBaixandoModelo(null) }
   }
 
   function onFile(f: File | null) {

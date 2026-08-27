@@ -449,7 +449,7 @@ function mapHeader(h: string): string | null {
   if (['disciplina', 'materia'].includes(n)) return 'disciplina'
   if (n === 'categoria') return 'categoria'
   if (['assuntoprincipal', 'assunto'].includes(n)) return 'assunto'
-  if (['assuntodetalhe', 'assuntodetalhado', 'detalhe'].includes(n)) return 'assunto_detalhe'
+  if (['assuntodetalhe', 'assuntoespecifico', 'assuntodetalhado', 'detalhe', 'especifico'].includes(n)) return 'assunto_detalhe'
   if (n === 'grupo') return 'grupo'
   if (['pilar1', 'pilarum'].includes(n)) return 'pilar_1'
   if (['pilar2', 'pilardois'].includes(n)) return 'pilar_2'
