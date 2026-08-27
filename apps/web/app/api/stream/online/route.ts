@@ -47,7 +47,8 @@ export async function GET(req: NextRequest) {
 
       const hb = setInterval(() => { if (!fechado) { try { controller.enqueue(encoder.encode(': ping\n\n')) } catch { /* */ } } }, 25_000)
       const flush = setInterval(() => { if (pendente) void recompute() }, 2_500)
-      const baseline = setInterval(() => { void recompute() }, 10_000)
+      // Rede de segurança: o pub/sub já dispara recompute por evento; o baseline é só fallback → 30s (menos varredura de matrículas/sessões).
+      const baseline = setInterval(() => { void recompute() }, 30_000)
 
       const cleanup = () => {
         if (fechado) return

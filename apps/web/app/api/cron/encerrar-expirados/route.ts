@@ -4,7 +4,7 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { rankearSimulado } from '@/lib/ranking'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
-import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
+import { invalidarRelatoriosSimulado } from '@/lib/cache/relatorio-cache'
 import { publicarAoVivo } from '@/lib/realtime/pubsub'
 import { onSimuladoFinalizado } from '@/lib/gamificacao'
 import { contextoNota, calcularNota, type NotaContexto } from '@/lib/simulado/nota'
@@ -44,7 +44,7 @@ async function processar() {
   const agora = new Date().toISOString()
   const ctxCache = new Map<string, NotaContexto>()
   const afetados = new Set<string>()
-  const tenantsAfetados = new Set<string>() // p/ invalidar o cache de relatórios (1x por tenant, no fim)
+  const afetadosTenant = new Map<string, string | null>() // simId → tenant, p/ invalidar cache SÓ do simulado afetado
   let simuladosEncerrados = 0
 
   // ── Coleta as sessões a finalizar (dois critérios), sem duplicar ──
@@ -129,7 +129,7 @@ async function processar() {
     if (!upd?.length) return
     sessoesEncerradas++
     afetados.add(s.simulado_id)
-    if (s.tenant_id) tenantsAfetados.add(s.tenant_id)
+    afetadosTenant.set(s.simulado_id, s.tenant_id ?? null)
     eventos.push({ tenant_id: s.tenant_id, sessao_id: s.id, tipo: 'auto_finalizou' })
     // Gamificação: XP do simulado auto-encerrado (idempotente pela dedupe do ledger; refId=sessao_id).
     void onSimuladoFinalizado(svc, { tenantId: s.tenant_id, estudanteId: s.estudante_id ?? null, sessaoId: s.id, nota, acertos, total })
@@ -152,12 +152,13 @@ async function processar() {
       .eq('id', sim.id)
       .eq('status', 'publicado')
       .select('id')
-    if (enc?.length) { simuladosEncerrados++; afetados.add(sim.id); if (sim.tenant_id) tenantsAfetados.add(sim.tenant_id) }
+    if (enc?.length) { simuladosEncerrados++; afetados.add(sim.id); afetadosTenant.set(sim.id, sim.tenant_id ?? null) }
   }
 
-  // Recalcula o ranking de cada simulado afetado + invalida o cache de relatórios (1x por tenant).
+  // Recalcula o ranking de cada simulado afetado + invalida o cache de relatórios SÓ desses
+  // simulados (agregados do tenant expiram por TTL — evita recomputar tudo a cada tick ao vivo).
   for (const id of afetados) await rankearSimulado(svc, id)
-  for (const t of tenantsAfetados) await invalidarRelatorios(t)
+  for (const [id, t] of afetadosTenant) await invalidarRelatoriosSimulado(t, id)
   for (const id of afetados) void publicarAoVivo(id) // realtime: painel "Ao Vivo" (Fase 2)
 
   return { ok: true, simuladosEncerrados, sessoesEncerradas, simuladosAfetados: afetados.size }

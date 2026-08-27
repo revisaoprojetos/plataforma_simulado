@@ -55,7 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ simu
 
       const hb = setInterval(() => { if (!fechado) { try { controller.enqueue(encoder.encode(': ping\n\n')) } catch { /* */ } } }, 25_000)
       const flush = setInterval(() => { if (pendente) void recompute() }, 2_500)
-      const baseline = setInterval(() => { void recompute() }, 10_000) // rede de segurança
+      const baseline = setInterval(() => { void recompute() }, 30_000) // rede de segurança (pub/sub já atualiza por evento; baseline só fallback)
 
       const cleanup = () => {
         if (fechado) return

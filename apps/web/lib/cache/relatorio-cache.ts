@@ -17,7 +17,7 @@ import IORedis from 'ioredis'
  * primeiro uso.
  */
 
-export const TTL_RELATORIO = Number(process.env.RELATORIO_CACHE_TTL ?? 600) // 10 min
+export const TTL_RELATORIO = Number(process.env.RELATORIO_CACHE_TTL ?? 1800) // 30 min (menos recomputações = menos egress)
 const DESLIGADO = process.env.RELATORIO_CACHE === 'off'
 
 let client: IORedis | null = null
@@ -95,9 +95,25 @@ export async function remember<T>(chave: string, ttlSeg: number, calcular: () =>
  * ⚠️ Chamar UMA vez por lote (fim do cron / fim da re-correção), nunca por sessão.
  */
 export async function invalidarRelatorios(tenantId: string | null): Promise<void> {
+  await invalidarPorPadrao(tenantId, '*')
+}
+
+/**
+ * Invalidação GRANULAR: só as chaves de UM simulado (`relatorio:{tenant}:*{simId}*` — relatório e
+ * ranking daquele simulado). Os agregados do tenant (gráficos/resumos/estudante) NÃO são apagados —
+ * expiram pelo TTL. Isso evita o padrão caro "finaliza 1 sessão → apaga TODO o cache do tenant →
+ * recomputa tudo", crítico durante simulado ao vivo (centenas de finalizações/min). Use este no
+ * auto-encerramento; a versão total (`invalidarRelatorios`) fica para re-correção/imports (raros).
+ */
+export async function invalidarRelatoriosSimulado(tenantId: string | null, simuladoId: string): Promise<void> {
+  if (!simuladoId) return
+  await invalidarPorPadrao(tenantId, `*${simuladoId}*`)
+}
+
+async function invalidarPorPadrao(tenantId: string | null, sufixo: string): Promise<void> {
   const r = redis()
   if (!r || !tenantId) return
-  const padrao = `relatorio:${tenantId}:*`
+  const padrao = `relatorio:${tenantId}:${sufixo}`
   try {
     let cursor = '0'
     do {

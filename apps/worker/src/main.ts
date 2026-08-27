@@ -68,7 +68,9 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   // pasta/matrícula (lag de deploy, banco vinculado depois, erro transitório). Idempotente.
   setInterval(() => { void chamarCron('/api/cron/sincronizar-grupos-bancos', 'cron sync grupos→bancos', (j) => !!(j.pastaInseridos || j.matriculasInseridas)) }, 180_000)
   // Warm-up de cache de relatórios (Fase 4): mantém o cache quente p/ a manhã da janela fixa.
-  setInterval(() => { void chamarCron('/api/cron/warm-cache', 'cron warm-cache', (j) => !!j.aquecidos) }, 300_000)
+  // 30 min (alinhado ao TTL padrão de 30 min): recomputar relatórios com mais frequência que o TTL
+  // só desperdiça egress (o remember() serve do cache enquanto não expira).
+  setInterval(() => { void chamarCron('/api/cron/warm-cache', 'cron warm-cache', (j) => !!j.aquecidos) }, 1_800_000)
   // Reconciliação Guru (rede de segurança): reaplica liberações das assinaturas ativas ALTERADAS
   // nas últimas 48h (incremental → barato). A cada 6h: robusto a restart do worker (não depende de
   // um único disparo diário) e a janela de 48h cobre qualquer buraco entre execuções. Só concede.
@@ -78,7 +80,7 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   // Armazenamento: recalcula o uso E sincroniza o catálogo simulado_arquivos (auto-cura o que os
   // uploads não registrarem). A cada 6h (idempotente); o console também dispara sob demanda.
   setInterval(() => { void chamarCron('/api/cron/storage-reconcile', 'cron storage', (j) => !!(j.inseridos || j.removidos)) }, 21_600_000)
-  console.log('[cron] agendado: encerramento + import + sync Curseduca + eventos Integrações (60s); sync grupos→bancos (180s); warm-cache (300s); guru-reconcile (6h, incremental 48h); gamificacao-streak (1h); storage-reconcile (6h)')
+  console.log('[cron] agendado: encerramento + import + sync Curseduca + eventos Integrações (60s); sync grupos→bancos (180s); warm-cache (30min); guru-reconcile (6h, incremental 48h); gamificacao-streak (1h); storage-reconcile (6h)')
 } else {
   console.warn('[cron] DESATIVADO — defina WEB_INTERNAL_URL e CRON_SECRET')
 }

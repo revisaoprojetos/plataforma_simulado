@@ -45,8 +45,11 @@ export function NotificationBell() {
     const ls = Number(localStorage.getItem(LAST_SEEN_KEY) ?? 0)
     setLastSeen(ls)
     carregar()
-    const t = setInterval(carregar, 60000)
-    return () => clearInterval(t)
+    // Poll a cada 5 min e SÓ com a aba visível (economia de egress). Ao voltar à aba, recarrega na hora.
+    const t = setInterval(() => { if (!document.hidden) carregar() }, 300000)
+    const onVis = () => { if (!document.hidden) carregar() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVis) }
   }, [carregar])
 
   // Fecha ao clicar fora.
