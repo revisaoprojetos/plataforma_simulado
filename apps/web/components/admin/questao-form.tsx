@@ -463,9 +463,9 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
                       <input type="hidden" defaultValue={isCerto ? 'Certo' : 'Errado'} {...register(`alternativas.${index}.texto`)} />
                       <button type="button" onClick={() => setCorreta(index)}
                         className={cn('flex w-full items-center gap-3 rounded-lg border-2 px-3 py-2.5 text-left transition-colors',
-                          correta ? isCerto ? 'border-emerald-500 bg-emerald-500/10' : 'border-rose-500 bg-rose-500/10' : 'border-border hover:border-primary')}>
+                          correta ? 'border-emerald-500 bg-emerald-500/10' : 'border-border hover:border-primary')}>
                         <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold',
-                          correta ? isCerto ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-rose-600 bg-rose-600 text-white' : 'border-muted-foreground/40 text-muted-foreground')}>
+                          correta ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-muted-foreground/40 text-muted-foreground')}>
                           {correta ? <Check className="h-4 w-4" /> : isCerto ? 'C' : 'E'}
                         </span>
                         <span className="text-sm font-semibold">{isCerto ? 'Certo' : 'Errado'}</span>
