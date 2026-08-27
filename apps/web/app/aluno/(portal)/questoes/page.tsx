@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
@@ -22,11 +23,12 @@ interface PageProps {
 export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
   const params = await searchParams
   const sessao = await getSessaoAluno()
+  if (!sessao) redirect('/aluno/entrar')
   const svc = createAdminClient()
   const page = Math.max(1, Number(params.page ?? 1))
   const offset = (page - 1) * POR_PAGINA
-  const tid = sessao!.tenantId
-  const estId = sessao!.estudanteId
+  const tid = sessao.tenantId
+  const estId = sessao.estudanteId
 
   // Taxonomia dos filtros + anos distintos + resumo de prática.
   const [{ data: disciplinasAll }, { data: bancas }, { data: assuntos }, { data: metaRows }, praticaTotal, praticaAcertos] = await Promise.all([

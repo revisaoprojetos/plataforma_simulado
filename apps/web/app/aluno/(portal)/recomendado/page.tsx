@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
@@ -10,6 +11,7 @@ import { DiagnosticoCard } from '@/components/aluno/diagnostico-card'
 
 export default async function RecomendadoPage() {
   const sessao = await getSessaoAluno()
+  if (!sessao) redirect('/aluno/entrar')
   const svc = createAdminClient()
 
   // 1) Histórico de respostas objetivas do aluno (todas as sessões).

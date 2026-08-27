@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { getGamConfig } from '@/lib/gamificacao'
@@ -14,8 +15,9 @@ const fmt = (n: number) => n.toLocaleString('pt-BR')
 
 export default async function LigasPage() {
   const sessao = await getSessaoAluno()
+  if (!sessao) redirect('/aluno/entrar')
   const svc = createAdminClient()
-  const config = await getGamConfig(svc, sessao!.tenantId)
+  const config = await getGamConfig(svc, sessao.tenantId)
 
   if (!config?.ativo) {
     return (

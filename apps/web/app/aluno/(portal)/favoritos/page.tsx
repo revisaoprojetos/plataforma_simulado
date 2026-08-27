@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
@@ -7,6 +8,7 @@ import { Star } from 'lucide-react'
 
 export default async function AlunoFavoritosPage() {
   const sessao = await getSessaoAluno()
+  if (!sessao) redirect('/aluno/entrar')
   const svc = createAdminClient()
 
   const { data: favs } = await svc

@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
@@ -29,8 +30,9 @@ import { cn } from '@/lib/utils'
 export default async function AlunoHome({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
   const { pasta } = await searchParams
   const sessao = await getSessaoAluno()
+  if (!sessao) redirect('/aluno/entrar')
   const svc = createAdminClient()
-  const estId = sessao!.estudanteId
+  const estId = sessao.estudanteId
 
   const [{ data: mats }, { data: acs }, { data: sessAll }, { data: banRows }, { data: tenantRow }, gratuitoIds] = await Promise.all([
     svc.from('simulado_matriculas').select('simulado_id, liberado').eq('estudante_id', estId),

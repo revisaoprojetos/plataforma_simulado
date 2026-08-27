@@ -26,9 +26,10 @@ const COMPARATIVO_VAZIO: Comparativo = { participantes: 0, notaMediaTurma: null,
 export default async function ResultadoPersonalizadoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const sessao = await getSessaoAluno()
+  if (!sessao) redirect('/aluno/entrar')
   const svc = createAdminClient()
-  const estId = sessao!.estudanteId
-  const tenantId = sessao!.tenantId
+  const estId = sessao.estudanteId
+  const tenantId = sessao.tenantId
 
   // Simulado do próprio aluno (posse) + sessões finalizadas dele nesse simulado.
   const { data: sim } = await svc.from('simulado_simulados')

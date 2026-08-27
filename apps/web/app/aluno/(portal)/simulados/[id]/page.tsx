@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { ChevronLeft, Lock, RotateCcw } from 'lucide-react'
@@ -20,8 +20,9 @@ const nota = (n: number | null) => (n == null ? '—' : Number(n).toFixed(1).rep
 export default async function ResultadoAlunoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const sessao = await getSessaoAluno()
+  if (!sessao) redirect('/aluno/entrar')
   const svc = createAdminClient()
-  const estId = sessao!.estudanteId
+  const estId = sessao.estudanteId
 
   // Simulado + sessões finalizadas do aluno em paralelo (as sessões definem o early-return).
   const [{ data: sim }, { data: sess }] = await Promise.all([
