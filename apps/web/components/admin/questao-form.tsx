@@ -319,7 +319,7 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)}>
       {/* Barra do topo — full-bleed (contra o p-6 do layout) e fixa ao rolar. */}
-      <div className="sticky top-0 z-30 -mx-6 -mt-6 mb-5 flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-2.5 sm:px-6">
+      <div className="sticky -top-6 z-30 -mx-6 -mt-6 mb-5 flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 pb-2.5 pt-6 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={() => history.back()} aria-label="Voltar" className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
             <ArrowLeft className="h-5 w-5" />
