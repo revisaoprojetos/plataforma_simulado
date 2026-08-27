@@ -183,6 +183,8 @@ interface QuestaoFormProps {
   bancasSugestoes?: string[]
   disciplinasSugestoes?: string[]
   assuntosSugestoes?: string[]
+  /** Valores distintos de "assunto específico" (coluna assunto_detalhe) já cadastrados. */
+  assuntosDetalheSugestoes?: string[]
   /** Bancos em que a questão está sincronizada + posição de ordenação (somente leitura). */
   bancosDaQuestao?: BancoSync[]
   /** Conteúdo extra da barra lateral (ex.: seletor de etiquetas). */
@@ -364,7 +366,7 @@ function StatusBadge({ status }: { status?: string }) {
   return <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', cfg.cls)}>{cfg.label}</span>
 }
 
-export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], disciplinasSugestoes = [], assuntosSugestoes = [], bancosDaQuestao = [], sidebarExtra, onSubmit }: QuestaoFormProps) {
+export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], disciplinasSugestoes = [], assuntosSugestoes = [], assuntosDetalheSugestoes = [], bancosDaQuestao = [], sidebarExtra, onSubmit }: QuestaoFormProps) {
   const ocultarDiscursiva = useOcultarDiscursiva()
   const [isLoading, setIsLoading] = useState(false)
   const [, forcar] = useReducer((x: number) => x + 1, 0) // força re-render (reverte o <select> Tipo ao cancelar)
@@ -436,6 +438,7 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
   const bancasOpts = [...new Set([watch('banca'), ...bancasSugestoes].filter(Boolean) as string[])]
   const discOpts = [...new Set([watch('disciplina'), ...disciplinasSugestoes].filter(Boolean) as string[])]
   const assuntoOpts = [...new Set([watch('assunto'), ...assuntosSugestoes].filter(Boolean) as string[])]
+  const assuntoDetalheOpts = [...new Set([watch('assunto_detalhe'), ...assuntosDetalheSugestoes].filter(Boolean) as string[])]
 
   async function onImagemFile(file: File | null) {
     if (!file) return
@@ -767,7 +770,9 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
               </Campo>
 
               <Campo label="Assunto específico">
-                <Input placeholder="Detalhe do assunto (ex.: importado)" {...register('assunto_detalhe')} />
+                <SelectMenu value={watch('assunto_detalhe') ?? ''} ariaLabel="Assunto específico" placeholder="—"
+                  onChange={(v) => setValue('assunto_detalhe', v, { shouldDirty: true })}
+                  options={[{ value: '', label: '—' }, ...assuntoDetalheOpts.map((n) => ({ value: n, label: n }))]} />
               </Campo>
 
               <Campo label="Dificuldade">

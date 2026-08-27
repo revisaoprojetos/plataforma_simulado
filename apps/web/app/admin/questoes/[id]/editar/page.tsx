@@ -29,6 +29,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
     { data: bancosDestino },
     { data: vinculos },
     vincAll,
+    detalheRows,
   ] = await Promise.all([
     admin
       .from('simulado_questoes')
@@ -49,6 +50,8 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
     admin.from('simulado_questao_pasta').select('pasta_id').eq('questao_id', id).eq('tenant_id', tenantId ?? NADA),
     // Todos os vínculos questão↔banco do tenant (para contagem + composição da ordem de cada banco).
     fetchAll<{ pasta_id: string; questao_id: string }>(() => admin.from('simulado_questao_pasta').select('pasta_id, questao_id').eq('tenant_id', tenantId ?? NADA)),
+    // Valores distintos de "assunto específico" (assunto_detalhe) já cadastrados → opções do dropdown.
+    fetchAll<{ assunto_detalhe: string | null }>(() => admin.from('simulado_questoes').select('assunto_detalhe').eq('tenant_id', tenantId ?? NADA).not('assunto_detalhe', 'is', null)),
   ])
 
   if (!questao) {
@@ -58,6 +61,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
   const bancasSugestoes = (bancas ?? []).map((b) => b.nome)
   const disciplinasSugestoes = (disciplinas ?? []).map((d) => d.nome)
   const assuntosSugestoes = [...new Set((assuntosLista ?? []).map((a: { nome: string }) => a.nome).filter(Boolean))]
+  const assuntosDetalheSugestoes = [...new Set(detalheRows.map((r) => (r.assunto_detalhe ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
   const meusBancoIds = (vinculos ?? []).map((v: { pasta_id: string }) => v.pasta_id)
   const et = await etiquetasDaQuestao(id)
 
@@ -138,6 +142,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
       bancasSugestoes={bancasSugestoes}
       disciplinasSugestoes={disciplinasSugestoes}
       assuntosSugestoes={assuntosSugestoes}
+      assuntosDetalheSugestoes={assuntosDetalheSugestoes}
       bancosDaQuestao={bancosDaQuestao}
       onSubmit={updateQuestaoAction.bind(null, id)}
       sidebarExtra={<EtiquetaPicker questaoId={id} todas={et.todas ?? []} ativasIniciais={et.ativas ?? []} />}
