@@ -114,8 +114,8 @@ async function baixarModelo(formato: ModeloImport, etiquetasSistema: string[] = 
   try {
     const cfg = MODELOS[formato]
     const COLS = cfg.colunas
-    // Exemplo da coluna Etiquetas: usa as etiquetas REAIS do sistema (as 3 primeiras) quando houver.
-    const etqExemplo = etiquetasSistema.slice(0, 3).join(', ')
+    // Exemplo da coluna Etiquetas: lista TODAS as etiquetas reais do sistema (todos os tipos).
+    const etqExemplo = etiquetasSistema.join(', ')
     const valorCelula = (ex: Record<string, string>, c: string) =>
       c === 'Etiquetas' && etqExemplo ? etqExemplo : (ex[c] ?? '')
     const ExcelJS = (await import('exceljs')).default
