@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { CalendarDays, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, ListChecks, Loader2, Package, Pencil, Plus, Search, Tags, Trash2, X, Zap } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ListChecks, Loader2, Package, Pencil, Plus, Power, Search, Tags, Trash2, Upload, X, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -281,15 +281,21 @@ export function CronogramasClient({
     [filtrados, pagina, porPagina],
   )
 
-  // Agrupa por carga horária — é assim que o aluno escolhe (spec §4, passo 2).
-  const porCarga = useMemo(() => {
-    const mapa = new Map<number, CronogramaLista[]>()
+  // Agrupa por CATEGORIA (como na referência: Pós-edital / Extensivo / Reta final).
+  // "Sem categoria" vai por último; a carga vira etiqueta na linha + filtro em pílula.
+  const porCategoria = useMemo(() => {
+    const mapa = new Map<string, CronogramaLista[]>()
     for (const c of daPagina) {
-      const lista = mapa.get(c.carga_horaria)
+      const k = c.categoria_nome ?? 'Sem categoria'
+      const lista = mapa.get(k)
       if (lista) lista.push(c)
-      else mapa.set(c.carga_horaria, [c])
+      else mapa.set(k, [c])
     }
-    return [...mapa.entries()].sort((a, b) => a[0] - b[0])
+    return [...mapa.entries()].sort((a, b) => {
+      if (a[0] === 'Sem categoria') return 1
+      if (b[0] === 'Sem categoria') return -1
+      return a[0].localeCompare(b[0], 'pt-BR')
+    })
   }, [daPagina])
 
   function abrirNovo() {
@@ -482,7 +488,10 @@ export function CronogramasClient({
           <Button variant="outline" onClick={() => setCategoriasAberto(true)}>
             <Tags className="mr-1 h-4 w-4" /> Categorias
           </Button>
-          {/* Botão "Novo cronograma" com brilho: gradiente + gloss no topo + brilho que varre (dash-shimmer). */}
+          <Link href="/admin/cronogramas/importar" className={buttonVariants({ variant: 'outline' })}>
+            <Upload className="mr-1 h-4 w-4" /> Importar modelo
+          </Link>
+          {/* Botão "Novo cronograma" com brilho: gradiente + glow (cor dedicada --crono-cor). */}
           <button
             type="button"
             onClick={abrirNovo}
@@ -527,82 +536,103 @@ export function CronogramasClient({
         ))}
       </div>
 
-      {/* GERADOR RÁPIDO — cria um rascunho (grade de semanas) em segundos, sem abrir o diálogo. */}
-      <div
-        className="relative overflow-hidden rounded-2xl border border-white/10 p-4 text-white sm:p-5"
-        style={{ marginTop: '1.75rem', background: GRAD_MARCA, boxShadow: GLOW_CARD }}
-      >
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0 flex-1 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
-                <Zap className="h-3.5 w-3.5" /> Gerador rápido
-              </span>
-              <span className="text-sm text-white/85">monte um rascunho em segundos — o gerador cria a grade de semanas</span>
-            </div>
-            <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-              <div>
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">Carga diária</div>
-                <div className="flex gap-1.5">
-                  {[2, 3, 4, 6].map((h) => (
-                    <button
-                      key={h}
-                      type="button"
-                      onClick={() => setGerCarga(h)}
-                      className={cn('rounded-full px-3 py-1 text-sm font-semibold transition', gerCarga === h ? 'bg-white text-primary shadow' : 'bg-white/15 text-white hover:bg-white/25')}
-                    >
-                      {h}h
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="min-w-[180px] flex-1">
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">Semanas — {gerSemanas}</div>
-                <input
-                  type="range"
-                  min={4}
-                  max={60}
-                  value={gerSemanas}
-                  onChange={(e) => setGerSemanas(Number(e.target.value))}
-                  className="w-full accent-white"
-                  aria-label="Total de semanas"
-                />
-              </div>
-              <div>
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-white/70">Dias</div>
-                <div className="flex gap-1.5">
-                  {([['seg-sab', 'Seg–Sáb'], ['seg-sex', 'Seg–Sex']] as const).map(([v, l]) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => setGerDias(v)}
-                      className={cn('rounded-full px-3 py-1 text-sm font-semibold transition', gerDias === v ? 'bg-white text-primary shadow' : 'bg-white/15 text-white hover:bg-white/25')}
-                    >
-                      {l}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+      {/* LAYOUT 2 COLUNAS: Gerador rápido (vertical, à esquerda) + lista (à direita), como na referência. */}
+      <div className="grid items-start gap-5 lg:grid-cols-[300px_1fr]" style={{ marginTop: '1.25rem' }}>
+        {/* GERADOR RÁPIDO — painel vertical fixo à esquerda. Mesma função de antes, reflow vertical. */}
+        <aside
+          className="space-y-4 rounded-2xl border border-white/10 p-4 text-white lg:sticky lg:top-4"
+          style={{ background: GRAD_MARCA, boxShadow: GLOW_CARD }}
+        >
+          <div className="space-y-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+              <Zap className="h-3.5 w-3.5" /> Gerador rápido
+            </span>
+            <h2 className="text-lg font-bold leading-tight">Cronograma em segundos</h2>
+            <p className="text-xs text-white/80">Só o básico: carga, duração e dias. Você ajusta depois.</p>
           </div>
-          <div className="flex shrink-0 flex-col items-start gap-2 lg:items-end lg:text-right">
-            <div>
-              <div className="text-3xl font-extrabold leading-none">{metasEstimadas.toLocaleString('pt-BR')}</div>
-              <div className="text-[11px] text-white/75">
-                metas estimadas · {gerSemanas} semanas · {gerDias === 'seg-sab' ? 'Segunda a Sábado' : 'Segunda a Sexta'} · {gerCarga}h/dia
-              </div>
-            </div>
-            <Button onClick={gerarRascunho} disabled={gerando} className="bg-white text-primary hover:bg-white/90">
-              {gerando ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-              Gerar rascunho
-            </Button>
-          </div>
-        </div>
-      </div>
 
-      {/* TUDO que filtra mora aqui: busca, categoria, situação e carga. Antes a busca ficava no
-          cabeçalho do cartão e as pílulas acima dele — dois lugares para a mesma tarefa, e
-          nenhum deles mostrando o que estava ligado. */}
+          <div>
+            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-white/70">Carga diária</div>
+            <div className="space-y-1.5">
+              {[2, 3, 4, 6].map((h) => {
+                const sel = gerCarga === h
+                return (
+                  <button
+                    key={h}
+                    type="button"
+                    onClick={() => setGerCarga(h)}
+                    className={cn('flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition', sel ? 'bg-white shadow' : 'bg-white/10 text-white hover:bg-white/20')}
+                    style={sel ? { color: MARCA } : undefined}
+                  >
+                    <span>{h}h / dia</span>
+                    <span className={cn('text-xs font-medium', sel ? 'opacity-70' : 'text-white/70')}>≈ {h * gerDiasQtd}h/sem</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-white/70">Duração (semanas)</span>
+              <span className="text-sm font-bold tabular-nums">{gerSemanas}</span>
+            </div>
+            <input
+              type="range"
+              min={4}
+              max={60}
+              value={gerSemanas}
+              onChange={(e) => setGerSemanas(Number(e.target.value))}
+              className="w-full accent-white"
+              aria-label="Total de semanas"
+            />
+          </div>
+
+          <div>
+            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-white/70">Dias</div>
+            <div className="flex gap-1.5">
+              {([['seg-sab', 'Seg–Sáb'], ['seg-sex', 'Seg–Sex']] as const).map(([v, l]) => {
+                const sel = gerDias === v
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setGerDias(v)}
+                    className={cn('flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition', sel ? 'bg-white shadow' : 'bg-white/10 text-white hover:bg-white/20')}
+                    style={sel ? { color: MARCA } : undefined}
+                  >
+                    {l}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 rounded-xl bg-white/10 px-3 py-2.5 text-center">
+            <div>
+              <div className="text-base font-extrabold leading-none">{metasEstimadas.toLocaleString('pt-BR')}</div>
+              <div className="mt-0.5 text-[10px] text-white/70">metas ≈</div>
+            </div>
+            <div>
+              <div className="text-base font-extrabold leading-none">{gerSemanas}</div>
+              <div className="mt-0.5 text-[10px] text-white/70">semanas</div>
+            </div>
+            <div>
+              <div className="text-base font-extrabold leading-none">{gerDiasQtd}</div>
+              <div className="mt-0.5 text-[10px] text-white/70">dias/sem</div>
+            </div>
+          </div>
+
+          <Button onClick={gerarRascunho} disabled={gerando} className="w-full bg-white hover:bg-white/90" style={{ color: MARCA }}>
+            {gerando ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Zap className="mr-1 h-4 w-4" />}
+            Gerar cronograma
+          </Button>
+          <p className="text-center text-[11px] text-white/70">Nada é publicado sem a sua revisão.</p>
+        </aside>
+
+        {/* COLUNA DIREITA: filtros + lista + paginação. */}
+        <div className="min-w-0 space-y-4">
+      {/* TUDO que filtra mora aqui: busca, categoria, situação e carga. */}
       <div className="space-y-3">
       <div className="flex flex-row flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1">
@@ -824,15 +854,12 @@ export function CronogramasClient({
                 </Button>
               </div>
             )}
-            {porCarga.map(([carga, lista]) => (
-              <div key={carga}>
-                {/* Cabeçalho do grupo: pílula da carga + contagem + linha divisória à direita (como na referência). */}
+            {porCategoria.map(([cat, lista]) => (
+              <div key={cat}>
+                {/* Cabeçalho do grupo: NOME da categoria + contagem + divisória (como na referência). */}
                 <div className="mb-2 flex items-center gap-3">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
-                    <Clock className="h-3.5 w-3.5" />
-                    {carga}h por dia
-                  </span>
-                  <span className="whitespace-nowrap text-xs text-muted-foreground">{lista.length} cronograma(s)</span>
+                  <span className="text-xs font-bold uppercase tracking-wide text-foreground">{cat}</span>
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">{lista.length}</span>
                   <span className="h-px flex-1 bg-border" />
                 </div>
                 {/* Cada grupo é um card próprio; as linhas dentro dele separadas por divisória leve. */}
@@ -881,6 +908,7 @@ export function CronogramasClient({
                         {/* Quatro dados encadeados por "·" viravam uma frase que não se lê.
                             Como etiquetas, o que está errado salta: âmbar é problema. */}
                         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                          <span className="rounded-full border px-2 py-0.5 font-medium text-muted-foreground">{c.carga_horaria}h/dia</span>
                           <span className="rounded-full border px-2 py-0.5 text-muted-foreground">{c.faixa}</span>
                           <span className="rounded-full border px-2 py-0.5 text-muted-foreground">
                             {c.total_semanas} semanas
@@ -915,29 +943,42 @@ export function CronogramasClient({
                         </div>
                       </div>
 
-                      {/* Sparkline "metas por semana" (visão geral) — o mesmo do design de referência. */}
+                      {/* Sparkline "metas por semana" (visão geral) — como no design de referência. */}
                       <Sparkline c={c} />
 
-                      {/* Divisória antes das ações: sem ela, os ícones flutuavam entre linhas e
-                          ficava fácil clicar na lixeira do cronograma de cima. */}
-                      <div className="flex shrink-0 items-center gap-1 border-l pl-3">
-                        {/* Largura FIXA: "Voltar a rascunho" é o dobro de "Liberar", e sem isso
-                            a divisória e os três ícones dançavam alguns pixels a cada linha,
-                            conforme o estado do cronograma. */}
+                      {/* Métrica REAL à direita (metas) — ocupa o lugar do "acessos" da referência. */}
+                      <div className="hidden w-16 shrink-0 text-right sm:block">
+                        <div className="text-sm font-bold leading-none tabular-nums">
+                          {c.metas > 0 ? c.metas.toLocaleString('pt-BR') : '—'}
+                        </div>
+                        <div className="mt-0.5 text-[10px] text-muted-foreground">metas</div>
+                      </div>
+
+                      {/* Ações compactas em ícones (como na referência): liberar (power), metas, editar, excluir. */}
+                      <div className="flex shrink-0 items-center gap-0.5 border-l pl-2">
                         <Button
                           size="sm"
-                          className="w-36 shrink-0"
-                          variant={c.status === 'liberado' ? 'secondary' : 'default'}
+                          variant="ghost"
                           onClick={() => liberar(c)}
                           disabled={ocupado(`lib:${c.id}`) || (c.status !== 'liberado' && c.metas === 0)}
-                          title={c.status !== 'liberado' && c.metas === 0 ? 'Cadastre metas antes de liberar' : undefined}
-                          style={
-                            c.status !== 'liberado'
-                              ? { background: GRAD_MARCA, boxShadow: GLOW_BTN, color: '#fff', border: 'none' }
-                              : undefined
+                          title={
+                            c.status === 'liberado'
+                              ? 'Liberado — clique para voltar a rascunho'
+                              : c.metas === 0
+                                ? 'Cadastre metas antes de liberar'
+                                : 'Liberar para os alunos'
                           }
                         >
-                          {c.status === 'liberado' ? 'Voltar a rascunho' : 'Liberar'}
+                          {ocupado(`lib:${c.id}`) ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Power
+                              className={cn(
+                                'h-4 w-4',
+                                c.status === 'liberado' ? (invisivel ? 'text-amber-500' : 'text-emerald-500') : 'text-muted-foreground',
+                              )}
+                            />
+                          )}
                         </Button>
                         <Link
                           href={`/admin/cronogramas/${c.id}`}
@@ -1007,6 +1048,8 @@ export function CronogramasClient({
             )}
           </div>
         )}
+        </div>
+      </div>
       </div>
 
       <Dialog open={aberto} onOpenChange={setAberto}>
