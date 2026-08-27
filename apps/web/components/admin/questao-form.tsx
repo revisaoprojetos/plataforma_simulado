@@ -379,8 +379,8 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
   const reajustarCaixas = () => requestAnimationFrame(() => formRef.current?.querySelectorAll('textarea').forEach((t) => { t.style.height = 'auto'; t.style.height = `${t.scrollHeight + 2}px` }))
 
   const {
-    register, handleSubmit, watch, setValue, control, reset,
-    formState: { errors, isDirty },
+    register, handleSubmit, watch, setValue, control, reset, getValues,
+    formState: { errors },
   } = useForm<QuestaoFormData>({
     resolver: zodResolver(questaoSchema),
     defaultValues: {
@@ -416,6 +416,14 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
   const tipoUi: 'multipla' | 'certo_errado' | 'discursiva' =
     tipo === 'discursiva' ? 'discursiva' : formato === 'certo_errado' ? 'certo_errado' : 'multipla'
   const ehCE = tipo === 'objetiva' && formato === 'certo_errado'
+
+  // "Sujo" robusto: compara os valores atuais com um baseline (JSON). Evita o falso "não salvo"
+  // do isDirty do RHF e serve de gate ao guard de saída. Rebaseia ao carregar / salvar / desfazer.
+  const valoresAtuais = watch()
+  const baselineRef = useRef<string | null>(null)
+  if (baselineRef.current === null) baselineRef.current = JSON.stringify(valoresAtuais)
+  const sujo = JSON.stringify(valoresAtuais) !== baselineRef.current
+  const marcarSalvo = () => { baselineRef.current = JSON.stringify(getValues()) }
 
   const anoAtual = new Date().getFullYear()
   const anos = Array.from({ length: anoAtual + 2 - 1999 }, (_, i) => anoAtual + 1 - i)
@@ -484,10 +492,10 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
     }
   }
 
-  function desfazer() { reset(); setPrevEnun(false); setPrevAlts(false); setPrevProf(false); reajustarCaixas(); toast.success('Alterações desfeitas.') }
+  function desfazer() { reset(); setPrevEnun(false); setPrevAlts(false); setPrevProf(false); reajustarCaixas(); marcarSalvo(); toast.success('Alterações desfeitas.') }
 
   // Guarda edições não salvas (F5/fechar aba + navegação por link do menu → pop-up de confirmação).
-  useUnsavedGuard(isDirty)
+  useUnsavedGuard(sujo)
   // Saídas que não passam por um <a> (voltar/cancelar): confirma descartar antes de sair.
   async function sair() { if (await confirmarDescartarAlteracoes()) history.back() }
 
@@ -495,7 +503,11 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
     setIsLoading(true)
     try {
       const result = await onSubmit(data)
-      if (result?.error) toast.error(result.error)
+      if (result?.error) { toast.error(result.error); return }
+      // Edição bem-sucedida: NÃO redireciona (a action retorna sucesso). Permanece na tela,
+      // confirma com toast e rebaseia o estado → volta a "Salvo". (Criar redireciona e nem chega aqui.)
+      marcarSalvo()
+      toast.success('Questão salva com sucesso.')
     } catch (e) {
       if (e && typeof e === 'object' && 'digest' in e && String((e as { digest?: string }).digest).startsWith('NEXT_REDIRECT')) throw e
       toast.error('Erro ao salvar questão')
@@ -519,11 +531,11 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
         </div>
         <div className="flex items-center gap-2">
           {/* Status de salvamento — mesmo padrão da área de gamificação (ponto + rótulo). */}
-          <span className={cn('mr-0.5 hidden items-center gap-1.5 text-xs font-medium sm:inline-flex', isDirty ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400')}>
-            <span className={cn('h-1.5 w-1.5 rounded-full', isDirty ? 'bg-amber-500' : 'bg-emerald-500')} />
-            {isDirty ? 'Não salvo' : 'Salvo'}
+          <span className={cn('mr-0.5 hidden items-center gap-1.5 text-xs font-medium sm:inline-flex', sujo ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400')}>
+            <span className={cn('h-1.5 w-1.5 rounded-full', sujo ? 'bg-amber-500' : 'bg-emerald-500')} />
+            {sujo ? 'Não salvo' : 'Salvo'}
           </span>
-          <Button type="button" variant="ghost" size="sm" onClick={desfazer} disabled={!isDirty} title="Desfazer todas as alterações">
+          <Button type="button" variant="ghost" size="sm" onClick={desfazer} disabled={!sujo} title="Desfazer todas as alterações">
             <Undo2 className="mr-1.5 h-4 w-4" /> Desfazer
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={sair}>Cancelar</Button>

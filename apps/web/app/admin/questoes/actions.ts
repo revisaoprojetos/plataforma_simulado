@@ -388,5 +388,6 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
   revalidatePath('/admin/questoes')
   revalidatePath(`/admin/questoes/${id}/editar`)
   revalidatePath('/admin/banco-questoes')
-  redirect('/admin/questoes')
+  // Não redireciona: o usuário permanece na edição e recebe um toast de sucesso no cliente.
+  return { ok: true as const }
 }
