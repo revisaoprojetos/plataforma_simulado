@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import { Tag, Plus, X, Loader2, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAbreFecha } from '@/lib/use-abre-fecha'
 import { Button } from '@/components/ui/button'
 import { aplicarEtiqueta, removerEtiquetaDaQuestao, type Etiqueta } from '@/app/admin/etiquetas/actions'
 
@@ -43,28 +44,37 @@ export function EtiquetaPicker({ questaoId, todas, ativasIniciais }: { questaoId
         <Plus className="h-3.5 w-3.5" /> Selecionar etiquetas
       </button>
 
-      {modal && (
-        <EtiquetaModal
-          questaoId={questaoId}
-          todas={todas}
-          ativas={ativas}
-          onClose={() => setModal(false)}
-          onSalvo={(set) => { setAtivas(set); setModal(false) }}
-        />
-      )}
+      <EtiquetaModal
+        open={modal}
+        questaoId={questaoId}
+        todas={todas}
+        ativas={ativas}
+        onClose={() => setModal(false)}
+        onSalvo={(set) => { setAtivas(set); setModal(false) }}
+      />
     </div>
   )
 }
 
-function EtiquetaModal({ questaoId, todas, ativas, onClose, onSalvo }: {
+function EtiquetaModal({ open, questaoId, todas, ativas, onClose, onSalvo }: {
+  open: boolean
   questaoId: string
   todas: Etiqueta[]
   ativas: Set<string>
   onClose: () => void
   onSalvo: (s: Set<string>) => void
 }) {
+  const { montado, aberto } = useAbreFecha(open, 200)
   const [sel, setSel] = useState<Set<string>>(new Set(ativas))
   const [pending, start] = useTransition()
+
+  useEffect(() => { if (open) setSel(new Set(ativas)) }, [open, ativas])
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, onClose])
 
   function toggle(id: string) {
     setSel((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n })
@@ -86,10 +96,12 @@ function EtiquetaModal({ questaoId, todas, ativas, onClose, onSalvo }: {
     })
   }
 
+  if (!montado) return null
   return createPortal(
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div role="dialog" aria-modal="true" className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+      <div className={cn('absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-200', aberto ? 'opacity-100' : 'opacity-0')} onClick={onClose} />
+      <div role="dialog" aria-modal="true" className={cn('relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl transition-all duration-200 ease-out',
+        aberto ? 'scale-100 opacity-100 translate-y-0' : 'translate-y-2 scale-95 opacity-0')}>
         <div className="flex items-center justify-between border-b px-5 py-3.5">
           <h3 className="flex items-center gap-2 text-sm font-semibold"><Tag className="h-4 w-4" /> Etiquetas da questão</h3>
           <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>

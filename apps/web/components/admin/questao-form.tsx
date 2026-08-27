@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { MarkdownContent } from '@/components/markdown-content'
 import { useUnsavedGuard, confirmarDescartarAlteracoes } from '@/components/admin/use-unsaved-guard'
+import { useAbreFecha } from '@/lib/use-abre-fecha'
 import { useOcultarDiscursiva } from '@/components/auth/can-provider'
 import { hospedarImagemQuestaoAction } from '@/app/admin/questoes/actions'
 
@@ -229,6 +230,7 @@ function SelectMenu({ value, onChange, options, placeholder, ariaLabel }: {
   ariaLabel?: string
 }) {
   const [open, setOpen] = useState(false)
+  const { montado, aberto } = useAbreFecha(open, 140)
   const ref = useRef<HTMLDivElement>(null)
   const atual = options.find((o) => o.value === value)
   useEffect(() => {
@@ -245,10 +247,11 @@ function SelectMenu({ value, onChange, options, placeholder, ariaLabel }: {
         className={cn('flex h-10 w-full items-center justify-between gap-2 rounded-lg border bg-background/50 px-3 text-left text-sm outline-none transition-colors hover:border-primary/40 focus-visible:border-primary/60 focus-visible:ring-1 focus-visible:ring-primary/30',
           open && 'border-primary/60 ring-1 ring-primary/30')}>
         <span className={cn('truncate', atual?.value ? 'text-foreground' : 'text-muted-foreground')}>{atual?.label ?? placeholder ?? '—'}</span>
-        <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
+        <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200', open && 'rotate-180')} />
       </button>
-      {open && (
-        <div role="listbox" className="absolute left-0 right-0 top-[calc(100%+4px)] z-40 max-h-60 overflow-auto rounded-xl border bg-popover p-1 shadow-lg">
+      {montado && (
+        <div role="listbox" className={cn('absolute left-0 right-0 top-[calc(100%+4px)] z-40 max-h-60 origin-top overflow-auto rounded-xl border bg-popover p-1 shadow-lg transition duration-150 ease-out',
+          aberto ? 'scale-100 opacity-100 translate-y-0' : 'pointer-events-none -translate-y-1 scale-95 opacity-0')}>
           {options.map((o) => {
             const sel = o.value === value
             return (
@@ -316,21 +319,32 @@ function PosterEscolha({ banco, ativo, onClick, nenhum }: { banco?: BancoOpt; at
 }
 
 /** Modal de seleção do banco (grade de pôsteres com capa + nome + botão Salvar). */
-function BancoModal({ bancos, selecionadoId, onSalvar, onClose }: {
+function BancoModal({ open, bancos, selecionadoId, onSalvar, onClose }: {
+  open: boolean
   bancos: BancoOpt[]
   selecionadoId: string
   onSalvar: (id: string) => void
   onClose: () => void
 }) {
+  const { montado, aberto } = useAbreFecha(open, 200)
   const [sel, setSel] = useState(selecionadoId)
   const [busca, setBusca] = useState('')
+  useEffect(() => { if (open) { setSel(selecionadoId); setBusca('') } }, [open, selecionadoId])
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+  if (!montado) return null
   const q = busca.trim().toLowerCase()
   const filtrados = q ? bancos.filter((b) => b.nome.toLowerCase().includes(q)) : bancos
   const nomeSel = bancos.find((b) => b.id === sel)?.nome
   return createPortal(
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div role="dialog" aria-modal="true" className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+      <div className={cn('absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-200', aberto ? 'opacity-100' : 'opacity-0')} onClick={onClose} />
+      <div role="dialog" aria-modal="true" className={cn('relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl transition-all duration-200 ease-out',
+        aberto ? 'scale-100 opacity-100 translate-y-0' : 'translate-y-2 scale-95 opacity-0')}>
         <div className="flex items-center justify-between gap-3 border-b px-5 py-3.5">
           <h3 className="flex items-center gap-2 text-sm font-semibold"><Database className="h-4 w-4" /> Selecionar banco</h3>
           <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
@@ -819,14 +833,13 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
         </aside>
       </div>
 
-      {bancoModal && (
-        <BancoModal
-          bancos={bancos}
-          selecionadoId={bancoSel}
-          onSalvar={(id) => { setValue('bancoIds', id ? [id] : [], { shouldDirty: true }); setBancoModal(false) }}
-          onClose={() => setBancoModal(false)}
-        />
-      )}
+      <BancoModal
+        open={bancoModal}
+        bancos={bancos}
+        selecionadoId={bancoSel}
+        onSalvar={(id) => { setValue('bancoIds', id ? [id] : [], { shouldDirty: true }); setBancoModal(false) }}
+        onClose={() => setBancoModal(false)}
+      />
     </form>
   )
 }
