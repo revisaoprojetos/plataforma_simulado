@@ -74,10 +74,13 @@ function BarraMD({ onAplicar, preview, onTogglePreview }: { onAplicar: (t: MdTip
       ))}
       <span className="mx-1 hidden text-[11px] font-medium text-muted-foreground sm:inline">Markdown</span>
       {onTogglePreview && (
-        <button type="button" onClick={onTogglePreview}
-          className={cn('inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors', preview ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>
-          {preview ? <><Pencil className="h-3.5 w-3.5" /> Editar</> : <><Eye className="h-3.5 w-3.5" /> Prévia</>}
-        </button>
+        <>
+          <span className="mx-1 h-4 w-px bg-border" />
+          <button type="button" onClick={onTogglePreview}
+            className={cn('inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors', preview ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>
+            {preview ? <><Pencil className="h-3.5 w-3.5" /> Editar</> : <><Eye className="h-3.5 w-3.5" /> Prévia</>}
+          </button>
+        </>
       )}
     </div>
   )
@@ -483,12 +486,7 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
               </div>
             </Secao>
           ) : tipo === 'objetiva' ? (
-            <Secao titulo="Alternativas" acao={
-              <div className="flex items-center gap-3">
-                <span className="hidden text-xs text-muted-foreground sm:inline">clique na letra para marcar a correta</span>
-                <BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} preview={prevAlts} onTogglePreview={() => setPrevAlts((v) => !v)} />
-              </div>
-            }>
+            <Secao titulo="Alternativas" acao={<BarraMD onAplicar={(t) => aplicarMarkdown(activeTa.current, t)} preview={prevAlts} onTogglePreview={() => setPrevAlts((v) => !v)} />}>
               <div className="space-y-3">
                 {fields.map((field, index) => {
                   const correta = !!alternativas?.[index]?.correta
