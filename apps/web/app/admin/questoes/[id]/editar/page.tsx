@@ -60,6 +60,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
 
   const initialData = {
     tipo: questao.tipo as 'objetiva' | 'discursiva',
+    formato: ((questao.formato as string | null) === 'certo_errado' ? 'certo_errado' : 'multipla') as 'multipla' | 'certo_errado',
     enunciado: questao.enunciado,
     banca: (questao.bancas as { nome?: string } | null)?.nome ?? undefined,
     disciplina: (questao.disciplinas as { nome?: string } | null)?.nome ?? undefined,
