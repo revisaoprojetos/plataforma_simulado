@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { ModeloCard, PastaModeloCard, MODALIDADE_META } from '@/components/admin/modelos-caderno/modelo-card'
 import { EditarPastaModeloDialog } from '@/components/admin/modelos-caderno/editar-pasta-modelo-dialog'
-import { criarModeloEmBranco, moverModelo, excluirPastaModelo, type ModeloRow, type PastaModeloRow } from '@/app/admin/modelos-caderno/actions'
+import { NovoModeloDialog } from '@/components/admin/modelos-caderno/novo-modelo-dialog'
+import { moverModelo, excluirPastaModelo, type ModeloRow, type PastaModeloRow } from '@/app/admin/modelos-caderno/actions'
 
 const MODALIDADES_FILTRO = ['folha_respostas', 'caderno_questoes', 'caderno_completo', 'diagnostico'] as const
 
@@ -17,8 +18,9 @@ export function ModelosGrid({ modelos, pastas, pastaAtual }: { modelos: ModeloRo
   const router = useRouter()
   const [busca, setBusca] = useState('')
   const [filtroMod, setFiltroMod] = useState<string>('')
-  const [pending, start] = useTransition()
+  const [, start] = useTransition()
   const [novaPasta, setNovaPasta] = useState(false)
+  const [novoModelo, setNovoModelo] = useState(false)
   const [editarPasta, setEditarPasta] = useState<PastaModeloRow | null>(null)
   const [mover, setMover] = useState<ModeloRow | null>(null)
 
@@ -48,13 +50,6 @@ export function ModelosGrid({ modelos, pastas, pastaAtual }: { modelos: ModeloRo
   }, [modelos])
 
   function irPara(id: string | null) { router.push(id ? `/admin/modelos-caderno?pasta=${id}` : '/admin/modelos-caderno') }
-  function novoModelo() {
-    start(async () => {
-      const r = await criarModeloEmBranco(pastaAtual)
-      if (r.ok && r.id) router.push(`/admin/modelos-caderno/${r.id}`)
-      else toast.error(r.error ?? 'Erro ao criar')
-    })
-  }
   async function excluirPasta(p: PastaModeloRow) {
     if (!(await confirmar({ titulo: 'Excluir pasta?', mensagem: `"${p.nome}" será excluída. Os modelos e subpastas dentro dela voltam para a raiz.`, confirmar: 'Excluir', destrutivo: true }))) return
     start(async () => {
@@ -94,8 +89,8 @@ export function ModelosGrid({ modelos, pastas, pastaAtual }: { modelos: ModeloRo
         <button type="button" onClick={() => setNovaPasta(true)} className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors hover:bg-muted">
           <FolderPlus className="h-4 w-4" /> Nova pasta
         </button>
-        <button type="button" onClick={novoModelo} disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Novo modelo
+        <button type="button" onClick={() => setNovoModelo(true)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90">
+          <Plus className="h-4 w-4" /> Novo modelo
         </button>
       </div>
 
@@ -104,6 +99,9 @@ export function ModelosGrid({ modelos, pastas, pastaAtual }: { modelos: ModeloRo
           <LayoutTemplate className="h-9 w-9 text-muted-foreground/40" />
           <p className="text-sm font-medium">Nenhum modelo {current ? 'nesta pasta' : 'ainda'}</p>
           <p className="max-w-sm text-xs text-muted-foreground">Crie um modelo do zero, ou use um dos <strong>Modelos padrão</strong> e salve como editável. Organize tudo em pastas.</p>
+          <button type="button" onClick={() => setNovoModelo(true)} className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90">
+            <Plus className="h-4 w-4" /> Novo modelo
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
@@ -125,6 +123,7 @@ export function ModelosGrid({ modelos, pastas, pastaAtual }: { modelos: ModeloRo
         />
       )}
       {mover && <MoverModeloDialog modelo={mover} pastas={pastas} atualId={mover.pasta_id} onClose={() => setMover(null)} />}
+      {novoModelo && <NovoModeloDialog pastaAtual={pastaAtual} onClose={() => setNovoModelo(false)} />}
     </div>
   )
 }
