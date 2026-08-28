@@ -48,7 +48,8 @@ export const OCULTAR_CRONOGRAMA = process.env.NEXT_PUBLIC_CRONOGRAMA_ATIVO !== '
 
 /**
  * MODELOS_CADERNO_ATIVO: liga a área "Modelos de Caderno" (biblioteca editável de modelos/folhas
- * de caderno, com pastas) no menu do admin. Default OFF (em construção) — defina
- * NEXT_PUBLIC_MODELOS_CADERNO_ATIVO=true no build para liberar. BUILD-TIME (NEXT_PUBLIC_*).
+ * de caderno, com pastas) no menu do admin. Em PRODUÇÃO fica OFF até definir
+ * NEXT_PUBLIC_MODELOS_CADERNO_ATIVO=true no build (como o cronograma). Em DESENVOLVIMENTO liga
+ * sozinho (NODE_ENV inlinado no bundle → false no build de produção), p/ facilitar o teste local.
  */
-export const MODELOS_CADERNO_ATIVO = process.env.NEXT_PUBLIC_MODELOS_CADERNO_ATIVO === 'true'
+export const MODELOS_CADERNO_ATIVO = process.env.NEXT_PUBLIC_MODELOS_CADERNO_ATIVO === 'true' || process.env.NODE_ENV === 'development'
