@@ -27,6 +27,7 @@ const AREA_PERM: { prefix: string; perm: string; ou?: string }[] = [
   { prefix: '/admin/questoes', perm: 'questoes:view' },
   { prefix: '/admin/etiquetas', perm: 'questoes:view' },
   { prefix: '/admin/banco-questoes', perm: 'questoes:view' },
+  { prefix: '/admin/modelos-caderno', perm: 'questoes:view' },
   { prefix: '/admin/cadernos', perm: 'questoes:view' },
   { prefix: '/admin/correcao', perm: 'correcao:view', ou: 'questoes:view' },
   { prefix: '/admin/comentarios', perm: 'questoes:view' },

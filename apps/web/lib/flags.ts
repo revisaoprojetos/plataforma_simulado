@@ -45,3 +45,10 @@ export const LEITURA_ATIVA = process.env.NEXT_PUBLIC_LEITURA_ATIVA === 'true'
  * (NEXT_PUBLIC_*, inlinado no bundle): mudar exige rebuild/restart do dev server.
  */
 export const OCULTAR_CRONOGRAMA = process.env.NEXT_PUBLIC_CRONOGRAMA_ATIVO !== 'true'
+
+/**
+ * MODELOS_CADERNO_ATIVO: liga a área "Modelos de Caderno" (biblioteca editável de modelos/folhas
+ * de caderno, com pastas) no menu do admin. Default OFF (em construção) — defina
+ * NEXT_PUBLIC_MODELOS_CADERNO_ATIVO=true no build para liberar. BUILD-TIME (NEXT_PUBLIC_*).
+ */
+export const MODELOS_CADERNO_ATIVO = process.env.NEXT_PUBLIC_MODELOS_CADERNO_ATIVO === 'true'

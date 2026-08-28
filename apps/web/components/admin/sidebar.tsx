@@ -46,6 +46,7 @@ import {
   CalendarDays,
   Upload,
   Package,
+  LayoutTemplate,
   Link2 as LinkIcon,
 } from 'lucide-react'
 import {
@@ -79,7 +80,7 @@ import { logoutAction } from '@/app/login/actions'
 import { confirmarDescartarAlteracoes } from '@/components/admin/use-unsaved-guard'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { LOGIN_DEFAULT, type LoginConfig } from '@/lib/login-config'
-import { LEITURA_ATIVA } from '@/lib/flags'
+import { LEITURA_ATIVA, MODELOS_CADERNO_ATIVO } from '@/lib/flags'
 
 type IconType = React.ComponentType<{ className?: string; style?: React.CSSProperties }>
 
@@ -123,6 +124,7 @@ const navGroups: NavGroup[] = [
       { label: 'Questões', href: '/admin/questoes', icon: BookOpen, perm: 'questoes:view' },
       { label: 'Etiquetas', href: '/admin/etiquetas', icon: Tag, perm: 'questoes:view' },
       { label: 'Banco de Simulado', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
+      { label: 'Modelos de Caderno', href: '/admin/modelos-caderno', icon: LayoutTemplate, perm: 'questoes:view', oculto: !MODELOS_CADERNO_ATIVO },
       { label: 'Área de Leitura', href: '/admin/leitura', icon: Library, perm: 'leitura:view', oculto: !LEITURA_ATIVA },
     ],
   },
