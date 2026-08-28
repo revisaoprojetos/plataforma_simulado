@@ -19,12 +19,18 @@ const SAMPLE: PreviewQuestao[] = Array.from({ length: 4 }, (_, i) => ({
 }))
 
 /** Cria um modelo: do zero OU a partir de um modelo padrão (com prévia + "Salvar como" editável). */
-export function NovoModeloDialog({ pastaAtual, modoInicial = 'padrao', onClose }: { pastaAtual: string | null; modoInicial?: 'zero' | 'padrao'; onClose: () => void }) {
+export function NovoModeloDialog({ pastaAtual, modoInicial = 'padrao', modalidadeInicial = 'folha_respostas', modeloInicial, onClose }: {
+  pastaAtual: string | null
+  modoInicial?: 'zero' | 'padrao'
+  modalidadeInicial?: Modalidade
+  modeloInicial?: string
+  onClose: () => void
+}) {
   const router = useRouter()
   const [modo, setModo] = useState<'zero' | 'padrao'>(modoInicial)
-  const [modalidade, setModalidade] = useState<Modalidade>('folha_respostas')
+  const [modalidade, setModalidade] = useState<Modalidade>(modalidadeInicial)
   const meta = useMemo(() => MODALIDADES.find((m) => m.id === modalidade) ?? MODALIDADES[0], [modalidade])
-  const [modeloId, setModeloId] = useState(meta.modelos[0].id)
+  const [modeloId, setModeloId] = useState(modeloInicial ?? (MODALIDADES.find((m) => m.id === modalidadeInicial)?.modelos[0].id ?? meta.modelos[0].id))
   const [nome, setNome] = useState('')
   const [pending, start] = useTransition()
 

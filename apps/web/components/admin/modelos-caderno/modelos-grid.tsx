@@ -10,6 +10,7 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { ModeloCard, PastaModeloCard, MODALIDADE_META } from '@/components/admin/modelos-caderno/modelo-card'
 import { EditarPastaModeloDialog } from '@/components/admin/modelos-caderno/editar-pasta-modelo-dialog'
 import { NovoModeloDialog } from '@/components/admin/modelos-caderno/novo-modelo-dialog'
+import { ModelosPadrao } from '@/components/admin/modelos-caderno/modelos-padrao'
 import { moverModelo, excluirPastaModelo, type ModeloRow, type PastaModeloRow } from '@/app/admin/modelos-caderno/actions'
 
 const MODALIDADES_FILTRO = ['folha_respostas', 'caderno_questoes', 'caderno_completo', 'diagnostico'] as const
@@ -19,6 +20,7 @@ export function ModelosGrid({ modelos, pastas, pastaAtual }: { modelos: ModeloRo
   const [busca, setBusca] = useState('')
   const [filtroMod, setFiltroMod] = useState<string>('')
   const [, start] = useTransition()
+  const [aba, setAba] = useState<'meus' | 'padrao'>('meus')
   const [novaPasta, setNovaPasta] = useState(false)
   const [novoModelo, setNovoModelo] = useState(false)
   const [editarPasta, setEditarPasta] = useState<PastaModeloRow | null>(null)
@@ -62,6 +64,17 @@ export function ModelosGrid({ modelos, pastas, pastaAtual }: { modelos: ModeloRo
 
   return (
     <div className="space-y-4">
+      {/* Abas: minha biblioteca × modelos padrão do sistema */}
+      <div className="inline-flex rounded-lg border bg-muted/40 p-0.5 text-sm">
+        {([['meus', 'Meus modelos'], ['padrao', 'Modelos padrão']] as const).map(([k, lbl]) => (
+          <button key={k} type="button" onClick={() => setAba(k)} className={cn('rounded-md px-3 py-1.5 font-medium transition-colors', aba === k ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>{lbl}</button>
+        ))}
+      </div>
+
+      {aba === 'padrao' ? (
+        <ModelosPadrao pastaAtual={pastaAtual} />
+      ) : (
+        <>
       {/* Barra: trilha + busca + filtros + ações */}
       <div className="flex flex-wrap items-center gap-2">
         <nav className="flex min-w-0 flex-1 items-center gap-1 text-sm">
@@ -111,6 +124,8 @@ export function ModelosGrid({ modelos, pastas, pastaAtual }: { modelos: ModeloRo
           ))}
           {modelosNivel.map((m) => <ModeloCard key={m.id} modelo={m} onMover={() => setMover(m)} />)}
         </div>
+      )}
+        </>
       )}
 
       {(novaPasta || editarPasta) && (
