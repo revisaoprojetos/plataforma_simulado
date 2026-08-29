@@ -319,8 +319,10 @@ export async function adicionarQuestoes(bancoId: string, questaoIds: string[]): 
 }
 
 export type QuestaoBancoBuscaItem = {
-  id: string; external_id: string | null; enunciado: string; tipo: string
-  nivel_dificuldade: string | null; disciplina: string | null; assunto: string | null
+  id: string; external_id: string | null; enunciado: string; tipo: string; formato: string | null
+  nivel_dificuldade: string | null; disciplina: string | null; assunto: string | null; assunto_detalhe: string | null
+  banca: string | null; orgao: string | null; ano: number | null
+  etiquetas: { nome: string; cor: string | null }[]
 }
 export type FiltrosBuscaBanco = { busca?: string; disciplinaId?: string; dificuldade?: string; tipo?: string }
 
@@ -329,27 +331,74 @@ export type FiltrosBuscaBanco = { busca?: string; disciplinaId?: string; dificul
  * e limitada. Antes a página carregava 500 questões no load — bancos grandes perdiam o resto.
  * Filtra por enunciado/código, disciplina (id), dificuldade e tipo direto no banco.
  */
-export async function buscarQuestoesForaBanco(bancoId: string, filtros: FiltrosBuscaBanco = {}, limite = 40): Promise<{ ok: boolean; itens?: QuestaoBancoBuscaItem[]; error?: string }> {
+export async function buscarQuestoesForaBanco(bancoId: string | null, filtros: FiltrosBuscaBanco = {}, limite = 40): Promise<{ ok: boolean; itens?: QuestaoBancoBuscaItem[]; error?: string }> {
   const g = await guard()
   if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const jaNo = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', g.tenantId).order('questao_id', { ascending: true }))
-  const noSet = new Set(jaNo.map((r) => r.questao_id))
+  // bancoId null (criação de simulado do zero, sem banco ainda) → não exclui nada.
+  const noSet = new Set<string>()
+  if (bancoId) {
+    const jaNo = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', g.tenantId).order('questao_id', { ascending: true }))
+    for (const r of jaNo) noSet.add(r.questao_id)
+  }
   const safe = (filtros.busca ?? '').replace(/[,()%*]/g, ' ').trim()
-  let q = svc.from('simulado_questoes')
-    .select('id, external_id, enunciado, tipo, nivel_dificuldade, disciplina_id, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
-    .eq('tenant_id', g.tenantId).eq('deletado', false)
-  if (filtros.disciplinaId && filtros.disciplinaId !== 'all') q = q.eq('disciplina_id', filtros.disciplinaId)
-  if (filtros.dificuldade && filtros.dificuldade !== 'all') q = q.eq('nivel_dificuldade', filtros.dificuldade)
-  if (filtros.tipo && filtros.tipo !== 'all') q = q.eq('tipo', filtros.tipo)
-  if (safe) q = q.or(`enunciado.ilike.%${safe}%,external_id.ilike.%${safe}%`)
-  const { data, error } = await q.order('created_at', { ascending: false }).limit(Math.min(200, Math.max(limite * 4, 80)))
+  // `formato` pode não existir no banco (migração 20260708000002 não aplicada) → select tolerante:
+  // tenta COM formato; se a coluna faltar, refaz SEM (formato vira null e o tipo cai em "Múltipla").
+  const SELECT_BASE = 'id, external_id, enunciado, tipo, nivel_dificuldade, ano, disciplina_id, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome)'
+  // `formato` e `assunto_detalhe` podem não existir em bancos sem as migrações → select tolerante.
+  const OPCIONAIS = 'formato, assunto_detalhe'
+  const rodar = (comOpc: boolean) => {
+    let q = svc.from('simulado_questoes')
+      .select(comOpc ? `${SELECT_BASE}, ${OPCIONAIS}` : SELECT_BASE)
+      .eq('tenant_id', g.tenantId).eq('deletado', false)
+    if (filtros.disciplinaId && filtros.disciplinaId !== 'all') q = q.eq('disciplina_id', filtros.disciplinaId)
+    if (filtros.dificuldade && filtros.dificuldade !== 'all') q = q.eq('nivel_dificuldade', filtros.dificuldade)
+    if (filtros.tipo && filtros.tipo !== 'all') q = q.eq('tipo', filtros.tipo)
+    if (safe) q = q.or(`enunciado.ilike.%${safe}%,external_id.ilike.%${safe}%`)
+    return q.order('created_at', { ascending: false }).limit(Math.min(200, Math.max(limite * 4, 80)))
+  }
+  let { data, error } = await rodar(true)
+  if (error && /(formato|assunto_detalhe)/i.test(error.message)) ({ data, error } = await rodar(false))
   if (error) return { ok: false, error: error.message }
-  const itens = (data ?? []).filter((r: any) => !noSet.has(r.id)).slice(0, limite).map((r: any) => ({
-    id: r.id, external_id: r.external_id ?? null, enunciado: r.enunciado ?? '', tipo: r.tipo,
-    nivel_dificuldade: r.nivel_dificuldade ?? null, disciplina: r.disciplinas?.nome ?? null, assunto: r.assuntos?.nome ?? null,
+  const itens: QuestaoBancoBuscaItem[] = (data ?? []).filter((r: any) => !noSet.has(r.id)).slice(0, limite).map((r: any) => ({
+    id: r.id, external_id: r.external_id ?? null, enunciado: r.enunciado ?? '', tipo: r.tipo, formato: r.formato ?? null,
+    nivel_dificuldade: r.nivel_dificuldade ?? null, disciplina: r.disciplinas?.nome ?? null, assunto: r.assuntos?.nome ?? null, assunto_detalhe: r.assunto_detalhe ?? null,
+    banca: r.bancas?.nome ?? null, orgao: r.orgaos?.nome ?? null, ano: r.ano ?? null, etiquetas: [],
   }))
+
+  // Etiquetas por questão (uma consulta a mais, só para os itens da página). Tolerante.
+  try {
+    const ids = itens.map((i) => i.id)
+    if (ids.length) {
+      const { data: links } = await svc.from('simulado_questao_etiquetas').select('questao_id, etiqueta_id').eq('tenant_id', g.tenantId).in('questao_id', ids)
+      const etIds = [...new Set((links ?? []).map((l: any) => l.etiqueta_id).filter(Boolean))]
+      if (etIds.length) {
+        const { data: ets } = await svc.from('simulado_etiquetas').select('id, nome, cor').in('id', etIds)
+        const etMap = new Map((ets ?? []).map((e: any) => [e.id, { nome: e.nome ?? 'Etiqueta', cor: e.cor ?? null }]))
+        const porQuestao = new Map<string, { nome: string; cor: string | null }[]>()
+        for (const l of (links ?? []) as any[]) { const e = etMap.get(l.etiqueta_id); if (e) { const arr = porQuestao.get(l.questao_id) ?? []; arr.push(e); porQuestao.set(l.questao_id, arr) } }
+        for (const it of itens) it.etiquetas = porQuestao.get(it.id) ?? []
+      }
+    }
+  } catch { /* etiquetas são secundárias */ }
+
   return { ok: true, itens }
+}
+
+export type QuestaoDetalheBanco = { alternativas: { ordem: number; texto: string; correta: boolean; comentario: string | null }[]; comentario: string | null }
+
+/** Detalhe de UMA questão (alternativas + comentário do professor) — carregado SOB DEMANDA ao expandir
+ *  a linha no seletor de questões (evita puxar tudo na listagem). */
+export async function detalheQuestaoBanco(questaoId: string): Promise<{ ok: boolean; detalhe?: QuestaoDetalheBanco; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const [alt, q] = await Promise.all([
+    svc.from('simulado_alternativas').select('ordem, texto, correta, comentario').eq('questao_id', questaoId).eq('tenant_id', g.tenantId).order('ordem', { ascending: true }),
+    svc.from('simulado_questoes').select('comentario_professor').eq('id', questaoId).eq('tenant_id', g.tenantId).maybeSingle(),
+  ])
+  const alternativas = (alt.data ?? []).map((a: any) => ({ ordem: a.ordem ?? 0, texto: a.texto ?? '', correta: !!a.correta, comentario: a.comentario ?? null }))
+  return { ok: true, detalhe: { alternativas, comentario: (q.data as any)?.comentario_professor ?? null } }
 }
 
 /** Disciplinas do tenant (id + nome) para o filtro do pop-up — tabela pequena, carga leve. */

@@ -87,6 +87,14 @@ export async function remember<T>(chave: string, ttlSeg: number, calcular: () =>
   return valor
 }
 
+/** Remove UMA chave do cache (Redis + fallback em memória). Best-effort — nunca lança. */
+export async function esquecer(chave: string): Promise<void> {
+  mem.delete(chave)
+  const r = redis()
+  if (!r) return
+  try { await r.del(chave) } catch { /* best-effort */ }
+}
+
 /**
  * Invalida TODOS os relatórios de um tenant. Chamado nos pontos de mutação que
  * mudam números de relatório: finalização de sessões (cron encerrar-expirados),

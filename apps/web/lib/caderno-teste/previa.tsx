@@ -508,7 +508,7 @@ function Folha({ item, num, total, pad, Ht, Hf, ehCapa, ehUltima, capaCfg, onPic
   )
 }
 
-export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selParte, onPickCapa, selCapa }: { item: ItemCaderno; questoes: PreviewQuestao[]; vars?: Record<string, string>; discBanco?: DiscBanco[]; onPick?: (parte: string, label: string, cor: string, anchor: DOMRect) => void; selParte?: string; onPickCapa?: () => void; selCapa?: boolean }) {
+export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selParte, onPickCapa, selCapa, estatico }: { item: ItemCaderno; questoes: PreviewQuestao[]; vars?: Record<string, string>; discBanco?: DiscBanco[]; onPick?: (parte: string, label: string, cor: string, anchor: DOMRect) => void; selParte?: string; onPickCapa?: () => void; selCapa?: boolean; estatico?: boolean }) {
   const a = item.ajustes
   const qs = questoes.length ? questoes : QUESTOES_EXEMPLO
   const pad = a.compacto ? 40 : 56
@@ -601,9 +601,11 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
       {/* passe de medição (escondido) — ESPELHA a caixa de conteúdo da folha: mesma largura A4 +
           padding + border-box + fonte/cor. Assim o texto quebra no MESMO nº de linhas e as alturas
           batem (senão um bloco "cabe" na conta mas renderiza mais alto e é cortado). */}
-      <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: A4_W, padding: `8px ${pad}px`, boxSizing: 'border-box', fontFamily: 'var(--font-inter), system-ui, sans-serif', color: '#1a202c' }}>
-        {blocos.map((b, i) => <div key={i} style={{ marginTop: i === 0 ? 0 : (b.juntar ? 0 : GAP) }}>{b.node}</div>)}
-      </div>
+      {!estatico && (
+        <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: A4_W, padding: `8px ${pad}px`, boxSizing: 'border-box', fontFamily: 'var(--font-inter), system-ui, sans-serif', color: '#1a202c' }}>
+          {blocos.map((b, i) => <div key={i} style={{ marginTop: i === 0 ? 0 : (b.juntar ? 0 : GAP) }}>{b.node}</div>)}
+        </div>
+      )}
       {temCapa && <Folha item={item} num={1} total={total} pad={pad} Ht={Ht} Hf={Hf} ehCapa capaCfg={item.capa ?? CAPA_PADRAO} onPickCapa={onPickCapa} selCapa={selCapa} />}
       {pages.map((idxs, pi) => (
         <Folha key={pi} item={item} num={(temCapa ? 1 : 0) + pi + 1} total={total} pad={pad} Ht={Ht} Hf={Hf}>

@@ -92,7 +92,7 @@ const INSTRUCOES_CE: [string, string][] = [
 ]
 
 const MODELOS: Record<ModeloImport, { colunas: readonly string[]; exemplos: Record<string, string>[]; instrucoes: [string, string][]; corretaOpts: string; tipoValor: string; arquivo: string; aba: string }> = {
-  multipla: { colunas: COLUNAS_ME, exemplos: EXEMPLOS_ME, instrucoes: INSTRUCOES_ME, corretaOpts: 'A,B,C,D,E,ANULADA', tipoValor: 'Múltipla escolha', arquivo: 'modelo-questoes-multipla-escolha.xlsx', aba: 'Múltipla escolha' },
+  multipla: { colunas: COLUNAS_ME, exemplos: EXEMPLOS_ME, instrucoes: INSTRUCOES_ME, corretaOpts: 'A,B,C,D,E,Certo,Errado,ANULADA', tipoValor: 'Múltipla escolha', arquivo: 'modelo-questoes-multipla-escolha.xlsx', aba: 'Múltipla escolha' },
   certo_errado: { colunas: COLUNAS_CE, exemplos: EXEMPLOS_CE, instrucoes: INSTRUCOES_CE, corretaOpts: 'Certo,Errado,ANULADA', tipoValor: 'Certo/Errado', arquivo: 'modelo-questoes-certo-errado.xlsx', aba: 'Certo-Errado' },
 }
 
@@ -152,7 +152,9 @@ async function baixarModelo(formato: ModeloImport, etiquetasSistema: string[] = 
     }
     lista('Nível', 'facil,medio,dificil')
     lista('Alternativa Correta', cfg.corretaOpts)
-    lista('Tipo', cfg.tipoValor)
+    // Tipo aceita os DOIS formatos em qualquer modelo — assim dá para marcar uma linha como
+    // "Certo/Errado" mesmo no modelo de múltipla escolha (o parser detecta pela coluna Tipo).
+    lista('Tipo', 'Múltipla escolha,Certo/Errado')
 
     // Aba de instruções.
     const wi = wb.addWorksheet('Instruções')
@@ -180,7 +182,7 @@ async function baixarModelo(formato: ModeloImport, etiquetasSistema: string[] = 
 
 type Resumo = { total: number; novas: number; jaExistem: number; comErro: number }
 
-export function ImportarQuestoesTab({ bancoId = null, onDone }: { bancoId?: string | null; onDone: () => void }) {
+export function ImportarQuestoesTab({ bancoId = null, onDone, onParsed }: { bancoId?: string | null; onDone: () => void; onParsed?: (questoes: QuestaoImport[]) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [nomeArquivo, setNomeArquivo] = useState('')
   const [questoes, setQuestoes] = useState<QuestaoImport[] | null>(null)
@@ -221,6 +223,8 @@ export function ImportarQuestoesTab({ bancoId = null, onDone }: { bancoId?: stri
 
   function confirmar() {
     if (!questoes) return
+    // Modo parse-only (criação de simulado): entrega as questões válidas ao fluxo, sem gravar agora.
+    if (onParsed) { onParsed(questoes.filter((q) => !q.erro)); onDone(); return }
     startSalvar(async () => {
       const r = await confirmarImportQuestoes(bancoId, questoes)
       if (!r.ok) { toast.error(r.error ?? 'Erro ao importar'); return }
@@ -413,7 +417,7 @@ export function ImportarQuestoesTab({ bancoId = null, onDone }: { bancoId?: stri
         <div className="flex gap-2">
           <Button variant="outline" onClick={onDone}>Cancelar</Button>
           <Button onClick={confirmar} disabled={!podeImportar || salvando}>
-            {salvando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Importar
+            {salvando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} {onParsed ? 'Usar estas questões' : 'Importar'}
           </Button>
         </div>
       </div>

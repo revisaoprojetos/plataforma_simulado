@@ -57,6 +57,17 @@ function celula(children: Paragraph[], opts: { bg?: string; widthPct?: number; t
 }
 const tabela = (rows: TableRow[]): Table => new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: SEM_BORDA, rows })
 
+/** Intercala um parágrafo-espaçador entre os blocos: o Word NÃO separa tabelas adjacentes sozinho,
+ *  então sem isto os blocos (banners/cards) saem colados. Dá um respiro vertical entre cada bloco. */
+function comEspacamento(ns: (Paragraph | Table)[]): (Paragraph | Table)[] {
+  const out: (Paragraph | Table)[] = []
+  ns.forEach((n, i) => {
+    out.push(n)
+    if (i < ns.length - 1) out.push(new Paragraph({ children: [new TextRun({ text: '', size: 6 })], spacing: { before: 0, after: 120 } }))
+  })
+  return out
+}
+
 export async function gerarDocxDiagnostico(item: ItemCaderno, disc: DiscBanco[], vars: Record<string, string> = {}): Promise<Buffer> {
   const c: DiagConteudo = item.conteudo ?? DIAG_PADRAO
   const a = item.ajustes
@@ -176,7 +187,7 @@ export async function gerarDocxDiagnostico(item: ItemCaderno, disc: DiscBanco[],
   try { cfg = 'CTV3:' + Buffer.from(JSON.stringify(item), 'utf8').toString('base64') } catch { /* ignora */ }
   if (cfg) nodes.push(new Paragraph({ children: [new TextRun({ text: cfg, color: 'FFFFFF', size: 2 })], spacing: { after: 0 } }))
 
-  const secao: ISectionOptions = { properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: nodes }
+  const secao: ISectionOptions = { properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: comEspacamento(nodes) }
   const doc = new Document({ description: cfg, creator: 'Revisão — Caderno de teste', title: item.ajustes.titulo || 'Diagnóstico', sections: [secao] })
   return Packer.toBuffer(doc)
 }

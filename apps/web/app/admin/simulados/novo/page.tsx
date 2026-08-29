@@ -1,6 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { fetchAll } from '@/lib/supabase/fetch-all'
 import { SimuladoWizard } from '@/components/admin/simulado-wizard'
 import { createSimuladoAction, listarDisciplinasWizard } from '../actions'
 import Link from 'next/link'
@@ -11,41 +10,34 @@ export default async function NovoSimuladoPage() {
   const svc = createAdminClient()
   const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
 
-  // NÃO pré-carregamos as questões nem os estudantes (podem ser dezenas de milhares): o wizard
-  // busca sob demanda no servidor — questões via buscarQuestoesWizard/listarQuestoesDoBanco,
-  // estudantes via buscarEstudantesSimulado. Aqui só ficam as contagens por banco (id-pairs leves)
-  // e as disciplinas (tabela pequena) para os filtros. fetchAll = evita o corte de 1000 do PostgREST.
-  const [vinculos, pastaEst, disciplinas] = await Promise.all([
-    fetchAll<any>(() => svc.from('simulado_questao_pasta').select('questao_id, pasta_id').eq('tenant_id', tid).order('questao_id')),
-    fetchAll<any>(() => svc.from('simulado_pasta_estudantes').select('pasta_id, estudante_id').eq('tenant_id', tid).order('estudante_id')),
-    listarDisciplinasWizard(),
-  ])
+  // Carregamento LEVE: só as disciplinas (filtro) e a LISTA de bancos (sem fotos, sem contagens).
+  // As contagens de questões/estudantes por banco são buscadas SOB DEMANDA por página no wizard
+  // (contarBancosWizard) — antes pré-carregávamos TODOS os vínculos questão-banco e banco-estudante
+  // (dezenas de milhares de linhas), o que fazia a tela levar >1min para abrir.
+  const disciplinas = await listarDisciplinasWizard()
 
-  // Bancos: tolerante à coluna `tipo` (migration pode não ter rodado).
-  let bancos: any[] | null = null
+  // Pastas do tenant (bancos is_folder=false + PASTAS is_folder=true) — tolerante às colunas ausentes.
+  let all: any[] = []
   {
-    const r = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, capa_card_url, tipo').eq('deletado', false).eq('tenant_id', tid).order('nome')
-    if (r.error && /tipo|capa_card_url|column/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url').eq('deletado', false).eq('tenant_id', tid).order('nome')
-      bancos = r2.data
-    } else bancos = r.data
+    const sel = (cols: string) => svc.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid)
+    let r = await sel('id, nome, cor, icone, tipo, is_folder, folder_area, pai_id, created_at')
+    if (r.error && /created_at|pai_id|tipo|is_folder|folder_area|column/i.test(r.error.message)) r = await sel('id, nome, cor, icone, is_folder, pai_id')
+    if (r.error) r = await sel('id, nome, cor, icone')
+    all = r.data ?? []
+  }
+  const daArea = (b: any) => b.folder_area !== 'simulado' && b.folder_area !== 'caderno'
+  const bancosRows = all.filter((b: any) => !b.is_folder && daArea(b))
+  // Mapa de pastas (is_folder) p/ montar o CAMINHO de cada banco (pai → pai → …).
+  const folderMap = new Map(all.filter((b: any) => b.is_folder && daArea(b)).map((f: any) => [f.id, { nome: f.nome as string, pai: (f.pai_id ?? null) as string | null }]))
+  const caminho = (paiId: string | null): string | null => {
+    const parts: string[] = []; const seen = new Set<string>(); let cur = paiId
+    while (cur && folderMap.has(cur) && !seen.has(cur)) { seen.add(cur); const f = folderMap.get(cur)!; parts.unshift(f.nome); cur = f.pai }
+    return parts.length ? parts.join(' / ') : null
   }
 
-  // Contagens por banco (questões e estudantes) — a partir dos vínculos leves.
-  const qCount = new Map<string, number>()
-  for (const v of vinculos ?? []) qCount.set((v as any).pasta_id, (qCount.get((v as any).pasta_id) ?? 0) + 1)
-  const eCount = new Map<string, Set<string>>()
-  for (const pe of pastaEst ?? []) {
-    const s = eCount.get((pe as any).pasta_id) ?? new Set<string>()
-    if ((pe as any).estudante_id) s.add((pe as any).estudante_id)
-    eCount.set((pe as any).pasta_id, s)
-  }
-
-  const bancosDetalhe = (bancos ?? []).map((b: any) => ({
-    // Card do wizard é paisagem (aspect-16/10) → prefere o BANNER (capa_url, largo) e cai no
-    // recorte pôster (capa_card_url, 4:5) só quando não há banner. Assim a capa centraliza no meio.
-    id: b.id, nome: b.nome, cor: b.cor ?? null, icone: b.icone ?? null, capa: (b.capa_url ?? b.capa_card_url) ?? null, tipo: b.tipo ?? 'objetiva',
-    nQuestoes: qCount.get(b.id) ?? 0, nEstudantes: eCount.get(b.id)?.size ?? 0,
+  const bancosDetalhe = bancosRows.map((b: any) => ({
+    id: b.id, nome: b.nome, cor: b.cor ?? null, icone: b.icone ?? null, tipo: b.tipo ?? 'objetiva',
+    pasta: caminho(b.pai_id ?? null), created_at: (b.created_at ?? null) as string | null,
   }))
 
   return (

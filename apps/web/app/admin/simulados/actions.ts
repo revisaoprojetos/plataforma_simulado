@@ -118,6 +118,9 @@ export async function createSimuladoAction(data: SimuladoData) {
   redirect(`/admin/simulados/${simulado.id}`)
 }
 
+// Ações da criação página-por-página movidas para ./criar/acoes.ts (leves) e ./criar/salvar.ts
+// (pesada, carregada sob demanda) — mantém este módulo mais leve para as demais telas.
+
 export async function updateSimuladoAction(id: string, data: SimuladoData) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Você não tem permissão para editar simulados.' }
   const tenantId = await getCurrentTenantId()
@@ -583,7 +586,7 @@ export async function addQuestaoToSimulado(simuladoId: string, questaoId: string
 
 // ─────────── Busca server-side sob demanda (evita carregar todo o banco/estudantes no load) ───────────
 
-export type EstudanteBuscaItem = { id: string; nome: string; email: string | null }
+export type EstudanteBuscaItem = { id: string; nome: string; email: string | null; telefone: string | null; cpf: string | null; classificacao: string | null; avatar: string | null; perfil_avatar_cor: string | null }
 
 /** Busca estudantes do tenant (nome/email) para o seletor do wizard, limitada. `total` = quantos casam a busca. */
 export async function buscarEstudantesSimulado(busca: string, limite = 40): Promise<{ ok: boolean; itens?: EstudanteBuscaItem[]; total?: number; error?: string }> {
@@ -592,11 +595,11 @@ export async function buscarEstudantesSimulado(busca: string, limite = 40): Prom
   if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
   const safe = busca.replace(/[,()%*]/g, ' ').trim() // chars que quebram o parser do .or()
-  let q = svc.from('simulado_estudantes').select('id, nome, email', { count: 'exact' }).eq('tenant_id', tenantId).eq('deletado', false)
+  let q = svc.from('simulado_estudantes').select('id, nome, email, telefone, cpf, classificacao, avatar, perfil_avatar_cor', { count: 'exact' }).eq('tenant_id', tenantId).eq('deletado', false)
   if (safe) q = q.or(`nome.ilike.%${safe}%,email.ilike.%${safe}%`)
   const { data, error, count } = await q.order('nome', { ascending: true }).limit(Math.min(100, limite))
   if (error) return { ok: false, error: error.message }
-  return { ok: true, total: count ?? 0, itens: (data ?? []).map((e: any) => ({ id: e.id, nome: e.nome ?? 'Estudante', email: e.email ?? null })) }
+  return { ok: true, total: count ?? 0, itens: (data ?? []).map((e: any) => ({ id: e.id, nome: e.nome ?? 'Estudante', email: e.email ?? null, telefone: e.telefone ?? null, cpf: e.cpf ?? null, classificacao: e.classificacao ?? null, avatar: e.avatar ?? null, perfil_avatar_cor: e.perfil_avatar_cor ?? null })) }
 }
 
 /** Todos os ids de estudantes que casam a busca (para "Selecionar todos") — só ids, leve. */
@@ -612,6 +615,26 @@ export async function listarEstudanteIdsSimulado(busca = ''): Promise<{ ok: bool
     return q.order('id', { ascending: true })
   })
   return { ok: true, ids: rows.map((r) => r.id) }
+}
+
+/** Contagem de questões/estudantes de cada banco (por PÁGINA do wizard) — HEAD count (só o total,
+ *  sem trazer linhas). Antes contávamos TODOS os vínculos do tenant de uma vez (dezenas de milhares). */
+export async function contarBancosWizard(bancoIds: string[]): Promise<{ ok: boolean; counts?: Record<string, { q: number; e: number }>; error?: string }> {
+  if (!(await checkPermission('simulados:create')) && !(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const ids = [...new Set((bancoIds ?? []).filter(Boolean))].slice(0, 40)
+  if (!ids.length) return { ok: true, counts: {} }
+  const svc = createAdminClient()
+  const out: Record<string, { q: number; e: number }> = {}
+  await Promise.all(ids.map(async (id) => {
+    const [q, e] = await Promise.all([
+      svc.from('simulado_questao_pasta').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('pasta_id', id),
+      svc.from('simulado_pasta_estudantes').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('pasta_id', id),
+    ])
+    out[id] = { q: q.count ?? 0, e: e.count ?? 0 }
+  }))
+  return { ok: true, counts: out }
 }
 
 export type QuestaoBuscaItem = { id: string; enunciado: string; status: string | null; disciplina: string | null }

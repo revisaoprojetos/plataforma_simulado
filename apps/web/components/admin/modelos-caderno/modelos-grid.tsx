@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { Search, FolderPlus, Plus, Home, ChevronRight, X, Check, Loader2, Folder, LayoutTemplate, Filter } from 'lucide-react'
+import { Search, FolderPlus, Plus, Home, ChevronRight, ChevronDown, X, Check, Loader2, Folder, LayoutTemplate, Filter } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { ModeloCard, PastaModeloCard, MODALIDADE_META } from '@/components/admin/modelos-caderno/modelo-card'
@@ -15,12 +15,29 @@ import { moverModelo, excluirPastaModelo, type ModeloRow, type PastaModeloRow } 
 
 const MODALIDADES_FILTRO = ['folha_respostas', 'caderno_questoes', 'caderno_completo', 'diagnostico'] as const
 
-export function ModelosGrid({ modelos, pastas, pastaAtual }: { modelos: ModeloRow[]; pastas: PastaModeloRow[]; pastaAtual: string | null }) {
+export function ModelosGrid({ modelos, pastas, pastaAtual: pastaAtualInicial }: { modelos: ModeloRow[]; pastas: PastaModeloRow[]; pastaAtual: string | null }) {
   const router = useRouter()
+  // Pasta atual = estado no CLIENTE (dados já vêm todos e filtramos aqui) → abrir pasta é instantâneo,
+  // sem re-executar o server component. A URL é sincronizada via History API (compartilhável/refresh).
+  const [pastaAtual, setPastaAtual] = useState<string | null>(pastaAtualInicial)
+  useEffect(() => {
+    const onPop = () => setPastaAtual(new URLSearchParams(window.location.search).get('pasta'))
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
   const [busca, setBusca] = useState('')
   const [filtroMod, setFiltroMod] = useState<string>('')
   const [, start] = useTransition()
   const [aba, setAba] = useState<'meus' | 'padrao'>('meus')
+  // Sublinhado deslizante das tabs: mede a tab ativa e desliza a linha até ela (transição CSS).
+  const tabsRef = useRef<Record<string, HTMLButtonElement | null>>({})
+  const [underline, setUnderline] = useState<{ left: number; width: number }>({ left: 0, width: 0 })
+  useEffect(() => {
+    const medir = () => { const el = tabsRef.current[aba]; if (el) setUnderline({ left: el.offsetLeft, width: el.offsetWidth }) }
+    medir()
+    window.addEventListener('resize', medir)
+    return () => window.removeEventListener('resize', medir)
+  }, [aba])
   const [novaPasta, setNovaPasta] = useState(false)
   const [novoModelo, setNovoModelo] = useState(false)
   const [editarPasta, setEditarPasta] = useState<PastaModeloRow | null>(null)
@@ -51,7 +68,10 @@ export function ModelosGrid({ modelos, pastas, pastaAtual }: { modelos: ModeloRo
     return map
   }, [modelos])
 
-  function irPara(id: string | null) { router.push(id ? `/admin/modelos-caderno?pasta=${id}` : '/admin/modelos-caderno') }
+  function irPara(id: string | null) {
+    setPastaAtual(id)
+    if (typeof window !== 'undefined') window.history.pushState(null, '', id ? `/admin/modelos-caderno?pasta=${id}` : '/admin/modelos-caderno')
+  }
   async function excluirPasta(p: PastaModeloRow) {
     if (!(await confirmar({ titulo: 'Excluir pasta?', mensagem: `"${p.nome}" será excluída. Os modelos e subpastas dentro dela voltam para a raiz.`, confirmar: 'Excluir', destrutivo: true }))) return
     start(async () => {
@@ -64,11 +84,20 @@ export function ModelosGrid({ modelos, pastas, pastaAtual }: { modelos: ModeloRo
 
   return (
     <div className="space-y-4">
-      {/* Abas: minha biblioteca × modelos padrão do sistema */}
-      <div className="inline-flex rounded-lg border bg-muted/40 p-0.5 text-sm">
+      {/* Abas: minha biblioteca × modelos padrão do sistema — sublinhado deslizante animado. */}
+      <div className="relative inline-flex items-center gap-1 border-b text-sm">
         {([['meus', 'Meus modelos'], ['padrao', 'Modelos padrão']] as const).map(([k, lbl]) => (
-          <button key={k} type="button" onClick={() => setAba(k)} className={cn('rounded-md px-3 py-1.5 font-medium transition-colors', aba === k ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>{lbl}</button>
+          <button
+            key={k}
+            type="button"
+            ref={(el) => { tabsRef.current[k] = el }}
+            onClick={() => setAba(k)}
+            className={cn('px-3 py-2 font-medium transition-colors', aba === k ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}
+          >
+            {lbl}
+          </button>
         ))}
+        <span className="pointer-events-none absolute -bottom-px h-0.5 rounded-full bg-primary transition-all duration-300 ease-out" style={{ left: underline.left, width: underline.width }} />
       </div>
 
       {aba === 'padrao' ? (
@@ -117,12 +146,21 @@ export function ModelosGrid({ modelos, pastas, pastaAtual }: { modelos: ModeloRo
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-          {foldersNivel.map((p) => (
-            <PastaModeloCard key={p.id} pasta={{ id: p.id, nome: p.nome, cor: p.cor, capa: p.capa_card_url ?? p.capa_url }} count={countPorPasta.get(p.id) ?? 0}
-              onAbrir={() => irPara(p.id)} onPersonalizar={() => setEditarPasta(p)} onExcluir={() => excluirPasta(p)} />
-          ))}
-          {modelosNivel.map((m) => <ModeloCard key={m.id} modelo={m} onMover={() => setMover(m)} />)}
+        <div className="space-y-5">
+          {/* Mesma grade nas duas seções → pasta e card com a MESMA largura. Só separadas por espaço. */}
+          {foldersNivel.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+              {foldersNivel.map((p) => (
+                <PastaModeloCard key={p.id} pasta={{ id: p.id, nome: p.nome, cor: p.cor }} count={countPorPasta.get(p.id) ?? 0}
+                  onAbrir={() => irPara(p.id)} onPersonalizar={() => setEditarPasta(p)} onExcluir={() => excluirPasta(p)} />
+              ))}
+            </div>
+          )}
+          {modelosNivel.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+              {modelosNivel.map((m) => <ModeloCard key={m.id} modelo={m} onMover={() => setMover(m)} />)}
+            </div>
+          )}
         </div>
       )}
         </>
@@ -132,7 +170,7 @@ export function ModelosGrid({ modelos, pastas, pastaAtual }: { modelos: ModeloRo
         <EditarPastaModeloDialog
           criar={novaPasta}
           criarEmPai={novaPasta ? pastaAtual : null}
-          pasta={editarPasta ? { id: editarPasta.id, nome: editarPasta.nome, cor: editarPasta.cor, capa: editarPasta.capa_card_url, capaLarga: editarPasta.capa_url } : null}
+          pasta={editarPasta ? { id: editarPasta.id, nome: editarPasta.nome, cor: editarPasta.cor } : null}
           onClose={() => { setNovaPasta(false); setEditarPasta(null) }}
           onSaved={() => router.refresh()}
         />
@@ -147,6 +185,10 @@ function MoverModeloDialog({ modelo, pastas, atualId, onClose }: { modelo: Model
   const router = useRouter()
   const [sel, setSel] = useState<string | null>(atualId)
   const [pending, start] = useTransition()
+  const arvore = useMemo(() => construirArvorePastas(pastas), [pastas])
+  // Pastas recolhidas (por id). Padrão: tudo expandido; o usuário minimiza o que quiser.
+  const [recolhidos, setRecolhidos] = useState<Set<string>>(new Set())
+  const toggle = (id: string) => setRecolhidos((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
   function salvar() {
     start(async () => {
       const r = await moverModelo(modelo.id, sel)
@@ -156,7 +198,7 @@ function MoverModeloDialog({ modelo, pastas, atualId, onClose }: { modelo: Model
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
-      <div role="dialog" aria-modal="true" className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+      <div role="dialog" aria-modal="true" className="relative flex h-[600px] max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b px-5 py-3">
           <h3 className="flex items-center gap-2 text-sm font-semibold"><Folder className="h-4 w-4" /> Mover “{modelo.nome}”</h3>
           <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
@@ -164,7 +206,7 @@ function MoverModeloDialog({ modelo, pastas, atualId, onClose }: { modelo: Model
         <div className="min-h-0 flex-1 space-y-1.5 overflow-auto p-4">
           <Opcao ativo={sel === null} onClick={() => setSel(null)} label="Raiz (sem pasta)" />
           {pastas.length === 0 && <p className="px-1 py-2 text-center text-xs text-muted-foreground">Nenhuma pasta criada ainda.</p>}
-          {pastas.map((p) => <Opcao key={p.id} ativo={sel === p.id} onClick={() => setSel(p.id)} label={p.nome} />)}
+          {arvore.map((n) => <ArvoreNodo key={n.id} node={n} sel={sel} onSelect={setSel} recolhidos={recolhidos} onToggle={toggle} />)}
         </div>
         <div className="flex items-center justify-end gap-2 border-t px-5 py-3">
           <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
@@ -178,12 +220,81 @@ function MoverModeloDialog({ modelo, pastas, atualId, onClose }: { modelo: Model
   )
 }
 
-function Opcao({ ativo, onClick, label }: { ativo: boolean; onClick: () => void; label: string }) {
+function Opcao({ ativo, onClick, label, expansor }: { ativo: boolean; onClick: () => void; label: string; expansor?: ReactNode }) {
+  // Div clicável (não <button>) para permitir aninhar o botão do chevron sem HTML inválido.
   return (
-    <button type="button" onClick={onClick} className={cn('flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', ativo ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
+      className={cn('flex w-full cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40', ativo ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}
+    >
       <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', ativo ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{ativo && <Check className="h-3 w-3" />}</span>
       <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
-    </button>
+      {expansor}
+    </div>
+  )
+}
+
+// ── Árvore de pastas (pai → subpastas) para o pop-up de mover ─────────────────
+type NodoPasta = PastaModeloRow & { filhos: NodoPasta[] }
+
+/** Monta a hierarquia (pai_id) a partir da lista plana, ordenando por nome em cada nível. */
+function construirArvorePastas(pastas: PastaModeloRow[]): NodoPasta[] {
+  const map = new Map<string, NodoPasta>()
+  pastas.forEach((p) => map.set(p.id, { ...p, filhos: [] }))
+  const raiz: NodoPasta[] = []
+  map.forEach((n) => {
+    const pai = n.pai_id ? map.get(n.pai_id) : null
+    if (pai) pai.filhos.push(n)
+    else raiz.push(n)
+  })
+  const ordenar = (arr: NodoPasta[]) => { arr.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')); arr.forEach((x) => ordenar(x.filhos)) }
+  ordenar(raiz)
+  return raiz
+}
+
+/** Nó recursivo: a opção da pasta + as subpastas recuadas à direita, com linha de ligação à esquerda.
+ *  A linha vertical é desenhada por item: PARA no cotovelo da última subpasta (não fica pendurada);
+ *  nas demais, desce até a próxima irmã. */
+function ArvoreNodo({ node, sel, onSelect, recolhidos, onToggle, filho = false, ultimo = false }: {
+  node: NodoPasta; sel: string | null; onSelect: (id: string) => void
+  recolhidos: Set<string>; onToggle: (id: string) => void; filho?: boolean; ultimo?: boolean
+}) {
+  const temFilhos = node.filhos.length > 0
+  const aberto = !recolhidos.has(node.id)
+  return (
+    <div className={cn('relative', filho && 'pl-5')}>
+      {filho && (
+        <>
+          {/* Linha vertical: para no cotovelo se for a última; senão continua até a próxima irmã. */}
+          <span className={cn('pointer-events-none absolute left-0 top-0 w-px bg-border', ultimo ? 'h-[19px]' : '-bottom-1.5')} />
+          {/* Cotovelo horizontal ligando a linha à opção. */}
+          <span className="pointer-events-none absolute left-0 top-[19px] h-px w-5 bg-border" />
+        </>
+      )}
+      <Opcao
+        ativo={sel === node.id}
+        onClick={() => onSelect(node.id)}
+        label={node.nome}
+        expansor={temFilhos ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggle(node.id) }}
+            className="-my-1.5 -mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label={aberto ? 'Recolher subpastas' : 'Expandir subpastas'}
+          >
+            {aberto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </button>
+        ) : undefined}
+      />
+      {temFilhos && aberto && (
+        <div className="ml-2.5 mt-1.5 space-y-1.5">
+          {node.filhos.map((f, i) => <ArvoreNodo key={f.id} node={f} sel={sel} onSelect={onSelect} recolhidos={recolhidos} onToggle={onToggle} filho ultimo={i === node.filhos.length - 1} />)}
+        </div>
+      )}
+    </div>
   )
 }

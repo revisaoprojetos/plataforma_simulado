@@ -142,14 +142,15 @@ const SLOT_ROTULO: Record<'diagnostico' | 'folha' | 'enunciado' | 'gabarito', st
 
 /** Cria um caderno da modalidade do SLOT já ASSOCIADO à entrega do banco (caderno_entrega[slot]) e
  *  devolve o id p/ abrir o editor. Fluxo do card da Entrega: clicar vazio → cria + edita, sem selecionar. */
-export async function criarCadernoParaSlot(bancoId: string, slot: 'diagnostico' | 'folha' | 'enunciado' | 'gabarito'): Promise<{ ok: boolean; cadernoId?: string; itemId?: string; error?: string }> {
-  if (!(await checkPermission('questoes:create')) && !(await checkPermission('questoes:update'))) return { ok: false, error: 'Sem permissão.' }
+export async function criarCadernoParaSlot(bancoId: string, slot: 'diagnostico' | 'folha' | 'enunciado' | 'gabarito', modeloIdEscolhido?: string): Promise<{ ok: boolean; cadernoId?: string; itemId?: string; error?: string }> {
+  if (!(await checkPermission('questoes:create')) && !(await checkPermission('questoes:update')) && !(await checkPermission('simulados:create'))) return { ok: false, error: 'Sem permissão.' }
   const access = await getCurrentAccess()
   if (!access.tenantId || !bancoId) return { ok: false, error: 'Tenant/banco não resolvido.' }
   const svc = createAdminClient()
   const modalidade = SLOT_MODALIDADE[slot]
   const rotulo = SLOT_ROTULO[slot]
-  const modeloId = metaDaModalidade(modalidade).modelos[0]?.id ?? ''
+  const modelos = metaDaModalidade(modalidade).modelos
+  const modeloId = (modeloIdEscolhido && modelos.some((m) => m.id === modeloIdEscolhido)) ? modeloIdEscolhido : (modelos[0]?.id ?? '')
   const item = novoItem(modalidade, modeloId)
   item.ajustes.titulo = rotulo
   const builder: BuilderV3 = { v: 3, bancoId, itens: [item], ativo: item.id }

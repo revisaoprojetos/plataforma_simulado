@@ -9,6 +9,7 @@ import { BookOpen, ClipboardList, Users, Activity, Trophy, ArrowRight, Plus } fr
 import { SecaoHeader } from '@/components/admin/secao-header'
 import { montarDashboardSerie } from '@/lib/admin/dashboard-serie'
 import { DashboardCharts } from '@/components/admin/dashboard-charts'
+import { NovoSimuladoDialog } from '@/components/admin/novo-simulado-dialog'
 
 async function getDados(tenantId: string) {
   const svc = await createServiceClient()
@@ -88,9 +89,14 @@ export default async function AdminDashboard() {
           <Link href="/admin/questoes/nova" className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition hover:bg-muted">
             <Plus className="h-4 w-4" /> Nova questão
           </Link>
-          <Link href="/admin/simulados/novo" className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:opacity-90">
-            <Plus className="h-4 w-4" /> Novo simulado
-          </Link>
+          <NovoSimuladoDialog
+            origem="inicio"
+            trigger={
+              <button type="button" className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:opacity-90">
+                <Plus className="h-4 w-4" /> Novo simulado
+              </button>
+            }
+          />
         </div>
       </div>
 

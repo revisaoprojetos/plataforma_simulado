@@ -141,7 +141,7 @@ function FolhaCapa({ capaUrl, capa, theme, onPick, sel }: { capaUrl: string; cap
 }
 
 /** Prévia A4 de um modelo pronto (doc v1) com as questões do banco + variáveis do aluno. */
-export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl, ultimaUrl, folhaUrl, cabecalhoUrl, rodapeUrl, capa, onPickCapa, selCapa, docOverride, onPickBloco, selBlocoId, respostas, gabaritoLiberado, margemTopo, margemBase }: {
+export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl, ultimaUrl, folhaUrl, cabecalhoUrl, rodapeUrl, capa, onPickCapa, selCapa, docOverride, onPickBloco, selBlocoId, respostas, gabaritoLiberado, margemTopo, margemBase, estatico }: {
   presetId: string
   questoes: PreviewQuestao[]
   vars?: Record<string, string>
@@ -177,6 +177,8 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
   onPickBloco?: (id: string) => void
   /** Bloco selecionado (destaque). */
   selBlocoId?: string | null
+  /** Render estático (export/SSR): omite o passe de medição oculto e a paginação client. */
+  estatico?: boolean
 }) {
   // docOverride (docEdit/variantes) pode vir SEM ids → keys `undefined-undefined` e nós
   // duplicados/embaralhados no BlockRender. Normaliza os ids (posição) sempre.
@@ -244,10 +246,12 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
       {/* Seleção POR DENTRO do card (outline-offset negativo) — igual ao diagnóstico, sem borda vazando. */}
       {selectable && selBlocoId && <style>{`[data-block-id="${selBlocoId}"] > *{outline:2px solid #6d28d9!important;outline-offset:-2px;border-radius:2px}`}</style>}
       {selectable && <style>{`[data-block-id]{cursor:pointer}[data-block-id]:hover > *{outline:1.5px dashed #6d28d966;outline-offset:-2px}`}</style>}
-      {/* passe de medição (escondido) */}
-      <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: contentW, display: 'flex', flexDirection: 'column' }}>
-        {itens.map((it, i) => <div key={it.key} style={{ marginTop: i === 0 ? 0 : (it.gapTop || 0) }}>{it.node}</div>)}
-      </div>
+      {/* passe de medição (escondido) — omitido no render estático (export) */}
+      {!estatico && (
+        <div ref={medRef} aria-hidden style={{ position: 'absolute', left: -99999, top: 0, width: contentW, display: 'flex', flexDirection: 'column' }}>
+          {itens.map((it, i) => <div key={it.key} style={{ marginTop: i === 0 ? 0 : (it.gapTop || 0) }}>{it.node}</div>)}
+        </div>
+      )}
       {capaPage && <FolhaCapa key="capa" capaUrl={capaUrl!} capa={capaEfetiva} theme={theme} onPick={onPickCapa} sel={selCapa} />}
       {pages.map((idxs, pi) => (
         <FolhaConteudo key={pi} theme={theme} folhaUrl={folhaUrl} cabecalhoUrl={cabecalhoUrl} rodapeUrl={rodapeUrl} cabH={cabH} rodH={rodH}>

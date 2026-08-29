@@ -179,10 +179,10 @@ export function gerarWordDiagnostico(item: ItemCaderno, disc: DiscBanco[] = []):
     for (const o of c.gabaritoObs) h += `<p>${W(o)}</p>`
   }
 
-  return `<!doctype html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${esc(titulo)}</title>`
+  return `<!doctype html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><meta name="color-scheme" content="light"><title>${esc(titulo)}</title>`
     + `<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->`
-    + `<style>@page{size:A4;margin:2cm}body{font-family:Arial,Helvetica,sans-serif;font-size:11pt;color:#111;line-height:1.4}h1{font-size:18pt;margin:0 0 6pt}h2{font-size:13pt;margin:14pt 0 4pt}h3{font-size:11pt;margin:8pt 0 2pt}p{margin:0 0 6pt}</style></head>`
-    + `<body>${h}</body></html>`
+    + `<style>@page{size:A4;margin:2cm}:root{color-scheme:light}html,body{background:#fff!important;color:#111;line-height:1.4}body{font-family:Arial,Helvetica,sans-serif;font-size:11pt}h1{font-size:18pt;margin:0 0 6pt}h2{font-size:13pt;margin:14pt 0 4pt}h3{font-size:11pt;margin:8pt 0 2pt}p{margin:0 0 6pt}</style></head>`
+    + `<body style="background:#fff">${h}</body></html>`
 }
 
 function htmlCaderno(item: ItemCaderno, qs: PreviewQuestao[]): string {
@@ -237,8 +237,9 @@ export function gerarHtmlItem(item: ItemCaderno, opts: { vars?: Record<string, s
   const bg = a.folhaUrl ? `background-image:url('${esc(a.folhaUrl)}');background-size:cover;` : ''
   // Conteúdo numa TABELA centralizada de largura fixa (o Word ignora max-width/margin:auto de div, mas
   // respeita largura de tabela) + página A4 com margens via @page/mso → download fiel à prévia.
-  return `<!doctype html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${titulo}</title>`
+  return `<!doctype html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><meta name="color-scheme" content="light"><title>${titulo}</title>`
     + `<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->`
-    + `<style>@page{size:A4;margin:1.4cm}body{font-family:Arial,Helvetica,sans-serif;color:#1a202c}img{max-width:100%}</style></head>`
-    + `<body>${bg ? `<div style="${bg}padding:1px">` : ''}<table role="presentation" align="center" width="720" cellpadding="0" cellspacing="0" style="width:720px;margin:0 auto;border-collapse:collapse"><tr><td>${cab}${capa}${corpo}${rod}${ultima}</td></tr></table>${bg ? '</div>' : ''}</body></html>`
+    // Fundo BRANCO forçado + esquema claro: evita a página ficar preta com texto invertido em visualizadores/Word em dark mode.
+    + `<style>@page{size:A4;margin:1.4cm}:root{color-scheme:light}html,body{background:#fff!important;color:#1a202c;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Arial,Helvetica,sans-serif}img{max-width:100%}</style></head>`
+    + `<body style="background:#fff">${bg ? `<div style="${bg}padding:1px">` : ''}<table role="presentation" align="center" width="720" cellpadding="0" cellspacing="0" style="width:720px;margin:0 auto;border-collapse:collapse;background:#fff"><tr><td>${cab}${capa}${corpo}${rod}${ultima}</td></tr></table>${bg ? '</div>' : ''}</body></html>`
 }

@@ -403,6 +403,11 @@
 }
 .loading-bar-fill { animation: loading-bar 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
 
+/* Loader que só aparece se o carregamento DEMORAR (evita flash em cargas rápidas/cacheadas):
+   fica invisível e só faz fade-in depois de ~400ms. */
+@keyframes loader-atrasado { to { opacity: 1; } }
+.loader-atrasado { opacity: 0; animation: loader-atrasado 0.25s ease-out 0.4s forwards; }
+
 /* Duração/curva do modelo (~.5s, cubic-bezier(.2,.8,.2,1)). */
 .animate-page { animation: page-enter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .animate-rise { animation: riseIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }

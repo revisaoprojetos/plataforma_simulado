@@ -70,6 +70,8 @@ function ModeloEditorBase({ id, nomeInicial, configInicial }: { id: string; nome
   const sujoRef = useRef(false); sujoRef.current = sujo
 
   const [pending, start] = useTransition()
+  const importRef = useRef<HTMLInputElement>(null)
+  const [importando, setImportando] = useState(false)
   const { ref, zoom } = useZoomAjustado()
   const [pickerCor, setPickerCor] = useState<{ parte: string; label: string; cor: string } | null>(null)
   const [pickerCapa, setPickerCapa] = useState(false)
@@ -176,7 +178,8 @@ function ModeloEditorBase({ id, nomeInicial, configInicial }: { id: string; nome
 
   function salvar() {
     start(async () => {
-      const r = await salvarModelo(id, { nome: nome.trim() || 'Modelo', config: { v: 1, item }, modalidade: item.modalidade })
+      // Preserva metadados do config (origem/padraoRef) — só sobrescreve v/item.
+      const r = await salvarModelo(id, { nome: nome.trim() || 'Modelo', config: { ...((configInicial as Record<string, unknown>) ?? {}), v: 1, item }, modalidade: item.modalidade })
       if (r.ok) { baselineRef.current = JSON.stringify({ nome, item }); bump(); toast.success('Modelo salvo') }
       else toast.error(r.error ?? 'Erro ao salvar')
     })
@@ -193,6 +196,21 @@ function ModeloEditorBase({ id, nomeInicial, configInicial }: { id: string; nome
   async function sair() {
     if (sujo && !(await confirmar({ titulo: 'Sair sem salvar?', mensagem: 'Há alterações não salvas neste modelo.', confirmar: 'Sair sem salvar', destrutivo: true }))) return
     router.push('/admin/modelos-caderno')
+  }
+  // Import (só diagnóstico): Word/PDF/HTML → conteúdo do diagnóstico (round-trip do .docx nativo exportado).
+  async function importarDoc(f: File | null) {
+    if (!f) return
+    setImportando(true)
+    try {
+      const fd = new FormData(); fd.append('file', f)
+      const r = await fetch('/api/admin/caderno-teste/importar', { method: 'POST', body: fd })
+      const j = await r.json()
+      if (!j.ok) { toast.error(j.error ?? 'Falha ao importar'); return }
+      setItem((it) => ({ ...it, conteudo: j.conteudo, ajustes: { ...it.ajustes, ...(j.ajustes ?? {}) }, capa: j.capa ?? it.capa }))
+      if (Array.isArray(j.avisos) && j.avisos.length) toast(j.avisos.slice(0, 2).join(' · '))
+      toast.success('Documento importado')
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Falha ao importar') }
+    finally { setImportando(false) }
   }
 
   return (
@@ -212,6 +230,12 @@ function ModeloEditorBase({ id, nomeInicial, configInicial }: { id: string; nome
             <button type="button" onClick={undo} disabled={!podeUndo} title="Desfazer (Ctrl+Z)" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"><Undo2 className="h-4 w-4" /></button>
             <button type="button" onClick={redo} disabled={!podeRedo} title="Refazer (Ctrl+Shift+Z)" className="flex h-8 w-8 items-center justify-center border-l text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"><Redo2 className="h-4 w-4" /></button>
           </div>
+          {item.modalidade === 'diagnostico' && (
+            <>
+              <input ref={importRef} type="file" accept=".docx,.html,.pdf" className="hidden" onChange={(e) => { importarDoc(e.target.files?.[0] ?? null); e.target.value = '' }} />
+              <Button variant="outline" size="sm" onClick={() => importRef.current?.click()} disabled={importando || pending} title="Importar Word/PDF/HTML (diagnóstico)">{importando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileUp className="mr-1.5 h-4 w-4" />} Importar</Button>
+            </>
+          )}
           <Button variant="outline" size="sm" onClick={salvarComo} disabled={pending} title="Salvar como uma cópia editável"><Copy className="mr-1.5 h-4 w-4" /> Salvar como</Button>
           <span className={cn('hidden items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium sm:inline-flex', sujo ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400')}>
             <span className={cn('h-1.5 w-1.5 rounded-full', sujo ? 'bg-amber-500' : 'bg-emerald-500')} />

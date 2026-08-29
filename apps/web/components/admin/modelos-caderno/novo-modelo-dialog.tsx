@@ -8,7 +8,7 @@ import { X, Loader2, Sparkles, LayoutTemplate, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PreviaBlocos, docDoPreset, idsDeterministicos } from '@/lib/caderno-teste/previa-blocos'
 import { Previa } from '@/lib/caderno-teste/previa'
-import { MODALIDADES, novoItem, novoItemVazio, presetDoModelo, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
+import { MODALIDADES, modelosVisiveis, novoItem, novoItemVazio, presetDoModelo, type Modalidade, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { criarModeloComConfig } from '@/app/admin/modelos-caderno/actions'
 import { MODALIDADE_META } from './modelo-card'
 
@@ -30,11 +30,12 @@ export function NovoModeloDialog({ pastaAtual, modoInicial = 'padrao', modalidad
   const [modo, setModo] = useState<'zero' | 'padrao'>(modoInicial)
   const [modalidade, setModalidade] = useState<Modalidade>(modalidadeInicial)
   const meta = useMemo(() => MODALIDADES.find((m) => m.id === modalidade) ?? MODALIDADES[0], [modalidade])
-  const [modeloId, setModeloId] = useState(modeloInicial ?? (MODALIDADES.find((m) => m.id === modalidadeInicial)?.modelos[0].id ?? meta.modelos[0].id))
+  const visiveis = useMemo(() => modelosVisiveis(modalidade), [modalidade])
+  const [modeloId, setModeloId] = useState(modeloInicial ?? modelosVisiveis(modalidadeInicial)[0]?.id ?? meta.modelos[0].id)
   const [nome, setNome] = useState('')
   const [pending, start] = useTransition()
 
-  const modeloSel = meta.modelos.find((m) => m.id === modeloId) ?? meta.modelos[0]
+  const modeloSel = visiveis.find((m) => m.id === modeloId) ?? visiveis[0] ?? meta.modelos[0]
   const previewItem = useMemo(() => {
     if (modo === 'zero') return null
     const it = novoItem(modalidade, modeloId)
@@ -46,8 +47,7 @@ export function NovoModeloDialog({ pastaAtual, modoInicial = 'padrao', modalidad
 
   function trocarModalidade(m: Modalidade) {
     setModalidade(m)
-    const mm = MODALIDADES.find((x) => x.id === m) ?? MODALIDADES[0]
-    setModeloId(mm.modelos[0].id)
+    setModeloId(modelosVisiveis(m)[0]?.id ?? '')
   }
 
   function criar() {
@@ -100,7 +100,7 @@ export function NovoModeloDialog({ pastaAtual, modoInicial = 'padrao', modalidad
                   })}
                 </div>
                 <div className="space-y-1">
-                  {meta.modelos.map((m) => (
+                  {visiveis.map((m) => (
                     <button key={m.id} type="button" onClick={() => setModeloId(m.id)} className={cn('flex w-full items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors', modeloId === m.id ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
                       <span className={cn('mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', modeloId === m.id ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{modeloId === m.id && <Check className="h-3 w-3" />}</span>
                       <span className="min-w-0"><span className="block text-[13px] font-semibold leading-tight">{m.nome}</span><span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">{m.descricao}</span></span>

@@ -13,8 +13,11 @@ import { UserPlus, Upload, Download, Search, Check, Loader2, FileText } from 'lu
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { vincularEstudantes, importarEstudantesLote, buscarEstudantesPlataforma } from '@/app/admin/banco-questoes/estudantes-actions'
+import { buscarEstudantesSimulado } from '@/app/admin/simulados/actions'
 
-interface Aluno { id: string; nome: string; email?: string | null; telefone?: string | null; classificacao?: string | null; jaVinculado: boolean }
+interface Aluno { id: string; nome: string; email?: string | null; telefone?: string | null; cpf?: string | null; classificacao?: string | null; avatar?: string | null; perfil_avatar_cor?: string | null; jaVinculado: boolean }
+/** Dados de exibição devolvidos no modo reutilizável (criação de simulado). */
+export type AlunoSel = { id: string; nome: string; email: string | null; telefone: string | null; cpf: string | null; classificacao: string | null; avatar: string | null; perfil_avatar_cor: string | null }
 
 function splitCsvLine(line: string): string[] {
   const out: string[] = []; let cur = ''; let q = false
@@ -40,7 +43,13 @@ function parseCsv(text: string): Record<string, string>[] {
 
 const MODELO = 'email,nome,telefone,documento,classificacao\njoao@exemplo.com,João Silva,11999990000,12345678900,normal\n'
 
-export function AdicionarEstudantesDialog({ bancoId }: { bancoId: string }) {
+export function AdicionarEstudantesDialog({ bancoId, onSelecionar, jaIds }: {
+  bancoId?: string
+  /** Modo REUTILIZÁVEL (criação de simulado): em vez de vincular no banco, devolve os alunos escolhidos. */
+  onSelecionar?: (alunos: AlunoSel[]) => void
+  /** Ids já escolhidos (para marcar como "já vinculado" e não repetir) — modo reutilizável. */
+  jaIds?: Set<string>
+}) {
   const [open, setOpen] = useState(false)
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -56,11 +65,18 @@ export function AdicionarEstudantesDialog({ bancoId }: { bancoId: string }) {
     if (!open) return
     setCarregando(true)
     const t = setTimeout(async () => {
-      const r = await buscarEstudantesPlataforma(bancoId, busca)
-      setResultados(r.ok ? (r.estudantes ?? []) : [])
+      if (onSelecionar || !bancoId) {
+        // Modo reutilizável (criação): busca banco-less no tenant; os já escolhidos aparecem marcados.
+        const r = await buscarEstudantesSimulado(busca, 50)
+        setResultados((r.ok ? (r.itens ?? []) : []).map((e) => ({ ...e, jaVinculado: !!jaIds?.has(e.id) })))
+      } else {
+        const r = await buscarEstudantesPlataforma(bancoId, busca)
+        setResultados(r.ok ? (r.estudantes ?? []) : [])
+      }
       setCarregando(false)
     }, 250)
     return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, busca, bancoId])
 
   function toggle(a: Aluno) {
@@ -70,8 +86,16 @@ export function AdicionarEstudantesDialog({ bancoId }: { bancoId: string }) {
 
   function vincular() {
     if (sel.size === 0) { toast.error('Selecione ao menos um estudante.'); return }
+    // Modo reutilizável (criação de simulado): devolve os escolhidos, sem tocar em banco.
+    if (onSelecionar) {
+      onSelecionar(resultados.filter((a) => sel.has(a.id)).map((a) => ({
+        id: a.id, nome: a.nome, email: a.email ?? null, telefone: a.telefone ?? null, cpf: a.cpf ?? null,
+        classificacao: a.classificacao ?? null, avatar: a.avatar ?? null, perfil_avatar_cor: a.perfil_avatar_cor ?? null,
+      })))
+      setOpen(false); setSel(new Set()); return
+    }
     start(async () => {
-      const r = await vincularEstudantes(bancoId, [...sel])
+      const r = await vincularEstudantes(bancoId as string, [...sel])
       if (r.ok) { toast.success(`${r.vinculados ?? 0} vinculado(s)`); setOpen(false); setSel(new Set()); router.refresh() }
       else toast.error(r.error ?? 'Erro')
     })
@@ -84,14 +108,14 @@ export function AdicionarEstudantesDialog({ bancoId }: { bancoId: string }) {
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file) return
+    if (!file || !bancoId) return
     const reader = new FileReader()
     reader.onload = () => {
       const rows = parseCsv(String(reader.result ?? ''))
       const mapped = rows.map((r) => ({ email: r.email, nome: r.nome, telefone: r.telefone, cpf: r.cpf || r.documento, classificacao: r.classificacao }))
       if (!mapped.some((r) => r.email)) { toast.error('CSV sem coluna "email" ou vazio.'); return }
       start(async () => {
-        const res = await importarEstudantesLote(bancoId, mapped)
+        const res = await importarEstudantesLote(bancoId as string, mapped)
         if (res.ok) { toast.success(`${res.criados ?? 0} criado(s), ${res.vinculados ?? 0} vinculado(s)`); setOpen(false); router.refresh() }
         else toast.error(res.error ?? 'Erro ao importar')
       })
@@ -111,7 +135,8 @@ export function AdicionarEstudantesDialog({ bancoId }: { bancoId: string }) {
           <DialogDescription>Importe um arquivo CSV ou selecione estudantes já cadastrados na plataforma.</DialogDescription>
         </DialogHeader>
 
-        {/* Upload CSV */}
+        {/* Upload CSV — só no modo banco (na criação de simulado não se criam alunos novos). */}
+        {!onSelecionar && (
         <div className="px-6 pt-4">
           <div className="rounded-lg border border-dashed p-5 text-center">
             <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
@@ -125,6 +150,7 @@ export function AdicionarEstudantesDialog({ bancoId }: { bancoId: string }) {
             </div>
           </div>
         </div>
+        )}
 
         {/* Tabela de estudantes existentes */}
         <div className="flex items-center justify-between gap-3 px-6 pb-2 pt-4">
@@ -177,7 +203,7 @@ export function AdicionarEstudantesDialog({ bancoId }: { bancoId: string }) {
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={vincular} disabled={pending || sel.size === 0}>
-              {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Vincular
+              {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} {onSelecionar ? 'Adicionar' : 'Vincular'}
             </Button>
           </div>
         </div>

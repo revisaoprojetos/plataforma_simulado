@@ -11,18 +11,24 @@ import { funcaoEtiquetaPorQuestao } from './etiqueta-funcao'
 
 type AnyClient = { from: (t: string) => any }
 type Politica = 'pontua_todos' | 'desconsidera'
+export type TipoCorrecao = 'pontuacao' | 'cebraspe'
 
 export interface NotaContexto {
   totalQuestoes: number
   anuladas: Map<string, Politica> // questao_id -> política
+  // 'pontuacao' = +1 por acerto (padrão) | 'cebraspe' = acertos − erros (erro desconta um acerto).
+  tipoCorrecao: TipoCorrecao
 }
 
-/** Monta o contexto (total de questões + anuladas com política) UMA vez por simulado. */
+/** Monta o contexto (total de questões + anuladas com política + tipo de correção) UMA vez por simulado. */
 export async function contextoNota(svc: AnyClient, simuladoId: string): Promise<NotaContexto> {
   const { data: pq } = await svc
     .from('simulado_prova_questoes')
     .select('questao_id, anulada')
     .eq('simulado_id', simuladoId)
+  // Tipo de correção vem das regras do simulado (default pontuação).
+  const { data: sim } = await svc.from('simulado_simulados').select('regras').eq('id', simuladoId).maybeSingle()
+  const tipoCorrecao: TipoCorrecao = ((sim as any)?.regras?.tipo_correcao === 'cebraspe') ? 'cebraspe' : 'pontuacao'
   const { data: recs } = await svc
     .from('simulado_recorrecoes')
     .select('questao_id, tipo, politica')
@@ -50,21 +56,31 @@ export async function contextoNota(svc: AnyClient, simuladoId: string): Promise<
     const { data: banco } = await svc.from('simulado_questoes').select('id').in('id', qids).eq('anulada', true)
     for (const b of (banco ?? []) as any[]) if (!anuladas.has(b.id)) anuladas.set(b.id, 'pontua_todos')
   }
-  return { totalQuestoes: (pq ?? []).length, anuladas }
+  return { totalQuestoes: (pq ?? []).length, anuladas, tipoCorrecao }
 }
 
-/** Calcula a nota (0–10) de uma sessão a partir das respostas e do contexto. */
+/** Calcula a nota (escala 0–100) de uma sessão a partir das respostas e do contexto. */
 export function calcularNota(respostas: { questao_id: string; correta: boolean | null }[], ctx: NotaContexto): number {
   let nPontuaTodos = 0
   let nDesconsidera = 0
   for (const p of ctx.anuladas.values()) { if (p === 'desconsidera') nDesconsidera++; else nPontuaTodos++ }
 
   const denom = ctx.totalQuestoes - nDesconsidera // desconsideradas saem do total
-  const corretasValidas = respostas.filter((r) => r.correta && !ctx.anuladas.has(r.questao_id)).length
-  const acertos = corretasValidas + nPontuaTodos // pontua_todos credita a todos
+  if (denom <= 0) return 0
+  const corretasValidas = respostas.filter((r) => r.correta === true && !ctx.anuladas.has(r.questao_id)).length
 
-  // Escala 0–100 (percentual de acerto). Ex.: 13/100 acertos → 13,00; tudo certo → 100.
-  return denom > 0 ? Math.round((acertos / denom) * 100 * 100) / 100 : 0
+  if (ctx.tipoCorrecao === 'cebraspe') {
+    // Estilo CEBRASPE: nota = acertos − erros. Cada erro anula um acerto. Questões NÃO marcadas
+    // ficam de fora (não descontam — não têm linha em respostas). Anuladas (pontua_todos) somam
+    // ponto. Piso em 0 (o líquido não fica negativo).
+    const errosValidos = respostas.filter((r) => r.correta === false && !ctx.anuladas.has(r.questao_id)).length
+    const liquido = Math.max(0, corretasValidas + nPontuaTodos - errosValidos)
+    return Math.round((liquido / denom) * 100 * 100) / 100
+  }
+
+  // Padrão: +1 por acerto. Escala 0–100 (percentual). Ex.: 13/100 acertos → 13,00; tudo certo → 100.
+  const acertos = corretasValidas + nPontuaTodos // pontua_todos credita a todos
+  return Math.round((acertos / denom) * 100 * 100) / 100
 }
 
 /** Conveniência: recalcula e devolve a nota de UMA sessão (1 read de respostas). */

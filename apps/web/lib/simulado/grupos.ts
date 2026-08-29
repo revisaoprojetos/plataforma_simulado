@@ -1,4 +1,5 @@
 import type { createAdminClient } from '@/lib/supabase/server'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 
 /**
  * Grupo mestre (pasta) × grupo comum.
@@ -61,4 +62,31 @@ export async function selecionarGrupos(
     codigo_externo: g.codigo_externo ?? null,
     criado_em: g.criado_em ?? null,
   }))
+}
+
+// ── Contagem de membros por grupo, MEMORIZADA por tenant (cache em memória do processo) ──────
+// Contar membros = varrer ~milhares de filiações (`simulado_grupo_membros`). Fazer isso a cada
+// abertura do seletor de grupos (banco e criação) é o que deixava tudo lento. Aqui a contagem é
+// calculada UMA vez e reaproveitada por TTL curto → números "pré setados", carregamento rápido.
+type ContagemCache = { at: number; counts: Record<string, number> }
+const _contagemCache = new Map<string, ContagemCache>()
+const CONTAGEM_TTL_MS = 5 * 60_000 // 5 min
+
+/** Mapa grupo_id → nº de membros do tenant, memorizado (TTL 5 min). `forcar` recalcula. */
+export async function contarMembrosGrupos(svc: Svc, tenantId: string, opts?: { forcar?: boolean }): Promise<Record<string, number>> {
+  const tid = tenantId || '00000000-0000-0000-0000-000000000000'
+  const hit = _contagemCache.get(tid)
+  if (!opts?.forcar && hit && Date.now() - hit.at < CONTAGEM_TTL_MS) return hit.counts
+  const membros = await fetchAll<{ grupo_id: string }>(() =>
+    svc.from('simulado_grupo_membros').select('grupo_id').eq('tenant_id', tid).order('grupo_id', { ascending: true }))
+  const counts: Record<string, number> = {}
+  for (const m of membros) counts[m.grupo_id] = (counts[m.grupo_id] ?? 0) + 1
+  _contagemCache.set(tid, { at: Date.now(), counts })
+  return counts
+}
+
+/** Invalida o cache de contagem (após mudanças de filiação em massa). */
+export function invalidarContagemGrupos(tenantId?: string) {
+  if (tenantId) _contagemCache.delete(tenantId)
+  else _contagemCache.clear()
 }

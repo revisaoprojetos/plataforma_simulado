@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { hospedarImagensDoc } from '@/lib/caderno-designer/hospedar-imagens'
+import { validateFile, PRESETS } from '@/lib/storage/validate'
 
 // Endpoint dinâmico (mutação/sessão) — nunca cachear.
 export const dynamic = 'force-dynamic'
@@ -32,10 +33,9 @@ export async function POST(req: NextRequest) {
 
   const buf = Buffer.from(await file.arrayBuffer())
   if (!buf.length) return NextResponse.json({ ok: false, error: 'Arquivo vazio.' }, { status: 400 })
-  // .docx é um contêiner ZIP → magic bytes "PK\x03\x04".
-  if (!(buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04)) {
-    return NextResponse.json({ ok: false, error: 'O arquivo não parece um .docx válido (talvez seja .doc antigo ou esteja corrompido).' }, { status: 400 })
-  }
+  // Validação central (magic bytes ZIP/PK + tamanho + anti-spoof — ponto S3). .docx é um contêiner ZIP.
+  const v = validateFile(buf, 'application/zip', PRESETS.docx)
+  if (!v.ok) return NextResponse.json({ ok: false, error: v.error || 'O arquivo não parece um .docx válido.' }, { status: 400 })
 
   try {
     // mammoth é pesado e roda fora do bundle (serverExternalPackages) — importa sob demanda.

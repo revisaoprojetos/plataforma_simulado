@@ -8,14 +8,20 @@ import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { novoItemVazio, type Modalidade } from '@/lib/caderno-teste/tipos'
+import { remember, chaveRelatorio, esquecer, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 
 const TABELA = 'simulado_caderno_modelos'
 const AREA = 'caderno_modelo'
 const NADA = '00000000-0000-0000-0000-000000000000'
 
+/** Chave de cache da área (a lista inteira do tenant) + invalidação em toda mutação. */
+const chaveModelos = (tenantId: string) => chaveRelatorio(tenantId, 'modelos-caderno')
+async function invalidarModelosCache(tenantId: string | null) { if (tenantId) await esquecer(chaveModelos(tenantId)) }
+
 export type ModeloRow = {
   id: string; nome: string; modalidade: string | null; origem: string | null
   pasta_id: string | null; cor: string | null; capa_url: string | null; capa_card_url: string | null; atualizado_em: string | null
+  config?: unknown // { v, item } — usado para a prévia da 1ª folha no card
 }
 export type PastaModeloRow = {
   id: string; nome: string; pai_id: string | null; cor: string | null; capa_url: string | null; capa_card_url: string | null
@@ -28,28 +34,34 @@ async function guard() {
   return { ok: true as const, tenantId: access.tenantId, atorId: access.userId ?? null }
 }
 
-/** Carrega TODOS os modelos + pastas da área (para montar níveis/trilha na page). Somente leitura. */
+/** Carrega TODOS os modelos + pastas da área (para montar níveis/trilha na page). Somente leitura.
+ *  Cacheado no Redis por tenant (TTL) — invalidado em toda mutação (`invalidarModelosCache`). O grid
+ *  filtra por pasta no cliente, então esta consulta roda 1× por visita, não a cada clique de pasta. */
 export async function carregarModelosArea(): Promise<{ ok: boolean; modelos: ModeloRow[]; pastas: PastaModeloRow[] }> {
   const g = await guard()
   if (!g.ok) return { ok: false, modelos: [], pastas: [] }
-  const svc = createAdminClient()
-  let modelos: ModeloRow[] = []
   try {
-    modelos = await fetchAll<ModeloRow>(() => svc
-      .from(TABELA)
-      .select('id, nome, modalidade, origem, pasta_id, cor, capa_url, capa_card_url, atualizado_em')
-      .eq('tenant_id', g.tenantId).eq('deletado', false).order('atualizado_em', { ascending: false }))
+    // Só resultados OK entram no cache: se a tabela não estiver migrada, o fetchAll lança e o
+    // remember NÃO cacheia (o catch abaixo devolve ok:false sem gravar 30min de falha).
+    const dados = await remember(chaveModelos(g.tenantId), TTL_RELATORIO, async () => {
+      const svc = createAdminClient()
+      const modelos = await fetchAll<ModeloRow>(() => svc
+        .from(TABELA)
+        .select('id, nome, modalidade, origem, pasta_id, cor, capa_url, capa_card_url, atualizado_em, config')
+        .eq('tenant_id', g.tenantId).eq('deletado', false).order('atualizado_em', { ascending: false }))
+      const pastasAll = await fetchAll<PastaModeloRow & { is_folder?: boolean; folder_area?: string }>(() => svc
+        .from('simulado_pastas')
+        .select('id, nome, pai_id, cor, capa_url, capa_card_url, is_folder, folder_area')
+        .eq('tenant_id', g.tenantId).eq('deletado', false).order('nome'))
+      const pastas = pastasAll.filter((p) => p.is_folder && p.folder_area === AREA)
+        .map((p) => ({ id: p.id, nome: p.nome, pai_id: p.pai_id, cor: p.cor, capa_url: p.capa_url, capa_card_url: p.capa_card_url }))
+      return { modelos, pastas }
+    })
+    return { ok: true, modelos: dados.modelos, pastas: dados.pastas }
   } catch {
     // Tabela ainda não migrada → a page mostra a mensagem de migração pendente.
     return { ok: false, modelos: [], pastas: [] }
   }
-  const pastasAll = await fetchAll<PastaModeloRow & { is_folder?: boolean; folder_area?: string }>(() => svc
-    .from('simulado_pastas')
-    .select('id, nome, pai_id, cor, capa_url, capa_card_url, is_folder, folder_area')
-    .eq('tenant_id', g.tenantId).eq('deletado', false).order('nome'))
-  const pastas = pastasAll.filter((p) => p.is_folder && p.folder_area === AREA)
-    .map((p) => ({ id: p.id, nome: p.nome, pai_id: p.pai_id, cor: p.cor, capa_url: p.capa_url, capa_card_url: p.capa_card_url }))
-  return { ok: true, modelos, pastas }
 }
 
 /** Abre um modelo para o editor. */
@@ -84,6 +96,7 @@ async function inserirModelo({ nome, config, modalidade, origem, pastaId }: { no
   }).select('id').single()
   if (error || !data) return { ok: false, error: error?.message ?? 'Erro ao criar modelo.' }
   await registrarAudit({ operacao: 'INSERT', entidade: TABELA, entidadeId: data.id, depois: { nome: titulo, origem, modalidade } })
+  await invalidarModelosCache(g.tenantId)
   revalidatePath('/admin/modelos-caderno')
   return { ok: true, id: data.id }
 }
@@ -99,6 +112,7 @@ export async function salvarModelo(id: string, patch: { nome?: string; config: u
   const { error } = await svc.from(TABELA).update(up).eq('id', id).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: TABELA, entidadeId: id, depois: { salvo: true } })
+  await invalidarModelosCache(g.tenantId)
   revalidatePath('/admin/modelos-caderno')
   revalidatePath(`/admin/modelos-caderno/${id}`)
   return { ok: true }
@@ -118,6 +132,7 @@ export async function salvarComoModelo(id: string, nome: string, pastaId?: strin
   }).select('id').single()
   if (e2 || !novo) return { ok: false, error: e2?.message ?? 'Erro ao salvar como.' }
   await registrarAudit({ operacao: 'INSERT', entidade: TABELA, entidadeId: novo.id, depois: { salvarComo: id } })
+  await invalidarModelosCache(g.tenantId)
   revalidatePath('/admin/modelos-caderno')
   return { ok: true, id: novo.id }
 }
@@ -138,6 +153,7 @@ export async function renomearModelo(id: string, nome: string): Promise<{ ok: bo
   const svc = createAdminClient()
   const { error } = await svc.from(TABELA).update({ nome: titulo, atualizado_em: new Date().toISOString() }).eq('id', id).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
+  await invalidarModelosCache(g.tenantId)
   revalidatePath('/admin/modelos-caderno')
   return { ok: true }
 }
@@ -149,6 +165,7 @@ export async function moverModelo(id: string, pastaId: string | null): Promise<{
   const { error } = await svc.from(TABELA).update({ pasta_id: pastaId }).eq('id', id).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: TABELA, entidadeId: id, depois: { pasta_id: pastaId } })
+  await invalidarModelosCache(g.tenantId)
   revalidatePath('/admin/modelos-caderno')
   return { ok: true }
 }
@@ -161,6 +178,7 @@ export async function excluirModelo(id: string): Promise<{ ok: boolean; error?: 
   const { error } = await svc.from(TABELA).update({ deletado: true, deletado_em: new Date().toISOString(), deletado_por: g.atorId }).eq('id', id).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'DELETE', entidade: TABELA, entidadeId: id, depois: { deletado: true } })
+  await invalidarModelosCache(g.tenantId)
   revalidatePath('/admin/modelos-caderno')
   return { ok: true }
 }
@@ -178,6 +196,7 @@ export async function criarPastaModelo(nome: string, paiId?: string | null): Pro
   if (error && /folder_area/i.test(error.message)) ({ data, error } = await svc.from('simulado_pastas').insert(base).select('id').single())
   if (error || !data) return { ok: false, error: error?.message ?? 'Erro ao criar pasta.' }
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_pastas', entidadeId: data.id, depois: { nome: titulo, pasta: true, area: AREA } })
+  await invalidarModelosCache(g.tenantId)
   revalidatePath('/admin/modelos-caderno')
   return { ok: true, id: data.id }
 }
@@ -200,6 +219,7 @@ export async function atualizarPastaModelo(id: string, nome: string, cor: string
   }
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: id, depois: { nome: titulo, cor } })
+  await invalidarModelosCache(g.tenantId)
   revalidatePath('/admin/modelos-caderno')
   return { ok: true }
 }
@@ -210,6 +230,7 @@ export async function moverPastaModelo(id: string, paiId: string | null): Promis
   const svc = createAdminClient()
   const { error } = await svc.from('simulado_pastas').update({ pai_id: paiId }).eq('id', id).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
+  await invalidarModelosCache(g.tenantId)
   revalidatePath('/admin/modelos-caderno')
   return { ok: true }
 }
@@ -224,6 +245,7 @@ export async function excluirPastaModelo(id: string): Promise<{ ok: boolean; err
   const { error } = await softDelete('simulado_pastas', id)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_pastas', entidadeId: id, depois: { deletado: true, pasta: true } })
+  await invalidarModelosCache(g.tenantId)
   revalidatePath('/admin/modelos-caderno')
   return { ok: true }
 }

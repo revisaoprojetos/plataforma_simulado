@@ -179,6 +179,9 @@ export async function GET(request: NextRequest) {
   }
   const total = ((sq ?? []).length) - desconsideraSet.size
   const acertos = (respostas ?? []).filter((r) => r.correta && !anuladaSet.has(r.questao_id as string) && !desconsideraSet.has(r.questao_id as string)).length + anuladaSet.size
+  // Erros marcados (para o estilo CEBRASPE, onde cada erro desconta um acerto). Em branco não conta.
+  const erros = (respostas ?? []).filter((r) => r.correta === false && !anuladaSet.has(r.questao_id as string) && !desconsideraSet.has(r.questao_id as string)).length
+  const tipoCorrecao = (simulado?.regras as any)?.tipo_correcao === 'cebraspe' ? 'cebraspe' : 'pontuacao'
 
   // Estatística por matéria/disciplina (só quando o gabarito está liberado).
   let statsPorDisciplina: Array<{ disciplina: string; acertos: number; total: number; percentual: number }> = []
@@ -254,6 +257,8 @@ export async function GET(request: NextRequest) {
     titulo: simulado?.titulo ?? 'Simulado',
     nota: sessao.nota ?? null,
     acertos,
+    erros,
+    tipo_correcao: tipoCorrecao,
     total,
     marcadas,
     em_branco: emBranco,

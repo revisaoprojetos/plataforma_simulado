@@ -3,7 +3,7 @@
 // própria (como as "modalidades" do editor antigo). Config isolado em
 // simulado_cadernos_teste.config.builderV3.
 
-import { DIAG_PADRAO, DIAG_AGU_2023, DIAG_PGE_RS, DIAG_BASE_4, DIAG_VAZIO, type DiagConteudo } from './diagnostico'
+import { DIAG_PADRAO, DIAG_AGU_2023, DIAG_PGE_RS, DIAG_BASE_4, DIAG_SEMANA_6EM7, DIAG_VAZIO, type DiagConteudo } from './diagnostico'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
 import { FOLHA_RESPOSTAS_DOC, CADERNO_PERGUNTAS_DOC } from '@/lib/caderno-designer/preset-cadernos-doc'
 
@@ -252,8 +252,9 @@ export const MODALIDADES: ModalidadeMeta[] = [
     id: 'diagnostico', nome: 'Diagnóstico', descricao: 'Relatório de desempenho do aluno (pilares, disciplinas, sugestões).',
     modelos: [
       { id: 'padrao', nome: 'Em branco', descricao: 'Estrutura vazia para preencher.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_PADRAO },
-      { id: 'base_4', nome: 'Base — 4 disciplinas', descricao: 'Estrutura completa pronta (intro, pilar separado, 3 pilares, 4 disciplinas, sugestões e gabarito) com textos genéricos.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_BASE_4 },
-      { id: 'agu_2023', nome: 'Completo (AGU 2023)', descricao: 'Pré-preenchido com o diagnóstico da AGU 2023.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_AGU_2023 },
+      { id: 'base_4', nome: 'Diagnóstico - 4 disciplinas', descricao: 'Estrutura completa pronta (intro, pilar separado, 3 pilares, 4 disciplinas, sugestões e gabarito) com textos genéricos.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_BASE_4 },
+      { id: 'semana_6em7', nome: 'Diagnóstico - 1 disciplina', descricao: 'Diagnóstico enxuto por disciplina (lei seca/jurisprudência/doutrina) + bloco de jurisprudência prioritária — base dos cadernos "Semana de atualização (6 meses em 7 dias)". Ajuste a disciplina e os temas.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420', colunas: 2, coresPilar: { doutrina: '#e8850c', lei_seca: '#c9a227', jurisprudencia: '#3b5bdb', lingua_portuguesa: '#1a7a4a' } }, conteudo: DIAG_SEMANA_6EM7 },
+      { id: 'agu_2023', nome: 'Diagnóstico - Padrão', descricao: 'Pré-preenchido com o diagnóstico da AGU 2023.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_AGU_2023 },
       { id: 'pge_rs', nome: 'Completo (PGE/RS)', descricao: 'Estrutura base para o diagnóstico da PGE/RS — ajuste os textos/disciplinas.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_PGE_RS },
       // 'agu_diagnostico' (v1 doc-backed, blocos antigos) REMOVIDO — usava o render legado (PreviaBlocos)
       // em vez do atual (conteudo/Previa com os fixes). 0 cadernos usavam. Use 'agu_2023' (mesmo AGU, atual).
@@ -263,6 +264,15 @@ export const MODALIDADES: ModalidadeMeta[] = [
 
 export function metaDaModalidade(id: Modalidade): ModalidadeMeta {
   return MODALIDADES.find((m) => m.id === id) ?? MODALIDADES[0]
+}
+
+/** IDs de modelos padrão OCULTOS dos seletores da UI (mantidos no engine p/ compat com cadernos antigos —
+ *  ex.: `classico` ainda é o default de `builderPadrao`). Filtram só a exibição nos seletores. */
+export const MODELOS_PADRAO_OCULTOS = new Set<string>(['agu_marcada', 'agu_oficial', 'classico', 'compacto', 'com_gabarito'])
+
+/** Modelos de uma modalidade visíveis nos seletores (sem os ocultos). */
+export function modelosVisiveis(modalidade: Modalidade): ModalidadeMeta['modelos'] {
+  return metaDaModalidade(modalidade).modelos.filter((m) => !MODELOS_PADRAO_OCULTOS.has(m.id))
 }
 
 /** Id do preset de blocos (v1) de um modelo, se ele for um "modelo pronto" doc-backed. */

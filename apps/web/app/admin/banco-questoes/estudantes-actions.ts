@@ -7,7 +7,7 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { matricularEmSimuladosDoBanco } from '@/lib/simulado/matricular-banco'
-import { selecionarGrupos } from '@/lib/simulado/grupos'
+import { selecionarGrupos, contarMembrosGrupos } from '@/lib/simulado/grupos'
 import { pdfStoragePath } from '@/lib/caderno-designer/material'
 
 async function guard() {
@@ -510,15 +510,10 @@ export async function carregarGruposDoBanco(bancoId: string): Promise<{ ok: bool
   if (!g.ok) return g
   const svc = createAdminClient()
   const gruposRaw = await selecionarGrupos(svc, g.tenantId)
-  const gids = gruposRaw.filter((x: any) => !x.is_mestre).map((x: any) => x.id)
-  const contMembros = new Map<string, number>()
-  if (gids.length) {
-    const gm = await fetchAll<{ grupo_id: string }>(() =>
-      svc.from('simulado_grupo_membros').select('grupo_id').in('grupo_id', gids).order('id', { ascending: true }))
-    for (const m of gm) contMembros.set(m.grupo_id, (contMembros.get(m.grupo_id) ?? 0) + 1)
-  }
+  // Contagem memorizada (TTL) — não reprocessa as filiações a cada abertura do diálogo.
+  const contMembros = await contarMembrosGrupos(svc, g.tenantId)
   const { data: links } = await svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', bancoId)
   const vinculadosSet = new Set((links ?? []).map((l: any) => l.grupo_id))
-  const grupos = gruposRaw.map((x: any) => ({ id: x.id, nome: x.nome, cor: x.cor ?? null, membros: contMembros.get(x.id) ?? 0, vinculado: vinculadosSet.has(x.id), pai_id: x.pai_id ?? null, is_mestre: !!x.is_mestre }))
+  const grupos = gruposRaw.map((x: any) => ({ id: x.id, nome: x.nome, cor: x.cor ?? null, membros: contMembros[x.id] ?? 0, vinculado: vinculadosSet.has(x.id), pai_id: x.pai_id ?? null, is_mestre: !!x.is_mestre }))
   return { ok: true, grupos }
 }

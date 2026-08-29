@@ -49,6 +49,7 @@ import {
   BarChart3,
   FolderTree,
   Rows3,
+  GalleryHorizontalEnd,
   Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -417,7 +418,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   catalogo?: { sims: SimuladoCatalogo[]; grupos: PastaSim[] }
 }) {
   const router = useRouter()
-  const [pending, start] = useTransition()
+  const [, start] = useTransition()
   const [busca, setBusca] = useState('')
   const [modo, setModo] = useState<string>('todos')
   const [movendo, setMovendo] = useState<SimuladoCard | null>(null)
@@ -429,10 +430,11 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   // na raiz usamos o catálogo completo (todos os simulados) para montar as seções por pasta.
   const todos = useMemo(() => (atual ? simulados : (catalogo?.sims ?? simulados)) as SimuladoCard[], [atual, simulados, catalogo])
 
-  // Vista: "pastas" (seções por pasta, padrão) ou "status" (grade por Em andamento/A iniciar/Encerrado).
-  const [vista, setVista] = useState<'pastas' | 'status'>('pastas')
-  useEffect(() => { const v = localStorage.getItem('simulados-vista-2'); if (v === 'pastas' || v === 'status') setVista(v) }, [])
-  useEffect(() => { localStorage.setItem('simulados-vista-2', vista) }, [vista])
+  // Vista: "linhas" (fileiras por pasta, estilo catálogo — padrão), "pastas" (só as pastas em tiles;
+  // clicar entra nela) ou "status" (grade por Em andamento/A iniciar/Encerrado).
+  const [vista, setVista] = useState<'linhas' | 'pastas' | 'status'>('linhas')
+  useEffect(() => { const v = localStorage.getItem('simulados-vista-3'); if (v === 'linhas' || v === 'pastas' || v === 'status') setVista(v) }, [])
+  useEffect(() => { localStorage.setItem('simulados-vista-3', vista) }, [vista])
 
   // Seções recolhidas.
   const [recolhidas, setRecolhidas] = useState<Set<string>>(new Set())
@@ -497,20 +499,6 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
     start(async () => { const r = await excluirPastaFolder(f.id); if (r.ok) { toast.success('Pasta excluída'); router.refresh() } else toast.error(r.error ?? 'Erro') })
   }
 
-  // Alternar (em massa) uma liberação para TODOS os simulados de uma pasta.
-  function alternarPasta(sims: SimuladoCard[], item: 'nota' | 'gabarito') {
-    const alvos = sims.filter((s) => s.status !== 'rascunho')
-    if (!alvos.length) return toast.error('Nenhum simulado publicado/encerrado nesta pasta.')
-    const flag = item === 'nota' ? 'notaLiberada' : 'gabaritoLiberado'
-    const liberados = alvos.filter((s) => resolverLiberacoes(s.regras, { status: s.status, data_fim: s.data_fim })[flag]).length
-    const liberar = liberados < alvos.length // se nem todos liberados → libera todos; senão bloqueia todos
-    start(async () => {
-      await Promise.all(alvos.map((s) => liberarItemAction(s.id, item, liberar)))
-      toast.success(`${item === 'nota' ? 'Notas' : 'Gabaritos'} ${liberar ? 'liberados' : 'bloqueados'} em ${alvos.length} simulado(s)`)
-      router.refresh()
-    })
-  }
-
   const totalFiltrado = filtrados.length
 
   return (
@@ -528,7 +516,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
         <div className="flex flex-wrap items-center gap-2">
           {!atual && (
             <div className="flex gap-1 rounded-lg bg-[var(--tab-bg,var(--muted))] p-1">
-              {([['pastas', 'Pastas', FolderTree], ['status', 'Status', Rows3]] as const).map(([v, label, Icon]) => (
+              {([['linhas', 'Linhas', GalleryHorizontalEnd], ['pastas', 'Pastas', FolderTree], ['status', 'Status', Rows3]] as const).map(([v, label, Icon]) => (
                 <button key={v} type="button" onClick={() => setVista(v)} aria-pressed={vista === v}
                   className={cn('inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors',
                     vista === v ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
@@ -559,13 +547,32 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
       {vista === 'status' && !atual ? (
         <SecoesStatus sims={filtrados} online={online} appUrl={appUrl} onMover={podeMover ? (s) => setMovendo(s) : undefined}
           recolhidas={recolhidas} toggleSecao={toggleSecao} selecao={selecao} onSelecionar={setSel} />
+      ) : vista === 'pastas' && !atual ? (
+        // Só as PASTAS (tiles). Clicar entra na pasta (?pasta=id) e mostra os simulados de dentro.
+        <div className="space-y-6">
+          {secoesPasta.pastas.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {secoesPasta.pastas.map(({ folder, sims }) => folder && (
+                <FolderTile key={folder.id} folder={folder} count={sims.length} appUrl={appUrl}
+                  onPersonalizar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)} />
+              ))}
+            </div>
+          )}
+          {secoesPasta.semPasta.length > 0 && (
+            <SecaoSimples titulo="Sem pasta" icone={FolderInput} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
+              aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
+              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} />
+          )}
+          {secoesPasta.pastas.length === 0 && secoesPasta.semPasta.length === 0 && (
+            <p className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">Nenhuma pasta ainda. Crie a primeira em “Nova pasta”.</p>
+          )}
+        </div>
       ) : (
         <div className="space-y-8">
           {secoesPasta.pastas.map(({ folder, sims }) => (
             folder && <PastaSection key={folder.id} folder={folder} sims={sims} online={online} appUrl={appUrl}
               aberto={!recolhidas.has(`p:${folder.id}`)} toggle={() => toggleSecao(`p:${folder.id}`)}
               onGerenciar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)}
-              onAlternar={(item) => alternarPasta(sims, item)} pendingBulk={pending}
               onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} />
           ))}
 
@@ -607,15 +614,56 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
 }
 
 /** Uma seção de PASTA: cabeçalho (nome + contagem + status + ações em massa) e grade de cards. */
-function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerenciar, onExcluir, onAlternar, pendingBulk, onMover, selecao, onSelecionar }: {
+/** Tile de PASTA (view "Pastas"): pôster que leva para dentro da pasta (?pasta=id) → simulados de lá.
+ *  Menu de 3 pontos: personalizar, copiar link e excluir. */
+function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir }: {
+  folder: PastaSim; count: number; appUrl: string; onPersonalizar: () => void; onExcluir: () => void
+}) {
+  const cor = folder.cor ?? '#6d28d9'
+  const Icon = iconeBanco(folder.icone)
+  async function copiarLink() {
+    const url = `${appUrl}/aluno?pasta=${folder.id}`
+    if (await copiarTexto(url)) toast.success('Link da pasta copiado')
+    else toast.error(`Não foi possível copiar. Link: ${url}`)
+  }
+  return (
+    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+      {/* Pôster clicável (entra na pasta). */}
+      <Link href={`/admin/simulados?pasta=${folder.id}`} className="absolute inset-0 flex flex-col justify-end outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+        {folder.capa ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={folder.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        ) : (
+          <div className="absolute inset-0" style={{ background: `linear-gradient(150deg, ${cor} 0%, #0f172a 150%)` }} />
+        )}
+        {!folder.capa && <Icon className="pointer-events-none absolute -right-4 -top-4 h-24 w-24 text-white/10" />}
+        <div className="relative bg-gradient-to-t from-black/85 via-black/45 to-transparent p-3 pt-8">
+          <p className="line-clamp-2 text-[13px] font-bold leading-tight text-white">{folder.nome}</p>
+          <p className="mt-0.5 text-[11px] font-medium text-white/80">{count} simulado(s)</p>
+        </div>
+      </Link>
+      {/* Menu (fora do <a> → clicar não navega). */}
+      <DropdownMenu>
+        <DropdownMenuTrigger className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-white/90 backdrop-blur-sm outline-none transition-colors hover:bg-black/60 hover:text-white focus-visible:ring-2 focus-visible:ring-white/60" aria-label="Ações da pasta">
+          <MoreHorizontal className="h-4 w-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuItem onClick={onPersonalizar}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
+          <DropdownMenuItem onClick={copiarLink}><Copy className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={onExcluir} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir pasta</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
+}
+
+function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerenciar, onExcluir, onMover, selecao, onSelecionar }: {
   folder: PastaSim; sims: SimuladoCard[]; online: Record<string, number>; appUrl: string
   aberto: boolean; toggle: () => void; onGerenciar: () => void; onExcluir: () => void
-  onAlternar: (item: 'nota' | 'gabarito') => void; pendingBulk: boolean
   onMover?: (s: SimuladoCard) => void; selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void
 }) {
   const st = statusPasta(sims)
-  const cor = folder.cor ?? '#6d28d9'
-  const Icon = iconeBanco(folder.icone)
   // Link da PASTA para o aluno: abre a home filtrada nesta pasta. Sem login, o proxy manda para
   // /aluno/entrar preservando a query (redirectTo) e, após entrar, cai direto aqui.
   async function copiarLinkPasta() {
@@ -629,7 +677,6 @@ function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerencia
         <div className="flex min-w-0 items-center gap-2">
         <button type="button" onClick={toggle} aria-expanded={aberto} className="group flex min-w-0 items-center gap-2 text-left">
           <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:text-foreground', !aberto && '-rotate-90')} />
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white shadow-sm" style={{ background: cor }}><Icon className="h-3.5 w-3.5" /></span>
           <span className="truncate font-semibold">{folder.nome}</span>
           <span className="shrink-0 text-sm text-muted-foreground">{sims.length} simulado(s)</span>
           {st && <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide', st.cls)}>{st.label}</span>}
@@ -640,14 +687,6 @@ function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerencia
         </button>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <button type="button" onClick={() => onAlternar('nota')} disabled={pendingBulk}
-            className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary disabled:opacity-50">
-            <Unlock className="h-3.5 w-3.5" /> Alternar notas
-          </button>
-          <button type="button" onClick={() => onAlternar('gabarito')} disabled={pendingBulk}
-            className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary disabled:opacity-50">
-            <Unlock className="h-3.5 w-3.5" /> Alternar gabaritos
-          </button>
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-semibold shadow-sm outline-none transition-colors hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
               <FolderCog className="h-3.5 w-3.5" /> Gerenciar pasta

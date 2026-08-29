@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { htmlParaDiagnostico, pdfParaHtml, caixasDeTextoDocx } from '@/lib/caderno-teste/importar'
+import { validateFile, PRESETS } from '@/lib/storage/validate'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -25,6 +26,12 @@ export async function POST(req: NextRequest) {
   if (file.size > 25 * 1024 * 1024) return NextResponse.json({ ok: false, error: 'Arquivo muito grande (máx. ~25 MB).' }, { status: 400 })
   const buf = Buffer.from(await file.arrayBuffer())
   if (!buf.length) return NextResponse.json({ ok: false, error: 'Arquivo vazio.' }, { status: 400 })
+
+  // Validação server-side central (magic bytes + tamanho + anti-spoof — ponto S3). HTML não tem assinatura.
+  const ehDocx = nome.endsWith('.docx') || (buf[0] === 0x50 && buf[1] === 0x4b && !nome.endsWith('.pdf'))
+  const ehPdfArq = nome.endsWith('.pdf') || buf.subarray(0, 4).toString('latin1') === '%PDF'
+  if (ehDocx) { const v = validateFile(buf, 'application/zip', PRESETS.docx); if (!v.ok) return NextResponse.json({ ok: false, error: v.error }, { status: 400 }) }
+  else if (ehPdfArq) { const v = validateFile(buf, 'application/pdf', PRESETS.documento); if (!v.ok) return NextResponse.json({ ok: false, error: v.error }, { status: 400 }) }
 
   let html = ''
   let ehPdf = false

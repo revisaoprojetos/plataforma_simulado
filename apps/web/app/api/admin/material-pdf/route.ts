@@ -20,7 +20,7 @@ export const maxDuration = 60
  */
 export async function POST(req: NextRequest) {
   const access = await getCurrentAccess()
-  if (!access.tenantId || !(access.isAdmin || access.permissions.includes('questoes:update'))) {
+  if (!access.tenantId || !(access.isAdmin || access.permissions.includes('questoes:update') || access.permissions.includes('simulados:create'))) {
     return NextResponse.json({ ok: false, error: 'Sem permissão.' }, { status: 403 })
   }
 
@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
   // alvo=entrega → PDF do slot da MONTAGEM do banco (simulado_pastas.caderno_entrega), não de um caderno.
   const alvo = String(form.get('alvo') ?? '')
   if (!(file instanceof File)) return NextResponse.json({ ok: false, error: 'Dados incompletos.' }, { status: 400 })
-  if (alvo !== 'entrega' && !cadernoId) return NextResponse.json({ ok: false, error: 'Dados incompletos.' }, { status: 400 })
+  // 'draft' (criação de simulado) e 'entrega' (montagem do banco) NÃO têm cadernoId — só os slots de caderno precisam.
+  if (alvo !== 'entrega' && alvo !== 'draft' && !cadernoId) return NextResponse.json({ ok: false, error: 'Dados incompletos.' }, { status: 400 })
   if (alvo === 'entrega' && !bancoId) return NextResponse.json({ ok: false, error: 'Banco ausente.' }, { status: 400 })
   if (file.size > 8 * 1024 * 1024) return NextResponse.json({ ok: false, error: 'PDF muito grande (máx. ~8 MB).' }, { status: 400 })
 
@@ -47,6 +48,20 @@ export async function POST(req: NextRequest) {
   if (buf.subarray(0, 4).toString('latin1') !== '%PDF') return NextResponse.json({ ok: false, error: 'O arquivo não é um PDF válido.' }, { status: 400 })
 
   const svc = createAdminClient()
+
+  // ----- Upload avulso (criação de simulado, banco ainda não existe): só sobe e devolve a URL -----
+  if (alvo === 'draft') {
+    const chave = slot === 'enunciado' ? 'enunciado' : 'gabarito'
+    const hash = createHash('sha1').update(buf).digest('hex').slice(0, 10)
+    const path = `materiais/${access.tenantId}/draft-${chave}-${hash}.pdf`
+    try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
+    let up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true })
+    if (up.error && /bucket.*not.*found/i.test(up.error.message)) { await svc.storage.createBucket('pdfs', { public: true }).catch(() => {}); up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true }) }
+    if (up.error) return NextResponse.json({ ok: false, error: up.error.message }, { status: 500 })
+    const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
+    const nome = ((file.name || 'PDF').replace(/\.pdf$/i, '').trim()) || 'PDF'
+    return NextResponse.json({ ok: true, url, nome })
+  }
 
   // ----- Montagem do banco (slot enunciado/gabarito como PDF) -----
   if (alvo === 'entrega') {

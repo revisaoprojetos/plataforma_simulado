@@ -115,6 +115,39 @@ export const DIAG_PADRAO: DiagConteudo = {
   gabaritoObs: [],
 }
 
+/** Preset "Semana 6/7" — diagnóstico enxuto por disciplina (lei seca/jurisprudência/doutrina) + bloco de
+ *  jurisprudência prioritária. Baseado nos cadernos "Semana de atualização (6 meses em 7 dias)" (twdr).
+ *  Generalizado: sem disciplina/temas fixos e sem imagens específicas — o admin ajusta por disciplina. */
+export const DIAG_SEMANA_6EM7: DiagConteudo = {
+  tituloCabecalho: 'Diagnóstico de Desempenho',
+  subtitulo: 'Semana de atualização — [6 MESES] em 7 DIAS',
+  notaTotal: '{total_questoes}',
+  notaTexto: '{acertos} acertos de {total_questoes} questões — {percentual} de aproveitamento',
+  intro: [
+    'A análise a seguir tem foco nos seus pontos de erros. Para cada disciplina, você encontra o desempenho por categoria (lei seca, jurisprudência e doutrina) e uma leitura personalizada do que os erros revelam sobre as lacunas a priorizar.',
+  ],
+  pilares: [],
+  disciplinasIntro: 'A análise a seguir tem foco nos seus pontos de erros.',
+  disciplinas: [{ nome: 'Disciplina', chave: 'disciplina', total: '', categoria: 'Assunto Principal' }],
+  sugestoes: [
+    {
+      titulo: 'JURISPRUDÊNCIA',
+      prioridade: 'Prioridade Alta',
+      corTitulo: '#d17a00',
+      intro: 'Jurisprudência é o ponto sensível que não pode ser negligenciado. As bancas cobram informativos e teses fixadas de forma sistemática — quem não acompanha jurisprudência perde questões que dá para acertar. Liste os temas de maior recorrência da banca nesta disciplina:',
+      itens: [
+        { forte: true, texto: 'Tema de alta recorrência 1' },
+        { forte: true, texto: 'Tema de alta recorrência 2' },
+      ],
+    },
+  ],
+  fechamento: [],
+  partesOcultas: ['gabarito'],
+  gabaritoTitulo: '',
+  gabaritoIntro: [],
+  gabaritoObs: [],
+}
+
 /** Diagnóstico VAZIO — canvas "em branco total" para criação do zero: nenhum bloco renderiza até
  *  o usuário adicioná-los (painel Estrutura). As chaves estruturais ficam em `partesOcultas`;
  *  cabeçalho/dados do aluno são desligados nos ajustes do item (ver novoItemVazio). */

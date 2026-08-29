@@ -1,23 +1,36 @@
 'use client'
 
-import { useState, useTransition, useMemo, useEffect } from 'react'
+import { useState, useTransition, useMemo, useEffect, useRef } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-  ListChecks, PenLine, Check, ChevronLeft, ChevronRight, Loader2, Search, Settings2, Users, Sparkles,
-  FileText, CalendarClock, ShieldCheck, Info, Clock, ArrowUpDown, Trophy, AlertTriangle,
+  ListChecks, PenLine, Check, ChevronLeft, ChevronRight, ChevronDown, Loader2, Search, Settings2, Users, FilePlus2,
+  FileText, CalendarClock, ShieldCheck, Info, Clock, ArrowUp, ArrowDown, ChevronsUpDown, Trophy, AlertTriangle, FolderOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { iconeBanco } from '@/lib/banco-visual'
 import { BRT_LABEL } from '@/lib/brt'
 import { useOcultarDiscursiva } from '@/components/auth/can-provider'
-import { buscarEstudantesSimulado, listarEstudanteIdsSimulado, buscarQuestoesWizard, listarQuestoesDoBanco, type QuestaoWizardItem } from '@/app/admin/simulados/actions'
+import { buscarEstudantesSimulado, listarEstudanteIdsSimulado, buscarQuestoesWizard, listarQuestoesDoBanco, contarBancosWizard, type QuestaoWizardItem } from '@/app/admin/simulados/actions'
 import { toast } from 'sonner'
 
-interface Banco { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null; nQuestoes?: number; nEstudantes?: number }
+interface Banco { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null; pasta?: string | null; created_at?: string | null; nQuestoes?: number; nEstudantes?: number }
+type OrdCampo = 'recente' | 'nome' | 'pasta' | 'questoes' | 'estudantes'
+
+/** Cabeçalho ordenável da tabela de bancos (seta ↑/↓ + estado). */
+function SortHead({ label, campo, ordCampo, ordDir, onSort, className }: { label: string; campo: OrdCampo; ordCampo: OrdCampo; ordDir: 'asc' | 'desc'; onSort: (c: OrdCampo) => void; className?: string }) {
+  const on = ordCampo === campo
+  return (
+    <th className={className}>
+      <button type="button" onClick={() => onSort(campo)} className={cn('inline-flex items-center gap-1 rounded px-1 py-0.5 font-medium uppercase transition-colors hover:text-foreground', on ? 'text-foreground' : '')}>
+        {label}
+        {on ? (ordDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+      </button>
+    </th>
+  )
+}
 interface Estudante { id: string; nome: string; email: string | null }
 
 // No modo "banco" o tipo já vem do banco → não há etapa "Tipo".
@@ -29,6 +42,59 @@ const modoLabel: Record<string, string> = { janela_fixa: 'Agendado', prazo_relat
 const liberarLabel: Record<string, string> = { imediato: 'Imediato', apos_janela: 'Após janela', manual: 'Manual' }
 const politicaLabel: Record<string, string> = { ultima: 'Última', melhor: 'Maior', media: 'Média' }
 const LIB_OPTS = [{ v: 'imediato', label: 'Imediato' }, { v: 'apos_janela', label: 'Após janela' }, { v: 'manual', label: 'Manual' }]
+
+/** Seletor de itens por página — dropdown compacto que abre PARA CIMA (fica no rodapé da tabela),
+ *  com animação de abrir/fechar (monta antes de animar; desmonta após a saída). */
+function PageSizeSelect({ value, onChange, opcoes }: { value: number; onChange: (v: number) => void; opcoes: number[] }) {
+  const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false) // fica montado durante a animação de saída
+  const [visivel, setVisivel] = useState(false) // estado visual (dispara a transição)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true)
+      const r = requestAnimationFrame(() => setVisivel(true)) // 1 frame depois → transição de entrada
+      return () => cancelAnimationFrame(r)
+    }
+    setVisivel(false)
+    const t = setTimeout(() => setMounted(false), 160) // espera a saída antes de desmontar
+    return () => clearTimeout(t)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey) }
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        className={cn('inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1 text-xs font-semibold text-foreground shadow-sm transition-colors hover:border-primary/50', open && 'border-primary/50 ring-2 ring-primary/20')}>
+        {value} <span className="text-muted-foreground">/ página</span>
+        <ChevronDown className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform duration-200', open && 'rotate-180')} />
+      </button>
+      {mounted && (
+        <div className={cn('absolute bottom-full left-0 z-30 mb-1.5 w-40 origin-bottom overflow-hidden rounded-xl border bg-card p-1 shadow-xl transition-all duration-150 ease-out',
+          visivel ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-1 scale-95 opacity-0')}>
+          {opcoes.map((o) => {
+            const on = o === value
+            return (
+              <button key={o} type="button" onClick={() => { onChange(o); setOpen(false) }}
+                className={cn('flex w-full items-center justify-between gap-2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors', on ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted')}>
+                <span>{o} por página</span> {on && <Check className="h-3.5 w-3.5 shrink-0" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function SimuladoWizard({
   bancos,
@@ -69,9 +135,19 @@ export function SimuladoWizard({
   const [estBuscando, setEstBuscando] = useState(false)
   const [estTotal, setEstTotal] = useState(0)
   const [buscaBanco, setBuscaBanco] = useState('')
-  const [ordemBanco, setOrdemBanco] = useState<'nome' | 'estudantes' | 'questoes'>('nome')
+  // Ordenação por coluna (setas). Padrão = criado mais recente.
+  const [ordCampo, setOrdCampo] = useState<OrdCampo>('recente')
+  const [ordDir, setOrdDir] = useState<'asc' | 'desc'>('desc')
   const [filtroBanco, setFiltroBanco] = useState<'todos' | 'objetiva' | 'discursiva'>('todos')
   const [fDisc, setFDisc] = useState('all')
+  // Tabela de bancos: paginação (10/15/20) + contagens carregadas SOB DEMANDA por página.
+  const [paginaBanco, setPaginaBanco] = useState(0)
+  const [porPaginaBanco, setPorPaginaBanco] = useState(10)
+  const [contBancos, setContBancos] = useState<Record<string, { q: number; e: number }>>({})
+  function ordenarBanco(campo: OrdCampo) {
+    if (ordCampo === campo) setOrdDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setOrdCampo(campo); setOrdDir(campo === 'recente' ? 'desc' : 'asc') }
+  }
   // Questões buscadas SOB DEMANDA (não pré-carregadas). Modo "banco" herda os ids do banco escolhido;
   // modo "do zero" usa o picker paginado por busca/disciplina.
   const [bancoQids, setBancoQids] = useState<string[]>([])
@@ -84,12 +160,31 @@ export function SimuladoWizard({
     let arr = s ? bancos.filter((b) => b.nome.toLowerCase().includes(s)) : bancos.slice()
     if (filtroBanco === 'objetiva') arr = arr.filter((b) => (b.tipo ?? 'objetiva') !== 'discursiva')
     if (filtroBanco === 'discursiva') arr = arr.filter((b) => b.tipo === 'discursiva')
-    arr.sort((a, b) =>
-      ordemBanco === 'estudantes' ? (b.nEstudantes ?? 0) - (a.nEstudantes ?? 0)
-        : ordemBanco === 'questoes' ? (b.nQuestoes ?? 0) - (a.nQuestoes ?? 0)
-          : (a.nome || '').localeCompare(b.nome || '', 'pt-BR'))
+    const dir = ordDir === 'asc' ? 1 : -1
+    arr.sort((a, b) => {
+      if (ordCampo === 'recente') { const x = a.created_at ?? '', y = b.created_at ?? ''; return (x < y ? -1 : x > y ? 1 : 0) * dir }
+      if (ordCampo === 'questoes') return ((contBancos[a.id]?.q ?? 0) - (contBancos[b.id]?.q ?? 0)) * dir
+      if (ordCampo === 'estudantes') return ((contBancos[a.id]?.e ?? 0) - (contBancos[b.id]?.e ?? 0)) * dir
+      if (ordCampo === 'pasta') return (a.pasta ?? '').localeCompare(b.pasta ?? '', 'pt-BR') * dir
+      return (a.nome || '').localeCompare(b.nome || '', 'pt-BR') * dir
+    })
     return arr
-  }, [bancos, buscaBanco, filtroBanco, ordemBanco])
+  }, [bancos, buscaBanco, filtroBanco, ordCampo, ordDir, contBancos])
+
+  const totalPagBanco = Math.max(1, Math.ceil(bancosFiltrados.length / porPaginaBanco))
+  const bancosPagina = useMemo(() => bancosFiltrados.slice(paginaBanco * porPaginaBanco, paginaBanco * porPaginaBanco + porPaginaBanco), [bancosFiltrados, paginaBanco, porPaginaBanco])
+  const pageIdsKey = bancosPagina.map((b) => b.id).join(',')
+  useEffect(() => { setPaginaBanco(0) }, [buscaBanco, filtroBanco, ordCampo, ordDir, porPaginaBanco])
+  useEffect(() => { if (paginaBanco > totalPagBanco - 1) setPaginaBanco(0) }, [totalPagBanco, paginaBanco])
+  // Contagens (questões/estudantes) só da página visível, e só as que ainda faltam.
+  useEffect(() => {
+    const ids = bancosPagina.map((b) => b.id).filter((id) => !(id in contBancos))
+    if (!ids.length) return
+    let vivo = true
+    contarBancosWizard(ids).then((r) => { if (vivo && r.ok && r.counts) setContBancos((p) => ({ ...p, ...r.counts })) }).catch(() => {})
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageIdsKey])
 
   const passos = modo === 'banco' ? PASSOS_BANCO : PASSOS_ZERO
   // Stepper mostrado: null/"banco" → 3 passos (caminho comum); "do zero" → 6 passos.
@@ -210,7 +305,7 @@ export function SimuladoWizard({
 
   // ── Resumo (barra lateral) ─────────────────────────────────────────
   const rulesAtivas = ['embaralhar_questoes', 'embaralhar_alternativas', 'revisao_antes_enviar', 'iniciar_atrasado', 'exibir_nota', 'mostrar_comentario'].filter((k) => regras[k]).length
-  const estudantesResumo = modo === 'banco' ? (bancoAtual?.nEstudantes ?? 0) : estSel.size
+  const estudantesResumo = modo === 'banco' ? (contBancos[bancoBase ?? '']?.e ?? bancoAtual?.nEstudantes ?? 0) : estSel.size
   const pronto = podeAvancar()
   const resumoBanco = modo === 'zero' ? 'Criado do zero — sem herança' : bancoAtual ? bancoAtual.nome : 'Nenhum banco selecionado'
   const checklist = [
@@ -279,7 +374,7 @@ export function SimuladoWizard({
                   </div>
                   <button type="button" onClick={() => { setModo('zero'); setBancoBase(null); setStep((s) => s + 1) }}
                     className="inline-flex shrink-0 items-center gap-2 rounded-lg border-2 border-dashed border-primary bg-primary/5 px-3.5 py-2 text-sm font-bold text-primary transition-colors hover:bg-primary/10">
-                    <Sparkles className="h-4 w-4" /> Criar do zero
+                    <FilePlus2 className="h-4 w-4" /> Criar do zero
                   </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -287,14 +382,6 @@ export function SimuladoWizard({
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input value={buscaBanco} onChange={(e) => setBuscaBanco(e.target.value)} placeholder="Buscar banco por nome…" className="pl-9" />
                   </div>
-                  <label className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-2 text-xs font-semibold text-muted-foreground">
-                    <ArrowUpDown className="h-3.5 w-3.5" />
-                    <select value={ordemBanco} onChange={(e) => setOrdemBanco(e.target.value as any)} className="cursor-pointer bg-transparent outline-none">
-                      <option value="nome">Nome (A → Z)</option>
-                      <option value="estudantes">Mais estudantes</option>
-                      <option value="questoes">Mais questões</option>
-                    </select>
-                  </label>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {([['todos', 'Todos'], ['objetiva', 'Objetivas'], ...(ocultarDiscursiva ? [] : [['discursiva', 'Discursivas']])] as const).map(([v, label]) => {
@@ -311,45 +398,73 @@ export function SimuladoWizard({
                 </div>
               </div>
 
-              <div className="scroll-claro max-h-[calc(100vh-360px)] overflow-y-auto p-4">
+              <div className="p-4">
                 {bancosFiltrados.length === 0 ? (
                   <p className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">{bancos.length === 0 ? 'Nenhum banco criado ainda. Use "Criar do zero".' : 'Nenhum banco encontrado.'}</p>
                 ) : (
-                  <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-                    {bancosFiltrados.map((b) => {
-                      const on = modo === 'banco' && bancoBase === b.id
-                      const Icon = iconeBanco(b.icone)
-                      const c = b.cor ?? '#6d28d9'
-                      const discursiva = b.tipo === 'discursiva'
-                      return (
-                        <button key={b.id} type="button" onClick={() => { setModo('banco'); setBancoBase(b.id); setTipo(discursiva ? 'discursivo' : 'objetivo') }}
-                          className={cn('group flex flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md',
-                            on ? 'border-primary ring-2 ring-primary/40' : 'border-border')}>
-                          <div className="relative aspect-[16/10] overflow-hidden">
-                            {b.capa
-                              ? <img src={b.capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
-                              : <div className="absolute inset-0" style={{ background: `linear-gradient(140deg, ${c} 0%, #0f172a 140%)` }} />}
-                            {!b.capa && <Icon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
-                            <span className="absolute left-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-lg text-white shadow-sm ring-1 ring-white/20" style={{ background: c }}>
-                              {discursiva ? <PenLine className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
-                            </span>
-                            {on && <span className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow"><Check className="h-4 w-4" /></span>}
-                          </div>
-                          <div className="flex flex-1 flex-col gap-1.5 p-2.5">
-                            <p className="line-clamp-1 text-[13px] font-bold leading-snug" title={b.nome}>{b.nome}</p>
-                            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-muted-foreground">
-                              <span className="inline-flex items-center gap-1">{discursiva ? <PenLine className="h-3 w-3" /> : <ListChecks className="h-3 w-3" />} {discursiva ? 'Discursiva' : 'Objetiva'}</span>
-                              <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" /> {nf(b.nQuestoes ?? 0)}</span>
-                              <span className="inline-flex items-center gap-1"><Users className="h-3 w-3" /> {nf(b.nEstudantes ?? 0)}</span>
-                            </div>
-                            <span className={cn('mt-0.5 rounded-lg border px-3 py-1.5 text-center text-xs font-bold transition-colors',
-                              on ? 'border-transparent bg-emerald-500/12 text-emerald-600 dark:text-emerald-400' : 'bg-muted/50 text-muted-foreground group-hover:border-primary/40 group-hover:text-primary')}>
-                              {on ? 'Selecionado' : 'Usar este banco'}
-                            </span>
-                          </div>
-                        </button>
-                      )
-                    })}
+                  <div className="overflow-hidden rounded-xl border">
+                    <div className="scroll-claro max-h-[calc(100vh-420px)] overflow-auto">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 z-10 bg-muted/50">
+                          <tr className="border-b text-left align-middle text-[11px] uppercase tracking-wide text-muted-foreground">
+                            <th className="w-10 py-2 pl-3"></th>
+                            <SortHead label="Banco" campo="nome" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenarBanco} className="py-2 pr-3" />
+                            <SortHead label="Pasta" campo="pasta" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenarBanco} className="py-2 pr-3" />
+                            <th className="w-28 py-2 text-center font-medium">Tipo</th>
+                            <SortHead label="Questões" campo="questoes" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenarBanco} className="w-24 py-2 text-center" />
+                            <SortHead label="Estudantes" campo="estudantes" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenarBanco} className="w-24 py-2 text-center" />
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/60">
+                          {bancosPagina.map((b) => {
+                            const on = modo === 'banco' && bancoBase === b.id
+                            const discursiva = b.tipo === 'discursiva'
+                            const c = contBancos[b.id]
+                            return (
+                              <tr key={b.id} onClick={() => { setModo('banco'); setBancoBase(b.id); setTipo(discursiva ? 'discursivo' : 'objetivo') }}
+                                className={cn('cursor-pointer align-middle transition-colors hover:bg-muted/40', on && 'bg-primary/5')}>
+                                <td className="py-2.5 pl-3">
+                                  <span className={cn('flex h-4 w-4 items-center justify-center rounded-full border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
+                                </td>
+                                <td className="py-2.5 pr-3 font-medium" title={b.nome}>{b.nome}</td>
+                                <td className="py-2.5 pr-3 text-xs text-muted-foreground">
+                                  {b.pasta ? <span className="inline-flex items-center gap-1" title={b.pasta}><FolderOpen className="h-3 w-3 shrink-0" /> <span className="max-w-[220px] truncate">{b.pasta}</span></span> : <span className="text-muted-foreground/50">—</span>}
+                                </td>
+                                <td className="py-2.5 text-center">
+                                  <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase', discursiva ? 'border-indigo-400 text-indigo-600 dark:text-indigo-300' : 'border-sky-400 text-sky-600 dark:text-sky-300')}>
+                                    {discursiva ? <PenLine className="h-2.5 w-2.5" /> : <ListChecks className="h-2.5 w-2.5" />} {discursiva ? 'Discursiva' : 'Objetiva'}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 text-center tabular-nums text-muted-foreground">{c ? nf(c.q) : '…'}</td>
+                                <td className="py-2.5 text-center tabular-nums text-muted-foreground">{c ? nf(c.e) : '…'}</td>
+                              </tr>
+                            )
+                          })}
+                          {/* Preenche com linhas VAZIAS até `porPaginaBanco` → a tabela mantém altura fixa
+                              em qualquer página (a última não "sobe" o rodapé). Só a 1ª vazia mantém a
+                              divisória (fecha o último banco); as demais ficam em branco. */}
+                          {Array.from({ length: Math.max(0, porPaginaBanco - bancosPagina.length) }).map((_, i) => (
+                            <tr key={`vazio-${i}`} aria-hidden className="align-middle" style={i > 0 ? { borderTopColor: 'transparent' } : undefined}>
+                              <td className="py-2.5 pl-3"><span className="block h-5" /></td>
+                              <td className="py-2.5" colSpan={5} />
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-3">
+                        <span>{nf(bancosFiltrados.length)} banco(s)</span>
+                        <PageSizeSelect value={porPaginaBanco} onChange={setPorPaginaBanco} opcoes={[10, 15, 20]} />
+                      </div>
+                      {totalPagBanco > 1 && (
+                        <div className="flex items-center gap-1.5">
+                          <button type="button" onClick={() => setPaginaBanco((p) => Math.max(0, p - 1))} disabled={paginaBanco === 0} className="rounded-md border bg-card px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">Anterior</button>
+                          <span className="px-1 tabular-nums">Pág. {paginaBanco + 1}/{totalPagBanco}</span>
+                          <button type="button" onClick={() => setPaginaBanco((p) => Math.min(totalPagBanco - 1, p + 1))} disabled={paginaBanco >= totalPagBanco - 1} className="rounded-md border bg-card px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">Próxima</button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

@@ -63,6 +63,7 @@ interface Resultado {
   nota: number | null
   acertos: number
   total: number
+  tipo_correcao?: 'pontuacao' | 'cebraspe'
   marcadas: number
   em_branco: number
   tempo: string | null
@@ -232,7 +233,10 @@ export function RevisaoFinal({
   const pendentes = qs.filter((q) => acertoEfetivo(q) === null).length
   const respondidas = qs.filter((q) => q.resposta_aluno !== null).length
   const branco = qs.length - respondidas
-  const media = qs.length > 0 ? Math.round((acertos / qs.length) * 100) : 0
+  // Estilo CEBRASPE: cada erro anula um acerto → a média é (acertos − erros), com piso em 0.
+  const cebraspe = data?.tipo_correcao === 'cebraspe'
+  const liquido = cebraspe ? Math.max(0, acertos - erros) : acertos
+  const media = qs.length > 0 ? Math.round((liquido / qs.length) * 100) : 0
   const numAnuladas = qs.filter((q) => q.anulada).length
   const numAlt = qs.filter((q) => q.alt_trocada).length
   // Cores do navegador — iguais às da prova (respondem às CSS vars do caderno).
@@ -423,7 +427,7 @@ export function RevisaoFinal({
                 <div className="rounded-xl border p-3 text-center" style={cardStat(COR_MEDIA)}>
                   <Trophy className="mx-auto mb-1 h-4 w-4" style={{ color: COR_MEDIA }} />
                   <p className="text-xl font-bold tabular-nums" style={{ color: COR_MEDIA }}>{media}%</p>
-                  <p className="text-[11px] text-muted-foreground">Média</p>
+                  <p className="text-[11px] text-muted-foreground">{cebraspe ? 'Nota (líquida)' : 'Média'}</p>
                 </div>
               </div>
             ) : (
@@ -440,6 +444,12 @@ export function RevisaoFinal({
                   <p className="text-[11px] text-muted-foreground">Em branco</p>
                 </div>
               </div>
+            )}
+
+            {notaLiberada && cebraspe && (
+              <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                Estilo CEBRASPE: cada erro anula um acerto — {acertos} acerto(s) − {erros} erro(s). Questões em branco não descontam.
+              </p>
             )}
 
             {/* Como você fez (sem gabarito) — as opções padrão do caderno, sempre após terminar. */}
