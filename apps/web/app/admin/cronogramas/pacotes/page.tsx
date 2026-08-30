@@ -14,11 +14,11 @@ export default async function PacotesPage() {
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
           <Package className="h-6 w-6 text-primary" />
-          Pacotes de cronogramas
+          Grupos de acessos
         </h1>
         <p className="text-muted-foreground">
-          É por aqui que o aluno recebe acesso: o pacote reúne cronogramas e é liberado para grupos de
-          alunos ou para alunos avulsos.
+          É por aqui que o aluno recebe acesso: cada grupo de acesso reúne cronogramas e é liberado para
+          grupos de alunos ou para alunos avulsos.
         </p>
       </div>
 

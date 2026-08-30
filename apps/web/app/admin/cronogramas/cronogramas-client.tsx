@@ -508,7 +508,7 @@ export function CronogramasClient({
       <div className="-mb-px flex flex-wrap items-center gap-1 overflow-x-auto border-b" style={{ marginTop: '0' }}>
         {([
           ['/admin/cronogramas', 'Catálogo', itens.length],
-          ['/admin/cronogramas/pacotes', 'Pacotes e acesso', null],
+          ['/admin/cronogramas/pacotes', 'Grupos de acessos', null],
           ['/admin/cronogramas/links', 'Links de aula', null],
           ['/admin/cronogramas/tipos', 'Tipos de meta', null],
           ['/admin/cronogramas/metas', 'Auditoria', null],

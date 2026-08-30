@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 // sublinhado, sem ícones. Relatórios e Importar NÃO são abas (ficam na sidebar / botão do catálogo).
 const TABS: { href: string; label: string }[] = [
   { href: '/admin/cronogramas', label: 'Catálogo' },
-  { href: '/admin/cronogramas/pacotes', label: 'Pacotes e acesso' },
+  { href: '/admin/cronogramas/pacotes', label: 'Grupos de acessos' },
   { href: '/admin/cronogramas/links', label: 'Links de aula' },
   { href: '/admin/cronogramas/tipos', label: 'Tipos de meta' },
   { href: '/admin/cronogramas/metas', label: 'Auditoria' },
