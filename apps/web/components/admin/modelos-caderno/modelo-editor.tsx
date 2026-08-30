@@ -211,10 +211,18 @@ function ModeloEditorBase({ id, nomeInicial, configInicial }: { id: string; nome
         // (mantém só o id atual do editor, que é interno).
         setItem((it) => ({ ...(j.item as ItemCaderno), id: it.id }))
       } else {
-        // Import EXTERNO (heurística): garante que o cabeçalho e o nome do estudante apareçam (são
-        // partes padrão do diagnóstico) — liga os toggles e desoculta 'nome'/'nota'.
+        // Import EXTERNO (heurística) num MODELO = TEMPLATE. Duas coisas:
+        // 1) Garante cabeçalho + nome do estudante (partes padrão do diagnóstico).
+        // 2) NÃO fixa as disciplinas específicas do doc: o modelo deve MAPEAR as disciplinas do BANCO
+        //    quando for usado num simulado (senão bugaria com outras disciplinas). Deixa um placeholder
+        //    genérico e zera os mapeamentos por-disciplina. (Import ligado a um banco no builder usa as reais.)
         const oc = (j.conteudo?.partesOcultas ?? []).filter((p: string) => p !== 'nome' && p !== 'nota')
-        const conteudo = { ...j.conteudo, partesOcultas: oc }
+        const conteudo = {
+          ...j.conteudo,
+          partesOcultas: oc,
+          disciplinas: [{ nome: 'Disciplina', chave: 'disciplina', total: 'x/N', categoria: 'Assunto' }],
+          discNomes: {}, discFonte: {}, discCorTexto: {}, discOcultas: [],
+        }
         setItem((it) => ({ ...it, conteudo, ajustes: { ...it.ajustes, ...(j.ajustes ?? {}), mostrarCabecalho: true, mostrarDadosAluno: true }, capa: j.capa ?? it.capa }))
       }
       if (Array.isArray(j.avisos) && j.avisos.length) toast(j.avisos.slice(0, 2).join(' · '))
