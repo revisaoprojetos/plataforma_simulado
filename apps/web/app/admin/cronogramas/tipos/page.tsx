@@ -1,6 +1,4 @@
-import Link from 'next/link'
-import { ArrowLeft, Tag } from 'lucide-react'
-import { buttonVariants } from '@/components/ui/button'
+import { Tag } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { listarTipos } from '../tipos-actions'
 import { TiposClient } from './tipos-client'
@@ -12,13 +10,6 @@ export default async function TiposMetaPage() {
 
   return (
     <div className="animate-page space-y-6">
-      <div>
-        <Link href="/admin/cronogramas" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Voltar ao catálogo
-        </Link>
-      </div>
-
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
           <Tag className="h-6 w-6 text-primary" />

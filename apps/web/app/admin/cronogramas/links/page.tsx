@@ -1,6 +1,4 @@
-import Link from 'next/link'
-import { ArrowLeft, Link2 } from 'lucide-react'
-import { buttonVariants } from '@/components/ui/button'
+import { Link2 } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { listarLinks } from './actions'
 import { LinksClient } from './links-client'
@@ -12,13 +10,6 @@ export default async function LinksAulaPage() {
 
   return (
     <div className="animate-page space-y-6">
-      <div>
-        <Link href="/admin/cronogramas" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Voltar ao catálogo
-        </Link>
-      </div>
-
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
           <Link2 className="h-6 w-6 text-primary" />

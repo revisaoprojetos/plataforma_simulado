@@ -11,7 +11,6 @@ import {
   Users,
   UsersRound,
   BarChart3,
-  ListChecks,
   Database,
   ClipboardCheck,
   CreditCard,
@@ -44,10 +43,7 @@ import {
   Tag,
   Library,
   CalendarDays,
-  Upload,
-  Package,
   LayoutTemplate,
-  Link2 as LinkIcon,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -131,14 +127,10 @@ const navGroups: NavGroup[] = [
   {
     label: 'Cronograma',
     icon: CalendarDays,
+    // Subáreas (Pacotes, Links, Tipos, Auditoria, Relatórios, Importar) agora são ABAS dentro da
+    // área (CronogramaTabs) — a sidebar guarda só a entrada do Catálogo.
     items: [
       { label: 'Catálogo', href: '/admin/cronogramas', icon: CalendarDays, perm: 'cronogramas:view' },
-      { label: 'Pacotes e acesso', href: '/admin/cronogramas/pacotes', icon: Package, perm: 'cronogramas:view' },
-      { label: 'Links de aula', href: '/admin/cronogramas/links', icon: LinkIcon, perm: 'cronogramas:view' },
-      { label: 'Tipos de meta', href: '/admin/cronogramas/tipos', icon: Tag, perm: 'cronogramas:view' },
-      { label: 'Auditoria de metas', href: '/admin/cronogramas/metas', icon: ListChecks, perm: 'cronogramas:view' },
-      { label: 'Relatórios', href: '/admin/cronogramas/relatorios', icon: BarChart3, perm: 'cronogramas:view' },
-      { label: 'Importar', href: '/admin/cronogramas/importar', icon: Upload, perm: 'cronogramas:update' },
     ],
   },
   {
