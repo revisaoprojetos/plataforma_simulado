@@ -184,6 +184,10 @@ function parsePilares(reg: Linha[]): DiagPilar[] {
   return pilares
 }
 
+/** Linhas que NÃO são disciplina (resumos/agrupamentos que apareciam como "disciplina" falsa):
+ *  "Acertos /33", "Acertos: 20", "Grupo II/III", "Nota", "Total", "…% de aproveitamento". */
+const RE_RUIDO_DISC = /(^|\s)acert|^grupo\s|^grupo$|aproveitamento|^nota\b|^total\b|^\d+\s*%$/
+
 function parseDisciplinas(reg: Linha[]): DiagDisciplina[] {
   const out: DiagDisciplina[] = []
   let cur: DiagDisciplina | null = null
@@ -191,6 +195,8 @@ function parseDisciplinas(reg: Linha[]): DiagDisciplina[] {
   for (const l of reg) {
     const t = l.p
     if (/^[-–]\s*categoria/i.test(norm(t))) { if (cur) cur.categoria = lim(t.replace(/^[-–]\s*categoria:?\s*/i, '')) || 'Assunto'; continue }
+    // Pula linhas de resumo/agrupamento (não são disciplinas) — ex.: "Acertos /33", "Grupo II".
+    if (RE_RUIDO_DISC.test(norm(t))) continue
     // Nome + nota na MESMA linha (ex.: "D. Eleitoral x/5 x%") — comum no PDF.
     const inline = t.match(/^(.{2,}?)\s+([xX\d]+\s*\/\s*\d+)\b/)
     if (inline && !/^[-–]/.test(t)) { push(); cur = { nome: lim(inline[1]), total: inline[2].replace(/\s+/g, ''), categoria: 'Assunto' }; continue }
@@ -203,8 +209,11 @@ function parseDisciplinas(reg: Linha[]): DiagDisciplina[] {
   return out
 }
 
-const RE_BULLET = /^\s*(?:[•·▪‣◦*]|[-–—]\s|\d+[.)])\s*/
-const limparMarcador = (t: string) => t.replace(/^\s*(?:[•·▪‣◦*]|[-–—]|\d+[.)]|>+)\s*/, '')
+// Detecta linha de item (bullet/seta/número). Aceita ● ○ ◆ » › ▶ etc. `* ` avulso é bullet; `**` NÃO (negrito).
+const RE_BULLET = /^\s*(?:[•·▪‣◦●○◉◆■»›▶◾▸]|[-–—]\s|\*(?!\*)\s|\d+[.)])\s*/
+// Marcador no início p/ REMOVER (repetido/combinado: ">> ●● texto", "• → texto"). Preserva `**negrito**`.
+const RE_MARCADOR_INI = /^\s*(?:>+|[•·▪‣◦●○◉◆■»›▶◾▸]+|[-–—]\s|\*(?!\*)\s|\d+[.)])\s*/
+const limparMarcador = (t: string) => { let s = t, p: string; do { p = s; s = s.replace(RE_MARCADOR_INI, '') } while (s !== p); return s.trim() }
 const ehTituloSug = (l: Linha) => !l.p.startsWith('>') && !RE_BULLET.test(l.p) && (UP(l.p) || l.h) && l.p.length < 46 && !/prioridade/i.test(l.p)
 
 /** Sugestões + parágrafos de FECHAMENTO (texto de encerramento após as sugestões). */
