@@ -45,6 +45,7 @@ export function MontarSemana({
   diasNome,
   tipos,
   disciplinas,
+  onCriarDisciplina,
   aoCriar,
 }: {
   cronogramaId: string
@@ -53,6 +54,8 @@ export function MontarSemana({
   diasNome: string[]
   tipos: TipoMetaDef[]
   disciplinas: Disciplina[]
+  /** Criar disciplina pela busca do picker — repassado direto ao DisciplinaPicker. */
+  onCriarDisciplina?: (nome: string) => Promise<{ id: string; nome: string } | null>
   /** Recarrega a lista — quem manda no estado é a tela de metas. */
   aoCriar: () => void
 }) {
@@ -180,6 +183,7 @@ export function MontarSemana({
                   setDisciplina(v.nome)
                   setDisciplinaId(v.disciplina_id)
                 }}
+                onCriar={onCriarDisciplina}
               />
             </div>
 

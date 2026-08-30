@@ -31,6 +31,7 @@ import { faixaSemanal } from '@/lib/cronograma/faixa'
 import {
   atualizarMeta,
   carregarDetalhe,
+  criarDisciplina,
   criarMeta,
   excluirMeta,
   type PacotesDoCronograma,
@@ -58,7 +59,7 @@ export function MetasClient({
   cronograma: c,
   metasIniciais,
   tipos,
-  disciplinas,
+  disciplinas: disciplinasIniciais,
   simulados,
   pacotes,
   diagnostico,
@@ -77,7 +78,22 @@ export function MetasClient({
   const corTipo = (slug: string) => porSlug.get(slug)?.cor || null
   const ordemDoTipo = (slug: string) => porSlug.get(slug)?.ordem ?? 999
   const [metas, setMetas] = useState(metasIniciais)
+  // Disciplinas em estado: criar uma nova pelo picker precisa fazê-la aparecer na hora.
+  const [disciplinas, setDisciplinas] = useState(disciplinasIniciais)
   const [pendente, iniciar] = useTransition()
+
+  /** Cria (ou reaproveita) uma disciplina e a deixa disponível nos pickers imediatamente. */
+  async function criarDisciplinaLocal(nome: string) {
+    const r = await criarDisciplina(nome)
+    if (!r.ok || !r.id) {
+      toast.error(r.error ?? 'Não foi possível criar a disciplina.')
+      return null
+    }
+    const nova = { id: r.id, nome: r.nome ?? nome.trim() }
+    setDisciplinas((xs) => (xs.some((d) => d.id === nova.id) ? xs : [...xs, nova].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))))
+    toast.success(`Disciplina "${nova.nome}" pronta para uso`)
+    return nova
+  }
 
   /**
    * Recarrega as metas do servidor. A MontarSemana grava em lote / repete semanas, e o estado
@@ -322,6 +338,7 @@ export function MetasClient({
                 diasNome={c.dias_nome}
                 tipos={tipos}
                 disciplinas={disciplinas}
+                onCriarDisciplina={criarDisciplinaLocal}
                 aoCriar={recarregarMetas}
               />
               <Button size="sm" variant="ghost" onClick={abrirNova} disabled={pendente} title="Diálogo completo — use para meta que aponta simulado">
@@ -730,6 +747,7 @@ export function MetasClient({
                   nome={form.disciplina}
                   disciplinaId={form.disciplina_id}
                   onChange={(v) => setForm((f) => ({ ...f, ...v }))}
+                  onCriar={criarDisciplinaLocal}
                 />
               </div>
 

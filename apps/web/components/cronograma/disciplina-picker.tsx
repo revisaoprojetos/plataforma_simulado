@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, ChevronDown, Search, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, Loader2, Plus, Search, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PSEUDO_DISCIPLINA } from '@/lib/cronograma/tipos'
 
@@ -32,15 +32,22 @@ export function DisciplinaPicker({
   nome,
   disciplinaId,
   onChange,
+  onCriar,
 }: {
   disciplinas: DisciplinaOpcao[]
   /** Nome atual — pode ser texto legado que não está no cadastro. */
   nome: string
   disciplinaId: string | null
   onChange: (v: { nome: string; disciplina_id: string | null }) => void
+  /**
+   * Quando passado, habilita "criar disciplina" pela busca — devolve a criada (ou a existente
+   * reaproveitada), ou `null` em caso de erro. Sem isso, o picker só seleciona.
+   */
+  onCriar?: (nome: string) => Promise<{ id: string; nome: string } | null>
 }) {
   const [aberto, setAberto] = useState(false)
   const [busca, setBusca] = useState('')
+  const [criando, setCriando] = useState(false)
   const caixa = useRef<HTMLDivElement>(null)
   const campoBusca = useRef<HTMLInputElement>(null)
 
@@ -76,6 +83,21 @@ export function DisciplinaPicker({
   function escolher(v: { nome: string; disciplina_id: string | null }) {
     onChange(v)
     setAberto(false)
+  }
+
+  const termoLimpo = busca.trim()
+  const temExato = useMemo(
+    () => disciplinas.some((d) => normalizar(d.nome) === normalizar(termoLimpo)),
+    [disciplinas, termoLimpo],
+  )
+  const podeCriar = !!onCriar && termoLimpo.length >= 2 && !temExato && normalizar(termoLimpo) !== normalizar(PSEUDO_DISCIPLINA)
+
+  async function criar() {
+    if (!onCriar || criando || !podeCriar) return
+    setCriando(true)
+    const nova = await onCriar(termoLimpo)
+    setCriando(false)
+    if (nova) escolher({ nome: nova.nome, disciplina_id: nova.id })
   }
 
   return (
@@ -116,8 +138,9 @@ export function DisciplinaPicker({
               onChange={(e) => setBusca(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') setAberto(false)
-                if (e.key === 'Enter' && filtradas.length === 1) {
-                  escolher({ nome: filtradas[0].nome, disciplina_id: filtradas[0].id })
+                if (e.key === 'Enter') {
+                  if (filtradas.length === 1) escolher({ nome: filtradas[0].nome, disciplina_id: filtradas[0].id })
+                  else if (podeCriar) void criar()
                 }
               }}
               placeholder="Buscar disciplina…"
@@ -131,6 +154,26 @@ export function DisciplinaPicker({
           </div>
 
           <div className="max-h-72 overflow-y-auto py-1">
+            {/* Criar pela busca: fecha a lacuna de precisar sair para Questões só para
+                cadastrar uma disciplina nova antes de montar a meta. */}
+            {podeCriar && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void criar()}
+                  disabled={criando}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-primary transition hover:bg-primary/10 disabled:opacity-60"
+                >
+                  {criando ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : <Plus className="h-3.5 w-3.5 shrink-0" />}
+                  <span className="min-w-0 flex-1">
+                    Criar “<span className="font-medium">{termoLimpo}</span>”
+                  </span>
+                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">nova disciplina</span>
+                </button>
+                <div className="my-1 border-t" />
+              </>
+            )}
+
             {/* R13 — `Atividade` não é disciplina: é o valor usado quando a linha não
                 pertence a uma matéria. Por isso não vive no cadastro compartilhado. */}
             <Opcao

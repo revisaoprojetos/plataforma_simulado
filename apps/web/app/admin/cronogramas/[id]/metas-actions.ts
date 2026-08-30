@@ -544,6 +544,60 @@ export async function excluirMeta(cronogramaId: string, metaId: string): Promise
   return { ok: true }
 }
 
+/** Sem acento/caixa e com espaços colapsados — para dedupe de nome de disciplina. */
+const normalizarNome = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+
+/**
+ * Cria (ou reaproveita) uma disciplina no cadastro compartilhado, a partir da tela de metas.
+ *
+ * Fecha a lacuna de "só dava por importação": montar conteúdo à mão exigia que a disciplina já
+ * existisse (o `DisciplinaPicker` só seleciona), mandando o usuário até Questões → Disciplinas.
+ *
+ * Aqui só se ADICIONA — nunca renomeia/apaga daqui, porque o cadastro é o mesmo do banco de
+ * questões e mexer no nome afetaria as questões. É tolerante a duplicata: se já existe uma com
+ * o mesmo nome (ignorando acento/caixa), devolve a existente em vez de criar uma irmã.
+ */
+export async function criarDisciplina(nome: string): Promise<{ ok: boolean; id?: string; nome?: string; error?: string }> {
+  const g = await guard('cronogramas:update')
+  if (!g.ok) return { ok: false, error: g.error }
+  const n = nome.trim().replace(/\s+/g, ' ')
+  if (n.length < 2) return { ok: false, error: 'Nome muito curto.' }
+  const svc = createAdminClient()
+
+  // O cadastro tem ~37 disciplinas: reler tudo para deduplicar por nome normalizado é barato,
+  // e evita criar "Direito Civil" ao lado de "direito civil".
+  const { data: existentes } = await svc
+    .from('simulado_disciplinas')
+    .select('id, nome')
+    .eq('tenant_id', g.tenantId)
+  const alvo = normalizarNome(n)
+  const achado = (existentes ?? []).find((d: any) => normalizarNome(d.nome) === alvo)
+  if (achado) return { ok: true, id: (achado as any).id, nome: (achado as any).nome }
+
+  const { data, error } = await svc
+    .from('simulado_disciplinas')
+    .insert({ tenant_id: g.tenantId, nome: n })
+    .select('id, nome')
+    .single()
+  if (error) return { ok: false, error: error.message }
+
+  await registrarAudit({
+    operacao: 'INSERT',
+    entidade: 'simulado_disciplinas',
+    entidadeId: (data as any).id,
+    depois: { nome: n, origem: 'cronograma' },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  return { ok: true, id: (data as any).id, nome: (data as any).nome }
+}
+
 /**
  * `aula` é gravada como TEXTO, sempre — nunca coagida a número. "01", "1" e "1.1" são
  * aulas diferentes, e o casamento com os links é exato (R11).
