@@ -225,8 +225,17 @@ function parseSugestoes(reg: Linha[]): { sugestoes: DiagSugestao[]; fechamento: 
     const t = l.p
     if (ehTituloSug(l)) { if (cur) out.push(cur); cur = { titulo: l.f, prioridade: 'Prioridade Alta', intro: '', itens: [] }; continue }
     if (!cur) { if (t.length > 60) fechamento.push(l.f); continue }
-    if (/prioridade/i.test(t)) { cur.prioridade = lim(t.replace(/^\[!\]\s*/, '')); continue }
-    if (t.startsWith('>') || RE_BULLET.test(t)) { const forte = t.startsWith('>>') || /^\s*\*\*/.test(l.f); cur.itens.push({ forte, texto: limparMarcador(l.f) }); continue }
+    // Prioridade: SÓ um rótulo curto começando por "prioridade" (ou "[!] prioridade") — não um
+    // parágrafo que apenas MENCIONA a palavra (antes virava um textão na área de prioridade).
+    if (/^\s*(?:\[!\]\s*)?prioridade\b/i.test(t) && t.length < 40) { cur.prioridade = lim(t.replace(/^\s*\[!\]\s*/, '')); continue }
+    if (t.startsWith('>') || RE_BULLET.test(t)) {
+      const forte = /^\s*>>/.test(t) // "forte" só quando o doc marca com >> (negrito sozinho NÃO é forte)
+      // Divide itens colados na MESMA linha por marcadores inline (>> > ● • › ▶ …) e limpa cada um —
+      // evita "item1 >> item2" virar um item só com >> cru no meio.
+      const partes = l.f.split(/\s*(?:>{1,2}|[•·▪‣◦●○◉◆■»›▶◾▸])\s+/).map((x) => limparMarcador(x)).filter(Boolean)
+      for (const p of (partes.length ? partes : [limparMarcador(l.f)])) if (p) cur.itens.push({ forte, texto: p })
+      continue
+    }
     if (t.length > 40) {
       if (!cur.intro && cur.itens.length === 0) cur.intro = l.f // parágrafo antes dos itens = introdução
       else fechamento.push(l.f) // parágrafo depois dos itens = fechamento
