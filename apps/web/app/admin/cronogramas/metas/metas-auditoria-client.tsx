@@ -15,6 +15,7 @@ import {
   Wand2,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -160,22 +161,24 @@ function Cartao({
   return (
     <button
       onClick={aoClicar}
-      className={`rounded-xl border p-4 text-left transition ${
-        ativo ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'bg-card hover:bg-muted/50'
-      }`}
+      className={cn(
+        'group relative flex flex-col overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md',
+        ativo ? 'border-primary ring-1 ring-primary/30' : 'bg-card hover:border-primary/40',
+      )}
     >
-      <div className="flex items-baseline gap-2">
-        <span className={`text-3xl font-bold tabular-nums ${grave ? 'text-amber-600 dark:text-amber-500' : ''}`}>
+      {/* Acento lateral pelo estado (âmbar = precisa de decisão · esmeralda = ok). */}
+      <span className={cn('absolute inset-y-0 left-0 w-1', grave ? 'bg-amber-500' : 'bg-emerald-500')} />
+      <div className="flex items-start justify-between gap-2">
+        <span className={cn('flex h-10 w-10 items-center justify-center rounded-xl', grave ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400')}>
+          {grave ? <AlertTriangle className="h-5 w-5" /> : <Check className="h-5 w-5" />}
+        </span>
+        <span className={cn('text-4xl font-bold leading-none tabular-nums', grave ? 'text-amber-600 dark:text-amber-500' : 'text-foreground')}>
           {n.toLocaleString('pt-BR')}
         </span>
-        {grave ? (
-          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
-        ) : (
-          <Check className="h-4 w-4 text-emerald-600" />
-        )}
       </div>
-      <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{rotulo}</p>
+      <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{rotulo}</p>
       <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground/90">{nota}</p>
+      {ativo && <span className="mt-2 inline-flex w-fit items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Vendo agora</span>}
     </button>
   )
 }
