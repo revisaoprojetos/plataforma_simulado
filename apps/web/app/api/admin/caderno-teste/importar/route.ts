@@ -58,26 +58,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message || 'Falha ao ler o arquivo.' }, { status: 500 })
   }
 
-  // Config embutida (CTV3:base64) do .docx gerado por nós → restaura modelo/estilo exatos na reimportação.
-  // O TEXTO visível (editado no Word) vira o conteúdo; os ajustes/capa vêm da config embutida.
+  // Config embutida (CTV3:base64) do .docx gerado por nós.
   let embutido: any = null
   const mCfg = html.match(/CTV3:([A-Za-z0-9+/=]{16,})/)
   if (mCfg) { try { embutido = JSON.parse(Buffer.from(mCfg[1], 'base64').toString('utf8')) } catch { /* ignora */ } html = html.replace(mCfg[0], '') }
 
+  // ROUND-TRIP EXATO: se o documento foi gerado por nós (config embutida com o item completo),
+  // restaura o ITEM verbatim — SEM heurística de texto. Idêntico ao original (é o JSON do próprio item).
+  if (embutido && typeof embutido === 'object' && embutido.conteudo && typeof embutido.conteudo === 'object') {
+    return NextResponse.json({
+      ok: true,
+      fiel: true,
+      modalidade: typeof embutido.modalidade === 'string' ? embutido.modalidade : 'diagnostico',
+      item: embutido,                 // ItemCaderno completo (conteudo + ajustes + capa + docEdit + modelo)
+      conteudo: embutido.conteudo,    // compat com consumidores antigos
+      ajustes: embutido.ajustes,
+      capa: embutido.capa,
+      avisos: ['Documento restaurado da configuração embutida — idêntico ao original.'],
+    })
+  }
+
+  // Documento EXTERNO (sem config embutida): reconstrução heurística do texto.
   const { conteudo, avisos } = htmlParaDiagnostico(html, caixas)
   avisos.unshift(...avisosFonte)
   if (ehPdf) avisos.unshift('Importado de PDF (aproximado) — os pilares em colunas podem embaralhar. Para fidelidade, use Word/HTML.')
-  const resp: Record<string, unknown> = { ok: true, modalidade: 'diagnostico', conteudo, avisos }
-  if (embutido && typeof embutido === 'object') {
-    if (embutido.ajustes && typeof embutido.ajustes === 'object') resp.ajustes = embutido.ajustes
-    if (embutido.capa && typeof embutido.capa === 'object') resp.capa = embutido.capa
-    // Tokens/chaves de fonte e cores por bloco só existem na config embutida — mescla no conteúdo parseado.
-    if (embutido.conteudo && typeof embutido.conteudo === 'object') {
-      const ec = embutido.conteudo as any
-      for (const k of ['discFonte', 'discNomes', 'discCorTexto', 'corMarcador', 'corMarcadorForte', 'ordem', 'partesOcultas'] as const) {
-        if (ec[k] != null) (conteudo as any)[k] = ec[k]
-      }
-    }
-  }
-  return NextResponse.json(resp)
+  return NextResponse.json({ ok: true, modalidade: 'diagnostico', conteudo, avisos })
 }

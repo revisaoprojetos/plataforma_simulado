@@ -206,7 +206,13 @@ function ModeloEditorBase({ id, nomeInicial, configInicial }: { id: string; nome
       const r = await fetch('/api/admin/caderno-teste/importar', { method: 'POST', body: fd })
       const j = await r.json()
       if (!j.ok) { toast.error(j.error ?? 'Falha ao importar'); return }
-      setItem((it) => ({ ...it, conteudo: j.conteudo, ajustes: { ...it.ajustes, ...(j.ajustes ?? {}) }, capa: j.capa ?? it.capa }))
+      if (j.item && typeof j.item === 'object') {
+        // Round-trip FIEL: o .docx trazia a config embutida → restaura o item idêntico ao original
+        // (mantém só o id atual do editor, que é interno).
+        setItem((it) => ({ ...(j.item as ItemCaderno), id: it.id }))
+      } else {
+        setItem((it) => ({ ...it, conteudo: j.conteudo, ajustes: { ...it.ajustes, ...(j.ajustes ?? {}) }, capa: j.capa ?? it.capa }))
+      }
       if (Array.isArray(j.avisos) && j.avisos.length) toast(j.avisos.slice(0, 2).join(' · '))
       toast.success('Documento importado')
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Falha ao importar') }
