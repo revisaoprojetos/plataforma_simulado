@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { ChevronRight, Package, Plus, Users } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -81,29 +82,32 @@ export function PacotesClient({ inicial }: { inicial: PacoteLista[] }) {
             </Button>
           </div>
         ) : (
-          <div className="divide-y">
+          <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-3">
             {itens.map((p) => (
               <Link
                 key={p.id}
                 href={`/admin/cronogramas/pacotes/${p.id}`}
-                className={`flex items-center gap-3 px-4 py-3 transition hover:bg-muted/40 ${p.ativo ? '' : 'opacity-60'}`}
+                className={cn('group relative flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-sm transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg', !p.ativo && 'opacity-60')}
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate font-medium">{p.nome}</span>
-                    {!p.ativo && <Badge variant="secondary">Inativo</Badge>}
+                <div className="flex items-start gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package className="h-5 w-5" /></span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate font-semibold">{p.nome}</span>
+                      {!p.ativo && <Badge variant="secondary">Inativo</Badge>}
+                    </div>
+                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{p.descricao || 'Sem descrição.'}</p>
                   </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {p.cronogramas} cronograma(s) · {p.grupos} grupo(s)
-                    {p.estudantes > 0 && ` · ${p.estudantes} aluno(s) avulso(s)`}
-                    {p.descricao && ` · ${p.descricao}`}
-                  </p>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                 </div>
-                <Badge variant="outline" className="shrink-0 gap-1">
-                  <Users className="h-3 w-3" />
-                  {p.alcance.toLocaleString('pt-BR')} aluno(s)
-                </Badge>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="mt-auto flex flex-wrap items-center gap-1.5">
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{p.cronogramas} cronograma(s)</span>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{p.grupos} grupo(s)</span>
+                  {p.estudantes > 0 && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{p.estudantes} avulso(s)</span>}
+                  <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                    <Users className="h-3 w-3" /> {p.alcance.toLocaleString('pt-BR')}
+                  </span>
+                </div>
               </Link>
             ))}
           </div>

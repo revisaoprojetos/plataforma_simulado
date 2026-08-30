@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { ArrowDown, ArrowUp, Eye, EyeOff, Info, Pencil, Plus, Tag, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -203,45 +204,48 @@ export function TiposClient({ inicial }: { inicial: TipoComUso[] }) {
           }
         />
 
-        <div className="divide-y">
-          {itens.map((t, i) => (
-            <div key={t.id} className={`flex flex-wrap items-center gap-3 px-4 py-3 ${t.ativo ? '' : 'opacity-60'}`}>
-              <div className="flex shrink-0 flex-col">
-                <button onClick={() => mover(i, -1)} disabled={pendente || i === 0} className="disabled:opacity-30">
-                  <ArrowUp className="h-3.5 w-3.5" />
-                </button>
-                <button onClick={() => mover(i, 1)} disabled={pendente || i === itens.length - 1} className="disabled:opacity-30">
-                  <ArrowDown className="h-3.5 w-3.5" />
-                </button>
-              </div>
+        <div className="space-y-2.5 p-3 sm:p-4">
+          {itens.map((t, i) => {
+            const chips = resumo(t)
+            return (
+              <div key={t.id} className={cn('group relative flex items-start gap-3 overflow-hidden rounded-xl border bg-card p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md', !t.ativo && 'opacity-60')}>
+                {/* Acento de cor do próprio tipo (fallback = primária). */}
+                <span className={cn('absolute inset-y-0 left-0 w-1', !t.cor && 'bg-primary')} style={t.cor ? { background: t.cor } : undefined} />
 
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{t.nome}</span>
-                  <Badge variant="outline" className="font-mono text-xs">
-                    {t.slug}
-                  </Badge>
-                  {!t.ativo && <Badge variant="secondary">Inativo</Badge>}
+                {/* Ordenar */}
+                <div className="flex shrink-0 flex-col gap-0.5 pl-1.5 pt-0.5 text-muted-foreground">
+                  <button onClick={() => mover(i, -1)} disabled={pendente || i === 0} title="Subir" className="rounded transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"><ArrowUp className="h-4 w-4" /></button>
+                  <button onClick={() => mover(i, 1)} disabled={pendente || i === itens.length - 1} title="Descer" className="rounded transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"><ArrowDown className="h-4 w-4" /></button>
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {t.usos === 0 ? 'nenhuma meta usa' : `${t.usos.toLocaleString('pt-BR')} meta(s)`}
-                  {resumo(t).length > 0 && ` · ${resumo(t).join(' · ')}`}
-                </p>
-              </div>
 
-              <div className="flex shrink-0 items-center gap-1">
-                <Button size="sm" variant="ghost" onClick={() => alternarAtivo(t)} disabled={pendente} title={t.ativo ? 'Desativar' : 'Reativar'}>
-                  {t.ativo ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => abrirEdicao(t)} disabled={pendente}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => remover(t)} disabled={pendente}>
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold">{t.nome}</span>
+                    <Badge variant="outline" className="font-mono text-[11px]">{t.slug}</Badge>
+                    {!t.ativo && <Badge variant="secondary">Inativo</Badge>}
+                    <span className="ml-auto shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      {t.usos === 0 ? 'sem uso' : `${t.usos.toLocaleString('pt-BR')} meta(s)`}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {chips.length === 0 ? (
+                      <span className="text-[11px] italic text-muted-foreground">comportamento padrão</span>
+                    ) : chips.map((c) => (
+                      <span key={c} className="rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{c}</span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <Button size="sm" variant="ghost" onClick={() => alternarAtivo(t)} disabled={pendente} title={t.ativo ? 'Desativar' : 'Reativar'}>
+                    {t.ativo ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => abrirEdicao(t)} disabled={pendente} title="Editar"><Pencil className="h-4 w-4" /></Button>
+                  <Button size="sm" variant="ghost" onClick={() => remover(t)} disabled={pendente} title="Excluir"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </Card>
 
