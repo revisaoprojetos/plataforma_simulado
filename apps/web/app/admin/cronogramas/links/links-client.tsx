@@ -1,8 +1,9 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { AlertTriangle, ExternalLink, Layers, Link2, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronsDownUp, ChevronsUpDown, ExternalLink, Layers, Link2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -48,6 +49,8 @@ export function LinksClient({
   const [faltando, setFaltando] = useState(faltandoInicial)
   const [pendente, iniciar] = useTransition()
   const [busca, setBusca] = useState('')
+  const [soSemLink, setSoSemLink] = useState(false)
+  const [abertos, setAbertos] = useState<Set<string>>(new Set())
 
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<string | null>(null)
@@ -60,11 +63,12 @@ export function LinksClient({
 
   const filtrados = useMemo(() => {
     const t = busca.trim().toLowerCase()
-    if (!t) return itens
     return itens.filter(
-      (l) => l.disciplina.toLowerCase().includes(t) || l.aula.toLowerCase().includes(t) || (l.tema ?? '').toLowerCase().includes(t),
+      (l) =>
+        (!soSemLink || l.urls.length === 0) &&
+        (!t || l.disciplina.toLowerCase().includes(t) || l.aula.toLowerCase().includes(t) || (l.tema ?? '').toLowerCase().includes(t)),
     )
-  }, [itens, busca])
+  }, [itens, busca, soSemLink])
 
   const porDisciplina = useMemo(() => {
     const mapa = new Map<string, LinkAulaRow[]>()
@@ -75,6 +79,13 @@ export function LinksClient({
     }
     return [...mapa.entries()].sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
   }, [filtrados])
+
+  // Filtrando (busca/só-sem-link) → tudo expandido; senão, respeita o que o usuário abriu.
+  const forcarExpandir = !!busca.trim() || soSemLink
+  const estaAberto = (d: string) => forcarExpandir || abertos.has(d)
+  const tudoAberto = porDisciplina.length > 0 && porDisciplina.every(([d]) => estaAberto(d))
+  const toggleDisc = (d: string) => setAbertos((s) => { const n = new Set(s); if (n.has(d)) n.delete(d); else n.add(d); return n })
+  const toggleTudo = () => setAbertos(tudoAberto ? new Set() : new Set(porDisciplina.map(([d]) => d)))
 
   /** Plataformas ainda não usadas neste formulário — o seletor só oferece essas. */
   const disponiveis = useMemo(
@@ -220,8 +231,16 @@ export function LinksClient({
           titulo="Links de aula"
           subtitulo={`${itens.length} aula(s) · ${plataformas.length} plataforma(s) cadastrada(s)`}
           acao={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar…" className="h-9 w-44" />
+              <Button size="sm" variant={soSemLink ? 'default' : 'outline'} onClick={() => setSoSemLink((v) => !v)} title="Mostrar só aulas sem link">
+                <AlertTriangle className="mr-1 h-4 w-4" />
+                Sem link
+              </Button>
+              <Button size="sm" variant="outline" onClick={toggleTudo} title={tudoAberto ? 'Recolher todas' : 'Expandir todas'}>
+                {tudoAberto ? <ChevronsDownUp className="mr-1 h-4 w-4" /> : <ChevronsUpDown className="mr-1 h-4 w-4" />}
+                {tudoAberto ? 'Recolher' : 'Expandir'}
+              </Button>
               <Button size="sm" variant="outline" onClick={() => setPlataformasAberto(true)}>
                 <Layers className="mr-1 h-4 w-4" />
                 Plataformas
@@ -245,12 +264,22 @@ export function LinksClient({
           </div>
         ) : (
           <div className="divide-y">
-            {porDisciplina.map(([disciplina, lista]) => (
+            {porDisciplina.length === 0 && (
+              <div className="px-4 py-10 text-center text-sm text-muted-foreground">Nenhuma aula encontrada com os filtros atuais.</div>
+            )}
+            {porDisciplina.map(([disciplina, lista]) => {
+              const aberto = estaAberto(disciplina)
+              const semLink = lista.filter((l) => l.urls.length === 0).length
+              return (
               <div key={disciplina}>
-                <div className="bg-muted/40 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {disciplina} · {lista.length} aula(s)
-                </div>
-                {lista.map((l) => (
+                <button type="button" onClick={() => toggleDisc(disciplina)}
+                  className="sticky top-0 z-10 flex w-full items-center gap-2 border-b bg-muted/60 px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur transition-colors hover:bg-muted">
+                  <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', aberto ? '' : '-rotate-90')} />
+                  <span className="min-w-0 flex-1 truncate normal-case text-foreground">{disciplina}</span>
+                  <span className="shrink-0 font-normal normal-case">{lista.length} aula(s)</span>
+                  {semLink > 0 && <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 font-medium normal-case text-amber-600 dark:text-amber-400">{semLink} sem link</span>}
+                </button>
+                {aberto && lista.map((l) => (
                   <div key={l.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5 hover:bg-muted/30">
                     <Badge variant="outline" className="shrink-0 font-mono">
                       {l.aula}
@@ -288,7 +317,8 @@ export function LinksClient({
                   </div>
                 ))}
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </Card>
