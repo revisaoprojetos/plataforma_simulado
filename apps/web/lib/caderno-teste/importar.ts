@@ -352,7 +352,7 @@ export function htmlParaDiagnostico(html: string, caixas: string[] = []): { cont
     const fim = iDisc >= 0 ? iDisc : (iSug >= 0 ? iSug : (iGab >= 0 ? iGab : undefined))
     const p = parsePilares(linhas.slice(iPilar + 1, fim))
     if (p.length) conteudo.pilares = p; else avisos.push('Não reconheci os pilares — usando o padrão.')
-  } else avisos.push('Seção “desempenho por pilar” não encontrada.')
+  } else { conteudo.pilares = []; avisos.push('Seção “desempenho por pilar” não encontrada — bloco omitido.') } // doc sem pilares → não cria a seção (limpa o default)
 
   // Bandas vazias? Recupera os textos que estavam em CAIXAS DE TEXTO do .docx (mammoth ignora),
   // atribuindo-os por ordem (3 por pilar) + faixa detectada na abertura.
@@ -380,20 +380,20 @@ export function htmlParaDiagnostico(html: string, caixas: string[] = []): { cont
     if (regDisc[0] && regDisc[0].p.length > 60 && !ehNomePilar(regDisc[0].p, regDisc[0].h)) { conteudo.disciplinasIntro = regDisc[0].f; ini = 1 }
     const d = parseDisciplinas(regDisc.slice(ini))
     if (d.length) conteudo.disciplinas = d; else avisos.push('Não reconheci as disciplinas.')
-  } else avisos.push('Seção “desempenho por disciplina” não encontrada.')
+  } else { conteudo.disciplinas = []; avisos.push('Seção “desempenho por disciplina” não encontrada — bloco omitido.') } // doc sem disciplinas → não cria a seção
 
   if (iSug >= 0) {
     const { sugestoes, fechamento } = parseSugestoes(linhas.slice(iSug + 1, iGab >= 0 ? iGab : undefined))
     if (sugestoes.length) conteudo.sugestoes = sugestoes
     if (fechamento.length) conteudo.fechamento = fechamento
-  }
+  } else { conteudo.sugestoes = []; conteudo.fechamento = [] } // doc sem “sugestões de estudo” → não cria a seção (limpa o default)
 
   if (iGab >= 0) {
     const reg = linhas.slice(iGab + 1)
     conteudo.gabaritoTitulo = linhas[iGab].f || conteudo.gabaritoTitulo
     conteudo.gabaritoIntro = reg.filter((l) => l.p.length > 40 && !/^quest[ãa]o\s+\d+/i.test(l.p)).map((l) => l.f).slice(0, 4)
     conteudo.gabaritoObs = reg.filter((l) => /^quest[ãa]o\s+\d+/i.test(l.p)).map((l) => l.f)
-  }
+  } else { conteudo.gabaritoIntro = []; conteudo.gabaritoObs = [] } // doc sem “gabarito desatualizado” → não cria a seção (limpa o default)
 
   if (secs.length === 0) avisos.push('Não reconheci a estrutura do diagnóstico — confira a prévia; talvez seja um formato muito diferente.')
   return { conteudo, avisos }

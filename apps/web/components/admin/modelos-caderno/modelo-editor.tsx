@@ -219,7 +219,7 @@ function ModeloEditorBase({ id, nomeInicial, configInicial }: { id: string; nome
         //    placeholder (x/N · X%); ao LINKAR num banco, o render adota as disciplinas REAIS do banco
         //    automaticamente (discBanco sobrescreve). Zera mapeamentos por-disciplina presos ao doc.
         const oc = (j.conteudo?.partesOcultas ?? []).filter((p: string) => p !== 'nome' && p !== 'nota')
-        const nDisc = Math.max(j.conteudo?.disciplinas?.length ?? 0, 1)
+        const nDisc = j.conteudo?.disciplinas?.length ?? 0 // 0 = doc sem seção de disciplinas → não cria cards
         const disciplinas = Array.from({ length: nDisc }, (_, i) => ({ nome: `Disciplina ${i + 1}`, chave: `disciplina_${i + 1}`, total: 'x/N', categoria: 'Assunto' }))
         const conteudo = {
           ...j.conteudo,
