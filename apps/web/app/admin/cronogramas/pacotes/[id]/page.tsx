@@ -16,7 +16,7 @@ export default async function PacoteDetalhePage({ params }: { params: Promise<{ 
       <div>
         <Link href="/admin/cronogramas/pacotes" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
           <ArrowLeft className="mr-1 h-4 w-4" />
-          Voltar aos pacotes
+          Voltar aos acessos
         </Link>
       </div>
 

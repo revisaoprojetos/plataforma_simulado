@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
 import { CaixaCheck } from '@/components/cronograma/caixa-check'
 import { SecaoHeader } from '@/components/admin/secao-header'
+import { CronogramaTabs } from '@/components/admin/cronograma-tabs'
 import { AlertBox } from '@/components/ui/alert-box'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { confirmar } from '@/components/ui/confirm-dialog'
@@ -504,37 +505,8 @@ export function CronogramasClient({
         </div>
       </div>
 
-      {/* ABAS da seção Cronograma (Catálogo é a ativa). marginTop 0 vence o space-y do wrapper (colado na descrição). */}
-      <div className="-mb-px flex flex-wrap items-center gap-1 overflow-x-auto border-b" style={{ marginTop: '0' }}>
-        {([
-          ['/admin/cronogramas', 'Catálogo', itens.length],
-          ['/admin/cronogramas/pacotes', 'Grupos de acessos', null],
-          ['/admin/cronogramas/links', 'Links de aula', null],
-          ['/admin/cronogramas/tipos', 'Tipos de meta', null],
-          ['/admin/cronogramas/metas', 'Auditoria', null],
-        ] as const).map(([href, label, n], i) => (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              'relative flex shrink-0 items-center gap-1.5 rounded-t-lg border-b-2 px-3 py-2 text-sm font-medium transition',
-              i === 0 ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {label}
-            {n != null && n > 0 && (
-              <span
-                className={cn(
-                  'rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums',
-                  i === 0 ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
-                )}
-              >
-                {n.toLocaleString('pt-BR')}
-              </span>
-            )}
-          </Link>
-        ))}
-      </div>
+      {/* ABAS da seção Cronograma (componente único, idêntico às subpáginas). */}
+      <CronogramaTabs catalogoCount={itens.length} />
 
       {/* LAYOUT 2 COLUNAS: Gerador rápido (vertical, à esquerda) + lista (à direita), como na referência. */}
       <div className="grid items-start gap-5 lg:grid-cols-[300px_1fr]" style={{ marginTop: '1.25rem' }}>

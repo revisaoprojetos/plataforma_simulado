@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, CalendarDays, Check, ChevronDown, ChevronRight, Gift, Loader2, Plus, Search, Trash2, UserPlus, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -352,8 +353,8 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
           <p className="text-sm font-medium">Liberar para todos os alunos</p>
           <p className="text-xs text-muted-foreground">
             {d.pacote.acesso_gratuito
-              ? 'Qualquer aluno da plataforma recebe os cronogramas deste pacote, sem precisar de grupo nem vínculo individual.'
-              : 'Ligado, dispensa grupos e vínculos: todo aluno da plataforma passa a receber os cronogramas deste pacote.'}
+              ? 'Qualquer aluno da plataforma recebe os cronogramas deste grupo de acesso, sem precisar de grupo nem vínculo individual.'
+              : 'Ligado, dispensa grupos e vínculos: todo aluno da plataforma passa a receber os cronogramas deste grupo de acesso.'}
           </p>
         </div>
         <Button
@@ -368,15 +369,19 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {([
-          ['Cronogramas', d.cronogramas.length],
-          ['Grupos', d.grupos.length],
-          ['Alunos avulsos', d.estudantes.length],
-          ['Alcance total', d.pacote.acesso_gratuito ? 'todos' : d.alcance],
-        ] as [string, number | string][]).map(([rotulo, n]) => (
-          <Card key={rotulo as string} className="p-4">
-            <p className="text-2xl font-bold tabular-nums">{typeof n === 'number' ? n.toLocaleString('pt-BR') : n}</p>
-            <p className="text-xs text-muted-foreground">{rotulo as string}</p>
-          </Card>
+          ['Cronogramas', d.cronogramas.length, CalendarDays],
+          ['Grupos', d.grupos.length, Users],
+          ['Alunos avulsos', d.estudantes.length, UserPlus],
+          ['Alcance total', d.pacote.acesso_gratuito ? 'todos' : d.alcance, Gift],
+        ] as [string, number | string, typeof Users][]).map(([rotulo, n, Icone], i) => (
+          <div key={rotulo as string} className="relative overflow-hidden rounded-2xl border bg-card p-4 shadow-sm">
+            <span className={cn('absolute inset-y-0 left-0 w-1', i === 3 ? 'bg-emerald-500' : 'bg-primary')} />
+            <div className="flex items-start justify-between gap-2">
+              <span className={cn('flex h-9 w-9 items-center justify-center rounded-xl', i === 3 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-primary/10 text-primary')}><Icone className="h-4 w-4" /></span>
+              <span className={cn('text-3xl font-extrabold leading-none tabular-nums', i === 3 && 'text-emerald-600 dark:text-emerald-500')}>{typeof n === 'number' ? n.toLocaleString('pt-BR') : n}</span>
+            </div>
+            <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{rotulo as string}</p>
+          </div>
         ))}
       </div>
 
@@ -394,7 +399,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
         <SecaoHeader
           icon={CalendarDays}
-          titulo="Cronogramas do pacote"
+          titulo="Cronogramas do acesso"
           subtitulo="O que os alunos vinculados vão receber"
           acao={
             <div className="flex items-center gap-2">
@@ -413,7 +418,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
         />
         {d.cronogramas.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-            Nenhum cronograma no pacote. Sem isso, vincular alunos não libera nada.
+            Nenhum cronograma neste grupo de acesso. Sem isso, vincular alunos não libera nada.
           </p>
         ) : (
           <div className="divide-y">
@@ -434,8 +439,8 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
                   disabled={ocupado(`cron:${c.id}`)}
                   title={
                     c.status === 'liberado'
-                      ? 'Volta a rascunho — os alunos do pacote deixam de receber'
-                      : 'Libera — os alunos do pacote passam a receber'
+                      ? 'Volta a rascunho — os alunos do grupo de acesso deixam de receber'
+                      : 'Libera — os alunos do grupo de acesso passam a receber'
                   }
                 >
                   {c.status === 'liberado' ? 'Voltar a rascunho' : 'Liberar'}
@@ -569,7 +574,7 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
                 ? 'Todos os membros atuais e futuros do grupo passam a ter acesso — não é preciso revincular quando alguém entra.'
                 : modal === 'alunos'
                   ? 'Busque por nome ou e-mail. Use para exceções; o caminho normal é pelo grupo.'
-                  : 'Só cronogramas liberados aparecem para o aluno, mesmo estando no pacote.'}
+                  : 'Só cronogramas liberados aparecem para o aluno, mesmo estando no grupo de acesso.'}
             </DialogDescription>
           </DialogHeader>
 
