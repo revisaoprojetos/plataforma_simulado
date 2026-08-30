@@ -522,6 +522,49 @@ export async function alternarEstudanteNoPacote(pacoteId: string, estudanteId: s
 }
 
 /**
+ * Importa alunos AVULSOS a partir de uma lista de e-mails (CSV / colados).
+ *
+ * Não cria alunos — casa cada e-mail com um estudante já cadastrado e concede o acesso
+ * individual. O que não casar volta em `naoEncontrados` para o admin ver o que ficou de fora.
+ */
+export async function adicionarEstudantesPorEmails(
+  pacoteId: string,
+  emails: string[],
+): Promise<{ ok: boolean; adicionados?: number; naoEncontrados?: string[]; itens?: { id: string; nome: string; email: string | null }[]; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return { ok: false, error: g.error }
+  const limpos = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter((e) => e.includes('@')))]
+  if (!limpos.length) return { ok: false, error: 'Nenhum e-mail válido no arquivo.' }
+  const svc = createAdminClient()
+
+  // Busca em lotes (o teto do PostgREST é 1.000 por `.in`).
+  const encontrados = await fetchAllByIn<{ id: string; nome: string; email: string | null }>(
+    limpos,
+    (fatia) =>
+      svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', g.tenantId).eq('deletado', false).in('email', fatia) as any,
+  )
+  const achadosEmails = new Set(encontrados.map((e) => (e.email ?? '').toLowerCase()))
+  const naoEncontrados = limpos.filter((e) => !achadosEmails.has(e))
+  if (!encontrados.length) return { ok: true, adicionados: 0, naoEncontrados, itens: [] }
+
+  const { error } = await svc.from('simulado_cronograma_pacote_estudantes').upsert(
+    encontrados.map((e) => ({ tenant_id: g.tenantId, pacote_id: pacoteId, estudante_id: e.id })),
+    { onConflict: 'pacote_id,estudante_id', ignoreDuplicates: true },
+  )
+  if (error) return { ok: false, error: error.message }
+
+  await registrarAudit({
+    operacao: 'LIBERAR',
+    entidade: 'simulado_cronograma_pacote_estudantes',
+    entidadeId: pacoteId,
+    depois: { emails: limpos.length, adicionados: encontrados.length, nao_encontrados: naoEncontrados.length },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  return { ok: true, adicionados: encontrados.length, naoEncontrados, itens: encontrados }
+}
+
+/**
  * Alunos de um grupo, para a tela mostrar QUEM recebe — não só quantos.
  *
  * Paginado: um grupo pode passar de 1.000 membros, e sem isso a lista mentiria sobre o
