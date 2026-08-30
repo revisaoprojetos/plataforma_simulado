@@ -22,6 +22,7 @@ export function camposDoBloco(item: ItemCaderno, parte: string, nomeFallback?: s
   if (parte === 'diag_cab_titulo') return [{ id: 'tituloCab', label: 'Texto', valor: c.tituloCabecalho ?? 'Diagnóstico de Desempenho' }]
   if (parte === 'diag_cab_sub') return [{ id: 'subtitulo', label: 'Texto', valor: c.subtitulo, multiline: true }]
   if (parte === 'diag_nome_rot') return [{ id: 'rotuloNome', label: 'Texto', valor: c.rotuloNome ?? 'NOME:' }]
+  if (parte === 'diag_nome_val') return [{ id: 'nomeTexto', label: 'Texto', valor: c.nomeTexto ?? '{nome}', placeholder: '{nome}' }]
   if (parte === 'diag_nota_num') return [{ id: 'notaTotal', label: 'Total (denominador)', valor: c.notaTotal }]
   if (parte === 'diag_nota_faixa') return [{ id: 'notaTexto', label: 'Texto da nota', valor: c.notaTexto, multiline: true }]
   if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] == null) return []; return [{ id: 'intro', label: 'Parágrafo', valor: c.intro[i], multiline: true }] }
@@ -128,6 +129,7 @@ export function aplicarCampoBloco(conteudo: DiagConteudo | undefined, parte: str
   if (parte === 'diag_cab_titulo') { if (campoId === 'tituloCab') c.tituloCabecalho = valor }
   else if (parte === 'diag_cab_sub') { if (campoId === 'subtitulo') c.subtitulo = valor }
   else if (parte === 'diag_nome_rot') { if (campoId === 'rotuloNome') c.rotuloNome = valor }
+  else if (parte === 'diag_nome_val') { if (campoId === 'nomeTexto') c.nomeTexto = valor }
   else if (parte === 'diag_nota_num') { if (campoId === 'notaTotal') c.notaTotal = valor }
   else if (parte === 'diag_nota_faixa') { if (campoId === 'notaTexto') c.notaTexto = valor }
   else if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] != null) c.intro[i] = valor }

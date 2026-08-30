@@ -92,7 +92,7 @@ export async function gerarDocxDiagnostico(item: ItemCaderno, disc: DiscBanco[],
   if (a.mostrarDadosAluno) {
     nodes.push(tabela([new TableRow({ children: [
       celula([P(runs(c.rotuloNome ?? 'NOME:', vars, { color: 'FFFFFF', size: sz(13), bold: true, font: 'Arial' }), { after: 0 })], { bg: corParte('diag_nome_rot', a.corPrimaria || '#2d254f'), widthPct: 18 }),
-      celula([P(runs('{nome}', vars, { color: '3B2F00', size: sz(11), bold: true, font: 'Arial' }), { after: 0 })], { bg: corParte('diag_nome_val', amar), widthPct: 82 }),
+      celula([P(runs(c.nomeTexto ?? '{nome}', vars, { color: '3B2F00', size: sz(11), bold: true, font: 'Arial' }), { after: 0 })], { bg: corParte('diag_nome_val', amar), widthPct: 82 }),
     ] })]))
   }
 

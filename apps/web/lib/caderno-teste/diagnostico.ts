@@ -43,6 +43,8 @@ export type DiagConteudo = {
   tituloCabecalho?: string
   /** Rótulo do campo do nome (ex.: "NOME:"). */
   rotuloNome?: string
+  /** Texto da FAIXA do nome (valor à direita) — default a variável {nome}; editável como os demais blocos. */
+  nomeTexto?: string
   subtitulo: string
   notaTotal: string
   notaTexto: string
