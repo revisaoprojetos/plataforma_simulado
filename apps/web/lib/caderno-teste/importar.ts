@@ -214,6 +214,15 @@ const RE_BULLET = /^\s*(?:[•·▪‣◦●○◉◆■»›▶◾▸]|[-–—
 // Marcador no início p/ REMOVER (repetido/combinado: ">> ●● texto", "• → texto"). Preserva `**negrito**`.
 const RE_MARCADOR_INI = /^\s*(?:>+|[•·▪‣◦●○◉◆■»›▶◾▸]+|[-–—]\s|\*(?!\*)\s|\d+[.)])\s*/
 const limparMarcador = (t: string) => { let s = t, p: string; do { p = s; s = s.replace(RE_MARCADOR_INI, '') } while (s !== p); return s.trim() }
+/** Limpa um item de sugestão: tira marcadores E conserta **negrito** quebrado (o doc às vezes solta
+ *  `**` sem par → antes aparecia "** " cru e itens vazios "**"). */
+const limparItemSug = (t: string): string => {
+  let s = limparMarcador(t).replace(/\*\*\s*\*\*/g, '')            // remove negrito VAZIO "** **"
+  if ((s.match(/\*\*/g) ?? []).length % 2 !== 0) s = s.replace(/\*\*/g, '') // ** desbalanceado → texto puro (senão o par preserva o negrito)
+  return s.trim()
+}
+/** Item tem conteúdo real? (descarta "**", vazio, só pontuação/marcador). */
+const itemTemTexto = (t: string): boolean => /[0-9A-Za-zÀ-ú]/.test(t)
 const ehTituloSug = (l: Linha) => !l.p.startsWith('>') && !RE_BULLET.test(l.p) && (UP(l.p) || l.h) && l.p.length < 46 && !/prioridade/i.test(l.p)
 
 /** Sugestões + parágrafos de FECHAMENTO (texto de encerramento após as sugestões). */
@@ -230,10 +239,10 @@ function parseSugestoes(reg: Linha[]): { sugestoes: DiagSugestao[]; fechamento: 
     if (/^\s*(?:\[!\]\s*)?prioridade\b/i.test(t) && t.length < 40) { cur.prioridade = lim(t.replace(/^\s*\[!\]\s*/, '')); continue }
     if (t.startsWith('>') || RE_BULLET.test(t)) {
       const forte = /^\s*>>/.test(t) // "forte" só quando o doc marca com >> (negrito sozinho NÃO é forte)
-      // Divide itens colados na MESMA linha por marcadores inline (>> > ● • › ▶ …) e limpa cada um —
-      // evita "item1 >> item2" virar um item só com >> cru no meio.
-      const partes = l.f.split(/\s*(?:>{1,2}|[•·▪‣◦●○◉◆■»›▶◾▸])\s+/).map((x) => limparMarcador(x)).filter(Boolean)
-      for (const p of (partes.length ? partes : [limparMarcador(l.f)])) if (p) cur.itens.push({ forte, texto: p })
+      // Divide itens colados na MESMA linha por marcadores inline (>> > ● • › ▶ …), limpa cada um e
+      // conserta **negrito** quebrado. Descarta pedaços vazios/só-marcador (ex.: "**").
+      const partes = l.f.split(/\s*(?:>{1,2}|[•·▪‣◦●○◉◆■»›▶◾▸])\s+/).map((x) => limparItemSug(x)).filter(itemTemTexto)
+      for (const p of (partes.length ? partes : [limparItemSug(l.f)])) if (itemTemTexto(p)) cur.itens.push({ forte, texto: p })
       continue
     }
     if (t.length > 40) {
