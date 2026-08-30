@@ -119,7 +119,14 @@ const ehNomePilar = (t: string, h = false) => (UP(t) || h) && t.length <= 42 && 
 /** Faixa (0-49/50-80/81-100) tolerante: "0-49", "0 a 49", "0 até 49" e também "abaixo/acima de N". */
 function detectarFaixa(t: string): string | null {
   const m = t.match(RE_FAIXA)
-  if (m) return `${m[1]}-${m[2]}`
+  if (m) {
+    // Normaliza p/ as 3 faixas canônicas — o doc pode usar 0-50/51-80 (em vez de 0-49/50-80),
+    // e sem isso o pilar acumulava bandas duplicadas (0-50 + 0-49 + 51-80 + 50-80 + 81-100).
+    const lo = Number(m[1]), hi = Number(m[2])
+    if (hi >= 81 || lo >= 81) return '81-100'
+    if (lo >= 50) return '50-80'
+    return '0-49'
+  }
   const s = norm(t)
   if (t.length > 26) return null // frases longas não são rótulo de faixa
   if (/(abaixo|menos|inferior|ate 49|ate 50)/.test(s) && /(49|50)/.test(s)) return '0-49'
