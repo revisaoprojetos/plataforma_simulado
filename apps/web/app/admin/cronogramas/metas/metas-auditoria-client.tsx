@@ -9,8 +9,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Info,
+  Layers,
   Loader2,
   Search,
+  ShieldCheck,
   Trash2,
   Wand2,
 } from 'lucide-react'
@@ -66,120 +69,168 @@ export function MetasAuditoriaClient({
   const [aba, setAba] = useState<Aba>(variantesIniciais.length ? 'aula' : duracoesIniciais.length ? 'duracao' : 'buscar')
   const [ocupado, setOcupado] = useState<string | null>(null)
 
+  const nDisciplinasAula = new Set(variantes.map((v) => v.disciplina)).size
+  const totalPendencias = nDisciplinasAula + duracoes.length
   const nadaAFazer = variantes.length === 0 && duracoes.length === 0
 
+  const abas: { chave: Aba; icone: typeof Layers; rotulo: string; n: number; grave: boolean; nota: string }[] = [
+    {
+      chave: 'aula',
+      icone: Layers,
+      rotulo: 'Formato de aula',
+      n: nDisciplinasAula,
+      grave: variantes.length > 0,
+      nota: variantes.length
+        ? 'Risco latente: uma meta de questões nova no formato errado perde o link em silêncio.'
+        : 'Toda aula usa uma grafia só — nada a padronizar.',
+    },
+    {
+      chave: 'duracao',
+      icone: Clock,
+      rotulo: 'Durações',
+      n: duracoes.length,
+      grave: duracoes.length > 0,
+      nota: duracoes.length
+        ? 'Afeta o PDF hoje: só a primeira duração é impressa, as outras somem sem aviso.'
+        : 'Cada semana usa uma duração por tipo — nada a uniformizar.',
+    },
+    {
+      chave: 'buscar',
+      icone: Search,
+      rotulo: 'Buscar metas',
+      n: totalGrupos,
+      grave: false,
+      nota: 'Consulta: veja em quais cronogramas uma meta aparece — é normal a mesma aula servir vários.',
+    },
+  ]
+  const abaAtiva = abas.find((a) => a.chave === aba)!
+
   return (
-    <div className="space-y-6">
-      {/* ── O que a tela quer dizer, em três números com CONSEQUÊNCIA declarada */}
-      <div className="grid gap-3 md:grid-cols-3">
-        <Cartao
-          ativo={aba === 'aula'}
-          aoClicar={() => setAba('aula')}
-          n={new Set(variantes.map((v) => v.disciplina)).size}
-          rotulo="Disciplinas com aula em dois formatos"
-          nota={
-            variantes.length
-              ? 'Risco latente: uma meta de questões nova no formato errado perde o link em silêncio.'
-              : 'Toda aula usa uma grafia só.'
-          }
-          grave={variantes.length > 0}
-        />
-        <Cartao
-          ativo={aba === 'duracao'}
-          aoClicar={() => setAba('duracao')}
-          n={duracoes.length}
-          rotulo="Durações que se contradizem"
-          nota={
-            duracoes.length
-              ? 'Afeta o PDF hoje: só a primeira duração é impressa, as outras somem sem aviso.'
-              : 'Cada semana usa uma duração por tipo.'
-          }
-          grave={duracoes.length > 0}
-        />
-        <Cartao
-          ativo={aba === 'buscar'}
-          aoClicar={() => setAba('buscar')}
-          n={totalGrupos}
-          rotulo="Metas em mais de um cronograma"
-          nota="Isto é o normal — a mesma aula serve vários cronogramas. Use para consultar onde ela está."
-          grave={false}
-        />
+    <div className="space-y-5">
+      {/* Verdito no topo: o estado geral em uma frase, antes de qualquer lista. */}
+      <div
+        className={cn(
+          'flex flex-wrap items-center gap-4 overflow-hidden rounded-2xl border p-5 shadow-sm',
+          nadaAFazer ? 'bg-emerald-500/5' : 'bg-amber-500/5',
+        )}
+      >
+        <span
+          className={cn(
+            'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl',
+            nadaAFazer
+              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+              : 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+          )}
+        >
+          {nadaAFazer ? <ShieldCheck className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-semibold">
+            {nadaAFazer
+              ? 'Nenhuma inconsistência a decidir'
+              : `${totalPendencias.toLocaleString('pt-BR')} ponto${totalPendencias > 1 ? 's' : ''} a decidir`}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {nadaAFazer
+              ? 'Nem formato de aula divergente, nem duração se contradizendo. A busca abaixo é ferramenta de consulta.'
+              : 'As correções abaixo já vêm com a ação junto — cada uma tem uma consequência conhecida no que o aluno recebe.'}
+          </p>
+        </div>
       </div>
 
-      {nadaAFazer && aba !== 'buscar' && (
-        <Card className="flex flex-row items-center gap-3 p-4">
-          <Check className="h-5 w-5 shrink-0 text-emerald-600" />
-          <p className="text-sm">
-            <strong>Nada a corrigir.</strong>{' '}
-            <span className="text-muted-foreground">
-              Nem formato de aula divergente, nem duração se contradizendo. Use a busca para consultar onde
-              uma meta aparece.
-            </span>
-          </p>
-        </Card>
-      )}
+      {/* Navegação segmentada: cada aba mostra seu número e acende um ponto âmbar quando pede decisão. */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-1.5">
+          {abas.map((a) => {
+            const ativo = a.chave === aba
+            const Icone = a.icone
+            return (
+              <button
+                key={a.chave}
+                onClick={() => setAba(a.chave)}
+                className={cn(
+                  'inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition',
+                  ativo ? 'border-primary bg-primary/10 text-primary' : 'bg-card text-foreground hover:border-primary/40 hover:bg-muted',
+                )}
+              >
+                <Icone className="h-4 w-4 shrink-0" />
+                {a.rotulo}
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums',
+                    a.grave
+                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                      : ativo
+                        ? 'bg-primary/15 text-primary'
+                        : 'bg-muted text-muted-foreground',
+                  )}
+                >
+                  {a.grave && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
+                  {a.n.toLocaleString('pt-BR')}
+                </span>
+              </button>
+            )
+          })}
+        </div>
 
-      {aba === 'aula' && (
-        <AbaFormatoAula
-          variantes={variantes}
-          ocupado={ocupado}
-          setOcupado={setOcupado}
-          aoResolverDisciplina={(disciplina) => setVariantes((xs) => xs.filter((x) => x.disciplina !== disciplina))}
-        />
-      )}
+        {/* Consequência da aba ativa — o "por que importa" que os cartões grandes carregavam. */}
+        <div
+          className={cn(
+            'flex items-start gap-2 rounded-lg border px-3 py-2 text-xs',
+            abaAtiva.grave
+              ? 'border-amber-400/50 bg-amber-500/5 text-amber-800 dark:text-amber-200'
+              : 'text-muted-foreground',
+          )}
+        >
+          {abaAtiva.grave ? (
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          ) : (
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          )}
+          <span>{abaAtiva.nota}</span>
+        </div>
+      </div>
 
-      {aba === 'duracao' && (
-        <AbaDuracao
-          duracoes={duracoes}
-          ocupado={ocupado}
-          setOcupado={setOcupado}
-          aoResolver={(d) => setDuracoes((xs) => xs.filter((x) => x !== d))}
-        />
-      )}
+      {/* Conteúdo da aba */}
+      {aba === 'aula' &&
+        (variantes.length ? (
+          <AbaFormatoAula
+            variantes={variantes}
+            ocupado={ocupado}
+            setOcupado={setOcupado}
+            aoResolverDisciplina={(disciplina) => setVariantes((xs) => xs.filter((x) => x.disciplina !== disciplina))}
+          />
+        ) : (
+          <VazioOk texto="Toda aula usa uma grafia só. Nada para padronizar aqui." />
+        ))}
+
+      {aba === 'duracao' &&
+        (duracoes.length ? (
+          <AbaDuracao
+            duracoes={duracoes}
+            ocupado={ocupado}
+            setOcupado={setOcupado}
+            aoResolver={(d) => setDuracoes((xs) => xs.filter((x) => x !== d))}
+          />
+        ) : (
+          <VazioOk texto="Cada semana usa uma duração por tipo. Nada para uniformizar aqui." />
+        ))}
 
       {aba === 'buscar' && <AbaBuscar tipos={tipos} ocupado={ocupado} setOcupado={setOcupado} />}
     </div>
   )
 }
 
-/** Cartão-resumo que também é a navegação. O número é o gancho; a nota diz se importa. */
-function Cartao({
-  n,
-  rotulo,
-  nota,
-  grave,
-  ativo,
-  aoClicar,
-}: {
-  n: number
-  rotulo: string
-  nota: string
-  grave: boolean
-  ativo: boolean
-  aoClicar: () => void
-}) {
+/** Estado "tudo certo" de uma aba de correção — verde, sem alarme. */
+function VazioOk({ texto }: { texto: string }) {
   return (
-    <button
-      onClick={aoClicar}
-      className={cn(
-        'group relative flex flex-col overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md',
-        ativo ? 'border-primary ring-1 ring-primary/30' : 'bg-card hover:border-primary/40',
-      )}
-    >
-      {/* Acento lateral pelo estado (âmbar = precisa de decisão · esmeralda = ok). */}
-      <span className={cn('absolute inset-y-0 left-0 w-1', grave ? 'bg-amber-500' : 'bg-emerald-500')} />
-      <div className="flex items-start justify-between gap-2">
-        <span className={cn('flex h-10 w-10 items-center justify-center rounded-xl', grave ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400')}>
-          {grave ? <AlertTriangle className="h-5 w-5" /> : <Check className="h-5 w-5" />}
-        </span>
-        <span className={cn('text-4xl font-bold leading-none tabular-nums', grave ? 'text-amber-600 dark:text-amber-500' : 'text-foreground')}>
-          {n.toLocaleString('pt-BR')}
-        </span>
-      </div>
-      <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{rotulo}</p>
-      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground/90">{nota}</p>
-      {ativo && <span className="mt-2 inline-flex w-fit items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Vendo agora</span>}
-    </button>
+    <div className="flex flex-col items-center gap-2 rounded-2xl border bg-card py-14 text-center shadow-sm">
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+        <Check className="h-6 w-6" />
+      </span>
+      <p className="text-sm font-medium">Tudo em ordem</p>
+      <p className="max-w-sm text-xs text-muted-foreground">{texto}</p>
+    </div>
   )
 }
 
