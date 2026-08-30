@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Clock, ListChecks, Package, Pencil, Plus, Search, Trash2, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -31,6 +30,7 @@ import type { MetaFonte, TipoMeta, TipoMetaDef } from '@/lib/cronograma/tipos'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
 import {
   atualizarMeta,
+  carregarDetalhe,
   criarMeta,
   excluirMeta,
   type PacotesDoCronograma,
@@ -77,8 +77,19 @@ export function MetasClient({
   const corTipo = (slug: string) => porSlug.get(slug)?.cor || null
   const ordemDoTipo = (slug: string) => porSlug.get(slug)?.ordem ?? 999
   const [metas, setMetas] = useState(metasIniciais)
-  const router = useRouter()
   const [pendente, iniciar] = useTransition()
+
+  /**
+   * Recarrega as metas do servidor. A MontarSemana grava em lote / repete semanas, e o estado
+   * local precisa refletir isso — sem depender de `router.refresh()`, que recarrega a rota (não
+   * o estado `useState` desta tela) e nem existe quando o editor abre dentro da aba "Conteúdo".
+   */
+  function recarregarMetas() {
+    iniciar(async () => {
+      const r = await carregarDetalhe(c.id)
+      if (r.ok && r.metas) setMetas(r.metas)
+    })
+  }
   const [semanaAtiva, setSemanaAtiva] = useState<number>(1)
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<string | null>(null)
@@ -311,7 +322,7 @@ export function MetasClient({
                 diasNome={c.dias_nome}
                 tipos={tipos}
                 disciplinas={disciplinas}
-                aoCriar={() => router.refresh()}
+                aoCriar={recarregarMetas}
               />
               <Button size="sm" variant="ghost" onClick={abrirNova} disabled={pendente} title="Diálogo completo — use para meta que aponta simulado">
                 <Plus className="mr-1 h-4 w-4" />
