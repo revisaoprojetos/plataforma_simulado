@@ -213,14 +213,18 @@ function ModeloEditorBase({ id, nomeInicial, configInicial }: { id: string; nome
       } else {
         // Import EXTERNO (heurística) num MODELO = TEMPLATE. Duas coisas:
         // 1) Garante cabeçalho + nome do estudante (partes padrão do diagnóstico).
-        // 2) NÃO fixa as disciplinas específicas do doc: o modelo deve MAPEAR as disciplinas do BANCO
-        //    quando for usado num simulado (senão bugaria com outras disciplinas). Deixa um placeholder
-        //    genérico e zera os mapeamentos por-disciplina. (Import ligado a um banco no builder usa as reais.)
+        // 2) NÃO fixa as disciplinas específicas do doc. Padroniza os cards em placeholders GENÉRICOS
+        //    numerados ("Disciplina 1..N", como o modelo padrão de 4 disciplinas), mantendo a QUANTIDADE
+        //    importada e dando a cada card uma chave própria (disciplina_1…). No editor mostra o
+        //    placeholder (x/N · X%); ao LINKAR num banco, o render adota as disciplinas REAIS do banco
+        //    automaticamente (discBanco sobrescreve). Zera mapeamentos por-disciplina presos ao doc.
         const oc = (j.conteudo?.partesOcultas ?? []).filter((p: string) => p !== 'nome' && p !== 'nota')
+        const nDisc = Math.max(j.conteudo?.disciplinas?.length ?? 0, 1)
+        const disciplinas = Array.from({ length: nDisc }, (_, i) => ({ nome: `Disciplina ${i + 1}`, chave: `disciplina_${i + 1}`, total: 'x/N', categoria: 'Assunto' }))
         const conteudo = {
           ...j.conteudo,
           partesOcultas: oc,
-          disciplinas: [{ nome: 'Disciplina', chave: 'disciplina', total: 'x/N', categoria: 'Assunto' }],
+          disciplinas,
           discNomes: {}, discFonte: {}, discCorTexto: {}, discOcultas: [],
         }
         setItem((it) => ({ ...it, conteudo, ajustes: { ...it.ajustes, ...(j.ajustes ?? {}), mostrarCabecalho: true, mostrarDadosAluno: true }, capa: j.capa ?? it.capa }))
