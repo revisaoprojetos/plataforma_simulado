@@ -1,5 +1,6 @@
 import { Link2 } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
+import { CronogramaTabs } from '@/components/admin/cronograma-tabs'
 import { listarLinks } from './actions'
 import { LinksClient } from './links-client'
 
@@ -20,6 +21,8 @@ export default async function LinksAulaPage() {
           citarem aquela aula — não são por cronograma.
         </p>
       </div>
+
+      <CronogramaTabs />
 
       {!r.ok ? (
         <SemPermissao>{r.error ?? 'Não foi possível carregar os links.'}</SemPermissao>

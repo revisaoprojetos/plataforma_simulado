@@ -1,5 +1,6 @@
 import { Package } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
+import { CronogramaTabs } from '@/components/admin/cronograma-tabs'
 import { listarPacotes } from './actions'
 import { PacotesClient } from './pacotes-client'
 
@@ -20,6 +21,8 @@ export default async function PacotesPage() {
           alunos ou para alunos avulsos.
         </p>
       </div>
+
+      <CronogramaTabs />
 
       {!r.ok ? <SemPermissao>{r.error ?? 'Não foi possível carregar os pacotes.'}</SemPermissao> : <PacotesClient inicial={r.itens ?? []} />}
     </div>

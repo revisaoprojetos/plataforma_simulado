@@ -1,5 +1,6 @@
 import { Tag } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
+import { CronogramaTabs } from '@/components/admin/cronograma-tabs'
 import { listarTipos } from '../tipos-actions'
 import { TiposClient } from './tipos-client'
 
@@ -20,6 +21,8 @@ export default async function TiposMetaPage() {
           links de questões aparecem e se ele conta como atividade.
         </p>
       </div>
+
+      <CronogramaTabs />
 
       {!r.ok ? <SemPermissao>{r.error ?? 'Não foi possível carregar os tipos.'}</SemPermissao> : <TiposClient inicial={r.itens ?? []} />}
     </div>

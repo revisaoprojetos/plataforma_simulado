@@ -1,5 +1,6 @@
 import { ListChecks } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
+import { CronogramaTabs } from '@/components/admin/cronograma-tabs'
 import { listarTiposMeta } from '@/lib/cronograma/carregar-tipos'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { buscarGrupos, carregarDuracoes, carregarVariantesAula } from './actions'
@@ -55,6 +56,8 @@ export default async function AuditoriaMetasPage() {
           Onde as metas se contradizem entre cronogramas — e onde uma meta específica aparece.
         </p>
       </div>
+
+      <CronogramaTabs />
 
       <MetasAuditoriaClient
         variantesIniciais={variantes.itens ?? []}
