@@ -21,7 +21,7 @@ export function CronogramaTabs({ catalogoCount }: { catalogoCount?: number }) {
   const ativaSecao = secoes.find((t) => pathname === t.href || pathname.startsWith(t.href + '/'))
 
   return (
-    <div className="-mb-px flex flex-wrap items-center gap-1 overflow-x-auto border-b">
+    <div className="mb-5 flex flex-wrap items-center gap-1 overflow-x-auto border-b">
       {TABS.map((t) => {
         const ativo = t.href === '/admin/cronogramas' ? !ativaSecao : t === ativaSecao
         const Icone = t.icon
