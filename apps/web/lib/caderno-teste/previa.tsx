@@ -570,9 +570,14 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
         } else {
           // ÂNCORA: tenta manter o card inteiro numa só página (não parte assuntos entre páginas).
           let necessario = necessarioDe(i)
-          // Faixa de SEÇÃO não pode ficar órfã no fim da página: exige caber JUNTO com o próximo card
-          // (mede o card seguinte inteiro) — senão a seção desce com o conteúdo dela.
-          if (blocos[i]?.secao && i + 1 < hs.length && !blocos[i + 1]?.juntar) necessario = hs[i] + necessarioDe(i + 1)
+          // Faixa de SEÇÃO: anti-órfão INTELIGENTE. Mantém a faixa junto do conteúdo seguinte SÓ quando
+          // esse conteúdo é pequeno (cabe em até ~metade da folha). Se for GRANDE (ex.: a linha de pilares,
+          // que é um bloco atômico alto), NÃO arrasta a faixa junto — a faixa preenche a folha atual e o
+          // conteúdo desce para a próxima, em vez de os dois pularem juntos deixando a folha quase vazia.
+          if (blocos[i]?.secao && i + 1 < hs.length && !blocos[i + 1]?.juntar) {
+            const prox = necessarioDe(i + 1)
+            necessario = prox <= availH * 0.5 ? hs[i] + prox : hs[i]
+          }
           if (cur.length && h + necessario > availH - BUF) { pages.push(cur); cur = []; h = 0 }
           cur.push(i); h += hs[i]
         }

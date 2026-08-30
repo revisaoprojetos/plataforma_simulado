@@ -211,7 +211,11 @@ function ModeloEditorBase({ id, nomeInicial, configInicial }: { id: string; nome
         // (mantém só o id atual do editor, que é interno).
         setItem((it) => ({ ...(j.item as ItemCaderno), id: it.id }))
       } else {
-        setItem((it) => ({ ...it, conteudo: j.conteudo, ajustes: { ...it.ajustes, ...(j.ajustes ?? {}) }, capa: j.capa ?? it.capa }))
+        // Import EXTERNO (heurística): garante que o cabeçalho e o nome do estudante apareçam (são
+        // partes padrão do diagnóstico) — liga os toggles e desoculta 'nome'/'nota'.
+        const oc = (j.conteudo?.partesOcultas ?? []).filter((p: string) => p !== 'nome' && p !== 'nota')
+        const conteudo = { ...j.conteudo, partesOcultas: oc }
+        setItem((it) => ({ ...it, conteudo, ajustes: { ...it.ajustes, ...(j.ajustes ?? {}), mostrarCabecalho: true, mostrarDadosAluno: true }, capa: j.capa ?? it.capa }))
       }
       if (Array.isArray(j.avisos) && j.avisos.length) toast(j.avisos.slice(0, 2).join(' · '))
       toast.success('Documento importado')
