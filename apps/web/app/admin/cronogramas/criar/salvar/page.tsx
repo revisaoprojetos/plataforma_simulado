@@ -12,7 +12,7 @@ export default function SalvarPage() {
 
   return (
     <Etapa titulo="Revisar e criar" descricao="Confira antes de criar. O cronograma nasce como rascunho até você publicar.">
-      <div className="space-y-2 rounded-2xl border bg-card p-5 shadow-sm">
+      <div className="grid gap-x-8 rounded-2xl border bg-card p-5 shadow-sm sm:grid-cols-2">
         <Resumo rotulo="Nome" valor={draft.nome || '—'} />
         {draft.subtitulo && <Resumo rotulo="Subtítulo" valor={draft.subtitulo} />}
         <Resumo

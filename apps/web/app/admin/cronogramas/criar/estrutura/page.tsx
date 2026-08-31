@@ -33,7 +33,7 @@ export default function EstruturaPage() {
   return (
     <Etapa titulo="Estrutura" descricao="A grade fixa: carga por dia, número de semanas e os dias de curso.">
       <div className="space-y-5 rounded-2xl border bg-card p-5 shadow-sm">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid max-w-sm grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>Carga (h/dia)</Label>
             <Input

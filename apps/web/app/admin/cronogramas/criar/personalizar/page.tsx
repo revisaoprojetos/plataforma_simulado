@@ -21,8 +21,8 @@ export default function PersonalizarPage() {
 
   return (
     <Etapa titulo="Personalizar" descricao="Como o cronograma aparece no catálogo.">
-      <div className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm">
-        <div className="space-y-1.5">
+      <div className="grid gap-4 rounded-2xl border bg-card p-5 shadow-sm sm:grid-cols-2">
+        <div className="space-y-1.5 sm:col-span-2">
           <Label>Nome</Label>
           <Input
             value={draft.nome}
