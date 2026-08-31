@@ -4,6 +4,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
+import { resolverCardView } from '@/lib/card-view'
 import { MeusSimuladosCatalogo } from '@/components/aluno/meus-simulados-catalogo'
 
 export default async function MeusSimuladosPage() {
@@ -14,13 +15,16 @@ export default async function MeusSimuladosPage() {
 
   // Simulados atribuídos: matrícula (liberada) + acesso avulso. O passaporte NÃO enxerga
   // tudo automaticamente — recebe matrícula via grupo "Passaporte" vinculado ao banco.
-  const [{ data: mats }, { data: acs }, { data: sessAll }] = await Promise.all([
+  const [{ data: mats }, { data: acs }, { data: sessAll }, { data: tenantRow }] = await Promise.all([
     svc.from('simulado_matriculas').select('simulado_id, liberado').eq('estudante_id', estId),
     svc.from('simulado_acessos').select('simulado_id').eq('estudante_id', estId),
     // Sessões dela (independem do acesso ATUAL): garantem que os simulados JÁ FEITOS apareçam
     // em "Concluídos" mesmo se a matrícula/acesso mudou depois de concluir (histórico não some).
     svc.from('simulado_sessoes_prova').select('id, simulado_id, status, nota, finalizado_em, tentativa_num').eq('estudante_id', estId).eq('is_teste', false).eq('deletado', false),
+    // Estilo dos cards definido no console (tema.card_view) — o aluno apenas obedece.
+    svc.from('simulado_tenants').select('tema').eq('id', sessao.tenantId).maybeSingle(),
   ])
+  const cardView = resolverCardView((tenantRow?.tema as any)?.card_view)
   const ids = [...new Set([
     ...(mats ?? []).filter((m: any) => m.liberado !== false).map((m: any) => m.simulado_id),
     ...(acs ?? []).map((a: any) => a.simulado_id),
@@ -67,5 +71,5 @@ export default async function MeusSimuladosPage() {
     melhor: s.melhor, notaLiberada: s.notaLiberada, vis: visual.get(s.id) ?? null, grupoId: grupoPorSim.get(s.id) ?? null,
   }))
 
-  return <MeusSimuladosCatalogo itens={concluidosCat} grupos={grupos} />
+  return <MeusSimuladosCatalogo itens={concluidosCat} grupos={grupos} view={cardView} />
 }

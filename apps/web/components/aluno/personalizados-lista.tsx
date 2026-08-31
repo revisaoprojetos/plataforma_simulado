@@ -6,10 +6,13 @@ import Link from 'next/link'
 import { Wand2, Plus, Loader2, FileQuestion, Play, Pencil, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconePersonalizado } from '@/lib/personalizado-visual'
+import { type CardView } from '@/lib/card-view'
 import { listarMeusSimulados, type MeuSimuladoResumo } from '@/app/aluno/(portal)/simulados/builder-actions'
 
-// Nota (0–100) → tom (mesma régua dos cards oficiais).
+// Nota (0–100) → tom (mesma régua dos cards oficiais). `notaTone` = sobre a capa escura (pôster);
+// `notaToneCard` = sobre fundo claro/card (ticket), com variante dark.
 const notaTone = (n: number) => (n >= 70 ? 'text-emerald-400' : n >= 50 ? 'text-amber-400' : 'text-rose-400')
+const notaToneCard = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
 const fmtNota = (n: number | null) => (n == null ? '—' : Number(n).toFixed(1).replace('.', ','))
 
 /**
@@ -18,7 +21,7 @@ const fmtNota = (n: number | null) => (n == null ? '—' : Number(n).toFixed(1).
  * chip de estado + título) SEM botões na capa. Clicar no card abre a PARTE INTERNA: concluído →
  * página de resultado (hero + Visão geral/Questões + Refazer/Editar); senão → editor (com Fazer).
  */
-function CardPersonalizado({ s }: { s: MeuSimuladoResumo }) {
+function CardPersonalizado({ s, variant = 'poster' }: { s: MeuSimuladoResumo; variant?: CardView }) {
   const concluido = s.tentativas > 0
   const cor = s.cor
   const Icone = iconePersonalizado(s.icone) // ícone marca-d'água escolhido pelo aluno
@@ -27,6 +30,33 @@ function CardPersonalizado({ s }: { s: MeuSimuladoResumo }) {
     ? `/aluno/simulados/personalizados/${s.id}/resultado`
     : `/aluno/simulados/personalizados/${s.id}`
   const estadoLabel = concluido ? 'Concluído' : s.emAndamento ? 'Em andamento' : 'Rascunho'
+  const EstadoIcon = concluido ? CheckCircle2 : s.emAndamento ? Play : Pencil
+
+  // ===== TICKET: card baixo/retangular — imagem à esquerda, infos à direita. =====
+  if (variant === 'ticket') {
+    return (
+      <div className="group relative flex h-28 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-32">
+        <div className="relative w-[42%] max-w-[11rem] shrink-0 overflow-hidden">
+          <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />
+          <Icone className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />
+          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${cor})` }} />
+        </div>
+        <Link href={hrefPrincipal} className="absolute inset-0 z-10" aria-label={s.titulo} />
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"><Wand2 className="h-2.5 w-2.5" /> Personalizado</span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"><EstadoIcon className={cn('h-3 w-3', concluido && 'text-emerald-500')} /> {estadoLabel}</span>
+          </div>
+          <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground sm:text-[15px]">{s.titulo}</h3>
+          <div className="text-xs text-muted-foreground">
+            {concluido
+              ? <span className="font-semibold">Melhor nota: <span className={cn('tabular-nums', s.melhorNota != null && notaToneCard(s.melhorNota))}>{fmtNota(s.melhorNota)}</span></span>
+              : <span className="inline-flex items-center gap-1"><FileQuestion className="h-3 w-3" /> {s.questoes} quest.</span>}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
@@ -69,7 +99,7 @@ function CardPersonalizado({ s }: { s: MeuSimuladoResumo }) {
 }
 
 /** Aba "Personalizados": lista os simulados criados pelo próprio aluno + criar/abrir/excluir. */
-export function PersonalizadosLista() {
+export function PersonalizadosLista({ view = 'poster' }: { view?: CardView }) {
   const router = useRouter()
   const [itens, setItens] = useState<MeuSimuladoResumo[] | null>(null)
 
@@ -109,9 +139,9 @@ export function PersonalizadosLista() {
           </button>
         </div>
       ) : (
-        // Mesma grade dos cards oficiais (pôsteres).
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {itens.map((s) => <CardPersonalizado key={s.id} s={s} />)}
+        // Mesma grade dos cards oficiais (pôster ou ticket, conforme o console).
+        <div className={view === 'ticket' ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3' : 'grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}>
+          {itens.map((s) => <CardPersonalizado key={s.id} s={s} variant={view} />)}
         </div>
       )}
     </section>

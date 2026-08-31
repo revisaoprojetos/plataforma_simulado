@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { FileiraHorizontal } from '@/components/fileira-horizontal'
 import { PersonalizadosLista } from '@/components/aluno/personalizados-lista'
+import { type CardView } from '@/lib/card-view'
 import type { VisualSim } from '@/lib/aluno/simulado-visual'
 
 export type MeuSimuladoItem = {
@@ -28,11 +29,42 @@ const modoLabel = (m: string) => (m === 'janela_fixa' ? 'Agendado' : m === 'praz
 // Cards um pouco mais estreitos para espiar um pedaço do próximo na fileira do catálogo.
 const BASIS = 'shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-3rem)/4.3)] xl:basis-[calc((100%-4rem)/5.3)]'
 
-/** Card (pôster) de um simulado concluído — nota, tentativas e link para o resultado. */
-function CardConcluido({ s }: { s: MeuSimuladoItem }) {
+/** Card de um simulado concluído — nota, tentativas e link para o resultado. `variant`: pôster (4:5) ou ticket. */
+function CardConcluido({ s, variant = 'poster' }: { s: MeuSimuladoItem; variant?: CardView }) {
   const cor = s.vis?.cor ?? '#6d28d9'
   const BancoIcon = iconeBanco(s.vis?.icone)
   const capa = s.vis?.capa
+
+  // ===== TICKET: card baixo/retangular — imagem à esquerda, infos à direita. =====
+  if (variant === 'ticket') {
+    return (
+      <div className="group relative flex h-28 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-32">
+        <div className="relative w-[42%] max-w-[11rem] shrink-0 overflow-hidden">
+          {capa
+            ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+          {!capa && <BancoIcon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
+          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${cor})` }} />
+        </div>
+        <Link href={`/aluno/simulados/${s.id}`} className="absolute inset-0 z-10" aria-label={s.titulo} />
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{modoLabel(s.modo_aplicacao)}</span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-3 w-3" /> Concluído</span>
+          </div>
+          <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground sm:text-[15px]">{s.titulo}</h3>
+          <div className="text-xs">
+            {s.notaLiberada ? (
+              <span className="font-semibold text-muted-foreground">Melhor nota: <span className={cn('tabular-nums', s.melhor != null && notaTone(s.melhor))}>{s.melhor != null ? s.melhor.toFixed(1).replace('.', ',') : '—'}</span></span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-muted-foreground"><Lock className="h-3 w-3" /> Nota a liberar</span>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
       {capa
@@ -68,7 +100,7 @@ function CardConcluido({ s }: { s: MeuSimuladoItem }) {
  * "Meus simulados" (concluídos) com dois modos: "Quadro" (grade) e "Catálogo" (fileiras horizontais
  * por grupo/pasta do banco, estilo Netflix). Catálogo é o padrão quando há grupos.
  */
-export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoItem[]; grupos: Grupo[] }) {
+export function MeusSimuladosCatalogo({ itens, grupos, view = 'poster' }: { itens: MeuSimuladoItem[]; grupos: Grupo[]; view?: CardView }) {
   const temCatalogo = grupos.length > 0
   const searchParams = useSearchParams()
   // Aba refletida na URL (?aba=personalizados). Manter na URL é o que faz o VOLTAR do navegador
@@ -141,19 +173,28 @@ export function MeusSimuladosCatalogo({ itens, grupos }: { itens: MeuSimuladoIte
           )}
           <div className="space-y-4">
             {fileiras.map(({ g, its }) => (
-              <FileiraHorizontal key={g.id} titulo={g.nome} count={its.length}>
-                {its.map((s) => <div key={s.id} className={BASIS}><CardConcluido s={s} /></div>)}
-              </FileiraHorizontal>
+              view === 'ticket' ? (
+                <section key={g.id} className="space-y-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground">{g.nome} <span className="opacity-60">({its.length})</span></h3>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {its.map((s) => <CardConcluido key={s.id} s={s} variant="ticket" />)}
+                  </div>
+                </section>
+              ) : (
+                <FileiraHorizontal key={g.id} titulo={g.nome} count={its.length}>
+                  {its.map((s) => <div key={s.id} className={BASIS}><CardConcluido s={s} /></div>)}
+                </FileiraHorizontal>
+              )
             ))}
             {avulsos.length > 0 && (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {avulsos.map((s) => <CardConcluido key={s.id} s={s} />)}
+              <div className={view === 'ticket' ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3' : 'grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}>
+                {avulsos.map((s) => <CardConcluido key={s.id} s={s} variant={view} />)}
               </div>
             )}
           </div>
         </section>
       ) : (
-        <PersonalizadosLista />
+        <PersonalizadosLista view={view} />
       )}
       </div>
     </div>
