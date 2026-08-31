@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { CalendarDays, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ListChecks, Loader2, Package, Pencil, Plus, Power, Search, Tags, Trash2, Upload, X, Zap } from 'lucide-react'
 import { toast } from 'sonner'
@@ -141,6 +142,8 @@ export function CronogramasClient({
     })()
   }
   const [selecao, setSelecao] = useState<Set<string>>(new Set())
+  const router = useRouter()
+  const [escolhaAberta, setEscolhaAberta] = useState(false)
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<string | null>(null)
   const [form, setForm] = useState<EntradaCronograma>(vazio())
@@ -495,7 +498,7 @@ export function CronogramasClient({
           {/* Botão "Novo cronograma" com brilho: gradiente + glow (cor dedicada --crono-cor). */}
           <button
             type="button"
-            onClick={abrirNovo}
+            onClick={() => setEscolhaAberta(true)}
             className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             style={{ background: GRAD_MARCA, boxShadow: GLOW_BTN }}
           >
@@ -781,7 +784,7 @@ export function CronogramasClient({
             Crie um cronograma e depois importe as metas, ou use a importação para trazer o catálogo inteiro.
           </p>
           <div className="mt-4 flex justify-center gap-2">
-            <Button onClick={abrirNovo}>
+            <Button onClick={() => setEscolhaAberta(true)}>
               <Plus className="mr-1 h-4 w-4" />
               Criar o primeiro
             </Button>
@@ -1023,6 +1026,50 @@ export function CronogramasClient({
         </div>
       </div>
       </div>
+
+      {/* Pop-up de escolha: assistente completo (wizard) × criação rápida (o diálogo abaixo). */}
+      <Dialog open={escolhaAberta} onOpenChange={setEscolhaAberta}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Novo cronograma</DialogTitle>
+            <DialogDescription>Como você quer criar?</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => {
+                setEscolhaAberta(false)
+                router.push('/admin/cronogramas/criar/personalizar')
+              }}
+              className="group flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <ListChecks className="h-5 w-5" />
+              </span>
+              <span className="font-semibold">Assistente completo</span>
+              <span className="text-xs text-muted-foreground">
+                Etapas guiadas — personalização, estrutura, metas, links e acessos. Monta o cronograma inteiro e cria como rascunho.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEscolhaAberta(false)
+                abrirNovo()
+              }}
+              className="group flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-foreground">
+                <Zap className="h-5 w-5" />
+              </span>
+              <span className="font-semibold">Rápido</span>
+              <span className="text-xs text-muted-foreground">
+                Só a casca — nome, carga, semanas e dias. Cria na hora; as metas você adiciona depois no editor.
+              </span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={aberto} onOpenChange={setAberto}>
         <DialogContent className="sm:max-w-lg">
