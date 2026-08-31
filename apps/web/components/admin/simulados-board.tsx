@@ -54,6 +54,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
+import { CardViewToggle, useCardView, type CardView } from '@/components/card-view-toggle'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { abrirLinkTemado } from '@/lib/hud/abrir-temado'
 import { copiarTexto } from '@/lib/clipboard'
@@ -176,9 +177,9 @@ function LiberacaoChip({ label, on, pending, onClick }: { label: string; on: boo
 }
 
 /** Cartão de simulado (admin): capa em cima, corpo com chips, LIBERAÇÕES clicáveis e ações inline. */
-function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecionar }: {
+function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecionar, variant = 'poster' }: {
   s: SimuladoCard; appUrl: string; online: number
-  onMover?: () => void; selecionado: boolean; onSelecionar: (v: boolean) => void
+  onMover?: () => void; selecionado: boolean; onSelecionar: (v: boolean) => void; variant?: CardView
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -242,6 +243,96 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
   const capa = s.vis?.capa ?? s.vis?.capaBanner
   const detalhe = `/admin/simulados/${s.id}`
 
+  // Itens do menu de 3 pontos — compartilhados entre pôster e ticket.
+  const menuItens = (
+    <>
+      <DropdownMenuItem onClick={() => setDetalhes(true)}><Info className="mr-2 h-4 w-4" /> Detalhes</DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}/ao-vivo`)}><Radio className="mr-2 h-4 w-4" /> Ao vivo (online/progresso)</DropdownMenuItem>
+      <DropdownMenuItem onClick={() => router.push(detalhe)}><Pencil className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
+      <DropdownMenuItem onClick={() => router.push(detalhe)}><Trophy className="mr-2 h-4 w-4" /> Ranking</DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onClick={copiarLink}><Copy className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
+      <DropdownMenuItem onClick={abrirSimulado}><ExternalLink className="mr-2 h-4 w-4" /> Abrir aplicação</DropdownMenuItem>
+      {onMover && <DropdownMenuItem onClick={onMover}><FolderInput className="mr-2 h-4 w-4" /> Mover para pasta</DropdownMenuItem>}
+      <DropdownMenuSeparator />
+      {s.status === 'publicado' && <DropdownMenuItem onClick={() => acao(encerrarSimuladoAction, 'Simulado encerrado')}><Square className="mr-2 h-4 w-4" /> Encerrar</DropdownMenuItem>}
+      {s.status === 'encerrado' && <DropdownMenuItem onClick={() => acao(reabrirSimuladoAction, 'Simulado reaberto')}><Play className="mr-2 h-4 w-4" /> Reabrir</DropdownMenuItem>}
+      {s.status === 'rascunho' && <DropdownMenuItem onClick={() => acao(publishSimuladoAction, 'Simulado publicado')}><Send className="mr-2 h-4 w-4" /> Publicar</DropdownMenuItem>}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onClick={excluir} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
+    </>
+  )
+
+  // ===== Variante TICKET: card baixo/retangular — imagem à esquerda, infos+ações à direita. =====
+  if (variant === 'ticket') {
+    return (
+      <>
+      <div className={cn(
+        'group relative flex h-32 overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-300 sm:h-36',
+        selecionado ? 'ring-2 ring-primary' : 'ring-1 ring-black/5 hover:-translate-y-0.5 hover:shadow-lg',
+      )}>
+        {/* metade esquerda: imagem/degradê */}
+        <div className="relative w-[38%] max-w-[12rem] shrink-0 overflow-hidden">
+          {capa
+            ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
+            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+          {!capa && <BancoIcon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
+          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${cor})` }} />
+          {online > 0 && (
+            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur" title={`${online} aluno(s) fazendo agora`}>
+              <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-white" /></span>
+              {online}
+            </span>
+          )}
+        </div>
+        {/* Link cobre o card (abaixo dos controles) */}
+        <Link href={detalhe} className="absolute inset-0 z-10" aria-label={s.titulo} />
+        {/* direita: infos + ações */}
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white', dotClass[s.status])}>{statusLabel[s.status] ?? s.status}</span>
+            {/* seleção + kebab */}
+            <div className="pointer-events-auto z-20 flex items-center gap-1">
+              <button type="button" role="checkbox" aria-checked={selecionado} aria-label={selecionado ? 'Desmarcar simulado' : 'Selecionar simulado'} onClick={() => onSelecionar(!selecionado)}
+                className={cn('flex h-6 w-6 items-center justify-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                  selecionado ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-transparent hover:border-primary/50 hover:text-muted-foreground')}>
+                <Check className="h-4 w-4" />
+              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" title="Mais ações">
+                  <MoreHorizontal className="h-4 w-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">{menuItens}</DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+          <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground sm:text-[15px]">
+            <Link href={detalhe} className="pointer-events-auto relative z-20 transition-opacity hover:opacity-80">{s.titulo}</Link>
+          </h3>
+          <p className="line-clamp-1 text-[11px] text-muted-foreground">{subtituloSim(s)}</p>
+          <div className="pointer-events-auto relative z-20 mt-1 flex items-center gap-1.5">
+            <button type="button" onClick={abrirSimulado} disabled={!linkAcesso}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-all hover:brightness-110 disabled:opacity-50"
+              style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
+              <ExternalLink className="h-4 w-4" /> Abrir
+            </button>
+            <button type="button" onClick={copiarLink} title="Copiar link de acesso"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+              <Copy className="h-4 w-4" />
+            </button>
+            <Link href={`/admin/simulados/${s.id}/ao-vivo`} title="Ranking e desempenho ao vivo"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+              <BarChart3 className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </div>
+      {detalhes && <DetalhesSimuladoDialog s={s} online={online} estado={estado} pending={pending} onToggle={toggleLib} onCopiar={copiarLink} onClose={() => setDetalhes(false)} />}
+      </>
+    )
+  }
+
   return (
     <>
     <div className={cn(
@@ -286,23 +377,7 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
               <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/50 data-popup-open:!bg-white data-popup-open:!text-neutral-900" title="Mais ações">
                 <MoreHorizontal className="h-4 w-4" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52">
-                <DropdownMenuItem onClick={() => setDetalhes(true)}><Info className="mr-2 h-4 w-4" /> Detalhes</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}/ao-vivo`)}><Radio className="mr-2 h-4 w-4" /> Ao vivo (online/progresso)</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push(detalhe)}><Pencil className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push(detalhe)}><Trophy className="mr-2 h-4 w-4" /> Ranking</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={copiarLink}><Copy className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
-                <DropdownMenuItem onClick={abrirSimulado}><ExternalLink className="mr-2 h-4 w-4" /> Abrir aplicação</DropdownMenuItem>
-                {onMover && <DropdownMenuItem onClick={onMover}><FolderInput className="mr-2 h-4 w-4" /> Mover para pasta</DropdownMenuItem>}
-                <DropdownMenuSeparator />
-                {s.status === 'publicado' && <DropdownMenuItem onClick={() => acao(encerrarSimuladoAction, 'Simulado encerrado')}><Square className="mr-2 h-4 w-4" /> Encerrar</DropdownMenuItem>}
-                {s.status === 'encerrado' && <DropdownMenuItem onClick={() => acao(reabrirSimuladoAction, 'Simulado reaberto')}><Play className="mr-2 h-4 w-4" /> Reabrir</DropdownMenuItem>}
-                {s.status === 'rascunho' && <DropdownMenuItem onClick={() => acao(publishSimuladoAction, 'Simulado publicado')}><Send className="mr-2 h-4 w-4" /> Publicar</DropdownMenuItem>}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={excluir} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
-              </DropdownMenuContent>
+              <DropdownMenuContent align="start" className="w-52">{menuItens}</DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
@@ -398,7 +473,16 @@ function DetalhesSimuladoDialog({ s, online, estado, pending, onToggle, onCopiar
 }
 
 /** Tile "adicionar" no fim de cada seção. */
-function NovoTile({ pastaNome }: { pastaNome?: string }) {
+function NovoTile({ pastaNome, variant = 'poster' }: { pastaNome?: string; variant?: CardView }) {
+  if (variant === 'ticket') {
+    return (
+      <Link href="/admin/simulados/novo"
+        className="group flex h-32 items-center justify-center gap-2 rounded-2xl border-2 border-dashed bg-muted/20 p-4 text-center text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/[0.04] hover:text-primary sm:h-36">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed transition-colors group-hover:border-primary"><Plus className="h-4 w-4" /></span>
+        {pastaNome ? 'Novo nesta pasta' : 'Novo simulado'}
+      </Link>
+    )
+  }
   return (
     <Link href="/admin/simulados/novo"
       className="group flex h-full min-h-[240px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed bg-muted/20 p-4 text-center text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/[0.04] hover:text-primary">
@@ -435,6 +519,8 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   const [vista, setVista] = useState<'linhas' | 'pastas' | 'status'>('linhas')
   useEffect(() => { const v = localStorage.getItem('simulados-vista-3'); if (v === 'linhas' || v === 'pastas' || v === 'status') setVista(v) }, [])
   useEffect(() => { localStorage.setItem('simulados-vista-3', vista) }, [vista])
+  // Estilo do card: pôster (4:5) × ticket (baixo/retangular).
+  const [cardView, setCardView] = useCardView('admin-simulados')
 
   // Seções recolhidas.
   const [recolhidas, setRecolhidas] = useState<Set<string>>(new Set())
@@ -525,6 +611,8 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
               ))}
             </div>
           )}
+          {/* Estilo do card: pôster × ticket (aparece nas vistas que mostram cards). */}
+          {vista !== 'pastas' && <CardViewToggle value={cardView} onChange={setCardView} />}
           <div className="flex flex-wrap gap-1 rounded-lg bg-[var(--tab-bg,var(--muted))] p-1">
             {filtros.map((f) => (
               <button key={f.v} onClick={() => setModo(f.v)}
@@ -546,7 +634,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
       {/* Conteúdo */}
       {vista === 'status' && !atual ? (
         <SecoesStatus sims={filtrados} online={online} appUrl={appUrl} onMover={podeMover ? (s) => setMovendo(s) : undefined}
-          recolhidas={recolhidas} toggleSecao={toggleSecao} selecao={selecao} onSelecionar={setSel} />
+          recolhidas={recolhidas} toggleSecao={toggleSecao} selecao={selecao} onSelecionar={setSel} variant={cardView} />
       ) : vista === 'pastas' && !atual ? (
         // Só as PASTAS (tiles). Clicar entra na pasta (?pasta=id) e mostra os simulados de dentro.
         <div className="space-y-6">
@@ -561,7 +649,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
           {secoesPasta.semPasta.length > 0 && (
             <SecaoSimples titulo="Sem pasta" icone={FolderInput} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
               aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
-              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} />
+              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} variant={cardView} />
           )}
           {secoesPasta.pastas.length === 0 && secoesPasta.semPasta.length === 0 && (
             <p className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">Nenhuma pasta ainda. Crie a primeira em “Nova pasta”.</p>
@@ -573,7 +661,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
             folder && <PastaSection key={folder.id} folder={folder} sims={sims} online={online} appUrl={appUrl}
               aberto={!recolhidas.has(`p:${folder.id}`)} toggle={() => toggleSecao(`p:${folder.id}`)}
               onGerenciar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)}
-              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} />
+              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} variant={cardView} />
           ))}
 
           {/* Sem pasta (ou o conteúdo de dentro de uma pasta aberta) */}
@@ -582,7 +670,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
               sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
               aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
               onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel}
-              mostrarNovo={!!atual} />
+              mostrarNovo={!!atual} variant={cardView} />
           )}
 
           {folders.length === 0 && secoesPasta.semPasta.length === 0 && !atual && (
@@ -658,10 +746,10 @@ function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir }: {
   )
 }
 
-function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerenciar, onExcluir, onMover, selecao, onSelecionar }: {
+function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerenciar, onExcluir, onMover, selecao, onSelecionar, variant = 'poster' }: {
   folder: PastaSim; sims: SimuladoCard[]; online: Record<string, number>; appUrl: string
   aberto: boolean; toggle: () => void; onGerenciar: () => void; onExcluir: () => void
-  onMover?: (s: SimuladoCard) => void; selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void
+  onMover?: (s: SimuladoCard) => void; selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void; variant?: CardView
 }) {
   const st = statusPasta(sims)
   // Link da PASTA para o aluno: abre a home filtrada nesta pasta. Sem login, o proxy manda para
@@ -700,7 +788,15 @@ function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerencia
           </DropdownMenu>
         </div>
       </div>
-      {aberto && (
+      {aberto && (variant === 'ticket' ? (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {sims.map((s) => (
+            <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} variant="ticket"
+              onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
+          ))}
+          <NovoTile pastaNome={folder.nome} variant="ticket" />
+        </div>
+      ) : (
         <FileiraHorizontal>
           {sims.map((s) => (
             <div key={s.id} className={CARD_BASIS}>
@@ -710,16 +806,16 @@ function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerencia
           ))}
           <div className={CARD_BASIS}><NovoTile pastaNome={folder.nome} /></div>
         </FileiraHorizontal>
-      )}
+      ))}
     </section>
   )
 }
 
 /** Seção simples (sem ações de pasta) — usada para "Sem pasta" e para o nível de dentro de uma pasta. */
-function SecaoSimples({ titulo, icone: Icone, sims, online, appUrl, aberto, toggle, onMover, selecao, onSelecionar, mostrarNovo }: {
+function SecaoSimples({ titulo, icone: Icone, sims, online, appUrl, aberto, toggle, onMover, selecao, onSelecionar, mostrarNovo, variant = 'poster' }: {
   titulo: string; icone: any; sims: SimuladoCard[]; online: Record<string, number>; appUrl: string
   aberto: boolean; toggle: () => void; onMover?: (s: SimuladoCard) => void
-  selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void; mostrarNovo?: boolean
+  selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void; mostrarNovo?: boolean; variant?: CardView
 }) {
   return (
     <section className="space-y-3">
@@ -732,6 +828,14 @@ function SecaoSimples({ titulo, icone: Icone, sims, online, appUrl, aberto, togg
       {aberto && (
         sims.length === 0 && !mostrarNovo ? (
           <p className="rounded-2xl border border-dashed py-10 text-center text-sm text-muted-foreground">Nenhum simulado aqui.</p>
+        ) : variant === 'ticket' ? (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {sims.map((s) => (
+              <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} variant="ticket"
+                onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
+            ))}
+            {mostrarNovo && <NovoTile pastaNome={titulo} variant="ticket" />}
+          </div>
         ) : (
           <FileiraHorizontal>
             {sims.map((s) => (
@@ -749,10 +853,10 @@ function SecaoSimples({ titulo, icone: Icone, sims, online, appUrl, aberto, togg
 }
 
 /** Seções por status (Em andamento / A iniciar / Encerrado) em grade — vista "Status". */
-function SecoesStatus({ sims, online, appUrl, onMover, recolhidas, toggleSecao, selecao, onSelecionar }: {
+function SecoesStatus({ sims, online, appUrl, onMover, recolhidas, toggleSecao, selecao, onSelecionar, variant = 'poster' }: {
   sims: SimuladoCard[]; online: Record<string, number>; appUrl: string
   onMover?: (s: SimuladoCard) => void; recolhidas: Set<string>; toggleSecao: (chave: string) => void
-  selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void
+  selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void; variant?: CardView
 }) {
   return (
     <div className="space-y-8">
@@ -773,9 +877,9 @@ function SecoesStatus({ sims, online, appUrl, onMover, recolhidas, toggleSecao, 
                 {sec.chave === 'rascunho' ? 'Nenhum simulado aguardando início' : sec.chave === 'publicado' ? 'Nenhum simulado em andamento' : 'Nenhum simulado encerrado'}
               </p>
             ) : (
-              <div className="grid items-stretch gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              <div className={variant === 'ticket' ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3' : 'grid items-stretch gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}>
                 {itens.map((s) => (
-                  <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0}
+                  <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} variant={variant}
                     onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
                 ))}
               </div>

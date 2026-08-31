@@ -1,9 +1,12 @@
+'use client'
+
 import Link from 'next/link'
 import { ArrowLeft, FolderOpen, Play, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { CardSimulado } from '@/components/aluno/card-simulado'
 import { FileiraHorizontal } from '@/components/fileira-horizontal'
+import { CardViewToggle, useCardView, type CardView } from '@/components/card-view-toggle'
 import type { ItemSimulado } from '@/lib/aluno/simulado-item'
 import type { GrupoCatalogo } from '@/lib/aluno/grupos-catalogo'
 
@@ -29,10 +32,14 @@ function bucketDe(i: ItemSimuladoCat): 'agendados' | 'disponiveis' | 'refazer' {
   return i.modo_aplicacao === 'janela_fixa' ? 'agendados' : 'disponiveis'
 }
 
-function SecoesGrid({ itens, cols5 }: { itens: ItemSimuladoCat[]; cols5?: boolean }) {
+function SecoesGrid({ itens, cols5, view = 'poster' }: { itens: ItemSimuladoCat[]; cols5?: boolean; view?: CardView }) {
   const buckets: Record<string, ItemSimuladoCat[]> = { agendados: [], disponiveis: [], refazer: [] }
   for (const i of itens) buckets[bucketDe(i)].push(i)
   if (itens.length === 0) return <p className="rounded-2xl border border-dashed py-10 text-center text-sm text-muted-foreground">Nenhum simulado nesta pasta ainda.</p>
+  // Ticket ocupa a largura toda → grade de 1–2 colunas; pôster mantém a grade 4:5.
+  const gridCls = view === 'ticket'
+    ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3'
+    : cn('grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4', cols5 && 'xl:grid-cols-5')
   return (
     <div className="space-y-6">
       {SECOES.map((sec) => {
@@ -45,8 +52,8 @@ function SecoesGrid({ itens, cols5 }: { itens: ItemSimuladoCat[]; cols5?: boolea
               <h2 className="font-semibold">{sec.titulo}</h2>
               <span className="text-sm text-muted-foreground">({arr.length})</span>
             </div>
-            <div className={cn('grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4', cols5 && 'xl:grid-cols-5')}>
-              {arr.map((s) => <CardSimulado key={s.id} s={s} />)}
+            <div className={gridCls}>
+              {arr.map((s) => <CardSimulado key={s.id} s={s} variant={view} />)}
             </div>
           </section>
         )
@@ -114,6 +121,8 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
   /** Aluno já fez todos os simulados recentes disponíveis (sem pendentes, mas com histórico). */
   recentesConcluidos?: boolean
 }) {
+  const [view, setView] = useCardView('aluno-simulados')
+
   // VISÃO DA PASTA — só os simulados de dentro dela (por grupo do catálogo OU por pasta_id do admin).
   if (pastaAtiva) {
     const g = grupos.find((x) => x.id === pastaAtiva)
@@ -125,12 +134,13 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
         <Link href="/aluno" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Início</Link>
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}><FolderOpen className="h-5 w-5" /></span>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="truncate text-2xl font-bold tracking-tight">{nome}</h1>
             <p className="text-muted-foreground">{its.length} simulado(s) nesta pasta.</p>
           </div>
+          <CardViewToggle value={view} onChange={setView} />
         </div>
-        <SecoesGrid itens={its} />
+        <SecoesGrid itens={its} view={view} />
       </div>
     )
   }
@@ -145,12 +155,21 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-end">
+        <CardViewToggle value={view} onChange={setView} />
+      </div>
       {recent.length > 0 ? (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold"><Play className="h-4 w-4 text-primary" /> Simulados recentes</h2>
-          <FileiraHorizontal>
-            {recent.map((s) => <div key={s.id} className={basis}><CardSimulado s={s} dica={s.id === dicaId} /></div>)}
-          </FileiraHorizontal>
+          {view === 'ticket' ? (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {recent.map((s) => <CardSimulado key={s.id} s={s} dica={s.id === dicaId} variant="ticket" />)}
+            </div>
+          ) : (
+            <FileiraHorizontal>
+              {recent.map((s) => <div key={s.id} className={basis}><CardSimulado s={s} dica={s.id === dicaId} /></div>)}
+            </FileiraHorizontal>
+          )}
         </section>
       ) : recentesConcluidos ? (
         <section className="space-y-3">
@@ -188,7 +207,7 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
       {avulsos.length > 0 && (
         <section className="space-y-3">
           {grupos.length > 0 && <h2 className="text-sm font-semibold text-muted-foreground">Outros simulados</h2>}
-          <SecoesGrid itens={avulsos} cols5={full} />
+          <SecoesGrid itens={avulsos} cols5={full} view={view} />
         </section>
       )}
     </div>
