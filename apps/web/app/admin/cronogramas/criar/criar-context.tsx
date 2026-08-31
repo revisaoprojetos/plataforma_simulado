@@ -1,7 +1,6 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
 
 /**
  * Estado compartilhado da criação de cronograma (página-por-página), espelhando o assistente
@@ -12,17 +11,6 @@ import { usePathname, useRouter } from 'next/navigation'
 
 // Bumpar a versão da chave descarta rascunhos antigos que sobrescreveriam novos defaults.
 export const DRAFT_KEY = 'criar-cronograma-draft-v1'
-
-export const STEPS = [
-  { slug: 'personalizar', label: 'Personalizar' },
-  { slug: 'estrutura', label: 'Estrutura' },
-  { slug: 'metas', label: 'Metas' },
-  { slug: 'links', label: 'Links' },
-  { slug: 'acessos', label: 'Acessos' },
-  { slug: 'salvar', label: 'Salvar' },
-] as const
-
-export type StepSlug = (typeof STEPS)[number]['slug']
 
 /** Uma meta em construção (id temporário só do cliente — vira linha no banco ao salvar). */
 export interface MetaDraft {
@@ -85,28 +73,6 @@ export function draftVazio(): CronogramaDraft {
   }
 }
 
-/** Uma etapa está completa? (lenient onde a etapa é opcional). */
-export function stepCompleta(d: CronogramaDraft, slug: StepSlug): boolean {
-  switch (slug) {
-    case 'personalizar':
-      return d.nome.trim().length >= 3
-    case 'estrutura':
-      return d.cargaHoraria > 0 && Number.isInteger(d.totalSemanas) && d.totalSemanas >= 1 && d.diasCurso.length >= 1
-    case 'metas':
-    case 'links':
-    case 'acessos':
-      return true // opcionais — dá para criar a casca e completar depois
-    case 'salvar':
-      return true
-  }
-}
-
-/** Índice da 1ª etapa incompleta (ou a última, se tudo ok) — teto de navegação. */
-export function primeiraIncompleta(d: CronogramaDraft): number {
-  for (let i = 0; i < STEPS.length; i++) if (!stepCompleta(d, STEPS[i].slug)) return i
-  return STEPS.length - 1
-}
-
 interface CriarCtx {
   draft: CronogramaDraft
   patch: (p: Partial<CronogramaDraft>) => void
@@ -152,16 +118,4 @@ export function CriarProvider({ children }: { children: React.ReactNode }) {
   }
 
   return <Ctx.Provider value={{ draft, patch, reset }}>{children}</Ctx.Provider>
-}
-
-/** Guarda de etapa: se cair numa etapa à frente de uma anterior INCOMPLETA, volta pra 1ª pendente. */
-export function useGuardStep(indiceAtual: number) {
-  const { draft } = useCriar()
-  const router = useRouter()
-  const pathname = usePathname()
-  useEffect(() => {
-    const teto = primeiraIncompleta(draft)
-    if (indiceAtual > teto) router.replace(`/admin/cronogramas/criar/${STEPS[teto].slug}`)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname])
 }

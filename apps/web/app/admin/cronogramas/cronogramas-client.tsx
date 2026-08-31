@@ -1039,7 +1039,7 @@ export function CronogramasClient({
               type="button"
               onClick={() => {
                 setEscolhaAberta(false)
-                router.push('/admin/cronogramas/criar/personalizar')
+                router.push('/admin/cronogramas/criar')
               }}
               className="group flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
             >
