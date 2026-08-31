@@ -14,6 +14,7 @@ import {
 import { cn } from '@/lib/utils'
 import { OCULTAR_ALUNO_EXTRAS, OCULTAR_CRONOGRAMA, ROTAS_ALUNO_OCULTAS, LEITURA_ATIVA } from '@/lib/flags'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { FontScaleControl } from '@/components/font-scale-control'
 import { NotificacaoBellAluno } from '@/components/aluno/notificacao-bell-aluno'
 import { AjudaDrawer } from '@/components/aluno/ajuda-drawer'
 
@@ -232,6 +233,8 @@ export function AlunoSidebar({
         <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2">
           {/* tema — normalizado para 36px (mesmo tamanho do avatar/sino/sair) */}
           <span className="flex h-9 w-9 items-center justify-center"><ThemeToggle /></span>
+          {/* tamanho do texto (acessibilidade) — ao lado do tema */}
+          <span className="flex h-9 w-9 items-center justify-center"><FontScaleControl scope={`aluno:${usuarioEmail || 'aluno'}`} align="start" /></span>
           {/* Ajuda/Sair (rótulo): some por completo na colapsada (sem gap fantasma) */}
           <div className="flex min-w-0 flex-1 items-center gap-2 group-data-[collapsible=icon]:hidden">
             <AjudaDrawer gamAtivo={gamAtivo} renderTrigger={(abrir) => (

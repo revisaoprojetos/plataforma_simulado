@@ -190,6 +190,9 @@
   }
   html {
     @apply font-sans;
+    /* Escala de fonte (acessibilidade): --font-scale multiplica o tamanho-base → todo o app
+       (portal, admin e runner do simulado) cresce/diminui proporcionalmente. Default 1 = 100%. */
+    font-size: calc(100% * var(--font-scale, 1));
   }
 
   /* Transições suaves padrão nos elementos interativos (cor/transform/sombra). */

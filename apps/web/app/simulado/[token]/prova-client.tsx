@@ -12,6 +12,7 @@ import { type HudCores, type HudPorPagina, efetivarHud } from '@/lib/caderno-des
 import { hudCssVars } from '@/lib/caderno-designer/hud'
 import { useDarkMode } from '@/lib/hud/use-dark'
 import { ProvaHud } from '@/components/prova/prova-hud'
+import { FontScaleControl } from '@/components/font-scale-control'
 import { ProvaIntro, ProvaLoading, type EstiloProvaLoading } from '@/components/prova/prova-intro'
 import { toast } from 'sonner'
 import { RevisaoFinal } from '@/components/aluno/revisao-final'
@@ -492,6 +493,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
       isFinalizando={isFinalizando}
       dark={dark}
       onToggleDark={toggleDark}
+      fontControl={<FontScaleControl scope={`aluno:${token}`} openDir="down" />}
     />
   )
 

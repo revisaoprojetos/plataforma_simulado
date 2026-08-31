@@ -18,6 +18,7 @@ import { MonitorManutencao } from '@/components/aluno/monitor-manutencao'
 import { getGamConfig } from '@/lib/gamificacao'
 import { resumoGamificacao } from '@/lib/gamificacao/leitura'
 import { lerPersonalizacaoEstudante } from '@/lib/aluno/personalizacao'
+import { FontScaleInit } from '@/components/font-scale-init'
 import type { ProgressoAluno } from '@/components/aluno/aluno-sidebar'
 
 export default async function AlunoPortalLayout({ children }: { children: React.ReactNode }) {
@@ -95,6 +96,8 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   return (
     <>
       {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
+      {/* Anti-flash: aplica a escala de fonte salva (por aluno) antes do 1º paint. */}
+      <FontScaleInit scope={`aluno:${sessao.email || 'aluno'}`} />
       <MonitorManutencao inicial={{ inicio: manut.inicio, avisos: manut.avisos }} />
       {/* Tour guiado da Capi (acionado pelo "Iniciar passo a passo" na Ajuda) — global p/ sobreviver à navegação. */}
       <GuiaTourRunner gamAtivo={gamAtivo} />

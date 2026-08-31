@@ -71,6 +71,7 @@ import { cn } from '@/lib/utils'
 import { OCULTAR_CRONOGRAMA } from '@/lib/flags'
 import { useCan } from '@/components/auth/can-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { FontScaleControl } from '@/components/font-scale-control'
 import { NotificationBell } from '@/components/admin/notification-bell'
 import { AjudaButton } from '@/components/admin/ajuda-center'
 import { logoutAction } from '@/app/login/actions'
@@ -452,6 +453,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
 
         <div className="flex items-center gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1.5">
           <ThemeToggle />
+          <FontScaleControl scope={`admin:${userEmail || 'admin'}`} align="start" />
           <AjudaButton />
           <button type="button" onClick={() => { window.location.href = '/login' }} title="Trocar de plataforma" aria-label="Trocar de plataforma"
             className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[color:var(--sidebar-accent)]">

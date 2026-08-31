@@ -80,6 +80,8 @@ export interface ProvaHudProps {
   /** tema claro/escuro — mostra o sol/lua na top bar. */
   dark?: boolean
   onToggleDark?: () => void
+  /** Slot do controle de tamanho do texto (acessibilidade) — renderizado ao lado do tema. */
+  fontControl?: React.ReactNode
 }
 
 /** HUD do simulado em andamento — usado pela prova real E pelo preview do caderno (idênticos). */
@@ -127,6 +129,7 @@ export function ProvaHud(p: ProvaHudProps) {
               </div>
             )}
             {p.onToggleDark && <ThemeToggle dark={!!p.dark} onToggle={p.onToggleDark} />}
+            {p.fontControl}
             <Button data-campo="finalizar" size="sm" onClick={p.onRevisar} disabled={p.isFinalizando} style={{ background: FINALIZAR, color: '#fff' }}><Send className="mr-1.5 h-3.5 w-3.5" />Finalizar</Button>
           </div>
         </div>

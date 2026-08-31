@@ -5,6 +5,7 @@ import { HUD_CORES_PADRAO, type HudCores, type HudPorPagina } from '@/lib/cadern
 import { EmbedLoginForm } from '@/components/embed/embed-login-form'
 import { AlertCircle } from 'lucide-react'
 import { ProvaClient } from './prova-client'
+import { FontScaleInit } from '@/components/font-scale-init'
 
 // Página cheia da prova (acesso pelo portal do aluno ou por link direto).
 // - Sem `?st=`: mostra a tela de identificação (branded) que, ao validar, redireciona
@@ -51,7 +52,13 @@ export default async function ProvaPage({ params, searchParams }: { params: Prom
   const brandingSimples = branding
     ? { logoUrl: branding.logoUrl, logoBg: branding.logoBg, logoEstilo: branding.logoEstilo }
     : null
-  return <ProvaClient token={token} hudInicial={{ base, porPagina, branding: brandingSimples }} darkInicial={dark} />
+  return (
+    <>
+      {/* Anti-flash: aplica a escala de fonte salva (por token do simulado) antes do 1º paint. */}
+      <FontScaleInit scope={`aluno:${token}`} />
+      <ProvaClient token={token} hudInicial={{ base, porPagina, branding: brandingSimples }} darkInicial={dark} />
+    </>
+  )
 }
 
 function SimuladoNaoEncontrado() {

@@ -15,6 +15,7 @@ import { SplashSistema } from '@/components/admin/splash-sistema'
 import { TourProvider } from '@/components/admin/tour-guiado'
 import { NavProgress } from '@/components/admin/nav-progress'
 import { AvisoSemAcesso } from '@/components/admin/aviso-sem-acesso'
+import { FontScaleInit } from '@/components/font-scale-init'
 import { Suspense } from 'react'
 
 const CURRENT_POLICY_VERSION = '1.0'
@@ -128,6 +129,9 @@ export default async function AdminLayout({
   const podeGerenciarManutencao = access.isAdmin || access.permissions.includes('configuracoes:view')
 
   return (
+    <>
+    {/* Anti-flash: aplica a escala de fonte salva (por usuário) antes do 1º paint. */}
+    <FontScaleInit scope={`admin:${userEmail || 'admin'}`} />
     <CanProvider isAdmin={access.isAdmin} permissions={access.permissions} ocultarDiscursiva={ocultarDiscursiva}>
       {/* O script anti-flash do splash (classe splash-ativo antes do 1º paint) foi movido para o
           <head> do layout raiz — renderizar um <script> aqui, dentro do CanProvider (client),
@@ -156,5 +160,6 @@ export default async function AdminLayout({
         </div>
       </SidebarProvider>
     </CanProvider>
+    </>
   )
 }
