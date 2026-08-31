@@ -9,6 +9,7 @@ import { NovoSimuladoDialog } from '@/components/admin/novo-simulado-dialog'
 import { onlinePorSimulado } from '@/app/admin/simulados/actions'
 import { tiposDeSimulados, type TipoSimulado } from '@/lib/simulado/tipo'
 import { resolverVisualSimulados, type VisualSim } from '@/lib/aluno/simulado-visual'
+import { resolverCardView } from '@/lib/card-view'
 import { getOcultarDiscursiva } from '@/lib/sistema/manutencao-areas-server'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { simuladosTiposSql } from '@/lib/data/simulados.repo'
@@ -177,6 +178,9 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
     .map((b) => ({ id: b.id, nome: b.nome, cor: b.cor ?? null, icone: b.icone ?? null, capa: (b.capa_card_url ?? b.capa_url) ?? null, count: contGrupo.get(b.id) ?? 0 }))
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  // Estilo dos cards definido no console (tema.card_view) — o admin apenas obedece.
+  const { data: tenantTema } = await supabase.from('simulado_tenants').select('tema').eq('id', tid).maybeSingle()
+  const cardView = resolverCardView((tenantTema?.tema as any)?.card_view)
 
   return (
     <SimuladosBoard
@@ -187,6 +191,7 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
       destinos={destinos}
       atual={current ? { id: current.id, nome: current.nome } : null}
       catalogo={{ sims: catalogoSims as (SimuladoCard & { grupoId: string | null })[], grupos: catalogoGrupos }}
+      cardView={cardView}
     />
   )
 }

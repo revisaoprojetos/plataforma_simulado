@@ -54,7 +54,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
-import { CardViewToggle, useCardView, type CardView } from '@/components/card-view-toggle'
+import { type CardView } from '@/lib/card-view'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { abrirLinkTemado } from '@/lib/hud/abrir-temado'
 import { copiarTexto } from '@/lib/clipboard'
@@ -496,10 +496,12 @@ type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string 
 type DestinoSim = { id: string; nome: string }
 export type SimuladoCatalogo = SimuladoCard & { grupoId: string | null }
 
-export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo }: {
+export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo, cardView = 'poster' }: {
   simulados: SimuladoCard[]; appUrl: string; onlineInicial?: Record<string, number>
   folders?: PastaSim[]; destinos?: DestinoSim[]; atual?: { id: string; nome: string } | null
   catalogo?: { sims: SimuladoCatalogo[]; grupos: PastaSim[] }
+  /** Estilo dos cards definido no console (tema.card_view). O admin não troca por conta própria. */
+  cardView?: CardView
 }) {
   const router = useRouter()
   const [, start] = useTransition()
@@ -519,8 +521,6 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   const [vista, setVista] = useState<'linhas' | 'pastas' | 'status'>('linhas')
   useEffect(() => { const v = localStorage.getItem('simulados-vista-3'); if (v === 'linhas' || v === 'pastas' || v === 'status') setVista(v) }, [])
   useEffect(() => { localStorage.setItem('simulados-vista-3', vista) }, [vista])
-  // Estilo do card: pôster (4:5) × ticket (baixo/retangular).
-  const [cardView, setCardView] = useCardView('admin-simulados')
 
   // Seções recolhidas.
   const [recolhidas, setRecolhidas] = useState<Set<string>>(new Set())
@@ -611,8 +611,6 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
               ))}
             </div>
           )}
-          {/* Estilo do card: pôster × ticket (aparece nas vistas que mostram cards). */}
-          {vista !== 'pastas' && <CardViewToggle value={cardView} onChange={setCardView} />}
           <div className="flex flex-wrap gap-1 rounded-lg bg-[var(--tab-bg,var(--muted))] p-1">
             {filtros.map((f) => (
               <button key={f.v} onClick={() => setModo(f.v)}

@@ -1,12 +1,10 @@
-'use client'
-
 import Link from 'next/link'
 import { ArrowLeft, FolderOpen, Play, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { CardSimulado } from '@/components/aluno/card-simulado'
 import { FileiraHorizontal } from '@/components/fileira-horizontal'
-import { CardViewToggle, useCardView, type CardView } from '@/components/card-view-toggle'
+import { type CardView } from '@/lib/card-view'
 import type { ItemSimulado } from '@/lib/aluno/simulado-item'
 import type { GrupoCatalogo } from '@/lib/aluno/grupos-catalogo'
 
@@ -108,7 +106,7 @@ function CardPasta({ g, count, prog }: { g: GrupoCatalogo; count: number; prog?:
  * com progresso no hover). Ao abrir uma pasta (?pasta=id), mostra os simulados de dentro.
  * Os sem pasta (avulsos) aparecem em grade. A área "Simulados" foi absorvida por aqui.
  */
-export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pastaAtiva, pastaInfo, full, recentesConcluidos }: {
+export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pastaAtiva, pastaInfo, full, recentesConcluidos, view = 'poster' }: {
   itens: ItemSimuladoCat[]
   grupos: GrupoCatalogo[]
   progresso?: ProgressoGrupo
@@ -120,9 +118,9 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
   full?: boolean
   /** Aluno já fez todos os simulados recentes disponíveis (sem pendentes, mas com histórico). */
   recentesConcluidos?: boolean
+  /** Estilo dos cards definido no console (tema.card_view). O aluno não troca por conta própria. */
+  view?: CardView
 }) {
-  const [view, setView] = useCardView('aluno-simulados')
-
   // VISÃO DA PASTA — só os simulados de dentro dela (por grupo do catálogo OU por pasta_id do admin).
   if (pastaAtiva) {
     const g = grupos.find((x) => x.id === pastaAtiva)
@@ -138,7 +136,6 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
             <h1 className="truncate text-2xl font-bold tracking-tight">{nome}</h1>
             <p className="text-muted-foreground">{its.length} simulado(s) nesta pasta.</p>
           </div>
-          <CardViewToggle value={view} onChange={setView} />
         </div>
         <SecoesGrid itens={its} view={view} />
       </div>
@@ -155,9 +152,6 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
-        <CardViewToggle value={view} onChange={setView} />
-      </div>
       {recent.length > 0 ? (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold"><Play className="h-4 w-4 text-primary" /> Simulados recentes</h2>

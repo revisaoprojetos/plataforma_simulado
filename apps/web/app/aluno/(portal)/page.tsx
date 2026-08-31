@@ -24,6 +24,7 @@ import { ConquistasProgressoLista } from '@/components/aluno/conquistas-progress
 import { CelebracaoXp } from '@/components/aluno/celebracao-xp'
 import { MascoteTour } from '@/components/mascote/mascote-tour'
 import { getCurrentTenant } from '@/lib/tenant'
+import { resolverCardView } from '@/lib/card-view'
 import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -46,6 +47,8 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   ])
   // Painel de desempenho (KPIs) nos banners de simulado: só quando o tenant liga (default OFF).
   const mostrarDesempenhoBanner = (tenantRow?.tema as any)?.banners_desempenho === true
+  // Estilo dos cards de simulado, definido no console (tema.card_view) — o aluno apenas obedece.
+  const cardView = resolverCardView((tenantRow?.tema as any)?.card_view)
   // Config por-banner do rótulo "Em destaque para você" (ativo + texto). Default: ativo, texto padrão.
   const destaquesBanner = ((tenantRow?.tema as any)?.banner_destaques ?? {}) as Record<string, { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number }>
   const destaqueDe = (id: string) => ({
@@ -278,7 +281,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     }
     return (
       <div className="animate-page">
-        <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} pastaAtiva={pasta} pastaInfo={pastaInfo} />
+        <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} pastaAtiva={pasta} pastaInfo={pastaInfo} view={cardView} />
         {semAcesso}
       </div>
     )
@@ -407,7 +410,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
           {/* Divisória horizontal (quase às bordas) separando a trilha dos simulados recentes. */}
           {gamResumo && trilhas.length > 0 && <div className="mx-auto h-px w-[92%]" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--foreground) 24%, transparent) 18%, color-mix(in oklab, var(--foreground) 24%, transparent) 82%, transparent)' }} />}
 
-          <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} recentes={recentes} full={!gamResumo} recentesConcluidos={recentes.length === 0 && feitosSet.size > 0} />
+          <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} recentes={recentes} full={!gamResumo} recentesConcluidos={recentes.length === 0 && feitosSet.size > 0} view={cardView} />
         </div>
 
         {/* ── Coluna direita: meta, sequência, missões, liga, conquistas ── */}

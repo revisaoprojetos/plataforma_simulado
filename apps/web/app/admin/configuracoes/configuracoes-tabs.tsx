@@ -1,8 +1,9 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Fingerprint, Palette, LoaderCircle, Settings2, PanelTop, MonitorPlay, LayoutGrid, Sparkles, Contact, Smartphone } from 'lucide-react'
+import { Fingerprint, Palette, LoaderCircle, Settings2, PanelTop, MonitorPlay, LayoutGrid, Sparkles, Contact, Smartphone, StretchHorizontal } from 'lucide-react'
 import { ConfiguracoesForm } from './configuracoes-form'
+import { CardViewForm } from './card-view-form'
 import { CarregamentoForm } from './carregamento-form'
 import { ImersaoForm } from './imersao-form'
 import { AvancadoForm } from './avancado-form'
@@ -24,6 +25,7 @@ export function ConfiguracoesTabs({ tema, salvarTema, capasSistema }: { tema: an
         <TabsTrigger value="tema"><Palette /> Cores &amp; Tema</TabsTrigger>
         <TabsTrigger value="carregamento"><LoaderCircle /> Carregamento</TabsTrigger>
         <TabsTrigger value="mobile"><Smartphone /> Mobile</TabsTrigger>
+        <TabsTrigger value="cards"><StretchHorizontal /> Cards</TabsTrigger>
         <TabsTrigger value="assistente"><Sparkles /> Assistente</TabsTrigger>
         <TabsTrigger value="personalizacao"><Contact /> Personalização</TabsTrigger>
         <TabsTrigger value="avancado"><Settings2 /> Avançado</TabsTrigger>
@@ -59,6 +61,10 @@ export function ConfiguracoesTabs({ tema, salvarTema, capasSistema }: { tema: an
 
       <TabsContent value="mobile">
         <NavegacaoMobileForm tema={tema} salvarTema={salvarTema} />
+      </TabsContent>
+
+      <TabsContent value="cards">
+        <CardViewForm tema={tema} salvarTema={salvarTema} />
       </TabsContent>
 
       <TabsContent value="assistente">
