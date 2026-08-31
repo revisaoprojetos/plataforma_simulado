@@ -18,8 +18,11 @@ export function FontScaleControl({
   scope, className, align = 'end', openDir = 'up',
 }: { scope: string; className?: string; align?: 'start' | 'end' | 'center'; openDir?: 'up' | 'down' }) {
   const [scale, setScale] = useState<number>(FONT_SCALE_DEFAULT)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false)       // aberto (lógico)
+  const [montado, setMontado] = useState(false) // fica no DOM durante a animação de SAÍDA
   const boxRef = useRef<HTMLDivElement>(null)
+  const abrir = () => { setMontado(true); setOpen(true) }
+  const fechar = () => setOpen(false) // dispara a animação de saída; desmonta no onAnimationEnd
 
   // Hidrata do localStorage no mount (evita mismatch SSR) + sincroniza entre instâncias.
   useEffect(() => { setScale(lerEscala(scope)) }, [scope])
@@ -32,8 +35,8 @@ export function FontScaleControl({
   // Fecha ao clicar fora / Esc.
   useEffect(() => {
     if (!open) return
-    const onDown = (e: MouseEvent) => { if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false) }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    const onDown = (e: MouseEvent) => { if (boxRef.current && !boxRef.current.contains(e.target as Node)) fechar() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') fechar() }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
@@ -52,7 +55,7 @@ export function FontScaleControl({
     <div ref={boxRef} className={cn('relative', className)}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => (open ? fechar() : abrir())}
         title="Tamanho do texto"
         aria-label="Ajustar o tamanho do texto"
         aria-expanded={open}
@@ -61,15 +64,19 @@ export function FontScaleControl({
         <ALargeSmall className="h-4 w-4" />
       </button>
 
-      {open && (
+      {montado && (
         <div
           role="dialog"
           aria-label="Tamanho do texto"
+          onAnimationEnd={() => { if (!open) setMontado(false) }}
           className={cn(
-            'absolute z-[120] w-56 rounded-xl border bg-card p-3 shadow-xl',
-            'duration-150 animate-in fade-in',
-            openDir === 'up' ? 'bottom-full mb-2 slide-in-from-bottom-1' : 'top-full mt-2 slide-in-from-top-1',
+            'absolute z-[120] w-56 rounded-xl border bg-card p-3 shadow-xl duration-150',
+            openDir === 'up' ? 'bottom-full mb-2' : 'top-full mt-2',
             align === 'end' ? 'right-0' : align === 'start' ? 'left-0' : 'left-1/2 -translate-x-1/2',
+            // Entrada quando aberto, saída quando fechando (fica montado até a animação terminar).
+            open
+              ? cn('animate-in fade-in', openDir === 'up' ? 'slide-in-from-bottom-1' : 'slide-in-from-top-1')
+              : cn('animate-out fade-out', openDir === 'up' ? 'slide-out-to-bottom-1' : 'slide-out-to-top-1'),
           )}
         >
           <div className="mb-2 flex items-center justify-between">
