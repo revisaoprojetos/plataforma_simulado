@@ -7,7 +7,7 @@ import { atualizarBanco, criarPastaFolder } from '@/app/admin/banco-questoes/act
 import { BANCO_CORES } from '@/lib/banco-visual'
 import { Loader2, X, Check, Palette, ImagePlus, Trash2, RefreshCw, Crop } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ImageCropper } from '@/app/admin/simulados/criar/image-cropper'
+import { ImageCropper, type CropState } from '@/app/admin/simulados/criar/image-cropper'
 import { type CardView } from '@/lib/card-view'
 
 export type PastaPatch = { nome: string; cor: string | null; capa: string | null; capaLarga: string | null }
@@ -36,7 +36,12 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   const [capaLarga, setCapaLarga] = useState<string | null>(pasta?.capaLarga ?? null)
   const [salvando, setSalvando] = useState(false)
   // Editor de recorte (posição + zoom) na proporção certa, aberto ao escolher OU ao "Ajustar".
-  const [cropper, setCropper] = useState<{ file?: File; src?: string; alvo: 'card' | 'banner'; aspect: number; titulo: string } | null>(null)
+  const [cropper, setCropper] = useState<{ file?: File; src?: string; alvo: 'card' | 'banner'; aspect: number; titulo: string; zoom?: number; off?: { x: number; y: number } } | null>(null)
+  // Fonte ORIGINAL + estado do recorte por imagem — p/ REEDITAR de onde parou (re-recorta do original).
+  const origCard = useRef<File | string | null>(pasta?.capa ?? null)
+  const origBanner = useRef<File | string | null>(pasta?.capaLarga ?? null)
+  const cropCard = useRef<CropState | null>(null)
+  const cropBanner = useRef<CropState | null>(null)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -51,24 +56,28 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   // com o formato realmente exibido.
   const aspectDe = (alvo: 'card' | 'banner') => (cardView === 'ticket' ? 4 / 3 : alvo === 'banner' ? 16 / 4 : 4 / 5)
 
-  // Escolher um arquivo novo → abre o recorte na proporção do alvo.
+  // Escolher um arquivo novo → vira o original desta imagem, zera o estado e abre o recorte.
   function abrirCropper(f: File | null, alvo: 'card' | 'banner') {
     if (!f) return
     if (!f.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
+    if (alvo === 'card') { origCard.current = f; cropCard.current = null } else { origBanner.current = f; cropBanner.current = null }
     setCropper({ file: f, alvo, aspect: aspectDe(alvo), titulo: tituloCrop(alvo) })
   }
-  // "Ajustar" a imagem ATUAL (posição/zoom) sem trocar o arquivo.
+  // "Ajustar": reabre a partir do ORIGINAL + o zoom/posição salvos → continua de onde parou (sem perda).
   function ajustarAtual(alvo: 'card' | 'banner') {
-    const url = alvo === 'card' ? capaCard : capaLarga
-    if (!url) return
-    setCropper({ src: url, alvo, aspect: aspectDe(alvo), titulo: tituloCrop(alvo) })
+    const base = (alvo === 'card' ? origCard.current : origBanner.current) ?? (alvo === 'card' ? capaCard : capaLarga)
+    if (!base) return
+    const est = alvo === 'card' ? cropCard.current : cropBanner.current
+    const comum = { alvo, aspect: aspectDe(alvo), titulo: tituloCrop(alvo), zoom: est?.zoom, off: est?.offsetFrac }
+    if (base instanceof File) setCropper({ file: base, ...comum })
+    else setCropper({ src: base, ...comum })
   }
-  // Recorte enquadrado (base64) volta do editor → guarda no alvo certo.
-  function aplicarCrop(base64: string) {
+  // Recorte (base64) + estado voltam do editor → guarda o recorte e o estado; NÃO mexe no original.
+  function aplicarCrop(base64: string, state: CropState) {
     const alvo = cropper?.alvo
     setCropper(null)
-    if (alvo === 'card') setCapaCard(base64)
-    else if (alvo === 'banner') setCapaLarga(base64)
+    if (alvo === 'card') { setCapaCard(base64); cropCard.current = state }
+    else if (alvo === 'banner') { setCapaLarga(base64); cropBanner.current = state }
   }
 
   // capa_url = imagem LARGA; capa_card_url = CAPA do card (imagem inteira).
@@ -217,7 +226,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
         </div>
       </div>
 
-      {cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} onCancel={() => setCropper(null)} onConfirm={aplicarCrop} />}
+      {cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} initialZoom={cropper.zoom} initialOffsetFrac={cropper.off} onCancel={() => setCropper(null)} onConfirm={aplicarCrop} />}
     </div>,
     document.body,
   )

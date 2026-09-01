@@ -1,13 +1,14 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, ImagePlus, RefreshCw, Trash2, Check, Crop } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BANCO_CORES } from '@/lib/banco-visual'
-import { hospedarImagemCapa } from '../acoes'
+import { hospedarImagemCapa, cardViewAtual } from '../acoes'
 import { useCriar, useGuardStep } from '../criar-context'
 import { ImageCropper } from '../image-cropper'
+import type { CardView } from '@/lib/card-view'
 
 export default function PersonalizarPage() {
   useGuardStep(0)
@@ -17,6 +18,10 @@ export default function PersonalizarPage() {
   const [subBanner, setSubBanner] = useState(false)
   const [subCard, setSubCard] = useState(false)
   const [cropper, setCropper] = useState<{ file?: File; src?: string; alvo: 'banner' | 'card'; aspect: number; titulo: string } | null>(null)
+  // Estilo de card do console: em TICKET o recorte da capa é PAISAGEM (4:3), não o card 4:5.
+  const [cardView, setCardView] = useState<CardView>('poster')
+  useEffect(() => { cardViewAtual().then(setCardView).catch(() => {}) }, [])
+  const aspectDe = (alvo: 'banner' | 'card') => (cardView === 'ticket' ? 4 / 3 : alvo === 'banner' ? 16 / 4 : 4 / 5)
 
   const cor = draft.cor ?? '#6d28d9'
   const imgCard = draft.capaCardUrl ?? draft.capaUrl
@@ -25,7 +30,7 @@ export default function PersonalizarPage() {
   function abrirCropper(file: File | null, alvo: 'banner' | 'card') {
     if (!file) return
     if (!file.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
-    setCropper({ file, alvo, aspect: alvo === 'banner' ? 16 / 4 : 4 / 5, titulo: alvo === 'banner' ? 'Ajustar banner' : 'Ajustar card' })
+    setCropper({ file, alvo, aspect: aspectDe(alvo), titulo: alvo === 'banner' ? 'Ajustar banner' : 'Ajustar card' })
   }
 
   // Recebe o recorte já enquadrado (base64) → hospeda e guarda a URL.
@@ -50,7 +55,7 @@ export default function PersonalizarPage() {
   function ajustarAtual(alvo: 'banner' | 'card') {
     const url = alvo === 'banner' ? draft.capaUrl : draft.capaCardUrl
     if (!url) return
-    setCropper({ src: url, alvo, aspect: alvo === 'banner' ? 16 / 4 : 4 / 5, titulo: alvo === 'banner' ? 'Ajustar banner' : 'Ajustar card' })
+    setCropper({ src: url, alvo, aspect: aspectDe(alvo), titulo: alvo === 'banner' ? 'Ajustar banner' : 'Ajustar card' })
   }
 
   return (

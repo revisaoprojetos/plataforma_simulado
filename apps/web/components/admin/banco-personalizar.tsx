@@ -8,7 +8,7 @@ import { BANCO_CORES } from '@/lib/banco-visual'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, Check, ImagePlus, Trash2, RefreshCw, Palette, Crop } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ImageCropper } from '@/app/admin/simulados/criar/image-cropper'
+import { ImageCropper, type CropState } from '@/app/admin/simulados/criar/image-cropper'
 import { type CardView } from '@/lib/card-view'
 
 type Banco = { id: string; nome: string; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; total: number }
@@ -26,7 +26,13 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
   const [capaCard, setCapaCard] = useState<string | null>(banco.capa_card_url) // imagem do card (capa_card_url)
   const [salvando, setSalvando] = useState(false)
   // Editor de recorte (posição + zoom) na proporção certa — aberto ao escolher OU ao "Ajustar".
-  const [cropper, setCropper] = useState<{ file?: File; src?: string; alvo: 'card' | 'banner'; aspect: number; titulo: string } | null>(null)
+  const [cropper, setCropper] = useState<{ file?: File; src?: string; alvo: 'card' | 'banner'; aspect: number; titulo: string; zoom?: number; off?: { x: number; y: number } } | null>(null)
+  // Fonte ORIGINAL (não recortada) + estado do recorte por imagem — p/ REEDITAR de onde parou sem
+  // perda progressiva (cada ajuste re-recorta do original). Inicia com a imagem salva.
+  const origCard = useRef<File | string | null>(banco.capa_card_url)
+  const origBanner = useRef<File | string | null>(banco.capa_url)
+  const cropCard = useRef<CropState | null>(null)
+  const cropBanner = useRef<CropState | null>(null)
 
   const c = cor ?? '#6d28d9'
   // O card usa a imagem própria (capa_card_url); se vazia, cai para o banner (capa_url).
@@ -39,18 +45,25 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
   function abrirCropper(f: File | null, alvo: 'card' | 'banner') {
     if (!f) return
     if (!f.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
+    // Arquivo NOVO → vira o original desta imagem e zera o estado de recorte.
+    if (alvo === 'card') { origCard.current = f; cropCard.current = null } else { origBanner.current = f; cropBanner.current = null }
     setCropper({ file: f, alvo, aspect: aspectDe(alvo), titulo: tituloCrop(alvo) })
   }
   function ajustarAtual(alvo: 'card' | 'banner') {
-    const url = alvo === 'card' ? capaCard : capa
-    if (!url) return
-    setCropper({ src: url, alvo, aspect: aspectDe(alvo), titulo: tituloCrop(alvo) })
+    // Reabre a partir do ORIGINAL (não do recorte anterior) + o zoom/posição salvos → continua de onde parou.
+    const base = (alvo === 'card' ? origCard.current : origBanner.current) ?? (alvo === 'card' ? capaCard : capa)
+    if (!base) return
+    const est = alvo === 'card' ? cropCard.current : cropBanner.current
+    const comum = { alvo, aspect: aspectDe(alvo), titulo: tituloCrop(alvo), zoom: est?.zoom, off: est?.offsetFrac }
+    if (base instanceof File) setCropper({ file: base, ...comum })
+    else setCropper({ src: base, ...comum })
   }
-  function aplicarCrop(base64: string) {
+  function aplicarCrop(base64: string, state: CropState) {
     const alvo = cropper?.alvo
     setCropper(null)
-    if (alvo === 'card') setCapaCard(base64)
-    else if (alvo === 'banner') setCapa(base64)
+    // Guarda o recorte (p/ exibir/salvar) + o estado (p/ reeditar); NÃO mexe no original.
+    if (alvo === 'card') { setCapaCard(base64); cropCard.current = state }
+    else if (alvo === 'banner') { setCapa(base64); cropBanner.current = state }
   }
 
   async function salvar() {
@@ -191,7 +204,7 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
         )}
       </div>
 
-      {cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} onCancel={() => setCropper(null)} onConfirm={aplicarCrop} />}
+      {cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} initialZoom={cropper.zoom} initialOffsetFrac={cropper.off} onCancel={() => setCropper(null)} onConfirm={aplicarCrop} />}
     </div>
   )
 }

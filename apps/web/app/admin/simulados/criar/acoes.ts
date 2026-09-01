@@ -4,12 +4,20 @@
 // e enxuto de propósito: as páginas do fluxo importam daqui em vez do simulados/actions.ts
 // gigante — assim o Next não compila todo aquele grafo ao abrir a 1ª etapa (dev mais rápido).
 import { createAdminClient } from '@/lib/supabase/server'
-import { getCurrentTenantId } from '@/lib/tenant'
+import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { selecionarGrupos, contarMembrosGrupos } from '@/lib/simulado/grupos'
 import { ehPastaBanco } from '@/lib/simulado/pasta-area'
+import { resolverCardView, type CardView } from '@/lib/card-view'
+
+/** Estilo de card do admin (tema.card_view_admin, fallback card_view) — p/ o recorte da capa na
+ *  criação seguir o formato ativo (ticket = paisagem, não o card 4:5). */
+export async function cardViewAtual(): Promise<CardView> {
+  const tema = ((await getCurrentTenant())?.tema as any) ?? {}
+  return resolverCardView(tema.card_view_admin ?? tema.card_view)
+}
 
 /** Hospeda uma imagem (base64) e devolve a URL — usado na etapa Personalizar (upload na hora). */
 export async function hospedarImagemCapa(base64: string): Promise<{ ok: boolean; url?: string; error?: string }> {

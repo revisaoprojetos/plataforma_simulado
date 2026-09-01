@@ -10,19 +10,24 @@ import { cn } from '@/lib/utils'
 // (banner/card), então "o que você vê é o que aparece". Ao aplicar, o recorte é RASTERIZADO num
 // canvas na proporção alvo e devolvido como base64 (WebP/JPEG) — já enquadrado para o upload.
 // Aceita um arquivo novo (`file`) OU a imagem já enviada (`src`, URL) para reajustar.
-export function ImageCropper({ file, src, aspect, titulo, onCancel, onConfirm }: {
+export type CropState = { zoom: number; offsetFrac: { x: number; y: number } }
+
+export function ImageCropper({ file, src, aspect, titulo, initialZoom, initialOffsetFrac, onCancel, onConfirm }: {
   file?: File
   src?: string
   aspect: number // largura / altura (banner ~4, card 0.8)
   titulo?: string
+  /** Estado inicial p/ REEDITAR de onde parou: zoom + deslocamento NORMALIZADO (-1..1 do máximo). */
+  initialZoom?: number
+  initialOffsetFrac?: { x: number; y: number }
   onCancel: () => void
-  onConfirm: (base64: string) => void
+  onConfirm: (base64: string, state: CropState) => void
 }) {
   const frameRef = useRef<HTMLDivElement>(null)
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null)
   const [displaySrc, setDisplaySrc] = useState('')
   const [img, setImg] = useState<HTMLImageElement | null>(null)
-  const [zoom, setZoom] = useState(1)
+  const [zoom, setZoom] = useState(initialZoom ?? 1)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [frame, setFrame] = useState({ w: 0, h: 0 })
   const [salvando, setSalvando] = useState(false)
@@ -60,6 +65,16 @@ export function ImageCropper({ file, src, aspect, titulo, onCancel, onConfirm }:
 
   useEffect(() => { setOffset((o) => clamp(o)) /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [zoom, frame.w, frame.h, img])
 
+  // Reabrir "de onde parou": aplica UMA vez o deslocamento salvo (normalizado) assim que a imagem e o
+  // quadro foram medidos (maxX/maxY já conhecidos). O zoom já entra pelo estado inicial.
+  const iniAplicado = useRef(false)
+  useEffect(() => {
+    if (iniAplicado.current || !img || !frame.w) return
+    if (initialOffsetFrac) setOffset(clamp({ x: initialOffsetFrac.x * maxX, y: initialOffsetFrac.y * maxY }))
+    iniAplicado.current = true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [img, frame.w, maxX, maxY])
+
   function onDown(e: React.PointerEvent) { drag.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y }; try { (e.target as HTMLElement).setPointerCapture(e.pointerId) } catch { /* ok */ } }
   function onMove(e: React.PointerEvent) { if (!drag.current) return; setOffset(clamp({ x: drag.current.ox + (e.clientX - drag.current.x), y: drag.current.oy + (e.clientY - drag.current.y) })) }
   function onUp() { drag.current = null }
@@ -92,7 +107,8 @@ export function ImageCropper({ file, src, aspect, titulo, onCancel, onConfirm }:
         toast.error('Não foi possível reajustar esta imagem. Use "Trocar" e envie o arquivo de novo.')
         return
       }
-      onConfirm(out)
+      const offsetFrac = { x: maxX ? offset.x / maxX : 0, y: maxY ? offset.y / maxY : 0 }
+      onConfirm(out, { zoom, offsetFrac })
     } finally {
       setSalvando(false)
     }
