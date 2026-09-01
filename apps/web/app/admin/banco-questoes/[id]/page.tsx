@@ -2,7 +2,8 @@ import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getCurrentTenantId } from '@/lib/tenant'
+import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
+import { resolverCardView } from '@/lib/card-view'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
@@ -45,6 +46,9 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
   const svc = createAdminClient()
 
   const tidB = tenantId ?? '00000000-0000-0000-0000-000000000000'
+  // Estilo do card (admin usa card_view_admin, fallback card_view) — a prévia da personalização o espelha.
+  const temaAdmin = ((await getCurrentTenant())?.tema as any) ?? {}
+  const cardView = resolverCardView(temaAdmin.card_view_admin ?? temaAdmin.card_view)
 
   // Batch inicial: banco (colunas de personalização tolerantes), vínculos de questões, ordem manual,
   // grupos de disciplinas e disciplinas do filtro — tudo depende só de (id, tenant), então roda em
@@ -302,7 +306,7 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
         </TabsContent>
 
         <TabsContent value="personalizar">
-          <BancoPersonalizar banco={{ id: banco.id, nome: banco.nome, cor: banco.cor ?? null, icone: banco.icone ?? null, capa_url: banco.capa_url ?? null, capa_card_url: banco.capa_card_url ?? null, total: questoes.length }} />
+          <BancoPersonalizar banco={{ id: banco.id, nome: banco.nome, cor: banco.cor ?? null, icone: banco.icone ?? null, capa_url: banco.capa_url ?? null, capa_card_url: banco.capa_card_url ?? null, total: questoes.length }} cardView={cardView} />
         </TabsContent>
       </BancoTabsShell>
     </div>
