@@ -180,6 +180,78 @@ export async function buscarConjuntosParaCompor(
   return { ok: true, itens }
 }
 
+// ── Carregar conteúdos p/ o MONTADOR (sequência de aulas + conteúdo/links por tipo) ──
+export type AulaConteudoBanco = {
+  /** Chave normalizada da aula ("1","2","1.1"…) — casa "01" com "1" (R11). */
+  chave: string
+  tipo: string
+  /** A aula EXATA como está no banco ("01" na lição, "1" na resolução…). */
+  aulaReal: string
+  conteudo: string | null
+  tema: string | null
+  /** slug da plataforma → url. */
+  urls: Record<string, string>
+}
+export type ConteudoBanco = { id: string; disciplina: string; disciplina_id: string | null; nome: string; aulas: AulaConteudoBanco[] }
+
+const chaveAulaSrv = (a: string | null) => {
+  const t = (a ?? '').trim()
+  if (!t) return ''
+  return /^\d+$/.test(t) ? String(Number(t)) : t.toLowerCase()
+}
+
+/** Dados completos dos conjuntos escolhidos, prontos para o montador. */
+export async function buscarConteudosParaMontar(conjuntoIds: string[]): Promise<{ ok: boolean; conteudos?: ConteudoBanco[]; error?: string }> {
+  const g = await guard('cronogramas:view')
+  if (!g.ok) return { ok: false, error: g.error }
+  if (!conjuntoIds.length) return { ok: true, conteudos: [] }
+  const svc = createAdminClient()
+
+  const conjuntos = await fetchAllByIn<any>(conjuntoIds, (chunk) =>
+    svc.from('simulado_cronograma_conjuntos').select('id, nome, disciplina, disciplina_id').eq('tenant_id', g.tenantId).eq('deletado', false).in('id', chunk).order('id') as any,
+  )
+  const aulas = await fetchAllByIn<any>(conjuntoIds, (chunk) =>
+    svc.from('simulado_cronograma_conjunto_aulas').select('id, conjunto_id, tipo, aula, conteudo, tema, ordem').eq('tenant_id', g.tenantId).in('conjunto_id', chunk).order('ordem').order('id') as any,
+  )
+  const aulaIds = aulas.map((a) => a.id)
+  const urlsPorAula = new Map<string, Record<string, string>>()
+  if (aulaIds.length) {
+    const { data: plats } = await svc.from('simulado_cronograma_plataformas').select('id, slug').eq('tenant_id', g.tenantId)
+    const slugDe = new Map<string, string>((plats ?? []).map((p: any) => [p.id, p.slug]))
+    const urls = await fetchAllByIn<any>(aulaIds, (chunk) => svc.from('simulado_cronograma_conjunto_aula_urls').select('aula_id, plataforma_id, url').eq('tenant_id', g.tenantId).in('aula_id', chunk).order('id') as any)
+    for (const u of urls) {
+      const slug = slugDe.get(u.plataforma_id)
+      if (!slug) continue
+      const m = urlsPorAula.get(u.aula_id) ?? {}
+      m[slug] = u.url
+      urlsPorAula.set(u.aula_id, m)
+    }
+  }
+
+  const aulasPorConjunto = new Map<string, any[]>()
+  for (const a of aulas) {
+    const l = aulasPorConjunto.get(a.conjunto_id) ?? []
+    l.push(a)
+    aulasPorConjunto.set(a.conjunto_id, l)
+  }
+
+  const conteudos: ConteudoBanco[] = conjuntos.map((c) => ({
+    id: c.id,
+    disciplina: c.disciplina,
+    disciplina_id: c.disciplina_id ?? null,
+    nome: c.nome,
+    aulas: (aulasPorConjunto.get(c.id) ?? []).map((a) => ({
+      chave: chaveAulaSrv(a.aula),
+      tipo: a.tipo,
+      aulaReal: (a.aula ?? '').trim(),
+      conteudo: a.conteudo ?? null,
+      tema: a.tema ?? null,
+      urls: urlsPorAula.get(a.id) ?? {},
+    })),
+  }))
+  return { ok: true, conteudos }
+}
+
 // ── Conjuntos (CRUD) ─────────────────────────────────────────────────────────
 export async function criarConjunto(entrada: {
   nome: string

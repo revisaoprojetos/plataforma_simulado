@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useCriar } from './criar-context'
 import { SecaoPersonalizar } from './secao-personalizar'
 import { SecaoEstrutura } from './secao-estrutura'
+import { SecaoMontagem } from './secao-montagem'
 import { SecaoMetas } from './secao-metas'
 import { SecaoLinks } from './secao-links'
 import { SecaoAcessos } from './secao-acessos'
@@ -79,6 +80,7 @@ export default function CriarCronogramaPage() {
 
       <SecaoPersonalizar />
       <SecaoEstrutura />
+      <SecaoMontagem />
       <SecaoMetas />
       <SecaoLinks />
       <SecaoAcessos />

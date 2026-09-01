@@ -156,9 +156,9 @@ export function SecaoMetas() {
 
   return (
     <Secao
-      numero={3}
-      titulo="Metas & Conteúdos"
-      descricao="Monte a semana-modelo e use “Repetir semana” para levar o padrão adiante (a aula avança sozinha). Opcional — dá para montar depois no editor."
+      numero={4}
+      titulo="Ajuste fino das metas"
+      descricao="Opcional. A Montagem por conteúdos acima já preenche tudo — aqui você revisa semana a semana, corrige ou adiciona metas avulsas. “Repetir semana” leva um padrão adiante (a aula avança sozinha)."
     >
       <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
         {/* Régua de semanas */}

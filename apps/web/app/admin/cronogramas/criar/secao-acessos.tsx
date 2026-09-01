@@ -24,7 +24,7 @@ export function SecaoAcessos() {
   }
 
   return (
-    <Secao numero={5} titulo="Acessos" descricao="Grupos de acesso que recebem o cronograma — é por eles que o aluno recebe. Opcional; dá para vincular depois.">
+    <Secao numero={6} titulo="Acessos" descricao="Grupos de acesso que recebem o cronograma — é por eles que o aluno recebe. Opcional; dá para vincular depois.">
       {carregando ? (
         <p className="flex items-center gap-2 rounded-2xl border bg-card p-4 text-sm text-muted-foreground shadow-sm">
           <Loader2 className="h-4 w-4 animate-spin" /> Carregando grupos de acesso…
