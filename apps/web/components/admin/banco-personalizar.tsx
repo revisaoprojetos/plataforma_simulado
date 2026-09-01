@@ -1,9 +1,10 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { atualizarBanco } from '@/app/admin/banco-questoes/actions'
+import { atualizarBanco, lerCapaMeta } from '@/app/admin/banco-questoes/actions'
+import { type CapaMetaIn } from '@/lib/capa-meta'
 import { BANCO_CORES } from '@/lib/banco-visual'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, Check, ImagePlus, Trash2, RefreshCw, Palette, Crop } from 'lucide-react'
@@ -12,6 +13,23 @@ import { ImageCropper, type CropState } from '@/app/admin/simulados/criar/image-
 import { type CardView } from '@/lib/card-view'
 
 type Banco = { id: string; nome: string; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; total: number }
+
+/** Redimensiona a imagem ORIGINAL (a guardar p/ reeditar) em WebP q0.92 até `max` px. */
+async function redimensionar(file: File, max = 2400): Promise<string> {
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale)
+  const ctx = canvas.getContext('2d'); if (!ctx) throw new Error('canvas')
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  const webp = canvas.toDataURL('image/webp', 0.92)
+  return webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', 0.92)
+}
+async function origParaMeta(o: File | string | null): Promise<string | null> {
+  if (o instanceof File) return redimensionar(o)
+  return o ?? null
+}
 
 /** Aba "Personalizar" de um banco: nome, cor e duas imagens — a CAPA/banner (capa_url, horizontal) e a
  * imagem do CARD (capa_card_url). Cada uma tem "Ajustar" (arraste + zoom). A PRÉVIA e o aspecto do
@@ -33,6 +51,15 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
   const origBanner = useRef<File | string | null>(banco.capa_url)
   const cropCard = useRef<CropState | null>(null)
   const cropBanner = useRef<CropState | null>(null)
+
+  // Carrega o recorte salvo (imagem ORIGINAL + zoom/posição) → o "Ajustar" reabre de onde parou.
+  useEffect(() => {
+    lerCapaMeta(banco.id).then((meta) => {
+      if (meta?.card) { if (meta.card.orig) origCard.current = meta.card.orig; if (meta.card.crop) cropCard.current = meta.card.crop as CropState }
+      if (meta?.banner) { if (meta.banner.orig) origBanner.current = meta.banner.orig; if (meta.banner.crop) cropBanner.current = meta.banner.crop as CropState }
+    }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [banco.id])
 
   const c = cor ?? '#6d28d9'
   // O card usa a imagem própria (capa_card_url); se vazia, cai para o banner (capa_url).
@@ -66,10 +93,17 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
     else if (alvo === 'banner') { setCapa(base64); cropBanner.current = state }
   }
 
+  // Monta o capa_meta (ORIGINAL + params) p/ reeditar depois. `capa` = banner, `capaCard` = card.
+  async function montarMeta(): Promise<CapaMetaIn> {
+    const card = capaCard ? { orig: await origParaMeta(origCard.current), crop: cropCard.current } : null
+    const banner = capa ? { orig: await origParaMeta(origBanner.current), crop: cropBanner.current } : null
+    return { card, banner }
+  }
+
   async function salvar() {
     if (!nome.trim()) { toast.error('Informe um nome.'); return }
     setSalvando(true)
-    const r = await atualizarBanco(banco.id, nome, cor, null, capa, capaCard)
+    const r = await atualizarBanco(banco.id, nome, cor, null, capa, capaCard, await montarMeta())
     setSalvando(false)
     if (r.ok) { toast.success('Personalização salva'); router.refresh() } else toast.error(r.error ?? 'Erro ao salvar')
   }

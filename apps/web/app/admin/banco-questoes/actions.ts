@@ -1,5 +1,6 @@
 'use server'
 
+import type { CapaMetaIn } from '@/lib/capa-meta'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetch-all'
@@ -150,8 +151,9 @@ export async function renomearBanco(id: string, nome: string): Promise<{ ok: boo
   return { ok: true }
 }
 
-/** Atualiza nome + personalização (cor/ícone/capa + imagem do card) de um banco. Tolerante caso as colunas não existam. */
-export async function atualizarBanco(id: string, nome: string, cor: string | null, icone: string | null, capaUrl?: string | null, capaCardUrl?: string | null): Promise<{ ok: boolean; error?: string }> {
+/** Atualiza nome + personalização (cor/ícone/capa + imagem do card) de um banco. Tolerante caso as colunas não existam.
+ *  `capaMeta` (opcional): quando definido, guarda a original + params do recorte (undefined = não mexe). */
+export async function atualizarBanco(id: string, nome: string, cor: string | null, icone: string | null, capaUrl?: string | null, capaCardUrl?: string | null, capaMeta?: CapaMetaIn): Promise<{ ok: boolean; error?: string }> {
   const g = await guard()
   if (!g.ok) return g
   const titulo = nome.trim()
@@ -161,10 +163,24 @@ export async function atualizarBanco(id: string, nome: string, cor: string | nul
   // Capas vêm como base64 (redimensionar → toDataURL) → storage; grava só a URL (não infla a linha).
   const capa = capaUrl ? (await hospedarBase64(capaUrl, svc)) : null
   const capaCard = capaCardUrl ? (await hospedarBase64(capaCardUrl, svc)) : null
+  // Monta o capa_meta a guardar: sobe originais base64 (URL existente passa direto).
+  const subirOrig = async (o?: string | null) => (o && o.startsWith('data:')) ? (await hospedarBase64(o, svc)) : (o ?? null)
+  let capaMetaOut: Record<string, unknown> | null = null
+  if (capaMeta) {
+    capaMetaOut = {}
+    if (capaMeta.card) capaMetaOut.card = { orig: await subirOrig(capaMeta.card.orig), crop: capaMeta.card.crop ?? null }
+    if (capaMeta.banner) capaMetaOut.banner = { orig: await subirOrig(capaMeta.banner.orig), crop: capaMeta.banner.crop ?? null }
+  }
   const upd = (patch: Record<string, unknown>) => svc.from('simulado_pastas').update(patch).eq('id', id).eq('tenant_id', g.tenantId)
-  const completo = { nome: titulo, cor: cor || null, icone: icone || null, capa_url: capa || null, capa_card_url: capaCard || null }
+  const completo: Record<string, unknown> = { nome: titulo, cor: cor || null, icone: icone || null, capa_url: capa || null, capa_card_url: capaCard || null }
+  if (capaMeta !== undefined) completo.capa_meta = capaMetaOut
 
   let { error } = await upd(completo)
+  // Fallback 0: coluna capa_meta ainda não migrada → salva o resto (recorte volta a ser destrutivo).
+  if (error && /capa_meta/i.test(error.message)) {
+    const { capa_meta, ...semMeta } = completo
+    ;({ error } = await upd(semMeta))
+  }
   // Fallback 1: coluna capa_card_url ainda não migrada → salva o resto (cor/ícone/capa preservados).
   if (error && /capa_card_url/i.test(error.message)) {
     const { capa_card_url, ...semCard } = completo
@@ -180,6 +196,17 @@ export async function atualizarBanco(id: string, nome: string, cor: string | nul
   revalidatePath('/admin/banco-questoes')
   revalidatePath(`/admin/banco-questoes/${id}`)
   return { ok: true }
+}
+
+/** Lê o capa_meta (original + params de recorte) de uma pasta/banco — p/ o "Ajustar" reabrir de onde parou. */
+export async function lerCapaMeta(id: string): Promise<CapaMetaIn> {
+  const g = await guard()
+  if (!g.ok) return null
+  const svc = createAdminClient()
+  try {
+    const { data } = await svc.from('simulado_pastas').select('capa_meta').eq('id', id).eq('tenant_id', g.tenantId).maybeSingle()
+    return ((data as any)?.capa_meta ?? null) as CapaMetaIn
+  } catch { return null }
 }
 
 /**
@@ -701,26 +728,43 @@ async function resolveEtiqueta(svc: ReturnType<typeof createAdminClient>, tenant
 }
 
 /**
- * Reimport de uma questão que JÁ EXISTE: atualiza os comentários vindos da planilha
- * (Comentário completo → comentario_professor; Comentário/Lei A–E → alternativas por ordem).
- * Só grava o que veio PREENCHIDO — célula vazia não apaga o que já existe.
+ * Reimport de uma questão que JÁ EXISTE (casada por enunciado): atualiza os campos vindos da planilha,
+ * SEM tocar no GABARITO (alternativa `correta`) — mexer no gabarito de questão já respondida mudaria a
+ * pontuação sem re-correção. Atualiza: metadados (banca/órgão/disciplina/assunto/ano/dificuldade),
+ * comentário do professor e, por alternativa casada por ordem (A–E), o TEXTO + comentário + lei.
+ * Só grava o que veio PREENCHIDO — célula vazia NÃO apaga o que já existe.
  */
-async function atualizarComentariosExistente(
+async function atualizarQuestaoExistente(
   svc: ReturnType<typeof createAdminClient>,
   tenantId: string,
   questaoId: string,
   q: QuestaoImport,
 ) {
   const tem = (s?: string | null) => typeof s === 'string' && s.trim().length > 0
-  if (tem(q.comentario_professor)) {
-    await svc.from('simulado_questoes').update({ comentario_professor: q.comentario_professor }).eq('id', questaoId).eq('tenant_id', tenantId)
-  }
+
+  // Metadados: resolve/cria a taxonomia só p/ campos PREENCHIDOS (célula vazia não sobrescreve).
+  const patchQ: Record<string, unknown> = {}
+  const banca_id = await resolveNome(svc, 'simulado_bancas', tenantId, q.banca)
+  if (banca_id) patchQ.banca_id = banca_id
+  const orgao_id = await resolveNome(svc, 'simulado_orgaos', tenantId, q.orgao)
+  if (orgao_id) patchQ.orgao_id = orgao_id
+  const disciplina_id = await resolveNome(svc, 'simulado_disciplinas', tenantId, q.disciplina)
+  if (disciplina_id) patchQ.disciplina_id = disciplina_id
+  const assunto_id = await resolveAssunto(svc, tenantId, q.assunto, disciplina_id)
+  if (assunto_id) patchQ.assunto_id = assunto_id
+  if (q.ano != null) patchQ.ano = q.ano
+  if (tem(q.nivel_dificuldade)) patchQ.nivel_dificuldade = q.nivel_dificuldade
+  if (tem(q.comentario_professor)) patchQ.comentario_professor = q.comentario_professor
+  if (Object.keys(patchQ).length) await svc.from('simulado_questoes').update(patchQ).eq('id', questaoId).eq('tenant_id', tenantId)
+
+  // Alternativas: TEXTO + comentário + lei, casadas por ordem (A–E). NUNCA toca em `correta` (gabarito).
   for (const a of q.alternativas ?? []) {
     const patch: Record<string, unknown> = {}
+    if (tem(a.texto)) patch.texto = a.texto
     if (tem(a.comentario)) patch.comentario = a.comentario
     if (tem(a.lei)) patch.lei = a.lei
     if (!Object.keys(patch).length) continue
-    // Casa por ordem (A–E). Tolerante às colunas comentario/lei que podem não existir.
+    // Casa por ordem. Tolerante às colunas comentario/lei que podem não existir em bases antigas.
     const r = await svc.from('simulado_alternativas').update(patch).eq('questao_id', questaoId).eq('tenant_id', tenantId).eq('ordem', a.ordem)
     if (r.error) {
       const p2 = { ...patch }
@@ -812,8 +856,8 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
       // Re-import marcando ANULADA atualiza a questão existente no banco (para propagar depois).
       if (q.anulada) { anuladaIds.add(q.questaoIdExistente); await svc.from('simulado_questoes').update({ anulada: true }).eq('id', q.questaoIdExistente).eq('tenant_id', g.tenantId) }
       await vincularEtiquetas(q.questaoIdExistente, q.etiquetas) // aplica as etiquetas na questão já existente também
-      // Enriquecer comentários (completo + por alternativa) da questão já existente com o que veio na planilha.
-      await atualizarComentariosExistente(svc, g.tenantId, q.questaoIdExistente, q)
+      // Reimport atualiza a questão existente: metadados + texto/comentário/lei das alternativas (NÃO o gabarito).
+      await atualizarQuestaoExistente(svc, g.tenantId, q.questaoIdExistente, q)
       continue
     }
 

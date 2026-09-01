@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { atualizarBanco, criarPastaFolder } from '@/app/admin/banco-questoes/actions'
+import { atualizarBanco, criarPastaFolder, lerCapaMeta } from '@/app/admin/banco-questoes/actions'
+import { type CapaMetaIn } from '@/lib/capa-meta'
 import { BANCO_CORES } from '@/lib/banco-visual'
 import { Loader2, X, Check, Palette, ImagePlus, Trash2, RefreshCw, Crop } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -11,6 +12,24 @@ import { ImageCropper, type CropState } from '@/app/admin/simulados/criar/image-
 import { type CardView } from '@/lib/card-view'
 
 export type PastaPatch = { nome: string; cor: string | null; capa: string | null; capaLarga: string | null }
+
+/** Redimensiona a imagem ORIGINAL (a guardar p/ reeditar) em WebP q0.92 até `max` px. */
+async function redimensionar(file: File, max = 2400): Promise<string> {
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale)
+  const ctx = canvas.getContext('2d'); if (!ctx) throw new Error('canvas')
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  const webp = canvas.toDataURL('image/webp', 0.92)
+  return webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', 0.92)
+}
+/** ORIGINAL (File novo → base64 redimensionado; URL existente passa direto) p/ o capa_meta. */
+async function origParaMeta(o: File | string | null): Promise<string | null> {
+  if (o instanceof File) return redimensionar(o)
+  return o ?? null
+}
 
 /** Personaliza uma PASTA (folder) de bancos: nome, cor e DUAS imagens — a CAPA (imagem inteira,
  * usada no card pôster = capa_card_url) e a IMAGEM LARGA (banner usado na trilha e no card ticket =
@@ -49,6 +68,16 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Carrega o recorte salvo (imagem ORIGINAL + zoom/posição) → o "Ajustar" reabre de onde parou.
+  useEffect(() => {
+    if (!pasta?.id) return
+    lerCapaMeta(pasta.id).then((meta) => {
+      if (meta?.card) { if (meta.card.orig) origCard.current = meta.card.orig; if (meta.card.crop) cropCard.current = meta.card.crop as CropState }
+      if (meta?.banner) { if (meta.banner.orig) origBanner.current = meta.banner.orig; if (meta.banner.crop) cropBanner.current = meta.banner.crop as CropState }
+    }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pasta?.id])
+
   const c = cor ?? '#6d28d9'
   const tituloCrop = (alvo: 'card' | 'banner') => (alvo === 'banner' ? 'Ajustar imagem larga' : 'Ajustar capa do card')
   // O recorte segue o CARD VIEW ATIVO: em TICKET tudo é PAISAGEM (4:3, como o card ticket exibe a
@@ -80,18 +109,26 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
     else if (alvo === 'banner') { setCapaLarga(base64); cropBanner.current = state }
   }
 
+  // Monta o capa_meta (ORIGINAL + params de recorte) p/ reeditar depois. Só inclui a imagem que existe.
+  async function montarMeta(): Promise<CapaMetaIn> {
+    const card = capaCard ? { orig: await origParaMeta(origCard.current), crop: cropCard.current } : null
+    const banner = capaLarga ? { orig: await origParaMeta(origBanner.current), crop: cropBanner.current } : null
+    return { card, banner }
+  }
+
   // capa_url = imagem LARGA; capa_card_url = CAPA do card (imagem inteira).
   async function salvar() {
     if (!nome.trim()) { toast.error('Informe um nome.'); return }
     setSalvando(true)
+    const meta = await montarMeta()
     if (criar) {
       const r = await criarPastaFolder(nome.trim(), paiId, area)
       if (!r.ok || !r.id) { setSalvando(false); toast.error(r.error ?? 'Erro ao criar'); return }
-      await atualizarBanco(r.id, nome.trim(), cor, null, capaLarga, capaCard)
+      await atualizarBanco(r.id, nome.trim(), cor, null, capaLarga, capaCard, meta)
       setSalvando(false)
       toast.success(paiId ? 'Subpasta criada' : 'Pasta criada'); onSaved(); onClose()
     } else {
-      const r = await atualizarBanco(pasta!.id!, nome.trim(), cor, null, capaLarga, capaCard)
+      const r = await atualizarBanco(pasta!.id!, nome.trim(), cor, null, capaLarga, capaCard, meta)
       setSalvando(false)
       if (r.ok) { toast.success('Pasta atualizada'); onSaved({ nome: nome.trim(), cor, capa: capaCard, capaLarga }); onClose() }
       else toast.error(r.error ?? 'Erro ao salvar')
