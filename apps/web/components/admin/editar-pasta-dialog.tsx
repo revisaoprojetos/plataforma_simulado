@@ -46,10 +46,10 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
 
   const c = cor ?? '#6d28d9'
   const tituloCrop = (alvo: 'card' | 'banner') => (alvo === 'banner' ? 'Ajustar imagem larga' : 'Ajustar capa do card')
-  // Proporção do recorte: a imagem larga é sempre 16:4; a CAPA segue o CARD VIEW — ticket = PAISAGEM
-  // (4:3, como o card ticket mostra a imagem deitada) e pôster = 4:5. Assim o "Ajustar" bate com o
-  // formato realmente exibido, em vez de sempre abrir no 4:5.
-  const aspectDe = (alvo: 'card' | 'banner') => (alvo === 'banner' ? 16 / 4 : cardView === 'ticket' ? 4 / 3 : 4 / 5)
+  // O recorte segue o CARD VIEW ATIVO: em TICKET tudo é PAISAGEM (4:3, como o card ticket exibe a
+  // imagem deitada); em PÔSTER a imagem larga fica 16:4 e a capa do card 4:5. Assim o "Ajustar" bate
+  // com o formato realmente exibido.
+  const aspectDe = (alvo: 'card' | 'banner') => (cardView === 'ticket' ? 4 / 3 : alvo === 'banner' ? 16 / 4 : 4 / 5)
 
   // Escolher um arquivo novo → abre o recorte na proporção do alvo.
   function abrirCropper(f: File | null, alvo: 'card' | 'banner') {

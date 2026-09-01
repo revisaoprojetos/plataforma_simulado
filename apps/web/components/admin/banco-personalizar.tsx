@@ -32,8 +32,9 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
   // O card usa a imagem própria (capa_card_url); se vazia, cai para o banner (capa_url).
   const imgCard = capaCard ?? capa
   const tituloCrop = (alvo: 'card' | 'banner') => (alvo === 'banner' ? 'Ajustar imagem de capa' : 'Ajustar imagem do card')
-  // Banner sempre 16:4; a imagem do card segue o CARD VIEW — ticket = PAISAGEM (4:3, deitada) e pôster = 4:5.
-  const aspectDe = (alvo: 'card' | 'banner') => (alvo === 'banner' ? 16 / 4 : cardView === 'ticket' ? 4 / 3 : 4 / 5)
+  // O recorte segue o CARD VIEW ATIVO: em TICKET tudo é PAISAGEM (4:3, deitado, como o card ticket
+  // exibe a imagem); em PÔSTER o banner fica largo (16:4) e a imagem do card 4:5.
+  const aspectDe = (alvo: 'card' | 'banner') => (cardView === 'ticket' ? 4 / 3 : alvo === 'banner' ? 16 / 4 : 4 / 5)
 
   function abrirCropper(f: File | null, alvo: 'card' | 'banner') {
     if (!f) return
