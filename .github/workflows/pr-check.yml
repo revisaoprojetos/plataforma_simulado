@@ -46,3 +46,5 @@ jobs:
           NEXT_PUBLIC_APP_URL: https://simulado.revisaopge.com.br
           NEXT_PUBLIC_COOKIE_DOMAIN: ${{ secrets.NEXT_PUBLIC_COOKIE_DOMAIN || '.revisaopge.com.br' }}
           NEXT_PUBLIC_CRONOGRAMA_ATIVO: 'true'
+          NEXT_PUBLIC_LEITURA_ATIVA: 'true'
+          NEXT_PUBLIC_MODELOS_CADERNO_ATIVO: 'true'
