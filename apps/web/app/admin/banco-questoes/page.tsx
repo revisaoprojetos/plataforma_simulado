@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getCurrentTenantId } from '@/lib/tenant'
+import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
+import { resolverCardView } from '@/lib/card-view'
 import { NovoBancoForm } from '@/components/admin/novo-banco-form'
 import { BancosGrid } from '@/components/admin/bancos-grid'
 import { ehPastaBanco } from '@/lib/simulado/pasta-area'
@@ -84,6 +85,10 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
   const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), capaLarga: f.capa_url ?? null, count: bancosPorPasta.get(f.id) ?? 0, subpastas: subpastasPorPasta.get(f.id) ?? 0 }))
   // Destinos de "mover banco": todas as pastas, exceto a atual (não faz sentido mover p/ onde já está).
   const destinos = folders.filter((f) => f.id !== current?.id).map((f) => ({ id: f.id, nome: f.nome }))
+  // Estilo dos cards (admin usa card_view_admin, fallback card_view). Lido do getCurrentTenant
+  // (createAdminClient, sem RLS) — a mesma fonte do tema visual.
+  const temaCards = ((await getCurrentTenant())?.tema as any) ?? {}
+  const cardView = resolverCardView(temaCards.card_view_admin ?? temaCards.card_view)
 
   return (
     <div className="space-y-6">
@@ -105,7 +110,7 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
         <NovoBancoForm pastaId={current?.id ?? null} />
       </div>
 
-      <BancosGrid bancos={bancosOut} folders={foldersOut} destinos={destinos} atual={current ? { id: current.id, nome: current.nome } : null} trilha={trilha} />
+      <BancosGrid bancos={bancosOut} folders={foldersOut} destinos={destinos} atual={current ? { id: current.id, nome: current.nome } : null} trilha={trilha} cardView={cardView} />
     </div>
   )
 }

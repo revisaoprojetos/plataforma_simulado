@@ -13,6 +13,7 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { moverBancoParaPasta, excluirPastaFolder, duplicarPastaFolder } from '@/app/admin/banco-questoes/actions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import type { CardView } from '@/lib/card-view'
 import { Database, Search, FolderPlus, Folder, FolderOpen, ChevronRight, MoreVertical, Trash2, X, Check, Loader2, FolderInput, Palette, Copy } from 'lucide-react'
 
 type Banco = { id: string; nome: string; total: number; estudantes?: number; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null }
@@ -20,9 +21,11 @@ type Pasta = { id: string; nome: string; cor?: string | null; icone?: string | n
 type Destino = { id: string; nome: string }
 type Trilha = { id: string; nome: string }
 
-export function BancosGrid({ bancos, folders = [], destinos = [], atual = null, trilha = [] }: {
-  bancos: Banco[]; folders?: Pasta[]; destinos?: Destino[]; atual?: { id: string; nome: string } | null; trilha?: Trilha[]
+export function BancosGrid({ bancos, folders = [], destinos = [], atual = null, trilha = [], cardView = 'poster' }: {
+  bancos: Banco[]; folders?: Pasta[]; destinos?: Destino[]; atual?: { id: string; nome: string } | null; trilha?: Trilha[]; cardView?: CardView
 }) {
+  // Grade: ticket = cards horizontais (2–3 colunas); pôster = cards 4:5 (2–5 colunas).
+  const gridCls = cardView === 'ticket' ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3' : 'grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
   const router = useRouter()
   const [pending, start] = useTransition()
   const [busca, setBusca] = useState('')
@@ -107,8 +110,8 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null, 
           {foldersF.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2"><Folder className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">{atual ? 'Subpastas' : 'Pastas'}</h2><span className="text-sm text-muted-foreground">({foldersF.length})</span></div>
-              <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {foldersF.map((f) => <FolderCard key={f.id} f={f} onExcluir={() => excluirPasta(f)} onPersonalizar={() => setEditandoPasta(f)} onDuplicar={() => duplicarPasta(f)} />)}
+              <div className={gridCls}>
+                {foldersF.map((f) => <FolderCard key={f.id} f={f} onExcluir={() => excluirPasta(f)} onPersonalizar={() => setEditandoPasta(f)} onDuplicar={() => duplicarPasta(f)} variant={cardView} />)}
               </div>
             </div>
           )}
@@ -116,8 +119,8 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null, 
           {bancosF.length > 0 && (
             <div className="space-y-3">
               {(!atual || foldersF.length > 0) && <div className="flex items-center gap-2"><Database className="h-4 w-4 text-muted-foreground" /><h2 className="font-semibold">Bancos</h2><span className="text-sm text-muted-foreground">({bancosF.length})</span></div>}
-              <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {bancosF.map((b) => <BancoCard key={b.id} {...b} onMover={podeMover ? () => setMovendo(b) : undefined} />)}
+              <div className={gridCls}>
+                {bancosF.map((b) => <BancoCard key={b.id} {...b} onMover={podeMover ? () => setMovendo(b) : undefined} variant={cardView} />)}
               </div>
             </div>
           )}
@@ -140,8 +143,54 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null, 
 }
 
 /** Card de PASTA (folder) — imagem/cor + nome + quantos bancos tem dentro. Clicar abre a pasta. */
-function FolderCard({ f, onExcluir, onPersonalizar, onDuplicar }: { f: Pasta; onExcluir: () => void; onPersonalizar: () => void; onDuplicar: () => void }) {
+function FolderCard({ f, onExcluir, onPersonalizar, onDuplicar, variant = 'poster' }: { f: Pasta; onExcluir: () => void; onPersonalizar: () => void; onDuplicar: () => void; variant?: CardView }) {
   const c = f.cor ?? '#6d28d9'
+  const href = `/admin/banco-questoes?pasta=${f.id}`
+  const contagem = [(f.subpastas ?? 0) > 0 ? `${f.subpastas} pasta(s)` : null, `${f.count} banco(s)`].filter(Boolean).join(' · ')
+  const menuPasta = (
+    <DropdownMenuContent align="end" className="w-40">
+      <DropdownMenuItem render={<Link href={href} />}><FolderOpen className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
+      <DropdownMenuItem onClick={onPersonalizar}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
+      <DropdownMenuItem onClick={onDuplicar}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onClick={onExcluir} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir pasta</DropdownMenuItem>
+    </DropdownMenuContent>
+  )
+
+  // ===== Variante TICKET: card baixo/retangular — imagem à esquerda, infos+ações à direita. =====
+  if (variant === 'ticket') {
+    return (
+      <div className="group relative flex h-32 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-36">
+        <div className="relative w-[38%] max-w-[12rem] shrink-0 overflow-hidden">
+          {f.capa
+            ? <img src={f.capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
+            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />}
+          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${c})` }} />
+        </div>
+        <Link href={href} className="absolute inset-0 z-10" aria-label={f.nome} />
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pasta</p>
+            <div className="pointer-events-auto z-20">
+              <DropdownMenu>
+                <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Ações da pasta">
+                  <MoreVertical className="h-4 w-4" />
+                </DropdownMenuTrigger>
+                {menuPasta}
+              </DropdownMenu>
+            </div>
+          </div>
+          <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground sm:text-[15px]">
+            <Link href={href} className="pointer-events-auto relative z-20 transition-opacity hover:opacity-80">{f.nome}</Link>
+          </h3>
+          <span className="inline-flex w-fit items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <Folder className="h-3 w-3" /> {contagem}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
       {f.capa ? (
@@ -150,27 +199,20 @@ function FolderCard({ f, onExcluir, onPersonalizar, onDuplicar }: { f: Pasta; on
         <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
-      <Link href={`/admin/banco-questoes?pasta=${f.id}`} className="absolute inset-0 z-10" aria-label={f.nome} />
+      <Link href={href} className="absolute inset-0 z-10" aria-label={f.nome} />
       <div className="absolute right-2 top-2 z-30">
         <DropdownMenu>
           <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 outline-none transition-colors hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Ações da pasta">
             <MoreVertical className="h-4 w-4" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem render={<Link href={`/admin/banco-questoes?pasta=${f.id}`} />}><FolderOpen className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
-            <DropdownMenuItem onClick={onPersonalizar}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
-            <DropdownMenuItem onClick={onDuplicar}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onExcluir} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir pasta</DropdownMenuItem>
-          </DropdownMenuContent>
+          {menuPasta}
         </DropdownMenu>
       </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-3">
         <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">Pasta</p>
         <h3 className="mt-0.5 line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm">{f.nome}</h3>
         <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">
-          <Folder className="h-3 w-3" />
-          {[(f.subpastas ?? 0) > 0 ? `${f.subpastas} pasta(s)` : null, `${f.count} banco(s)`].filter(Boolean).join(' · ')}
+          <Folder className="h-3 w-3" /> {contagem}
         </span>
       </div>
     </div>
