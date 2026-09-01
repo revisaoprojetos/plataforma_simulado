@@ -148,7 +148,7 @@ function FolderCard({ f, onExcluir, onPersonalizar, onDuplicar, variant = 'poste
   const href = `/admin/banco-questoes?pasta=${f.id}`
   const contagem = [(f.subpastas ?? 0) > 0 ? `${f.subpastas} pasta(s)` : null, `${f.count} banco(s)`].filter(Boolean).join(' · ')
   const menuPasta = (
-    <DropdownMenuContent align="end" className="w-40">
+    <DropdownMenuContent align="start" className="w-40">
       <DropdownMenuItem render={<Link href={href} />}><FolderOpen className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
       <DropdownMenuItem onClick={onPersonalizar}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
       <DropdownMenuItem onClick={onDuplicar}><Copy className="mr-2 h-4 w-4" /> Duplicar</DropdownMenuItem>
@@ -168,19 +168,18 @@ function FolderCard({ f, onExcluir, onPersonalizar, onDuplicar, variant = 'poste
           <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${c})` }} />
         </div>
         <Link href={href} className="absolute inset-0 z-10" aria-label={f.nome} />
+        {/* Kebab no CANTO SUPERIOR DIREITO */}
+        <div className="pointer-events-auto absolute right-2 top-2 z-30">
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg bg-card/80 text-muted-foreground backdrop-blur outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Ações da pasta">
+              <MoreVertical className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            {menuPasta}
+          </DropdownMenu>
+        </div>
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pasta</p>
-            <div className="pointer-events-auto z-20">
-              <DropdownMenu>
-                <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Ações da pasta">
-                  <MoreVertical className="h-4 w-4" />
-                </DropdownMenuTrigger>
-                {menuPasta}
-              </DropdownMenu>
-            </div>
-          </div>
-          <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground sm:text-[15px]">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pasta</p>
+          <h3 className="line-clamp-2 pr-8 text-sm font-bold leading-tight text-foreground sm:text-[15px]">
             <Link href={href} className="pointer-events-auto relative z-20 transition-opacity hover:opacity-80">{f.nome}</Link>
           </h3>
           <span className="inline-flex w-fit items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">

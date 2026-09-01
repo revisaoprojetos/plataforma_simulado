@@ -63,30 +63,29 @@ export function BancoCard({ id, nome, total, estudantes = 0, cor, icone, capa, t
         </div>
         {/* Link cobre o card (abaixo dos controles) */}
         <Link href={detalhe} className="absolute inset-0 z-10" aria-label={nome} />
+        {/* Controles no CANTO SUPERIOR DIREITO */}
+        <div className="pointer-events-auto absolute right-2 top-2 z-30">
+          {confirmar ? (
+            <div className="flex items-center gap-1 rounded-lg border bg-card px-2 py-1 shadow-sm">
+              <span className="text-xs text-muted-foreground">Excluir?</span>
+              <button type="button" onClick={excluir} disabled={pending} className="rounded p-0.5 text-rose-600 hover:text-rose-500">
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              </button>
+              <button type="button" onClick={() => setConfirmar(false)} className="rounded p-0.5 text-xs text-muted-foreground hover:text-foreground">Não</button>
+            </div>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg bg-card/80 text-muted-foreground backdrop-blur outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Ações do banco">
+                <MoreVertical className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44">{menuItens}</DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
         {/* direita: infos + ações */}
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Banco de questões</p>
-            <div className="pointer-events-auto z-20">
-              {confirmar ? (
-                <div className="flex items-center gap-1 rounded-lg border bg-card px-2 py-1 shadow-sm">
-                  <span className="text-xs text-muted-foreground">Excluir?</span>
-                  <button type="button" onClick={excluir} disabled={pending} className="rounded p-0.5 text-rose-600 hover:text-rose-500">
-                    {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                  </button>
-                  <button type="button" onClick={() => setConfirmar(false)} className="rounded p-0.5 text-xs text-muted-foreground hover:text-foreground">Não</button>
-                </div>
-              ) : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Ações do banco">
-                    <MoreVertical className="h-4 w-4" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-44">{menuItens}</DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-          </div>
-          <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground sm:text-[15px]">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Banco de questões</p>
+          <h3 className="line-clamp-2 pr-8 text-sm font-bold leading-tight text-foreground sm:text-[15px]">
             <Link href={detalhe} className="pointer-events-auto relative z-20 transition-opacity hover:opacity-80">{nome}</Link>
           </h3>
           <div className="flex flex-wrap items-center gap-1">
@@ -136,7 +135,7 @@ export function BancoCard({ id, nome, total, estudantes = 0, cor, icone, capa, t
             >
               <MoreVertical className="h-4 w-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">{menuItens}</DropdownMenuContent>
+            <DropdownMenuContent align="start" className="w-44">{menuItens}</DropdownMenuContent>
           </DropdownMenu>
         )}
       </div>

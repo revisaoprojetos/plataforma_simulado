@@ -290,26 +290,24 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
         </div>
         {/* Link cobre o card (abaixo dos controles) */}
         <Link href={detalhe} className="absolute inset-0 z-10" aria-label={s.titulo} />
+        {/* Controles no CANTO SUPERIOR DIREITO */}
+        <div className="pointer-events-auto absolute right-2 top-2 z-30 flex items-center gap-1">
+          <button type="button" role="checkbox" aria-checked={selecionado} aria-label={selecionado ? 'Desmarcar simulado' : 'Selecionar simulado'} onClick={() => onSelecionar(!selecionado)}
+            className={cn('flex h-6 w-6 items-center justify-center rounded-md border bg-card/80 backdrop-blur transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+              selecionado ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-transparent hover:border-primary/50 hover:text-muted-foreground')}>
+            <Check className="h-4 w-4" />
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg bg-card/80 text-muted-foreground backdrop-blur outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" title="Mais ações">
+              <MoreHorizontal className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-52">{menuItens}</DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         {/* direita: infos + ações */}
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white', dotClass[s.status])}>{statusLabel[s.status] ?? s.status}</span>
-            {/* seleção + kebab */}
-            <div className="pointer-events-auto z-20 flex items-center gap-1">
-              <button type="button" role="checkbox" aria-checked={selecionado} aria-label={selecionado ? 'Desmarcar simulado' : 'Selecionar simulado'} onClick={() => onSelecionar(!selecionado)}
-                className={cn('flex h-6 w-6 items-center justify-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
-                  selecionado ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-transparent hover:border-primary/50 hover:text-muted-foreground')}>
-                <Check className="h-4 w-4" />
-              </button>
-              <DropdownMenu>
-                <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" title="Mais ações">
-                  <MoreHorizontal className="h-4 w-4" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">{menuItens}</DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-          <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground sm:text-[15px]">
+          <span className={cn('inline-flex w-fit items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white', dotClass[s.status])}>{statusLabel[s.status] ?? s.status}</span>
+          <h3 className="line-clamp-2 pr-8 text-sm font-bold leading-tight text-foreground sm:text-[15px]">
             <Link href={detalhe} className="pointer-events-auto relative z-20 transition-opacity hover:opacity-80">{s.titulo}</Link>
           </h3>
           <p className="line-clamp-1 text-[11px] text-muted-foreground">{subtituloSim(s)}</p>
@@ -370,7 +368,7 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
               selecionado ? 'border-primary bg-primary text-primary-foreground' : 'border-white/40 bg-black/35 text-transparent hover:bg-black/50')}>
             <Check className="h-4 w-4" />
           </button>
-          <div className="rounded-lg bg-black/40 backdrop-blur [&_button:hover]:!bg-white/20 [&_button]:!text-white/90">
+          <div className="rounded-lg bg-black/40 backdrop-blur [&_button:hover]:!bg-white [&_button:hover]:!text-neutral-900 [&_button]:!text-white/90">
             <DropdownMenu>
               <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/50 data-popup-open:!bg-white data-popup-open:!text-neutral-900" title="Mais ações">
                 <MoreHorizontal className="h-4 w-4" />
