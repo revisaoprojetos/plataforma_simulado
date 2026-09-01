@@ -77,7 +77,7 @@ function CardPasta({ g, count, prog, variant = 'poster' }: { g: GrupoCatalogo; c
     return (
       <Link href={`/aluno?pasta=${g.id}`}
         className="group relative flex h-28 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-32">
-        <div className="relative w-[42%] max-w-[11rem] shrink-0 overflow-hidden">
+        <div className="relative h-full aspect-[4/3] shrink-0 overflow-hidden">
           {capaT
             ? <img src={capaT} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
             : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}

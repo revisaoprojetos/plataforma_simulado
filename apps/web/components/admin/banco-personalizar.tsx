@@ -159,7 +159,7 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
         {cardView === 'ticket' ? (
           // Ticket: imagem deitada à esquerda + infos à direita (usa a imagem do card, deitada).
           <div className="relative flex h-32 w-full overflow-hidden rounded-2xl border bg-card shadow-sm sm:h-36">
-            <div className="relative w-[38%] max-w-[12rem] shrink-0 overflow-hidden">
+            <div className="relative h-full aspect-[4/3] shrink-0 overflow-hidden">
               {imgCard ? (
                 <img src={imgCard} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
               ) : (

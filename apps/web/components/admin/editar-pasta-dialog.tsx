@@ -186,7 +186,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
             // Ticket: imagem deitada à esquerda + nome à direita. Usa a CAPA (capa_card_url) primeiro,
             // igual ao card ticket do admin (que exibe a capa deitada), caindo p/ a imagem larga.
             <div className="relative flex h-28 w-full overflow-hidden rounded-2xl border bg-card shadow-sm">
-              <div className="relative w-[42%] shrink-0 overflow-hidden">
+              <div className="relative h-full aspect-[4/3] shrink-0 overflow-hidden">
                 {(capaCard ?? capaLarga) ? (
                   <img src={(capaCard ?? capaLarga)!} alt="" className="absolute inset-0 h-full w-full object-cover" />
                 ) : (

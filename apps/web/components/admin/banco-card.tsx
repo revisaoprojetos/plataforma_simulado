@@ -54,8 +54,9 @@ export function BancoCard({ id, nome, total, estudantes = 0, cor, icone, capa, t
   if (variant === 'ticket') {
     return (
       <div className="group relative flex h-32 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-36">
-        {/* metade esquerda: imagem/degradê */}
-        <div className="relative w-[38%] max-w-[12rem] shrink-0 overflow-hidden">
+        {/* metade esquerda: imagem em proporção FIXA (4:3) — assim o recorte "Ajustar" aparece igual
+            em qualquer largura de card (não re-corta como no slot de largura variável). */}
+        <div className="relative h-full aspect-[4/3] shrink-0 overflow-hidden">
           {capa
             ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
             : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />}
