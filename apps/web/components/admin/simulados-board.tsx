@@ -242,6 +242,8 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
   // Card pôster (4:5) → prefere o recorte pôster (capa_card_url) e cai no banner.
   const capa = s.vis?.capa ?? s.vis?.capaBanner
   const detalhe = `/admin/simulados/${s.id}`
+  // Banco base do simulado (a aparência do card vem dele) — "Personalizar" abre-o no tab personalizar.
+  const bancoBaseId = (s.regras as any)?.banco_base_id as string | undefined
 
   // Itens do menu de 3 pontos — compartilhados entre pôster e ticket.
   const menuItens = (
@@ -250,6 +252,7 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
       <DropdownMenuSeparator />
       <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}/ao-vivo`)}><Radio className="mr-2 h-4 w-4" /> Ao vivo (online/progresso)</DropdownMenuItem>
       <DropdownMenuItem onClick={() => router.push(detalhe)}><Pencil className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
+      {bancoBaseId && <DropdownMenuItem render={<Link href={`/admin/banco-questoes/${bancoBaseId}?tab=personalizar`} />}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>}
       <DropdownMenuItem onClick={() => router.push(detalhe)}><Trophy className="mr-2 h-4 w-4" /> Ranking</DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem onClick={copiarLink}><Copy className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
@@ -633,10 +636,10 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
         // Só as PASTAS (tiles). Clicar entra na pasta (?pasta=id) e mostra os simulados de dentro.
         <div className="space-y-6">
           {secoesPasta.pastas.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            <div className={cn('grid gap-3', cardView === 'ticket' ? 'md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5')}>
               {secoesPasta.pastas.map(({ folder, sims }) => folder && (
                 <FolderTile key={folder.id} folder={folder} count={sims.length} appUrl={appUrl}
-                  onPersonalizar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)} />
+                  onPersonalizar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)} variant={cardView} />
               ))}
             </div>
           )}
@@ -699,20 +702,68 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
 /** Uma seção de PASTA: cabeçalho (nome + contagem + status + ações em massa) e grade de cards. */
 /** Tile de PASTA (view "Pastas"): pôster que leva para dentro da pasta (?pasta=id) → simulados de lá.
  *  Menu de 3 pontos: personalizar, copiar link e excluir. */
-function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir }: {
-  folder: PastaSim; count: number; appUrl: string; onPersonalizar: () => void; onExcluir: () => void
+function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant = 'poster' }: {
+  folder: PastaSim; count: number; appUrl: string; onPersonalizar: () => void; onExcluir: () => void; variant?: CardView
 }) {
   const cor = folder.cor ?? '#6d28d9'
   const Icon = iconeBanco(folder.icone)
+  const href = `/admin/simulados?pasta=${folder.id}`
   async function copiarLink() {
     const url = `${appUrl}/aluno?pasta=${folder.id}`
     if (await copiarTexto(url)) toast.success('Link da pasta copiado')
     else toast.error(`Não foi possível copiar. Link: ${url}`)
   }
+  const menuItens = (
+    <>
+      <DropdownMenuItem onClick={onPersonalizar}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
+      <DropdownMenuItem onClick={copiarLink}><Copy className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onClick={onExcluir} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir pasta</DropdownMenuItem>
+    </>
+  )
+
+  // ===== Variante TICKET: retangular baixo — imagem à esquerda, nome/contagem/ação à direita. =====
+  if (variant === 'ticket') {
+    const capaT = (folder as { capaLarga?: string | null }).capaLarga ?? folder.capa
+    return (
+      <div className="group relative flex h-32 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-36">
+        <div className="relative w-[38%] max-w-[12rem] shrink-0 overflow-hidden">
+          {capaT
+            ? <img src={capaT} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
+            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+          {!capaT && <Icon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
+          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${cor})` }} />
+        </div>
+        <Link href={href} className="absolute inset-0 z-10" aria-label={folder.nome} />
+        <div className="absolute right-2 top-2 z-30">
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-popup-open:bg-accent data-popup-open:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Ações da pasta">
+              <MoreHorizontal className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">{menuItens}</DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
+          <span className="inline-flex w-fit items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground"><Folder className="h-3 w-3" /> Pasta</span>
+          <h3 className="line-clamp-2 pr-8 text-sm font-bold leading-tight text-foreground sm:text-[15px]">
+            <Link href={href} className="pointer-events-auto relative z-20 transition-opacity hover:opacity-80">{folder.nome}</Link>
+          </h3>
+          <p className="text-[11px] text-muted-foreground">{count} simulado(s)</p>
+          <div className="pointer-events-auto relative z-20 mt-1">
+            <Link href={href} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-all hover:brightness-110"
+              style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
+              <FolderOpen className="h-4 w-4" /> Abrir pasta
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
       {/* Pôster clicável (entra na pasta). */}
-      <Link href={`/admin/simulados?pasta=${folder.id}`} className="absolute inset-0 flex flex-col justify-end outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+      <Link href={href} className="absolute inset-0 flex flex-col justify-end outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
         {folder.capa ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={folder.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
