@@ -323,10 +323,6 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
               className="flex h-8 w-8 items-center justify-center rounded-lg border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
               <Copy className="h-4 w-4" />
             </button>
-            <Link href={`/admin/simulados/${s.id}/ao-vivo`} title="Ranking e desempenho ao vivo"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-              <BarChart3 className="h-4 w-4" />
-            </Link>
           </div>
         </div>
       </div>

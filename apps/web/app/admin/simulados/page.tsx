@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { createServiceClient } from '@/lib/supabase/server'
-import { getCurrentTenantId } from '@/lib/tenant'
+import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { buttonVariants } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
@@ -10,6 +10,7 @@ import { onlinePorSimulado } from '@/app/admin/simulados/actions'
 import { tiposDeSimulados, type TipoSimulado } from '@/lib/simulado/tipo'
 import { resolverVisualSimulados, type VisualSim } from '@/lib/aluno/simulado-visual'
 import { resolverCardView } from '@/lib/card-view'
+import { ehPastaBanco } from '@/lib/simulado/pasta-area'
 import { getOcultarDiscursiva } from '@/lib/sistema/manutencao-areas-server'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { simuladosTiposSql } from '@/lib/data/simulados.repo'
@@ -96,7 +97,7 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
       const selB = (cols: string) => supabase.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid)
       let r: { data: any[] | null; error: { message: string } | null } = await selB('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area, pai_id, tipo')
       if (r.error) r = await selB('id, nome, cor, icone, is_folder, pai_id')
-      return (r.data ?? []).filter((p: any) => p.folder_area !== 'simulado' && p.folder_area !== 'caderno')
+      return (r.data ?? []).filter((p: any) => ehPastaBanco(p.folder_area))
     })(),
     getOcultarDiscursiva(),
   ])
@@ -180,8 +181,10 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   // Estilo dos cards definido no console: o admin usa `card_view_admin` (com fallback para o valor
   // compartilhado `card_view`, retrocompatível). O portal do aluno segue `card_view`.
-  const { data: tenantTema } = await supabase.from('simulado_tenants').select('tema').eq('id', tid).maybeSingle()
-  const temaCards = (tenantTema?.tema as any) ?? {}
+  // Lê a tema do getCurrentTenant (createAdminClient, memoizado, mesma fonte do tema visual) — NÃO
+  // via createServiceClient/PostgREST, que herda o cookie do admin e pode voltar null por RLS
+  // (isso fazia o board cair em pôster mesmo com card_view='ticket').
+  const temaCards = ((await getCurrentTenant())?.tema as any) ?? {}
   const cardView = resolverCardView(temaCards.card_view_admin ?? temaCards.card_view)
 
   return (
