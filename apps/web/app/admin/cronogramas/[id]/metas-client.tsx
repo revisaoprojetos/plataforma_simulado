@@ -24,6 +24,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DisciplinaPicker } from '@/components/cronograma/disciplina-picker'
 import { MontarSemana } from './montar-semana'
+import { AdicionarDoBancoDialog } from '@/components/admin/adicionar-do-banco-dialog'
 import { SimuladoPicker, type SimuladoOpcao } from '@/components/cronograma/simulado-picker'
 import { alternarCronogramaNoPacote } from '../pacotes/actions'
 import type { MetaFonte, TipoMeta, TipoMetaDef } from '@/lib/cronograma/tipos'
@@ -31,6 +32,7 @@ import { faixaSemanal } from '@/lib/cronograma/faixa'
 import {
   atualizarMeta,
   carregarDetalhe,
+  comporDoBanco,
   criarDisciplina,
   criarMeta,
   excluirMeta,
@@ -331,6 +333,20 @@ export function MetasClient({
           }
           acao={
             <div className="flex flex-wrap items-center gap-2">
+              <AdicionarDoBancoDialog
+                diasNome={c.dias_nome}
+                totalSemanas={c.total_semanas}
+                onConfirmar={async (opts) => {
+                  const r = await comporDoBanco(c.id, opts)
+                  if (!r.ok) {
+                    toast.error(r.error ?? 'Não foi possível compor do banco.')
+                    return
+                  }
+                  toast.success(`${r.criadas ?? 0} meta(s) adicionada(s) do banco`)
+                  if (r.avisos?.length) toast.message(r.avisos.join(' · '))
+                  recarregarMetas()
+                }}
+              />
               <MontarSemana
                 cronogramaId={c.id}
                 semana={semanaAtiva}

@@ -544,6 +544,184 @@ export async function excluirMeta(cronogramaId: string, metaId: string): Promise
   return { ok: true }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Compor a partir do Banco de Conteúdos (cópia/snapshot).
+
+export type ComposicaoBanco = {
+  conjuntoIds: string[]
+  semanaInicial: number
+  diaInicial: number
+  estrategia: 'sequencial' | 'mesmo_dia'
+}
+
+/**
+ * Copia as aulas dos conjuntos escolhidos para metas do cronograma (snapshot: editar o banco
+ * depois NÃO muda o que já foi composto). Faz UPSERT dos links QC/TEC por (disciplina, aula) e
+ * copia as refs de questão para `simulado_cronograma_meta_questoes`. Recompor duplica de propósito.
+ *
+ * `sequencial` = uma aula por dia de curso, avançando semana a semana (pula semanas de revisão).
+ * `mesmo_dia` = todas caem no mesmo (semana, dia) inicial (o admin refina depois).
+ */
+export async function comporDoBanco(cronogramaId: string, opts: ComposicaoBanco): Promise<{ ok: boolean; criadas?: number; avisos?: string[]; error?: string }> {
+  const g = await guard('cronogramas:update')
+  if (!g.ok) return { ok: false, error: g.error }
+  if (!opts.conjuntoIds?.length) return { ok: false, error: 'Selecione ao menos um conjunto.' }
+  const svc = createAdminClient()
+
+  const { data: cronRow } = await svc
+    .from('simulado_cronogramas')
+    .select('id, nome, total_semanas, dias_curso, semanas_revisao')
+    .eq('id', cronogramaId)
+    .eq('tenant_id', g.tenantId)
+    .eq('deletado', false)
+    .maybeSingle()
+  if (!cronRow) return { ok: false, error: 'Cronograma não encontrado.' }
+  const cron = cronRow as { nome: string; total_semanas: number; dias_curso: number[]; semanas_revisao: number[] }
+  const totalDias = Math.max(1, (cron.dias_curso ?? []).length)
+  const totalSemanas = cron.total_semanas
+  const revisao = new Set(cron.semanas_revisao ?? [])
+
+  const conjuntos = await fetchAllByIn<any>(opts.conjuntoIds, (chunk) =>
+    svc.from('simulado_cronograma_conjuntos').select('id, disciplina, disciplina_id, ordem').eq('tenant_id', g.tenantId).in('id', chunk).order('ordem') as any,
+  )
+  const conjMap = new Map(conjuntos.map((x) => [x.id, x]))
+
+  const aulas = await fetchAllByIn<any>(opts.conjuntoIds, (chunk) =>
+    svc.from('simulado_cronograma_conjunto_aulas').select('id, conjunto_id, tipo, aula, conteudo, duracao, tema, ordem').eq('tenant_id', g.tenantId).in('conjunto_id', chunk).order('ordem') as any,
+  )
+  if (!aulas.length) return { ok: false, error: 'Os conjuntos selecionados não têm aulas.' }
+  const idxConjunto = new Map(opts.conjuntoIds.map((id, i) => [id, i]))
+  aulas.sort((a, b) => (idxConjunto.get(a.conjunto_id) ?? 0) - (idxConjunto.get(b.conjunto_id) ?? 0) || (a.ordem - b.ordem))
+
+  // Tipos precisam existir/estar ativos (aula do banco pode ter tipo inativo).
+  for (const t of [...new Set(aulas.map((a) => a.tipo))]) {
+    const e = await validarTipo(svc, g.tenantId, t)
+    if (e) return { ok: false, error: e }
+  }
+
+  // Colocação na grade.
+  const avisos: string[] = []
+  const semIni = Math.min(Math.max(1, opts.semanaInicial || 1), totalSemanas)
+  const diaIni = Math.min(Math.max(0, opts.diaInicial || 0), totalDias - 1)
+  const alvos: { semana: number; dia: number }[] = []
+  if (opts.estrategia === 'mesmo_dia') {
+    for (let i = 0; i < aulas.length; i++) alvos.push({ semana: semIni, dia: diaIni })
+  } else {
+    let s = semIni
+    let d = diaIni
+    for (let i = 0; i < aulas.length; i++) {
+      while (revisao.has(s) && s <= totalSemanas) s++
+      if (s > totalSemanas) break
+      alvos.push({ semana: s, dia: d })
+      d++
+      if (d >= totalDias) {
+        d = 0
+        s++
+      }
+    }
+  }
+  if (alvos.length < aulas.length) avisos.push(`${aulas.length - alvos.length} aula(s) não couberam nas ${totalSemanas} semanas e ficaram de fora.`)
+  const usados = aulas.slice(0, alvos.length)
+  if (!usados.length) return { ok: false, error: 'Nada coube no intervalo escolhido.' }
+
+  const aulaIds = usados.map((a) => a.id)
+  const [qsRows, urlRows] = await Promise.all([
+    fetchAllByIn<any>(aulaIds, (chunk) => svc.from('simulado_cronograma_conjunto_aula_questoes').select('aula_id, questao_id, ordem').eq('tenant_id', g.tenantId).in('aula_id', chunk).order('ordem') as any),
+    fetchAllByIn<any>(aulaIds, (chunk) => svc.from('simulado_cronograma_conjunto_aula_urls').select('aula_id, plataforma_id, url').eq('tenant_id', g.tenantId).in('aula_id', chunk).order('id') as any),
+  ])
+  const qsPorAula = new Map<string, { questao_id: string; ordem: number }[]>()
+  for (const q of qsRows) {
+    const l = qsPorAula.get(q.aula_id) ?? []
+    l.push({ questao_id: q.questao_id, ordem: q.ordem ?? 0 })
+    qsPorAula.set(q.aula_id, l)
+  }
+  const urlsPorAula = new Map<string, { plataforma_id: string; url: string }[]>()
+  for (const u of urlRows) {
+    const l = urlsPorAula.get(u.aula_id) ?? []
+    l.push({ plataforma_id: u.plataforma_id, url: u.url })
+    urlsPorAula.set(u.aula_id, l)
+  }
+
+  // Insere meta a meta (para mapear meta_id ↔ questões com segurança) + conta ordem por (semana,dia).
+  const ordemBucket = new Map<string, number>()
+  let criadas = 0
+  for (let i = 0; i < usados.length; i++) {
+    const a = usados[i]
+    const { semana, dia } = alvos[i]
+    const k = `${semana}|${dia}`
+    const ordem = ordemBucket.get(k) ?? 0
+    ordemBucket.set(k, ordem + 1)
+    const disc = conjMap.get(a.conjunto_id)
+    const { data: metaRow, error: eMeta } = await svc
+      .from('simulado_cronograma_metas')
+      .insert({
+        tenant_id: g.tenantId,
+        cronograma_id: cronogramaId,
+        semana,
+        dia,
+        tipo: a.tipo,
+        disciplina: (disc?.disciplina ?? '').trim(),
+        disciplina_id: disc?.disciplina_id ?? null,
+        aula: a.aula?.trim() || null,
+        conteudo: a.conteudo?.trim() || null,
+        duracao: a.duracao?.trim() || null,
+        ordem,
+      })
+      .select('id')
+      .single()
+    if (eMeta || !metaRow) {
+      avisos.push(`Falha ao inserir uma aula: ${eMeta?.message ?? '—'}`)
+      continue
+    }
+    criadas++
+    const qs = qsPorAula.get(a.id) ?? []
+    if (qs.length) {
+      await svc
+        .from('simulado_cronograma_meta_questoes')
+        .upsert(qs.map((q) => ({ tenant_id: g.tenantId, meta_id: (metaRow as any).id, questao_id: q.questao_id, ordem: q.ordem })), { onConflict: 'meta_id,questao_id', ignoreDuplicates: true })
+    }
+  }
+
+  // Links QC/TEC por (disciplina, aula) distinta (compartilhado por tenant — último vence).
+  const linksVistos = new Set<string>()
+  for (const a of usados) {
+    const disc = conjMap.get(a.conjunto_id)
+    const disciplina = (disc?.disciplina ?? '').trim()
+    const aula = a.aula?.trim()
+    if (!disciplina || !aula) continue
+    const urls = urlsPorAula.get(a.id) ?? []
+    if (!urls.length && !a.tema) continue
+    const chave = `${disciplina.toLowerCase()}|${aula.toLowerCase()}`
+    if (linksVistos.has(chave)) continue
+    linksVistos.add(chave)
+    const { data: linkRow, error: eLink } = await svc
+      .from('simulado_cronograma_links')
+      .upsert({ tenant_id: g.tenantId, disciplina, disciplina_id: disc?.disciplina_id ?? null, aula, tema: a.tema?.trim() || null }, { onConflict: 'tenant_id,disciplina,aula' })
+      .select('id')
+      .single()
+    if (eLink || !linkRow) {
+      avisos.push(`Link ${disciplina}/${aula}: ${eLink?.message ?? 'falhou'}`)
+      continue
+    }
+    if (urls.length) {
+      const { error: eUrl } = await svc
+        .from('simulado_cronograma_aula_links')
+        .upsert(urls.map((u) => ({ tenant_id: g.tenantId, link_id: (linkRow as any).id, plataforma_id: u.plataforma_id, url: u.url })), { onConflict: 'link_id,plataforma_id' })
+      if (eUrl) avisos.push(`URLs de ${disciplina}/${aula}: ${eUrl.message}`)
+    }
+  }
+
+  await registrarAudit({
+    operacao: 'INSERT',
+    entidade: 'simulado_cronograma_metas',
+    entidadeId: cronogramaId,
+    depois: { via: 'banco_conteudos', conjuntos: opts.conjuntoIds.length, metas: criadas },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  return { ok: true, criadas, avisos: avisos.length ? avisos : undefined }
+}
+
 /** Sem acento/caixa e com espaços colapsados — para dedupe de nome de disciplina. */
 const normalizarNome = (s: string) =>
   s

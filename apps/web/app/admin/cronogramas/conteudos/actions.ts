@@ -142,6 +142,44 @@ export async function listarConteudos(
   return { ok: true, conjuntos, pastas, trilha }
 }
 
+// ── Busca para compor (picker "Adicionar do banco") ─────────────────────────
+export type ConjuntoParaCompor = { id: string; nome: string; disciplina: string; disciplina_id: string | null; aulas: number; questoes: number }
+
+export async function buscarConjuntosParaCompor(
+  filtros: { busca?: string; disciplinaId?: string } = {},
+): Promise<{ ok: boolean; itens?: ConjuntoParaCompor[]; error?: string }> {
+  const g = await guard('cronogramas:view')
+  if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  let q = svc.from('simulado_cronograma_conjuntos').select('id, nome, disciplina, disciplina_id').eq('tenant_id', g.tenantId).eq('deletado', false)
+  if (filtros.disciplinaId && filtros.disciplinaId !== 'all') q = q.eq('disciplina_id', filtros.disciplinaId)
+  const termo = (filtros.busca ?? '').replace(/[,()%*]/g, ' ').trim()
+  if (termo) q = q.or(`nome.ilike.%${termo}%,disciplina.ilike.%${termo}%`)
+  const conjuntos = await fetchAll<any>(() => q.order('nome') as any)
+  const ids = conjuntos.map((c) => c.id)
+
+  const aulasPorConjunto = new Map<string, number>()
+  const questoesPorConjunto = new Map<string, number>()
+  if (ids.length) {
+    const aulas = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_cronograma_conjunto_aulas').select('id, conjunto_id').eq('tenant_id', g.tenantId).in('conjunto_id', chunk).order('id') as any)
+    for (const a of aulas) aulasPorConjunto.set(a.conjunto_id, (aulasPorConjunto.get(a.conjunto_id) ?? 0) + 1)
+    const aulaIds = aulas.map((a) => a.id)
+    if (aulaIds.length) {
+      const qs = await fetchAllByIn<any>(aulaIds, (chunk) => svc.from('simulado_cronograma_conjunto_aula_questoes').select('aula_id').eq('tenant_id', g.tenantId).in('aula_id', chunk).order('id') as any)
+      const conjuntoDaAula = new Map<string, string>(aulas.map((a) => [a.id, a.conjunto_id]))
+      for (const x of qs) {
+        const cid = conjuntoDaAula.get(x.aula_id)
+        if (cid) questoesPorConjunto.set(cid, (questoesPorConjunto.get(cid) ?? 0) + 1)
+      }
+    }
+  }
+
+  const itens: ConjuntoParaCompor[] = conjuntos
+    .map((c) => ({ id: c.id, nome: c.nome, disciplina: c.disciplina, disciplina_id: c.disciplina_id ?? null, aulas: aulasPorConjunto.get(c.id) ?? 0, questoes: questoesPorConjunto.get(c.id) ?? 0 }))
+    .filter((c) => c.aulas > 0)
+  return { ok: true, itens }
+}
+
 // ── Conjuntos (CRUD) ─────────────────────────────────────────────────────────
 export async function criarConjunto(entrada: {
   nome: string
