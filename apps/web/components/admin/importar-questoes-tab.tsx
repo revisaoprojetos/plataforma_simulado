@@ -231,7 +231,7 @@ export function ImportarQuestoesTab({ bancoId = null, onDone, onParsed }: { banc
       toast.success(bancoId
         ? `${r.criadas ?? 0} questão(ões) criada(s) e ${r.vinculadas ?? 0} vinculada(s) ao banco`
         : `${r.criadas ?? 0} questão(ões) criada(s) no sistema`)
-      if (r.jaExistiam) toast.message(`${r.jaExistiam} já existia(m) no sistema — não duplicada(s).`)
+      if (r.jaExistiam) toast.message(`${r.jaExistiam} já existia(m) — atualizada(s) com os dados da planilha (gabarito preservado).`)
       onDone()
       // Navegação suave (a action faz revalidatePath): evita o window.location.assign,
       // que recarregava tudo e causava a "tela de erro/reload".
@@ -330,7 +330,7 @@ export function ImportarQuestoesTab({ bancoId = null, onDone, onParsed }: { banc
                             {q.erro ? (
                               <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-600 dark:text-rose-400" title={q.erro}><AlertTriangle className="h-3 w-3" /> Erro</span>
                             ) : q.jaExiste ? (
-                              <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Já existe</span>
+                              <span className="text-xs font-medium text-amber-600 dark:text-amber-400" title="Questão já existe — será ATUALIZADA com os dados da planilha (metadados + texto/comentário das alternativas; gabarito preservado).">Já existe · atualiza</span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400"><Check className="h-3 w-3" /> Nova</span>
                             )}
