@@ -60,8 +60,9 @@ function SecoesGrid({ itens, cols5, view = 'poster' }: { itens: ItemSimuladoCat[
   )
 }
 
-/** Card PÔSTER de uma pasta (grupo) — abre o conteúdo em /aluno?pasta=id. Barra de progresso no hover. */
-function CardPasta({ g, count, prog }: { g: GrupoCatalogo; count: number; prog?: { done: number; total: number } }) {
+/** Card de uma pasta (grupo) — abre o conteúdo em /aluno?pasta=id. `variant`: pôster (4:5, progresso
+ *  no hover) ou ticket (baixo/retangular: banner à esquerda, nome + progresso à direita). */
+function CardPasta({ g, count, prog, variant = 'poster' }: { g: GrupoCatalogo; count: number; prog?: { done: number; total: number }; variant?: CardView }) {
   const cor = g.cor ?? '#6d28d9'
   const Icon = iconeBanco(g.icone)
   const total = prog?.total ?? count
@@ -69,6 +70,40 @@ function CardPasta({ g, count, prog }: { g: GrupoCatalogo; count: number; prog?:
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
   // Card pôster (4:5) → usa a imagem NORMAL/inteira do banco (capa_card_url); só cai na larga se não houver.
   const capa = g.capaCard ?? g.capa ?? null
+
+  // ===== TICKET: card baixo/retangular — imagem (banner largo) à esquerda, infos à direita. =====
+  if (variant === 'ticket') {
+    const capaT = g.capa ?? g.capaCard ?? null // paisagem → prefere o banner largo (capa_url)
+    return (
+      <Link href={`/aluno?pasta=${g.id}`}
+        className="group relative flex h-28 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-32">
+        <div className="relative w-[42%] max-w-[11rem] shrink-0 overflow-hidden">
+          {capaT
+            ? <img src={capaT} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+          {!capaT && <Icon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
+          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${cor})` }} />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col justify-center p-3">
+          <span className="mb-1 inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground"><FolderOpen className="h-3.5 w-3.5 text-primary" /> {count} simulado{count !== 1 ? 's' : ''}</span>
+          <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground sm:text-[15px]">{g.nome}</h3>
+          {/* PROGRESSO — aparece/expande no hover (mesma animação do pôster). */}
+          <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-300 group-hover:mt-2 group-hover:grid-rows-[1fr] group-hover:opacity-100">
+            <div className="overflow-hidden">
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${pct}%`, background: 'var(--brand-accent, var(--primary))' }} />
+                </div>
+                <span className="shrink-0 text-[11px] font-semibold tabular-nums text-muted-foreground">{pct}%</span>
+              </div>
+              <p className="mt-1 text-[10px] text-muted-foreground">{done} de {total} concluído{done !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
+        </div>
+      </Link>
+    )
+  }
+
   return (
     <Link href={`/aluno?pasta=${g.id}`}
       className="group relative block aspect-[4/5] w-full overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
@@ -181,20 +216,29 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
       {grupos.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-semibold"><FolderOpen className="h-4 w-4 text-primary" /> Cursos e pacotes</h2>
+            <h2 className="flex items-center gap-2 text-sm font-semibold"><FolderOpen className="h-4 w-4 text-primary" /> Pastas de simulados</h2>
             <Link href="/aluno/simulados" className="text-xs font-semibold text-primary transition-opacity hover:opacity-80 md:hidden">Ver todos →</Link>
           </div>
-          {/* Mobile: carrossel horizontal com snap (cards pôster ~152px). Desktop: grade. */}
-          <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden">
-            {grupos.map((g) => (
-              <div key={g.id} className="w-[152px] shrink-0 snap-start">
-                <CardPasta g={g} count={contar(g.id)} prog={progresso?.[g.id]} />
+          {view === 'ticket' ? (
+            // Ticket: grade única (tickets empilham no mobile, 2–3 colunas no desktop).
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {grupos.map((g) => <CardPasta key={g.id} g={g} count={contar(g.id)} prog={progresso?.[g.id]} variant="ticket" />)}
+            </div>
+          ) : (
+            <>
+              {/* Mobile: carrossel horizontal com snap (cards pôster ~152px). Desktop: grade. */}
+              <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden">
+                {grupos.map((g) => (
+                  <div key={g.id} className="w-[152px] shrink-0 snap-start">
+                    <CardPasta g={g} count={contar(g.id)} prog={progresso?.[g.id]} />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className={cn('hidden gap-4 md:grid md:grid-cols-3 lg:grid-cols-4', full && 'xl:grid-cols-5')}>
-            {grupos.map((g) => <CardPasta key={g.id} g={g} count={contar(g.id)} prog={progresso?.[g.id]} />)}
-          </div>
+              <div className={cn('hidden gap-4 md:grid md:grid-cols-3 lg:grid-cols-4', full && 'xl:grid-cols-5')}>
+                {grupos.map((g) => <CardPasta key={g.id} g={g} count={contar(g.id)} prog={progresso?.[g.id]} />)}
+              </div>
+            </>
+          )}
         </section>
       )}
 
