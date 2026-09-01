@@ -178,9 +178,11 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
     .map((b) => ({ id: b.id, nome: b.nome, cor: b.cor ?? null, icone: b.icone ?? null, capa: (b.capa_card_url ?? b.capa_url) ?? null, count: contGrupo.get(b.id) ?? 0 }))
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  // Estilo dos cards definido no console (tema.card_view) — o admin apenas obedece.
+  // Estilo dos cards definido no console: o admin usa `card_view_admin` (com fallback para o valor
+  // compartilhado `card_view`, retrocompatível). O portal do aluno segue `card_view`.
   const { data: tenantTema } = await supabase.from('simulado_tenants').select('tema').eq('id', tid).maybeSingle()
-  const cardView = resolverCardView((tenantTema?.tema as any)?.card_view)
+  const temaCards = (tenantTema?.tema as any) ?? {}
+  const cardView = resolverCardView(temaCards.card_view_admin ?? temaCards.card_view)
 
   return (
     <SimuladosBoard
