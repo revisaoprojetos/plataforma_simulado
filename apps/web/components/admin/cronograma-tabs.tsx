@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 // Relatórios e Importar NÃO são abas (ficam na sidebar / botão do catálogo).
 const TABS: { href: string; label: string; icon: typeof CalendarDays }[] = [
   { href: '/admin/cronogramas', label: 'Catálogo', icon: CalendarDays },
-  { href: '/admin/cronogramas/conteudo', label: 'Conteúdo', icon: NotebookPen },
+  { href: '/admin/cronogramas/conteudos', label: 'Conteúdos', icon: NotebookPen },
   { href: '/admin/cronogramas/pacotes', label: 'Grupos de acessos', icon: Package },
   { href: '/admin/cronogramas/links', label: 'Links de aula', icon: Link2 },
   { href: '/admin/cronogramas/tipos', label: 'Tipos de meta', icon: Tag },
