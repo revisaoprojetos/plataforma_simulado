@@ -29,7 +29,7 @@ export const RBAC_CATALOGO: { resource: string; action: string }[] = [
 // Rótulos amigáveis (a matriz usa quando disponíveis; senão cai no valor cru).
 export const RBAC_RECURSO_LABEL: Record<string, string> = {
   questoes: 'Questões',
-  leitura: 'Área de Leitura',
+  leitura: 'LegProc Digital',
   correcao: 'Correção de discursivas',
   simulados: 'Simulados',
   estudantes: 'Estudantes',

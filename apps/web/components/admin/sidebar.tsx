@@ -123,7 +123,7 @@ const navGroups: NavGroup[] = [
       { label: 'Etiquetas', href: '/admin/etiquetas', icon: Tag, perm: 'questoes:view' },
       { label: 'Banco de Simulado', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
       { label: 'Modelos de Caderno', href: '/admin/modelos-caderno', icon: LayoutTemplate, perm: 'questoes:view', oculto: !MODELOS_CADERNO_ATIVO },
-      { label: 'Área de Leitura', href: '/admin/leitura', icon: Library, perm: 'leitura:view', oculto: !LEITURA_ATIVA },
+      { label: 'LegProc Digital', href: '/admin/leitura', icon: Library, perm: 'leitura:view', oculto: !LEITURA_ATIVA },
     ],
   },
   {

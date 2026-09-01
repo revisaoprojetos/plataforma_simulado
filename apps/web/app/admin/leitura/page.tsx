@@ -14,7 +14,7 @@ export default async function LeituraAdminPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Library className="h-6 w-6 text-primary" /> Área de Leitura</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Library className="h-6 w-6 text-primary" /> LegProc Digital</h1>
           <p className="text-muted-foreground">Documentos (leis/materiais) que o aluno lê num leitor dinâmico, com progresso e anotações.</p>
         </div>
         <div className="flex items-center gap-2">

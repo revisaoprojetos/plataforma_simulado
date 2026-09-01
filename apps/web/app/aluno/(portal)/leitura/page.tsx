@@ -16,7 +16,7 @@ export default async function LeituraAlunoPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Library className="h-6 w-6 text-primary" /> Leitura</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Library className="h-6 w-6 text-primary" /> LegProc Digital</h1>
         <p className="text-muted-foreground">Leis e materiais organizados por matéria, para ler com anotações e acompanhar seu progresso.</p>
       </div>
 

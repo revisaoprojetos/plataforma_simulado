@@ -10,7 +10,7 @@ export default async function MateriasPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/admin/leitura" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Área de Leitura</Link>
+        <Link href="/admin/leitura" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> LegProc Digital</Link>
         <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold tracking-tight"><Layers className="h-6 w-6 text-primary" /> Matérias</h1>
         <p className="text-muted-foreground">Áreas do direito para organizar o catálogo de leis (ex.: Constitucional, Administrativo, Civil).</p>
       </div>

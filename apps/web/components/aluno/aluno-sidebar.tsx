@@ -41,7 +41,7 @@ const NAV: ItemNav[] = [
   { href: '/aluno/recomendado', label: 'Recomendado', icon: Sparkles, tour: 'nav-recomendado' },
   { href: '/aluno/ligas', label: 'Ligas', icon: Trophy, tour: 'nav-liga' },
   { href: '/aluno/questoes', label: 'Banco de Questões', icon: BookOpen, tour: 'nav-questoes' },
-  { href: '/aluno/leitura', label: 'Leitura', icon: Library, tour: 'nav-leitura' },
+  { href: '/aluno/leitura', label: 'LegProc Digital', icon: Library, tour: 'nav-leitura' },
   { href: '/aluno/favoritos', label: 'Favoritos', icon: Star, tour: 'nav-favoritos' },
   { href: '/aluno/cadernos', label: 'Cadernos', icon: NotebookPen, tour: 'nav-cadernos' },
   {
