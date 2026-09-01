@@ -165,7 +165,8 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
   const foldersNivel = current ? [] : folders
 
   const capa = (b: any) => (b.capa_card_url ?? b.capa_url) ?? null
-  const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), count: contPasta.get(f.id) ?? 0 }))
+  // `capa` = pôster (card 4:5, prefere capa_card_url); `capaLarga` = banner (capa_url) usado no card ticket.
+  const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), capaLarga: f.capa_url ?? null, count: contPasta.get(f.id) ?? 0 }))
   const destinos = folders.map((f) => ({ id: f.id, nome: f.nome }))
 
   // Catálogo (view horizontal estilo Netflix): simulados agrupados pela PASTA DO BANCO de simulado

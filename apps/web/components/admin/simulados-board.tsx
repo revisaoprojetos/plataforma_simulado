@@ -491,7 +491,7 @@ function NovoTile({ pastaNome, variant = 'poster' }: { pastaNome?: string; varia
   )
 }
 
-type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; count: number }
+type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; capaLarga?: string | null; count: number }
 type DestinoSim = { id: string; nome: string }
 export type SimuladoCatalogo = SimuladoCard & { grupoId: string | null }
 
@@ -724,7 +724,7 @@ function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant 
 
   // ===== Variante TICKET: retangular baixo — imagem à esquerda, nome/contagem/ação à direita. =====
   if (variant === 'ticket') {
-    const capaT = (folder as { capaLarga?: string | null }).capaLarga ?? folder.capa
+    const capaT = folder.capaLarga ?? folder.capa
     return (
       <div className="group relative flex h-32 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-36">
         <div className="relative w-[38%] max-w-[12rem] shrink-0 overflow-hidden">
@@ -743,13 +743,15 @@ function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant 
             <DropdownMenuContent align="end" className="w-44">{menuItens}</DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
-          <span className="inline-flex w-fit items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground"><Folder className="h-3 w-3" /> Pasta</span>
-          <h3 className="line-clamp-2 pr-8 text-sm font-bold leading-tight text-foreground sm:text-[15px]">
-            <Link href={href} className="pointer-events-auto relative z-20 transition-opacity hover:opacity-80">{folder.nome}</Link>
-          </h3>
-          <p className="text-[11px] text-muted-foreground">{count} simulado(s)</p>
-          <div className="pointer-events-auto relative z-20 mt-1">
+        <div className="flex min-w-0 flex-1 flex-col p-3">
+          <div className="min-w-0 flex-1">
+            <span className="inline-flex w-fit items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground"><Folder className="h-3 w-3" /> Pasta</span>
+            <h3 className="mt-1 line-clamp-2 pr-8 text-sm font-bold leading-tight text-foreground sm:text-[15px]">
+              <Link href={href} className="pointer-events-auto relative z-20 transition-opacity hover:opacity-80">{folder.nome}</Link>
+            </h3>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">{count} simulado(s)</p>
+          </div>
+          <div className="pointer-events-auto relative z-20 mt-1 flex justify-end">
             <Link href={href} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-all hover:brightness-110"
               style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
               <FolderOpen className="h-4 w-4" /> Abrir pasta
