@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { NovoBancoForm } from '@/components/admin/novo-banco-form'
 import { BancosGrid } from '@/components/admin/bancos-grid'
+import { ehPastaBanco } from '@/lib/simulado/pasta-area'
 
 // Sempre renderizar fresco — a lista precisa refletir criações/exclusões/movimentações na hora.
 export const dynamic = 'force-dynamic'
@@ -27,10 +28,10 @@ export default async function BancoQuestoesPage({ searchParams }: { searchParams
     pastas = (r.data ?? []).map((b: any) => ({ ...b, pai_id: b.pai_id ?? null, is_folder: b.is_folder ?? false, folder_area: b.folder_area ?? null }))
   }
 
-  // Só pastas do CONTEXTO banco (exclui as pastas da Aplicação de Simulado, folder_area='simulado',
-  // e as de Cadernos de Prova, folder_area='caderno'). Pastas legadas (folder_area null) permanecem
+  // Só pastas do CONTEXTO banco (exclui Aplicação de Simulado 'simulado', Cadernos de Prova 'caderno'
+  // e Modelos de Caderno 'caderno_modelo' — ver ehPastaBanco). Pastas legadas (folder_area null) permanecem
   // no Banco por compatibilidade.
-  const folders = pastas.filter((p) => p.is_folder && p.folder_area !== 'simulado' && p.folder_area !== 'caderno')
+  const folders = pastas.filter((p) => p.is_folder && ehPastaBanco(p.folder_area))
   const bancosAll = pastas.filter((p) => !p.is_folder)
   const bancosPorPasta = new Map<string, number>()
   for (const b of bancosAll) if (b.pai_id) bancosPorPasta.set(b.pai_id, (bancosPorPasta.get(b.pai_id) ?? 0) + 1)

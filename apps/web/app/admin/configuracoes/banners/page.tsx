@@ -34,7 +34,7 @@ export default async function BannersPage() {
 
   // Destinos rápidos para linkar/escolher no banner: pastas + simulados publicados. Tolerante ao schema.
   const [pastasDest, simsDest] = await Promise.all([
-    svc.from('simulado_pastas').select('id, nome, folder_area').eq('tenant_id', tid).eq('is_folder', true).eq('deletado', false).order('nome', { ascending: true }).then((r: any) => (r.data ?? []).filter((f: any) => f.folder_area !== 'caderno'), () => []),
+    svc.from('simulado_pastas').select('id, nome, folder_area').eq('tenant_id', tid).eq('is_folder', true).eq('deletado', false).order('nome', { ascending: true }).then((r: any) => (r.data ?? []).filter((f: any) => f.folder_area !== 'caderno' && f.folder_area !== 'caderno_modelo'), () => []),
     svc.from('simulado_simulados').select('id, titulo, embed_token').eq('tenant_id', tid).eq('deletado', false).eq('status', 'publicado').order('created_at', { ascending: false }).limit(60).then((r: any) => r.data ?? [], () => []),
   ])
   const destinosBanner = dedupePorLabel([

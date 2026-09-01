@@ -9,6 +9,7 @@ import { checkPermission } from '@/lib/auth/permissions'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { selecionarGrupos, contarMembrosGrupos } from '@/lib/simulado/grupos'
+import { ehPastaBanco } from '@/lib/simulado/pasta-area'
 
 /** Hospeda uma imagem (base64) e devolve a URL — usado na etapa Personalizar (upload na hora). */
 export async function hospedarImagemCapa(base64: string): Promise<{ ok: boolean; url?: string; error?: string }> {
@@ -51,7 +52,7 @@ export async function listarPastasParaSalvar(): Promise<{ ok: boolean; simulado?
   const folders = linhas.filter((p) => !p.deletado && p.is_folder)
   const map = (p: any): PastaSalvar => ({ id: p.id, nome: p.nome, pai_id: p.pai_id ?? null })
   const simulado = folders.filter((p) => p.folder_area === 'simulado').map(map)
-  const banco = folders.filter((p) => p.folder_area !== 'simulado' && p.folder_area !== 'caderno').map(map)
+  const banco = folders.filter((p) => ehPastaBanco(p.folder_area)).map(map)
   return { ok: true, simulado, banco }
 }
 

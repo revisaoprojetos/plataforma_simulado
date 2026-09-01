@@ -49,7 +49,7 @@ export default async function PlataformaConfigPage({ params }: { params: Promise
     svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor, ativo, ordem').eq('tenant_id', id).order('ordem', { ascending: true }).order('criado_em', { ascending: false }).then((r) => r.data ?? [], () => []),
     svc.from('simulado_embed_config').select('ativo, origens_permitidas, metodo_identificacao, otp_email').eq('tenant_id', id).maybeSingle().then((r) => r.data, () => null),
     // Destinos rápidos para linkar um banner: pastas (folders) + simulados publicados. Tolerante ao schema.
-    svc.from('simulado_pastas').select('id, nome, folder_area').eq('tenant_id', id).eq('is_folder', true).eq('deletado', false).order('nome', { ascending: true }).then((r: any) => (r.data ?? []).filter((f: any) => f.folder_area !== 'caderno'), () => []),
+    svc.from('simulado_pastas').select('id, nome, folder_area').eq('tenant_id', id).eq('is_folder', true).eq('deletado', false).order('nome', { ascending: true }).then((r: any) => (r.data ?? []).filter((f: any) => f.folder_area !== 'caderno' && f.folder_area !== 'caderno_modelo'), () => []),
     svc.from('simulado_simulados').select('id, titulo, embed_token').eq('tenant_id', id).eq('deletado', false).eq('status', 'publicado').is('owner_estudante_id', null).order('created_at', { ascending: false }).limit(60).then((r: any) => r.data ?? [], () => []),
     // Capas largas já existentes (bancos/pastas) — modelos de fundo para a personalização do aluno.
     svc.from('simulado_pastas').select('capa_url, capa_card_url').eq('tenant_id', id).eq('deletado', false).limit(80).then((r: any) => r.data ?? [], () => []),

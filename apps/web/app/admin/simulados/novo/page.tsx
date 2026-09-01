@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { SimuladoWizard } from '@/components/admin/simulado-wizard'
 import { createSimuladoAction, listarDisciplinasWizard } from '../actions'
+import { ehPastaBanco } from '@/lib/simulado/pasta-area'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 
@@ -25,7 +26,7 @@ export default async function NovoSimuladoPage() {
     if (r.error) r = await sel('id, nome, cor, icone')
     all = r.data ?? []
   }
-  const daArea = (b: any) => b.folder_area !== 'simulado' && b.folder_area !== 'caderno'
+  const daArea = (b: any) => ehPastaBanco(b.folder_area)
   const bancosRows = all.filter((b: any) => !b.is_folder && daArea(b))
   // Mapa de pastas (is_folder) p/ montar o CAMINHO de cada banco (pai → pai → …).
   const folderMap = new Map(all.filter((b: any) => b.is_folder && daArea(b)).map((f: any) => [f.id, { nome: f.nome as string, pai: (f.pai_id ?? null) as string | null }]))
