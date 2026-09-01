@@ -755,7 +755,22 @@ async function atualizarQuestaoExistente(
   if (q.ano != null) patchQ.ano = q.ano
   if (tem(q.nivel_dificuldade)) patchQ.nivel_dificuldade = q.nivel_dificuldade
   if (tem(q.comentario_professor)) patchQ.comentario_professor = q.comentario_professor
-  if (Object.keys(patchQ).length) await svc.from('simulado_questoes').update(patchQ).eq('id', questaoId).eq('tenant_id', tenantId)
+  // Campos de texto adicionais (assunto ESPECÍFICO + demais) — só se preenchidos.
+  if (tem(q.assunto_detalhe)) patchQ.assunto_detalhe = q.assunto_detalhe
+  if (tem(q.categoria)) patchQ.categoria = q.categoria
+  if (tem(q.grupo)) patchQ.grupo = q.grupo
+  if (tem(q.pilar_1)) patchQ.pilar_1 = q.pilar_1
+  if (tem(q.pilar_2)) patchQ.pilar_2 = q.pilar_2
+  if (tem(q.cargo)) patchQ.cargo = q.cargo
+  // Update TOLERANTE: se uma coluna opcional (ex.: assunto_detalhe) não existir na base, remove SÓ
+  // ela e tenta de novo — não perde os outros campos.
+  for (let t = 0; t < 10 && Object.keys(patchQ).length; t++) {
+    const r = await svc.from('simulado_questoes').update(patchQ).eq('id', questaoId).eq('tenant_id', tenantId)
+    if (!r.error) break
+    const col = colFaltante(r.error.message)
+    if (col && col in patchQ) { delete patchQ[col]; continue }
+    break
+  }
 
   // Alternativas: TEXTO + comentário + lei, casadas por ordem (A–E). NUNCA toca em `correta` (gabarito).
   for (const a of q.alternativas ?? []) {
