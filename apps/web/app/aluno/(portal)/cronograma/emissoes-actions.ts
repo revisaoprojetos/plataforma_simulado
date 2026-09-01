@@ -18,6 +18,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { verificarAcessoCronograma } from '@/lib/cronograma/acesso'
 import { gerarGrade } from '@/lib/cronograma/gerador'
+import { contarQuestoesPorMeta, aplicarQtdQuestoes } from '@/lib/cronograma/questoes-meta'
 import { mapaTiposMeta } from '@/lib/cronograma/carregar-tipos'
 import { indexarLinks } from '@/lib/cronograma/formato-meta'
 import type { Grade, LinkAula, MetaFonte, OpcoesGeracao } from '@/lib/cronograma/tipos'
@@ -219,6 +220,9 @@ async function montarEmissao(
     opcoes,
   )
   if (!r.ok) return { ok: false, error: r.erro }
+
+  // Chip "N questões": referências copiadas do banco de conteúdos ao compor.
+  aplicarQtdQuestoes(r.grade, await contarQuestoesPorMeta(svc, tenantId, metas.map((m) => m.id)))
 
   return {
     ok: true,

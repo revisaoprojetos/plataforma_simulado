@@ -162,6 +162,8 @@ export type MetaDatada = MetaFonte & {
   links: LinksMeta | null
   /** Só em metas `simulado` internas: se o aluno tem matrícula na prova apontada. */
   acessoSimulado?: boolean
+  /** Quantas questões do banco de conteúdos foram anexadas a esta meta (referência). */
+  qtdQuestoes?: number
 }
 
 export type BlocoRevisao = { titulo: string; texto: string }

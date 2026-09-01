@@ -16,6 +16,7 @@ import { fetchAll } from '@/lib/supabase/fetch-all'
 import { verificarAcessoCronograma } from '@/lib/cronograma/acesso'
 import { indexarLinks } from '@/lib/cronograma/formato-meta'
 import { gerarGrade } from '@/lib/cronograma/gerador'
+import { contarQuestoesPorMeta, aplicarQtdQuestoes } from '@/lib/cronograma/questoes-meta'
 import { mapaTiposMeta } from '@/lib/cronograma/carregar-tipos'
 import type { Grade, LinkAula, MetaFonte, OpcoesGeracao } from '@/lib/cronograma/tipos'
 
@@ -80,6 +81,9 @@ export async function gerarCronograma(
     opcoes,
   )
   if (!r.ok) return { ok: false, error: r.erro }
+
+  // Chip "N questões": referências copiadas do banco de conteúdos ao compor.
+  aplicarQtdQuestoes(r.grade, await contarQuestoesPorMeta(svc, sessao.tenantId, metas.map((m) => m.id)))
 
   /**
    * Emissão: falhar o registro não pode impedir o aluno de ver a grade — mas também não pode

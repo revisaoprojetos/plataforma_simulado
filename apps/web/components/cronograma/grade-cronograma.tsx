@@ -337,6 +337,11 @@ export function GradeCronograma({
                     )}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-1.5">
+                    {m.qtdQuestoes ? (
+                      <span className="rounded-md border bg-background/70 px-2 py-0.5 text-xs text-muted-foreground" title="Questões desta aula (referência)">
+                        {m.qtdQuestoes} {m.qtdQuestoes === 1 ? 'questão' : 'questões'}
+                      </span>
+                    ) : null}
                     {m.links?.urls.map((u) => (
                       <a
                         key={u.plataforma.id}
