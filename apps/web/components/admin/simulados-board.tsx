@@ -266,6 +266,8 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
 
   // ===== Variante TICKET: card baixo/retangular — imagem à esquerda, infos+ações à direita. =====
   if (variant === 'ticket') {
+    // Ticket é paisagem → prefere o BANNER largo (capa_url); cai no pôster 4:5 só se não houver.
+    const capaT = s.vis?.capaBanner ?? s.vis?.capa
     return (
       <>
       <div className={cn(
@@ -274,8 +276,8 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
       )}>
         {/* metade esquerda: imagem/degradê */}
         <div className="relative w-[38%] max-w-[12rem] shrink-0 overflow-hidden">
-          {capa
-            ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
+          {capaT
+            ? <img src={capaT} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
             : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
           {!capa && <BancoIcon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
           <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${cor})` }} />
