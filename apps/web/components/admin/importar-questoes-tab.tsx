@@ -241,6 +241,13 @@ export function ImportarQuestoesTab({ bancoId = null, onDone, onParsed }: { banc
   }
 
   const podeImportar = !!resumo && resumo.novas + resumo.jaExistem > 0
+  // Rótulo do botão reflete a ação: criar novas e/ou ATUALIZAR as que já foram importadas.
+  const nNovas = resumo?.novas ?? 0, nExiste = resumo?.jaExistem ?? 0
+  const labelConfirmar = onParsed
+    ? 'Usar estas questões'
+    : nNovas > 0 && nExiste > 0 ? `Importar ${nNovas} · atualizar ${nExiste}`
+    : nExiste > 0 ? `Atualizar ${nExiste} questão(ões)`
+    : 'Importar'
   const LETRAS = ['A', 'B', 'C', 'D', 'E']
   const gabaritoDe = (q: QuestaoImport) => {
     if (q.anulada) return 'Anulada'
@@ -417,7 +424,7 @@ export function ImportarQuestoesTab({ bancoId = null, onDone, onParsed }: { banc
         <div className="flex gap-2">
           <Button variant="outline" onClick={onDone}>Cancelar</Button>
           <Button onClick={confirmar} disabled={!podeImportar || salvando}>
-            {salvando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} {onParsed ? 'Usar estas questões' : 'Importar'}
+            {salvando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} {labelConfirmar}
           </Button>
         </div>
       </div>
