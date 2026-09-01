@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { BookOpen, ChevronDown, ChevronRight, Link2, Loader2, Pencil, Plus, Trash2, Video } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { BookOpen, ChevronDown, ChevronRight, Link2, Loader2, Pencil, Plus, Search, Trash2, Video } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -41,17 +41,51 @@ export function ConjuntoEditorClient({
   const [disciplinas, setDisciplinas] = useState(disciplinasIniciais)
   const plataformas = dados.plataformas
   const [ocupado, setOcupado] = useState<string | null>(null)
-  const [expandida, setExpandida] = useState<string | null>(null)
+  const [busca, setBusca] = useState('')
+  const [filtroTipo, setFiltroTipo] = useState('todos')
+  const [gruposAbertos, setGruposAbertos] = useState<Set<string>>(new Set())
+  const [aulasAbertas, setAulasAbertas] = useState<Set<string>>(new Set())
   const [editarConjuntoAberto, setEditarConjuntoAberto] = useState(false)
 
   const rotuloTipo = (slug: string) => tipos.find((t) => t.slug === slug)?.nome ?? slug
   const corTipo = (slug: string) => tipos.find((t) => t.slug === slug)?.cor || null
+  const ordemTipo = (slug: string) => tipos.find((t) => t.slug === slug)?.ordem ?? 999
 
-  // ── Adição rápida de aula ──
+  // Agrupa por AULA normalizada: "01" e "1" caem na mesma aula; sem número vira "Sem aula".
+  const chaveAula = (aula: string | null) => {
+    const t = (aula ?? '').trim()
+    if (!t) return ''
+    return /^\d+$/.test(t) ? String(Number(t)) : t.toLowerCase()
+  }
+  const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+
+  const grupos = useMemo(() => {
+    const t = norm(busca.trim())
+    const filtradas = aulas.filter(
+      (a) => (filtroTipo === 'todos' || a.tipo === filtroTipo) && (!t || norm(`${a.aula ?? ''} ${a.conteudo ?? ''} ${rotuloTipo(a.tipo)}`).includes(t)),
+    )
+    const mapa = new Map<string, { key: string; num: number; entries: AulaBanco[] }>()
+    for (const a of filtradas) {
+      const k = chaveAula(a.aula)
+      let g = mapa.get(k)
+      if (!g) {
+        g = { key: k, num: k ? Number(k) : Number.POSITIVE_INFINITY, entries: [] }
+        mapa.set(k, g)
+      }
+      g.entries.push(a)
+    }
+    for (const g of mapa.values()) g.entries.sort((a, b) => ordemTipo(a.tipo) - ordemTipo(b.tipo) || a.ordem - b.ordem)
+    return [...mapa.values()].sort((a, b) => a.num - b.num || a.key.localeCompare(b.key))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aulas, busca, filtroTipo, tipos])
+
+  const toggleGrupo = (k: string) => setGruposAbertos((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
+  const toggleAula = (id: string) => setAulasAbertas((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  // ── Adição rápida de aula (a duração NÃO fica no conteúdo — é definida na criação do cronograma) ──
   const [tipo, setTipo] = useState(tipos[0]?.slug ?? '')
   const [aulaTxt, setAulaTxt] = useState('')
   const [conteudo, setConteudo] = useState('')
-  const [duracao, setDuracao] = useState('')
   const [video, setVideo] = useState('')
 
   async function criarDisciplinaLocal(n: string) {
@@ -68,10 +102,11 @@ export function ConjuntoEditorClient({
   async function adicionarAula() {
     if (!tipo) return toast.error('Escolha o tipo.')
     setOcupado('nova')
-    const r = await criarAula(conjunto.id, { tipo, aula: aulaTxt, conteudo, duracao, video_url: video })
+    const r = await criarAula(conjunto.id, { tipo, aula: aulaTxt, conteudo, video_url: video })
     setOcupado(null)
     if (!r.ok || !r.id) return toast.error(r.error ?? 'Não foi possível adicionar.')
-    setAulas((xs) => [...xs, { id: r.id!, tipo, aula: aulaTxt.trim() || null, conteudo: conteudo.trim() || null, duracao: duracao.trim() || null, video_url: video.trim() || null, tema: null, ordem: xs.length, urls: [], questoes: [] }])
+    setAulas((xs) => [...xs, { id: r.id!, tipo, aula: aulaTxt.trim() || null, conteudo: conteudo.trim() || null, duracao: null, video_url: video.trim() || null, tema: null, ordem: xs.length, urls: [], questoes: [] }])
+    setGruposAbertos((s) => { const n = new Set(s); n.add(chaveAula(aulaTxt.trim() || null)); return n })
     // O que repete fica; a aula avança sozinha e o conteúdo limpa.
     setConteudo('')
     setVideo('')
@@ -141,10 +176,6 @@ export function ConjuntoEditorClient({
             <Label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Conteúdo</Label>
             <Input value={conteudo} onChange={(e) => setConteudo(e.target.value)} placeholder="O que o aluno estuda" className="h-8" onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), adicionarAula())} />
           </div>
-          <div className="w-24">
-            <Label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Duração</Label>
-            <Input value={duracao} onChange={(e) => setDuracao(e.target.value)} placeholder="1:30" className="h-8" />
-          </div>
           <div className="min-w-40 flex-1">
             <Label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Vídeo (URL)</Label>
             <Input value={video} onChange={(e) => setVideo(e.target.value)} placeholder="https://…" className="h-8" />
@@ -156,44 +187,85 @@ export function ConjuntoEditorClient({
         <p className="mt-2 text-xs text-muted-foreground">Enter grava e a aula avança sozinha. Questões e links QC/TEC ficam em cada aula abaixo.</p>
       </div>
 
-      {/* Aulas */}
-      {aulas.length === 0 ? (
-        <div className="rounded-2xl border bg-card py-12 text-center text-sm text-muted-foreground shadow-sm">Nenhuma aula ainda. Adicione a primeira acima.</div>
+      {/* Barra de ferramentas: busca + filtro por tipo + expandir/recolher */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-0 flex-1 sm:max-w-xs">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar aula ou conteúdo…" className="h-9 pl-8" />
+        </div>
+        <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v ?? 'todos')}>
+          <SelectTrigger className="h-9 w-44"><SelectValue>{filtroTipo === 'todos' ? 'Todos os tipos' : rotuloTipo(filtroTipo)}</SelectValue></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os tipos</SelectItem>
+            {tipos.map((t) => <SelectItem key={t.slug} value={t.slug}>{t.nome}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Button size="sm" variant="outline" onClick={() => setGruposAbertos(new Set(grupos.map((g) => g.key)))}>Expandir tudo</Button>
+        <Button size="sm" variant="ghost" onClick={() => { setGruposAbertos(new Set()); setAulasAbertas(new Set()) }}>Recolher</Button>
+        <span className="ml-auto text-xs text-muted-foreground">{grupos.length} aula(s) · {aulas.length} conteúdo(s)</span>
+      </div>
+
+      {/* Tabela de aulas — agrupada por aula (Aula 01 reúne PDF, Resolução, Flashcards…) */}
+      {grupos.length === 0 ? (
+        <div className="rounded-2xl border bg-card py-12 text-center text-sm text-muted-foreground shadow-sm">
+          {aulas.length === 0 ? 'Nenhuma aula ainda. Adicione a primeira acima.' : 'Nada encontrado com esse filtro.'}
+        </div>
       ) : (
         <div className="space-y-2">
-          {aulas.map((a) => {
-            const aberta = expandida === a.id
+          {grupos.map((g) => {
+            const aberto = gruposAbertos.has(g.key)
+            const totalLinks = g.entries.reduce((n, a) => n + a.urls.length, 0)
+            const totalQ = g.entries.reduce((n, a) => n + a.questoes.length, 0)
             return (
-              <div key={a.id} className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                <div className="flex items-center gap-2 px-4 py-2.5">
-                  <button onClick={() => setExpandida(aberta ? null : a.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                    {aberta ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: corTipo(a.tipo) ?? 'var(--muted-foreground)' }} />
-                    <span className="shrink-0 text-xs text-muted-foreground">{rotuloTipo(a.tipo)}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm">
-                      {a.aula && <span className="font-medium">aula {a.aula} · </span>}
-                      {a.conteudo || <span className="text-muted-foreground">sem conteúdo</span>}
-                    </span>
-                  </button>
-                  {a.duracao && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{a.duracao}</span>}
-                  {a.video_url && <Video className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                  {a.urls.length > 0 && <Badge variant="outline" className="shrink-0 gap-1 text-[10px]"><Link2 className="h-3 w-3" />{a.urls.length}</Badge>}
-                  {a.questoes.length > 0 && <Badge variant="outline" className="shrink-0 text-[10px]">{a.questoes.length} q</Badge>}
-                  <Button size="sm" variant="ghost" className="h-7 w-7 shrink-0 p-0" onClick={() => removerAula(a)} disabled={ocupado === `aula:${a.id}`} title="Excluir aula">
-                    {ocupado === `aula:${a.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 text-destructive" />}
-                  </Button>
-                </div>
+              <div key={g.key} className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <button onClick={() => toggleGrupo(g.key)} className="flex w-full items-center gap-2 px-4 py-3 text-left transition hover:bg-muted/30">
+                  {aberto ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                  <span className="font-semibold">{g.key ? `Aula ${g.key}` : 'Sem número de aula'}</span>
+                  <Badge variant="secondary" className="shrink-0">{g.entries.length} conteúdo(s)</Badge>
+                  <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                    {[...new Set(g.entries.map((a) => a.tipo))].map((tp) => (
+                      <span key={tp} className="h-2 w-2 rounded-full" style={{ background: corTipo(tp) ?? 'var(--muted-foreground)' }} title={rotuloTipo(tp)} />
+                    ))}
+                    {totalLinks > 0 && <Badge variant="outline" className="gap-1 text-[10px]"><Link2 className="h-3 w-3" />{totalLinks}</Badge>}
+                    {totalQ > 0 && <Badge variant="outline" className="text-[10px]">{totalQ} q</Badge>}
+                  </span>
+                </button>
 
-                {aberta && (
-                  <AulaPainel
-                    aula={a}
-                    tipos={tipos}
-                    plataformas={plataformas}
-                    disciplinaFiltro={conjunto.disciplina_id ? [{ id: conjunto.disciplina_id, nome: conjunto.disciplina }] : disciplinas}
-                    ocupado={ocupado}
-                    setOcupado={setOcupado}
-                    onPatch={(p) => patchAula(a.id, p)}
-                  />
+                {aberto && (
+                  <div className="divide-y border-t">
+                    {g.entries.map((a) => {
+                      const aOpen = aulasAbertas.has(a.id)
+                      return (
+                        <div key={a.id} className={aOpen ? 'bg-muted/10' : ''}>
+                          <div className="flex items-center gap-2 py-2 pl-9 pr-3">
+                            <button onClick={() => toggleAula(a.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                              {aOpen ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: corTipo(a.tipo) ?? 'var(--muted-foreground)' }} />
+                              <span className="w-28 shrink-0 truncate text-xs text-muted-foreground">{rotuloTipo(a.tipo)}</span>
+                              <span className="min-w-0 flex-1 truncate text-sm">{a.conteudo || <span className="text-muted-foreground">sem conteúdo</span>}</span>
+                            </button>
+                            {a.video_url && <Video className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                            {a.urls.length > 0 && <Badge variant="outline" className="shrink-0 gap-1 text-[10px]"><Link2 className="h-3 w-3" />{a.urls.length}</Badge>}
+                            {a.questoes.length > 0 && <Badge variant="outline" className="shrink-0 text-[10px]">{a.questoes.length} q</Badge>}
+                            <Button size="sm" variant="ghost" className="h-7 w-7 shrink-0 p-0" onClick={() => removerAula(a)} disabled={ocupado === `aula:${a.id}`} title="Excluir">
+                              {ocupado === `aula:${a.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 text-destructive" />}
+                            </Button>
+                          </div>
+                          {aOpen && (
+                            <AulaPainel
+                              aula={a}
+                              tipos={tipos}
+                              plataformas={plataformas}
+                              disciplinaFiltro={conjunto.disciplina_id ? [{ id: conjunto.disciplina_id, nome: conjunto.disciplina }] : disciplinas}
+                              ocupado={ocupado}
+                              setOcupado={setOcupado}
+                              onPatch={(p) => patchAula(a.id, p)}
+                            />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
             )
@@ -235,7 +307,6 @@ function AulaPainel({
   const [tipo, setTipo] = useState(aula.tipo)
   const [aulaTxt, setAulaTxt] = useState(aula.aula ?? '')
   const [conteudo, setConteudo] = useState(aula.conteudo ?? '')
-  const [duracao, setDuracao] = useState(aula.duracao ?? '')
   const [video, setVideo] = useState(aula.video_url ?? '')
   const [tema, setTema] = useState(aula.tema ?? '')
   const [urls, setUrls] = useState<Record<string, string>>(() => Object.fromEntries(aula.urls.map((u) => [u.plataforma_id, u.url])))
@@ -243,10 +314,10 @@ function AulaPainel({
 
   async function salvarCampos() {
     setOcupado(`salvar:${aula.id}`)
-    const r = await atualizarAula(aula.id, { tipo, aula: aulaTxt, conteudo, duracao, video_url: video, tema })
+    const r = await atualizarAula(aula.id, { tipo, aula: aulaTxt, conteudo, video_url: video, tema })
     setOcupado(null)
     if (!r.ok) return toast.error(r.error ?? 'Não foi possível salvar.')
-    onPatch({ tipo, aula: aulaTxt.trim() || null, conteudo: conteudo.trim() || null, duracao: duracao.trim() || null, video_url: video.trim() || null, tema: tema.trim() || null })
+    onPatch({ tipo, aula: aulaTxt.trim() || null, conteudo: conteudo.trim() || null, duracao: null, video_url: video.trim() || null, tema: tema.trim() || null })
     toast.success('Aula salva')
   }
 
@@ -288,10 +359,6 @@ function AulaPainel({
         <div className="w-16">
           <Label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Aula</Label>
           <Input value={aulaTxt} onChange={(e) => setAulaTxt(e.target.value)} placeholder="01" className="h-8" />
-        </div>
-        <div className="w-28">
-          <Label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Duração</Label>
-          <Input value={duracao} onChange={(e) => setDuracao(e.target.value)} placeholder="1:30" className="h-8" />
         </div>
         <div className="min-w-52 flex-1">
           <Label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Vídeo (URL)</Label>
