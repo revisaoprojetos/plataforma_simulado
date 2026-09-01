@@ -1,6 +1,23 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetch-all'
+import { remember } from '@/lib/cache/relatorio-cache'
+
+/**
+ * Detecção de colunas opcionais (lei A1: materia_id; versionamento A2: versao_publicada) memoizada
+ * POR PROCESSO — o schema não muda em runtime, então roda 1x em vez de 2 round-trips a CADA
+ * carregamento do catálogo do aluno.
+ */
+let _colsLeitura: { temLei: boolean; temVers: boolean } | null = null
+async function detectarColunasLeitura(svc: ReturnType<typeof createAdminClient>): Promise<{ temLei: boolean; temVers: boolean }> {
+  if (_colsLeitura) return _colsLeitura
+  const [pLei, pVers] = await Promise.all([
+    svc.from('simulado_documentos').select('materia_id').limit(1),
+    svc.from('simulado_documentos').select('versao_publicada').limit(1),
+  ])
+  _colsLeitura = { temLei: !pLei.error, temVers: !pVers.error }
+  return _colsLeitura
+}
 
 export interface DocumentoAluno {
   id: string
@@ -29,12 +46,8 @@ export interface DocumentoAluno {
  */
 export async function documentosDoAluno(estudanteId: string, tenantId: string): Promise<DocumentoAluno[]> {
   const svc = createAdminClient()
-  // Detecta colunas de lei (A1) e de versionamento (A2) → select tolerante.
-  const [pLei, pVers] = await Promise.all([
-    svc.from('simulado_documentos').select('materia_id').limit(1),
-    svc.from('simulado_documentos').select('versao_publicada').limit(1),
-  ])
-  const temLei = !pLei.error, temVers = !pVers.error
+  // Detecta colunas de lei (A1) e de versionamento (A2) → select tolerante (memoizado por processo).
+  const { temLei, temVers } = await detectarColunasLeitura(svc)
   const cols = ['id, titulo, descricao, cor, icone, capa_url, versao', temVers && 'versao_publicada', temLei && 'materia_id, tipo_norma, numero, ano, ementa'].filter(Boolean).join(', ')
   const docs = await fetchAll<any>(() =>
     svc.from('simulado_documentos').select(cols)
@@ -193,7 +206,16 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
 
   // Aluno lê a versão PUBLICADA vigente (A2); genéricos usam a versão única.
   const versao = (doc as any).versao_publicada ?? (doc as any).versao ?? 1
-  const { data: cont } = await svc.from('simulado_documento_conteudos').select('html, artigos').eq('documento_id', documentoId).eq('versao', versao).maybeSingle()
+  // O HTML/artigos de uma (documento, versão) é IMUTÁVEL depois de publicado (nova publicação =
+  // nova versão = nova chave). Cacheia → não relê a lei inteira do banco a cada abertura (egress).
+  const cont = await remember<{ html: string; artigos: number }>(
+    `leitura:conteudo:${tenantId}:${documentoId}:${versao}`,
+    3600,
+    async () => {
+      const { data } = await svc.from('simulado_documento_conteudos').select('html, artigos').eq('documento_id', documentoId).eq('versao', versao).maybeSingle()
+      return { html: (data as any)?.html ?? '', artigos: (data as any)?.artigos ?? 0 }
+    },
+  )
   const { data: prog } = await svc.from('simulado_leitura_progresso')
     .select('pct, artigo_max, tempo_seg, concluido_em').eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).maybeSingle()
 
@@ -271,8 +293,8 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     titulo: (doc as any).titulo,
     descricao: (doc as any).descricao ?? null,
     versao,
-    html: (cont as any)?.html ?? '',
-    artigos: (cont as any)?.artigos ?? 0,
+    html: cont.html,
+    artigos: cont.artigos,
     desafio: { ativo: !!(doc as any).desafio_ativo, exigeFim: !!(doc as any).desafio_exige_fim, tempoMin: (doc as any).desafio_tempo_min ?? 0 },
     progresso: {
       pct: (prog as any)?.pct ?? 0,
