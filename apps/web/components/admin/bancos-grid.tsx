@@ -131,12 +131,13 @@ export function BancosGrid({ bancos, folders = [], destinos = [], atual = null, 
       {editandoPasta && (
         <EditarPastaDialog
           pasta={{ id: editandoPasta.id, nome: editandoPasta.nome, cor: editandoPasta.cor ?? null, capa: editandoPasta.capa ?? null, capaLarga: editandoPasta.capaLarga ?? null }}
+          cardView={cardView}
           onClose={() => setEditandoPasta(null)}
           onSaved={() => router.refresh()}
         />
       )}
       {criandoPasta && (
-        <EditarPastaDialog area="banco" paiId={atual?.id ?? null} onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
+        <EditarPastaDialog area="banco" paiId={atual?.id ?? null} cardView={cardView} onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
       )}
     </div>
   )
@@ -171,7 +172,7 @@ function FolderCard({ f, onExcluir, onPersonalizar, onDuplicar, variant = 'poste
         {/* Kebab no CANTO SUPERIOR DIREITO */}
         <div className="pointer-events-auto absolute right-2 top-2 z-30">
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg bg-card/80 text-muted-foreground backdrop-blur outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Ações da pasta">
+            <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-popup-open:bg-accent data-popup-open:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Ações da pasta">
               <MoreVertical className="h-4 w-4" />
             </DropdownMenuTrigger>
             {menuPasta}
@@ -201,7 +202,7 @@ function FolderCard({ f, onExcluir, onPersonalizar, onDuplicar, variant = 'poste
       <Link href={href} className="absolute inset-0 z-10" aria-label={f.nome} />
       <div className="absolute right-2 top-2 z-30">
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 outline-none transition-colors hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Ações da pasta">
+          <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 outline-none transition-colors hover:bg-white hover:text-neutral-900 data-popup-open:bg-white data-popup-open:text-neutral-900 focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Ações da pasta">
             <MoreVertical className="h-4 w-4" />
           </DropdownMenuTrigger>
           {menuPasta}

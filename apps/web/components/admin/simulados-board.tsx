@@ -298,7 +298,7 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
             <Check className="h-4 w-4" />
           </button>
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg bg-card/80 text-muted-foreground backdrop-blur outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" title="Mais ações">
+            <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-popup-open:bg-accent data-popup-open:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring" title="Mais ações">
               <MoreHorizontal className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-52">{menuItens}</DropdownMenuContent>
@@ -684,12 +684,13 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
       {editandoPasta && (
         <EditarPastaDialog
           pasta={{ id: editandoPasta.id, nome: editandoPasta.nome, cor: editandoPasta.cor ?? null, capa: editandoPasta.capa ?? null, capaLarga: (editandoPasta as any).capaLarga ?? null }}
+          cardView={cardView}
           onClose={() => setEditandoPasta(null)}
           onSaved={() => router.refresh()}
         />
       )}
       {criandoPasta && (
-        <EditarPastaDialog area="simulado" onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
+        <EditarPastaDialog area="simulado" cardView={cardView} onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
       )}
     </div>
   )
@@ -726,7 +727,7 @@ function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir }: {
       </Link>
       {/* Menu (fora do <a> → clicar não navega). */}
       <DropdownMenu>
-        <DropdownMenuTrigger className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-white/90 backdrop-blur-sm outline-none transition-colors hover:bg-black/60 hover:text-white focus-visible:ring-2 focus-visible:ring-white/60" aria-label="Ações da pasta">
+        <DropdownMenuTrigger className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-white/90 backdrop-blur-sm outline-none transition-colors hover:bg-white hover:text-neutral-900 data-popup-open:bg-white data-popup-open:text-neutral-900 focus-visible:ring-2 focus-visible:ring-white/60" aria-label="Ações da pasta">
           <MoreHorizontal className="h-4 w-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">

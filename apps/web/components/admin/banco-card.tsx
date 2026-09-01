@@ -75,7 +75,7 @@ export function BancoCard({ id, nome, total, estudantes = 0, cor, icone, capa, t
             </div>
           ) : (
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg bg-card/80 text-muted-foreground backdrop-blur outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Ações do banco">
+              <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-popup-open:bg-accent data-popup-open:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Ações do banco">
                 <MoreVertical className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-44">{menuItens}</DropdownMenuContent>
@@ -130,7 +130,7 @@ export function BancoCard({ id, nome, total, estudantes = 0, cor, icone, capa, t
         ) : (
           <DropdownMenu>
             <DropdownMenuTrigger
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 outline-none transition-colors hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-white/50"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 outline-none transition-colors hover:bg-white hover:text-neutral-900 data-popup-open:bg-white data-popup-open:text-neutral-900 focus-visible:ring-2 focus-visible:ring-white/50"
               aria-label="Ações do banco"
             >
               <MoreVertical className="h-4 w-4" />
