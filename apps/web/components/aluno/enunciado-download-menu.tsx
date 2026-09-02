@@ -47,7 +47,7 @@ export function EnunciadoDownloadBotao({ url }: { url: string }) {
       onClick={baixar}
       title="Baixar caderno de questões"
       aria-label="Baixar caderno de questões"
-      className="group/dl pointer-events-auto relative flex w-[42px] shrink-0 items-center justify-center overflow-hidden rounded-lg border-[1.5px] border-white/80 text-white transition-all hover:scale-[1.03]"
+      className="group/dl pointer-events-auto relative flex w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border-[1.5px] border-white/80 text-white transition-all hover:scale-[1.03]"
     >
       <span className="absolute inset-0 bg-white opacity-0 transition-opacity duration-300 group-hover/dl:opacity-100" />
       <FileDown className="relative z-10 h-4 w-4 text-white transition-colors group-hover/dl:text-primary" />
