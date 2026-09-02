@@ -16,8 +16,8 @@ export default async function AoVivoPage({ params }: { params: Promise<{ id: str
   return (
     <div className="space-y-5">
       <div>
-        <Link href={`/admin/simulados/${id}`} className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="h-4 w-4" /> Voltar para o simulado
+        <Link href="/admin/simulados" className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="h-4 w-4" /> Voltar para Aplicação de Simulado
         </Link>
         <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
           <Radio className="h-5 w-5 text-emerald-500" /> Ao vivo — {sim?.titulo ?? 'Simulado'}
