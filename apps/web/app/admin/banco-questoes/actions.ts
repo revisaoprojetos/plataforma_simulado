@@ -678,12 +678,15 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
     // boolean `anulada`; a anulação é aplicada ao vincular a etiqueta funcional na importação.)
     const anuladaPorEtiqueta = etiquetas.some((e) => { const n = norm(e); return n.startsWith('anul') || n.startsWith('desconsider') })
 
+    // Questão ANULADA (coluna "ANULADA" OU etiqueta funcional) é VÁLIDA mesmo sem alternativas e sem
+    // gabarito: por causa da anulação ela não tem resposta certa — só o enunciado aparece (bloqueado).
+    // Por isso pula toda a validação de objetiva (contagem de alternativas + alternativa correta).
+    const anuladaQualquer = anulada || anuladaPorEtiqueta
     let erro: string | null = null
     if (!enunciado) erro = 'Enunciado vazio'
-    else if (tipo === 'objetiva') {
+    else if (tipo === 'objetiva' && !anuladaQualquer) {
       if (alternativas.length < 2) erro = 'Menos de 2 alternativas'
-      // Anulada (coluna "ANULADA" OU etiqueta funcional) não exige alternativa correta.
-      else if (!anulada && !anuladaPorEtiqueta && !alternativas.some((a) => a.correta)) erro = 'Alternativa correta não indicada'
+      else if (!alternativas.some((a) => a.correta)) erro = 'Alternativa correta não indicada'
     }
 
     out.push({
