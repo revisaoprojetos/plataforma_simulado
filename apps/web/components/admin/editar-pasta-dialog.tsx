@@ -55,7 +55,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   const [capaLarga, setCapaLarga] = useState<string | null>(pasta?.capaLarga ?? null)
   const [salvando, setSalvando] = useState(false)
   // Editor de recorte (posição + zoom) na proporção certa, aberto ao escolher OU ao "Ajustar".
-  const [cropper, setCropper] = useState<{ file?: File; src?: string; alvo: 'card' | 'banner'; aspect: number; titulo: string; zoom?: number; off?: { x: number; y: number } } | null>(null)
+  const [cropper, setCropper] = useState<{ file?: File; src?: string; alvo: 'card' | 'banner'; aspect: number; titulo: string; zoom?: number; center?: { x: number; y: number } } | null>(null)
   // Fonte ORIGINAL + estado do recorte por imagem — p/ REEDITAR de onde parou (re-recorta do original).
   const origCard = useRef<File | string | null>(pasta?.capa ?? null)
   const origBanner = useRef<File | string | null>(pasta?.capaLarga ?? null)
@@ -97,7 +97,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
     const base = (alvo === 'card' ? origCard.current : origBanner.current) ?? (alvo === 'card' ? capaCard : capaLarga)
     if (!base) return
     const est = alvo === 'card' ? cropCard.current : cropBanner.current
-    const comum = { alvo, aspect: aspectDe(alvo), titulo: tituloCrop(alvo), zoom: est?.zoom, off: est?.offsetFrac }
+    const comum = { alvo, aspect: aspectDe(alvo), titulo: tituloCrop(alvo), zoom: est?.zoom, center: est ? { x: est.cx, y: est.cy } : undefined }
     if (base instanceof File) setCropper({ file: base, ...comum })
     else setCropper({ src: base, ...comum })
   }
@@ -263,7 +263,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
         </div>
       </div>
 
-      {cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} initialZoom={cropper.zoom} initialOffsetFrac={cropper.off} onCancel={() => setCropper(null)} onConfirm={aplicarCrop} />}
+      {cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} initialZoom={cropper.zoom} initialCenter={cropper.center} onCancel={() => setCropper(null)} onConfirm={aplicarCrop} />}
     </div>,
     document.body,
   )
