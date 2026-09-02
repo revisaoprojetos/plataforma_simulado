@@ -21,7 +21,8 @@ export default function PersonalizarPage() {
   // Estilo de card do console: em TICKET o recorte da capa é PAISAGEM (4:3), não o card 4:5.
   const [cardView, setCardView] = useState<CardView>('poster')
   useEffect(() => { cardViewAtual().then(setCardView).catch(() => {}) }, [])
-  const aspectDe = (alvo: 'banner' | 'card') => (cardView === 'ticket' ? 4 / 3 : alvo === 'banner' ? 16 / 4 : 4 / 5)
+  // Banner é SEMPRE largo (~2740×400); só o card adapta ao modo (ticket 4:3 / pôster 4:5).
+  const aspectDe = (alvo: 'banner' | 'card') => (alvo === 'banner' ? 2740 / 400 : cardView === 'ticket' ? 4 / 3 : 4 / 5)
 
   const cor = draft.cor ?? '#6d28d9'
   const imgCard = draft.capaCardUrl ?? draft.capaUrl
@@ -89,8 +90,8 @@ export default function PersonalizarPage() {
           <div className="min-w-0 flex-1">
             <Dropzone
               label="Banner (capa larga / horizontal)"
-              hint="Proporção 16:4 (horizontal) · ideal 1600×400 px."
-              aspect="aspect-[16/4]"
+              hint="Proporção larga (~2740×400) · usado nos banners/trilha, não no card."
+              aspect="aspect-[2740/400]"
               img={draft.capaUrl}
               processando={subBanner}
               inputRef={bannerRef}

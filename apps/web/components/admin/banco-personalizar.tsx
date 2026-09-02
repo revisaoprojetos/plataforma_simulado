@@ -67,7 +67,9 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
   const tituloCrop = (alvo: 'card' | 'banner') => (alvo === 'banner' ? 'Ajustar imagem de capa' : 'Ajustar imagem do card')
   // O recorte segue o CARD VIEW ATIVO: em TICKET tudo é PAISAGEM (4:3, deitado, como o card ticket
   // exibe a imagem); em PÔSTER o banner fica largo (16:4) e a imagem do card 4:5.
-  const aspectDe = (alvo: 'card' | 'banner') => (cardView === 'ticket' ? 4 / 3 : alvo === 'banner' ? 16 / 4 : 4 / 5)
+  // O BANNER (capa_url) é SEMPRE largo (~2740×400) — é usado nos banners/trilha, nunca no card/ticket,
+  // então NÃO segue o toggle. Só a imagem do CARD adapta: ticket = paisagem (4:3), pôster = 4:5.
+  const aspectDe = (alvo: 'card' | 'banner') => (alvo === 'banner' ? 2740 / 400 : cardView === 'ticket' ? 4 / 3 : 4 / 5)
 
   function abrirCropper(f: File | null, alvo: 'card' | 'banner') {
     if (!f) return
@@ -133,8 +135,8 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
             <label className="text-xs font-medium text-muted-foreground">Imagem de capa (banner largo / capa comprida)</label>
             <input ref={bannerRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropper(e.target.files?.[0] ?? null, 'banner'); e.target.value = '' }} />
             {capa ? (
-              // Miniatura na PROPORÇÃO real do recorte (altura fixa; largura pela proporção, sem gigantismo).
-              <div className="relative mx-auto max-w-full overflow-hidden rounded-xl border" style={{ aspectRatio: String(aspectDe('banner')), height: 168 }}>
+              // Banner largo: tira de largura total na proporção real (~2740×400) — fica baixa, nunca gigante.
+              <div className="relative w-full overflow-hidden rounded-xl border" style={{ aspectRatio: String(aspectDe('banner')) }}>
                 <img src={capa} alt="Capa" className="absolute inset-0 h-full w-full object-cover" />
                 <div className="absolute right-2 top-2 flex gap-1.5">
                   <button type="button" onClick={() => ajustarAtual('banner')} className={btnOverlay}><Crop className="h-3.5 w-3.5" /> Ajustar</button>
@@ -157,8 +159,9 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
             <label className="text-xs font-medium text-muted-foreground">Imagem do card ({cardView === 'ticket' ? 'ticket' : 'pôster'})</label>
             <input ref={cardInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropper(e.target.files?.[0] ?? null, 'card'); e.target.value = '' }} />
             {capaCard ? (
-              // Miniatura na PROPORÇÃO do card do modo ativo (pôster 4:5 / ticket 4:3), altura fixa.
-              <div className="relative mx-auto max-w-full overflow-hidden rounded-xl border" style={{ aspectRatio: String(aspectDe('card')), height: 168 }}>
+              // Miniatura na PROPORÇÃO do card do modo ativo (pôster 4:5 / ticket 4:3), altura fixa
+              // (um pouco maior p/ os botões do topo não cobrirem a imagem).
+              <div className="relative mx-auto max-w-full overflow-hidden rounded-xl border" style={{ aspectRatio: String(aspectDe('card')), height: 210 }}>
                 <img src={capaCard} alt="Imagem do card" className="absolute inset-0 h-full w-full object-cover" />
                 <div className="absolute right-2 top-2 flex gap-1.5">
                   <button type="button" onClick={() => ajustarAtual('card')} className={btnOverlay}><Crop className="h-3.5 w-3.5" /> Ajustar</button>
