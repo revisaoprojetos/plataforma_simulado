@@ -102,6 +102,10 @@ const secoes = [
 
 // Largura de cada card nas fileiras horizontais (deixa espiar um pedaço do próximo).
 const CARD_BASIS = 'shrink-0 basis-[calc((100%-1rem)/1.6)] sm:basis-[calc((100%-2rem)/2.6)] md:basis-[calc((100%-3rem)/3.4)] lg:basis-[calc((100%-4rem)/4.3)] xl:basis-[calc((100%-5rem)/5.3)]'
+// Ticket é deitado (mais largo) → menos por fileira, ainda "espiando" o próximo (estilo Netflix).
+const CARD_BASIS_TICKET = 'shrink-0 basis-[calc(100%/1.15)] sm:basis-[calc((100%-1rem)/2.1)] lg:basis-[calc((100%-2rem)/2.5)] xl:basis-[calc((100%-3rem)/3.1)]'
+// Grade (vista "Pastas" no ticket / "Status"): colunas conforme o estilo do card.
+const gradeCls = (v: CardView) => (v === 'ticket' ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3' : 'grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5')
 
 function formatDur(min: number | null) {
   if (!min) return 'Sem limite'
@@ -633,25 +637,46 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
         <SecoesStatus sims={filtrados} online={online} appUrl={appUrl} onMover={podeMover ? (s) => setMovendo(s) : undefined}
           recolhidas={recolhidas} toggleSecao={toggleSecao} selecao={selecao} onSelecionar={setSel} variant={cardView} />
       ) : vista === 'pastas' && !atual ? (
-        // Só as PASTAS (tiles). Clicar entra na pasta (?pasta=id) e mostra os simulados de dentro.
-        <div className="space-y-6">
-          {secoesPasta.pastas.length > 0 && (
-            <div className={cn('grid gap-3', cardView === 'ticket' ? 'md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5')}>
-              {secoesPasta.pastas.map(({ folder, sims }) => folder && (
-                <FolderTile key={folder.id} folder={folder} count={sims.length} appUrl={appUrl}
-                  onPersonalizar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)} variant={cardView} />
-              ))}
-            </div>
-          )}
-          {secoesPasta.semPasta.length > 0 && (
-            <SecaoSimples titulo="Sem pasta" icone={FolderInput} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
-              aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
-              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} variant={cardView} />
-          )}
-          {secoesPasta.pastas.length === 0 && secoesPasta.semPasta.length === 0 && (
-            <p className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">Nenhuma pasta ainda. Crie a primeira em “Nova pasta”.</p>
-          )}
-        </div>
+        cardView === 'ticket' ? (
+          // TICKET: grade agrupada por pasta (mesmo agrupamento das Linhas, porém em grade).
+          <div className="space-y-8">
+            {secoesPasta.pastas.map(({ folder, sims }) => (
+              folder && <PastaSection key={folder.id} folder={folder} sims={sims} online={online} appUrl={appUrl}
+                aberto={!recolhidas.has(`p:${folder.id}`)} toggle={() => toggleSecao(`p:${folder.id}`)}
+                onGerenciar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)}
+                onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel}
+                variant={cardView} layout="grade" />
+            ))}
+            {secoesPasta.semPasta.length > 0 && (
+              <SecaoSimples titulo="Sem pasta" icone={FolderInput} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
+                aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
+                onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} variant={cardView} layout="grade" />
+            )}
+            {secoesPasta.pastas.length === 0 && secoesPasta.semPasta.length === 0 && (
+              <p className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">Nenhuma pasta ainda. Crie a primeira em “Nova pasta”.</p>
+            )}
+          </div>
+        ) : (
+          // PÔSTER: só os TILES de pasta (clicar entra na pasta e mostra os simulados de dentro).
+          <div className="space-y-6">
+            {secoesPasta.pastas.length > 0 && (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {secoesPasta.pastas.map(({ folder, sims }) => folder && (
+                  <FolderTile key={folder.id} folder={folder} count={sims.length} appUrl={appUrl}
+                    onPersonalizar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)} variant={cardView} />
+                ))}
+              </div>
+            )}
+            {secoesPasta.semPasta.length > 0 && (
+              <SecaoSimples titulo="Sem pasta" icone={FolderInput} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
+                aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
+                onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} variant={cardView} />
+            )}
+            {secoesPasta.pastas.length === 0 && secoesPasta.semPasta.length === 0 && (
+              <p className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">Nenhuma pasta ainda. Crie a primeira em “Nova pasta”.</p>
+            )}
+          </div>
+        )
       ) : (
         <div className="space-y-8">
           {secoesPasta.pastas.map(({ folder, sims }) => (
@@ -794,10 +819,10 @@ function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant 
   )
 }
 
-function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerenciar, onExcluir, onMover, selecao, onSelecionar, variant = 'poster' }: {
+function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerenciar, onExcluir, onMover, selecao, onSelecionar, variant = 'poster', layout = 'fileira' }: {
   folder: PastaSim; sims: SimuladoCard[]; online: Record<string, number>; appUrl: string
   aberto: boolean; toggle: () => void; onGerenciar: () => void; onExcluir: () => void
-  onMover?: (s: SimuladoCard) => void; selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void; variant?: CardView
+  onMover?: (s: SimuladoCard) => void; selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void; variant?: CardView; layout?: 'fileira' | 'grade'
 }) {
   const st = statusPasta(sims)
   // Link da PASTA para o aluno: abre a home filtrada nesta pasta. Sem login, o proxy manda para
@@ -836,23 +861,23 @@ function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerencia
           </DropdownMenu>
         </div>
       </div>
-      {aberto && (variant === 'ticket' ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {aberto && (layout === 'grade' ? (
+        <div className={gradeCls(variant)}>
           {sims.map((s) => (
-            <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} variant="ticket"
+            <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} variant={variant}
               onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
           ))}
-          <NovoTile pastaNome={folder.nome} variant="ticket" />
+          <NovoTile pastaNome={folder.nome} variant={variant} />
         </div>
       ) : (
         <FileiraHorizontal>
           {sims.map((s) => (
-            <div key={s.id} className={CARD_BASIS}>
-              <CardSimuladoAdmin s={s} appUrl={appUrl} online={online[s.id] ?? 0}
+            <div key={s.id} className={variant === 'ticket' ? CARD_BASIS_TICKET : CARD_BASIS}>
+              <CardSimuladoAdmin s={s} appUrl={appUrl} online={online[s.id] ?? 0} variant={variant}
                 onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
             </div>
           ))}
-          <div className={CARD_BASIS}><NovoTile pastaNome={folder.nome} /></div>
+          <div className={variant === 'ticket' ? CARD_BASIS_TICKET : CARD_BASIS}><NovoTile pastaNome={folder.nome} variant={variant} /></div>
         </FileiraHorizontal>
       ))}
     </section>
@@ -860,10 +885,10 @@ function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerencia
 }
 
 /** Seção simples (sem ações de pasta) — usada para "Sem pasta" e para o nível de dentro de uma pasta. */
-function SecaoSimples({ titulo, icone: Icone, sims, online, appUrl, aberto, toggle, onMover, selecao, onSelecionar, mostrarNovo, variant = 'poster' }: {
+function SecaoSimples({ titulo, icone: Icone, sims, online, appUrl, aberto, toggle, onMover, selecao, onSelecionar, mostrarNovo, variant = 'poster', layout = 'fileira' }: {
   titulo: string; icone: any; sims: SimuladoCard[]; online: Record<string, number>; appUrl: string
   aberto: boolean; toggle: () => void; onMover?: (s: SimuladoCard) => void
-  selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void; mostrarNovo?: boolean; variant?: CardView
+  selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void; mostrarNovo?: boolean; variant?: CardView; layout?: 'fileira' | 'grade'
 }) {
   return (
     <section className="space-y-3">
@@ -876,23 +901,23 @@ function SecaoSimples({ titulo, icone: Icone, sims, online, appUrl, aberto, togg
       {aberto && (
         sims.length === 0 && !mostrarNovo ? (
           <p className="rounded-2xl border border-dashed py-10 text-center text-sm text-muted-foreground">Nenhum simulado aqui.</p>
-        ) : variant === 'ticket' ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        ) : layout === 'grade' ? (
+          <div className={gradeCls(variant)}>
             {sims.map((s) => (
-              <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} variant="ticket"
+              <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} variant={variant}
                 onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
             ))}
-            {mostrarNovo && <NovoTile pastaNome={titulo} variant="ticket" />}
+            {mostrarNovo && <NovoTile pastaNome={titulo} variant={variant} />}
           </div>
         ) : (
           <FileiraHorizontal>
             {sims.map((s) => (
-              <div key={s.id} className={CARD_BASIS}>
-                <CardSimuladoAdmin s={s} appUrl={appUrl} online={online[s.id] ?? 0}
+              <div key={s.id} className={variant === 'ticket' ? CARD_BASIS_TICKET : CARD_BASIS}>
+                <CardSimuladoAdmin s={s} appUrl={appUrl} online={online[s.id] ?? 0} variant={variant}
                   onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
               </div>
             ))}
-            {mostrarNovo && <div className={CARD_BASIS}><NovoTile pastaNome={titulo} /></div>}
+            {mostrarNovo && <div className={variant === 'ticket' ? CARD_BASIS_TICKET : CARD_BASIS}><NovoTile pastaNome={titulo} variant={variant} /></div>}
           </FileiraHorizontal>
         )
       )}
@@ -909,7 +934,9 @@ function SecoesStatus({ sims, online, appUrl, onMover, recolhidas, toggleSecao, 
   return (
     <div className="space-y-8">
       {secoes.map((sec) => {
+        // Dentro de cada status: do MAIS RECENTE para o mais antigo (por created_at).
         const itens = sims.filter((s) => s.status === sec.chave)
+          .slice().sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
         const aberto = !recolhidas.has(sec.chave)
         return (
           <div key={sec.chave} className="space-y-3">
