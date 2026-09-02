@@ -677,16 +677,20 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
     // (ponto a todos / fora do total), então NÃO exige alternativa correta nem vira erro. (Não mexe no
     // boolean `anulada`; a anulação é aplicada ao vincular a etiqueta funcional na importação.)
     const anuladaPorEtiqueta = etiquetas.some((e) => { const n = norm(e); return n.startsWith('anul') || n.startsWith('desconsider') })
+    // "Desatualizada" é AVISO de gabarito: a questão continua em jogo, mas o gabarito pode ter deixado
+    // de existir (tema não pacificado). Nesses casos a coluna "Alternativa Correta" vem vazia de
+    // propósito — dispensa o gabarito (mantém a exigência das alternativas).
+    const desatualizada = etiquetas.some((e) => norm(e).startsWith('desatualiz'))
 
-    // Questão ANULADA (coluna "ANULADA" OU etiqueta funcional) é VÁLIDA mesmo sem alternativas e sem
-    // gabarito: por causa da anulação ela não tem resposta certa — só o enunciado aparece (bloqueado).
-    // Por isso pula toda a validação de objetiva (contagem de alternativas + alternativa correta).
+    // ANULADA (coluna "ANULADA" OU etiqueta funcional anular/desconsiderar) é VÁLIDA mesmo sem
+    // alternativas e sem gabarito: só o enunciado aparece (bloqueado). Pula TODA a validação de objetiva.
     const anuladaQualquer = anulada || anuladaPorEtiqueta
     let erro: string | null = null
     if (!enunciado) erro = 'Enunciado vazio'
     else if (tipo === 'objetiva' && !anuladaQualquer) {
       if (alternativas.length < 2) erro = 'Menos de 2 alternativas'
-      else if (!alternativas.some((a) => a.correta)) erro = 'Alternativa correta não indicada'
+      // Anulada já saiu acima; desatualizada dispensa apenas o gabarito (mantém as alternativas).
+      else if (!desatualizada && !alternativas.some((a) => a.correta)) erro = 'Alternativa correta não indicada'
     }
 
     out.push({
