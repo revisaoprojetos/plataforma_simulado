@@ -670,16 +670,21 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
       ]
     }
 
+    // Etiquetas: nomes separados por vírgula ou ponto-e-vírgula (reusa as existentes, inclusive funcionais).
+    const etiquetas = get('etiquetas').split(/[,;]/).map((s) => s.trim()).filter(Boolean)
+    // Anulação também pode vir por ETIQUETA funcional (ex.: "Anulada"/"Desconsiderar") — convenção do
+    // tenant Revisão, em que a coluna "Alternativa Correta" fica vazia. Nesse caso a questão é válida
+    // (ponto a todos / fora do total), então NÃO exige alternativa correta nem vira erro. (Não mexe no
+    // boolean `anulada`; a anulação é aplicada ao vincular a etiqueta funcional na importação.)
+    const anuladaPorEtiqueta = etiquetas.some((e) => { const n = norm(e); return n.startsWith('anul') || n.startsWith('desconsider') })
+
     let erro: string | null = null
     if (!enunciado) erro = 'Enunciado vazio'
     else if (tipo === 'objetiva') {
       if (alternativas.length < 2) erro = 'Menos de 2 alternativas'
-      // Anulada não exige alternativa correta (o enunciado + assertivas aparecem, mas bloqueados).
-      else if (!anulada && !alternativas.some((a) => a.correta)) erro = 'Alternativa correta não indicada'
+      // Anulada (coluna "ANULADA" OU etiqueta funcional) não exige alternativa correta.
+      else if (!anulada && !anuladaPorEtiqueta && !alternativas.some((a) => a.correta)) erro = 'Alternativa correta não indicada'
     }
-
-    // Etiquetas: nomes separados por vírgula ou ponto-e-vírgula (reusa as existentes, inclusive funcionais).
-    const etiquetas = get('etiquetas').split(/[,;]/).map((s) => s.trim()).filter(Boolean)
 
     out.push({
       linha: r + 1, numero: get('numero') || null, enunciado, tipo, formato,
