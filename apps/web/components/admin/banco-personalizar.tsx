@@ -133,8 +133,9 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
             <label className="text-xs font-medium text-muted-foreground">Imagem de capa (banner largo / capa comprida)</label>
             <input ref={bannerRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropper(e.target.files?.[0] ?? null, 'banner'); e.target.value = '' }} />
             {capa ? (
-              <div className="relative overflow-hidden rounded-xl border">
-                <img src={capa} alt="Capa" className="h-40 w-full object-cover" />
+              // Miniatura na PROPORÇÃO real do recorte (altura fixa; largura pela proporção, sem gigantismo).
+              <div className="relative mx-auto max-w-full overflow-hidden rounded-xl border" style={{ aspectRatio: String(aspectDe('banner')), height: 168 }}>
+                <img src={capa} alt="Capa" className="absolute inset-0 h-full w-full object-cover" />
                 <div className="absolute right-2 top-2 flex gap-1.5">
                   <button type="button" onClick={() => ajustarAtual('banner')} className={btnOverlay}><Crop className="h-3.5 w-3.5" /> Ajustar</button>
                   <button type="button" onClick={() => bannerRef.current?.click()} className={btnOverlay}><RefreshCw className="h-3.5 w-3.5" /> Trocar</button>
@@ -156,8 +157,9 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
             <label className="text-xs font-medium text-muted-foreground">Imagem do card ({cardView === 'ticket' ? 'ticket' : 'pôster'})</label>
             <input ref={cardInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropper(e.target.files?.[0] ?? null, 'card'); e.target.value = '' }} />
             {capaCard ? (
-              <div className="relative overflow-hidden rounded-xl border">
-                <img src={capaCard} alt="Imagem do card" className="h-40 w-full object-cover" />
+              // Miniatura na PROPORÇÃO do card do modo ativo (pôster 4:5 / ticket 4:3), altura fixa.
+              <div className="relative mx-auto max-w-full overflow-hidden rounded-xl border" style={{ aspectRatio: String(aspectDe('card')), height: 168 }}>
+                <img src={capaCard} alt="Imagem do card" className="absolute inset-0 h-full w-full object-cover" />
                 <div className="absolute right-2 top-2 flex gap-1.5">
                   <button type="button" onClick={() => ajustarAtual('card')} className={btnOverlay}><Crop className="h-3.5 w-3.5" /> Ajustar</button>
                   <button type="button" onClick={() => cardInputRef.current?.click()} className={btnOverlay}><RefreshCw className="h-3.5 w-3.5" /> Trocar</button>
