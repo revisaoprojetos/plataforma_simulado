@@ -273,8 +273,8 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
 
   // ===== Variante TICKET: card baixo/retangular — imagem à esquerda, infos+ações à direita. =====
   if (variant === 'ticket') {
-    // Ticket é paisagem → prefere o BANNER largo (capa_url); cai no pôster 4:5 só se não houver.
-    const capaT = s.vis?.capaBanner ?? s.vis?.capa
+    // Ticket usa a IMAGEM DO CARD (capa_card_url, via vis.capa); cai no banner só se não houver.
+    const capaT = s.vis?.capa ?? s.vis?.capaBanner
     return (
       <>
       <div className={cn(
@@ -749,7 +749,7 @@ function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant 
 
   // ===== Variante TICKET: retangular baixo — imagem à esquerda, nome/contagem/ação à direita. =====
   if (variant === 'ticket') {
-    const capaT = folder.capaLarga ?? folder.capa
+    const capaT = folder.capa ?? folder.capaLarga // IMAGEM DO CARD (capa_card_url) primeiro; banner só se não houver
     return (
       <div className="group relative flex h-32 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-36">
         <div className="relative w-[38%] max-w-[12rem] shrink-0 overflow-hidden">

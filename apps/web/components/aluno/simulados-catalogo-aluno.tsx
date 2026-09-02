@@ -73,7 +73,7 @@ function CardPasta({ g, count, prog, variant = 'poster' }: { g: GrupoCatalogo; c
 
   // ===== TICKET: card baixo/retangular — imagem (banner largo) à esquerda, infos à direita. =====
   if (variant === 'ticket') {
-    const capaT = g.capa ?? g.capaCard ?? null // paisagem → prefere o banner largo (capa_url)
+    const capaT = g.capaCard ?? g.capa ?? null // usa a IMAGEM DO CARD (capa_card_url); cai no banner só se não houver
     return (
       <Link href={`/aluno?pasta=${g.id}`}
         className="group relative flex h-28 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-32">

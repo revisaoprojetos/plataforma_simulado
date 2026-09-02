@@ -37,8 +37,8 @@ function CardConcluido({ s, variant = 'poster' }: { s: MeuSimuladoItem; variant?
 
   // ===== TICKET: card baixo/retangular — imagem à esquerda, infos à direita. =====
   if (variant === 'ticket') {
-    // Ticket é paisagem → prefere o BANNER largo (capa_url); cai no pôster 4:5 só se não houver.
-    const capaT = s.vis?.capaBanner ?? capa
+    // Ticket usa a IMAGEM DO CARD (capa_card_url); cai no banner só se não houver.
+    const capaT = capa ?? s.vis?.capaBanner
     return (
       <div className="group relative flex h-28 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-32">
         <div className="relative w-[42%] max-w-[11rem] shrink-0 overflow-hidden">
